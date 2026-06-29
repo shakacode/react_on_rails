@@ -51,8 +51,8 @@ test.describe('React on Rails Basic Components', () => {
     await expect(heading).toContainText('Redux with Playwright');
   });
 
-  test('should render legacy Redux server HTML before hydration', async ({ browser }) => {
-    const context = await browser.newContext({ javaScriptEnabled: false });
+  test('should render legacy Redux server HTML before hydration', async ({ baseURL, browser }) => {
+    const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
     const page = await context.newPage();
 
     try {
