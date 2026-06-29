@@ -4503,6 +4503,8 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
       expect(output_text).to include("legacy Redux generator path")
+      expect(output_text.index("legacy Redux generator path"))
+        .to be < output_text.index("Failed to install Shakapacker")
     end
 
     specify "hidden install --redux emits a legacy warning" do
@@ -4513,6 +4515,16 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("legacy Redux generator path")
       expect(output_text).to include("rails generate react_on_rails:react_with_redux")
+    end
+
+    specify "hidden install --redux legacy warning is only added once" do
+      install_generator = install_generator_fixture(redux: true)
+
+      install_generator.send(:add_legacy_redux_install_warning_once)
+      install_generator.send(:add_legacy_redux_install_warning_once)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text.scan("legacy Redux generator path").size).to eq(1)
     end
 
     specify "hidden install --redux --tailwind warning stays on the install path" do
@@ -4546,6 +4558,7 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --redux")
       expect(output_text).to include("legacy Redux generator path")
+      expect(output_text.index("legacy Redux generator path")).to be < output_text.index("Failed to add Shakapacker")
     end
 
     specify "rsc installs include the Pro verification checklist message" do

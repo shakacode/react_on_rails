@@ -818,8 +818,8 @@ module ReactOnRails
       def add_legacy_redux_install_warning_once
         return if @legacy_redux_install_warning_added
 
-        add_legacy_redux_install_warning
         @legacy_redux_install_warning_added = true
+        add_legacy_redux_install_warning
       end
 
       def recovery_install_command
@@ -1104,8 +1104,8 @@ module ReactOnRails
           #{recovery_working_tree_note}
           Then re-run: #{recovery_install_command}
         MSG
-        GeneratorMessages.add_error(error)
         add_legacy_redux_install_warning_once
+        GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
@@ -1129,8 +1129,8 @@ module ReactOnRails
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
-        GeneratorMessages.add_error(error)
         add_legacy_redux_install_warning_once
+        GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
