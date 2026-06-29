@@ -102,6 +102,14 @@ export function clearHydratedStores(): void {
 }
 
 /**
+ * Internally used function to completely clear registered store generators.
+ * @public
+ */
+export function clearStoreGenerators(): void {
+  storeGeneratorRegistry.clear();
+}
+
+/**
  * Get a Map containing all registered store generators. Useful for debugging.
  * @returns Map where key is the component name and values are the store generators.
  * @public
