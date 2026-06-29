@@ -82,10 +82,15 @@ const parseSuccessJsonBody = async (response: Response): Promise<unknown> => {
     return null;
   }
 
+  if (isJsonResponse(response)) {
+    const responseText = await response.text();
+    return responseText.trim() === '' ? null : (JSON.parse(responseText) as unknown);
+  }
+
   try {
     return (await response.json()) as unknown;
   } catch (error) {
-    if (error instanceof SyntaxError && !isJsonResponse(response)) {
+    if (error instanceof SyntaxError) {
       return null;
     }
     throw error;

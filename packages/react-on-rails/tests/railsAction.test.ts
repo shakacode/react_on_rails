@@ -213,6 +213,21 @@ describe('createRailsAction', () => {
     await expect(createProject({ name: 'Apollo' })).rejects.toThrow(SyntaxError);
   });
 
+  it('resolves empty successful JSON responses as null', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        body: '',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const createProject = createRailsAction<{ name: string }, null>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).resolves.toBeNull();
+  });
+
   it('omits the JSON body for DELETE requests even when variables are provided', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
@@ -446,7 +461,7 @@ describe('createRailsAction', () => {
       ok: true,
       status: 200,
       headers: new Headers({ 'Content-Type': 'application/json' }),
-      json: () => Promise.reject(bodyError),
+      text: () => Promise.reject(bodyError),
     } as unknown as Response);
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
