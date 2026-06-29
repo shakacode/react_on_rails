@@ -48,7 +48,10 @@ EXCLUDED_RSC_REGISTRATION_ENTRY_PATH_COMPONENTS = %w[.git log node_modules publi
 # child computes from the inherited locale and is immune to a runtime `Encoding.default_external =`
 # override (e.g. the UTF-8 one Rails applies during boot when the shipped hook loads the env).
 #
-# `extra` keys (functional flags like REACT_ON_RAILS_SKIP_VALIDATION) are always applied.
+# `extra` keys are merged in. Functional control flags (e.g. REACT_ON_RAILS_SKIP_VALIDATION)
+# pass through unchanged in both paths. Under the C/POSIX gate, LANG and LC_ALL are pinned
+# to "C.UTF-8" regardless of any value in `extra`; a caller-supplied RUBYOPT is folded into
+# the widened value rather than passed through verbatim.
 def utf8_subprocess_env(extra = {})
   # US-ASCII (glibc) and ASCII-8BIT (some musl/empty-charmap C locales) both mean the libc reported
   # no real charset, so both are the bare C/POSIX fallback that is safe to widen to UTF-8.
@@ -65,6 +68,8 @@ def utf8_subprocess_env(extra = {})
 end
 
 def subprocess_rubyopt(extra)
+  # nil in extra["RUBYOPT"] means "no extra flags", not "suppress parent RUBYOPT".
+  # To let the child inherit ENV["RUBYOPT"] unchanged, omit the key from extra.
   [ENV.fetch("RUBYOPT", nil), extra["RUBYOPT"]].compact.reject(&:empty?).join(" ")
 end
 
