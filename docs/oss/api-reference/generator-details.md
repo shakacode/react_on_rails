@@ -28,6 +28,7 @@ Description:
 The react_on_rails:install generator integrates webpack with rails with ease. You
 can pass the options below to customize the generated example and supporting
 configuration.
+```
 
 > [!WARNING]
 > The Redux installer path (`--redux` / `-R`) is a hidden legacy escape hatch, not
@@ -38,6 +39,7 @@ configuration.
 > multi-island page where separate React roots must coordinate through one shared
 > client store.
 
+```text
 * TypeScript
 
     Passing the --typescript generator option generates TypeScript files (.tsx)

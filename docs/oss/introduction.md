@@ -15,7 +15,7 @@ React on Rails bridges the gap between Ruby on Rails and React, allowing you to:
 - Pass props from Rails to React without building a separate API
 - Enable server-side rendering for better SEO and initial page load performance
 - Use hot module replacement (HMR) for fast development iterations
-- Integrate with React Router, server-state tools, and advanced shared-store libraries such as Redux
+- Integrate with React Router, server-state tools, and, for existing apps or advanced multi-island pages, shared-store libraries such as Redux
 
 Unlike a separate SPA approach, React on Rails lets you leverage Rails conventions while progressively enhancing your UI with React components.
 

@@ -216,7 +216,7 @@ React on Rails bridges the gap between Ruby on Rails and React, allowing you to:
 - Pass props from Rails to React without building a separate API
 - Enable server-side rendering for better SEO and initial page load performance
 - Use hot module replacement (HMR) for fast development iterations
-- Integrate with React Router, server-state tools, and advanced shared-store libraries such as Redux
+- Integrate with React Router, server-state tools, and, for existing apps or advanced multi-island pages, shared-store libraries such as Redux
 
 Unlike a separate SPA approach, React on Rails lets you leverage Rails conventions while progressively enhancing your UI with React components.
 
@@ -18853,7 +18853,7 @@ SOURCE: docs/oss/api-reference/redux-store-api.md
 
 > [!IMPORTANT]
 >
-> **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md#important-redux-shared-store-caveat) for details and alternatives.
+> **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md) for details and alternatives.
 
 You don't need to use the `redux_store` API to use Redux inside a single React root. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
@@ -19166,6 +19166,7 @@ Description:
 The react_on_rails:install generator integrates webpack with rails with ease. You
 can pass the options below to customize the generated example and supporting
 configuration.
+```
 
 > [!WARNING]
 > The Redux installer path (`--redux` / `-R`) is a hidden legacy escape hatch, not
@@ -19176,6 +19177,7 @@ configuration.
 > multi-island page where separate React roots must coordinate through one shared
 > client store.
 
+```text
 * TypeScript
 
     Passing the --typescript generator option generates TypeScript files (.tsx)

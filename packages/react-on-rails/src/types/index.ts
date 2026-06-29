@@ -501,8 +501,8 @@ export interface ReactOnRails {
   registerStore(stores: Record<string, StoreGenerator>): void;
   /**
    * Allows registration of store generators to be used by multiple React components on one Rails
-   * view. Store generators are functions that take one arg, props, and return a store. Note that
-   * the `setStore` API is different in that it's the actual store hydrated with props.
+   * view. Store generators receive props and railsContext, then return a store. Note that the
+   * `setStore` API is different in that it's the actual store hydrated with props.
    * @param storeGenerators keys are store names, values are the store generators
    */
   registerStoreGenerators(storeGenerators: Record<string, StoreGenerator>): void;
