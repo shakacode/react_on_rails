@@ -150,6 +150,7 @@ function assertFirstIncrementalRenderRequestChunk(
   if (
     'rscStreamObservability' in chunk &&
     chunk.rscStreamObservability !== undefined &&
+    // Incremental NDJSON requests are produced in-process, so keep this strict.
     typeof chunk.rscStreamObservability !== 'boolean'
   ) {
     throw new Error(

@@ -34,6 +34,8 @@ import {
   getFixtureSecondaryBundle,
   getFixtureAsset,
   getOtherFixtureAsset,
+  createUploadedBundle,
+  uploadedBundlePath,
   createAsset,
   serverBundleCachePath,
   assetPath,
@@ -809,6 +811,37 @@ describe('worker', () => {
     // Verify no asset files were accidentally copied
     expect(files).not.toContain('loadable-stats.json');
     expect(files).not.toContain('loadable-stats-other.json');
+  });
+
+  test('post /upload-assets ignores asset-shaped fields missing file metadata', async () => {
+    const bundleHash = 'malformed-asset-field-hash';
+
+    await createUploadedBundle(testName);
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    const res = await app
+      .inject()
+      .post(`/upload-assets`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        [`bundle_${bundleHash}`]: {
+          type: 'asset',
+          savedFilePath: uploadedBundlePath(testName),
+          filename: `${bundleHash}.js`,
+        },
+        malformedAsset: { type: 'asset' },
+      })
+      .end();
+
+    expect(res.statusCode).toBe(200);
+
+    const bundleFilePath = path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`);
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
   });
 
   test('post /upload-assets with no assets and no bundles (empty request) returns 400', async () => {

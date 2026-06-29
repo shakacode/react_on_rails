@@ -371,7 +371,7 @@ module ReactOnRailsPro
           renderingRequest: js_code,
           onRequestClosedUpdateChunk: emitter.end_stream_chunk
         )
-        data[:rscStreamObservability] = true if rsc_stream_observability
+        data["rscStreamObservability"] = true if rsc_stream_observability
         if pull_enabled
           data[:pullEnabled] = true
           data[:pushProps] = Array(push_props)

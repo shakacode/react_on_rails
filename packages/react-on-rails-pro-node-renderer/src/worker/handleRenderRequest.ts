@@ -64,26 +64,11 @@ export type ProvidedNewBundle = {
   bundle: Asset;
 };
 
-/**
- * Attributes the renderer-internal contribution to a streamed RSC response's `responseEnd`
- * tail by attaching a `Server-Timing` header (GitHub issue #4239).
- *
- * Scoped to streamed responses only: the header rides on the renderer's HTTP response head,
- * which the Rails gem receives before the body chunks. The measured window spans execution
- * context lookup/build plus the synchronous render that produces the stream object. Cache-miss
- * requests also include bundle upload and validation so first-deploy cold starts are comparable
- * with cache-hit requests. Per-chunk and total render time are not known until the stream is
- * consumed, so they are intentionally excluded here.
- *
- * Non-streaming (buffered `data`) responses are left untouched: the issue targets the streamed
- * path, and their full duration is already attributable via the renderer's tracing spans.
- *
- * Exported for unit testing.
- */
 export function escapeServerTimingDescription(description: string): string {
   return description.replace(/[\r\n\0]/g, '').replace(/["\\]/g, (char) => `\\${char}`);
 }
 
+/** Adds renderer prepare Server-Timing to streamed responses when enabled. */
 export function addRendererServerTiming(
   response: ResponseResult,
   startedAtMs: number,
@@ -336,7 +321,7 @@ export async function handleRenderRequest({
 
     // Start before the first VM lookup so cache-hit and cache-miss timings cover
     // the same request span, including bundle upload on first deploy.
-    const rendererServerTimingStartedAt = performance.now();
+    const rendererServerTimingStartedAtMs = performance.now();
     try {
       const executionContext = await subSpan(
         {
@@ -354,7 +339,7 @@ export async function handleRenderRequest({
         bundleTimestamp,
         entryBundleFilePath,
         executionContext,
-        rendererServerTimingStartedAt,
+        rendererServerTimingStartedAtMs,
         rscStreamObservability,
       );
     } catch (e) {
@@ -419,7 +404,7 @@ export async function handleRenderRequest({
       bundleTimestamp,
       entryBundleFilePath,
       executionContext,
-      rendererServerTimingStartedAt,
+      rendererServerTimingStartedAtMs,
       rscStreamObservability,
     );
   } catch (error) {
