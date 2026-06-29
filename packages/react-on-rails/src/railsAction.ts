@@ -223,7 +223,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
       throw new Error('createRailsAction can only call same-origin Rails action URLs.');
     }
 
-    const csrfToken = authenticityToken();
+    const csrfToken = authenticityToken()?.trim();
     if (!csrfToken) {
       throw new Error(
         'createRailsAction requires a <meta name="csrf-token"> tag before submitting. ' +
@@ -231,7 +231,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
       );
     }
 
-    const requestBody = options.body !== undefined ? options.body(typedVariables) : variables;
+    const requestBody = options.body !== undefined ? options.body(typedVariables) : typedVariables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
     if (!warnedOnDiscardedDeleteBody) {
       warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(method, requestBody);

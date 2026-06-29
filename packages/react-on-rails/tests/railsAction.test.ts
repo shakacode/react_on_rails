@@ -282,9 +282,9 @@ describe('createRailsAction', () => {
     }
   });
 
-  it('rejects before fetch when the Rails CSRF meta tag has empty content', async () => {
+  it.each(['', '   '])('rejects before fetch when the Rails CSRF meta tag content is %p', async (content) => {
     const originalContent = csrfMeta.content;
-    csrfMeta.content = '';
+    csrfMeta.content = content;
 
     try {
       const createProject = createRailsAction<{ name: string }, { ok: true }>({
