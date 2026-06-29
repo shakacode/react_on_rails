@@ -74,4 +74,47 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"2.0\"]")
   end
+
+  it "ignores encoding-looking inline comments that are not Ruby magic comments" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY
+        gem "setup_gem", "1.0" # encoding: US-ASCII
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("setup_gem [\"1.0\"]")
+    expect(stdout).to include("base_gem [\"1.0\"]")
+  end
+
+  it "removes only the exact overridden gem name" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "baseXgem", "1.0"
+        gem "base.gem", "1.0"
+      RUBY
+      override_deps: <<~RUBY
+        # frozen_string_literal: true
+        gem "base.gem", "2.0"
+      RUBY
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("baseXgem [\"1.0\"]")
+    expect(stdout).to include("base.gem [\"2.0\"]")
+    expect(stdout).not_to include("base.gem [\"1.0\"]")
+  end
+
+  it "fails clearly for invalid UTF-8 fragments without a magic comment" do
+    stdout, stderr, status = run_loader(
+      base_deps: "# invalid byte: \xE9\ngem \"base_gem\", \"1.0\"\n".b
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include("Gemfile.development_dependencies is not valid UTF-8")
+  end
 end

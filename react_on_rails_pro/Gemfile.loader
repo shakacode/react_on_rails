@@ -13,12 +13,25 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+source_encoding_pattern = /(?:coding|encoding)\s*[:=]\s*([A-Za-z0-9._-]+)/ni
+magic_comment_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
+
 detect_source_encoding = lambda do |path, content|
-  header = content.lines.first(2).join
-  match = header.match(/(?:coding|encoding)\s*[:=]\s*([A-Za-z0-9._-]+)/ni)
-  match ? Encoding.find(match[1]) : Encoding::UTF_8
+  detected_encoding = nil
+
+  content.lines.first(2).each do |line|
+    next unless line.match?(magic_comment_pattern)
+
+    match = line.match(source_encoding_pattern)
+    next unless match
+
+    detected_encoding = match[1]
+    break
+  end
+
+  detected_encoding ? Encoding.find(detected_encoding) : Encoding::UTF_8
 rescue ArgumentError => e
-  raise ArgumentError, "#{path} declares unsupported source encoding #{match[1].inspect}: #{e.message}"
+  raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{e.message}"
 end
 
 read_gemfile_fragment = lambda do |path|
@@ -51,7 +64,7 @@ override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
 
 # Remove overridden gems from base dependencies
 override_gem_names.each do |gem_name|
-  base_deps.gsub!(/^\s*gem\s+["']#{gem_name}["'].*$/, "")
+  base_deps.gsub!(/^\s*gem\s+["']#{Regexp.escape(gem_name)}["'].*$/, "")
 end
 
 # Clean up any blank lines created by removals
