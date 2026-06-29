@@ -21,7 +21,11 @@ function latestRunsByWorkflow(workflowRuns) {
 
   for (const run of workflowRuns) {
     const existing = latestByWorkflow.get(run.workflow_id);
-    if (!existing || run.run_number > existing.run_number) {
+    if (
+      !existing ||
+      (existing.event !== 'push' && run.event === 'push') ||
+      (existing.event === run.event && run.run_number > existing.run_number)
+    ) {
       latestByWorkflow.set(run.workflow_id, run);
     }
   }
@@ -104,6 +108,7 @@ async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, ev
       owner: context.repo.owner,
       repo: context.repo.repo,
       event,
+      head_sha: sha,
       per_page: 30,
       created: `>${createdAfter}`,
       sort: 'created',
@@ -332,11 +337,15 @@ async function checkPreviousMainCommitStatus({
         remainingGuardOnlyHops <= 0
           ? `${maxGuardOnlyHops} docs-only guard-only commits`
           : `${maxNoRunsHops} no-run merge queue candidate commits`;
+      const noRunsTrailForFailure =
+        remainingNoRunsHops <= 0 && !noRunsTrail.includes(shaToCheck)
+          ? [...noRunsTrail, shaToCheck]
+          : noRunsTrail;
 
       core.setFailed(
         [
           `Cannot determine prior real CI status after ${exhaustedLimit}.`,
-          formatNoRunsTrailDetails(noRunsTrail),
+          formatNoRunsTrailDetails(noRunsTrailForFailure),
           formatGuardOnlyTrailDetails(guardOnlyTrail),
           'Push a non-docs change to trigger hosted CI.',
         ]

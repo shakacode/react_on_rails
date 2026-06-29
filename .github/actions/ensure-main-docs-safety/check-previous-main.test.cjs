@@ -117,7 +117,11 @@ function makeGithub({
         }
 
         for (const page of pages) {
-          yield { data: options.event ? page.filter((run) => run.event === options.event) : page };
+          yield {
+            data: page.filter(
+              (run) => (!options.event || run.event === options.event) && run.head_sha === options.head_sha,
+            ),
+          };
         }
       },
     },
@@ -522,7 +526,7 @@ async function testWorkflowDispatchRunDoesNotHideFailingTrustedRun() {
   assert.match(core.failed[0], /main commit previous-main still has failing workflows/);
 }
 
-async function testWorkflowRunsQueryTrustedEventsOnly() {
+async function testWorkflowRunsQueryTrustedEventsAndHeadShaOnly() {
   const workflowRunListOptions = [];
   const github = makeGithub({
     pages: [],
@@ -542,8 +546,11 @@ async function testWorkflowRunsQueryTrustedEventsOnly() {
   });
 
   assert.deepEqual(
-    workflowRunListOptions.map((options) => options.event),
-    ['push', 'merge_group'],
+    workflowRunListOptions.map((options) => ({ event: options.event, headSha: options.head_sha })),
+    [
+      { event: 'push', headSha: 'quiet-main' },
+      { event: 'merge_group', headSha: 'quiet-main' },
+    ],
   );
 }
 
@@ -656,6 +663,7 @@ async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
   assert.equal(core.failed.length, 1);
   assert.match(core.failed[0], /after 1 no-run merge queue candidate commits/);
   assert.match(core.failed[0], /synthetic-base/);
+  assert.match(core.failed[0], /prior-synthetic-base/);
 }
 
 async function testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure() {
@@ -851,6 +859,13 @@ async function main() {
     ]).get(10).id,
     7,
   );
+  assert.equal(
+    latestRunsByWorkflow([
+      run({ id: 8, workflowId: 11, sha: 'a', runNumber: 1, event: 'push' }),
+      run({ id: 9, workflowId: 11, sha: 'a', runNumber: 2, event: 'merge_group' }),
+    ]).get(11).id,
+    8,
+  );
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
   await testNoRunSyntheticBaseLooksThroughToParentFailure();
@@ -858,7 +873,7 @@ async function main() {
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
   await testReachableMergeQueueRunFailureIsChecked();
   await testWorkflowDispatchRunDoesNotHideFailingTrustedRun();
-  await testWorkflowRunsQueryTrustedEventsOnly();
+  await testWorkflowRunsQueryTrustedEventsAndHeadShaOnly();
   await testWorkflowRunListNetworkFailureSetsHelpfulFailure();
   await testJobListNetworkFailureSetsHelpfulFailure();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
