@@ -593,22 +593,27 @@ Before upgrading:
   read timeout on each renderer socket. It no longer wraps the entire request as a single task-level timeout.
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
   are bounded by `ssr_timeout`.
-- Treat `config.renderer_http_pool_size` as a per-request HTTP/2 stream limit, not as a persistent process-wide
-  connection pool size. The current async-http adapter opens a request-scoped client for each renderer request and
-  does not reuse TCP connections between Rails requests, so high-latency networks or very high request rates can see
-  extra connection and HTTP/2 handshake overhead compared with HTTPX. Setting this value now emits a warning to make
-  the changed meaning visible during upgrades. Setting it to `nil` keeps the default stream limit; it does not make
-  the request-scoped async-http client unlimited. Persistent async-http connection reuse is tracked in
-  [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283).
+- Treat `config.renderer_http_pool_size` as the per-client async-http connection-pool limit, not as the old
+  process-wide persistent pool size. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured with an
+  async scheduler), the client is reused across renderer requests within that scheduler and the setting bounds
+  concurrent async-http connections for streamed renders sharing one client. HTTP/2 may multiplex multiple request
+  streams over those pooled connections. Under standard Puma streaming, `Sync {}` creates a per-request scheduler and
+  cleans up the client when that streaming response ends, so reuse does not persist across consecutive Rails requests.
+  Setting it to `nil` keeps the default connection limit; it does not make the async-http client unlimited.
 - Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
   previously performed one implicit transport retry for some connection drops; the async-http adapter uses
   `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
-- Run the node renderer client from the normal synchronous Rails request path. Async Rails servers or middleware that
-  call the renderer from inside an existing Async reactor without an `Async::Task.current?` context are not currently
-  supported because the sync fallback may create a nested reactor. Keep Falcon/async-rails deployments on the previous
-  HTTPX renderer client until this support is explicitly added.
-- `config.renderer_http_keep_alive_timeout` remains accepted for compatibility, but it has no effect because
-  async-http clients are currently scoped to individual requests. Setting it now emits a deprecation warning.
+- Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
+  advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
+  now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
+  client uses scheduler-scoped connection reuse automatically when a `Fiber.scheduler` already exists before the adapter
+  enters `Sync {}`. Middleware and background code should call the renderer from a scheduler with a deliberate request or
+  service lifecycle; a custom scheduler-only context can keep renderer clients alive longer than intended.
+- `config.renderer_http_keep_alive_timeout` is deprecated and ignored, but remains accepted during upgrade because
+  async-http manages connection lifecycle through its scheduler-scoped clients and ephemeral request clients. Explicitly
+  setting it to a non-`nil` value in your `configure` block emits a deprecation warning; leaving it unset or setting it
+  to `nil` is accepted silently. If you previously set it to `30` (the old default), remove the line from your
+  `configure` block entirely.
 
 #### Upgrading to 16.4.0 or later
 
@@ -2130,6 +2135,26 @@ The initial RSC payload remains inline in the navigation response by design. A s
 
 `Server-Timing` headers are useful for non-streamed responses, but `ActionController::Live` commits headers on the first stream write. HTTP trailers can theoretically carry late timing data, but browser, proxy, and CDN support varies, and intermediaries may buffer, strip, rewrite, or hide trailer/header timing values. React on Rails Pro therefore does not make HTTP trailers the default streamed observability path. Inline marks travel in the response body, so they survive the same CDN path as the streamed HTML and are visible to `PerformanceObserver` or the fallback queue after the browser parses them.
 
+#### Server-Timing Attribution
+
+The browser-observable marks above close the client loop. To attribute the server/renderer side of a streamed RSC response's `responseEnd` tail (see [issue #4239](https://github.com/shakacode/react_on_rails/issues/4239)), `rsc_stream_observability: true` also emits a `Server-Timing` **response header**. Because the header is set in the narrow window before the first stream write — the only point at which `ActionController::Live` will still accept header changes — it can only carry timing known before the first byte is flushed:
+
+| `Server-Timing` metric | Emitted by               | What it records                                                                                                                 |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ror_stream_shell`     | Rails (gem)              | Duration of the shell `render_to_string`, which blocks on the first renderer chunk for each streamed component — the wait tail. |
+| `ror_renderer_prepare` | Node renderer (response) | Execution-context build (cold or cached) plus the synchronous render that produces the stream object, before the first chunk.   |
+
+`ror_stream_shell` appears on the navigation response your browser sees (visible in the Network panel and in `PerformanceResourceTiming.serverTiming`). `ror_renderer_prepare` rides on the renderer's HTTP response to Rails; it is visible to anything inspecting that hop (logs, tracing, a direct probe of the renderer).
+
+Both metrics are emitted only when `rsc_stream_observability: true` is set for the streamed render.
+
+Two figures are intentionally **not** on the browser-facing header:
+
+- **Total / stream-complete renderer time** is only known after the body is flushed, and `ActionController::Live` does not support HTTP trailers (see the caveat above). It remains available via the `react-on-rails:rsc:stream` mark's `sinceStreamStartMs`.
+- **Merging `ror_renderer_prepare` into the browser-facing header** would require Rails to read the renderer's response headers from the streaming hop; the gem's renderer HTTP client does not yet surface those. Until it does, read `ror_renderer_prepare` from the renderer hop and `ror_stream_shell` from the browser response.
+
+Existing `Server-Timing` entries set by your app or middleware (for example route-level `action_total`) are preserved — the gem appends to them rather than replacing.
+
 #### Loading Multiple Slow Sources in Parallel
 
 When several sources are slow and independent, run them concurrently with the [`async` gem](https://github.com/socketry/async) (already a dependency of React on Rails Pro and loaded by the streaming helper). Pro's streaming stack is fiber-based, so fan out with fibers from the running reactor rather than introducing a separate Ruby-thread concurrency model. The emit block runs inside an `Async` task — capture it with `Async::Task.current` and spawn one child task per source with `parent.async`, so each prop is emitted the moment its own query resolves:
@@ -2226,9 +2251,34 @@ Extending the example with a second slow section (`users`), the page fills in st
 
 [Diagram: Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done. Each Suspense boundary swaps its fallback for real content as its prop arrives.]
 
-## Compression Middleware Compatibility
+## Compression for Streamed RSC Responses {#compression-middleware-compatibility}
 
-Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware (`Rack::Deflater`, `Rack::Brotli`) works correctly with streaming **by default** — each chunk is compressed and flushed immediately, preserving low TTFB.
+Streaming RSC renders HTML directly into the document instead of serializing a JSON data payload, so the **raw** (uncompressed) HTML transfer is larger than the equivalent Inertia/JSON response — but rendered HTML compresses far better. To make the transfer-bytes comparison fair, compress the streamed response end to end (see [issue #4238](https://github.com/shakacode/react_on_rails/issues/4238)). The good news: streamed RSC responses compress with the **same** Rack middleware as any other response, with no special handling required.
+
+### Enabling Compression in Rails
+
+`Rack::Deflater` (gzip/deflate) compresses streamed responses correctly out of the box:
+
+```ruby
+# config/application.rb
+config.middleware.use Rack::Deflater
+```
+
+For Brotli (`br`), which typically beats gzip on HTML, add the [`rack-brotli`](https://github.com/marcotc/rack-brotli) gem and insert it the same way:
+
+```ruby
+# Gemfile
+gem "rack-brotli"
+
+# config/application.rb
+config.middleware.use Rack::Brotli
+```
+
+Either middleware negotiates the encoding from the request's `Accept-Encoding` header and sets `Content-Encoding: gzip` / `br` on the response. The regression coverage in this repository verifies `Rack::Deflater` end to end for gzip-compressed streaming responses. If your application intentionally runs both `Rack::Deflater` and `Rack::Brotli`, treat the combined middleware order as an application-level Rack stack choice: React on Rails Pro does not reorder compression middleware, so verify the final stack order, `Accept-Encoding` negotiation, and streamed flush behavior in your app before relying on both encodings in production.
+
+### Why It Works With Streaming
+
+Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware works with streaming by wrapping the response body and compressing as Rack iterates the stream; this repository verifies that behavior with `Rack::Deflater`. Downstream proxy, CDN buffering, or stacked third-party compression middleware can still affect observed TTFB, so verify the full path with the checks below.
 
 However, if you pass an `:if` condition that calls `body.each` to check the response size, **streaming responses will deadlock**. The `:if` callback destructively consumes all chunks from the queue, leaving nothing for the compressor to read.
 
@@ -2248,7 +2298,7 @@ The [Rack SPEC](https://github.com/rack/rack/blob/main/SPEC.rdoc) states that `e
 ```ruby
 config.middleware.use Rack::Deflater, if: lambda { |*, body|
   # Streaming bodies don't support to_ary — always compress them.
-  # Rack::Deflater handles streaming correctly with sync flush per chunk.
+  # Rack::Deflater handles streaming correctly when it owns body.each.
   return true unless body.respond_to?(:to_ary)
 
   body.to_ary.sum(&:bytesize) > 512
@@ -2256,6 +2306,72 @@ config.middleware.use Rack::Deflater, if: lambda { |*, body|
 ```
 
 The same applies to `Rack::Brotli` or any middleware that accepts an `:if` callback.
+
+### Compression at the Reverse Proxy
+
+You can compress in Rails (above) **or** at the reverse proxy. nginx will not recompress a response whose `Content-Encoding` is already set by Rails, but configuring compression at multiple layers adds complexity and can cause surprises with CDNs or older proxies. Pick one layer for predictable behavior. The critical constraint for streaming is that the proxy must **not buffer the whole response** before forwarding it, or you lose the streaming TTFB advantage.
+
+**nginx.** By default nginx buffers proxied responses (`proxy_buffering on`), which holds the stream until it is complete. Two options:
+
+```nginx
+location / {
+  proxy_pass http://rails_app;
+
+  # Option A — disable buffering for everything proxied here. Simplest; the
+  # whole location streams. Pick Rails compression (Rack::Deflater /
+  # Rack::Brotli) or nginx `gzip`/`brotli` directives so operators only need
+  # to reason about one compression layer.
+  proxy_buffering off;
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+**Option B — keep buffering on globally and let Rails opt specific streamed responses out** with the `X-Accel-Buffering: no` response header. nginx honors it per-response, so only streaming routes bypass the buffer while everything else keeps nginx buffering:
+
+```nginx
+location / {
+  proxy_pass http://rails_app;
+
+  # No proxy_buffering directive here; inherit the default `on`.
+  # Rails sets X-Accel-Buffering: no on streaming responses that need it.
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+```ruby
+# In the streaming controller action, before the first stream write:
+def show
+  response.headers["X-Accel-Buffering"] = "no"
+  stream_view_containing_react_components(template: "example/show")
+end
+```
+
+`X-Accel-Buffering: no` only disables **proxy** buffering; it does not affect compression. If Rails already set `Content-Encoding`, nginx will not recompress. If nginx itself compresses (`gzip on` / the brotli module), chunk flushing depends on upstream flush signals and nginx's compression buffers. For guaranteed per-chunk TTFB with arbitrary streaming intervals, compress at the Rails layer (`Rack::Deflater` / `Rack::Brotli`) rather than at nginx.
+
+**Cloudflare.** Cloudflare can compress eligible responses automatically and should respect an existing `Content-Encoding` from your origin rather than double-compressing. Do not assume any CDN preserves every application flush boundary: verify the production route with `curl`, browser DevTools, and the inline RSC stream marks after Cloudflare rules, cache settings, and plan-specific features are applied. If your origin already sets `Content-Encoding: br`, confirm that the header is still present at the browser.
+
+### Verifying Compression End to End
+
+Confirm the streamed route actually negotiates an encoding:
+
+```bash
+curl -sSD - -o /dev/null -H 'Accept-Encoding: br, gzip' https://your-app.example/your-streaming-route
+# Look for:  content-encoding: br   (or gzip)
+#            transfer-encoding: chunked   (no content-length — still streamed)
+#            vary: Accept-Encoding   (CDNs must cache by negotiated encoding)
+```
+
+In the browser, open DevTools → Network → select the navigation request → **Response Headers** should show `content-encoding`, and the **Size** column shows the transferred (compressed) bytes versus the larger uncompressed content size.
+
+`Rack::Deflater` appends `Vary: Accept-Encoding` when it compresses a response. Keep that header intact through custom middleware and proxies so CDNs do not serve a cached gzip response to a client that did not advertise gzip support.
+
+The gem's own coverage of this path lives in `react_on_rails_pro/spec/react_on_rails_pro/streaming_compression_spec.rb`, which asserts that a Rack body shaped like `ActionController::Live::Buffer` is gzip-compressed with the decompressed bytes unchanged.
 
 ## Metadata with Streaming
 
@@ -4338,7 +4454,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Cause**: A compression middleware (`Rack::Deflater`, `Rack::Brotli`) is configured with an `:if` condition that calls `body.each` to check the response size. This destructively consumes streaming chunks from the `SizedQueue`, causing a deadlock.
 
-**Fix**: See the [Compression Middleware Compatibility](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
+**Fix**: See the [Compression for Streamed RSC Responses](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## Node Renderer
 
@@ -5589,36 +5705,46 @@ three-bundle architecture.
 
 **How Tailwind works with RSC:**
 
-1. Tailwind runs as a PostCSS plugin during the client bundle build only.
-2. It scans all files listed in its `content` configuration for utility class names.
-3. The generated CSS is extracted into the client stylesheet.
+1. Tailwind/PostCSS follows each bundle's CSS loader pipeline when CSS imports are processed, but
+   only the client bundle emits browser-loadable CSS.
+2. Tailwind scans configured source roots for utility class names. Tailwind v4 uses CSS `@source`
+   directives; Tailwind v3 uses the `content` array.
+3. The generated CSS is delivered through a layout-owned client pack.
 4. Server Components and Client Components both use Tailwind class names as plain strings.
-5. The CSS loads from the Rails layout's `stylesheet_pack_tag`.
+5. The CSS loads according to the Rails layout's Shakapacker pack tags.
 
-**Critical configuration:** The Tailwind `content` array must include all directories that contain
-files using Tailwind classes, including React component files and ERB views:
+**Critical configuration:** Tailwind must scan every directory that contains utility class names,
+including React component files and ERB views. Tailwind v4 configures those roots from CSS
+`@source` directives; Tailwind v3 uses the `content` array.
 
 #### Tailwind CSS v4 (new apps)
 
 The React on Rails generator supports Tailwind v4 via `--tailwind`. Tailwind v4 uses a CSS-first
 configuration model:
 
+<!-- prettier-ignore -->
 ```css
-/* app/javascript/styles/application.css */
-@import 'tailwindcss';
+/* app/javascript/stylesheets/application.css */
+@import "tailwindcss" source("../..");
 ```
 
 ```js
-// postcss.config.mjs
-export default {
-  plugins: {
-    '@tailwindcss/postcss': {},
-  },
-};
+// app/javascript/packs/react_on_rails_tailwind.js
+import '../stylesheets/application.css';
 ```
 
-Tailwind v4 auto-discovers source files without a `content` configuration. It scans the project
-tree automatically.
+The generated React on Rails layout declares that pack from the layout:
+
+```erb
+<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+<%= javascript_pack_tag %>
+```
+
+Tailwind v4 uses CSS-level source discovery. The generated stylesheet points at the Rails `app/`
+directory by default so Tailwind scans app source without scanning the whole repository, build
+output, logs, or runtime directories. If your components live outside that source tree, add
+additional Tailwind `@source` lines to the stylesheet.
 
 #### Tailwind CSS v3 (existing apps)
 

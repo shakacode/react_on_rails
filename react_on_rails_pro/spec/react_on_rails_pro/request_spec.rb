@@ -159,6 +159,24 @@ describe ReactOnRailsPro::Request do
       expect(request_paths).to eq(["/render", "/upload-assets", "/render"])
     end
 
+    it "passes the stream observability opt-in to the renderer request" do
+      captured_form = nil
+      allow(mock_connection).to receive(:post) do |_path, form:, **_opts|
+        captured_form = form
+        mock_response(status: 200, chunks: [to_length_prefixed("Hello, world!")])
+      end
+
+      stream = described_class.render_code_as_stream(
+        "/render",
+        "console.log('Hello, world!');",
+        is_rsc_payload: false,
+        rsc_stream_observability: true
+      )
+      stream.each_chunk(&:itself)
+
+      expect(captured_form["rscStreamObservability"]).to be true
+    end
+
     it "raises duplicate bundle upload error when server asks for bundle twice" do
       call_count = 0
 
@@ -403,6 +421,20 @@ describe ReactOnRailsPro::Request do
         parsed = JSON.parse(data.chomp)
         parsed.key?("renderingRequest") && parsed["renderingRequest"] == js_code
       end)
+    end
+
+    it "passes the stream observability opt-in in the initial incremental request" do
+      stream = described_class.render_code_with_incremental_updates(
+        "/render-incremental",
+        js_code,
+        async_props_block:,
+        rsc_stream_observability: true
+      )
+
+      stream.each_chunk(&:itself)
+
+      parsed = JSON.parse(output_writes.first.chomp)
+      expect(parsed["rscStreamObservability"]).to be true
     end
 
     it "uses the explicit pull flag for pure-pull async props" do

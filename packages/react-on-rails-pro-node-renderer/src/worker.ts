@@ -291,7 +291,12 @@ const setResponseAndReleaseExecutionContext = async (
   }
 };
 
-const isAsset = (value: unknown): value is Asset => (value as { type?: string }).type === 'asset';
+const isAsset = (value: unknown): value is Asset =>
+  typeof value === 'object' &&
+  value !== null &&
+  (value as { type?: string }).type === 'asset' &&
+  typeof (value as { savedFilePath?: unknown }).savedFilePath === 'string' &&
+  typeof (value as { filename?: unknown }).filename === 'string';
 
 function conflictingHealthEndpointPath(error: unknown): (typeof HEALTH_ENDPOINT_ROUTES)[number] | undefined {
   if (typeof error !== 'object' || error === null) {
@@ -397,6 +402,20 @@ const errorCode = (error: unknown): string | undefined => {
 
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
+
+const isBooleanField = (value: unknown): value is boolean | 'true' | 'false' =>
+  typeof value === 'boolean' || value === 'true' || value === 'false';
+
+const parseOptionalBooleanField = (body: Record<string, unknown>, key: string): boolean | undefined => {
+  const value = body[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isBooleanField(value)) {
+    return undefined;
+  }
+  return value === true || value === 'true';
+};
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
@@ -581,6 +600,14 @@ export default function run(config: Partial<Config>) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
       return;
     }
+    const rscStreamObservability = parseOptionalBooleanField(body, 'rscStreamObservability');
+    if (body.rscStreamObservability != null && rscStreamObservability === undefined) {
+      await setResponse(
+        badRequestResponseResult('Invalid "rscStreamObservability" field in render request.'),
+        res,
+      );
+      return;
+    }
 
     const { bundleTimestamp } = req.params;
     const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(body, bundleTimestamp);
@@ -595,6 +622,7 @@ export default function run(config: Partial<Config>) {
             dependencyBundleTimestamps,
             providedNewBundles,
             assetsToCopy,
+            rscStreamObservability: rscStreamObservability === true,
             tracingContext: context,
           });
           await setResponseAndReleaseExecutionContext(result.response, res, result.executionContext);

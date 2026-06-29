@@ -206,13 +206,7 @@ module ReactOnRails
         # Check if HelloServer already exists (check both jsx and tsx)
         if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
            File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
-          tailwind_import_added = add_tailwind_import_to_rsc_client_component(components_dir)
-          message = if tailwind_import_added
-                      "ℹ️  HelloServer component already exists; added Tailwind stylesheet import to LikeButton"
-                    else
-                      "ℹ️  HelloServer component already exists, skipping"
-                    end
-          say message, :yellow
+          say "ℹ️  HelloServer component already exists, skipping", :yellow
           return
         end
 
@@ -229,41 +223,15 @@ module ReactOnRails
                   "#{components_dir}/HelloServer.#{ext}")
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.#{ext}",
                   "#{components_dir}/LikeButton.#{ext}")
-        add_tailwind_import_to_rsc_client_component(components_dir)
 
         say "✅ Created HelloServer component", :green
-      end
-
-      def add_tailwind_import_to_rsc_client_component(components_dir)
-        return false unless use_tailwind?
-
-        candidate_entry_paths = %w[jsx tsx].map do |extension|
-          "#{components_dir}/LikeButton.#{extension}"
-        end
-
-        relative_entry_path = candidate_entry_paths.find do |entry_path|
-          File.exist?(File.join(destination_root, entry_path))
-        end
-        return false unless relative_entry_path
-
-        stylesheet_import = "import '#{relative_stylesheet_import_path(relative_entry_path)}';"
-        entry_path = File.join(destination_root, relative_entry_path)
-        entry_content = File.read(entry_path)
-        return false if entry_content.include?(stylesheet_import)
-
-        client_directive_pattern = /\A\s*['"]use client['"];?[^\S\r\n]*(?:\r?\n|$)/
-        if entry_content.match?(client_directive_pattern)
-          insert_into_file(relative_entry_path, "#{stylesheet_import}\n", after: client_directive_pattern)
-        else
-          prepend_to_file(relative_entry_path, "#{stylesheet_import}\n")
-        end
-        true
       end
 
       def create_hello_server_controller
         controller_path = "app/controllers/hello_server_controller.rb"
 
         if File.exist?(File.join(destination_root, controller_path))
+          warn_existing_hello_server_tailwind_layout(controller_path)
           say "ℹ️  HelloServerController already exists, skipping", :yellow
           return
         end
@@ -300,6 +268,30 @@ module ReactOnRails
                  ))
 
         say "✅ Created #{view_path}", :green
+      end
+
+      def warn_existing_hello_server_tailwind_layout(controller_path)
+        return unless use_tailwind?
+        return if hello_server_controller_uses_tailwind_layout?(controller_path)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  HelloServerController already exists and may not use the Tailwind-aware React on Rails layout.
+
+          Ensure #{controller_path} uses a layout that includes:
+            <% prepend_javascript_pack_tag "#{tailwind_pack_name}" %>
+            <%= stylesheet_pack_tag "#{tailwind_pack_name}", media: "all" %>
+            <%= javascript_pack_tag %>
+
+          Merge these Tailwind pack tags into the existing layout pack-tag block and preserve app-specific pack names.
+        MSG
+      end
+
+      def hello_server_controller_uses_tailwind_layout?(controller_path)
+        controller_full_path = File.join(destination_root, controller_path)
+        layout_name = extract_declared_layout_name(File.read(controller_full_path))
+        layout_name ||= inherited_application_layout_name
+
+        layout_file_links_tailwind_pack?(layout_name)
       end
 
       def add_rsc_routes

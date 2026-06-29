@@ -26,6 +26,7 @@ import {
   createUploadedAsset,
   uploadedAssetPath,
   uploadedAssetOtherPath,
+  createIncrementalVmBundle,
   resetForTest,
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -49,6 +50,7 @@ const uploadedBundleForTest = (): Asset => ({
 const createUploadedBundleForTest = () => createUploadedBundle(testName);
 const lockfilePathForTest = () => lockfilePath(testName);
 const createVmBundleForTest = () => createVmBundle(testName);
+const createIncrementalVmBundleForTest = () => createIncrementalVmBundle(testName);
 const renderResult = {
   status: 200,
   headers: { 'Cache-Control': 'public, max-age=31536000' },
@@ -134,6 +136,35 @@ describe(testName, () => {
     });
 
     expect(result.response).toEqual(renderResult);
+  });
+
+  test('adds renderer Server-Timing to streamed results only when stream observability is enabled', async () => {
+    await createIncrementalVmBundleForTest();
+    const renderingRequest = `
+      (() => {
+        ReactOnRails.clearStreamValues();
+        const stream = ReactOnRails.getStreamValues();
+        ReactOnRails.addStreamValue('stream chunk');
+        ReactOnRails.endStream();
+        return stream;
+      })();
+    `;
+
+    const disabledResult = await handleRenderRequest({
+      renderingRequest,
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+    });
+    disabledResult.response.stream?.resume();
+
+    const enabledResult = await handleRenderRequest({
+      renderingRequest,
+      bundleTimestamp: BUNDLE_TIMESTAMP,
+      rscStreamObservability: true,
+    });
+    enabledResult.response.stream?.resume();
+
+    expect(disabledResult.response.headers['Server-Timing']).toBeUndefined();
+    expect(enabledResult.response.headers['Server-Timing']).toMatch(/^ror_renderer_prepare;dur=/);
   });
 
   test('If lockfile exists, and is stale', async () => {
