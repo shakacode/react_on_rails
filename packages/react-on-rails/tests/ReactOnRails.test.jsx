@@ -12,7 +12,7 @@ describe('ReactOnRails', () => {
   afterEach(() => {
     ComponentRegistry.clear();
     StoreRegistry.storeGenerators().clear();
-    StoreRegistry.stores().clear();
+    StoreRegistry.clearHydratedStores();
   });
 
   it('render returns a virtual DOM element for component', () => {
@@ -202,7 +202,7 @@ describe('ReactOnRails', () => {
     expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
   });
 
-  it('registerStore remains a deprecated alias for store generator registration', () => {
+  it('registerStore remains a legacy alias for store generator registration', () => {
     function reducer() {
       return {};
     }
