@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import '../../../stylesheets/application.css';
 
 const HelloWorld = (props) => {
   const [name, setName] = useState(props.name);

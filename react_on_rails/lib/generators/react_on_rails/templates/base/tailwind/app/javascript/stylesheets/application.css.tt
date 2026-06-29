@@ -1,0 +1,8 @@
+/* Tailwind v4 scans generated Rails app and Shakapacker source paths by default.
+   If you use Tailwind classes outside app/ (lib/, engines/, monorepo packages),
+   add @source directives here. These examples assume this stylesheet is under
+   app/javascript/stylesheets; adjust the relative path for custom source_path:
+     @source "../../../lib";
+     @source "../../../engines/my_engine/app";
+*/
+<%= tailwind_css_source_directives %>

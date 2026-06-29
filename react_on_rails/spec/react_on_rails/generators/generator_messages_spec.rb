@@ -51,6 +51,30 @@ describe GeneratorMessages do
     expect(message).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
   end
 
+  it "shows layout-owned Tailwind pack tags in Tailwind install messages" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world",
+      tailwind: true
+    )
+
+    expect(message).to include('prepend_javascript_pack_tag "react_on_rails_tailwind"')
+    expect(message).to include('stylesheet_pack_tag "react_on_rails_tailwind", media: "all"')
+    expect(message).to include("<%= javascript_pack_tag %>")
+  end
+
+  it "keeps empty pack tag guidance for non-Tailwind install messages" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world"
+    )
+
+    expect(message).to include("Your layout only needs")
+    expect(message).to include("<%= javascript_pack_tag %>")
+    expect(message).to include("<%= stylesheet_pack_tag %>")
+    expect(message).not_to include("react_on_rails_tailwind")
+  end
+
   it "points fresh-app installs at the landing page" do
     message = described_class.helpful_message_after_installation(
       component_name: "HelloWorld",

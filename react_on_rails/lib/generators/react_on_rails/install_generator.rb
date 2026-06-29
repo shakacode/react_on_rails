@@ -20,6 +20,9 @@ module ReactOnRails
     #       ValidationHelpers (~80 lines for Node/package manager checks).
     # rubocop:disable Metrics/ClassLength
     class InstallGenerator < Rails::Generators::Base
+      # Keep this Tailwind-only layout gate local so non-Tailwind installs can keep the lower gemspec floor.
+      MINIMUM_SHAKAPACKER_VERSION_FOR_TAILWIND_LAYOUT = "6.5.6"
+
       include GeneratorHelper
       include JsDependencyManager
       include ProSetup
@@ -511,7 +514,8 @@ module ReactOnRails
           return false
         end
 
-        !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
+        !(missing_node? || missing_package_manager? || unsupported_tailwind_shakapacker? ||
+          (!has_worktree_issues && missing_pro_gem?))
       end
 
       def warn_if_unsupported_env_package_manager
@@ -546,6 +550,21 @@ module ReactOnRails
         # Check Node.js version if available
         check_node_version
         false
+      end
+
+      def unsupported_tailwind_shakapacker?
+        return false unless use_tailwind?
+        return false if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?(
+          MINIMUM_SHAKAPACKER_VERSION_FOR_TAILWIND_LAYOUT
+        )
+
+        GeneratorMessages.add_error(<<~MSG.strip)
+          🚫 Tailwind layout wiring requires Shakapacker >= #{MINIMUM_SHAKAPACKER_VERSION_FOR_TAILWIND_LAYOUT}.
+
+          Installed version: #{ReactOnRails::PackerUtils.shakapacker_version}
+          Upgrade shakapacker or omit --tailwind.
+        MSG
+        true
       end
 
       def check_node_version
@@ -751,6 +770,7 @@ module ReactOnRails
                                      shakapacker_just_installed: shakapacker_just_installed?,
                                      landing_page: options.new_app? && new_app_root_route_available?,
                                      ci_workflow_generated: @ci_workflow_generated == true,
+                                     tailwind: use_tailwind?,
                                      app_root: destination_root
                                    ))
         GeneratorMessages.add_info(rsc_verification_message) if use_rsc?

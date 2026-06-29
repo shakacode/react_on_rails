@@ -62,6 +62,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4249](https://github.com/shakacode/react_on_rails/pull/4249) by
   [justin808](https://github.com/justin808).
 
+- **Generated Tailwind apps load Tailwind from the layout.** The install generator now declares Tailwind through a layout-owned pack instead of component-owned imports, keeps generated layout head metadata mobile/CSP-ready, and warns safely when custom layouts need manual pack-tag replacement. [PR 4182](https://github.com/shakacode/react_on_rails/pull/4182) by [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **Rspack RSC dev-server setup is easier to diagnose and customize**:
   Generated RSC helper code now verifies client-reference discovery support
   through the sibling `rscWebpackConfig.js` file instead of assuming

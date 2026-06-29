@@ -5609,36 +5609,46 @@ three-bundle architecture.
 
 **How Tailwind works with RSC:**
 
-1. Tailwind runs as a PostCSS plugin during the client bundle build only.
-2. It scans all files listed in its `content` configuration for utility class names.
-3. The generated CSS is extracted into the client stylesheet.
+1. Tailwind/PostCSS follows each bundle's CSS loader pipeline when CSS imports are processed, but
+   only the client bundle emits browser-loadable CSS.
+2. Tailwind scans configured source roots for utility class names. Tailwind v4 uses CSS `@source`
+   directives; Tailwind v3 uses the `content` array.
+3. The generated CSS is delivered through a layout-owned client pack.
 4. Server Components and Client Components both use Tailwind class names as plain strings.
-5. The CSS loads from the Rails layout's `stylesheet_pack_tag`.
+5. The CSS loads according to the Rails layout's Shakapacker pack tags.
 
-**Critical configuration:** The Tailwind `content` array must include all directories that contain
-files using Tailwind classes, including React component files and ERB views:
+**Critical configuration:** Tailwind must scan every directory that contains utility class names,
+including React component files and ERB views. Tailwind v4 configures those roots from CSS
+`@source` directives; Tailwind v3 uses the `content` array.
 
 #### Tailwind CSS v4 (new apps)
 
 The React on Rails generator supports Tailwind v4 via `--tailwind`. Tailwind v4 uses a CSS-first
 configuration model:
 
+<!-- prettier-ignore -->
 ```css
-/* app/javascript/styles/application.css */
-@import 'tailwindcss';
+/* app/javascript/stylesheets/application.css */
+@import "tailwindcss" source("../..");
 ```
 
 ```js
-// postcss.config.mjs
-export default {
-  plugins: {
-    '@tailwindcss/postcss': {},
-  },
-};
+// app/javascript/packs/react_on_rails_tailwind.js
+import '../stylesheets/application.css';
 ```
 
-Tailwind v4 auto-discovers source files without a `content` configuration. It scans the project
-tree automatically.
+The generated React on Rails layout declares that pack from the layout:
+
+```erb
+<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+<%= javascript_pack_tag %>
+```
+
+Tailwind v4 uses CSS-level source discovery. The generated stylesheet points at the Rails `app/`
+directory by default so Tailwind scans app source without scanning the whole repository, build
+output, logs, or runtime directories. If your components live outside that source tree, add
+additional Tailwind `@source` lines to the stylesheet.
 
 #### Tailwind CSS v3 (existing apps)
 

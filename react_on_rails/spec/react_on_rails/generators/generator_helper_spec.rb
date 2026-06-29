@@ -373,36 +373,81 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
-  describe "#relative_stylesheet_import_path" do
+  describe "Tailwind layout pack helpers" do
     let(:shakapacker_yml_path) { File.join(destination_root, "config/shakapacker.yml") }
-
-    before do
-      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
-      File.write(shakapacker_yml_path, <<~YAML)
-        development:
-          source_path: client/app
-      YAML
-      reset_shakapacker_memoization!
-    end
 
     after do
       FileUtils.rm_rf(File.join(destination_root, "config"))
       reset_shakapacker_memoization!
     end
 
-    it "computes the stylesheet import path from the generated entry file" do
-      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/LikeButton.jsx"))
-        .to eq("../../../stylesheets/application.css")
+    it "uses the default Shakapacker entry path for the Tailwind pack" do
+      expect(tailwind_pack_path).to eq("app/javascript/packs/react_on_rails_tailwind.js")
+      expect(tailwind_stylesheet_path).to eq("app/javascript/stylesheets/application.css")
+      expect(relative_tailwind_stylesheet_import_path).to eq("../stylesheets/application.css")
     end
 
-    it "adjusts when the generated entry moves deeper under the source path" do
-      expect(relative_stylesheet_import_path("client/app/src/HelloServer/components/nested/LikeButton.jsx"))
-        .to eq("../../../../stylesheets/application.css")
+    it "prefixes same-directory Tailwind stylesheet imports for root entry paths" do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: /
+      YAML
+      reset_shakapacker_memoization!
+
+      expect(tailwind_pack_path).to eq("client/app/react_on_rails_tailwind.js")
+      expect(tailwind_stylesheet_path).to eq("client/app/stylesheets/application.css")
+      expect(relative_tailwind_stylesheet_import_path).to eq("./stylesheets/application.css")
     end
 
-    it "rejects entry paths outside the generator destination" do
-      expect { relative_stylesheet_import_path("../../outside/LikeButton.jsx") }
-        .to raise_error(ArgumentError, "entry_path must stay inside the generator destination")
+    it "scans Rails app for the default generated stylesheet location" do
+      expect(tailwind_css_source_directives).to eq('@import "tailwindcss" source("../..");')
+    end
+
+    it "uses explicit Tailwind source roots when Shakapacker source_path is outside Rails app" do
+      FileUtils.mkdir_p(File.dirname(shakapacker_yml_path))
+      File.write(shakapacker_yml_path, <<~YAML)
+        development:
+          source_path: client/app
+          source_entry_path: entrypoints
+      YAML
+      reset_shakapacker_memoization!
+
+      expect(tailwind_css_source_directives).to eq(<<~CSS.strip)
+        @import "tailwindcss" source(none);
+        @source "..";
+        @source "../../../app";
+      CSS
+    end
+
+    it "does not accept Tailwind layout helper tags embedded mid-line" do
+      layout_content = <<~ERB
+        <head>
+          <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+          text <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+          <%= javascript_pack_tag %>
+        </head>
+      ERB
+
+      expect(layout_links_tailwind_pack?(layout_content)).to be false
+    end
+
+    it "escapes quoted Tailwind source paths with JSON string quoting" do
+      expect(tailwind_source_statement(%(../quoted"path\\dir)))
+        .to eq('@source "../quoted\\"path\\\\dir";')
+    end
+
+    it "rejects control characters in Tailwind source paths" do
+      expect { tailwind_source_statement("../bad\npath") }
+        .to raise_error(ArgumentError, "Tailwind source paths cannot contain control characters")
+    end
+
+    it "rejects Unicode line separators in Tailwind source paths" do
+      ["\u2028", "\u2029"].each do |separator|
+        expect { tailwind_source_statement("../bad#{separator}path") }
+          .to raise_error(ArgumentError, "Tailwind source paths cannot contain control characters")
+      end
     end
   end
 
