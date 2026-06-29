@@ -197,9 +197,10 @@ module ReactOnRails
         # See lib/react_on_rails/engine.rb for the validation skip logic
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
 
+        add_legacy_redux_install_warning_once
+
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
-          add_legacy_redux_install_warning_once
           add_package_json_scripts
           add_ci_workflow
           add_bin_scripts
@@ -801,8 +802,6 @@ module ReactOnRails
             ]
           end
 
-        # Keep this install-specific warning aligned with
-        # ReactWithReduxGenerator::LEGACY_REDUX_GENERATOR_WARNING.
         GeneratorMessages.add_warning(<<~MSG.strip)
           The install --redux option is a hidden legacy Redux generator path and is not recommended
           for new React on Rails apps.

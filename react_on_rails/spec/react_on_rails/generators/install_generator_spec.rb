@@ -4392,6 +4392,20 @@ describe InstallGenerator, type: :generator do
       install_generator.run_generators
     end
 
+    specify "run_generators warns hidden redux users when prerequisites fail" do
+      install_generator = install_generator_fixture(redux: true)
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(false)
+      allow(install_generator).to receive(:print_generator_messages)
+
+      install_generator.run_generators
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("legacy Redux generator path")
+      expect(output_text).to include("React on Rails generator prerequisites not met")
+      expect(output_text.index("legacy Redux generator path"))
+        .to be < output_text.index("React on Rails generator prerequisites not met")
+    end
+
     specify "shows incomplete-installation guidance when shakapacker setup fails" do
       install_generator = install_generator_fixture
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
