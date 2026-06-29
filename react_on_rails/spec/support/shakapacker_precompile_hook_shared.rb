@@ -96,8 +96,8 @@ end
 # outright ("invalid switch in RUBYOPT"), so it can never appear here.
 ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES = %w[I r].freeze unless defined?(ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES)
 
-# True when RUBYOPT already pins the external encoding: a -E (including inside a short-option cluster
-# such as -wEUS-ASCII), or a --encoding/--external-encoding long option.
+# True when RUBYOPT already pins the external encoding: a -E with an external part (including inside
+# a short-option cluster such as -wEUS-ASCII), or a --encoding/--external-encoding long option.
 def rubyopt_pins_encoding?(rubyopt)
   rubyopt.split.any? { |token| rubyopt_token_pins_encoding?(token) }
 end
@@ -106,11 +106,16 @@ def rubyopt_token_pins_encoding?(token)
   return true if token.start_with?("--encoding", "--external-encoding")
   return false unless token.start_with?("-") && !token.start_with?("--") && token.length > 1
 
-  token[1..].each_char do |char|
+  chars = token[1..].chars
+  chars.each_with_index do |char, idx|
     break if ARGUMENT_TAKING_SHORT_RUBYOPT_SWITCHES.include?(char)
-    return true if char == "E"
+    return true if short_switch_pins_external_encoding?(chars, idx)
   end
   false
+end
+
+def short_switch_pins_external_encoding?(chars, idx)
+  chars[idx] == "E" && chars[idx + 1] != ":"
 end
 
 # Detect which package manager to use based on package.json's packageManager field,

@@ -248,7 +248,8 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       end
 
       it "still pins UTF-8 when RUBYOPT only sets the internal encoding" do
-        ["--internal-encoding=US-ASCII", "--internal-encoding US-ASCII"].each do |rubyopt|
+        ["--internal-encoding=US-ASCII", "--internal-encoding US-ASCII",
+         "-E:US-ASCII", "-E:UTF-8", "-wE:UTF-8"].each do |rubyopt|
           with_locale_encoding(Encoding::US_ASCII) do
             with_env("RUBYOPT" => rubyopt) do
               expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 #{rubyopt}")
