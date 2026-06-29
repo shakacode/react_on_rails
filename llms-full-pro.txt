@@ -2952,9 +2952,11 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 3. The rendered HTML is returned to Rails and inserted into the view
 4. Workers are pooled and can be automatically restarted to mitigate memory leaks
 
-Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
+Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Framework-owned request state, such as async props, post-SSR hooks, and RSC payload tracking, is stored in per-request `sharedExecutionContext` and tracker instances so concurrent renders do not share that framework state. The diagram below shows how render jobs fan out across reusable Node workers:
 
 [Diagram: Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once.]
+
+The JavaScript bundle module graph is still loaded into reusable worker VM contexts. Module-level mutable variables in your app persist for the worker lifetime and can be observed by overlapping renders, so do not store request data there. For RSC-safe request data, use the `React.cache()` patterns in [Sharing Per-Request Data in Server Components](./react-server-components/per-request-data.md).
 
 By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
 
@@ -8828,7 +8830,102 @@ export default function Breadcrumbs({ railsContext }) {
 }
 ```
 
-## Scenario 5: Deduplicating Expensive Computations
+## Scenario 5: Layout Context for Top-Level RSC Entries
+
+Top-level components registered with `registerServerComponent` can also be [render functions](../../oss/core-concepts/render-functions.md). React on Rails calls those functions with `(props, railsContext)` during RSC rendering, so a page-level entry can pass selected Rails context values into a request-local store seeder before the rest of the Server Component tree reads them. This only applies to the registered render-function entry path; if you render the entry as an ordinary component elsewhere, `railsContext` is not provided and those values should come through explicit props instead.
+
+This is the RSC-safe replacement for layout helpers that write Rails request data into module-level refs. It applies the [Seed Once, Read Anywhere](#pattern-seed-once-read-anywhere) pattern scoped to layout context:
+
+```jsx
+// lib/layoutRequestStore.js
+import { cache } from 'react';
+
+const _getLayoutRequestStore = cache(() => ({}));
+
+export function seedLayoutRequestStore(layoutContext) {
+  const store = _getLayoutRequestStore();
+  // Mutation is safe under the RSC renderer: this seeder runs once in a parent
+  // component before any reader renders. See "Seed Once, Read Anywhere" for the
+  // full rationale.
+  store.locale = layoutContext.locale;
+  store.pathname = layoutContext.pathname;
+  // Object.freeze is shallow. Keep publicEnv primitive-only, or explicitly
+  // freeze nested objects before storing them.
+  store.publicEnv = Object.freeze({ ...layoutContext.publicEnv });
+}
+
+export function getLayoutRequestStore() {
+  return _getLayoutRequestStore();
+}
+```
+
+```jsx
+// ProductPage.jsx — top-level Server Component entry
+import { seedLayoutRequestStore } from '../lib/layoutRequestStore';
+import ProductShell from './ProductShell';
+
+export default function ProductPage(props, railsContext) {
+  if (!railsContext) {
+    throw new Error(
+      'ProductPage must be registered with registerServerComponent as a render function to receive railsContext.',
+    );
+  }
+
+  const { pageHref, pageLocale, pagePathname } = props;
+  if (!pageHref || !pageLocale || !pagePathname) {
+    throw new Error(
+      'ProductPage requires pageHref, pageLocale, and pagePathname props; pass them from Rails instead of using the RSC payload request context.',
+    );
+  }
+
+  const layoutContext = {
+    locale: pageLocale,
+    pathname: pagePathname,
+    publicEnv: {
+      host: railsContext.host,
+      href: pageHref,
+      // Add app-specific public fields via rendering_extension.custom_context
+      // on the Rails side.
+    },
+  };
+
+  return function ProductPageWithLayoutContext() {
+    seedLayoutRequestStore(layoutContext);
+    return <ProductShell {...props} />;
+  };
+}
+```
+
+The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React enters the RSC render work loop. At that point, `React.cache()` is outside the per-request AsyncLocalStorage scope React establishes for each render tree, so `_getLayoutRequestStore()` would not access the same request-local slot used by components rendered by React. Seeding must happen inside a component that React renders. If you want the JSX tree to show the boundary explicitly, wrap children in a `LayoutRequestStoreSeeder` component that calls `seedLayoutRequestStore(layoutContext)` and returns `<>{children}</>`.
+
+Pass current-page values, such as `pageHref`, `pageLocale`, and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component. In apps that derive locale from the route or controller, `railsContext.i18nLocale` can likewise describe the payload request rather than the original page.
+
+```jsx
+// DeepServerComponent.jsx
+import { getLayoutRequestStore } from '../lib/layoutRequestStore';
+
+export default function DeepServerComponent() {
+  const store = getLayoutRequestStore();
+  if (!store.publicEnv?.host || !store.publicEnv?.href || !store.locale || !store.pathname) {
+    throw new Error('seedLayoutRequestStore must provide host, href, locale, and pathname');
+  }
+  const { locale, pathname, publicEnv } = store;
+
+  return (
+    <span data-locale={locale} data-pathname={pathname}>
+      {publicEnv.host}
+    </span>
+  );
+}
+```
+
+Seed in a Server Component that renders above every reader. The two-argument entry function is useful for selecting values from `railsContext`, but the invocation of `_getLayoutRequestStore()` and the seeding should happen while React is rendering the seeder component. Keep the `cache(() => ({}))` definition at module level, keep the stored values immutable after seeding, and pass needed values as props if a reader might run outside that entry.
+
+### Concurrency model
+
+React on Rails Pro creates request-scoped RSC payload trackers and passes the current `railsContext` through the render function path for each RSC render. That framework state is isolated per render request. App module state is different; see [Don't: Store module-level mutable state](#dont-store-module-level-mutable-state) for the Node renderer leakage pitfall.
+
+## Scenario 6: Deduplicating Expensive Computations
 
 When multiple components need the result of the same expensive computation, `React.cache()` ensures it runs only once:
 
@@ -8928,12 +9025,13 @@ export default function UserGreeting() {
 
 ## When to Use Each Approach
 
-| Approach                    | Use when                                                           | Example                              |
-| --------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
-| `React.cache(fn)` with args | Multiple components call the same function with the same arguments | `getIntl(locale)`, `getUser(userId)` |
-| Seed once, read anywhere    | You want Context-like zero-argument access across the tree         | `getRequestStore().locale`           |
-| Props from Rails            | Data is used by a single component or a small subtree              | `<ProductCard product={product} />`  |
-| Client Component Context    | Interactive components need reactive state                         | `<IntlProvider>`, `<ThemeProvider>`  |
+| Approach                    | Use when                                                                                        | Example                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `React.cache(fn)` with args | Multiple components call the same function with the same arguments                              | `getIntl(locale)`, `getUser(userId)`    |
+| Seed once, read anywhere    | You want Context-like zero-argument access across the tree                                      | `getRequestStore().locale`              |
+| Render-function layout seed | A top-level RSC entry needs Rails page data available to deep readers without module-level refs | `seedLayoutRequestStore(layoutContext)` |
+| Props from Rails            | Data is used by a single component or a small subtree                                           | `<ProductCard product={product} />`     |
+| Client Component Context    | Interactive components need reactive state                                                      | `<IntlProvider>`, `<ThemeProvider>`     |
 
 ## Rules and Pitfalls
 
