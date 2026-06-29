@@ -384,7 +384,9 @@ export function seedLayoutRequestStore(layoutContext) {
   // any reader renders. See "Seed Once, Read Anywhere" for the full rationale.
   store.locale = layoutContext.locale;
   store.pathname = layoutContext.pathname;
-  store.publicEnv = Object.freeze(layoutContext.publicEnv);
+  // Object.freeze is shallow. Keep publicEnv primitive-only, or explicitly
+  // freeze nested objects before storing them.
+  store.publicEnv = Object.freeze({ ...layoutContext.publicEnv });
 }
 
 export function getLayoutRequestStore() {
@@ -412,7 +414,7 @@ export default function ProductPage(props, railsContext) {
   const { pageHref, pagePathname } = props;
   if (!pageHref || !pagePathname) {
     throw new Error(
-      'Pass pageHref and pagePathname from Rails props when layout readers need the current page URL.',
+      'ProductPage requires pageHref and pagePathname props; pass them from Rails instead of using the RSC payload URL.',
     );
   }
 
@@ -437,7 +439,7 @@ export default function ProductPage(props, railsContext) {
 }
 ```
 
-The render function returns `ProductPageWithLayoutContext` instead of JSX directly so React on Rails renders a component and the seeder runs during React render. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is equivalent; keep the seed call inside a component render, before any descendant readers render.
+The render function returns `ProductPageWithLayoutContext` instead of JSX directly because React on Rails invokes `ProductPage(props, railsContext)` before React starts rendering. At that point `React.cache()` is not yet request-scoped, so seeding must happen inside a component that React renders. The `LayoutRequestStoreSeeder` wrapper makes the seeding boundary explicit in JSX. If this entry has only one seeder, calling `seedLayoutRequestStore(layoutContext)` at the top of `ProductPageWithLayoutContext` before `return` is also valid for the seeding-order guarantee; use the wrapper when you want the JSX tree to show the boundary clearly.
 
 Pass current-page URL values, such as `pageHref` and `pagePathname`, through props from Rails when readers need them. During client RSC payload refetches, `railsContext.href` and `railsContext.pathname` describe the `/rsc_payload/:component` request, not the page that originally hosted the component.
 
@@ -446,10 +448,11 @@ Pass current-page URL values, such as `pageHref` and `pagePathname`, through pro
 import { getLayoutRequestStore } from '../lib/layoutRequestStore';
 
 export default function DeepServerComponent() {
-  const { locale, pathname, publicEnv } = getLayoutRequestStore();
-  if (!publicEnv) {
+  const store = getLayoutRequestStore();
+  if (!store.publicEnv || store.locale == null || store.pathname == null) {
     throw new Error('seedLayoutRequestStore must be called above this component in the render tree');
   }
+  const { locale, pathname, publicEnv } = store;
 
   return (
     <span data-locale={locale} data-pathname={pathname}>
