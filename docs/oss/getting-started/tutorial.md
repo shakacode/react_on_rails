@@ -313,7 +313,7 @@ When rendering an existing Redux-backed component, the Rails side still uses the
 
 The component is named `HelloWorldApp` when you are working with the legacy generated Redux example. Adjust the component name and props key to match your app's controller setup.
 
-For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [Redux integration guide](../building-features/react-and-redux.md).
+For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [legacy Redux reducer guidance](../building-features/react-and-redux.md).
 
 ## What's Next?
 

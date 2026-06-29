@@ -114,7 +114,6 @@ For server rendering without Redux, use the same route tree with `StaticRouter` 
 
 ```jsx
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { Routes, Route } from 'react-router-dom';
 
@@ -124,16 +123,14 @@ const About = () => <div>About</div>;
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
 
-  const html = renderToString(
+  return (
     <StaticRouter location={location}>
       <Routes>
         <Route path="/" element={<Home {...props} />} />
         <Route path="/about" element={<About />} />
       </Routes>
-    </StaticRouter>,
+    </StaticRouter>
   );
-
-  return { renderedHtml: html };
 };
 
 export default RouterApp;
