@@ -147,7 +147,7 @@ const RouterApp = (props, railsContext) => {
   // React on Rails calls RouterApp(props, railsContext), then renders the returned
   // function component. Props are passed again by React, but this example uses the
   // props and location captured by closure.
-  return () => (
+  return (_props) => (
     <StaticRouter location={location}>
       <RouterRoutes {...props} />
     </StaticRouter>
@@ -179,7 +179,7 @@ const HelloWorldApp = (props, railsContext) => {
   const store = configureStore(props);
   const { location } = railsContext;
 
-  return () => (
+  return (_props) => (
     <Provider store={store}>
       <StaticRouter location={location}>
         <Routes>

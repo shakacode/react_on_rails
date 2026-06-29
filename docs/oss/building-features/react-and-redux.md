@@ -11,6 +11,8 @@ See [Sharing State Between Components](https://react.dev/learn/sharing-state-bet
 The `helloWorld/reducers/helloWorldReducer.js` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
 
 ```javascript
+import { combineReducers } from 'redux';
+
 import usersReducer from './usersReducer';
 import blogPostsReducer from './blogPostsReducer';
 import commentsReducer from './commentsReducer';
@@ -21,12 +23,14 @@ import { $$initialState as $$blogPostsState } from './blogPostsReducer';
 import { $$initialState as $$commentsState } from './commentsReducer';
 // ...
 
-export default {
+const rootReducer = combineReducers({
   $$usersStore: usersReducer,
   $$blogPostsStore: blogPostsReducer,
   $$commentsStore: commentsReducer,
   // ...
-};
+});
+
+export default rootReducer;
 
 export const initialStates = {
   $$usersState,

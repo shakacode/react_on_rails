@@ -40,49 +40,19 @@ supporting configuration.
 > multi-island page where separate React roots must coordinate through one shared
 > client store.
 
-```text
-* TypeScript
+Additional option details:
 
-    Passing the --typescript generator option generates TypeScript files (.tsx)
-    instead of JavaScript files (.jsx) and sets up TypeScript configuration.
+- **TypeScript**: Passing the `--typescript` generator option generates TypeScript files (`.tsx`) instead of JavaScript files (`.jsx`) and sets up TypeScript configuration.
 
-* Tailwind CSS v4
+- **Tailwind CSS v4**: Passing the `--tailwind` generator option installs Tailwind CSS v4, configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the generated SSR HelloWorld page. See [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
 
-    Passing the --tailwind generator option installs Tailwind CSS v4,
-    configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the
-    generated SSR HelloWorld page. See
-    [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
+- **Rspack (default)**: Rspack is the default bundler for fresh installs, providing significantly faster builds (~20x improvement with SWC). Pass `--no-rspack` (or its alias `--webpack`) to use Webpack instead. Either way you get a unified configuration that works with both bundlers and a `bin/switch-bundler` utility to switch between them post-installation.
 
-* Rspack (default)
+- **Pro**: Passing the `--pro` generator option sets up React on Rails Pro with Node server rendering, fragment caching, and code-splitting support. Requires the `react_on_rails_pro` gem (add it to your Gemfile first). Creates the Pro initializer, `renderer/node-renderer.js`, and adds the Node Renderer process to `Procfile.dev`.
 
-    Rspack is the default bundler for fresh installs, providing significantly
-    faster builds (~20x improvement with SWC). Pass --no-rspack (or its alias
-    --webpack) to use Webpack instead. Either way you get a unified
-    configuration that works with both bundlers and a bin/switch-bundler
-    utility to switch between them post-installation.
+- **RSC (React Server Components)**: Passing the `--rsc` generator option sets up React Server Components support. This automatically includes Pro setup (`--rsc` implies `--pro`). Creates RSC webpack configuration, a HelloServer example component, and RSC routes. Requires React 19 with a compatible `react-on-rails-rsc` version.
 
-* Pro
-
-    Passing the --pro generator option sets up React on Rails Pro with Node
-    server rendering, fragment caching, and code-splitting support.
-    Requires the react_on_rails_pro gem (add it to your Gemfile first).
-    Creates the Pro initializer, renderer/node-renderer.js, and adds the Node Renderer
-    process to Procfile.dev.
-
-* RSC (React Server Components)
-
-    Passing the --rsc generator option sets up React Server Components support.
-    This automatically includes Pro setup (--rsc implies --pro). Creates RSC
-    webpack configuration, a HelloServer example component, and RSC routes.
-    Requires React 19 with a compatible `react-on-rails-rsc` version.
-
-*******************************************************************************
-
-
-Then you may run
-
-    `rails s`
-```
+Then you may run `rails s`.
 
 Another good option is to create a simple test app per the [Tutorial](../getting-started/tutorial.md).
 
