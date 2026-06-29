@@ -143,8 +143,10 @@ This legacy structure is useful only when you intentionally maintain Redux:
 If you already have a React on Rails app and intentionally need to recreate the legacy Redux example, use the direct hidden generator after the base installer has configured React on Rails:
 
 ```bash
-rails generate react_on_rails:react_with_redux --typescript
+rails generate react_on_rails:react_with_redux
 ```
+
+For an app that is already configured for TypeScript, add `--typescript` to generate `.ts` and `.tsx` Redux example files.
 
 For full install recovery of an older Redux-generated app, the hidden `react_on_rails:install --redux` option still exists, but do not use it for greenfield apps.
 
