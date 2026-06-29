@@ -7,15 +7,18 @@ let originalFetch: typeof globalThis.fetch;
 interface MockResponseOptions {
   status?: number;
   body?: unknown;
+  headers?: HeadersInit;
+  jsonError?: unknown;
 }
 
 const mockResponse = (options: MockResponseOptions = {}): Response => {
-  const { status = 200, body = null } = options;
+  const { status = 200, body = null, headers = {}, jsonError } = options;
   let bodyUsed = false;
 
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     clone: () => {
       if (bodyUsed) {
         throw new TypeError('body already used');
@@ -27,6 +30,9 @@ const mockResponse = (options: MockResponseOptions = {}): Response => {
         return Promise.reject(new TypeError('body already used'));
       }
       bodyUsed = true;
+      if (jsonError !== undefined) {
+        return Promise.reject(jsonError);
+      }
       if (body === null || typeof body === 'string') {
         return Promise.reject(new SyntaxError('no JSON body'));
       }
@@ -192,6 +198,21 @@ describe('createRailsAction', () => {
     await expect(createProject({ name: 'Apollo' })).resolves.toBeNull();
   });
 
+  it('rejects malformed JSON when a successful response declares JSON', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        body: '{not json',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      }),
+    );
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(SyntaxError);
+  });
+
   it('omits the JSON body for DELETE requests even when variables are provided', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 204 }));
@@ -303,7 +324,9 @@ describe('createRailsAction', () => {
       path: 'https://example.com/projects',
     });
 
-    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/same-origin Rails action URLs/);
+    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(
+      /same-origin Rails action URLs \(attempted: https:\/\/example\.com\/projects\)/,
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -373,8 +396,10 @@ describe('createRailsAction', () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 500,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       clone: () =>
         ({
+          headers: new Headers({ 'Content-Type': 'application/json' }),
           json: () => Promise.reject(new TypeError('stream failed')),
         }) as unknown as Response,
     } as unknown as Response);
@@ -396,11 +421,31 @@ describe('createRailsAction', () => {
     }
   });
 
+  it('propagates abort errors while parsing an error body clone', async () => {
+    const abortError = new DOMException('aborted', 'AbortError');
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 422,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      clone: () =>
+        ({
+          headers: new Headers({ 'Content-Type': 'application/json' }),
+          json: () => Promise.reject(abortError),
+        }) as unknown as Response,
+    } as unknown as Response);
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).rejects.toBe(abortError);
+  });
+
   it('propagates response body stream errors instead of treating them as empty JSON', async () => {
     const bodyError = new TypeError('body already used');
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
       json: () => Promise.reject(bodyError),
     } as unknown as Response);
     const createProject = createRailsAction<{ name: string }, { ok: true }>({

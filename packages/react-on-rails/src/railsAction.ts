@@ -12,6 +12,10 @@ export interface RailsActionOptions<TVariables> {
    * supply `() => null` to send no body when variables only populate the path.
    */
   body?: (variables: TVariables) => unknown;
+  /**
+   * Additional request headers. Security-critical Rails headers always win.
+   * When no JSON body is sent, Content-Type is removed after these headers are merged.
+   */
   headers?: HeadersInit | ((variables: TVariables) => HeadersInit);
 }
 
@@ -54,7 +58,15 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
   return null;
 };
 
-const parseJsonBody = async (response: Response): Promise<unknown> => {
+const JSON_CONTENT_TYPE_PATTERN = /^(application\/json|[^/]+\/[^;]+\+json)(?:\s*;|$)/i;
+
+const isJsonResponse = (response: Response): boolean =>
+  JSON_CONTENT_TYPE_PATTERN.test(response.headers.get('Content-Type') ?? '');
+
+const isAbortError = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
+
+const parseOptionalJsonBody = async (response: Response): Promise<unknown> => {
   try {
     return (await response.json()) as unknown;
   } catch (error) {
@@ -62,6 +74,21 @@ const parseJsonBody = async (response: Response): Promise<unknown> => {
       throw error;
     }
     return null;
+  }
+};
+
+const parseSuccessJsonBody = async (response: Response): Promise<unknown> => {
+  if (response.status === 204 || response.status === 205) {
+    return null;
+  }
+
+  try {
+    return (await response.json()) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError && !isJsonResponse(response)) {
+      return null;
+    }
+    throw error;
   }
 };
 
@@ -207,8 +234,8 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
 ): RailsActionCaller<TVariables, TResponse> {
   const method = (options.method ?? 'POST').toUpperCase();
-  // Warn once per action factory; DELETE body discard is an action configuration problem, not per-call data.
-  let warnedOnDiscardedDeleteBody = false;
+  // DELETE body discard is an action configuration problem, so warn at most once per DELETE action factory.
+  let warnedOnDiscardedDeleteBody = method !== 'DELETE';
 
   const callRailsAction = async (
     variables?: TVariables,
@@ -218,9 +245,12 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     const typedVariables = variables as TVariables;
     assertBrowserContext();
 
-    const requestUrl = resolveSameOriginRequestUrl(resolvePath(options.path, typedVariables));
+    const resolvedPath = resolvePath(options.path, typedVariables);
+    const requestUrl = resolveSameOriginRequestUrl(resolvedPath);
     if (requestUrl === null) {
-      throw new Error('createRailsAction can only call same-origin Rails action URLs.');
+      throw new Error(
+        `createRailsAction can only call same-origin Rails action URLs (attempted: ${resolvedPath}).`,
+      );
     }
 
     const csrfToken = authenticityToken()?.trim();
@@ -262,14 +292,17 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
       // Keep this clone before any error-body reads so callers can still inspect the original response body.
       let responseBody: unknown = null;
       try {
-        responseBody = await parseJsonBody(response.clone());
-      } catch {
+        responseBody = await parseOptionalJsonBody(response.clone());
+      } catch (bodyReadError) {
+        if (isAbortError(bodyReadError)) {
+          throw bodyReadError;
+        }
         responseBody = null;
       }
       throw new RailsActionRequestError(response, responseBody);
     }
 
-    const responseBody = await parseJsonBody(response);
+    const responseBody = await parseSuccessJsonBody(response);
     return responseBody as TResponse;
   };
 
