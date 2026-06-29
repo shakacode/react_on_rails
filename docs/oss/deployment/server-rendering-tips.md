@@ -22,7 +22,7 @@ For the best SSR performance, React on Rails Pro provides a [dedicated Node.js r
 
 1. First make sure your code works with server rendering disabled (`prerender: false`).
 2. Set `config.trace` to true. You will get the server invocation code that renders your component. If you're not using Shakapacker, you will also get the whole file used to set up the JavaScript context.
-3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-for-streamed-rsc-responses) section in the Streaming SSR guide.
+3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## CSS
 

@@ -15,7 +15,7 @@
 
 require_relative "spec_helper"
 require "rack/deflater"
-require "rack/mock"
+require "rack/mock_request"
 require "stringio"
 require "zlib"
 

@@ -20,7 +20,7 @@ module ReactOnRailsPro
   class CompressionMiddlewareGuard
     COMPATIBILITY_GUIDE_PATH =
       "https://reactonrails.com/docs/pro/" \
-      "streaming-ssr#compression-for-streamed-rsc-responses"
+      "streaming-ssr#compression-middleware-compatibility"
     PROBLEMATIC_MIDDLEWARES = %w[Rack::Deflater Rack::Brotli].freeze
     PROBE_TIMEOUT_SECONDS = 1
 
