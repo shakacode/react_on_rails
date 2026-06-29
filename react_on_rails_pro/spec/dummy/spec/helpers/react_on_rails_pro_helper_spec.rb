@@ -474,6 +474,26 @@ describe ReactOnRailsProHelper do
         expect(result).to include(react_component_div_with_initial_chunk)
         expect(chunks_read.count).to eq(chunks.count)
       end
+
+      it "calls on_complete with buffered string chunks" do
+        completed_chunks = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(
+            component_name,
+            props:,
+            on_complete: ->(buffered_chunks) { completed_chunks = buffered_chunks },
+            **component_options
+          )
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(completed_chunks).to all(be_a(String))
+        expect(completed_chunks.join).to eq(result)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
     end
 
     describe "#stream_react_component" do # rubocop:disable RSpec/MultipleMemoizedHelpers
@@ -1211,25 +1231,24 @@ describe ReactOnRailsProHelper do
         ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
       end
 
-      it "ignores on_complete on cache miss so hits and misses have the same callback behavior" do
-        on_complete_called = false
-        result = nil
-
-        Sync do
-          mock_request_and_response
-          result = cached_buffered_stream_react_component(
-            component_name,
-            cache_key: ["buffered-stream-cache-on-complete", component_name],
-            id: "#{component_name}-react-component-0",
-            on_complete: ->(_chunks) { on_complete_called = true },
-            cache_options: { expires_in: 60 }
-          ) do
-            props
+      it "rejects on_complete because cache hits cannot replay callbacks consistently" do
+        expect do
+          Sync do
+            mock_request_and_response
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: ->(_chunks) {},
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
           end
-        end
-
-        expect(result).to be_html_safe
-        expect(on_complete_called).to be false
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /cached_buffered_stream_react_component does not support on_complete/
+        )
       end
     end
 

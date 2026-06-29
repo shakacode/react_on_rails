@@ -180,16 +180,24 @@ module ReactOnRailsProHelper
     end
 
     on_complete = options.delete(:on_complete)
-    chunks = [] if on_complete.respond_to?(:call)
-    html = +""
+    collect_chunks = on_complete.respond_to?(:call)
+    chunks = [] if collect_chunks
+    html = collect_chunks ? nil : +""
 
     internal_stream_react_component(component_name, options).each_chunk do |chunk|
-      chunks&.push(chunk)
-      html << chunk.to_s
+      if collect_chunks
+        chunks << chunk.to_s
+      else
+        html << chunk.to_s
+      end
     end
-    on_complete.call(chunks) if on_complete.respond_to?(:call)
 
-    html.html_safe
+    if collect_chunks
+      on_complete.call(chunks)
+      chunks.join.html_safe
+    else
+      html.html_safe
+    end
   end
 
   def stream_react_component_with_async_props(component_name, options = {}, &props_block)
@@ -302,10 +310,16 @@ module ReactOnRailsProHelper
 
   # Cached version of buffered_stream_react_component. Unlike cached_stream_react_component,
   # this returns the complete HTML string from the cache/miss path and does not require
-  # stream_view_containing_react_components.
+  # stream_view_containing_react_components. The on_complete callback is unsupported
+  # because cache hits do not replay chunks.
   def cached_buffered_stream_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      if raw_options.key?(:on_complete)
+        raise ReactOnRailsPro::Error,
+              "cached_buffered_stream_react_component does not support on_complete; " \
+              "use buffered_stream_react_component for chunk callbacks"
+      end
 
       cache_options = raw_options.merge(
         cache_key: lambda do
@@ -320,7 +334,7 @@ module ReactOnRailsProHelper
       )
 
       cached_result = fetch_react_component(component_name, cache_options) do
-        options = raw_options.except(:on_complete).merge(
+        options = raw_options.merge(
           props: yield,
           skip_prerender_cache: true,
           auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
