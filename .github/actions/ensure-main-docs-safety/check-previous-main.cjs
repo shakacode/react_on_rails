@@ -57,46 +57,112 @@ function isGuardOnlyFailure(jobs) {
   );
 }
 
-async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
+function githubApiErrorStatus(error) {
+  return error?.status ?? error?.response?.status;
+}
+
+function isGithubApiFailure(error) {
+  return Boolean(error?.githubApiFailure);
+}
+
+function githubApiFailureDetails(error, status = githubApiErrorStatus(error)) {
+  if (error?.githubApiFailure) {
+    return error.message || '';
+  }
+
+  const details = [];
+
+  if (status !== undefined) {
+    details.push(`GitHub API status: ${status}.`);
+  }
+
+  if (error?.message) {
+    details.push(error.message);
+  }
+
+  return details.join(' ');
+}
+
+function wrapGithubApiFailure(error, message) {
+  const status = githubApiErrorStatus(error);
+  const wrappedError = new Error([message, githubApiFailureDetails(error, status)].filter(Boolean).join(' '));
+
+  wrappedError.githubApiFailure = true;
+
+  if (status !== undefined) {
+    wrappedError.status = status;
+  }
+
+  return wrappedError;
+}
+
+async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }) {
   const workflowRuns = [];
 
-  for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    per_page: 30,
-    created: `>${createdAfter}`,
-    sort: 'created',
-    direction: 'desc',
-  })) {
-    const pageRuns = response.data;
-    const relevantInPage = pageRuns.filter(
-      (run) => run.head_sha === sha && TRUSTED_RUN_EVENTS.has(run.event),
-    );
+  try {
+    for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      event,
+      per_page: 30,
+      created: `>${createdAfter}`,
+      sort: 'created',
+      direction: 'desc',
+    })) {
+      const pageRuns = response.data;
+      const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
 
-    if (relevantInPage.length > 0) {
-      workflowRuns.push(...relevantInPage);
+      if (relevantInPage.length > 0) {
+        workflowRuns.push(...relevantInPage);
+      }
     }
+  } catch (error) {
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub Actions API failed while listing ${event} workflow runs for ${sha}.`,
+    );
   }
 
   return workflowRuns;
 }
 
+async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
+  const runsByEvent = await Promise.all(
+    Array.from(TRUSTED_RUN_EVENTS, (event) =>
+      listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }),
+    ),
+  );
+
+  return runsByEvent.flat();
+}
+
 async function listJobsForRun({ github, context, run }) {
   const jobs = [];
 
-  for await (const response of github.paginate.iterator(github.rest.actions.listJobsForWorkflowRun, {
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    run_id: run.id,
-    per_page: 100,
-  })) {
-    const pageJobs = Array.isArray(response.data) ? response.data : response.data?.jobs;
+  try {
+    for await (const response of github.paginate.iterator(github.rest.actions.listJobsForWorkflowRun, {
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      run_id: run.id,
+      per_page: 100,
+    })) {
+      const pageJobs = Array.isArray(response.data) ? response.data : response.data?.jobs;
 
-    if (!Array.isArray(pageJobs)) {
-      throw new TypeError(`Expected jobs array while listing workflow run ${run.id} (${run.name}).`);
+      if (!Array.isArray(pageJobs)) {
+        throw new TypeError(`Expected jobs array while listing workflow run ${run.id} (${run.name}).`);
+      }
+
+      jobs.push(...pageJobs);
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw error;
     }
 
-    jobs.push(...pageJobs);
+    throw wrapGithubApiFailure(
+      error,
+      `GitHub Actions API failed while listing jobs for workflow run ${run.id} (${run.name}).`,
+    );
   }
 
   return jobs;
@@ -174,41 +240,6 @@ async function evaluateCommitRuns({ github, context, core, sha, createdAfter, ex
     failingRuns,
     guardOnlyRuns,
   };
-}
-
-function githubApiErrorStatus(error) {
-  return error?.status ?? error?.response?.status;
-}
-
-function isGithubApiFailure(error) {
-  return Boolean(error?.githubApiFailure);
-}
-
-function githubApiFailureDetails(error, status = githubApiErrorStatus(error)) {
-  const details = [];
-
-  if (status !== undefined) {
-    details.push(`GitHub API status: ${status}.`);
-  }
-
-  if (error?.message) {
-    details.push(error.message);
-  }
-
-  return details.join(' ');
-}
-
-function wrapGithubApiFailure(error, message) {
-  const status = githubApiErrorStatus(error);
-  const wrappedError = new Error([message, githubApiFailureDetails(error, status)].filter(Boolean).join(' '));
-
-  wrappedError.githubApiFailure = true;
-
-  if (status !== undefined) {
-    wrappedError.status = status;
-  }
-
-  return wrappedError;
 }
 
 async function firstParentSha({ github, context, sha }) {
