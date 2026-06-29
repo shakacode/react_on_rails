@@ -4986,7 +4986,7 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
 
-**File: `app/javascript/src/RouterApp/RouterApp.jsx`**
+**File: `app/javascript/src/RouterApp/RouterRoutes.jsx`**
 
 ```jsx
 import React from 'react';
@@ -5005,7 +5005,7 @@ const RouterRoutes = (props) => (
 export default RouterRoutes;
 ```
 
-`RouterApp.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
+`RouterRoutes.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
 `ror_components/` and do not register it directly with React on Rails. Only the files inside
 `ror_components/` are registered entry points.
 
@@ -5015,7 +5015,7 @@ export default RouterRoutes;
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import RouterRoutes from '../RouterApp';
+import RouterRoutes from '../RouterRoutes';
 
 const RouterApp = (props) => (
   <BrowserRouter>
@@ -5084,7 +5084,7 @@ The server entry returns a render function, not JSX directly; see
 ```jsx
 import React from 'react';
 import { StaticRouter } from 'react-router-dom/server';
-import RouterRoutes from '../RouterApp';
+import RouterRoutes from '../RouterRoutes';
 
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
@@ -5146,9 +5146,10 @@ export default HelloWorldApp;
 - Use `<Routes>` and `<Route>` with `element` prop
 - `location` prop takes a string path from `railsContext`
 - No need for `match()` or `RouterContext` - simplified API
-- Components rendered through `react_component_hash` still need the explicit object return shape,
-  such as `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`, rather than
-  the render-function thunk shown here.
+- Components rendered through `react_component_hash` still need the explicit object return shape
+  instead of the render-function thunk shown here. Return the object described in
+  [Render-Functions](../core-concepts/render-functions.md), for example
+  `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
 
 ## Rails Routes Configuration
 
@@ -8784,7 +8785,7 @@ See [Sharing State Between Components](https://react.dev/learn/sharing-state-bet
 
 ## Redux Reducers
 
-The `helloWorld/reducers/index.jsx` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
+The `helloWorld/reducers/helloWorldReducer.js` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
 
 ```javascript
 import usersReducer from './usersReducer';
@@ -18849,7 +18850,7 @@ SOURCE: docs/oss/api-reference/redux-store-api.md
 
 > [!WARNING]
 >
-> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store.
+> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store. Keeping one large shared store can also prevent dynamic code splitting for performance.
 
 > [!IMPORTANT]
 >
@@ -18861,7 +18862,7 @@ If you are rendering one React component on a page, pass props to that component
 
 Choose state ownership before reaching for `redux_store`:
 
-- **Local island state:** use React Hooks or React Context inside one `react_component` root.
+- **Island-local state:** use React Hooks or React Context inside one `react_component` root.
 - **Server state:** use Rails controller props for initial data, then Rails JSON endpoints, GraphQL, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md) for data that belongs on the server.
 - **Multi-island shared client state:** use `redux_store` when separate React roots on one Rails page must read and update the same client-side state.
 
@@ -19163,9 +19164,10 @@ Runtime options:
 
 Description:
 
-The react_on_rails:install generator integrates webpack with rails with ease. You
-can pass the options below to customize the generated example and supporting
-configuration.
+The react_on_rails:install generator integrates a JavaScript bundler with Rails
+with ease. Fresh installs use Rspack by default; pass --no-rspack to use
+Webpack. You can pass the options below to customize the generated example and
+supporting configuration.
 ```
 
 > [!WARNING]

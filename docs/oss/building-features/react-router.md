@@ -41,7 +41,7 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
 
-**File: `app/javascript/src/RouterApp/RouterApp.jsx`**
+**File: `app/javascript/src/RouterApp/RouterRoutes.jsx`**
 
 ```jsx
 import React from 'react';
@@ -60,7 +60,7 @@ const RouterRoutes = (props) => (
 export default RouterRoutes;
 ```
 
-`RouterApp.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
+`RouterRoutes.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
 `ror_components/` and do not register it directly with React on Rails. Only the files inside
 `ror_components/` are registered entry points.
 
@@ -70,7 +70,7 @@ export default RouterRoutes;
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import RouterRoutes from '../RouterApp';
+import RouterRoutes from '../RouterRoutes';
 
 const RouterApp = (props) => (
   <BrowserRouter>
@@ -139,7 +139,7 @@ The server entry returns a render function, not JSX directly; see
 ```jsx
 import React from 'react';
 import { StaticRouter } from 'react-router-dom/server';
-import RouterRoutes from '../RouterApp';
+import RouterRoutes from '../RouterRoutes';
 
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
@@ -201,9 +201,10 @@ export default HelloWorldApp;
 - Use `<Routes>` and `<Route>` with `element` prop
 - `location` prop takes a string path from `railsContext`
 - No need for `match()` or `RouterContext` - simplified API
-- Components rendered through `react_component_hash` still need the explicit object return shape,
-  such as `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`, rather than
-  the render-function thunk shown here.
+- Components rendered through `react_component_hash` still need the explicit object return shape
+  instead of the render-function thunk shown here. Return the object described in
+  [Render-Functions](../core-concepts/render-functions.md), for example
+  `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
 
 ## Rails Routes Configuration
 

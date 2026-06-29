@@ -2,7 +2,7 @@
 
 > [!WARNING]
 >
-> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store.
+> This runtime API remains supported for existing apps and advanced shared-store use cases, but it is not recommended as the default state model for new React on Rails apps. Prefer the standard `react_component` view helper with props or a render-function unless multiple React islands must coordinate through one client store. Keeping one large shared store can also prevent dynamic code splitting for performance.
 
 > [!IMPORTANT]
 >
@@ -14,7 +14,7 @@ If you are rendering one React component on a page, pass props to that component
 
 Choose state ownership before reaching for `redux_store`:
 
-- **Local island state:** use React Hooks or React Context inside one `react_component` root.
+- **Island-local state:** use React Hooks or React Context inside one `react_component` root.
 - **Server state:** use Rails controller props for initial data, then Rails JSON endpoints, GraphQL, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md) for data that belongs on the server.
 - **Multi-island shared client state:** use `redux_store` when separate React roots on one Rails page must read and update the same client-side state.
 

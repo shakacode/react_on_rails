@@ -25,9 +25,10 @@ Runtime options:
 
 Description:
 
-The react_on_rails:install generator integrates webpack with rails with ease. You
-can pass the options below to customize the generated example and supporting
-configuration.
+The react_on_rails:install generator integrates a JavaScript bundler with Rails
+with ease. Fresh installs use Rspack by default; pass --no-rspack to use
+Webpack. You can pass the options below to customize the generated example and
+supporting configuration.
 ```
 
 > [!WARNING]

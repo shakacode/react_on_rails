@@ -8,7 +8,7 @@ See [Sharing State Between Components](https://react.dev/learn/sharing-state-bet
 
 ## Redux Reducers
 
-The `helloWorld/reducers/index.jsx` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
+The `helloWorld/reducers/helloWorldReducer.js` example from the hidden legacy Redux generator may be slightly confusing because of its simplicity. For clarity, what follows is a more fleshed-out example of what a reducer might look like:
 
 ```javascript
 import usersReducer from './usersReducer';
