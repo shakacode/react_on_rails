@@ -13,7 +13,7 @@ module ReactOnRails
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
-      LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip
+      LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip.freeze
         The react_on_rails:react_with_redux generator is a hidden legacy Redux generator path and is not
         recommended for new React on Rails apps.
         New apps should use the default React on Rails installer without Redux. Runtime Redux APIs such as

@@ -196,9 +196,9 @@ module ReactOnRails
         # This is inherited by all invoked generators and persists through Rails initialization
         # See lib/react_on_rails/engine.rb for the validation skip logic
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
-        add_legacy_redux_install_warning
 
         if installation_prerequisites_met? || options.ignore_warnings?
+          add_legacy_redux_install_warning
           invoke_generators
           add_package_json_scripts
           add_ci_workflow
@@ -794,7 +794,8 @@ module ReactOnRails
             ]
           else
             [
-              "Existing apps that need the legacy Redux scaffold can run:",
+              "Existing apps that need the legacy Redux scaffold can use the hidden react_with_redux generator. " \
+              "That generator is also legacy and emits its own warning:",
               "bundle exec rails generate react_on_rails:react_with_redux"
             ]
           end
