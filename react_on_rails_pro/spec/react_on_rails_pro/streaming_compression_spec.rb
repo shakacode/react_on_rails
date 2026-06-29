@@ -25,8 +25,8 @@ require "zlib"
 # just like a buffered response, closing the raw-transfer-bytes gap versus the Inertia baseline.
 RSpec.describe "Streamed RSC compression" do
   # Mimics ActionController::Live::Buffer's Rack body: chunked and deliberately
-  # WITHOUT `to_ary` (which Live::Buffer also omits). Rack::Deflater streams via `each` and
-  # issues a Z_SYNC_FLUSH per chunk, matching streamed RSC responses.
+  # WITHOUT `to_ary` (which Live::Buffer also omits). Rack::Deflater streams via
+  # `each`, matching the shape of streamed RSC responses.
   let(:streaming_body_class) do
     Class.new do
       def initialize(chunks)
