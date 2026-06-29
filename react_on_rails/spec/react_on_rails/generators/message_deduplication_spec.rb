@@ -41,6 +41,21 @@ describe "Message Deduplication", type: :generator do
         expect(output_text).to include("✨ KEY FEATURES:")
       end
     end
+
+    context "with legacy Redux installation" do
+      it "shows the success message exactly once" do
+        run_generator_test_with_args(%w[--redux], package_json: true)
+        output_text = GeneratorMessages.output.join("\n")
+
+        success_count = output_text.scan("🎉 React on Rails Successfully Installed!").count
+        expect(success_count).to(
+          eq(1),
+          "Expected success message to appear exactly once, but appeared #{success_count} times"
+        )
+
+        expect(output_text).to include("hidden legacy Redux generator path")
+      end
+    end
   end
 
   describe "NPM install execution" do

@@ -356,12 +356,44 @@ shared_examples "React Component Shared Store" do |url|
   end
 end
 
+shared_examples "Legacy Redux shared store route smoke" do |url|
+  subject { page }
+
+  before { visit url }
+
+  context url do
+    it "renders both shared store components from the registered store" do
+      expect(page).to have_current_path(url, ignore_query: true)
+      expect(page).to have_css(
+        "#ReduxSharedStoreApp-react-component-0 h3",
+        text: "Redux Hello, Mr. Server Side Rendering!"
+      )
+      expect(page).to have_css(
+        "#ReduxSharedStoreApp-react-component-1 h3",
+        text: "Redux Hello, Mr. Server Side Rendering!"
+      )
+    end
+  end
+end
+
 describe "legacy Redux shared store, client only", :js do
   include_examples "React Component Shared Store", "/client_side_hello_world_shared_store"
 end
 
 describe "legacy Redux shared store, server side", :js do
   include_examples "React Component Shared Store", "/server_side_hello_world_shared_store"
+end
+
+describe "legacy Redux shared store, controller setup, client only", :js do
+  include_examples "Legacy Redux shared store route smoke", "/client_side_hello_world_shared_store_controller"
+end
+
+describe "legacy Redux shared store, controller setup, server side", :js do
+  include_examples "Legacy Redux shared store route smoke", "/server_side_hello_world_shared_store_controller"
+end
+
+describe "legacy Redux shared store, client side, defer", :js do
+  include_examples "Legacy Redux shared store route smoke", "/client_side_hello_world_shared_store_defer"
 end
 
 describe "legacy Redux shared store, server side, defer", :js do

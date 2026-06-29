@@ -51,19 +51,16 @@ test.describe('React on Rails Basic Components', () => {
     await expect(heading).toContainText('Redux with Playwright');
   });
 
-  test('should render legacy Redux server HTML before hydration', async ({ baseURL, browser }) => {
-    const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
-    const page = await context.newPage();
+  test.describe('legacy Redux server-side rendering (no JS)', () => {
+    test.use({ javaScriptEnabled: false });
 
-    try {
+    test('should render legacy Redux server HTML before hydration', async ({ page }) => {
       await page.goto('/');
 
       const reduxApp = page.locator('#ReduxApp-react-component-0');
       await expect(reduxApp.locator('h3')).toContainText('Redux Hello, Mr. Server Side Rendering!');
       await expect(reduxApp.locator('input')).toHaveValue('Mr. Server Side Rendering');
-    } finally {
-      await context.close();
-    }
+    });
   });
 
   test('should properly hydrate server-rendered components', async ({ page }) => {
