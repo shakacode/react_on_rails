@@ -59,7 +59,7 @@ test.describe('React on Rails Basic Components', () => {
 
       const reduxApp = page.locator('#ReduxApp-react-component-0');
       await expect(reduxApp.locator('h3')).toContainText('Redux Hello, Mr. Server Side Rendering!');
-      await expect(reduxApp.locator('input')).toHaveValue('Mr. Server Side Rendering');
+      await expect(reduxApp.locator('input')).toHaveAttribute('value', 'Mr. Server Side Rendering');
     });
   });
 
