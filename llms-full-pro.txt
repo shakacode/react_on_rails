@@ -2246,9 +2246,34 @@ Extending the example with a second slow section (`users`), the page fills in st
 
 [Diagram: Three browser snapshots. Stage 1 is the shell at about 50 ms: the header is done while users and posts show loading states, but the page is already visible and becomes interactive as JS loads. Stage 2: the users section fills in while posts still load. Stage 3: the page is complete with header, users, and posts all done. Each Suspense boundary swaps its fallback for real content as its prop arrives.]
 
-## Compression Middleware Compatibility
+## Compression for Streamed RSC Responses {#compression-middleware-compatibility}
 
-Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware (`Rack::Deflater`, `Rack::Brotli`) works correctly with streaming **by default** — each chunk is compressed and flushed immediately, preserving low TTFB.
+Streaming RSC renders HTML directly into the document instead of serializing a JSON data payload, so the **raw** (uncompressed) HTML transfer is larger than the equivalent Inertia/JSON response — but rendered HTML compresses far better. To make the transfer-bytes comparison fair, compress the streamed response end to end (see [issue #4238](https://github.com/shakacode/react_on_rails/issues/4238)). The good news: streamed RSC responses compress with the **same** Rack middleware as any other response, with no special handling required.
+
+### Enabling Compression in Rails
+
+`Rack::Deflater` (gzip/deflate) compresses streamed responses correctly out of the box:
+
+```ruby
+# config/application.rb
+config.middleware.use Rack::Deflater
+```
+
+For Brotli (`br`), which typically beats gzip on HTML, add the [`rack-brotli`](https://github.com/marcotc/rack-brotli) gem and insert it the same way:
+
+```ruby
+# Gemfile
+gem "rack-brotli"
+
+# config/application.rb
+config.middleware.use Rack::Brotli
+```
+
+Either middleware negotiates the encoding from the request's `Accept-Encoding` header and sets `Content-Encoding: gzip` / `br` on the response. The regression coverage in this repository verifies `Rack::Deflater` end to end for gzip-compressed streaming responses. If your application intentionally runs both `Rack::Deflater` and `Rack::Brotli`, treat the combined middleware order as an application-level Rack stack choice: React on Rails Pro does not reorder compression middleware, so verify the final stack order, `Accept-Encoding` negotiation, and streamed flush behavior in your app before relying on both encodings in production.
+
+### Why It Works With Streaming
+
+Streaming responses use `ActionController::Live`, which writes chunks to a `SizedQueue` (a destructive, non-idempotent data structure). Standard Rack compression middleware works with streaming by wrapping the response body and compressing as Rack iterates the stream; this repository verifies that behavior with `Rack::Deflater`. Downstream proxy, CDN buffering, or stacked third-party compression middleware can still affect observed TTFB, so verify the full path with the checks below.
 
 However, if you pass an `:if` condition that calls `body.each` to check the response size, **streaming responses will deadlock**. The `:if` callback destructively consumes all chunks from the queue, leaving nothing for the compressor to read.
 
@@ -2268,7 +2293,7 @@ The [Rack SPEC](https://github.com/rack/rack/blob/main/SPEC.rdoc) states that `e
 ```ruby
 config.middleware.use Rack::Deflater, if: lambda { |*, body|
   # Streaming bodies don't support to_ary — always compress them.
-  # Rack::Deflater handles streaming correctly with sync flush per chunk.
+  # Rack::Deflater handles streaming correctly when it owns body.each.
   return true unless body.respond_to?(:to_ary)
 
   body.to_ary.sum(&:bytesize) > 512
@@ -2276,6 +2301,72 @@ config.middleware.use Rack::Deflater, if: lambda { |*, body|
 ```
 
 The same applies to `Rack::Brotli` or any middleware that accepts an `:if` callback.
+
+### Compression at the Reverse Proxy
+
+You can compress in Rails (above) **or** at the reverse proxy. nginx will not recompress a response whose `Content-Encoding` is already set by Rails, but configuring compression at multiple layers adds complexity and can cause surprises with CDNs or older proxies. Pick one layer for predictable behavior. The critical constraint for streaming is that the proxy must **not buffer the whole response** before forwarding it, or you lose the streaming TTFB advantage.
+
+**nginx.** By default nginx buffers proxied responses (`proxy_buffering on`), which holds the stream until it is complete. Two options:
+
+```nginx
+location / {
+  proxy_pass http://rails_app;
+
+  # Option A — disable buffering for everything proxied here. Simplest; the
+  # whole location streams. Pick Rails compression (Rack::Deflater /
+  # Rack::Brotli) or nginx `gzip`/`brotli` directives so operators only need
+  # to reason about one compression layer.
+  proxy_buffering off;
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+**Option B — keep buffering on globally and let Rails opt specific streamed responses out** with the `X-Accel-Buffering: no` response header. nginx honors it per-response, so only streaming routes bypass the buffer while everything else keeps nginx buffering:
+
+```nginx
+location / {
+  proxy_pass http://rails_app;
+
+  # No proxy_buffering directive here; inherit the default `on`.
+  # Rails sets X-Accel-Buffering: no on streaming responses that need it.
+
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+```ruby
+# In the streaming controller action, before the first stream write:
+def show
+  response.headers["X-Accel-Buffering"] = "no"
+  stream_view_containing_react_components(template: "example/show")
+end
+```
+
+`X-Accel-Buffering: no` only disables **proxy** buffering; it does not affect compression. If Rails already set `Content-Encoding`, nginx will not recompress. If nginx itself compresses (`gzip on` / the brotli module), chunk flushing depends on upstream flush signals and nginx's compression buffers. For guaranteed per-chunk TTFB with arbitrary streaming intervals, compress at the Rails layer (`Rack::Deflater` / `Rack::Brotli`) rather than at nginx.
+
+**Cloudflare.** Cloudflare can compress eligible responses automatically and should respect an existing `Content-Encoding` from your origin rather than double-compressing. Do not assume any CDN preserves every application flush boundary: verify the production route with `curl`, browser DevTools, and the inline RSC stream marks after Cloudflare rules, cache settings, and plan-specific features are applied. If your origin already sets `Content-Encoding: br`, confirm that the header is still present at the browser.
+
+### Verifying Compression End to End
+
+Confirm the streamed route actually negotiates an encoding:
+
+```bash
+curl -sSD - -o /dev/null -H 'Accept-Encoding: br, gzip' https://your-app.example/your-streaming-route
+# Look for:  content-encoding: br   (or gzip)
+#            transfer-encoding: chunked   (no content-length — still streamed)
+#            vary: Accept-Encoding   (CDNs must cache by negotiated encoding)
+```
+
+In the browser, open DevTools → Network → select the navigation request → **Response Headers** should show `content-encoding`, and the **Size** column shows the transferred (compressed) bytes versus the larger uncompressed content size.
+
+`Rack::Deflater` appends `Vary: Accept-Encoding` when it compresses a response. Keep that header intact through custom middleware and proxies so CDNs do not serve a cached gzip response to a client that did not advertise gzip support.
+
+The gem's own coverage of this path lives in `react_on_rails_pro/spec/react_on_rails_pro/streaming_compression_spec.rb`, which asserts that a Rack body shaped like `ActionController::Live::Buffer` is gzip-compressed with the decompressed bytes unchanged.
 
 ## Metadata with Streaming
 
@@ -4358,7 +4449,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Cause**: A compression middleware (`Rack::Deflater`, `Rack::Brotli`) is configured with an `:if` condition that calls `body.each` to check the response size. This destructively consumes streaming chunks from the `SizedQueue`, causing a deadlock.
 
-**Fix**: See the [Compression Middleware Compatibility](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
+**Fix**: See the [Compression for Streamed RSC Responses](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## Node Renderer
 
