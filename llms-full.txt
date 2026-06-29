@@ -18130,9 +18130,9 @@ ReactOnRailsPro.configure do |config|
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
-  # for a SSR request to return once issued. With the async-http renderer client, this is applied as
+  # for a renderer socket read once issued. With the async-http renderer client, this is applied as
   # the per-read socket timeout on the renderer connection. Increase this value for long-running
-  # streaming SSR responses.
+  # streaming SSR responses with legitimate gaps between chunks.
   config.ssr_timeout = 5
 
   # If false, then crash if no backup rendering when the remote renderer is not available
@@ -18142,10 +18142,15 @@ ReactOnRailsPro.configure do |config|
   # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
-  # Currently has no effect. The async-http adapter creates a new client per request,
-  # so this pool limit is never reached. The setting is kept for forward-compatibility
-  # with planned persistent connection support (see issue #3283).
-  # Setting a non-default value emits a warning explaining this.
+  # Maximum number of concurrent async-http connections per client to the Node renderer.
+  # HTTP/2 may multiplex multiple request streams over those pooled connections.
+  # When a Fiber.scheduler already exists before the renderer request enters `Sync {}`, the
+  # client is reused across requests within that long-lived scheduler (persistent connection /
+  # keep-alive; see the tuning section below), so this limit bounds connection concurrency for
+  # streamed renders sharing one client.
+  # Otherwise the adapter uses a request-scoped client. Under standard Puma (no pre-existing scheduler), `Sync {}`
+  # creates that scheduler/client for the request and cleans it up when the request ends.
+  # See "Renderer Performance Tuning for Streamed RSC" below.
   # Default for `renderer_http_pool_size` is 10
   config.renderer_http_pool_size = 10
 
@@ -18219,6 +18224,47 @@ ReactOnRailsPro.configure do |config|
   # - Progressive rendering with Suspense boundaries
 end
 ```
+
+## Renderer Performance Tuning for Streamed RSC
+
+The dominant contributors to a streamed route's `responseEnd` tail are Node renderer round-trip overhead, cold or under-warmed renderer workers, and per-request connection setup between Rails and the renderer. Three levers address these (see [issue #4240](https://github.com/shakacode/react_on_rails/issues/4240)). Measure changes with before/after page-load timing for the streamed route, `Server-Timing` for the early Rails/renderer phases that are known before the first stream write, the inline RSC stream performance marks described in the [Streaming SSR guide](../../pro/streaming-ssr.md), and renderer logs or tracing for cold-worker behavior. Inline marks remain the source for late payload, flush, hydration, and stream-drain timing because `ActionController::Live` commits headers on the first stream write.
+
+### 1. Warm up renderer workers
+
+Each worker compiles its bundle on its **first** render request, so the first measured render after a deploy is cold. Pre-warm every worker before serving real traffic so cold-start cost does not land on a user (or skew a benchmark):
+
+- Send a warm-up render (or hit `/ready` after a warm-up render) to each replica during deploy.
+- With `workersCount > 1`, a single warm-up render is not enough. Route warm-up traffic so it reaches **every** worker under your actual load-balancing policy; sticky or hash-based routing may require replica-local hooks or an explicit fan-out endpoint. **Do not gate all traffic on `/ready` without a separate warm-up path** — if no render requests reach the renderer, `/ready` never flips to 200 (deadlock).
+
+Full warm-up patterns (Kubernetes probes, `postStart` hooks, the `/ready` cold-start contract) are in [Node renderer health checks → Gating traffic on `/ready`](../building-features/node-renderer/health-checks.md#gating-traffic-on-ready).
+
+### 2. Size the worker pool and the connection pool together
+
+Two independent limits gate renderer throughput:
+
+| Setting                                                                                             | Where    | Default  | Governs                                                           |
+| --------------------------------------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------- |
+| [`workersCount`](../building-features/node-renderer/js-configuration.md) / `RENDERER_WORKERS_COUNT` | Renderer | CPUs − 1 | How many renders the renderer can execute concurrently.           |
+| `renderer_http_pool_size`                                                                           | Rails    | 10       | Max concurrent async-http connections per client to the renderer. |
+
+Guidance:
+
+- With Falcon or another long-lived scheduler, keep `renderer_http_pool_size` close to (and generally not far above) `workersCount`; streamed renders sharing that scheduler use the same async-http client, and HTTP/2 may multiplex request streams over the pooled connections. Sending many more concurrent renderer requests than there are workers just queues renders at the renderer while adding connection and scheduling overhead.
+- Under standard Puma streaming, `Sync {}` creates a request-scoped client, so `renderer_http_pool_size` only bounds concurrent async-http connections inside one streamed response. Use a value near the number of renderer calls one response can overlap; scale `workersCount` and renderer replicas for cross-request concurrency.
+- Account for your Rails concurrency: with many Puma threads/workers all streaming, a renderer with only one or two workers becomes the bottleneck. Scale `workersCount` (and renderer replicas) to your real concurrent streamed-render load.
+- Tune `ssr_timeout` for legitimate long gaps between streamed chunks — it applies as a per-read socket timeout, so it fires when a single read from the renderer blocks for `ssr_timeout` seconds. It is not a total response-duration cap; avoid masking renderer hangs with an unnecessarily high value.
+
+### 3. Rails ↔ renderer keep-alive (persistent on Falcon/async scheduler; per-request on standard Puma)
+
+Connection reuse is automatic when the renderer request runs under a long-lived `Fiber.scheduler`, such as Falcon or Puma configured with an async scheduler. In that setup, the async-http client is stored on the scheduler and reused across streaming requests, so HTTP/2 connections stay alive and renders multiplex over them instead of paying TCP handshake and H2 connection setup per request ([issue #3283](https://github.com/shakacode/react_on_rails/issues/3283)). No React on Rails configuration is required to enable this.
+
+Under standard Puma, the streaming helper's `Sync {}` block creates a per-request scheduler. The async-http client is cleaned up when that streaming response ends, so connection reuse does not persist across consecutive Rails requests. The benefit is still meaningful inside a single streamed response: renderer calls in that response can share the same client lifecycle and `renderer_http_pool_size` still bounds concurrent async-http connections within that request.
+
+Call the renderer from the normal Rails request path. The adapter chooses scheduler-scoped reuse whenever a `Fiber.scheduler` already exists before it enters `Sync {}`; custom middleware or background code that installs a scheduler with an unclear lifecycle can therefore keep renderer clients alive longer than intended. Keep those calls inside the request's scheduler lifecycle, or use the standard path where `Sync {}` creates and cleans up the per-request client.
+
+`config.renderer_http_keep_alive_timeout` is **deprecated** and ignored: the async-http adapter manages connection lifecycle automatically (connections are reused within the scheduler and cleaned up when it ends). Explicitly setting it to a non-`nil` value in your `configure` block emits a deprecation warning; leaving it unset or setting it to `nil` is accepted silently. If you previously set it to `30` (the old default), remove the line from your `configure` block entirely.
+
+To confirm reuse, compare before/after `responseEnd` timing and streamed RSC performance marks, and trace renderer sockets when you need to distinguish long-lived scheduler reuse from standard Puma's per-request scheduler cleanup.
 
 ## Need Help?
 
@@ -20504,7 +20550,7 @@ For the best SSR performance, React on Rails Pro provides a [dedicated Node.js r
 
 1. First make sure your code works with server rendering disabled (`prerender: false`).
 2. Set `config.trace` to true. You will get the server invocation code that renders your component. If you're not using Shakapacker, you will also get the whole file used to set up the JavaScript context.
-3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression Middleware Compatibility](../../pro/streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
+3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## CSS
 
@@ -24640,7 +24686,7 @@ After adding `'use client'` to all entry points, rebuild all three bundles and v
 
 Replace synchronous view helpers and controller rendering with their streaming equivalents.
 
-> **Warning: Compression middleware.** If your app uses `Rack::Deflater`, `Rack::Brotli`, or similar compression middleware, streaming responses will deadlock. The middleware calls `body.each` to check the response size, which blocks on `ActionController::Live::Buffer`. See [Compression Middleware Compatibility](../building-features/streaming-server-rendering.md#compression-middleware-compatibility) for the fix.
+> **Warning: Compression middleware callbacks.** Default `Rack::Deflater`, `Rack::Brotli`, and similar compression middleware work with streaming responses, but a custom `:if` condition that calls `body.each` to check response size will deadlock on `ActionController::Live::Buffer`. See the Pro guide [Compression for Streamed RSC Responses](../../pro/streaming-ssr.md#compression-middleware-compatibility) for the safe pattern.
 
 ### 6a. Update controllers
 

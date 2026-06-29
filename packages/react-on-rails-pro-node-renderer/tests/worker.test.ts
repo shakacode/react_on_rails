@@ -34,6 +34,8 @@ import {
   getFixtureSecondaryBundle,
   getFixtureAsset,
   getOtherFixtureAsset,
+  createUploadedBundle,
+  uploadedBundlePath,
   createAsset,
   serverBundleCachePath,
   assetPath,
@@ -199,6 +201,27 @@ describe('worker', () => {
     expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
     expect(res.payload).toContain('Received type: null.');
     expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest treats null rscStreamObservability as absent', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        rscStreamObservability: null,
+      })
+      .end();
+
+    expect(res.statusCode).toBe(410);
+    expect(res.payload).toContain('No bundle uploaded');
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is empty string', async () => {
@@ -788,6 +811,37 @@ describe('worker', () => {
     // Verify no asset files were accidentally copied
     expect(files).not.toContain('loadable-stats.json');
     expect(files).not.toContain('loadable-stats-other.json');
+  });
+
+  test('post /upload-assets ignores asset-shaped fields missing file metadata', async () => {
+    const bundleHash = 'malformed-asset-field-hash';
+
+    await createUploadedBundle(testName);
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    const res = await app
+      .inject()
+      .post(`/upload-assets`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        password: 'my_password',
+        [`bundle_${bundleHash}`]: {
+          type: 'asset',
+          savedFilePath: uploadedBundlePath(testName),
+          filename: `${bundleHash}.js`,
+        },
+        malformedAsset: { type: 'asset' },
+      })
+      .end();
+
+    expect(res.statusCode).toBe(200);
+
+    const bundleFilePath = path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`);
+    expect(fs.existsSync(bundleFilePath)).toBe(true);
   });
 
   test('post /upload-assets with no assets and no bundles (empty request) returns 400', async () => {
