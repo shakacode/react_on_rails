@@ -23,6 +23,20 @@ module ReactOnRails
       end
     end
 
+    it "writes the generated declaration file with normal readable permissions" do
+      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        output_path = "generated/rails_response_types.d.ts"
+        generated_path = File.join(dir, output_path)
+
+        described_class.generate(output_path:)
+
+        expect(File.stat(generated_path).mode & 0o777).to eq(0o666 & ~File.umask)
+      end
+    end
+
     it "rejects output paths outside Rails.root" do
       Dir.mktmpdir do |dir|
         allow(Rails).to receive(:root).and_return(Pathname.new(dir))

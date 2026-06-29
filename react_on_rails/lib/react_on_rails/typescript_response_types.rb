@@ -149,13 +149,6 @@ module ReactOnRails
         end
       end
 
-      def raw_wrapper_hash?(spec)
-        return false unless spec.is_a?(Hash)
-
-        normalized = normalize_option_hash(spec)
-        normalized.key?(:raw) && option_wrapper_hash?(spec, normalized)
-      end
-
       def nullable_type(type, raw:)
         type = "(#{type})" if raw && raw_type_needs_parentheses_for_union?(type)
         "#{type} | null"
@@ -239,10 +232,15 @@ module ReactOnRails
         tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
         tempfile.write(content)
         tempfile.close
+        File.chmod(generated_file_mode, tempfile.path)
         FileUtils.mv(tempfile.path, path.to_s)
       rescue StandardError => error
         cleanup_generated_file_write(tempfile, cleanup_directory)
         raise error
+      end
+
+      def generated_file_mode
+        0o666 & ~File.umask
       end
 
       def cleanup_generated_file_write(tempfile, cleanup_directory)
@@ -532,6 +530,13 @@ module ReactOnRails
           nullable: normalized.fetch(:nullable, false),
           optional: normalized.fetch(:optional, false)
         }
+      end
+
+      def raw_wrapper_hash?(spec)
+        return false unless spec.is_a?(Hash)
+
+        normalized = normalize_option_hash(spec)
+        normalized.key?(:raw) && option_wrapper_hash?(spec, normalized)
       end
 
       def option_wrapper_hash?(spec, normalized = nil)
