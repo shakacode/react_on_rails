@@ -50,15 +50,19 @@ import { Routes, Route } from 'react-router-dom';
 const Home = ({ name }) => <div>Hello, {name}!</div>;
 const About = () => <div>About</div>;
 
-const RouterApp = (props) => (
+const RouterRoutes = (props) => (
   <Routes>
     <Route path="/" element={<Home {...props} />} />
     <Route path="/about" element={<About />} />
   </Routes>
 );
 
-export default RouterApp;
+export default RouterRoutes;
 ```
+
+`RouterApp.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
+`ror_components/` and do not register it directly with React on Rails. Only the files inside
+`ror_components/` are registered entry points.
 
 **File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
 
@@ -66,15 +70,15 @@ export default RouterApp;
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import RouterApp from '../RouterApp';
+import RouterRoutes from '../RouterApp';
 
-const RouterAppClient = (props) => (
+const RouterApp = (props) => (
   <BrowserRouter>
-    <RouterApp {...props} />
+    <RouterRoutes {...props} />
   </BrowserRouter>
 );
 
-export default RouterAppClient;
+export default RouterApp;
 ```
 
 ## Legacy Client-Side Setup with Redux
@@ -135,20 +139,21 @@ The server entry returns a render function, not JSX directly; see
 ```jsx
 import React from 'react';
 import { StaticRouter } from 'react-router-dom/server';
-import RouterApp from '../RouterApp';
+import RouterRoutes from '../RouterApp';
 
-const RouterAppServer = (props, railsContext) => {
+const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
 
-  // React on Rails render-function contract: return a function, not JSX directly.
+  // React on Rails calls RouterApp(props, railsContext), then mounts the returned
+  // zero-argument function. Props and location are captured by closure.
   return () => (
     <StaticRouter location={location}>
-      <RouterApp {...props} />
+      <RouterRoutes {...props} />
     </StaticRouter>
   );
 };
 
-export default RouterAppServer;
+export default RouterApp;
 ```
 
 ## Legacy Server-Side Setup with Redux
@@ -197,8 +202,8 @@ export default HelloWorldApp;
 - `location` prop takes a string path from `railsContext`
 - No need for `match()` or `RouterContext` - simplified API
 - Components rendered through `react_component_hash` still need the explicit object return shape,
-  such as `{ componentHtml: renderToString(...), ...otherSlots }`, rather than the render-function
-  thunk shown here.
+  such as `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`, rather than
+  the render-function thunk shown here.
 
 ## Rails Routes Configuration
 
