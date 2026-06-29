@@ -468,6 +468,48 @@ async function testReachableMergeQueueRunFailureIsChecked() {
   assert.match(core.failed[0], /main commit merge-queue-main still has failing workflows/);
 }
 
+async function testWorkflowDispatchRunDoesNotHideFailingTrustedRun() {
+  const previous = 'previous-main';
+  const failingPushRun = run({
+    id: 24,
+    workflowId: 240,
+    sha: previous,
+    name: 'Main CI',
+    runNumber: 1,
+    conclusion: 'failure',
+    event: 'push',
+  });
+  const passingManualRun = run({
+    id: 25,
+    workflowId: 240,
+    sha: previous,
+    name: 'Main CI',
+    runNumber: 2,
+    event: 'workflow_dispatch',
+  });
+  const github = makeGithub({
+    pages: [[failingPushRun, passingManualRun]],
+    jobsByRunId: {
+      24: [buildFailureJob()],
+      25: [successJob()],
+    },
+    parentsBySha: {},
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: previous,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit previous-main still has failing workflows/);
+}
+
 async function testNoRunSyntheticChainLooksThroughToParentFailure() {
   const syntheticBase = 'synthetic-base';
   const priorSyntheticBase = 'prior-synthetic-base';
@@ -723,6 +765,7 @@ async function main() {
   await testNoRunPushBaseAllowsQuietMainSkip();
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
   await testReachableMergeQueueRunFailureIsChecked();
+  await testWorkflowDispatchRunDoesNotHideFailingTrustedRun();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();

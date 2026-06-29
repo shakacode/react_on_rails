@@ -1,6 +1,7 @@
 const FAILURE_CONCLUSIONS = new Set(['failure', 'timed_out', 'cancelled', 'action_required']);
 const GUARD_JOB_NAME = 'detect-changes';
 const GUARD_STEP_NAME = 'Guard docs-only main pushes';
+const TRUSTED_RUN_EVENTS = new Set(['push', 'merge_group']);
 const MAX_GUARD_ONLY_HOPS = 10;
 const MAX_NO_RUNS_HOPS = 50;
 
@@ -68,7 +69,9 @@ async function listWorkflowRunsForSha({ github, context, sha, createdAfter }) {
     direction: 'desc',
   })) {
     const pageRuns = response.data;
-    const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
+    const relevantInPage = pageRuns.filter(
+      (run) => run.head_sha === sha && TRUSTED_RUN_EVENTS.has(run.event),
+    );
 
     if (relevantInPage.length > 0) {
       workflowRuns.push(...relevantInPage);
@@ -254,7 +257,7 @@ function formatNoRunsTrailDetails(noRunsTrail) {
 
   return [
     '',
-    'Skipped candidate commits with no workflow runs while looking for the underlying CI state:',
+    'Skipped candidate commits with no trusted workflow runs while looking for the underlying CI state:',
     ...noRunsTrail.map((sha) => `- ${sha}`),
   ].join('\n');
 }
@@ -332,7 +335,7 @@ async function checkPreviousMainCommitStatus({
       if (parentSha) {
         core.info(
           [
-            `No workflow runs found for ${shaToCheck} in the last 7 days.`,
+            `No trusted workflow runs found for ${shaToCheck} in the last 7 days.`,
             'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
             `that was never pushed to main. Checking first parent ${parentSha} for the underlying CI state.`,
           ].join(' '),
@@ -358,12 +361,14 @@ async function checkPreviousMainCommitStatus({
       if (context.eventName === 'merge_group') {
         core.info(
           [
-            `No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+            `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
             'This SHA is already in the default branch history; no parent tracing needed.',
           ].join('\n'),
         );
       } else {
-        core.info(`No workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`);
+        core.info(
+          `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+        );
       }
       return;
     }
