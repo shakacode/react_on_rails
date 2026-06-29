@@ -791,13 +791,13 @@ module ReactOnRails
           if use_tailwind?
             [
               "Existing apps that need Redux with Tailwind should keep using the hidden install path:",
-              "bundle exec rails generate react_on_rails:install --redux --tailwind"
+              "rails generate react_on_rails:install --redux --tailwind"
             ]
           else
             [
               "Existing apps that need the legacy Redux scaffold can use the hidden react_with_redux generator. " \
               "That generator is also legacy and emits its own warning:",
-              "bundle exec rails generate react_on_rails:react_with_redux"
+              "rails generate react_on_rails:react_with_redux"
             ]
           end
 

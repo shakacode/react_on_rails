@@ -152,11 +152,11 @@ module ReactOnRails
 
           Use the hidden legacy installer path if you intentionally need the Redux scaffold with Tailwind:
 
-            bundle exec rails generate react_on_rails:install --redux --tailwind
+            rails generate react_on_rails:install --redux --tailwind
 
           For new apps, run the default installer without Redux:
 
-            bundle exec rails generate react_on_rails:install --tailwind
+            rails generate react_on_rails:install --tailwind
         MSG
         true
       end

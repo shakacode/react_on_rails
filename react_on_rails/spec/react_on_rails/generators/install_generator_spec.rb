@@ -4512,7 +4512,7 @@ describe InstallGenerator, type: :generator do
       output_text = GeneratorMessages.messages.join("\n")
 
       expect(output_text).to include("legacy Redux generator path")
-      expect(output_text).to include("bundle exec rails generate react_on_rails:react_with_redux")
+      expect(output_text).to include("rails generate react_on_rails:react_with_redux")
     end
 
     specify "hidden install --redux --tailwind warning stays on the install path" do
@@ -4522,7 +4522,7 @@ describe InstallGenerator, type: :generator do
       output_text = GeneratorMessages.messages.join("\n")
 
       expect(output_text).to include("Redux with Tailwind")
-      expect(output_text).to include("bundle exec rails generate react_on_rails:install --redux --tailwind")
+      expect(output_text).to include("rails generate react_on_rails:install --redux --tailwind")
       expect(output_text).not_to include("react_on_rails:react_with_redux")
     end
 
@@ -4694,8 +4694,8 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include(
         "standalone react_on_rails:react_with_redux generator does not support --tailwind"
       )
-      expect(error_text).to include("bundle exec rails generate react_on_rails:install --redux --tailwind")
-      expect(error_text).to include("bundle exec rails generate react_on_rails:install --tailwind")
+      expect(error_text).to include("rails generate react_on_rails:install --redux --tailwind")
+      expect(error_text).to include("rails generate react_on_rails:install --tailwind")
     end
 
     it "allows Redux Tailwind setup when invoked by the install generator" do
