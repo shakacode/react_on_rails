@@ -52,8 +52,8 @@ const About = () => <div>About</div>;
 
 const RouterRoutes = (props) => (
   <Routes>
-    <Route path="/" element={<Home {...props} />} />
-    <Route path="/about" element={<About />} />
+    <Route path="/hello_world" element={<Home {...props} />} />
+    <Route path="/hello_world/about" element={<About />} />
   </Routes>
 );
 
@@ -144,8 +144,9 @@ import RouterRoutes from '../RouterRoutes';
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
 
-  // React on Rails calls RouterApp(props, railsContext), then mounts the returned
-  // zero-argument function. Props and location are captured by closure.
+  // React on Rails calls RouterApp(props, railsContext), then renders the returned
+  // function component. Props are passed again by React, but this example uses the
+  // props and location captured by closure.
   return () => (
     <StaticRouter location={location}>
       <RouterRoutes {...props} />
@@ -202,8 +203,8 @@ export default HelloWorldApp;
 - `location` prop takes a string path from `railsContext`
 - No need for `match()` or `RouterContext` - simplified API
 - Components rendered through `react_component_hash` still need the explicit object return shape
-  instead of the render-function thunk shown here. Return the object described in
-  [Render-Functions](../core-concepts/render-functions.md), for example
+  instead of the render-function thunk shown here. Keep using `renderToString(...)` and return the
+  object described in [Render-Functions](../core-concepts/render-functions.md), for example
   `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
 
 ## Rails Routes Configuration

@@ -6,7 +6,7 @@
 
 > [!IMPORTANT]
 >
-> **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Streaming Server Rendering documentation](../building-features/streaming-server-rendering.md) for details and alternatives.
+> **Script Loading Requirement:** If you use Redux shared stores with inline component registration (registering components in view templates with `<script>ReactOnRails.register({ MyComponent })</script>`), you **must use `defer: true`** in your `javascript_pack_tag` instead of `async: true`. With async loading, the bundle may execute before inline scripts, causing component registration failures. See the [Turbolinks async script loading guidance](../building-features/turbolinks.md#async-script-loading) and [auto-bundling layout integration](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#layout-integration-with-auto-loading) for related script-ordering patterns.
 
 You don't need to use the `redux_store` API to use Redux inside a single React root. This API was set up to support multiple calls to `react_component` on one page that all talk to the same Redux store.
 
