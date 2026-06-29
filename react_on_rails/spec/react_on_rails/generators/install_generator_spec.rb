@@ -4516,6 +4516,7 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
+      expect(output_text).to include("Failed to install Shakapacker")
       expect(output_text).to include("legacy Redux generator path")
       expect(output_text.index("legacy Redux generator path"))
         .to be > output_text.index("Failed to install Shakapacker")
@@ -4609,6 +4610,7 @@ describe InstallGenerator, type: :generator do
       output_text = GeneratorMessages.output.join("\n")
 
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --redux")
+      expect(output_text).to include("Failed to add Shakapacker")
       expect(output_text).to include("legacy Redux generator path")
       expect(output_text.index("legacy Redux generator path")).to be > output_text.index("Failed to add Shakapacker")
     end
