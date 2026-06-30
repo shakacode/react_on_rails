@@ -91,6 +91,21 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).not_to include("base_gem [\"1.0\"]")
   end
 
+  it "loads override fragments with a leading-text source-encoding magic comment" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "# generated file encoding: ISO-8859-1\n# Latin-1 comment with Andr\xE9\n" \
+                     "gem \"base_gem\", \"2.0\"\n".b
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"2.0\"]")
+    expect(stdout).not_to include("base_gem [\"1.0\"]")
+  end
+
   it "loads override fragments with an Emacs-style Ruby source-encoding magic comment" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY,
@@ -103,6 +118,21 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
 
     expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"2.0\"]")
+  end
+
+  it "leaves unpaired Emacs-looking source comments to Ruby's parser" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY
+        # Style note -*- see the encoding: docs for details
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include("unknown or invalid encoding in the magic comment")
+    expect(stderr).not_to include("Gemfile.development_dependencies declares unsupported source encoding \"docs\"")
   end
 
   it "loads a second-line source-encoding magic comment after a shebang" do
@@ -217,6 +247,25 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(status).not_to be_success
     expect(stdout).to eq("")
     expect(stderr).to include("Gemfile.local declares non-ASCII gem name")
+    expect(stderr).not_to include("Encoding::CompatibilityError")
+  end
+
+  it "fails clearly for non-ASCII-compatible source encodings" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: <<~RUBY
+        # encoding: UTF-16
+        gem "base_gem", "2.0"
+      RUBY
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include("Gemfile.local declares unsupported source encoding \"UTF-16\"")
+    expect(stderr).to include("non-ASCII-compatible source encoding")
     expect(stderr).not_to include("Encoding::CompatibilityError")
   end
 
