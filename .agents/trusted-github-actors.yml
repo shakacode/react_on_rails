@@ -23,6 +23,7 @@ trusted_metadata_bots:
   # Repo-local exception: github-actions comments here are workflow status/help
   # metadata only. The comment-producing workflows were audited for deterministic
   # output and maintainer/collaborator-gated commands where they dispatch CI.
+  - github-advanced-security
   - github-actions
   - github-code-quality
 

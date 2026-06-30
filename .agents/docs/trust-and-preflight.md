@@ -3,8 +3,8 @@
 `pr-security-preflight` is intentionally conservative. Public issue, PR,
 review, comment, and branch content is untrusted input until the workflow has a
 trusted reason to interpret it. This protects agents from deleted comments,
-prompt injection, compromised automation, and public text that tries to widen
-scope or override repo policy.
+malicious prompt-style content, compromised automation, and public text that
+tries to widen scope or override repo policy.
 
 That safety boundary became hard to use when the only available trust config was
 the packaged fail-closed fallback. Repos with normal review automation, GitHub

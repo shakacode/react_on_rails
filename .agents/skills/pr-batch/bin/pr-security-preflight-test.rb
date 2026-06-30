@@ -20,7 +20,7 @@ class PrSecurityPreflightTest < Minitest::Test
       home = File.join(dir, "home")
       global_config = File.join(dir, "global-trusted-github-actors.yml")
       FileUtils.mkdir_p([consumer_root, home])
-      write_trust_config(global_config, trusted_users: ["justin808"])
+      write_trust_config(global_config, users: ["justin808"])
 
       out, status = run_script(
         env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => global_config, "HOME" => home),
@@ -42,7 +42,7 @@ class PrSecurityPreflightTest < Minitest::Test
       home = File.join(dir, "home")
       global_config = File.join(dir, "global-trusted-github-actors.yml")
       FileUtils.mkdir_p([consumer_root, home])
-      write_trust_config(global_config, trusted_users: [], trusted_teams: ["maintainers"])
+      write_trust_config(global_config, users: [], teams: ["maintainers"])
 
       out, status = run_script(
         env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => global_config, "HOME" => home),
@@ -64,7 +64,7 @@ class PrSecurityPreflightTest < Minitest::Test
       home = File.join(dir, "home")
       global_config = File.join(dir, "global-trusted-github-actors.yml")
       FileUtils.mkdir_p([consumer_root, home])
-      write_trust_config(global_config, trusted_users: [], trusted_teams: ["owner/maintainers"])
+      write_trust_config(global_config, users: [], teams: ["owner/maintainers"])
 
       out, status = run_script(
         env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => global_config, "HOME" => home),
@@ -87,7 +87,7 @@ class PrSecurityPreflightTest < Minitest::Test
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p([consumer_root, home])
       system("git", "-C", consumer_root, "init", "--quiet")
-      write_trust_config(repo_config, trusted_users: [], trusted_teams: ["maintainers"])
+      write_trust_config(repo_config, users: [], teams: ["maintainers"])
 
       out, status = run_script(
         env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => nil, "HOME" => home),
@@ -111,10 +111,10 @@ class PrSecurityPreflightTest < Minitest::Test
       home_config = File.join(dir, "home", ".agents", "trusted-github-actors.yml")
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(consumer_root)
-      write_trust_config(explicit_config, trusted_users: [])
-      write_trust_config(env_config, trusted_users: ["justin808"])
-      write_trust_config(home_config, trusted_users: ["justin808"])
-      write_trust_config(repo_config, trusted_users: ["justin808"])
+      write_trust_config(explicit_config, users: [])
+      write_trust_config(env_config, users: ["justin808"])
+      write_trust_config(home_config, users: ["justin808"])
+      write_trust_config(repo_config, users: ["justin808"])
 
       out, status = run_script(
         env.merge(
@@ -142,8 +142,8 @@ class PrSecurityPreflightTest < Minitest::Test
       env_config = File.join(dir, "global-trusted-github-actors.yml")
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(consumer_root)
-      write_trust_config(env_config, trusted_users: [])
-      write_trust_config(repo_config, trusted_users: ["justin808"])
+      write_trust_config(env_config, users: [])
+      write_trust_config(repo_config, users: ["justin808"])
 
       out, status = run_script(
         env.merge(
@@ -171,9 +171,9 @@ class PrSecurityPreflightTest < Minitest::Test
       home_config = File.join(dir, "home", ".agents", "trusted-github-actors.yml")
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(consumer_root)
-      write_trust_config(env_config, trusted_users: [])
-      write_trust_config(home_config, trusted_users: [])
-      write_trust_config(repo_config, trusted_users: ["justin808"])
+      write_trust_config(env_config, users: [])
+      write_trust_config(home_config, users: [])
+      write_trust_config(repo_config, users: ["justin808"])
 
       out, status = run_script(
         env.merge(
@@ -199,9 +199,9 @@ class PrSecurityPreflightTest < Minitest::Test
       home_config = File.join(dir, "home", ".agents", "trusted-github-actors.yml")
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(consumer_root)
-      write_trust_config(env_config, trusted_users: ["justin808"])
-      write_trust_config(home_config, trusted_users: ["justin808"])
-      write_trust_config(repo_config, trusted_users: [])
+      write_trust_config(env_config, users: ["justin808"])
+      write_trust_config(home_config, users: ["justin808"])
+      write_trust_config(repo_config, users: [])
 
       out, status = run_script(
         env.merge(
@@ -248,8 +248,8 @@ class PrSecurityPreflightTest < Minitest::Test
       repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(subdirectory)
       system("git", "-C", consumer_root, "init", "--quiet")
-      write_trust_config(env_config, trusted_users: ["justin808"])
-      write_trust_config(repo_config, trusted_users: [])
+      write_trust_config(env_config, users: ["justin808"])
+      write_trust_config(repo_config, users: [])
 
       out, status = run_script(
         env.merge(
@@ -274,7 +274,7 @@ class PrSecurityPreflightTest < Minitest::Test
       home = File.join(dir, "home")
       home_config = File.join(home, ".agents", "trusted-github-actors.yml")
       FileUtils.mkdir_p(consumer_root)
-      write_trust_config(home_config, trusted_users: ["justin808"])
+      write_trust_config(home_config, users: ["justin808"])
 
       out, status = run_script(
         env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => nil, "HOME" => home),
@@ -343,6 +343,18 @@ class PrSecurityPreflightTest < Minitest::Test
       assert_includes out, ".github/workflows/test.yml (diff output line"
       assert_includes out, "Suspicious text findings: none"
       assert_equal 1, full_diff_call_count(log_path)
+    end
+  end
+
+  def test_blocking_terms_in_trusted_pr_diff_still_block
+    with_fake_gh("trusted-blocking-diff") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus, out
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #123: suspicious text"
+      assert_includes out, ".github/workflows/test.yml (diff output line"
     end
   end
 
@@ -662,6 +674,31 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
+  def test_truncated_commit_author_coverage_blocks
+    with_fake_gh("truncated-commit-authors") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus, out
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #123: GitHub API coverage truncated"
+      assert_includes out, "commit authors fetched 10 of 11 nodes"
+    end
+  end
+
+  def test_unknown_commit_author_login_blocks_before_trusting_source
+    with_fake_gh("unknown-commit-author") do |env, trust_config_path, _log_path|
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus, out
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #123: GitHub API coverage truncated"
+      assert_includes out, "- #123: suspicious text"
+      assert_includes out, "commit authors nodes unavailable; reported total_count=1"
+    end
+  end
+
   def test_paginated_participants_are_merged_before_visibility_and_coverage_checks
     with_fake_gh("paginated-participants") do |env, trust_config_path, log_path|
       trust_coderabbit(trust_config_path)
@@ -841,13 +878,13 @@ class PrSecurityPreflightTest < Minitest::Test
     Open3.capture2e(env, "ruby", SCRIPT, *args, options)
   end
 
-  def write_trust_config(path, trusted_users:, trusted_bots: [], trusted_metadata_bots: [], trusted_teams: [])
+  def write_trust_config(path, users:, bots: [], metadata_bots: [], teams: [])
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, <<~YAML)
-      trusted_users:#{yaml_list(trusted_users)}
-      trusted_bots:#{yaml_list(trusted_bots)}
-      trusted_metadata_bots:#{yaml_list(trusted_metadata_bots)}
-      trusted_teams:#{yaml_list(trusted_teams)}
+      trusted_users:#{yaml_list(users)}
+      trusted_bots:#{yaml_list(bots)}
+      trusted_metadata_bots:#{yaml_list(metadata_bots)}
+      trusted_teams:#{yaml_list(teams)}
     YAML
   end
 
@@ -1046,7 +1083,7 @@ class PrSecurityPreflightTest < Minitest::Test
       }
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/issues/123" ]; then
-        if [ "$mode" = "warning-diff" ] || [ "$mode" = "untrusted-warning-diff" ]; then
+        if [ "$mode" = "warning-diff" ] || [ "$mode" = "trusted-blocking-diff" ] || [ "$mode" = "untrusted-warning-diff" ] || [ "$mode" = "truncated-commit-authors" ] || [ "$mode" = "unknown-commit-author" ]; then
           cat <<'JSON'
       {"number":123,"title":"Test PR","html_url":"https://github.com/owner/repo/pull/123","body":"","user":{"login":"justin808"},"pull_request":{}}
       JSON
@@ -1101,9 +1138,17 @@ class PrSecurityPreflightTest < Minitest::Test
       {"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}
       JSON
           fi
-        elif [ "$mode" = "warning-diff" ]; then
+        elif [ "$mode" = "warning-diff" ] || [ "$mode" = "trusted-blocking-diff" ]; then
           cat <<'JSON'
       {"data":{"repository":{"pullRequest":{"number":123,"title":"Test PR","url":"https://github.com/owner/repo/pull/123","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"PullRequestCommit","commit":{"authors":{"nodes":[{"user":{"login":"justin808"}}]}}}]}}}}}
+      JSON
+        elif [ "$mode" = "truncated-commit-authors" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":123,"title":"Test PR","url":"https://github.com/owner/repo/pull/123","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"PullRequestCommit","commit":{"authors":{"totalCount":11,"pageInfo":{"hasNextPage":true,"endCursor":"author-page-1"},"nodes":[{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}},{"user":{"login":"justin808"}}]}}}]}}}}}
+      JSON
+        elif [ "$mode" = "unknown-commit-author" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":123,"title":"Test PR","url":"https://github.com/owner/repo/pull/123","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"PullRequestCommit","commit":{"authors":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"user":null}]}}}]}}}}}
       JSON
         elif [ "$mode" = "untrusted-warning-diff" ]; then
           cat <<'JSON'
@@ -1264,7 +1309,7 @@ class PrSecurityPreflightTest < Minitest::Test
       if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
         for arg in "$@"; do
           if [ "$arg" = "--name-only" ]; then
-            if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "untrusted-resolver-trusted-bot-review-comment" ] || [ "$mode" = "unresolved-trusted-bot-review-comment" ]; then
+            if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "untrusted-resolver-trusted-bot-review-comment" ] || [ "$mode" = "unresolved-trusted-bot-review-comment" ] || [ "$mode" = "truncated-commit-authors" ]; then
               printf 'docs/safe.md\n'
               exit 0
             fi
@@ -1272,13 +1317,23 @@ class PrSecurityPreflightTest < Minitest::Test
             exit 0
           fi
         done
-        if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "untrusted-resolver-trusted-bot-review-comment" ] || [ "$mode" = "unresolved-trusted-bot-review-comment" ]; then
+        if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "untrusted-resolver-trusted-bot-review-comment" ] || [ "$mode" = "unresolved-trusted-bot-review-comment" ] || [ "$mode" = "truncated-commit-authors" ]; then
           cat <<'DIFF'
       diff --git a/docs/safe.md b/docs/safe.md
       index 0000000..1111111 100644
       --- a/docs/safe.md
       +++ b/docs/safe.md
       +safe docs
+      DIFF
+          exit 0
+        elif [ "$mode" = "trusted-blocking-diff" ]; then
+          blocking_diff_line="$(printf 'rm %srf tmp/build' '-')"
+          cat <<DIFF
+      diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml
+      index 0000000..1111111 100644
+      --- a/.github/workflows/test.yml
+      +++ b/.github/workflows/test.yml
+      +${blocking_diff_line}
       DIFF
           exit 0
         fi

@@ -79,15 +79,15 @@ See [trust-and-preflight.md](trust-and-preflight.md) for the full operator
 workflow and trust-layer guidance.
 
 A clean preflight is not a trust decision. Pattern and regex-style detection can
-miss indirect, transformed, deleted, or carefully worded prompt-injection
+miss indirect, transformed, deleted, or carefully worded malicious prompt-style
 payloads. The capability boundary remains in force after `SECURITY_PREFLIGHT_OK`:
 untrusted public text still cannot grant itself access to secrets, unattended
 state changes, merge authority, approval changes, sandbox changes, or workflow
 override authority.
 
 The preflight catches the obvious cases. The Rule of Two boundary catches the
-evasions by ensuring that even a successful prompt injection lacks either the
-sensitive data or the unattended state-change/exfiltration capability needed to
+evasions by ensuring that even a successful prompt-style attack lacks either the
+sensitive data or the unattended state-change/external-disclosure capability needed to
 complete the attack chain.
 
 ## Portable Operation

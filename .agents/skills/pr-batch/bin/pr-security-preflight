@@ -72,9 +72,6 @@ WARNING_SUSPICIOUS_PATTERN = /
   ssh-key
 /ix
 
-# Diffs get stricter scrutiny: both blocking and warning terms are treated as blocking.
-DIFF_SUSPICIOUS_PATTERN = Regexp.union(BLOCKING_SUSPICIOUS_PATTERN, WARNING_SUSPICIOUS_PATTERN)
-
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--trust-config PATH] " \
                 "[--acknowledge-risk NUMBER:RISK[,RISK]] [--include-reactions] " \
@@ -487,6 +484,8 @@ def target_source_actor_logins(target)
 end
 
 def trusted_pr_source?(repo, target, trust_config:, team_cache:)
+  return false unless commit_author_coverage_findings(target).empty?
+
   logins = pr_source_actor_logins(target)
   return false if logins.empty?
 
@@ -595,11 +594,13 @@ def suspicious_findings_for_target(repo:, number:, rest:, target:, target_is_pr:
 
   if target_is_pr
     diff = run_gh("pr", "diff", number.to_s, "--repo", repo)
-    diff_findings = suspicious_added_lines(diff, pattern: DIFF_SUSPICIOUS_PATTERN)
+    blocking_diff_findings = suspicious_added_lines(diff, pattern: BLOCKING_SUSPICIOUS_PATTERN)
+    warning_diff_findings = suspicious_added_lines(diff, pattern: WARNING_SUSPICIOUS_PATTERN)
+    suspicious.concat(blocking_diff_findings)
     if trusted_pr_source?(repo, target, trust_config:, team_cache:)
-      suspicious_warnings.concat(diff_findings)
+      suspicious_warnings.concat(warning_diff_findings)
     else
-      suspicious.concat(diff_findings)
+      suspicious.concat(warning_diff_findings)
     end
   end
 
@@ -757,7 +758,13 @@ PR_TIMELINE_NODES_FRAGMENT = <<~GRAPHQL
   ... on ClosedEvent { actor { login } }
   ... on ReopenedEvent { actor { login } }
   ... on PullRequestCommit {
-    commit { authors(first:10) { nodes { user { login } } } }
+    commit {
+      authors(first:10) {
+        totalCount
+        pageInfo { hasNextPage endCursor }
+        nodes { user { login } }
+      }
+    }
   }
 GRAPHQL
 
@@ -936,7 +943,35 @@ def connection_coverage_finding(target, connection_name)
 end
 
 def graph_coverage_findings(target)
-  PAGINATED_CONNECTIONS.filter_map { |connection_name| connection_coverage_finding(target, connection_name) }
+  PAGINATED_CONNECTIONS.filter_map { |connection_name| connection_coverage_finding(target, connection_name) } +
+    commit_author_coverage_findings(target)
+end
+
+def commit_author_coverage_findings(target)
+  return [] unless target["headRefOid"]
+
+  Array(target.dig("timelineItems", "nodes")).filter_map do |item|
+    next unless item["__typename"] == "PullRequestCommit"
+
+    authors = item.dig("commit", "authors")
+    unless authors.is_a?(Hash)
+      next({ connection: "commit authors", fetched_count: 0, reason: "nodes unavailable", total_count: 0 })
+    end
+
+    nodes = authors["nodes"]
+    unless nodes.is_a?(Array)
+      next({ connection: "commit authors", fetched_count: 0, reason: "nodes unavailable", total_count: authors["totalCount"].to_i })
+    end
+
+    total_count = authors["totalCount"].to_i
+    if nodes.any? { |author| author.dig("user", "login").to_s.empty? }
+      next({ connection: "commit authors", fetched_count: nodes.size, reason: "nodes unavailable", total_count: total_count })
+    end
+
+    next unless authors.dig("pageInfo", "hasNextPage") || total_count > nodes.size
+
+    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: total_count }
+  end
 end
 
 def participant_logins_and_unknown_count(target)
