@@ -196,6 +196,7 @@ RSpec.describe "TypeScript response type raw validation" do
       type_name: "EventsShowResponse",
       fields: {
         formatter: { raw: "(value: Project) => string", nullable: true },
+        typed_formatter: { type: { raw: "(value: Project) => string" }, nullable: true },
         label: { raw: "Project extends { id: number } ? string : number", nullable: true },
         compact_label: { raw: "Project extends { id: number }?string:number", nullable: true },
         labels: { array: { raw: "Project extends { id: number } ? string : number", nullable: true } }
@@ -205,6 +206,7 @@ RSpec.describe "TypeScript response type raw validation" do
     declaration = response_types.to_d_ts
 
     expect(declaration).to include("  formatter: ((value: Project) => string) | null;")
+    expect(declaration).to include("  typed_formatter: ((value: Project) => string) | null;")
     expect(declaration).to include("  label: (Project extends { id: number } ? string : number) | null;")
     expect(declaration).to include("  compact_label: (Project extends { id: number }?string:number) | null;")
     expect(declaration).to include("  labels: ((Project extends { id: number } ? string : number) | null)[];")
@@ -277,6 +279,20 @@ RSpec.describe "TypeScript response type raw validation" do
     expect do
       response_types.to_d_ts
     end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:hint/)
+  end
+
+  it "reports boolean-like modifier literals when mixed with plain object fields" do
+    response_types.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        value: { name: :string, nullable: "yes" }
+      }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /:nullable modifier must be true or false/)
   end
 
   it "reports unknown option keys when multiple wrapper keys make the spec ambiguous" do

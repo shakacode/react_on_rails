@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
-require "fileutils"
 require "json"
 require "pathname"
 require "react_on_rails/error"
-require "tempfile"
+require "react_on_rails/typescript_response_types/generated_file_writer"
 
 module ReactOnRails
   module TypeScriptResponseTypes
@@ -56,7 +55,7 @@ module ReactOnRails
     }.freeze
 
     Definition = Struct.new(:name, :fields, :response_key, keyword_init: true)
-    private_constant :Definition, :REGISTRY_MUTEX
+    private_constant :Definition, :GeneratedFileWriter, :REGISTRY_MUTEX
 
     module TypeSpecHelpers
       private
@@ -112,7 +111,7 @@ module ReactOnRails
       end
 
       def validate_modifier_booleans!(spec, normalized)
-        return unless wrapper_keys_for(normalized).any? || non_option_keys_for(spec).empty?
+        return unless validate_modifier_booleans_for?(spec, normalized)
 
         %i[nullable optional].each do |key|
           next unless normalized.key?(key)
@@ -120,6 +119,19 @@ module ReactOnRails
 
           raise ReactOnRails::Error,
                 "Response type spec #{key.inspect} modifier must be true or false: #{spec.inspect}"
+        end
+      end
+
+      def validate_modifier_booleans_for?(spec, normalized)
+        return true if wrapper_keys_for(normalized).any?
+        return true if non_option_keys_for(spec).empty?
+
+        boolean_like_modifier_literals?(normalized)
+      end
+
+      def boolean_like_modifier_literals?(normalized)
+        %i[nullable optional].any? do |key|
+          normalized[key].is_a?(String) && normalized[key].match?(/\A(?:true|false|yes|no)\z/i)
         end
       end
 
@@ -170,6 +182,13 @@ module ReactOnRails
       def raw_type_needs_parentheses_for_union?(type)
         type.match?(/=>|\?/)
       end
+
+      def quote_property(property_name)
+        name = property_name.to_s
+        return name if name.match?(IDENTIFIER_PATTERN)
+
+        name.to_json.gsub("\u2028", "\\u2028").gsub("\u2029", "\\u2029")
+      end
     end
 
     class << self
@@ -183,8 +202,7 @@ module ReactOnRails
 
       def generate(output_path: nil)
         path = root_relative_output_path(output_path || DEFAULT_OUTPUT_PATH)
-        content = to_d_ts
-        write_generated_file(path, content)
+        GeneratedFileWriter.write(path, to_d_ts)
         path.to_s
       end
 
@@ -225,70 +243,6 @@ module ReactOnRails
         output_path_error!(output_path)
       end
 
-      def write_generated_file(path, content)
-        cleanup_directory = highest_missing_ancestor(path.dirname)
-        FileUtils.mkdir_p(path.dirname)
-        validate_generated_file_parent!(path)
-        tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
-        tempfile.write(content)
-        tempfile.close
-        File.chmod(generated_file_mode, tempfile.path)
-        FileUtils.mv(tempfile.path, path.to_s)
-      rescue StandardError => error
-        cleanup_generated_file_write(tempfile, cleanup_directory)
-        raise error
-      end
-
-      def generated_file_mode
-        0o666 & ~File.umask
-      end
-
-      def cleanup_generated_file_write(tempfile, cleanup_directory)
-        cleanup_tempfile(tempfile)
-      rescue StandardError
-        nil
-      ensure
-        cleanup_created_directory(cleanup_directory)
-      end
-
-      def cleanup_tempfile(tempfile)
-        return unless tempfile
-
-        tempfile.close unless tempfile.closed?
-        tempfile.unlink if tempfile.path && File.exist?(tempfile.path)
-      end
-
-      def cleanup_created_directory(cleanup_directory)
-        FileUtils.rm_rf(cleanup_directory) if cleanup_directory&.exist?
-      rescue StandardError
-        nil
-      end
-
-      def highest_missing_ancestor(path)
-        missing_path = nil
-        current_path = path
-
-        until current_path.exist? || current_path.symlink?
-          missing_path = current_path
-          parent_path = current_path.dirname
-          break if parent_path == current_path
-
-          current_path = parent_path
-        end
-
-        missing_path
-      end
-
-      def validate_generated_file_parent!(path)
-        real_root = Rails.root.expand_path.realpath
-        real_parent = path.dirname.realpath
-        return if same_or_child_path?(real_parent, real_root)
-
-        output_path_error!(path.to_s)
-      rescue ArgumentError, Errno::ENOENT, Errno::ELOOP, Errno::ENOTDIR, Errno::EINVAL, Errno::EACCES, Errno::EPERM
-        output_path_error!(path.to_s)
-      end
-
       def nearest_existing_path(path)
         current_path = path
         until current_path.exist? || current_path.symlink?
@@ -322,12 +276,18 @@ module ReactOnRails
     class Registry
       include TypeSpecHelpers
 
-      attr_reader :types, :responses
-
       def initialize
         @types = []
         @responses = []
         @mutex = Mutex.new
+      end
+
+      def types
+        @mutex.synchronize { @types.dup.freeze }
+      end
+
+      def responses
+        @mutex.synchronize { @responses.dup.freeze }
       end
 
       def define_type(type_name, fields:)
@@ -468,6 +428,7 @@ module ReactOnRails
         normalized = normalize_option_hash(spec)
         validate_modifier_booleans!(spec, normalized)
         validate_modifier_only_hash!(spec, normalized)
+        validate_option_wrapper_hash!(spec, normalized)
 
         if option_wrapper_hash?(spec, normalized)
           return array_type(normalized.fetch(:array), indentation:, closing_indentation:) if normalized.key?(:array)
@@ -524,6 +485,7 @@ module ReactOnRails
 
         normalized = normalize_option_hash(spec)
         validate_modifier_booleans!(spec, normalized)
+        validate_option_wrapper_hash!(spec, normalized)
         return {} unless option_wrapper_hash?(spec, normalized)
 
         {
@@ -536,23 +498,28 @@ module ReactOnRails
         return false unless spec.is_a?(Hash)
 
         normalized = normalize_option_hash(spec)
-        normalized.key?(:raw) && option_wrapper_hash?(spec, normalized)
+        return false unless option_wrapper_hash?(spec, normalized)
+        return true if normalized.key?(:raw)
+
+        normalized.key?(:type) && raw_wrapper_hash?(normalized.fetch(:type))
       end
 
       def option_wrapper_hash?(spec, normalized = nil)
         return false unless spec.is_a?(Hash)
 
         normalized ||= normalize_option_hash(spec)
+        return false if non_option_keys_for(spec).any?
+
+        wrapper_keys_for(normalized).one?
+      end
+
+      def validate_option_wrapper_hash!(spec, normalized = nil)
+        normalized ||= normalize_option_hash(spec)
         wrapper_keys = wrapper_keys_for(normalized)
-
         non_option_keys = non_option_keys_for(spec)
-        if non_option_keys.any?
-          validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys)
-          return false
-        end
 
-        return false if wrapper_keys.empty?
-        return true if wrapper_keys.one?
+        validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys) if non_option_keys.any?
+        return if non_option_keys.any? || wrapper_keys.length <= 1
 
         raise ReactOnRails::Error, "Response type specs can only use one of :array, :fields, :raw, or :type"
       end
@@ -574,13 +541,6 @@ module ReactOnRails
 
         raise ReactOnRails::Error,
               "Unrecognized option key(s) in response type spec: #{unrecognized_keys.map(&:inspect).join(', ')}"
-      end
-
-      def quote_property(property_name)
-        name = property_name.to_s
-        return name if name.match?(IDENTIFIER_PATTERN)
-
-        name.to_json
       end
     end
   end
