@@ -48,7 +48,7 @@ export default class CallbackRegistry<T> {
     this.registryType = registryType;
   }
 
-  private clearTimeout() {
+  private clearPendingTimeout() {
     if (!this.timeoutId) return;
 
     clearTimeout(this.timeoutId);
@@ -59,7 +59,7 @@ export default class CallbackRegistry<T> {
     const registryTimeout = getRailsContext()?.componentRegistryTimeout;
     if (!registryTimeout) return;
 
-    this.clearTimeout();
+    this.clearPendingTimeout();
     this.timeoutId = setTimeout(() => this.triggerTimeout(), registryTimeout);
   }
 
@@ -69,6 +69,7 @@ export default class CallbackRegistry<T> {
     this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
       waitingPromiseInfo.reject(this.createNotFoundError(itemName));
     });
+    this.waitingPromises.clear();
     this.notUsedItems.forEach((itemName) => {
       console.warn(
         `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
@@ -89,7 +90,7 @@ export default class CallbackRegistry<T> {
       this.pageLoaded = false;
       this.waitingPromises.clear();
       this.timedout = false;
-      this.clearTimeout();
+      this.clearPendingTimeout();
     });
   }
 
@@ -136,7 +137,6 @@ export default class CallbackRegistry<T> {
     this.waitingPromises.clear();
     this.clear();
     this.timedout = false;
-    if (this.pageLoaded) this.startTimeout();
   }
 
   getAll(): Map<string, T> {
@@ -164,6 +164,9 @@ export default class CallbackRegistry<T> {
         promiseReject = reject;
       });
       this.waitingPromises.set(name, { resolve: promiseResolve, reject: promiseReject, promise });
+      if (this.pageLoaded && this.timeoutId === undefined) {
+        this.startTimeout();
+      }
       return promise;
     }
   }
