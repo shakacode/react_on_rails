@@ -15,6 +15,11 @@ on:
       - 'script/release-forward-port-test.bash'
       - 'script/release-finish'
       - 'script/release-finish-test.bash'
+      - 'bin/read-tool-version'
+      - '.tool-versions'
+      - '.minimum.tool-versions'
+      - '.github/actions/read-tool-versions/**'
+      - '.github/actions/setup-ruby/**'
       - '.github/workflows/git-diff-base-tests.yml'
   pull_request:
     paths:
@@ -26,6 +31,11 @@ on:
       - 'script/release-forward-port-test.bash'
       - 'script/release-finish'
       - 'script/release-finish-test.bash'
+      - 'bin/read-tool-version'
+      - '.tool-versions'
+      - '.minimum.tool-versions'
+      - '.github/actions/read-tool-versions/**'
+      - '.github/actions/setup-ruby/**'
       - '.github/workflows/git-diff-base-tests.yml'
   workflow_dispatch:
 
@@ -37,6 +47,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Set up Ruby for release harnesses
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-version }}
+          install-libyaml: 'false'
+
       - name: Shellcheck detector scripts and test harnesses
         run: |
           shellcheck -x \
@@ -46,6 +66,9 @@ jobs:
             script/ci-changes-detector-test.bash \
             script/release-forward-port-test.bash \
             script/release-finish-test.bash
+
+      - name: Ruby syntax check release scripts
+        run: ruby -c script/release-forward-port && ruby -c script/release-finish
 
       - name: Run git-diff-base test harness
         run: bash script/lib/git-diff-base-test.bash
