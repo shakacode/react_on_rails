@@ -67,6 +67,7 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['Map', () => new Map([['name', 'Apollo']])],
   ['Set', () => new Set(['Apollo'])],
   ['BigInt', () => BigInt(1)],
+  ['Promise', () => Promise.resolve({ name: 'Apollo' })],
   ['Function', () => () => 'Apollo'],
   ['Symbol', () => Symbol('Apollo')],
 ];
@@ -640,6 +641,22 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('wraps BigInt stringify failures from custom toJSON values', async () => {
+    class BigIntJsonValue {
+      toJSON(): bigint {
+        return BigInt(1);
+      }
+    }
+
+    const createProject = createRailsAction<undefined, { ok: true }>({
+      path: '/api/projects',
+      body: () => new BigIntJsonValue(),
+    });
+
+    await expect(createProject()).rejects.toThrow(/contains a BigInt value/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects nested non-JSON request body values before fetch', async () => {
     const createProject = createRailsAction<{ tags: string[] }, { ok: true }>({
       path: '/api/projects',
@@ -647,6 +664,16 @@ describe('createRailsAction', () => {
     });
 
     await expect(createProject({ tags: ['alpha', 'beta'] })).rejects.toThrow(/resolved to Set/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects async body mappers before fetch', async () => {
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+      body: async ({ name }) => ({ project: { name } }),
+    });
+
+    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/resolved to Promise/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -671,6 +698,34 @@ describe('createRailsAction', () => {
 
       const [, init] = fetchMock.mock.calls[0];
       expect(init.body).toBe(JSON.stringify({ accountId: 1, name: 'Apollo' }));
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
+  it('does not consume the dynamic-path warning when body validation rejects before fetch', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(() => Promise.resolve(mockResponse()));
+
+    try {
+      const createProject = createRailsAction<
+        { accountId: number; name: string; attachment?: FormData },
+        { project: { id: number } }
+      >({
+        method: 'POST',
+        path: ({ accountId }) => `/api/accounts/${accountId}/projects`,
+      });
+
+      await expect(
+        createProject({ accountId: 1, name: 'Apollo', attachment: new FormData() }),
+      ).rejects.toThrow(/resolved to FormData/);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(consoleWarn).not.toHaveBeenCalled();
+
+      await createProject({ accountId: 1, name: 'Hermes' });
+
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('dynamic path'));
     } finally {
       consoleWarn.mockRestore();
     }

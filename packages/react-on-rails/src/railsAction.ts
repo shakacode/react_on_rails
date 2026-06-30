@@ -14,9 +14,10 @@ export interface RailsActionOptions<TVariables> {
    */
   body?: (variables: TVariables) => unknown;
   /**
-   * Additional request headers. `X-CSRF-Token` and `X-Requested-With` always win and cannot be
-   * overridden. `Accept` defaults to `application/json` but can be overridden here.
-   * When no JSON body is sent, `Content-Type` is removed after these headers are merged.
+   * Additional request headers. `X-CSRF-Token`, `X-Requested-With`, and the JSON-body
+   * `Content-Type` are controlled by this helper. `Accept` defaults to `application/json`
+   * but can be overridden here. When no JSON body is sent, `Content-Type` is removed after
+   * these headers are merged.
    */
   headers?: HeadersInit | ((variables: TVariables) => HeadersInit);
 }
@@ -183,6 +184,11 @@ const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()):
 
   if (typeof requestBody !== 'object' || requestBody === null) {
     return null;
+  }
+
+  const maybeThenable = requestBody as { then?: unknown };
+  if (typeof maybeThenable.then === 'function') {
+    return 'Promise';
   }
 
   if (seenObjects.has(requestBody)) {
@@ -362,14 +368,18 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
     const requestBody = options.body !== undefined ? options.body(typedVariables) : typedVariables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
-    if (!warnedOnDiscardedDeleteBody) {
-      warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(requestBody);
+    const shouldWarnOnDiscardedDeleteBody =
+      !warnedOnDiscardedDeleteBody && requestBody !== undefined && requestBody !== null;
+    const shouldWarnOnImplicitDynamicPathBody = !warnedOnImplicitDynamicPathBody && hasJsonBody;
+    assertJsonBodyValue(requestBody, hasJsonBody);
+    if (shouldWarnOnDiscardedDeleteBody) {
+      warnOnDiscardedDeleteBody(requestBody);
+      warnedOnDiscardedDeleteBody = true;
     }
-    if (!warnedOnImplicitDynamicPathBody && hasJsonBody) {
+    if (shouldWarnOnImplicitDynamicPathBody) {
       warnOnImplicitBodyWithDynamicPath();
       warnedOnImplicitDynamicPathBody = true;
     }
-    assertJsonBodyValue(requestBody, hasJsonBody);
     let response: Response;
     try {
       response = await fetch(requestUrl, {
