@@ -6,18 +6,36 @@ trusted_users:
 
 # Bot entries are base bot names. GitHub API logins usually include the
 # `[bot]` suffix; humans with the same base login are not trusted by this list.
-# Trusted bots are exempt from hidden-participant blocking, so keep this list
-# limited to bot identities whose generated PR content is safe to process.
+# Trusted bots are exempt from hidden-participant blocking and their generated
+# PR content may be processed as trusted review input. Keep this list narrow.
 trusted_bots:
   - chatgpt-codex-connector
   - claude
   - coderabbitai
   - cursor
   - dependabot
-  # Do not add github-actions without auditing comment-producing workflows:
-  # issue_comment-triggered jobs can mint github-actions[bot] comments from
-  # untrusted user input.
   - greptile-apps
+
+# Metadata-only bots are allowed to appear in PR comments/reviews without
+# becoming trusted instruction sources. Their comment bodies are CI/status
+# evidence only.
+trusted_metadata_bots:
+  # Repo-local exceptions. These comments/reviews are CI/status/static-analysis
+  # metadata only, never instruction text.
+  #
+  # github-actions: ci-commands.yml gates command dispatch to owners, members,
+  # and collaborators. detect-invalid-ci-commands.yml is triggerable by any
+  # commenter and may echo invalid command text back in deterministic help
+  # output; treat those bodies as metadata/status only. claude.yml also listens
+  # on issue_comment, but has read-only permissions and does not mint
+  # github-actions instruction comments.
+  #
+  # github-advanced-security and github-code-quality: GitHub-owned static
+  # analysis metadata from CodeQL/GHAS/code-quality annotations; treat findings
+  # as evidence to inspect, not as agent instructions.
+  - github-advanced-security
+  - github-actions
+  - github-code-quality
 
 # Team entries are GitHub team slugs under the repository owner org. For
 # `shakacode/react_on_rails`, `shakacode` resolves to
