@@ -366,6 +366,21 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <2\.0\.0})
         end
 
+        it "explains that unsupported npm ranges fail closed unless the installed package resolves to v2" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: ">=2.0.0 <3.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            expect(error.message).to include(
+              "React on Rails cannot statically verify, install dependencies so Node can resolve"
+            )
+          }
+        end
+
         it "uses the detected package manager in Rspack v2 fix instructions" do
           expect do
             validate_rsc_rspack_project(

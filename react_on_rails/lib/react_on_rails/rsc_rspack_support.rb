@@ -74,6 +74,9 @@ module ReactOnRails
 
         Rspack v1 is not supported for React Server Components in React on Rails Pro.
         Upgrade to Rspack v2 to ensure RSC works correctly instead of hitting bundler or runtime surprises.
+        If #{RSC_RSPACK_PACKAGE} is declared with an npm range, dist-tag, workspace spec, or local path that
+        React on Rails cannot statically verify, install dependencies so Node can resolve the installed package
+        version or pin #{RSC_RSPACK_PACKAGE} to Rspack v2.
 
         Fix:
           #{rsc_rspack_v2_install_command(package_json_path:)}#{doctor_recommendation}
@@ -131,6 +134,8 @@ module ReactOnRails
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
       return 0 if version_string.start_with?("workspace:")
 
+      # Accept installed semver versions and simple declared lower-bound specs. Other npm ranges or dist-tags
+      # fail closed unless Node resolution already proved that the installed package is Rspack v2.
       major = version_string.match(/\Av?(\d+)\.\d+\.\d+(?:[-+].*)?\z/)&.[](1)
       major.to_i
     end
@@ -180,6 +185,8 @@ module ReactOnRails
 
     def rsc_rspack_upgrade_packages(package_json_path)
       declared_packages = rsc_declared_rspack_upgrade_packages(package_json_path)
+      # If package.json cannot be read, suggest the full Rspack v2 suite so generated Rspack apps get all
+      # companion packages needed by the standard React on Rails development workflow.
       return RSC_RSPACK_V2_PACKAGES if declared_packages.empty?
       return declared_packages if declared_packages.include?(RSC_RSPACK_PACKAGE)
 
