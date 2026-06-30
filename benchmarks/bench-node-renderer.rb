@@ -1,8 +1,12 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Benchmark script for React on Rails Pro Node Renderer
-# Uses Vegeta with HTTP/2 Cleartext (h2c) support
+# Benchmark script for React on Rails Pro Node Renderer.
+#
+# Uses Vegeta with HTTP/2 Cleartext (h2c) support. Set
+# LOAD_GENERATOR_SHARDS=N to split each test across N Vegeta attack processes;
+# the script concatenates the binary result streams and runs one merged Vegeta
+# report so percentiles are recomputed over the combined sample distribution.
 
 require "English"
 require "open3"
@@ -36,6 +40,7 @@ end
 PASSWORD = read_password_from_config
 BASE_URL = env_or_default("BASE_URL", "localhost:3800")
 PROTOCOL_VERSION = read_protocol_version
+LOAD_GENERATOR_SHARDS = env_or_default("LOAD_GENERATOR_SHARDS", 1).to_i
 
 # Test cases: JavaScript expressions to evaluate
 # Format: { name: "test_name", request: "javascript_code", rsc: true/false }
@@ -152,12 +157,96 @@ def render_body(rendering_request)
   ].join("&")
 end
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+def validate_node_renderer_benchmark_config!
+  validate_benchmark_config!
+  validate_positive_integer(LOAD_GENERATOR_SHARDS, "LOAD_GENERATOR_SHARDS")
+
+  return if LOAD_GENERATOR_SHARDS == 1
+  return if LOAD_GENERATOR_SHARDS <= CONNECTIONS && LOAD_GENERATOR_SHARDS <= MAX_CONNECTIONS
+
+  raise "LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS " \
+        "(got shards=#{LOAD_GENERATOR_SHARDS}, connections=#{CONNECTIONS}, max_connections=#{MAX_CONNECTIONS})"
+end
+
+def distribute_integer(total, shard_count)
+  base, remainder = total.divmod(shard_count)
+  Array.new(shard_count) { |index| base + (index < remainder ? 1 : 0) }
+end
+
+def format_vegeta_rate(rate)
+  formatted = format("%.6f", rate)
+  formatted.sub(/\.?0+\z/, "")
+end
+
+def vegeta_rates_for_shards(shard_count)
+  return Array.new(shard_count, "0") if RATE == "max"
+
+  Array.new(shard_count, format_vegeta_rate(RATE.to_f / shard_count))
+end
+
+def vegeta_result_file(name, shard_number, shard_count)
+  return "#{OUTDIR}/#{name}_vegeta.bin" if shard_count == 1
+
+  "#{OUTDIR}/#{name}_vegeta_shard_#{shard_number}_of_#{shard_count}.bin"
+end
+
+def run_vegeta_attack_shards(name, targets_file, shard_count)
+  worker_counts = distribute_integer(CONNECTIONS, shard_count)
+  max_worker_counts = distribute_integer(MAX_CONNECTIONS, shard_count)
+  rates = vegeta_rates_for_shards(shard_count)
+
+  Array.new(shard_count) do |index|
+    shard_number = index + 1
+    result_file = vegeta_result_file(name, shard_number, shard_count)
+    vegeta_args = [
+      "-rate=#{rates.fetch(index)}",
+      "-workers=#{worker_counts.fetch(index)}",
+      "-max-workers=#{max_worker_counts.fetch(index)}"
+    ]
+
+    puts "  Shard #{shard_number}/#{shard_count}: #{vegeta_args.join(' ')}" if shard_count > 1
+
+    vegeta_cmd = [
+      "vegeta", "attack",
+      "-targets=#{Shellwords.escape(targets_file)}",
+      *vegeta_args,
+      "-duration=#{DURATION}",
+      "-timeout=#{REQUEST_TIMEOUT}",
+      "-h2c", # HTTP/2 Cleartext (required for node renderer)
+      "-max-body=0",
+      "> #{Shellwords.escape(result_file)}"
+    ].join(" ")
+
+    raise "Vegeta attack failed for #{name} shard #{shard_number}/#{shard_count}" unless system(vegeta_cmd)
+
+    result_file
+  end
+end
+
+def run_vegeta_reports(result_files, vegeta_txt, vegeta_json)
+  escaped_results = result_files.map { |path| Shellwords.escape(path) }.join(" ")
+
+  # Vegeta's binary result stream is concatenable, so feeding all shard files to
+  # one report recomputes percentiles over the merged sample distribution.
+  unless system("bash", "-c",
+                "set -o pipefail; cat #{escaped_results} | vegeta report | " \
+                "tee #{Shellwords.escape(vegeta_txt)}")
+    raise "Vegeta text report failed"
+  end
+
+  unless system("bash", "-c",
+                "set -o pipefail; cat #{escaped_results} | vegeta report -type=json > " \
+                "#{Shellwords.escape(vegeta_json)}")
+    raise "Vegeta JSON report failed"
+  end
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Run Vegeta benchmark for a single test case. Returns [rps, p50, p90, status]
 # on success and RAISES on any Vegeta/parse failure so the suite can record the
 # failure and exit non-zero instead of shipping fabricated metrics to Bencher.
-def run_vegeta_benchmark(test_case, bundle_timestamp)
+def run_vegeta_benchmark(test_case, bundle_timestamp, shard_count: LOAD_GENERATOR_SHARDS)
   name = test_case[:name]
   request = test_case[:request]
 
@@ -169,7 +258,6 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   # Create temp files for Vegeta
   targets_file = "#{OUTDIR}/#{name}_vegeta_targets.txt"
   body_file = "#{OUTDIR}/#{name}_vegeta_body.txt"
-  vegeta_bin = "#{OUTDIR}/#{name}_vegeta.bin"
   vegeta_json = "#{OUTDIR}/#{name}_vegeta.json"
   vegeta_txt = "#{OUTDIR}/#{name}_vegeta.txt"
 
@@ -183,48 +271,11 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
     @#{body_file}
   TARGETS
 
-  # Configure Vegeta arguments for max rate
-  is_max_rate = RATE == "max"
-  vegeta_args =
-    if is_max_rate
-      ["-rate=0", "-workers=#{CONNECTIONS}", "-max-workers=#{CONNECTIONS}"]
-    else
-      ["-rate=#{RATE}", "-workers=#{CONNECTIONS}", "-max-workers=#{MAX_CONNECTIONS}"]
-    end
-
-  # Run Vegeta attack with h2c
-  # All paths are Shellwords.escape'd for parity with the k6 command in bench.rb,
-  # so an OUTDIR (or test name) containing spaces/special chars can't break the
-  # shell command.
-  vegeta_cmd = [
-    "vegeta", "attack",
-    "-targets=#{Shellwords.escape(targets_file)}",
-    *vegeta_args,
-    "-duration=#{DURATION}",
-    "-timeout=#{REQUEST_TIMEOUT}",
-    "-h2c", # HTTP/2 Cleartext (required for node renderer)
-    "-max-body=0",
-    "> #{Shellwords.escape(vegeta_bin)}"
-  ].join(" ")
-
-  raise "Vegeta attack failed for #{name}" unless system(vegeta_cmd)
-
-  # Generate text report (display and save). Run through bash with pipefail so a
-  # non-zero `vegeta report` exit is not masked by tee's (always-zero) status;
-  # the default /bin/sh on Linux CI is dash, which has no `set -o pipefail`.
-  unless system("bash", "-c",
-                "set -o pipefail; vegeta report #{Shellwords.escape(vegeta_bin)} | " \
-                "tee #{Shellwords.escape(vegeta_txt)}")
-    raise "Vegeta text report failed"
-  end
-
-  # Generate JSON report
-  unless system("vegeta report -type=json #{Shellwords.escape(vegeta_bin)} > #{Shellwords.escape(vegeta_json)}")
-    raise "Vegeta JSON report failed"
-  end
+  result_files = run_vegeta_attack_shards(name, targets_file, shard_count)
+  run_vegeta_reports(result_files, vegeta_txt, vegeta_json)
 
   # Delete the large binary file to save disk space
-  FileUtils.rm_f(vegeta_bin)
+  FileUtils.rm_f(*result_files)
 
   # Parse results
   vegeta_data = parse_json_file(vegeta_json, "Vegeta")
@@ -236,7 +287,7 @@ def run_vegeta_benchmark(test_case, bundle_timestamp)
   [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_status]
 end
 
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Run a batch of test cases against a bundle, collecting per-test failures
 # instead of aborting on the first. A failed test is recorded as FAILED in the
@@ -279,10 +330,10 @@ end
 # Main execution
 
 if __FILE__ == $PROGRAM_NAME
-  validate_benchmark_config!
+  validate_node_renderer_benchmark_config!
 
   # Check required tools
-  check_required_tools(%w[vegeta curl column tee bash])
+  check_required_tools(%w[vegeta curl column tee bash cat])
 
   # Wait for node renderer to be ready
   # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
@@ -345,6 +396,7 @@ if __FILE__ == $PROGRAM_NAME
     "REQUEST_TIMEOUT" => REQUEST_TIMEOUT,
     "CONNECTIONS" => CONNECTIONS,
     "MAX_CONNECTIONS" => MAX_CONNECTIONS,
+    "LOAD_GENERATOR_SHARDS" => LOAD_GENERATOR_SHARDS,
     "RSC_TESTS" => rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s },
     "NON_RSC_TESTS" => non_rsc_tests.map { |tc| tc[:name] }.join(", ").then { |s| s.empty? ? "none" : s }
   )

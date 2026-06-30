@@ -10,6 +10,15 @@ require_relative "../bench-node-renderer"
 # collector), and must be surfaced so the suite can exit non-zero instead of
 # reporting a green run on fabricated data (#3459).
 RSpec.describe "bench-node-renderer" do
+  describe "#validate_node_renderer_benchmark_config!" do
+    it "rejects more load-generator shards than available Vegeta workers" do
+      stub_const("LOAD_GENERATOR_SHARDS", CONNECTIONS + 1)
+
+      expect { validate_node_renderer_benchmark_config! }
+        .to raise_error(/LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS/)
+    end
+  end
+
   describe "#run_vegeta_suite" do
     # Minimal stand-in for BmfCollector that records exactly what would ship to
     # Bencher, so the specs can assert failed tests never reach the payload.
@@ -76,6 +85,65 @@ RSpec.describe "bench-node-renderer" do
 
       expect(failed).to eq(["simple_eval (non-RSC)", "react_ssr (non-RSC)"])
       expect(collector.added).to be_empty
+    end
+  end
+
+  describe "#run_vegeta_benchmark" do
+    it "merges multiple shard result streams into one Vegeta report" do
+      allow(File).to receive(:write)
+      allow(FileUtils).to receive(:rm_f)
+      allow(self).to receive_messages(system: true, parse_json_file: { "throughput" => 123.456,
+                                                                       "latencies" => { "50th" => 1_500_000,
+                                                                                        "90th" => 2_500_000 },
+                                                                       "status_codes" => { "200" => 30 } })
+
+      result = run_vegeta_benchmark({ name: "simple_eval", request: "2+2" }, "bundleX", shard_count: 3)
+
+      expect(result).to eq([123.46, 1.5, 2.5, "200=30"])
+      expect(self).to have_received(:system).with(
+        a_string_matching(/vegeta attack .* -workers=4 -max-workers=4 .*simple_eval_vegeta_shard_1_of_3\.bin/)
+      )
+      expect(self).to have_received(:system).with(
+        a_string_matching(/vegeta attack .* -workers=3 -max-workers=3 .*simple_eval_vegeta_shard_2_of_3\.bin/)
+      )
+      expect(self).to have_received(:system).with(
+        a_string_matching(/vegeta attack .* -workers=3 -max-workers=3 .*simple_eval_vegeta_shard_3_of_3\.bin/)
+      )
+      shard_result_files = [
+        "simple_eval_vegeta_shard_1_of_3.bin",
+        "simple_eval_vegeta_shard_2_of_3.bin",
+        "simple_eval_vegeta_shard_3_of_3.bin"
+      ]
+      expect(self).to have_received(:system).with(
+        "bash",
+        "-c",
+        a_string_including("set -o pipefail; cat", *shard_result_files, "| vegeta report | tee")
+      )
+      expect(self).to have_received(:system).with(
+        "bash",
+        "-c",
+        a_string_including("set -o pipefail; cat", *shard_result_files, "| vegeta report -type=json >")
+      )
+      expect(FileUtils).to have_received(:rm_f).with(
+        a_string_matching(/simple_eval_vegeta_shard_1_of_3\.bin/),
+        a_string_matching(/simple_eval_vegeta_shard_2_of_3\.bin/),
+        a_string_matching(/simple_eval_vegeta_shard_3_of_3\.bin/)
+      )
+    end
+
+    it "raises before reporting or parsing when a shard attack fails" do
+      allow(File).to receive(:write)
+      allow(self).to receive(:system) do |*args|
+        command = args.join(" ")
+        !command.include?("simple_eval_vegeta_shard_2_of_3.bin")
+      end
+      allow(self).to receive(:parse_json_file)
+
+      expect { run_vegeta_benchmark({ name: "simple_eval", request: "2+2" }, "bundleX", shard_count: 3) }
+        .to raise_error(%r{Vegeta attack failed for simple_eval shard 2/3})
+
+      expect(self).not_to have_received(:system).with("bash", "-c", /vegeta report/)
+      expect(self).not_to have_received(:parse_json_file)
     end
   end
 end
