@@ -26,7 +26,7 @@ module AgentWorkflowSeamDoctorTestHelpers
     end
   end
 
-  def write_portable_contract(root)
+  def write_portable_contract(root, omit_scripts: [])
     body = +"# AGENTS.md\n\n"
     body << "## Agent Workflow Configuration\n\n"
     body << "Portable shared skills resolve this repo's commands and policy through:\n\n"
@@ -36,7 +36,7 @@ module AgentWorkflowSeamDoctorTestHelpers
     body << "\n## Commands\n"
     File.write(File.join(root, "AGENTS.md"), body)
     write_agent_workflow_config(root)
-    write_agent_workflow_scripts(root)
+    write_agent_workflow_scripts(root, omit: omit_scripts)
   end
 
   def write_agent_workflow_config(root, overrides = {})
@@ -108,8 +108,7 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
 
   def test_portable_contract_missing_script_fails
     with_repo do |root|
-      write_portable_contract(root)
-      FileUtils.rm_f(File.join(root, ".agents/bin/lint"))
+      write_portable_contract(root, omit_scripts: ["lint"])
       write_skill(root, "No commands here.\n")
 
       out, status = run_doctor(root)
@@ -136,6 +135,19 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     with_repo do |root|
       write_portable_contract(root)
       File.write(File.join(root, ".agents/agent-workflow.yml"), "base_branch: [\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid .agents/agent-workflow.yml"
+    end
+  end
+
+  def test_portable_contract_disallowed_yaml_class_fails_cleanly
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "base_branch: 2026-06-30\n")
       write_skill(root, "No commands here.\n")
 
       out, status = run_doctor(root)

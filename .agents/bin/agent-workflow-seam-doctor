@@ -201,7 +201,7 @@ module AgentWorkflowSeamDoctor
     return ["#{CONFIG_RELATIVE_PATH} must be a mapping"] unless parsed.is_a?(Hash)
 
     parsed
-  rescue Psych::SyntaxError => e
+  rescue Psych::Exception => e
     ["invalid #{CONFIG_RELATIVE_PATH}: #{e.message}"]
   rescue Errno::SystemCallError => e
     ["unable to read #{CONFIG_RELATIVE_PATH}: #{e.message}"]
