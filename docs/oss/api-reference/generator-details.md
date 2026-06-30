@@ -121,6 +121,10 @@ rails generate react_on_rails:react_with_redux
 
 For an app that is already configured for TypeScript, add `--typescript` to generate `.ts` and `.tsx` Redux example files.
 
+> **Note:** The standalone `react_on_rails:react_with_redux` generator does not support `--tailwind`.
+> If you intentionally need the legacy Redux scaffold with Tailwind, run the full installer path instead:
+> `rails generate react_on_rails:install --redux --tailwind`.
+
 For full install recovery of an older Redux-generated app, the hidden `react_on_rails:install --redux` option still exists, but do not use it for greenfield apps.
 
 ### TypeScript Support

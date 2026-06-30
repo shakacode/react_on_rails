@@ -144,9 +144,9 @@ import RouterRoutes from '../RouterRoutes';
 const RouterApp = (props, railsContext) => {
   const { location } = railsContext;
 
-  // React on Rails calls RouterApp(props, railsContext), then renders the returned
-  // function component. Props are passed again by React, but this example uses the
-  // props and location captured by closure.
+  // React on Rails calls RouterApp(props, railsContext) to get this function,
+  // then calls createElement(returnedFn, props). This example uses the props
+  // and location captured by closure.
   return (_props) => (
     <StaticRouter location={location}>
       <RouterRoutes {...props} />
@@ -156,6 +156,11 @@ const RouterApp = (props, railsContext) => {
 
 export default RouterApp;
 ```
+
+> **Note:** Components rendered through `react_component_hash` still need the explicit object return shape
+> instead of the render-function thunk shown here. Keep using `renderToString(...)` and return the object
+> described in [Render-Functions](../core-concepts/render-functions.md), for example
+> `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
 
 ## Legacy Server-Side Setup with Redux
 
