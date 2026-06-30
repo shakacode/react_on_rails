@@ -16,8 +16,31 @@
 import type { Store, StoreGenerator } from 'react-on-rails/types';
 import CallbackRegistry from './CallbackRegistry.ts';
 
-const storeGeneratorRegistry = new CallbackRegistry<StoreGenerator>('store generator');
+const createStoreGeneratorRegistry = () => new CallbackRegistry<StoreGenerator>('store generator');
+
+let storeGeneratorRegistry = createStoreGeneratorRegistry();
 const hydratedStoreRegistry = new CallbackRegistry<Store>('hydrated store');
+const storeGeneratorRegistryClearRejectors = new Set<(error: Error) => void>();
+
+const rejectPendingStoreGeneratorWaiters = () => {
+  if (storeGeneratorRegistryClearRejectors.size === 0) return;
+
+  const error = new Error('Cleared store generator registry before pending waiters resolved.');
+  storeGeneratorRegistryClearRejectors.forEach((reject) => reject(error));
+  storeGeneratorRegistryClearRejectors.clear();
+};
+
+const waitForStoreGenerator = (storeGeneratorPromise: Promise<StoreGenerator>): Promise<StoreGenerator> => {
+  let rejectOnClear: (error: Error) => void = () => {};
+  const clearPromise = new Promise<never>((_, reject) => {
+    rejectOnClear = reject;
+    storeGeneratorRegistryClearRejectors.add(rejectOnClear);
+  });
+
+  return Promise.race([storeGeneratorPromise, clearPromise]).finally(() => {
+    storeGeneratorRegistryClearRejectors.delete(rejectOnClear);
+  });
+};
 
 /**
  * Register a store generator, a function that takes props and returns a store.
@@ -94,7 +117,7 @@ export function setStore(name: string, store: Store): void {
 }
 
 /**
- * Internally used function to completely clear hydratedStores Map.
+ * Clear hydrated stores.
  * @public
  */
 export function clearHydratedStores(): void {
@@ -102,11 +125,13 @@ export function clearHydratedStores(): void {
 }
 
 /**
- * Internally used function to completely clear registered store generators.
+ * Reset registered store generators and pending generator waiters.
  * @public
  */
 export function clearStoreGenerators(): void {
+  rejectPendingStoreGeneratorWaiters();
   storeGeneratorRegistry.clear();
+  storeGeneratorRegistry = createStoreGeneratorRegistry();
 }
 
 /**
@@ -137,4 +162,4 @@ export const getOrWaitForStore = (name: string): Promise<Store> =>
  * @returns Promise that resolves with the StoreGenerator once registered
  */
 export const getOrWaitForStoreGenerator = (name: string): Promise<StoreGenerator> =>
-  storeGeneratorRegistry.getOrWaitForItem(name);
+  waitForStoreGenerator(storeGeneratorRegistry.getOrWaitForItem(name));

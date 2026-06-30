@@ -861,6 +861,35 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
+  context "with --redux --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+
+    it "keeps the hidden legacy Redux TypeScript template path covered" do
+      %w[
+        app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.ts
+        app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.ts
+        app/javascript/src/HelloWorldApp/constants/helloWorldConstants.ts
+        app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.ts
+        app/javascript/src/HelloWorldApp/store/helloWorldStore.ts
+        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx
+        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx
+        app/javascript/src/HelloWorldApp/components/HelloWorld.tsx
+      ].each { |file| assert_file(file) }
+
+      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx" do |content|
+        expect(content).to match(/type HelloWorldProps = PropsFromRedux/)
+        expect(content).to match(/React\.FC<HelloWorldProps>/)
+      end
+
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx" do |content|
+        expect(content).to match(/interface HelloWorldAppProps/)
+        expect(content).to match(/FC<HelloWorldAppProps>/)
+      end
+    end
+  end
+
   context "with --typescript" do
     before(:all) { run_generator_test_with_args(%w[--typescript], package_json: true) }
 
