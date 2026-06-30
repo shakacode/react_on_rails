@@ -362,6 +362,25 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
+        it "allows @rspack/core v2 from a scoped npm alias" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "npm:@rspack/core@^2.0.0"
+            )
+          end.not_to raise_error
+        end
+
+        it "does not treat peer dependencies as installed Rspack" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0",
+              dependency_field: "peerDependencies"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
         it "allows Rspack v1 when RSC is disabled" do
           expect do
             validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0",

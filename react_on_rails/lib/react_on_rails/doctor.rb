@@ -3617,6 +3617,7 @@ module ReactOnRails
     end
 
     def check_rsc_rspack_version
+      # check_rsc_setup gates this on enable_rsc_support before calling here.
       return unless active_assets_bundler == "rspack"
 
       rspack_version = detected_rspack_version_for_rsc

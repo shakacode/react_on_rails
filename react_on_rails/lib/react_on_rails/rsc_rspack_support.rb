@@ -18,8 +18,6 @@ module ReactOnRails
       dependencies
       devDependencies
       optionalDependencies
-      peerDependencies
-      peerOptionalDependencies
     ].freeze
     PACKAGE_NAME_PATTERN = %r{
       \A
@@ -94,9 +92,11 @@ module ReactOnRails
     end
 
     def rsc_package_major_version(version)
-      return 0 if version.to_s.include?("/") && !version.to_s.start_with?("npm:")
+      version_string = version.to_s
+      return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
 
-      major = version.to_s.sub(/\Anpm:[^@]+@/, "").match(/\d+/)&.[](0)
+      version_without_alias = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
+      major = version_without_alias.match(/\d+/)&.[](0)
       major.to_i
     end
 
