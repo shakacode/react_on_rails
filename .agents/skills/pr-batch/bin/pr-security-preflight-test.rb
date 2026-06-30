@@ -54,6 +54,31 @@ class PrSecurityPreflightTest < Minitest::Test
 
       refute status.success?, out
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, 'WARN: global trust config ignores unqualified team slug "maintainers"'
+      assert_includes out, "not in trusted actor allowlist"
+    end
+  end
+
+  def test_explicit_global_trust_config_ignores_unqualified_team_slugs
+    with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer")
+      explicit_config = File.join(dir, "explicit-trusted-github-actors.yml")
+      FileUtils.mkdir_p(consumer_root)
+      write_trust_config(explicit_config, users: [], teams: ["maintainers"])
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        explicit_config,
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, 'WARN: global trust config ignores unqualified team slug "maintainers"'
       assert_includes out, "not in trusted actor allowlist"
     end
   end
@@ -100,6 +125,31 @@ class PrSecurityPreflightTest < Minitest::Test
       assert status.success?, out
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+    end
+  end
+
+  def test_explicit_repo_local_trust_config_allows_unqualified_team_slugs
+    with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer")
+      repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
+      FileUtils.mkdir_p(consumer_root)
+      system("git", "-C", consumer_root, "init", "--quiet")
+      write_trust_config(repo_config, users: [], teams: ["maintainers"])
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        repo_config,
+        "123",
+        chdir: consumer_root
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      refute_includes out, "WARN: global trust config ignores unqualified team slug"
     end
   end
 
@@ -161,6 +211,32 @@ class PrSecurityPreflightTest < Minitest::Test
       refute status.success?, out
       assert_equal 1, status.exitstatus
       assert_includes out, "Trust config not found: #{missing_explicit_config}"
+      refute_includes out, "SECURITY_PREFLIGHT_OK"
+    end
+  end
+
+  def test_missing_env_trust_config_fails_closed_without_fallback
+    with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer")
+      missing_env_config = File.join(dir, "missing-env-trusted-github-actors.yml")
+      home_config = File.join(dir, "home", ".agents", "trusted-github-actors.yml")
+      FileUtils.mkdir_p(consumer_root)
+      write_trust_config(home_config, users: ["justin808"])
+
+      out, status = run_script(
+        env.merge(
+          "AGENT_WORKFLOWS_TRUST_CONFIG" => missing_env_config,
+          "HOME" => File.join(dir, "home")
+        ),
+        "--repo",
+        "owner/repo",
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_equal 1, status.exitstatus
+      assert_includes out, "AGENT_WORKFLOWS_TRUST_CONFIG points to a missing trust config: #{missing_env_config}"
       refute_includes out, "SECURITY_PREFLIGHT_OK"
     end
   end
@@ -383,6 +459,28 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
+  def test_acknowledged_coverage_does_not_downgrade_diff_warning_when_timeline_is_truncated
+    with_fake_gh("truncated-timeline-warning-diff") do |env, trust_config_path, _log_path|
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--acknowledge-risk",
+        "123:github-api-coverage",
+        "123"
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus, out
+      assert_includes out, "Acknowledged security preflight findings:\n- #123: GitHub API coverage truncated"
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #123: suspicious text"
+      assert_includes out, ".github/workflows/test.yml (diff output line"
+    end
+  end
+
   def test_acknowledged_risks_allow_exact_target_suspicious_diff_blocker
     with_fake_gh("untrusted-warning-diff") do |env, trust_config_path, _log_path|
       out, status = run_script(
@@ -525,7 +623,7 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_metadata_bot_comment_is_reported_but_not_actionable_suspicious_text
+  def test_metadata_bot_comment_is_reported_and_warning_scanned
     with_fake_gh("metadata-bot-comment") do |env, trust_config_path, _log_path|
       File.write(trust_config_path, <<~YAML)
         trusted_users:
@@ -544,7 +642,8 @@ class PrSecurityPreflightTest < Minitest::Test
       assert_includes out, "Metadata-only comment/review queue:"
       assert_includes out, "github-actions[bot] issue comment"
       assert_includes out, "Suspicious text findings: none"
-      assert_includes out, "Suspicious text warnings: none"
+      assert_includes out, "Suspicious text warnings:"
+      assert_includes out, "issue comment 701 by github-actions[bot]"
     end
   end
 
@@ -853,6 +952,7 @@ class PrSecurityPreflightTest < Minitest::Test
       assert status.success?, out
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       assert_includes out, "Suspicious text findings: none"
+      assert_includes out, "review comment 901 by coderabbitai[bot]"
     end
   end
 
@@ -1096,7 +1196,7 @@ class PrSecurityPreflightTest < Minitest::Test
       }
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/issues/123" ]; then
-        if [ "$mode" = "warning-diff" ] || [ "$mode" = "trusted-blocking-diff" ] || [ "$mode" = "untrusted-warning-diff" ] || [ "$mode" = "truncated-commit-authors" ] || [ "$mode" = "unknown-commit-author" ]; then
+        if [ "$mode" = "warning-diff" ] || [ "$mode" = "trusted-blocking-diff" ] || [ "$mode" = "untrusted-warning-diff" ] || [ "$mode" = "truncated-commit-authors" ] || [ "$mode" = "unknown-commit-author" ] || [ "$mode" = "truncated-timeline-warning-diff" ]; then
           cat <<'JSON'
       {"number":123,"title":"Test PR","html_url":"https://github.com/owner/repo/pull/123","body":"","user":{"login":"justin808"},"pull_request":{}}
       JSON
@@ -1154,6 +1254,10 @@ class PrSecurityPreflightTest < Minitest::Test
         elif [ "$mode" = "warning-diff" ] || [ "$mode" = "trusted-blocking-diff" ]; then
           cat <<'JSON'
       {"data":{"repository":{"pullRequest":{"number":123,"title":"Test PR","url":"https://github.com/owner/repo/pull/123","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"PullRequestCommit","commit":{"authors":{"nodes":[{"user":{"login":"justin808"}}]}}}]}}}}}
+      JSON
+        elif [ "$mode" = "truncated-timeline-warning-diff" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":123,"title":"Test PR","url":"https://github.com/owner/repo/pull/123","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":{"login":"justin808"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"justin808","url":"https://github.com/justin808","__typename":"User"}]},"timelineItems":{"totalCount":101,"pageInfo":{"hasNextPage":true,"endCursor":"timeline-page-1"},"nodes":[{"__typename":"PullRequestCommit","commit":{"authors":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"user":{"login":"justin808"}}]}}}]}}}}}
       JSON
         elif [ "$mode" = "truncated-commit-authors" ]; then
           cat <<'JSON'

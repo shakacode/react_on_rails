@@ -190,14 +190,19 @@ def resolved_trust_config(explicit_path)
     expanded = File.expand_path(explicit_path)
     abort "Trust config not found: #{expanded}" unless File.exist?(expanded)
 
-    return { path: expanded, global: false }
+    return { path: expanded, global: !path_inside_git_root?(expanded) }
   end
 
   repo_path = repo_trust_config_path
   return { path: repo_path, global: false } if File.exist?(repo_path)
 
   env_path = ENV[USER_TRUST_CONFIG_ENV].to_s
-  return { path: env_path, global: true } if !env_path.empty? && File.exist?(File.expand_path(env_path))
+  unless env_path.empty?
+    expanded_env_path = File.expand_path(env_path)
+    abort "#{USER_TRUST_CONFIG_ENV} points to a missing trust config: #{expanded_env_path}" unless File.exist?(expanded_env_path)
+
+    return { path: expanded_env_path, global: true }
+  end
 
   home_path = File.expand_path(HOME_TRUST_CONFIG)
   return { path: home_path, global: true } if File.exist?(home_path)
@@ -218,6 +223,22 @@ rescue StandardError
   nil
 end
 
+def path_inside_git_root?(path)
+  root = git_toplevel
+  return false unless root
+
+  expanded_root = canonical_path(root)
+  expanded_path = canonical_path(path)
+  expanded_path == expanded_root ||
+    expanded_path.start_with?("#{expanded_root}#{File::SEPARATOR}")
+end
+
+def canonical_path(path)
+  File.realpath(path)
+rescue StandardError
+  File.expand_path(path)
+end
+
 def normalized_team_entry(value, require_owner:)
   owner_or_slug, slug = value.to_s.split("/", 2)
   return if owner_or_slug.empty?
@@ -227,6 +248,8 @@ def normalized_team_entry(value, require_owner:)
 
     { owner: normalized_login(owner_or_slug), slug: }
   elsif require_owner
+    warn "WARN: global trust config ignores unqualified team slug #{owner_or_slug.inspect}: " \
+         "use OWNER/team-slug format"
     nil
   else
     { owner: nil, slug: owner_or_slug }
@@ -491,12 +514,17 @@ def target_source_actor_logins(target)
 end
 
 def trusted_pr_source?(repo, target, trust_config:, team_cache:)
-  return false unless commit_author_coverage_findings(target).empty?
+  return false unless source_actor_coverage_findings(target).empty?
 
   logins = pr_source_actor_logins(target)
   return false if logins.empty?
 
   logins.all? { |login| trusted_actor?(repo, login, trust_config, team_cache) }
+end
+
+def actor_trusted_for_suspicious_warning?(repo, login, trust_config, team_cache)
+  trusted_actor?(repo, login, trust_config, team_cache) ||
+    trusted_metadata_bot?(login, trust_config)
 end
 
 def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, pattern:)
@@ -510,7 +538,7 @@ def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, patter
 
   rest_context.fetch(:issue_comments).each do |comment|
     author = comment.dig("user", "login")
-    next unless trusted_actor?(repo, author, trust_config, team_cache)
+    next unless actor_trusted_for_suspicious_warning?(repo, author, trust_config, team_cache)
     next unless (comment["body"] || "").match?(pattern)
 
     findings << {
@@ -529,11 +557,12 @@ def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:
 
   rest_context.fetch(:review_comments).each do |comment|
     author = comment.dig("user", "login")
-    next unless trusted_actor?(repo, author, trust_config, team_cache)
+    next unless actor_trusted_for_suspicious_warning?(repo, author, trust_config, team_cache)
     # Resolved trusted-bot review comments are historical review metadata. Keep
-    # unresolved/current bot findings blocking, and fail closed if resolution
-    # state could not be fetched.
-    next if trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"])
+    # unresolved/current bot findings visible, preserve blocking-pattern warnings,
+    # and fail closed if resolution state could not be fetched.
+    next if trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"]) &&
+            !pattern.equal?(BLOCKING_SUSPICIOUS_PATTERN)
     next unless (comment["body"] || "").match?(pattern)
 
     findings << {
@@ -624,7 +653,6 @@ end
 
 def untrusted_issue_comment_findings(rest_context, repo, trust_config:, team_cache:)
   rest_context.fetch(:issue_comments).filter_map do |comment|
-
     untrusted_interaction_finding(
       repo,
       comment.dig("user", "login"),
@@ -954,6 +982,13 @@ def graph_coverage_findings(target)
     commit_author_coverage_findings(target)
 end
 
+def source_actor_coverage_findings(target)
+  [
+    connection_coverage_finding(target, "timelineItems"),
+    *commit_author_coverage_findings(target)
+  ].compact
+end
+
 def commit_author_coverage_findings(target)
   return [] unless target["headRefOid"]
 
@@ -972,12 +1007,12 @@ def commit_author_coverage_findings(target)
 
     total_count = authors["totalCount"].to_i
     if nodes.any? { |author| author.dig("user", "login").to_s.empty? }
-      next({ connection: "commit authors", fetched_count: nodes.size, reason: "nodes unavailable", total_count: total_count })
+      next({ connection: "commit authors", fetched_count: nodes.size, reason: "nodes unavailable", total_count: })
     end
 
     next unless authors.dig("pageInfo", "hasNextPage") || total_count > nodes.size
 
-    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: total_count }
+    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: }
   end
 end
 

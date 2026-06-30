@@ -25,9 +25,10 @@ trusted_metadata_bots:
   #
   # github-actions: ci-commands.yml gates command dispatch to owners, members,
   # and collaborators. detect-invalid-ci-commands.yml is triggerable by any
-  # commenter, but emits static help text and does not echo user input.
-  # claude.yml also listens on issue_comment, but has read-only permissions and
-  # does not mint github-actions instruction comments.
+  # commenter and may echo invalid command text back in deterministic help
+  # output; treat those bodies as metadata/status only. claude.yml also listens
+  # on issue_comment, but has read-only permissions and does not mint
+  # github-actions instruction comments.
   #
   # github-advanced-security and github-code-quality: GitHub-owned static
   # analysis metadata from CodeQL/GHAS/code-quality annotations; treat findings
