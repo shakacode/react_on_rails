@@ -243,6 +243,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           assets_bundler:,
           rspack_core_version:,
           dependency_field: "devDependencies",
+          rspack_package_versions: {},
           installed_rspack_core_version: nil,
           package_manager: nil
         )
@@ -260,6 +261,10 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           if rspack_core_version
             package_json[dependency_field] ||= {}
             package_json[dependency_field]["@rspack/core"] = rspack_core_version
+          end
+          rspack_package_versions.each do |package_name, package_version|
+            package_json[dependency_field] ||= {}
+            package_json[dependency_field][package_name] = package_version
           end
           File.write(
             File.join(root, "package.json"),
@@ -297,6 +302,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           rspack_core_version:,
           rsc_enabled: true,
           dependency_field: "devDependencies",
+          rspack_package_versions: {},
           installed_rspack_core_version: nil,
           package_manager: nil,
           configuration_error: nil,
@@ -316,6 +322,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               assets_bundler:,
               rspack_core_version:,
               dependency_field:,
+              rspack_package_versions:,
               installed_rspack_core_version:,
               package_manager:
             )
@@ -337,6 +344,11 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        def stub_failed_node_package_resolution
+          status = instance_double(Process::Status, success?: false)
+          allow(Open3).to receive(:capture3).and_return(["", "Cannot find module", status])
+        end
+
         it "raises before boot when active Rspack is v1" do
           expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
             .to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
@@ -345,6 +357,13 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         it "normalizes simple declared ranges in Rspack v2 errors" do
           expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
+        it "rejects upper-bound declared Rspack ranges" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "<2.0.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <2\.0\.0})
         end
 
         it "uses the detected package manager in Rspack v2 fix instructions" do
@@ -368,6 +387,25 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             aggregate_failures do
               expect(error.message).to include("npm install --save-dev @rspack/core@^2")
               expect(error.message).not_to include("@rspack/cli")
+            end
+          }
+        end
+
+        it "includes missing @rspack/core in fix instructions when only a companion package is declared" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: nil,
+              rspack_package_versions: { "@rspack/cli" => "^1.6.0" },
+              package_manager: "npm@10.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            aggregate_failures do
+              expect(error.message)
+                .to include("npm install --save-dev @rspack/core@^2 @rspack/cli@^2")
+              expect(error.message).not_to include("@rspack/dev-server")
             end
           }
         end

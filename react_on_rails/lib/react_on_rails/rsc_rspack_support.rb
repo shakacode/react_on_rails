@@ -111,13 +111,15 @@ module ReactOnRails
 
     def rsc_package_major_version(version)
       version_string = version.to_s
+      normalized_version = rsc_normalized_declared_package_version(version_string)
+      return normalized_version.split(".").first.to_i if normalized_version
+
       # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
       return 0 if version_string.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
       return 0 if version_string.start_with?("workspace:") && !version_string.match?(/\d/)
 
-      version_without_alias = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
-      major = version_without_alias.match(/\d+/)&.[](0)
+      major = version_string.match(/\Av?(\d+)\.\d+\.\d+(?:[-+].*)?\z/)&.[](1)
       major.to_i
     end
 
@@ -154,15 +156,20 @@ module ReactOnRails
     end
 
     def rsc_normalized_declared_package_version(package_spec)
-      return nil if package_spec.to_s.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
+      spec = package_spec.to_s.strip
+      return nil if spec.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
 
-      clean_version = package_spec.to_s.gsub(/\A[^0-9]*/, "")
-      clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
+      spec = spec.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
+                 .delete_prefix("workspace:")
+      spec.match(/\A(?:[~^]|>=?|=)?\s*v?(\d+\.\d+\.\d+)\z/)&.[](1)
     end
 
     def rsc_rspack_upgrade_packages(package_json_path)
       declared_packages = rsc_declared_rspack_upgrade_packages(package_json_path)
-      declared_packages.empty? ? RSC_RSPACK_V2_PACKAGES : declared_packages
+      return RSC_RSPACK_V2_PACKAGES if declared_packages.empty?
+      return declared_packages if declared_packages.include?(RSC_RSPACK_PACKAGE)
+
+      [RSC_RSPACK_PACKAGE, *declared_packages]
     end
 
     def rsc_declared_rspack_upgrade_packages(package_json_path)
