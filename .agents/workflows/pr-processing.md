@@ -1499,8 +1499,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - using the bounded coordination helper from the resolved `pr-batch`
-     workflow, run bounded `agent-coord doctor --json`, then run bounded
+   - using the bounded helper from the resolved `PR_BATCH_SKILL_DIR`
+     (`PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"`),
+     run bounded `agent-coord doctor --json`, then run bounded
      `agent-coord status --json` as a broad audit/discovery read to list
      candidate batch/run ids and lanes; do not use this broad read for worker
      lane readiness or dependency decisions, and do not retry indefinitely
@@ -1517,8 +1518,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      advisory fallback
    - if broad discovery returns no candidate batch/run ids, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
-     to supply or confirm a batch/run id directly
-   - if broad discovery returns candidates but cannot verify one, record
+     to supply or confirm a batch/run id directly; once the user supplies or
+     confirms one, continue with the known-batch-id path below
+   - if broad discovery returns candidates but cannot determine which candidate
+     is in scope, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
      to confirm one candidate before treating that candidate's lane list as
      worked-issue scope; once confirmed, continue with the known-batch-id path
