@@ -232,6 +232,77 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      context "when React Server Components are enabled with Rspack" do
+        def write_rsc_rspack_project(root, assets_bundler:, rspack_core_version:, rsc_enabled:)
+          write_rsc_rspack_project_files(root, assets_bundler:, rspack_core_version:)
+          stub_rsc_rspack_project(root, rsc_enabled:)
+        end
+
+        def write_rsc_rspack_project_files(root, assets_bundler:, rspack_core_version:)
+          FileUtils.mkdir_p(File.join(root, "config"))
+          File.write(File.join(root, "config/shakapacker.yml"), <<~YAML)
+            default:
+              assets_bundler: #{assets_bundler}
+          YAML
+
+          dependencies = { "react-on-rails-pro" => "17.0.0" }
+          dev_dependencies = {}
+          dev_dependencies["@rspack/core"] = rspack_core_version if rspack_core_version
+          File.write(
+            File.join(root, "package.json"),
+            JSON.generate("dependencies" => dependencies, "devDependencies" => dev_dependencies)
+          )
+        end
+
+        def stub_rsc_rspack_project(root, rsc_enabled:)
+          allow(Rails).to receive(:root).and_return(Pathname.new(root))
+          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          stub_gem_version("17.0.0")
+
+          stub_const("ReactOnRailsPro", Module.new)
+          stub_const("ReactOnRailsPro::Configuration", Class.new)
+          pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: rsc_enabled)
+          ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+        end
+
+        def validate_rsc_rspack_project(assets_bundler:, rspack_core_version:, rsc_enabled: true)
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project(root, assets_bundler:, rspack_core_version:, rsc_enabled:)
+            package_json = File.join(root, "package.json")
+            node_package_version = VersionChecker::NodePackageVersion.new(package_json)
+            VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
+          end
+        end
+
+        it "raises before boot when active Rspack is v1" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
+        end
+
+        it "raises before boot when active Rspack is missing @rspack/core" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
+        it "allows active Rspack v2" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+            .not_to raise_error
+        end
+
+        it "allows Rspack v1 when RSC is disabled" do
+          expect do
+            validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0",
+                                        rsc_enabled: false)
+          end.not_to raise_error
+        end
+
+        it "allows Rspack v1 when webpack is active" do
+          expect { validate_rsc_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
+            .not_to raise_error
+        end
+      end
+
       context "when package.json file does not exist" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,

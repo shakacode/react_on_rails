@@ -5274,6 +5274,80 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_rsc_rspack_version" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    def write_rspack_project(assets_bundler:, rspack_core_version:)
+      FileUtils.mkdir_p("config")
+      File.write("config/shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: #{assets_bundler}
+      YAML
+
+      dependencies = { "react" => "19.0.4" }
+      dev_dependencies = {}
+      dev_dependencies["@rspack/core"] = rspack_core_version if rspack_core_version
+      File.write(
+        "package.json",
+        JSON.generate("dependencies" => dependencies, "devDependencies" => dev_dependencies)
+      )
+    end
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+      allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+    end
+
+    context "when RSC uses Rspack v1" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Rspack v2 or newer") }).to be true
+        expect(error_msgs.any? { |m| m[:content].include?("@rspack/core@^2") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack but @rspack/core is missing" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Detected @rspack/core: not found") }).to be true
+        expect(error_msgs.any? { |m| m[:content].include?("@rspack/core@^2") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack v2" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+
+      it "reports success" do
+        doctor.send(:check_rsc_rspack_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when the app uses webpack" do
+      before { write_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
+
+      it "does not report an Rspack error" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs).to be_empty
+      end
+    end
+  end
+
   describe "check_rsc_rspack_lazy_compilation" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

@@ -3494,6 +3494,10 @@ module ReactOnRails
       config/rspack/rscWebpackConfig.js
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
+    RSC_RSPACK_PACKAGE = "@rspack/core"
+    MINIMUM_RSC_RSPACK_MAJOR = 2
+    RSPACK_V2_INSTALL_COMMAND = "pnpm add -D @rspack/core@^2 @rspack/cli@^2 " \
+                                "@rspack/dev-server@^2 @rspack/plugin-react-refresh@^2"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -3548,6 +3552,7 @@ module ReactOnRails
       check_rsc_renderer_mode(pro_config)
       check_rsc_payload_route
       check_rsc_bundler_config
+      check_rsc_rspack_version
       check_rsc_rspack_lazy_compilation
       check_rsc_react_version
       check_rsc_procfile_watcher
@@ -3619,6 +3624,47 @@ module ReactOnRails
             rails g react_on_rails:rsc
         MSG
       end
+    end
+
+    def check_rsc_rspack_version
+      return unless active_assets_bundler == "rspack"
+
+      rspack_version = detected_rspack_version_for_rsc
+      if rspack_version && package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+        checker.add_success("✅ Rspack #{rspack_version} is compatible with RSC")
+        return
+      end
+
+      checker.add_error(rsc_rspack_version_error(rspack_version))
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not verify Rspack version for RSC: #{e.message}")
+    end
+
+    def detected_rspack_version_for_rsc
+      detect_package_version_from_deps(RSC_RSPACK_PACKAGE) || declared_package_spec(RSC_RSPACK_PACKAGE)
+    end
+
+    def package_major_version(version)
+      return 0 if version.to_s.include?("/") && !version.to_s.start_with?("npm:")
+
+      major = version.to_s.sub(/\Anpm:[^@]+@/, "").match(/\d+/)&.[](0)
+      major.to_i
+    end
+
+    def rsc_rspack_version_error(rspack_version)
+      detected_version = rspack_version || "not found"
+
+      <<~MSG.strip
+        🚫 RSC with Rspack requires Rspack v2 or newer.
+
+        Detected #{RSC_RSPACK_PACKAGE}: #{detected_version}
+
+        Rspack v1 is not supported for React Server Components in React on Rails Pro.
+        Upgrade to Rspack v2 so RSC setup fails fast instead of hitting bundler or runtime surprises.
+
+        Fix:
+          #{RSPACK_V2_INSTALL_COMMAND}
+      MSG
     end
 
     def check_rsc_rspack_lazy_compilation
