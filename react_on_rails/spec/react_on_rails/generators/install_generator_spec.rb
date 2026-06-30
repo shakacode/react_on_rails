@@ -3107,6 +3107,66 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack --redux" do
+    # Uses --skip so template() preserves the pre-existing shakapacker.yml,
+    # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        # Note: You must restart bin/shakapacker-dev-server for changes to take effect
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_root_path: public
+          public_output_path: packs
+          cache_path: tmp/shakapacker
+          webpack_compile_output: true
+          shakapacker_precompile: true
+          additional_paths: []
+          cache_manifest: false
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--redux", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator"
+
+    it "installs both Rspack and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("@rspack/core")
+        expect(deps).to include("redux")
+      end
+    end
+  end
+
   context "with --rspack --typescript" do
     # Uses --skip so template() preserves the pre-existing shakapacker.yml,
     # while gsub_file patchers (configure_rspack_in_shakapacker) still run on it.
@@ -3257,6 +3317,23 @@ describe InstallGenerator, type: :generator do
       assert_file "config/initializers/react_on_rails_pro.rb" do |content|
         expect(content).not_to include("enable_rsc_support")
         expect(content).not_to include("rsc_bundle_js_file")
+      end
+    end
+  end
+
+  context "with --pro --redux" do
+    before(:all) { run_generator_test_with_args(%w[--pro --redux], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator"
+    include_examples "pro_common_files"
+
+    it "installs both Pro and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-pro")
+        expect(deps).to include("redux")
       end
     end
   end
@@ -3726,6 +3803,46 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("Return to the generated home page")
       end
     end
+  end
+
+  context "with --rsc --redux" do
+    before(:all) { run_generator_test_with_args(%w[--rsc --redux], package_json: true) }
+
+    include_examples "react_with_redux_generator"
+    include_examples "rsc_common_files"
+
+    it "creates both HelloWorldApp and HelloServer" do
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
+      assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+    end
+
+    it "links the Redux SSR demo to the RSC demo" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include("/hello_server")
+        expect(content).to include("Open the RSC demo")
+      end
+    end
+
+    it "creates hello_world route and controller for Redux" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include("hello_world")
+      end
+      assert_file "app/controllers/hello_world_controller.rb"
+    end
+
+    it "installs both RSC and Redux dependencies" do
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-rsc")
+        expect(deps).to include("redux")
+      end
+    end
+
+    include_examples "rsc_hello_server_files"
   end
 
   context "with --rsc --typescript" do
