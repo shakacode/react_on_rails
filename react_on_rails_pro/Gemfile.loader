@@ -15,7 +15,7 @@
 
 source_encoding_pattern = /
   \A[ \t]*(?:
-    (?:coding|encoding)[ \t]*[:=]|
+    (?:[A-Za-z0-9_-]+[ \t]*[:=][^;\n]*;[ \t]*)*(?:coding|encoding)[ \t]*[:=]|
     -\*-[ \t]*.*(?:coding|encoding)[ \t]*[:=]|
     (?:vim|vi|ex):.*(?:fileencoding|fenc|coding|encoding)[ \t]*[:=]
   )[ \t]*([A-Za-z0-9._-]+)

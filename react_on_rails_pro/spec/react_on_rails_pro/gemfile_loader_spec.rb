@@ -75,6 +75,20 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).to include("base_gem [\"2.0\"]")
   end
 
+  it "loads override fragments with a combined Ruby source-encoding magic comment" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "# frozen_string_literal: true; encoding: ISO-8859-1\n# Latin-1 comment with Andr\xE9\n" \
+                     "gem \"base_gem\", \"2.0\"\n".b
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"2.0\"]")
+  end
+
   it "loads override fragments with an Emacs-style Ruby source-encoding magic comment" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY,
