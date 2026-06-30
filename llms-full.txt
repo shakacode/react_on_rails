@@ -18946,7 +18946,7 @@ Renders through the same streaming/RSC renderer as `stream_react_component`, but
 
 Unlike `stream_react_component`, this helper does not require the controller to use `stream_view_containing_react_components`.
 
-`buffered_stream_react_component` forces `prerender: true`; passing `prerender: false` has no effect. Common options mirror `stream_react_component`, including `props`, `id`, `html_options`, `trace`, and `raise_on_prerender_error`.
+`buffered_stream_react_component` forces `prerender: true`; passing `prerender: false` has no effect. Common options mirror `stream_react_component`, including `props`, `id`, `html_options`, `trace`, `raise_on_prerender_error`, and `on_complete`. When provided, `on_complete` receives the buffered string chunks after rendering finishes; mutating those chunks does not change the returned HTML.
 
 ```ruby
 <%= buffered_stream_react_component("MarketingPage",
