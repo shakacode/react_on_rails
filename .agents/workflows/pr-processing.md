@@ -1504,13 +1504,17 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      as a broad audit/discovery read to list candidate batch/run ids and lanes;
      do not use this broad read for worker lane readiness or dependency
      decisions, and do not retry indefinitely
-   - if bounded `agent-coord doctor --json` is missing, fails, or times out,
+   - if the bounded helper or `agent-coord` binary is missing, or bounded
+     `agent-coord doctor --json` fails or times out,
      record `worked_issue_scope: UNKNOWN (setup)`
    - if bounded `agent-coord doctor --json` passes but broad discovery status
      fails or times out, record `worked_issue_scope: UNKNOWN (access)`
    - if broad discovery returns no candidate batch/run ids, or returns
      candidates but cannot verify one, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)`
+   - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
+     `UNKNOWN (needs batch confirmation)`; only report candidate ids as
+     confirmation targets when backend setup and discovery access both worked
    - ask the user to confirm a candidate before treating any candidate lane list
      as worked-issue scope
 
