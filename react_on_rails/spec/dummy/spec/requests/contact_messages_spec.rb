@@ -84,6 +84,15 @@ describe "ContactMessages (useRailsForm 422 round trip)" do
     end
   end
 
+  describe "GET /typed_rails_action" do
+    it "renders the typed Rails action example page" do
+      get "/typed_rails_action"
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Typed Rails action round trip")
+    end
+  end
+
   describe "React on Rails response type contract" do
     it "registers the contact message responses used by the typed Rails action example" do
       generated_types = ReactOnRails::TypeScriptResponseTypes.to_d_ts
