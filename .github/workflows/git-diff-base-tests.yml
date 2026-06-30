@@ -69,8 +69,14 @@ jobs:
 
       - name: Ruby syntax check release scripts
         run: |
+          set +e
           ruby -c script/release-forward-port
+          forward_port_status=$?
           ruby -c script/release-finish
+          finish_status=$?
+          if [ "$forward_port_status" -ne 0 ] || [ "$finish_status" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Run git-diff-base test harness
         run: bash script/lib/git-diff-base-test.bash
