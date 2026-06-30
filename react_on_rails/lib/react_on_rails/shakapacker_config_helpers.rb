@@ -19,6 +19,7 @@ module ReactOnRails
   # identically whether included or extended.
   module ShakapackerConfigHelpers
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    SHAKAPACKER_ASSETS_BUNDLER_ENV = "SHAKAPACKER_ASSETS_BUNDLER"
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
 
     private
@@ -82,8 +83,12 @@ module ReactOnRails
       SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
     end
 
+    def env_assets_bundler
+      normalize_assets_bundler(ENV.fetch(SHAKAPACKER_ASSETS_BUNDLER_ENV, nil))
+    end
+
     def active_assets_bundler
-      configured_assets_bundler || "webpack"
+      env_assets_bundler || configured_assets_bundler || "webpack"
     end
 
     def assets_bundler_label
