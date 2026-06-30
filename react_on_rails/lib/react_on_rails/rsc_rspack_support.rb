@@ -33,7 +33,7 @@ module ReactOnRails
         "#{package_name}@^#{MINIMUM_RSC_RSPACK_MAJOR}"
       end.join(" ")
 
-      case ReactOnRails::Utils.detect_package_manager
+      case rsc_detected_package_manager
       when :pnpm
         "pnpm add -D #{packages}"
       when :bun
@@ -91,8 +91,14 @@ module ReactOnRails
       nil
     end
 
+    def rsc_declared_package_version(package_json_path, package_name)
+      package_spec = rsc_declared_package_spec(package_json_path, package_name)
+      rsc_normalized_declared_package_version(package_spec) || package_spec
+    end
+
     def rsc_package_major_version(version)
       version_string = version.to_s
+      # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
 
       version_without_alias = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
@@ -100,7 +106,7 @@ module ReactOnRails
       major.to_i
     end
 
-    def rsc_resolved_node_package_json_path(package_root, package_name, script)
+    def rsc_resolved_node_package_json_path(package_root, package_name, script, &)
       stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
       unless status.success?
         yield(package_name) if block_given?
@@ -111,6 +117,12 @@ module ReactOnRails
     rescue StandardError
       yield(package_name) if block_given?
       ""
+    end
+
+    def rsc_detected_package_manager
+      ReactOnRails::Utils.detect_package_manager
+    rescue StandardError
+      :yarn
     end
 
     def valid_rsc_package_name?(package_name)
@@ -124,6 +136,11 @@ module ReactOnRails
       end
 
       nil
+    end
+
+    def rsc_normalized_declared_package_version(package_spec)
+      clean_version = package_spec.to_s.gsub(/\A[^0-9]*/, "")
+      clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
     end
   end
 end

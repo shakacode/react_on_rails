@@ -322,6 +322,11 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
         end
 
+        it "normalizes simple declared ranges in Rspack v2 errors" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
         it "uses the detected package manager in Rspack v2 fix instructions" do
           expect do
             validate_rsc_rspack_project(
@@ -330,6 +335,13 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               package_manager: "npm@10.0.0"
             )
           end.to raise_error(ReactOnRails::Error, %r{npm install --save-dev @rspack/core@\^2})
+        end
+
+        it "falls back to yarn instructions when package manager detection fails" do
+          allow(ReactOnRails::Utils).to receive(:detect_package_manager).and_raise(RuntimeError, "unavailable")
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, %r{yarn add --dev @rspack/core@\^2})
         end
 
         it "raises before boot when active Rspack is missing @rspack/core" do

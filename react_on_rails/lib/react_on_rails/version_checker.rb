@@ -283,7 +283,7 @@ module ReactOnRails
     end
 
     def package_dependency_spec(package_name)
-      rsc_declared_package_spec(node_package_version.package_json, package_name)
+      rsc_declared_package_version(node_package_version.package_json, package_name)
     end
 
     def rsc_rspack_version_error(rspack_version)

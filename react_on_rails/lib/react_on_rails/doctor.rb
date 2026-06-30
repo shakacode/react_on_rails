@@ -3617,8 +3617,8 @@ module ReactOnRails
     end
 
     def check_rsc_rspack_version
-      # check_rsc_setup gates this on enable_rsc_support before calling here.
       return unless active_assets_bundler == "rspack"
+      return unless rsc_support_enabled_for_doctor?
 
       rspack_version = detected_rspack_version_for_rsc
       if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
@@ -3629,6 +3629,14 @@ module ReactOnRails
       checker.add_error(rsc_rspack_version_error(rspack_version))
     rescue StandardError => e
       checker.add_warning("⚠️  Could not verify Rspack version for RSC: #{e.message}")
+    end
+
+    def rsc_support_enabled_for_doctor?
+      return false unless ReactOnRails::Utils.react_on_rails_pro?
+      return false unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
+
+      pro_config = ReactOnRailsPro.configuration
+      pro_config.respond_to?(:enable_rsc_support) && pro_config.enable_rsc_support
     end
 
     def detected_rspack_version_for_rsc

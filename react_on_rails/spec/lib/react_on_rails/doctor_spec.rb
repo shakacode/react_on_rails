@@ -5322,6 +5322,10 @@ RSpec.describe ReactOnRails::Doctor do
     before do
       allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
       allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      pro_config = double("ProConfig", enable_rsc_support: true)
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
     end
 
     context "when RSC uses Rspack v1" do
@@ -5353,6 +5357,20 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_rspack_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when RSC is disabled" do
+      before do
+        pro_config = double("ProConfig", enable_rsc_support: false)
+        ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+        write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0")
+      end
+
+      it "does not report an Rspack error" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs).to be_empty
       end
     end
 
