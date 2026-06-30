@@ -83,4 +83,15 @@ describe "ContactMessages (useRailsForm 422 round trip)" do
       expect(response.body).to include("useRailsForm 422 round trip")
     end
   end
+
+  describe "React on Rails response type contract" do
+    it "registers the contact message responses used by the typed Rails action example" do
+      generated_types = ReactOnRails::TypeScriptResponseTypes.to_d_ts
+
+      expect(generated_types).to include('"contact_messages.create": ContactMessagesCreateResponse;')
+      expect(generated_types).to include('"contact_messages.validation_error": ContactMessagesValidationErrorResponse;')
+      expect(generated_types).to include("message: string;")
+      expect(generated_types).to include("email?: string[];")
+    end
+  end
 end
