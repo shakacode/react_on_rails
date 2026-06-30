@@ -4317,6 +4317,15 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("rails generate react_on_rails:react_with_redux")
     end
 
+    specify "hidden install --redux --typescript legacy warning preserves the TypeScript flag" do
+      install_generator = install_generator_fixture(redux: true, typescript: true)
+
+      install_generator.send(:add_legacy_redux_install_warning)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("rails generate react_on_rails:react_with_redux --typescript")
+    end
+
     specify "hidden install --redux legacy warning is only added once" do
       install_generator = install_generator_fixture(redux: true)
 
