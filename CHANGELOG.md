@@ -41,6 +41,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
+  configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
+  `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
+  so Rspack v1 remains allowed for non-RSC apps, and bundler detection now honors `SHAKAPACKER_ASSETS_BUNDLER`
+  before `config/shakapacker.yml`.
+  [PR 4289](https://github.com/shakacode/react_on_rails/pull/4289) by [justin808](https://github.com/justin808).
 - **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
   `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
   React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
