@@ -135,6 +135,7 @@ export default class CallbackRegistry<T> {
       waitingPromiseInfo.reject(error);
     });
     this.waitingPromises.clear();
+    this.clearPendingTimeout();
     this.clear();
     this.timedout = false;
   }

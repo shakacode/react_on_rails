@@ -68,6 +68,25 @@ describe('StoreRegistry', () => {
     await expect(StoreRegistry.getOrWaitForStoreGenerator('DeferredStore')).resolves.toBe(storeGenerator);
   });
 
+  it('cancels pending store generator timeout when clearing before it fires', async () => {
+    jest.useFakeTimers();
+    addRailsContext(5);
+    const pendingStoreGenerator = StoreRegistry.getOrWaitForStoreGenerator('DeferredStore');
+
+    StoreRegistry.clearStoreGenerators();
+
+    await expect(pendingStoreGenerator).rejects.toThrow(
+      'Cleared store generator registry before pending waiters resolved.',
+    );
+
+    jest.advanceTimersByTime(5);
+
+    const laterStoreGenerator = StoreRegistry.getOrWaitForStoreGenerator('DeferredStore');
+    StoreRegistry.register({ DeferredStore: storeGenerator });
+
+    await expect(laterStoreGenerator).resolves.toBe(storeGenerator);
+  });
+
   it('clears timed-out waiters without poisoning later store generator waits', async () => {
     jest.useFakeTimers();
     addRailsContext(5);

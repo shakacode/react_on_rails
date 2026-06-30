@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-shared_examples "react_with_redux_generator" do |typescript = false|
+shared_examples "react_with_redux_generator" do |options = {}|
+  typescript = options.fetch(:typescript, false)
   template_extension = typescript ? "ts" : "js"
   component_extension = typescript ? "tsx" : "jsx"
 

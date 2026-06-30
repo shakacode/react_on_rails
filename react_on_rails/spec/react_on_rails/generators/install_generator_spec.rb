@@ -125,6 +125,28 @@ describe InstallGenerator, type: :generator do
     assert_tailwind_layout_owned_pack
   end
 
+  def assert_tailwind_redux_setup(config_dir:, extension:)
+    assert_tailwind_dependencies
+    assert_tailwind_stylesheet
+    assert_tailwind_pack_entry
+    assert_no_file "app/javascript/src/HelloWorldApp/components/HelloWorld.module.css"
+
+    assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{extension}" do |content|
+      expect(content).not_to include("application.css")
+    end
+
+    assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.#{extension}" do |content|
+      expect(content).to include("React on Rails + Redux + Tailwind CSS")
+      expect(content).to include("rounded-lg")
+      expect(content).to include("focus:outline-hidden")
+      expect(content).not_to include("HelloWorld.module.css")
+      expect(content).not_to include("<form")
+    end
+
+    assert_tailwind_bundler_config(config_dir)
+    assert_tailwind_layout_owned_pack
+  end
+
   def assert_tailwind_component(extension)
     assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.#{extension}" do |content|
       expect(content).not_to include("application.css")
@@ -865,7 +887,7 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
 
     include_examples "base_generator_common", application_js: true
-    include_examples "react_with_redux_generator", true
+    include_examples "react_with_redux_generator", typescript: true
 
     it "keeps the hidden legacy Redux TypeScript template path covered" do
       %w[
@@ -888,6 +910,16 @@ describe InstallGenerator, type: :generator do
         expect(content).to match(/interface HelloWorldAppProps/)
         expect(content).to match(/FC<HelloWorldAppProps>/)
       end
+    end
+  end
+
+  context "with --redux --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true, tailwind: true
+
+    it "wires Tailwind into the Redux SSR example" do
+      assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
     end
   end
 
