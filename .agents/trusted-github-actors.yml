@@ -6,21 +6,25 @@ trusted_users:
 
 # Bot entries are base bot names. GitHub API logins usually include the
 # `[bot]` suffix; humans with the same base login are not trusted by this list.
-# Trusted bots are exempt from hidden-participant blocking, so keep this list
-# limited to bot identities whose generated PR content is safe to process.
+# Trusted bots are exempt from hidden-participant blocking and their generated
+# PR content may be processed as trusted review input. Keep this list narrow.
 trusted_bots:
   - chatgpt-codex-connector
   - claude
   - coderabbitai
   - cursor
   - dependabot
-  # Repo-local exception: github-actions comments here are treated as workflow
-  # status/help metadata only. The comment-producing workflows were audited for
-  # deterministic output and maintainer/collaborator-gated commands where they
-  # dispatch CI.
+  - greptile-apps
+
+# Metadata-only bots are allowed to appear in PR comments/reviews without
+# becoming trusted instruction sources. Their comment bodies are CI/status
+# evidence only.
+trusted_metadata_bots:
+  # Repo-local exception: github-actions comments here are workflow status/help
+  # metadata only. The comment-producing workflows were audited for deterministic
+  # output and maintainer/collaborator-gated commands where they dispatch CI.
   - github-actions
   - github-code-quality
-  - greptile-apps
 
 # Team entries are GitHub team slugs under the repository owner org. For
 # `shakacode/react_on_rails`, `shakacode` resolves to
