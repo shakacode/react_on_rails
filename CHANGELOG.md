@@ -51,11 +51,29 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
-  The Pro Gemfile loader now reads dependency fragments in binary mode, applies Ruby source-encoding
-  magic comments or a UTF-8 default, and validates content before override-gem scanning and evaluation.
-  Pro Gemfiles with non-ASCII dependency comments no longer fail under shells where Ruby's default
-  external encoding is US-ASCII. Fixes [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
+  The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
+  source-encoding magic comments or a UTF-8 default, and validates content before override-gem
+  scanning and evaluation. This affects any environment that evaluates the Pro Gemfile through
+  Bundler, including local setup and CI, so Pro apps with non-ASCII dependency comments no longer
+  fail under shells where Ruby's default external encoding is US-ASCII. Fixes
+  [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
   [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
+
+- **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
+  The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess
+  to UTF-8 **only** under a bare C/POSIX locale, where the locale-derived encoding is US-ASCII — a
+  strict subset of UTF-8, so the widening cannot corrupt genuinely-ASCII content. Under a real
+  national locale (for example a Brazilian developer's `LANG=pt_BR.ISO8859-1`) it now leaves
+  `LANG`/`LC_ALL`/`RUBYOPT` untouched and lets the child inherit the working locale, instead of
+  force-pinning `-EUTF-8` and re-decoding the developer's latin-1/CP1252 source files as UTF-8 (which
+  raised `invalid byte sequence in UTF-8`). The locale gate reads `Encoding.find("locale")` so it is
+  not masked by Rails setting `Encoding.default_external` to UTF-8 at boot. This removes the
+  `RUBYOPT`-rewriting machinery added in
+  [PR 4231](https://github.com/shakacode/react_on_rails/pull/4231) while keeping the original
+  C/POSIX-locale crash fix from
+  [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169).
+  [PR 4244](https://github.com/shakacode/react_on_rails/pull/4244) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC Rspack doctor no longer false-warns on equivalent `lazyCompilation` configs**:
