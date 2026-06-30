@@ -1,4 +1,8 @@
-import { createRailsAction, RailsActionRequestError } from '../src/railsAction.ts';
+import {
+  createRailsAction,
+  RailsActionRequestError,
+  type RailsActionMutationFunctionContext,
+} from '../src/railsAction.ts';
 
 const TEST_CSRF_TOKEN = 'TEST_CSRF_TOKEN';
 let csrfMeta: HTMLMetaElement;
@@ -60,6 +64,8 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['ArrayBuffer', () => new ArrayBuffer(8)],
   ['Uint8Array', () => new Uint8Array([1, 2, 3])],
   ['DataView', () => new DataView(new ArrayBuffer(8))],
+  ['Map', () => new Map([['name', 'Apollo']])],
+  ['Set', () => new Set(['Apollo'])],
   ['BigInt', () => BigInt(1)],
 ];
 
@@ -161,6 +167,42 @@ describe('createRailsAction', () => {
     const mutationFn: MutationFunction<{ ok: true }, { name: string }> = createProject;
 
     expect(mutationFn).toBe(createProject);
+  });
+
+  it('ignores TanStack mutation context fields when resolving fetch options', async () => {
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await createProject(
+      { name: 'Apollo' },
+      {
+        client: {},
+        meta: {},
+        mutationKey: ['projects', 'create'],
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBeUndefined();
+    expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
+  });
+
+  it('ignores inherited fetch options on caller options', async () => {
+    const abortController = new AbortController();
+    const inheritedOptions = Object.create({
+      headers: { 'X-Request-Source': 'prototype' },
+      signal: abortController.signal,
+    }) as RailsActionMutationFunctionContext;
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await createProject({ name: 'Apollo' }, inheritedOptions);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBeUndefined();
+    expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
   });
 
   it('resolves relative paths against document.baseURI when a base tag is present', async () => {
@@ -334,6 +376,31 @@ describe('createRailsAction', () => {
     }
   });
 
+  it('still warns after an earlier DELETE call resolved a null body', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(() => Promise.resolve(mockResponse({ status: 204 })));
+    let includeReason = false;
+
+    try {
+      const deleteProject = createRailsAction<{ id: number; reason: string }, null>({
+        method: 'DELETE',
+        path: ({ id }) => `/api/projects/${id}`,
+        body: ({ reason }) => (includeReason ? { reason } : null),
+      });
+
+      await expect(deleteProject({ id: 7, reason: 'first call has no body' })).resolves.toBeNull();
+      expect(consoleWarn).not.toHaveBeenCalled();
+
+      includeReason = true;
+      await expect(deleteProject({ id: 8, reason: 'second call has a body' })).resolves.toBeNull();
+
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('resolved a JSON body'));
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
+
   it('rejects before fetch when the Rails CSRF meta tag is missing', async () => {
     const csrfMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
     csrfMeta?.remove();
@@ -378,7 +445,7 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects before fetch when called outside a browser context', async () => {
+  it('rejects at factory time when called outside a browser context', () => {
     const originalWindow = globalThis.window;
 
     try {
@@ -386,11 +453,12 @@ describe('createRailsAction', () => {
         configurable: true,
         value: undefined,
       });
-      const createProject = createRailsAction<{ name: string }, { ok: true }>({
-        path: '/api/projects',
-      });
 
-      await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/browser contexts/);
+      expect(() =>
+        createRailsAction<{ name: string }, { ok: true }>({
+          path: '/api/projects',
+        }),
+      ).toThrow(/browser contexts/);
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       Object.defineProperty(globalThis, 'window', {
@@ -499,6 +567,7 @@ describe('createRailsAction', () => {
       expect(caughtError.responseBody).toBeNull();
       expect(caughtError.cause).toBeInstanceOf(TypeError);
       expect((caughtError.cause as TypeError).message).toBe('stream failed');
+      expect(Object.getOwnPropertyDescriptor(caughtError, 'cause')).toMatchObject({ enumerable: false });
     }
   });
 
