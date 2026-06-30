@@ -798,7 +798,7 @@ module ReactOnRails
             [
               "Existing apps that need the legacy Redux scaffold can use the hidden react_with_redux generator. " \
               "That generator is also legacy and emits its own warning:",
-              "rails generate react_on_rails:react_with_redux"
+              legacy_redux_generator_command
             ]
           end
 
@@ -839,6 +839,13 @@ module ReactOnRails
         flags << "--no-agent-files" unless options.agent_files?
 
         ["rails generate react_on_rails:install", *flags.compact].join(" ")
+      end
+
+      def legacy_redux_generator_command
+        flags = []
+        flags << "--typescript" if options.typescript?
+
+        ["rails generate react_on_rails:react_with_redux", *flags].join(" ")
       end
 
       def optional_install_flags
