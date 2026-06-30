@@ -5760,6 +5760,33 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
+      it "does not treat optionalDependencies as a declared RSC package" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7"
+                },
+                "optionalDependencies" => {
+                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            stub_package_root(Dir.pwd)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs.none? { |msg| msg.include?("react-on-rails-rsc is declared") }).to be true
+          end
+        end
+      end
+
       it "keeps the React 19.0.4 security floor warning when broad RSC peer ranges allow older React" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do

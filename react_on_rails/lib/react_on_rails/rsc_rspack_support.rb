@@ -14,10 +14,13 @@ module ReactOnRails
       @rspack/plugin-react-refresh
     ].freeze
     MINIMUM_RSC_RSPACK_MAJOR = 2
-    PACKAGE_DEPENDENCY_FIELDS = %w[
+    DECLARED_PACKAGE_DEPENDENCY_FIELDS = %w[
       dependencies
       devDependencies
-      optionalDependencies
+    ].freeze
+    RSC_RSPACK_PACKAGE_DEPENDENCY_FIELDS = [
+      *DECLARED_PACKAGE_DEPENDENCY_FIELDS,
+      "optionalDependencies"
     ].freeze
     PACKAGE_NAME_PATTERN = %r{
       \A
@@ -129,8 +132,8 @@ module ReactOnRails
       package_name.to_s.match?(PACKAGE_NAME_PATTERN)
     end
 
-    def rsc_package_dependency_spec(package_json, package_name)
-      PACKAGE_DEPENDENCY_FIELDS.each do |field|
+    def rsc_package_dependency_spec(package_json, package_name, fields: RSC_RSPACK_PACKAGE_DEPENDENCY_FIELDS)
+      fields.each do |field|
         spec = package_json.fetch(field, nil)&.fetch(package_name, nil)
         return spec if spec
       end

@@ -4378,7 +4378,7 @@ module ReactOnRails
       return nil unless package_json_path
 
       package_json = parsed_package_json(package_json_path)
-      rsc_package_dependency_spec(package_json, package_name)
+      rsc_package_dependency_spec(package_json, package_name, fields: DECLARED_PACKAGE_DEPENDENCY_FIELDS)
     rescue StandardError
       nil
     end
