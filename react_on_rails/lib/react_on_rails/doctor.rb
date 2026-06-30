@@ -10,6 +10,7 @@ require_relative "utils"
 require_relative "version"
 require_relative "config_path_resolver"
 require_relative "shakapacker_config_helpers"
+require_relative "rsc_rspack_support"
 require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
@@ -51,6 +52,7 @@ module ReactOnRails
   class Doctor
     include ConfigPathResolver
     include ShakapackerConfigHelpers
+    include RscRspackSupport
 
     MESSAGE_COLORS = {
       error: :red,
@@ -3494,10 +3496,6 @@ module ReactOnRails
       config/rspack/rscWebpackConfig.js
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
-    RSC_RSPACK_PACKAGE = "@rspack/core"
-    MINIMUM_RSC_RSPACK_MAJOR = 2
-    RSPACK_V2_INSTALL_COMMAND = "pnpm add -D @rspack/core@^2 @rspack/cli@^2 " \
-                                "@rspack/dev-server@^2 @rspack/plugin-react-refresh@^2"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -3514,14 +3512,6 @@ module ReactOnRails
       generate_rsc_manifest_client_references_if_needed
       RSC_REFERENCE_DISCOVERY_BUILD
     ].freeze
-    # npm registry package names used here must be lowercase; keep this allowlist
-    # narrow so names remain safe when reused as Node resolver args and paths.
-    PACKAGE_NAME_PATTERN = %r{
-      \A
-      (?:@[a-z0-9][a-z0-9._-]*/)?
-      [a-z0-9][a-z0-9._-]*
-      \z
-    }x
     # Keep in sync with RSC_CLIENT_MANIFEST_GUIDANCE in
     # packages/react-on-rails-pro/src/handleErrorRSC.ts.
     RSC_CLIENT_MANIFEST_CLEANUP_PATHS = %w[public/packs public/packs-test ssr-generated .node-renderer-bundles].freeze
@@ -3630,7 +3620,7 @@ module ReactOnRails
       return unless active_assets_bundler == "rspack"
 
       rspack_version = detected_rspack_version_for_rsc
-      if rspack_version && package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+      if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
         checker.add_success("✅ Rspack #{rspack_version} is compatible with RSC")
         return
       end
@@ -3644,27 +3634,8 @@ module ReactOnRails
       detect_package_version_from_deps(RSC_RSPACK_PACKAGE) || declared_package_spec(RSC_RSPACK_PACKAGE)
     end
 
-    def package_major_version(version)
-      return 0 if version.to_s.include?("/") && !version.to_s.start_with?("npm:")
-
-      major = version.to_s.sub(/\Anpm:[^@]+@/, "").match(/\d+/)&.[](0)
-      major.to_i
-    end
-
     def rsc_rspack_version_error(rspack_version)
-      detected_version = rspack_version || "not found"
-
-      <<~MSG.strip
-        🚫 RSC with Rspack requires Rspack v2 or newer.
-
-        Detected #{RSC_RSPACK_PACKAGE}: #{detected_version}
-
-        Rspack v1 is not supported for React Server Components in React on Rails Pro.
-        Upgrade to Rspack v2 so RSC setup fails fast instead of hitting bundler or runtime surprises.
-
-        Fix:
-          #{RSPACK_V2_INSTALL_COMMAND}
-      MSG
+      rsc_rspack_version_requirement_error(rspack_version, error_prefix: "🚫")
     end
 
     def check_rsc_rspack_lazy_compilation
@@ -4343,44 +4314,15 @@ module ReactOnRails
     end
 
     def installed_package_version(package_root, package_name)
-      version = installed_package_json(package_root, package_name)&.fetch("version", nil)
-      version if version&.match?(/\A\d+\.\d+\.\d+/)
+      rsc_installed_package_version(package_root, package_name) do |failed_package_name|
+        report_node_package_resolution_failed(failed_package_name)
+      end
     end
 
     def installed_package_json(package_root, package_name)
-      # Use Node's own module resolution to find the actually installed package,
-      # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      # Resolve from the configured package root so nested client/ layouts work.
-      return nil unless valid_package_name?(package_name)
-
-      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
-      resolved_path = resolved_node_package_json_path(package_root, package_name, script)
-      # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
-      # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
-      # Limitation: a stale orphaned directory can still be read if Node resolution fails.
-      resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
-      return nil if resolved_path.empty? || !File.exist?(resolved_path)
-
-      JSON.parse(File.read(resolved_path))
-    rescue StandardError
-      nil
-    end
-
-    def valid_package_name?(package_name)
-      package_name.to_s.match?(PACKAGE_NAME_PATTERN)
-    end
-
-    def resolved_node_package_json_path(package_root, package_name, script)
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
-      unless status.success?
-        report_node_package_resolution_failed(package_name)
-        return ""
+      rsc_installed_package_json(package_root, package_name) do |failed_package_name|
+        report_node_package_resolution_failed(failed_package_name)
       end
-
-      stdout.strip
-    rescue StandardError
-      report_node_package_resolution_failed(package_name)
-      ""
     end
 
     def report_node_package_resolution_failed(package_name)
@@ -4427,8 +4369,7 @@ module ReactOnRails
       return nil unless package_json_path
 
       package_json = parsed_package_json(package_json_path)
-      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
-      all_deps[package_name]
+      rsc_package_dependency_spec(package_json, package_name)
     rescue StandardError
       nil
     end

@@ -3,22 +3,19 @@
 require "json"
 require_relative "version_syntax_converter"
 require_relative "shakapacker_config_helpers"
+require_relative "rsc_rspack_support"
 
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each other at runtime.
   class VersionChecker # rubocop:disable Metrics/ClassLength
     include ShakapackerConfigHelpers
+    include RscRspackSupport
 
     attr_reader :node_package_version
 
     # Semver uses - to separate pre-release, but RubyGems use .
     VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
-    RSC_RSPACK_PACKAGE = "@rspack/core"
-    MINIMUM_RSC_RSPACK_MAJOR = 2
-    RSPACK_V2_INSTALL_COMMAND = "pnpm add -D @rspack/core@^2 @rspack/cli@^2 " \
-                                "@rspack/dev-server@^2 @rspack/plugin-react-refresh@^2"
-
     def self.build
       new(NodePackageVersion.build)
     end
@@ -254,10 +251,15 @@ module ReactOnRails
       return unless rsc_support_enabled?
       return unless active_assets_bundler == "rspack"
 
-      rspack_version = package_dependency_spec(RSC_RSPACK_PACKAGE)
-      return if rspack_version && package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+      rspack_version = detected_rspack_version_for_rsc
+      return if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
 
       raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+    end
+
+    def detected_rspack_version_for_rsc
+      package_root = File.dirname(node_package_version.package_json)
+      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || package_dependency_spec(RSC_RSPACK_PACKAGE)
     end
 
     def rsc_support_enabled?
@@ -271,36 +273,15 @@ module ReactOnRails
     end
 
     def package_dependency_spec(package_name)
-      package_json = JSON.parse(File.read(node_package_version.package_json))
-      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
-      all_deps[package_name]
-    rescue JSON::ParserError, Errno::ENOENT
-      nil
-    end
-
-    def package_major_version(version)
-      return 0 if version.to_s.include?("/") && !version.to_s.start_with?("npm:")
-
-      major = version.to_s.sub(/\Anpm:[^@]+@/, "").match(/\d+/)&.[](0)
-      major.to_i
+      rsc_declared_package_spec(node_package_version.package_json, package_name)
     end
 
     def rsc_rspack_version_error(rspack_version)
-      detected_version = rspack_version || "not found"
-
-      <<~MSG.strip
-        **ERROR** ReactOnRails: RSC with Rspack requires Rspack v2 or newer.
-
-        Detected #{RSC_RSPACK_PACKAGE}: #{detected_version}
-
-        Rspack v1 is not supported for React Server Components in React on Rails Pro.
-        Upgrade to Rspack v2 so RSC setup fails fast instead of hitting bundler or runtime surprises.
-
-        Fix:
-          #{RSPACK_V2_INSTALL_COMMAND}
-
-        #{ReactOnRails::DOCTOR_RECOMMENDATION}
-      MSG
+      rsc_rspack_version_requirement_error(
+        rspack_version,
+        error_prefix: "**ERROR** ReactOnRails:",
+        include_doctor_recommendation: true
+      )
     end
 
     def gem_version
