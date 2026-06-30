@@ -60,6 +60,7 @@ jobs:
       - name: Shellcheck detector scripts and test harnesses
         run: |
           shellcheck -x \
+            bin/read-tool-version \
             script/lib/git-diff-base \
             script/lib/git-diff-base-test.bash \
             script/ci-changes-detector \
