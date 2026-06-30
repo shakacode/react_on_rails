@@ -503,6 +503,17 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
+        it "allows generated Rspack v2 prerelease lower-bound specs" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0-0"
+            )
+          end.not_to raise_error
+        end
+
         it "rejects path protocol specs even when the path contains a v2-looking version" do
           expect do
             validate_rsc_rspack_project(

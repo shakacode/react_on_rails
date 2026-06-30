@@ -161,7 +161,7 @@ module ReactOnRails
       return nil if spec.start_with?("workspace:")
 
       spec = spec.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
-      spec.match(/\A(?:[~^]|>=?|=)?\s*v?(\d+\.\d+\.\d+)\z/)&.[](1)
+      spec.match(/\A(?:[~^]|>=?|=)?\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)\z/)&.[](1)
     end
 
     def rsc_rspack_upgrade_packages(package_json_path)
