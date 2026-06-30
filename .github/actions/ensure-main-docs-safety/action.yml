@@ -5,7 +5,7 @@ inputs:
     description: 'String output from ci-changes-detector ("true" or "false")'
     required: true
   previous-sha:
-    description: 'SHA of the previous commit on main (github.event.before)'
+    description: 'SHA to inspect for prior main CI status (github.event.before or github.event.merge_group.base_sha)'
     required: true
   exclude-workflows:
     description: 'Comma-separated workflow names to exclude from failure checks (e.g., "Benchmark Workflow")'

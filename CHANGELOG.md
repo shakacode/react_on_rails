@@ -29,6 +29,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **`Server-Timing` attribution for streamed RSC responses**: When `rsc_stream_observability: true`, the streamed RSC response now also carries a `Server-Timing` response header with a `ror_stream_shell` metric (Rails shell render, including the blocking wait for each component's first renderer chunk), set in the narrow window before `ActionController::Live` commits headers and appended to any existing `Server-Timing` entries. The Node renderer additionally emits a `ror_renderer_prepare` metric (execution-context build plus render start) on its HTTP response. This is the server/renderer-side complement to the browser performance marks above, letting a reviewer attribute the streamed `responseEnd` tail to a specific phase rather than guessing. Total/stream-complete time stays on the `react-on-rails:rsc:stream` mark because `ActionController::Live` does not support HTTP trailers. Closes [Issue 4239](https://github.com/shakacode/react_on_rails/issues/4239). [PR 4251](https://github.com/shakacode/react_on_rails/pull/4251) by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Focused RSC doctor artifact diagnostics**: `rake react_on_rails:doctor:rsc` and
   `Doctor.new(only: ...)` now run the RSC artifact checks directly, reporting missing,
   stale, invalid, or dev-server-backed RSC bundle and manifest files with rebuild guidance
@@ -39,6 +41,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
+  configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
+  `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
+  so Rspack v1 remains allowed for non-RSC apps, and bundler detection now honors `SHAKAPACKER_ASSETS_BUNDLER`
+  before `config/shakapacker.yml`.
+  [PR 4289](https://github.com/shakacode/react_on_rails/pull/4289) by [justin808](https://github.com/justin808).
 - **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
   `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
   React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
@@ -47,6 +55,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   generated React Server Components example.
 
 #### Fixed
+
+- **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
+  The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess
+  to UTF-8 **only** under a bare C/POSIX locale, where the locale-derived encoding is US-ASCII — a
+  strict subset of UTF-8, so the widening cannot corrupt genuinely-ASCII content. Under a real
+  national locale (for example a Brazilian developer's `LANG=pt_BR.ISO8859-1`) it now leaves
+  `LANG`/`LC_ALL`/`RUBYOPT` untouched and lets the child inherit the working locale, instead of
+  force-pinning `-EUTF-8` and re-decoding the developer's latin-1/CP1252 source files as UTF-8 (which
+  raised `invalid byte sequence in UTF-8`). The locale gate reads `Encoding.find("locale")` so it is
+  not masked by Rails setting `Encoding.default_external` to UTF-8 at boot. This removes the
+  `RUBYOPT`-rewriting machinery added in
+  [PR 4231](https://github.com/shakacode/react_on_rails/pull/4231) while keeping the original
+  C/POSIX-locale crash fix from
+  [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169).
+  [PR 4244](https://github.com/shakacode/react_on_rails/pull/4244) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC Rspack doctor no longer false-warns on equivalent `lazyCompilation` configs**:
   `react_on_rails:doctor:rsc` only recognizes the generated literal
@@ -59,6 +83,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4234](https://github.com/shakacode/react_on_rails/pull/4234).
   [PR 4249](https://github.com/shakacode/react_on_rails/pull/4249) by
   [justin808](https://github.com/justin808).
+
+- **Generated Tailwind apps load Tailwind from the layout.** The install generator now declares Tailwind through a layout-owned pack instead of component-owned imports, keeps generated layout head metadata mobile/CSP-ready, and warns safely when custom layouts need manual pack-tag replacement. [PR 4182](https://github.com/shakacode/react_on_rails/pull/4182) by [ihabadham](https://github.com/ihabadham).
 
 - **[Pro]** **Rspack RSC dev-server setup is easier to diagnose and customize**:
   Generated RSC helper code now verifies client-reference discovery support
@@ -266,8 +292,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Breaking Changes
 
 - **[Pro]** **Node Renderer now requires Ruby 3.3+ for the async-http transport**: The `react-on-rails-pro` gem now requires Ruby `>= 3.3` (raised from `>= 3.0`) because `async-http` depends on Ruby 3.3 features. Upgrade Ruby before moving to this release. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **[Pro]** **Async Rails server deployments need to stay on the HTTPX renderer until support is added**: Falcon and async-rails deployments are not currently supported with the new async-http renderer client because calling the renderer from inside an existing Async reactor without an `Async::Task.current?` context can create a nested reactor. Keep those deployments on the previous HTTPX renderer client until support is explicitly added. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **[Pro]** **`config.renderer_http_pool_size` now limits per-request HTTP/2 streams**: Existing numeric values now cap concurrent HTTP/2 streams for each request-scoped renderer client instead of sizing a persistent process-wide connection pool. Setting a non-default value emits a warning so the changed meaning is visible during upgrades; setting `nil` keeps the default stream limit and does not make the request-scoped client unlimited. Persistent connection reuse is tracked in [Issue 3283](https://github.com/shakacode/react_on_rails/issues/3283). See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **`config.renderer_http_pool_size` now limits async-http connections per renderer client**: Existing numeric values now cap concurrent async-http connections for each renderer client instead of sizing a persistent process-wide connection pool. HTTP/2 may multiplex request streams over those pooled connections. Setting `nil` keeps the default connection limit and does not make the async-http client unlimited. Persistent connection reuse is automatic when a long-lived `Fiber.scheduler` is present. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Added
 
@@ -290,6 +315,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Allow trusted pnpm 10 build scripts in contributor installs**: The root workspace now allowlists required native dependency postinstall checks for `@swc/core` and `unrs-resolver`, so `pnpm install` under pnpm 10 no longer skips those trusted build hooks. [PR 3421](https://github.com/shakacode/react_on_rails/pull/3421) by [justin808](https://github.com/justin808).
 - **Release publishing now checks `origin/main` CI status before shipping**: `rake release` now inspects GitHub Checks for `origin/main` before publishing, blocking stable releases on any visible failing or missing checks and prereleases on required checks, with an explicit override path for maintainers. [PR 3407](https://github.com/shakacode/react_on_rails/pull/3407) by [justin808](https://github.com/justin808).
 - **[Pro]** **Updated Pino in the Node Renderer**: Raised the `react-on-rails-pro-node-renderer` `pino` dependency range to `^9.14.0 || ^10.1.0`, aligning with the current Fastify dependency. [PR 3401](https://github.com/shakacode/react_on_rails/pull/3401) by [alexeyr-ci2](https://github.com/alexeyr-ci2).
+- **[Pro]** **Async Rails server deployments use scheduler-scoped renderer clients**: Falcon and async-rails deployments can use the async-http renderer client when a long-lived `Fiber.scheduler` is already running; renderer clients are reused within that scheduler. Standard Puma streaming uses a per-request scheduler and cleans up the client when the response ends. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Per-scheduler persistent HTTP connections for Node Renderer**: `RendererHttpClient` now reuses HTTP/2 connections across requests within the same Fiber scheduler (Falcon, async Puma), eliminating per-request TCP+TLS+HTTP/2 handshake overhead. Standalone requests (no outer scheduler) continue using ephemeral connections with guaranteed cleanup. The internal connection pool automatically recovers from broken connections without manual eviction. [PR 3428](https://github.com/shakacode/react_on_rails/pull/3428) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Migrated Node Renderer HTTP transport from HTTPX to `async-http`**: React on Rails Pro now uses `async-http` (`~> 0.95`) with `io-endpoint` (`~> 0.17`) for all Rails→Node Renderer requests (render, streaming render, asset upload), replacing the previous HTTPX adapter and the custom `httpx_stream_bidi_patch.rb`. The new `RendererHttpClient` is a request-scoped client (one client per Rails request — no persistent process-wide pool) and integrates with the length-prefixed wire protocol introduced in [PR 2903](https://github.com/shakacode/react_on_rails/pull/2903). HTTP/2 bidirectional streaming for async props is now provided by `post_bidi` on the new adapter. **Action required for upgraders:**
   - **`config.ssr_timeout`** is now a per-read socket timeout applied to each renderer socket read, rather than a task-level timeout wrapping the entire request.
@@ -357,7 +383,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Deprecated
 
-- **[Pro]** **`config.renderer_http_keep_alive_timeout` is deprecated**: The setting now has no effect because async-http renderer clients are scoped to individual requests. Setting it emits a deprecation warning; remove the configuration during upgrade. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **`config.renderer_http_keep_alive_timeout` is deprecated**: The setting now has no effect because async-http manages renderer client lifecycle through scheduler-scoped clients when a `Fiber.scheduler` is already running and per-request clients otherwise. Explicitly setting it to a non-`nil` value emits a deprecation warning; leaving it unset or setting it to `nil` is accepted silently. Remove non-`nil` configuration during upgrade. See `docs/pro/updating.md` for the full upgrade guide. [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Removed
 
