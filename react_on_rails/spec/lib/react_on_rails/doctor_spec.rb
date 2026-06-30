@@ -6106,7 +6106,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(
             "node",
             "-e",
-            "console.log(require.resolve(process.argv[2] + '/package.json'))",
+            "console.log(require.resolve(process.argv[1] + '/package.json'))",
             "react",
             chdir: package_root
           )

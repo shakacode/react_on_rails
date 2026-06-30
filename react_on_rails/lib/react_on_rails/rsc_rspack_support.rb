@@ -84,7 +84,7 @@ module ReactOnRails
     def rsc_installed_package_json(package_root, package_name, &)
       return nil unless valid_rsc_package_name?(package_name)
 
-      script = "console.log(require.resolve(process.argv[2] + '/package.json'))"
+      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
       resolved_path = rsc_resolved_node_package_json_path(package_root, package_name, script, &)
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.

@@ -409,6 +409,43 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
+        it "allows Node-resolved Rspack v2 when the flat node_modules fallback is absent" do
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(root, assets_bundler: "rspack", rspack_core_version: nil)
+            resolved_package_json = File.join(root, "resolved-packages/@rspack/core/package.json")
+            FileUtils.mkdir_p(File.dirname(resolved_package_json))
+            File.write(
+              resolved_package_json,
+              JSON.generate("name" => "@rspack/core", "version" => "2.1.0")
+            )
+            stub_rsc_rspack_project(root, rsc_enabled: true)
+            node_package_version = VersionChecker::NodePackageVersion.new(File.join(root, "package.json"))
+            status = instance_double(Process::Status, success?: true)
+            allow(Open3).to receive(:capture3)
+              .and_return(["#{resolved_package_json}\n", "", status])
+
+            expect { described_class.new(node_package_version).validate_version_and_package_compatibility! }
+              .not_to raise_error
+            expect(Open3).to have_received(:capture3).with(
+              "node",
+              "-e",
+              "console.log(require.resolve(process.argv[1] + '/package.json'))",
+              "@rspack/core",
+              chdir: root
+            )
+          end
+        end
+
+        it "raises when installed Rspack is v1 even if package.json declares v2" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0",
+              installed_rspack_core_version: "1.6.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
         it "allows @rspack/core v2 from optional dependencies" do
           expect do
             validate_rsc_rspack_project(
