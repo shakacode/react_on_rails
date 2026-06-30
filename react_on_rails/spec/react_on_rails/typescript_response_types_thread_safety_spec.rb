@@ -29,12 +29,10 @@ module ReactOnRails
         reset_finished << true
       end
 
-      20.times do
-        break unless reset_finished.empty?
-
-        Thread.pass
-        sleep 0.001
-      end
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 0.2
+      Thread.pass until reset_thread.status == "sleep" ||
+                        Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      expect(reset_thread.status).to eq("sleep")
       expect(reset_finished).to be_empty
 
       release_registration << true
