@@ -1499,9 +1499,9 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run lightweight `agent-coord doctor --json`, then broad
-     `agent-coord status --json` through the resolved bounded `pr-batch` helper
-     only as an audit/discovery read to list candidate batch/run ids and lanes;
+   - through the resolved `pr-batch` helper, run bounded
+     `agent-coord doctor --json`, then run bounded `agent-coord status --json`
+     as a broad audit/discovery read to list candidate batch/run ids and lanes;
      do not use this broad read for worker lane readiness or dependency
      decisions, and do not retry indefinitely
    - if bounded `agent-coord doctor --json` is missing, fails, or times out,
