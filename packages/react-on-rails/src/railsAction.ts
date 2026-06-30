@@ -146,7 +146,7 @@ const warnOnImplicitBodyWithDynamicPath = (): void => {
   );
 };
 
-const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
+const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()): string | null => {
   if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
     return 'FormData';
   }
@@ -171,9 +171,35 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   if (typeof requestBody === 'bigint') {
     return 'BigInt';
   }
+  if (typeof requestBody === 'function') {
+    return 'Function';
+  }
+  if (typeof requestBody === 'symbol') {
+    return 'Symbol';
+  }
   if (typeof ReadableStream !== 'undefined' && requestBody instanceof ReadableStream) {
     return 'ReadableStream';
   }
+
+  if (typeof requestBody !== 'object' || requestBody === null) {
+    return null;
+  }
+
+  if (seenObjects.has(requestBody)) {
+    return null;
+  }
+  seenObjects.add(requestBody);
+
+  const nestedValues = Array.isArray(requestBody)
+    ? requestBody
+    : Object.values(requestBody as Record<string, unknown>);
+  for (const nestedValue of nestedValues) {
+    const nestedTypeName = nonJsonBodyTypeName(nestedValue, seenObjects);
+    if (nestedTypeName !== null) {
+      return nestedTypeName;
+    }
+  }
+
   return null;
 };
 

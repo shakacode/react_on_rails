@@ -67,6 +67,8 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['Map', () => new Map([['name', 'Apollo']])],
   ['Set', () => new Set(['Apollo'])],
   ['BigInt', () => BigInt(1)],
+  ['Function', () => () => 'Apollo'],
+  ['Symbol', () => Symbol('Apollo')],
 ];
 
 if (typeof ReadableStream !== 'undefined') {
@@ -634,7 +636,17 @@ describe('createRailsAction', () => {
       body: ({ id }) => ({ project: { id } }),
     });
 
-    await expect(createProject({ id: BigInt(1) })).rejects.toThrow(/request body contains a BigInt value/);
+    await expect(createProject({ id: BigInt(1) })).rejects.toThrow(/resolved to BigInt/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects nested non-JSON request body values before fetch', async () => {
+    const createProject = createRailsAction<{ tags: string[] }, { ok: true }>({
+      path: '/api/projects',
+      body: ({ tags }) => ({ project: { tags: new Set(tags) } }),
+    });
+
+    await expect(createProject({ tags: ['alpha', 'beta'] })).rejects.toThrow(/resolved to Set/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
