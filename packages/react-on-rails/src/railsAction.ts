@@ -14,8 +14,9 @@ export interface RailsActionOptions<TVariables> {
    */
   body?: (variables: TVariables) => unknown;
   /**
-   * Additional request headers. Security-critical Rails headers always win.
-   * When no JSON body is sent, Content-Type is removed after these headers are merged.
+   * Additional request headers. `X-CSRF-Token` and `X-Requested-With` always win and cannot be
+   * overridden. `Accept` defaults to `application/json` but can be overridden here.
+   * When no JSON body is sent, `Content-Type` is removed after these headers are merged.
    */
   headers?: HeadersInit | ((variables: TVariables) => HeadersInit);
 }
@@ -25,21 +26,32 @@ export interface RailsActionCallOptions {
   signal?: AbortSignal;
 }
 
+export interface RailsActionMutationFunctionContext {
+  client?: unknown;
+  meta?: unknown;
+  mutationKey?: unknown;
+}
+
+export type RailsActionCallerOptions = RailsActionCallOptions | RailsActionMutationFunctionContext;
+
 // Brackets prevent distribution over union TVariables, preserving a single caller signature.
 export type RailsActionCaller<TVariables, TResponse> = [TVariables] extends [undefined]
-  ? (variables?: undefined, options?: RailsActionCallOptions) => Promise<TResponse>
-  : (variables: TVariables, options?: RailsActionCallOptions) => Promise<TResponse>;
+  ? (variables?: undefined, options?: RailsActionCallerOptions) => Promise<TResponse>
+  : (variables: TVariables, options?: RailsActionCallerOptions) => Promise<TResponse>;
 
 export class RailsActionRequestError<TResponseBody = unknown> extends Error {
   readonly response: Response;
 
   readonly responseBody: TResponseBody;
 
-  constructor(response: Response, responseBody: TResponseBody) {
+  readonly cause?: unknown;
+
+  constructor(response: Response, responseBody: TResponseBody, options: { cause?: unknown } = {}) {
     super(`Rails action request failed with status ${response.status}`);
     this.name = 'RailsActionRequestError';
     this.response = response;
     this.responseBody = responseBody;
+    this.cause = options.cause;
   }
 }
 
@@ -68,6 +80,10 @@ const isAbortError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
 
 const parseOptionalJsonBody = async (response: Response): Promise<unknown> => {
+  if (!isJsonResponse(response)) {
+    return null;
+  }
+
   try {
     return (await response.json()) as unknown;
   } catch (error) {
@@ -140,6 +156,9 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(requestBody)) {
     return requestBody.constructor.name || 'ArrayBufferView';
   }
+  if (typeof requestBody === 'bigint') {
+    return 'BigInt';
+  }
   if (typeof ReadableStream !== 'undefined' && requestBody instanceof ReadableStream) {
     return 'ReadableStream';
   }
@@ -160,6 +179,20 @@ const assertJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void =
     `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
       'Return a plain JSON value, null, or undefined instead.',
   );
+};
+
+const stringifyJsonBody = (requestBody: unknown): string => {
+  try {
+    return JSON.stringify(requestBody);
+  } catch (error) {
+    if (error instanceof TypeError && /BigInt/i.test(error.message)) {
+      throw new TypeError(
+        '[createRailsAction] The request body contains a BigInt value, which cannot be JSON serialized correctly. ' +
+          'Convert BigInt values to strings or numbers before returning the body.',
+      );
+    }
+    throw error;
+  }
 };
 
 const mergeHeaders = (...headersList: Array<HeadersInit | undefined>): Headers => {
@@ -200,6 +233,17 @@ const resolveHeaders = <TVariables>(
   headers: RailsActionOptions<TVariables>['headers'],
   variables: TVariables,
 ): HeadersInit | undefined => (typeof headers === 'function' ? headers(variables) : headers);
+
+function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'signal'): AbortSignal | undefined;
+function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'headers'): HeadersInit | undefined;
+function callOptionsValue(
+  callOptions: RailsActionCallerOptions,
+  key: keyof RailsActionCallOptions,
+): RailsActionCallOptions[keyof RailsActionCallOptions] | undefined {
+  return typeof callOptions === 'object' && callOptions !== null && key in callOptions
+    ? (callOptions as RailsActionCallOptions)[key]
+    : undefined;
+}
 
 const assertBrowserContext = (): void => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
@@ -245,7 +289,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
   const callRailsAction = async (
     variables?: TVariables,
-    callOptions: RailsActionCallOptions = {},
+    callOptions: RailsActionCallerOptions = {},
   ): Promise<TResponse> => {
     // The public conditional type only permits omitted variables when TVariables is undefined.
     const typedVariables = variables as TVariables;
@@ -271,7 +315,8 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     const requestBody = options.body !== undefined ? options.body(typedVariables) : typedVariables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
     if (!warnedOnDiscardedDeleteBody) {
-      warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(requestBody);
+      warnedOnDiscardedDeleteBody =
+        warnOnDiscardedDeleteBody(requestBody) || requestBody === undefined || requestBody === null;
     }
     if (!warnedOnImplicitDynamicPathBody && hasJsonBody) {
       warnOnImplicitBodyWithDynamicPath();
@@ -285,14 +330,14 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
         mode: 'same-origin',
         credentials: 'same-origin',
         redirect: 'error',
-        signal: callOptions.signal,
+        signal: callOptionsValue(callOptions, 'signal'),
         headers: buildRailsActionHeaders(
           csrfToken,
           hasJsonBody,
           resolveHeaders(options.headers, typedVariables),
-          callOptions.headers,
+          callOptionsValue(callOptions, 'headers'),
         ),
-        body: hasJsonBody ? JSON.stringify(requestBody) : undefined,
+        body: hasJsonBody ? stringifyJsonBody(requestBody) : undefined,
       });
     } catch (fetchError) {
       warnOnPossibleRedirectFetchError(fetchError);
@@ -302,15 +347,17 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     if (!response.ok) {
       // Keep this clone before any error-body reads so callers can still inspect the original response body.
       let responseBody: unknown = null;
+      let bodyReadError: unknown;
       try {
         responseBody = await parseOptionalJsonBody(response.clone());
-      } catch (bodyReadError) {
-        if (isAbortError(bodyReadError)) {
-          throw bodyReadError;
+      } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
         }
+        bodyReadError = error;
         responseBody = null;
       }
-      throw new RailsActionRequestError(response, responseBody);
+      throw new RailsActionRequestError(response, responseBody, { cause: bodyReadError });
     }
 
     const responseBody = await parseSuccessJsonBody(response);

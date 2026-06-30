@@ -60,6 +60,7 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['ArrayBuffer', () => new ArrayBuffer(8)],
   ['Uint8Array', () => new Uint8Array([1, 2, 3])],
   ['DataView', () => new DataView(new ArrayBuffer(8))],
+  ['BigInt', () => BigInt(1)],
 ];
 
 if (typeof ReadableStream !== 'undefined') {
@@ -125,7 +126,7 @@ describe('createRailsAction', () => {
       { id: 3, name: 'Hermes' },
       {
         signal: abortController.signal,
-        // Security-critical Rails headers always win; caller headers cannot override them.
+        // Rails CSRF and XHR headers always win; Accept can be overridden for custom endpoints.
         headers: { 'X-Request-Source': 'test', 'X-CSRF-Token': 'CUSTOM', 'X-Requested-With': 'fetch' },
       },
     );
@@ -140,6 +141,26 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'X-Requested-With')).toBe('XMLHttpRequest');
     expect(headerValue(init.headers, 'X-Project-Id')).toBe('3');
     expect(headerValue(init.headers, 'X-Request-Source')).toBe('test');
+  });
+
+  it('is assignable to a TanStack-style mutation function', () => {
+    type TanStackMutationFunctionContext = {
+      client: unknown;
+      meta: unknown;
+      mutationKey?: readonly unknown[];
+    };
+    type MutationFunction<TData, TVariables> = (
+      variables: TVariables,
+      context: TanStackMutationFunctionContext,
+    ) => Promise<TData>;
+
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    const mutationFn: MutationFunction<{ ok: true }, { name: string }> = createProject;
+
+    expect(mutationFn).toBe(createProject);
   });
 
   it('resolves relative paths against document.baseURI when a base tag is present', async () => {
@@ -419,6 +440,37 @@ describe('createRailsAction', () => {
     }
   });
 
+  it('does not read non-JSON error bodies', async () => {
+    const json = jest.fn<Promise<unknown>, []>(() => Promise.reject(new Error('should not parse')));
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      headers: new Headers({ 'Content-Type': 'text/html' }),
+      clone: () =>
+        ({
+          headers: new Headers({ 'Content-Type': 'text/html' }),
+          json,
+        }) as unknown as Response,
+    } as unknown as Response);
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    let caughtError: unknown;
+    try {
+      await createProject({ name: 'Apollo' });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(RailsActionRequestError);
+    if (caughtError instanceof RailsActionRequestError) {
+      expect(caughtError.responseBody).toBeNull();
+      expect(caughtError.cause).toBeUndefined();
+    }
+    expect(json).not.toHaveBeenCalled();
+  });
+
   it('throws RailsActionRequestError when parsing an error body stream fails', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
@@ -445,6 +497,8 @@ describe('createRailsAction', () => {
     if (caughtError instanceof RailsActionRequestError) {
       expect(caughtError.response.status).toBe(500);
       expect(caughtError.responseBody).toBeNull();
+      expect(caughtError.cause).toBeInstanceOf(TypeError);
+      expect((caughtError.cause as TypeError).message).toBe('stream failed');
     }
   });
 
@@ -504,6 +558,16 @@ describe('createRailsAction', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     },
   );
+
+  it('rejects object request bodies that contain BigInt values before fetch', async () => {
+    const createProject = createRailsAction<{ id: bigint }, { ok: true }>({
+      path: '/api/projects',
+      body: ({ id }) => ({ project: { id } }),
+    });
+
+    await expect(createProject({ id: BigInt(1) })).rejects.toThrow(/request body contains a BigInt value/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it('warns once when a dynamic non-DELETE action omits the body mapper', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
