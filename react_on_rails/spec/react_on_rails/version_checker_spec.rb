@@ -512,6 +512,17 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: file:\.\./rspack-2\.0\.0})
         end
 
+        it "rejects workspace protocol specs even when they contain a v2-looking version" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "workspace:^2.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: workspace:\^2\.0\.0})
+        end
+
         it "does not treat peer dependencies as installed Rspack" do
           expect do
             validate_rsc_rspack_project(

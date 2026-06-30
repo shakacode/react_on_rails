@@ -117,7 +117,7 @@ module ReactOnRails
       # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
       return 0 if version_string.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
-      return 0 if version_string.start_with?("workspace:") && !version_string.match?(/\d/)
+      return 0 if version_string.start_with?("workspace:")
 
       major = version_string.match(/\Av?(\d+)\.\d+\.\d+(?:[-+].*)?\z/)&.[](1)
       major.to_i
@@ -158,9 +158,9 @@ module ReactOnRails
     def rsc_normalized_declared_package_version(package_spec)
       spec = package_spec.to_s.strip
       return nil if spec.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
+      return nil if spec.start_with?("workspace:")
 
       spec = spec.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
-                 .delete_prefix("workspace:")
       spec.match(/\A(?:[~^]|>=?|=)?\s*v?(\d+\.\d+\.\d+)\z/)&.[](1)
     end
 
