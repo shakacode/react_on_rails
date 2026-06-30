@@ -5324,7 +5324,7 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    def write_rspack_project(assets_bundler:, rspack_core_version:)
+    def write_rspack_project(assets_bundler:, rspack_core_version:, dependency_field: "devDependencies")
       FileUtils.mkdir_p("config")
       File.write("config/shakapacker.yml", <<~YAML)
         default:
@@ -5333,10 +5333,14 @@ RSpec.describe ReactOnRails::Doctor do
 
       dependencies = { "react" => "19.0.4" }
       dev_dependencies = {}
-      dev_dependencies["@rspack/core"] = rspack_core_version if rspack_core_version
+      package_json = { "dependencies" => dependencies, "devDependencies" => dev_dependencies }
+      if rspack_core_version
+        package_json[dependency_field] ||= {}
+        package_json[dependency_field]["@rspack/core"] = rspack_core_version
+      end
       File.write(
         "package.json",
-        JSON.generate("dependencies" => dependencies, "devDependencies" => dev_dependencies)
+        JSON.generate(package_json)
       )
     end
 
@@ -5400,6 +5404,22 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when RSC uses Rspack v2" do
       before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+
+      it "reports success" do
+        doctor.send(:check_rsc_rspack_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack v2 from optional dependencies" do
+      before do
+        write_rspack_project(
+          assets_bundler: "rspack",
+          rspack_core_version: "^2.0.0",
+          dependency_field: "optionalDependencies"
+        )
+      end
 
       it "reports success" do
         doctor.send(:check_rsc_rspack_version)

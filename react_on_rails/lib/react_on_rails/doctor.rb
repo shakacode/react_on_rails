@@ -3640,7 +3640,21 @@ module ReactOnRails
     end
 
     def detected_rspack_version_for_rsc
-      detect_package_version_from_deps(RSC_RSPACK_PACKAGE) || declared_package_spec(RSC_RSPACK_PACKAGE)
+      package_root = resolved_package_root
+      installed_version = nil
+      unless package_root_missing?(package_root)
+        installed_version = installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+      end
+      installed_version || declared_rspack_version_for_rsc
+    rescue StandardError
+      nil
+    end
+
+    def declared_rspack_version_for_rsc
+      package_json_path = package_json_path_for("declared Rspack version")
+      return nil unless package_json_path
+
+      rsc_declared_package_version(package_json_path, RSC_RSPACK_PACKAGE)
     end
 
     def rsc_rspack_version_error(rspack_version)
