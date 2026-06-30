@@ -82,7 +82,13 @@ override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
 
 # Remove overridden gems from base dependencies
 override_gem_names.each do |gem_name|
-  base_deps.gsub!(/^\s*gem\s+["']#{Regexp.escape(gem_name)}["'].*$/, "")
+  unless gem_name.ascii_only?
+    raise ArgumentError, "#{override_deps_path} declares non-ASCII gem name #{gem_name.inspect}; " \
+                         "gem names must be ASCII"
+  end
+
+  escaped_gem_name = Regexp.escape(gem_name).encode(base_deps.encoding)
+  base_deps.gsub!(/^\s*gem\s+["']#{escaped_gem_name}["'].*$/, "")
 end
 
 # Clean up any blank lines created by removals

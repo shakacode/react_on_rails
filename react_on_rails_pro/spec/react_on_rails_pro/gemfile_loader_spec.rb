@@ -203,6 +203,23 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).not_to include("base.gem [\"1.0\"]")
   end
 
+  it "fails clearly for non-ASCII override gem names before cross-encoding regex removal" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "# encoding: ISO-8859-1\n" \
+                     "gem \"base_\xE9\", \"2.0\"\n".b
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include("Gemfile.local declares non-ASCII gem name")
+    expect(stderr).not_to include("Encoding::CompatibilityError")
+  end
+
   it "fails clearly for invalid UTF-8 fragments without a magic comment" do
     stdout, stderr, status = run_loader(
       base_deps: "# invalid byte: \xE9\ngem \"base_gem\", \"1.0\"\n".b
