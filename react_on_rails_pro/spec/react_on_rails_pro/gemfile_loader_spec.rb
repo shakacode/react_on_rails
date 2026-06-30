@@ -75,6 +75,34 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).to include("base_gem [\"2.0\"]")
   end
 
+  it "loads override fragments with an Emacs-style Ruby source-encoding magic comment" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "# -*- coding: ISO-8859-1 -*-\n# Latin-1 comment with Andr\xE9\n" \
+                     "gem \"base_gem\", \"2.0\"\n".b
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"2.0\"]")
+  end
+
+  it "loads override fragments with a Vim-style Ruby source-encoding magic comment" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "# vim: set fileencoding=ISO-8859-1 :\n# Latin-1 comment with Andr\xE9\n" \
+                     "gem \"base_gem\", \"2.0\"\n".b
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"2.0\"]")
+  end
+
   it "ignores encoding-looking inline comments that are not Ruby magic comments" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY
@@ -86,6 +114,19 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
 
     expect(status).to be_success, stderr
     expect(stdout).to include("setup_gem [\"1.0\"]")
+    expect(stdout).to include("base_gem [\"1.0\"]")
+  end
+
+  it "ignores encoding-looking prose comments that are not Ruby magic comments" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY
+        # See docs on encoding: US-ASCII before editing this file
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+    )
+
+    expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"1.0\"]")
   end
 

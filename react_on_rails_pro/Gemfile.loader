@@ -13,25 +13,38 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
-source_encoding_pattern = /(?:coding|encoding)\s*[:=]\s*([A-Za-z0-9._-]+)/ni
-magic_comment_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
+source_encoding_pattern = /
+  \A[ \t]*(?:
+    (?:coding|encoding)[ \t]*[:=]|
+    -\*-[ \t]*.*(?:coding|encoding)[ \t]*[:=]|
+    (?:vim|vi|ex):.*(?:fileencoding|fenc|coding|encoding)[ \t]*[:=]
+  )[ \t]*([A-Za-z0-9._-]+)
+/nix
+magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 
 detect_source_encoding = lambda do |path, content|
   detected_encoding = nil
 
   content.lines.first(2).each do |line|
-    next unless line.match?(magic_comment_pattern)
+    next unless line.match?(magic_comment_prefix_pattern)
 
-    match = line.match(source_encoding_pattern)
+    comment_body = line.sub(magic_comment_prefix_pattern, "")
+    match = comment_body.match(source_encoding_pattern)
     next unless match
 
     detected_encoding = match[1]
     break
   end
 
-  detected_encoding ? Encoding.find(detected_encoding) : Encoding::UTF_8
-rescue ArgumentError => e
-  raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{e.message}"
+  if detected_encoding
+    begin
+      Encoding.find(detected_encoding)
+    rescue ArgumentError => e
+      raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{e.message}"
+    end
+  else
+    Encoding::UTF_8
+  end
 end
 
 read_gemfile_fragment = lambda do |path|
