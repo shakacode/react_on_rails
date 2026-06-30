@@ -1207,7 +1207,7 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
-      it "lets per-call auto_load_bundle false override the global default on cache misses" do
+      it "uses the configured auto_load_bundle default before the per-call option on cache misses" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
         captured_auto_load_bundle = nil
@@ -1230,7 +1230,7 @@ describe ReactOnRailsProHelper do
           end
         end
 
-        expect(captured_auto_load_bundle).to be(false)
+        expect(captured_auto_load_bundle).to be(true)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end

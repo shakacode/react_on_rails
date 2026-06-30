@@ -182,23 +182,18 @@ module ReactOnRailsProHelper
 
     on_complete = options.delete(:on_complete)
     collect_chunks = on_complete.respond_to?(:call)
-    chunks = []
-    html = collect_chunks ? nil : +""
+    buffer = collect_chunks ? [] : +""
 
     internal_stream_react_component(component_name, options).each_chunk do |chunk|
-      if collect_chunks
-        chunks << chunk.to_s
-      else
-        html << chunk.to_s
-      end
+      buffer << chunk.to_s
     end
 
     if collect_chunks
-      html = chunks.join.html_safe
-      on_complete.call(chunks)
+      html = buffer.join.html_safe
+      on_complete.call(buffer)
       html
     else
-      html.html_safe
+      buffer.html_safe
     end
   end
 
@@ -339,7 +334,7 @@ module ReactOnRailsProHelper
         options = raw_options.merge(
           props: yield,
           skip_prerender_cache: true,
-          auto_load_bundle: raw_options.fetch(:auto_load_bundle, ReactOnRails.configuration.auto_load_bundle)
+          auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         )
         buffered_stream_react_component(component_name, options)
       end
