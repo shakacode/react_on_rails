@@ -1515,15 +1515,17 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      private backend discovery only, report the exact broad discovery command,
      timeout, or error, and use structured public `codex-claim` comments as an
      advisory fallback
-   - if broad discovery returns no candidate batch/run ids, or returns
-     candidates but cannot verify one, record
-     `worked_issue_scope: UNKNOWN (needs batch confirmation)`
+   - if broad discovery returns no candidate batch/run ids, record
+     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
+     to supply or confirm a batch/run id directly
+   - if broad discovery returns candidates but cannot verify one, record
+     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
+     to confirm one candidate before treating that candidate's lane list as
+     worked-issue scope; once confirmed, continue with the known-batch-id path
+     below
    - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
      `UNKNOWN (needs batch confirmation)`; only report candidate ids as
      confirmation targets when backend setup and discovery access both worked
-   - ask the user to confirm a candidate before treating any candidate lane list
-     as worked-issue scope; once confirmed, continue with the known-batch-id
-     path below
 
    When the batch/run id is known, run bounded `agent-coord doctor --json` and
    bounded `agent-coord status --batch-id <batch-id> --json`, then inspect the
