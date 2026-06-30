@@ -77,7 +77,7 @@ module ReactOnRails
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       # Limitation: a stale orphaned directory can still be read if Node resolution fails.
       resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
-      return nil if resolved_path.empty? || !File.exist?(resolved_path)
+      return nil unless File.exist?(resolved_path)
 
       JSON.parse(File.read(resolved_path))
     rescue StandardError
@@ -87,7 +87,7 @@ module ReactOnRails
     def rsc_declared_package_spec(package_json_path, package_name)
       package_json = JSON.parse(File.read(package_json_path))
       rsc_package_dependency_spec(package_json, package_name)
-    rescue JSON::ParserError, Errno::ENOENT
+    rescue StandardError
       nil
     end
 

@@ -299,7 +299,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           dependency_field: "devDependencies",
           installed_rspack_core_version: nil,
           package_manager: nil,
-          configuration_error: nil
+          configuration_error: nil,
+          package_json_read_error_after_version_cache: false
         )
           Dir.mktmpdir do |root|
             write_rsc_rspack_project_files(
@@ -313,6 +314,11 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             stub_rsc_rspack_project(root, rsc_enabled:, configuration_error:)
             package_json = File.join(root, "package.json")
             node_package_version = VersionChecker::NodePackageVersion.new(package_json)
+            if package_json_read_error_after_version_cache
+              node_package_version.raw
+              allow(File).to receive(:read).and_call_original
+              allow(File).to receive(:read).with(package_json).and_raise(Errno::EACCES)
+            end
             VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
           end
         end
@@ -347,6 +353,16 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         it "raises before boot when active Rspack is missing @rspack/core" do
           expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
+        it "fails clearly when package.json cannot be reread for the RSC Rspack version" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              package_json_read_error_after_version_cache: true
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
         end
 
         it "allows active Rspack v2" do
