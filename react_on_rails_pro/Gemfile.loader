@@ -15,7 +15,7 @@
 
 source_encoding_patterns = [
   /(?:\A|[^A-Za-z0-9_])(?:coding|encoding)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix,
-  /(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc|enc)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix
+  /\A\s*vim?:.*(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc|enc)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix
 ].freeze
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n

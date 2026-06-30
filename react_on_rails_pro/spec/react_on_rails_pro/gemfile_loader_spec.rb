@@ -208,6 +208,19 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     end
   end
 
+  it "ignores Vim encoding keys outside Vim modelines" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY
+        # Local gem overrides, enc=detect automatically
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"1.0\"]")
+  end
+
   it "ignores encoding-looking inline comments that are not Ruby magic comments" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY
