@@ -15,10 +15,13 @@
 
 source_encoding_patterns = [
   /(?:\A|[^A-Za-z0-9_])(?:coding|encoding)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix,
-  /(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc)[ \t]*=[ \t]*["']?([A-Za-z0-9._-]+)/nix
+  /(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc|enc)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix
 ].freeze
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n
+unsupported_source_encoding = lambda do |path, detected_encoding, reason|
+  raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{reason}"
+end
 
 detect_source_encoding = lambda do |path, content|
   detected_encoding = nil
@@ -40,14 +43,15 @@ detect_source_encoding = lambda do |path, content|
   if detected_encoding
     begin
       encoding = Encoding.find(detected_encoding)
-      unless encoding.ascii_compatible?
-        raise ArgumentError, "non-ASCII-compatible source encoding #{detected_encoding.inspect}"
-      end
-
-      encoding
     rescue ArgumentError => e
-      raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{e.message}"
+      unsupported_source_encoding.call(path, detected_encoding, e.message)
     end
+
+    unless encoding.ascii_compatible?
+      unsupported_source_encoding.call(path, detected_encoding, "non-ASCII-compatible source encoding")
+    end
+
+    encoding
   else
     Encoding::UTF_8
   end

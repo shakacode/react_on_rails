@@ -192,6 +192,22 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).to include("base_gem [\"2.0\"]")
   end
 
+  it "loads override fragments with Vim fenc and enc source-encoding modelines" do
+    ["fenc:ISO-8859-1", "enc=ISO-8859-1"].each do |modeline|
+      stdout, stderr, status = run_loader(
+        base_deps: <<~RUBY,
+          # frozen_string_literal: true
+          gem "base_gem", "1.0"
+        RUBY
+        override_deps: "# vim: set #{modeline} :\n# Latin-1 comment with Andr\xE9\n" \
+                       "gem \"base_gem\", \"2.0\"\n".b
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("base_gem [\"2.0\"]")
+    end
+  end
+
   it "ignores encoding-looking inline comments that are not Ruby magic comments" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY
@@ -291,6 +307,7 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     expect(stdout).to eq("")
     expect(stderr).to include("Gemfile.local declares unsupported source encoding \"UTF-16\"")
     expect(stderr).to include("non-ASCII-compatible source encoding")
+    expect(stderr).not_to include("non-ASCII-compatible source encoding \"UTF-16\"")
     expect(stderr).not_to include("Encoding::CompatibilityError")
   end
 
