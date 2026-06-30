@@ -68,7 +68,9 @@ jobs:
             script/release-finish-test.bash
 
       - name: Ruby syntax check release scripts
-        run: ruby -c script/release-forward-port && ruby -c script/release-finish
+        run: |
+          ruby -c script/release-forward-port
+          ruby -c script/release-finish
 
       - name: Run git-diff-base test harness
         run: bash script/lib/git-diff-base-test.bash
