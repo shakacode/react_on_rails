@@ -248,8 +248,8 @@ module ReactOnRails
     end
 
     def validate_rsc_rspack_version!
-      return unless rsc_support_enabled?
       return unless active_assets_bundler == "rspack"
+      return unless rsc_support_enabled?
 
       rspack_version = detected_rspack_version_for_rsc
       return if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
@@ -268,8 +268,18 @@ module ReactOnRails
 
       pro_config = ReactOnRailsPro.configuration
       pro_config.respond_to?(:enable_rsc_support) && pro_config.enable_rsc_support
-    rescue StandardError
-      false
+    rescue StandardError => e
+      raise ReactOnRails::Error, <<~MSG.strip
+        **ERROR** ReactOnRails: could not determine whether React Server Components are enabled.
+
+        React on Rails Pro configuration raised while validating RSC/Rspack compatibility:
+          #{e.class}: #{e.message}
+
+        Fix:
+          Ensure ReactOnRailsPro.configuration loads and exposes enable_rsc_support.
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
+      MSG
     end
 
     def package_dependency_spec(package_name)

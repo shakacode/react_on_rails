@@ -275,7 +275,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           )
         end
 
-        def stub_rsc_rspack_project(root, rsc_enabled:)
+        def stub_rsc_rspack_project(root, rsc_enabled:, configuration_error: nil)
           allow(Rails).to receive(:root).and_return(Pathname.new(root))
           allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -283,6 +283,11 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
 
           stub_const("ReactOnRailsPro", Module.new)
           stub_const("ReactOnRailsPro::Configuration", Class.new)
+          if configuration_error
+            ReactOnRailsPro.define_singleton_method(:configuration) { raise configuration_error }
+            return
+          end
+
           pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: rsc_enabled)
           ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
         end
@@ -293,7 +298,8 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           rsc_enabled: true,
           dependency_field: "devDependencies",
           installed_rspack_core_version: nil,
-          package_manager: nil
+          package_manager: nil,
+          configuration_error: nil
         )
           Dir.mktmpdir do |root|
             write_rsc_rspack_project_files(
@@ -304,7 +310,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               installed_rspack_core_version:,
               package_manager:
             )
-            stub_rsc_rspack_project(root, rsc_enabled:)
+            stub_rsc_rspack_project(root, rsc_enabled:, configuration_error:)
             package_json = File.join(root, "package.json")
             node_package_version = VersionChecker::NodePackageVersion.new(package_json)
             VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
@@ -366,6 +372,29 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         it "allows Rspack v1 when webpack is active" do
           expect { validate_rsc_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
             .not_to raise_error
+        end
+
+        it "does not read RSC support when webpack is active" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "webpack",
+              rspack_core_version: "^1.6.0",
+              configuration_error: RuntimeError.new("Pro config unavailable")
+            )
+          end.not_to raise_error
+        end
+
+        it "fails clearly when active Rspack cannot read Pro RSC configuration" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              configuration_error: RuntimeError.new("Pro config unavailable")
+            )
+          end.to raise_error(
+            ReactOnRails::Error,
+            /could not determine whether React Server Components are enabled/
+          )
         end
       end
 
