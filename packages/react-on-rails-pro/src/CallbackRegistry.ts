@@ -40,38 +40,56 @@ export default class CallbackRegistry<T> {
 
   private timedout = false;
 
+  private pageLoaded = false;
+
+  private timeoutId: NodeJS.Timeout | undefined;
+
   constructor(registryType: string) {
     this.registryType = registryType;
+  }
+
+  private clearTimeout() {
+    if (!this.timeoutId) return;
+
+    clearTimeout(this.timeoutId);
+    this.timeoutId = undefined;
+  }
+
+  private startTimeout() {
+    const registryTimeout = getRailsContext()?.componentRegistryTimeout;
+    if (!registryTimeout) return;
+
+    this.clearTimeout();
+    this.timeoutId = setTimeout(() => this.triggerTimeout(), registryTimeout);
+  }
+
+  private triggerTimeout() {
+    this.timeoutId = undefined;
+    this.timedout = true;
+    this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
+      waitingPromiseInfo.reject(this.createNotFoundError(itemName));
+    });
+    this.notUsedItems.forEach((itemName) => {
+      console.warn(
+        `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
+      );
+    });
   }
 
   private initializeTimeoutEvents() {
     if (this.timeoutEventsInitialized) return;
     this.timeoutEventsInitialized = true;
 
-    let timeoutId: NodeJS.Timeout;
-    const triggerTimeout = () => {
-      this.timedout = true;
-      this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
-        waitingPromiseInfo.reject(this.createNotFoundError(itemName));
-      });
-      this.notUsedItems.forEach((itemName) => {
-        console.warn(
-          `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
-        );
-      });
-    };
-
     onPageLoaded(() => {
-      const registryTimeout = getRailsContext()?.componentRegistryTimeout;
-      if (!registryTimeout) return;
-
-      timeoutId = setTimeout(triggerTimeout, registryTimeout);
+      this.pageLoaded = true;
+      this.startTimeout();
     });
 
     onPageUnloaded(() => {
+      this.pageLoaded = false;
       this.waitingPromises.clear();
       this.timedout = false;
-      clearTimeout(timeoutId);
+      this.clearTimeout();
     });
   }
 
@@ -109,6 +127,16 @@ export default class CallbackRegistry<T> {
   clear(): void {
     this.registeredItems.clear();
     this.notUsedItems.clear();
+  }
+
+  clearWithReject(error: Error): void {
+    this.waitingPromises.forEach((waitingPromiseInfo) => {
+      waitingPromiseInfo.reject(error);
+    });
+    this.waitingPromises.clear();
+    this.clear();
+    this.timedout = false;
+    if (this.pageLoaded) this.startTimeout();
   }
 
   getAll(): Map<string, T> {

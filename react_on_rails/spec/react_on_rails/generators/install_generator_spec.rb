@@ -865,6 +865,7 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
 
     include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator", true
 
     it "keeps the hidden legacy Redux TypeScript template path covered" do
       %w[
