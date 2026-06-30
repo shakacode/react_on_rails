@@ -1506,11 +1506,15 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      lane readiness or dependency decisions, and do not retry indefinitely
    - if the bounded helper or `agent-coord` binary is missing, or bounded
      `agent-coord doctor --json` fails or times out,
-     record `worked_issue_scope: UNKNOWN (setup)` and stop; report the missing
-     helper, missing command, timeout, or error needed to recover
+     record `worked_issue_scope: UNKNOWN (setup)`; stop private backend
+     discovery only, report the missing helper, missing command, timeout, or
+     error needed to recover, and use structured public `codex-claim` comments
+     as an advisory fallback
    - if bounded `agent-coord doctor --json` passes but broad discovery status
-     fails or times out, record `worked_issue_scope: UNKNOWN (access)` and
-     stop; report the exact broad discovery command, timeout, or error
+     fails or times out, record `worked_issue_scope: UNKNOWN (access)`; stop
+     private backend discovery only, report the exact broad discovery command,
+     timeout, or error, and use structured public `codex-claim` comments as an
+     advisory fallback
    - if broad discovery returns no candidate batch/run ids, or returns
      candidates but cannot verify one, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)`
