@@ -14,9 +14,12 @@ trusted_bots:
   - coderabbitai
   - cursor
   - dependabot
-  # Do not add github-actions without auditing comment-producing workflows:
-  # issue_comment-triggered jobs can mint github-actions[bot] comments from
-  # untrusted user input.
+  # Repo-local exception: github-actions comments here are treated as workflow
+  # status/help metadata only. The comment-producing workflows were audited for
+  # deterministic output and maintainer/collaborator-gated commands where they
+  # dispatch CI.
+  - github-actions
+  - github-code-quality
   - greptile-apps
 
 # Team entries are GitHub team slugs under the repository owner org. For
