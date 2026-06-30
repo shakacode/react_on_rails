@@ -5050,6 +5050,25 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_setup)
         expect(checker.messages.length).to eq(initial_count)
       end
+
+      it "does not reject Rspack v1 when RSC is disabled" do
+        initial_count = checker.messages.length
+
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/shakapacker.yml", "default:\n  assets_bundler: rspack\n")
+            File.write(
+              "package.json",
+              JSON.generate("dependencies" => {}, "devDependencies" => { "@rspack/core" => "^1.6.0" })
+            )
+
+            doctor.send(:check_rsc_setup)
+          end
+        end
+
+        expect(checker.messages.length).to eq(initial_count)
+      end
     end
 
     context "when RSC is enabled with valid setup" do
