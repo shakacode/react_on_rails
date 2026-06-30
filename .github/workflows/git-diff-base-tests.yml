@@ -54,7 +54,7 @@ jobs:
       - name: Set up Ruby for release harnesses
         uses: ./.github/actions/setup-ruby
         with:
-          ruby-version: ${{ steps.tool-versions.outputs.ruby-version }}
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           install-libyaml: 'false'
 
       - name: Shellcheck detector scripts and test harnesses
