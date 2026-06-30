@@ -162,14 +162,23 @@ Portable shared skills resolve this repo's commands and policy through:
 Compatibility for older repo-local skills that still name the former inline keys:
 
 - **Base branch** → `.agents/agent-workflow.yml` key `base_branch`
+- **Pre-push local validation** → `.agents/bin/validate`
+- **CI change detector** → `.agents/bin/ci-detect`
 - **Hosted-CI trigger** → `.agents/agent-workflow.yml` key `hosted_ci_trigger`
+- **CI parity environment** → `.agents/agent-workflow.yml` key `ci_parity_environment`
+- **Secret redaction patterns** → `.agents/agent-workflow.yml` key `secret_redaction_patterns`
+- **Trusted GitHub actor boundary** → `.agents/agent-workflow.yml` key `trusted_github_actor_boundary`
+- **Benchmark labels** → `.agents/agent-workflow.yml` key `benchmark_labels`
+- **Follow-up issue prefix** → `.agents/agent-workflow.yml` key `follow_up_prefix`
 - **Changelog** → `.agents/agent-workflow.yml` key `changelog`
 - **Lint / format** → `.agents/bin/lint`
 - **Merge ledger** → `.agents/agent-workflow.yml` key `merge_ledger`
+- **Docs checks** → `.agents/bin/docs`
 - **Tests** → `.agents/bin/test`
-- **Pre-push local validation** → `.agents/bin/validate`
-- **CI change detector** → `.agents/bin/ci-detect`
-- **Follow-up issue prefix** → `.agents/agent-workflow.yml` key `follow_up_prefix`
+- **Build / type checks** → `.agents/bin/build`
+- **Review gate** → `.agents/agent-workflow.yml` key `review_gate`
+- **Approval-exempt change categories** → `.agents/agent-workflow.yml` key `approval_exempt`
+- **Coordination backend** → `.agents/agent-workflow.yml` key `coordination_backend`
 
 The shared source lives at
 [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see

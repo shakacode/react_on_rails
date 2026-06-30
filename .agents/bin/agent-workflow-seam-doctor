@@ -183,6 +183,8 @@ module AgentWorkflowSeamDoctor
       issues << "invalid agent workflow config value for key: follow_up_prefix (expected #{FOLLOW_UP_PREFIX.inspect})"
     end
 
+    # Optional keys written with an empty/null YAML value are "unresolved" rather
+    # than "missing" because the key is present but intentionally left unfilled.
     config.each do |key, value|
       next if REQUIRED_CONFIG_KEYS.include?(key)
       next unless unresolved_yaml_value?(value)

@@ -2,6 +2,8 @@
 # Build and type-check.
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-pnpm run build
-pnpm run type-check
-( cd react_on_rails && bundle exec rake rbs:validate )
+rc=0
+pnpm run build || rc=1
+pnpm run type-check || rc=1
+( cd react_on_rails && bundle exec rake rbs:validate ) || rc=1
+exit "$rc"

@@ -217,6 +217,58 @@ class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
     end
   end
 
+  def test_portable_contract_missing_command_readme_pointer_reports_precise_issue
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "Run `.agents/bin/<name>` and see `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+      refute_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+    end
+  end
+
+  def test_portable_contract_missing_generic_command_form_reports_precise_issue
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "See `.agents/bin/README.md` and `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+      refute_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+    end
+  end
+
+  def test_portable_contract_null_optional_yaml_key_is_unresolved
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "optional_future_key" => nil)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved agent workflow config value for key: optional_future_key"
+      refute_includes out, "missing agent workflow config key: optional_future_key"
+    end
+  end
+
   def test_portable_contract_follow_up_prefix_must_be_literal_prefix
     with_repo do |root|
       write_portable_contract(root)
