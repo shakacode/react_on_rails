@@ -14,12 +14,8 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 source_encoding_patterns = [
-  /\A[ \t]*
-    (?:(?:frozen_string_literal|warn_indent|shareable_constant_value)[ \t]*:[^;\n]*;[ \t]*)*
-    (?:coding|encoding)[ \t]*:[ \t]*([A-Za-z0-9._-]+)/nix,
-  /\A[ \t]*.*?\bfile[ \t]+(?:coding|encoding)[ \t]*:[ \t]*([A-Za-z0-9._-]+)/nix,
-  /\A[ \t]*.*?-\*-[ \t]*.*?(?:coding|encoding)[ \t]*:[ \t]*([A-Za-z0-9._-]+).*?-\*-/nix,
-  /\A[ \t]*(?:vim|vi|ex):.*?(?:fileencoding|fenc|coding|encoding)[ \t]*=[ \t]*([A-Za-z0-9._-]+)/nix
+  /(?:\A|[^A-Za-z0-9_])(?:coding|encoding)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix,
+  /(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc)[ \t]*=[ \t]*["']?([A-Za-z0-9._-]+)/nix
 ].freeze
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n
