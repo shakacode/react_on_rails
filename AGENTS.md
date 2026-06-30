@@ -154,7 +154,7 @@ Portable shared skills resolve this repo's commands and policy through:
 
 - **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, `lint`,
   `build`, `docs`, `ci-detect`); see [`.agents/bin/README.md`](.agents/bin/README.md).
-  A missing script means that capability is n/a here.
+  These listed scripts are required; capabilities without a listed script are n/a here.
 - **Policy / config** — [`.agents/agent-workflow.yml`](.agents/agent-workflow.yml)
   (base branch, hosted-CI trigger, benchmark labels, changelog, merge ledger, review
   gate, secret redaction, coordination backend, and other non-command keys).
