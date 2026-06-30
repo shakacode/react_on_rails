@@ -18,6 +18,10 @@ module ReactOnRails
       dependencies
       devDependencies
     ].freeze
+    GENERIC_DECLARED_PACKAGE_DEPENDENCY_FIELDS = %w[
+      devDependencies
+      dependencies
+    ].freeze
     RSC_RSPACK_PACKAGE_DEPENDENCY_FIELDS = [
       *DECLARED_PACKAGE_DEPENDENCY_FIELDS,
       "optionalDependencies"

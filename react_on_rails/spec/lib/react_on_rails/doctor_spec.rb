@@ -5742,6 +5742,29 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when React is declared in dependencies and devDependencies" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              '{"dependencies":{"react":"18.2.0"},"devDependencies":{"react":"19.0.4"}}'
+            )
+            example.run
+          end
+        end
+      end
+
+      it "preserves devDependencies precedence for declared package fallback" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+
+        expect(success_msgs.any? { |m| m[:content].include?("React 19.0.4") }).to be true
+        expect(error_msgs).to be_empty
+      end
+    end
+
     context "when react-on-rails-rsc declares a React peer range" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
