@@ -97,6 +97,14 @@ module ReactOnRails
       nil
     end
 
+    def rsc_support_enabled_config_value
+      return false unless ReactOnRails::Utils.react_on_rails_pro?
+      return false unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
+
+      pro_config = ReactOnRailsPro.configuration
+      pro_config.respond_to?(:enable_rsc_support) && pro_config.enable_rsc_support
+    end
+
     def rsc_declared_package_spec(package_json_path, package_name)
       package_json = JSON.parse(File.read(package_json_path))
       rsc_package_dependency_spec(package_json, package_name)
@@ -124,6 +132,7 @@ module ReactOnRails
     end
 
     def rsc_resolved_node_package_json_path(package_root, package_name, script, &)
+      # Boot/doctor validation only. This is intentionally outside the request path.
       stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
       unless status.success?
         yield(package_name) if block_given?
@@ -147,6 +156,7 @@ module ReactOnRails
     end
 
     def rsc_package_dependency_spec(package_json, package_name, fields: RSC_RSPACK_PACKAGE_DEPENDENCY_FIELDS)
+      # The default is Rspack-specific; generic package checks pass stricter dependency fields.
       fields.each do |field|
         spec = package_json.fetch(field, nil)&.fetch(package_name, nil)
         return spec if spec

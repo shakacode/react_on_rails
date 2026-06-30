@@ -263,11 +263,7 @@ module ReactOnRails
     end
 
     def rsc_support_enabled?
-      return false unless ReactOnRails::Utils.react_on_rails_pro?
-      return false unless defined?(ReactOnRailsPro) && ReactOnRailsPro.respond_to?(:configuration)
-
-      pro_config = ReactOnRailsPro.configuration
-      pro_config.respond_to?(:enable_rsc_support) && pro_config.enable_rsc_support
+      rsc_support_enabled_config_value
     rescue StandardError => e
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: could not determine whether React Server Components are enabled.
