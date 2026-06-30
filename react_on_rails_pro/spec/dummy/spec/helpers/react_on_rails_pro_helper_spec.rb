@@ -494,6 +494,27 @@ describe ReactOnRailsProHelper do
         expect(completed_chunks.join).to eq(result)
         expect(chunks_read.count).to eq(chunks.count)
       end
+
+      it "does not mutate the caller's options hash" do
+        completed_chunks = nil
+        options = {
+          props:,
+          trace: true,
+          id: "#{component_name}-react-component-0",
+          on_complete: ->(buffered_chunks) { completed_chunks = buffered_chunks }
+        }
+        original_options = options.dup
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(completed_chunks).to all(be_a(String))
+        expect(options).to eq(original_options)
+      end
     end
 
     describe "#stream_react_component" do # rubocop:disable RSpec/MultipleMemoizedHelpers
@@ -1153,7 +1174,9 @@ describe ReactOnRailsProHelper do
           cached_miss_result = Rails.cache.read(expected_cache_key)
           Rails.cache.write(expected_cache_key, String.new(first_result), expires_in: 60)
           @rendered_rails_context = nil
+          props_calls_before_hit = props_calls
           second_result = render_cached.call
+          expect(props_calls).to eq(props_calls_before_hit)
         end
 
         expect(first_result).to include(chunks.first[:html], chunks.second[:html], chunks.third[:html])
@@ -1163,6 +1186,34 @@ describe ReactOnRailsProHelper do
         expect(cached_miss_result).to eq(first_result)
         expect(props_calls).to eq(1)
         expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "lets per-call auto_load_bundle false override the global default on cache misses" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>cached buffered stream</div>".html_safe
+          end
+
+          cached_buffered_stream_react_component(
+            component_name,
+            cache_key: ["buffered-stream-cache-auto-load", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
       it "does not require an RSC bundle hash when RSC support is disabled" do

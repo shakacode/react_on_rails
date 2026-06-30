@@ -173,6 +173,7 @@ module ReactOnRailsProHelper
   # before returning HTML to Rails. Use this for static/cacheable responses that need RSC rendering
   # without ActionController::Live committing headers on the first streamed byte.
   def buffered_stream_react_component(component_name, options = {})
+    options = options.dup
     options[:prerender] = true
     if options.key?(:immediate_hydration)
       ReactOnRails::Helper.warn_removed_immediate_hydration_option("buffered_stream_react_component")
@@ -337,7 +338,7 @@ module ReactOnRailsProHelper
         options = raw_options.merge(
           props: yield,
           skip_prerender_cache: true,
-          auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+          auto_load_bundle: raw_options.fetch(:auto_load_bundle, ReactOnRails.configuration.auto_load_bundle)
         )
         buffered_stream_react_component(component_name, options)
       end
