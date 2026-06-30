@@ -12,7 +12,7 @@ interface MockResponseOptions {
 }
 
 const mockResponse = (options: MockResponseOptions = {}): Response => {
-  const { status = 200, body = null, headers = {}, jsonError } = options;
+  const { status = 200, body = null, headers = { 'Content-Type': 'application/json' }, jsonError } = options;
   let bodyUsed = false;
 
   return {
@@ -142,20 +142,20 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'X-Request-Source')).toBe('test');
   });
 
-  it('resolves relative paths against the current location when a base tag is present', async () => {
+  it('resolves relative paths against document.baseURI when a base tag is present', async () => {
     const base = document.createElement('base');
-    base.href = 'https://cdn.example.com/assets/';
+    base.href = new URL('/v2/', window.location.href).href;
     document.head.appendChild(base);
 
     try {
       const createProject = createRailsAction<{ name: string }, { ok: true }>({
-        path: '/api/projects',
+        path: 'api/projects',
       });
 
       await createProject({ name: 'Apollo' });
 
       const [url] = fetchMock.mock.calls[0];
-      expect(url).toBe(new URL('/api/projects', window.location.href).href);
+      expect(url).toBe(new URL('api/projects', document.baseURI).href);
     } finally {
       base.remove();
     }
@@ -190,7 +190,20 @@ describe('createRailsAction', () => {
   });
 
   it('resolves successful non-JSON responses as null', async () => {
-    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, body: '<p>created</p>' }));
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, body: '<p>created</p>', headers: { 'Content-Type': 'text/html' } }),
+    );
+    const createProject = createRailsAction<{ name: string }, null>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).resolves.toBeNull();
+  });
+
+  it('resolves successful non-JSON responses as null even when the body contains valid JSON', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, body: '{"ok":true}', headers: { 'Content-Type': 'text/plain' } }),
+    );
     const createProject = createRailsAction<{ name: string }, null>({
       path: '/api/projects',
     });
@@ -335,13 +348,12 @@ describe('createRailsAction', () => {
   });
 
   it('rejects cross-origin URLs before attaching CSRF headers', async () => {
-    const createProject = createRailsAction<{ name: string }, { ok: true }>({
-      path: 'https://example.com/projects',
+    const createProject = createRailsAction<{ token: string }, { ok: true }>({
+      path: ({ token }) => `https://example.com/projects/${token}`,
     });
 
-    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(
-      /same-origin Rails action URLs \(attempted: https:\/\/example\.com\/projects\)/,
-    );
+    await expect(createProject({ token: 'SECRET_TOKEN' })).rejects.toThrow(/same-origin Rails action URLs/);
+    await expect(createProject({ token: 'SECRET_TOKEN' })).rejects.not.toThrow(/SECRET_TOKEN|example\.com/);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -492,6 +504,32 @@ describe('createRailsAction', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     },
   );
+
+  it('warns once when a dynamic non-DELETE action omits the body mapper', async () => {
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockImplementation(() => Promise.resolve(mockResponse()));
+
+    try {
+      const createProject = createRailsAction<
+        { accountId: number; name: string },
+        { project: { id: number } }
+      >({
+        method: 'POST',
+        path: ({ accountId }) => `/api/accounts/${accountId}/projects`,
+      });
+
+      await createProject({ accountId: 1, name: 'Apollo' });
+      await createProject({ accountId: 1, name: 'Hermes' });
+
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+      expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining('dynamic path'));
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(init.body).toBe(JSON.stringify({ accountId: 1, name: 'Apollo' }));
+    } finally {
+      consoleWarn.mockRestore();
+    }
+  });
 
   it('warns in development when a fetch rejection could be a redirect or network failure', async () => {
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});

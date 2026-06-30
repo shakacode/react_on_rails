@@ -10,6 +10,7 @@ export interface RailsActionOptions<TVariables> {
   /**
    * Maps variables to the JSON request body. Omit to send variables verbatim;
    * supply `() => null` to send no body when variables only populate the path.
+   * DELETE requests never send a body; identify the resource in the URL instead.
    */
   body?: (variables: TVariables) => unknown;
   /**
@@ -44,7 +45,7 @@ export class RailsActionRequestError<TResponseBody = unknown> extends Error {
 
 const resolveSameOriginRequestUrl = (url: string): string | null => {
   try {
-    const resolvedUrl = new URL(url, window.location.href);
+    const resolvedUrl = new URL(url, document.baseURI);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
       resolvedUrl.origin === window.location.origin
@@ -82,19 +83,12 @@ const parseSuccessJsonBody = async (response: Response): Promise<unknown> => {
     return null;
   }
 
-  if (isJsonResponse(response)) {
-    const responseText = await response.text();
-    return responseText.trim() === '' ? null : (JSON.parse(responseText) as unknown);
+  if (!isJsonResponse(response)) {
+    return null;
   }
 
-  try {
-    return (await response.json()) as unknown;
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return null;
-    }
-    throw error;
-  }
+  const responseText = await response.text();
+  return responseText.trim() === '' ? null : (JSON.parse(responseText) as unknown);
 };
 
 const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
@@ -111,13 +105,8 @@ const warnOnPossibleRedirectFetchError = (fetchError: unknown): void => {
   );
 };
 
-const warnOnDiscardedDeleteBody = (method: string, requestBody: unknown): boolean => {
-  if (
-    process.env.NODE_ENV === 'production' ||
-    method !== 'DELETE' ||
-    requestBody === undefined ||
-    requestBody === null
-  ) {
+const warnOnDiscardedDeleteBody = (requestBody: unknown): boolean => {
+  if (requestBody === undefined || requestBody === null) {
     return false;
   }
 
@@ -126,6 +115,13 @@ const warnOnDiscardedDeleteBody = (method: string, requestBody: unknown): boolea
       'Use `body: () => null` when variables only populate the path, or identify the resource in the URL instead.',
   );
   return true;
+};
+
+const warnOnImplicitBodyWithDynamicPath = (): void => {
+  console.warn(
+    '[createRailsAction] A dynamic path with no `body` mapper sends all variables as the JSON body. ' +
+      'Supply `body` to choose which fields are serialized, or `body: () => null` when variables only populate the path.',
+  );
 };
 
 const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
@@ -240,7 +236,12 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 ): RailsActionCaller<TVariables, TResponse> {
   const method = (options.method ?? 'POST').toUpperCase();
   // DELETE body discard is an action configuration problem, so warn at most once per DELETE action factory.
-  let warnedOnDiscardedDeleteBody = method !== 'DELETE';
+  let warnedOnDiscardedDeleteBody = method !== 'DELETE' || process.env.NODE_ENV === 'production';
+  let warnedOnImplicitDynamicPathBody =
+    method === 'DELETE' ||
+    typeof options.path !== 'function' ||
+    options.body !== undefined ||
+    process.env.NODE_ENV === 'production';
 
   const callRailsAction = async (
     variables?: TVariables,
@@ -254,7 +255,8 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     const requestUrl = resolveSameOriginRequestUrl(resolvedPath);
     if (requestUrl === null) {
       throw new Error(
-        `createRailsAction can only call same-origin Rails action URLs (attempted: ${resolvedPath}).`,
+        'createRailsAction can only call same-origin Rails action URLs. ' +
+          'Ensure the path resolves to the same origin as the current page.',
       );
     }
 
@@ -269,7 +271,11 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     const requestBody = options.body !== undefined ? options.body(typedVariables) : typedVariables;
     const hasJsonBody = method !== 'DELETE' && requestBody !== undefined && requestBody !== null;
     if (!warnedOnDiscardedDeleteBody) {
-      warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(method, requestBody);
+      warnedOnDiscardedDeleteBody = warnOnDiscardedDeleteBody(requestBody);
+    }
+    if (!warnedOnImplicitDynamicPathBody && hasJsonBody) {
+      warnOnImplicitBodyWithDynamicPath();
+      warnedOnImplicitDynamicPathBody = true;
     }
     assertJsonBodyValue(requestBody, hasJsonBody);
     let response: Response;
