@@ -445,7 +445,7 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects at factory time when called outside a browser context', () => {
+  it('rejects before fetch when called outside a browser context', async () => {
     const originalWindow = globalThis.window;
 
     try {
@@ -454,11 +454,11 @@ describe('createRailsAction', () => {
         value: undefined,
       });
 
-      expect(() =>
-        createRailsAction<{ name: string }, { ok: true }>({
-          path: '/api/projects',
-        }),
-      ).toThrow(/browser contexts/);
+      const createProject = createRailsAction<{ name: string }, { ok: true }>({
+        path: '/api/projects',
+      });
+
+      await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/browser contexts/);
       expect(fetchMock).not.toHaveBeenCalled();
     } finally {
       Object.defineProperty(globalThis, 'window', {

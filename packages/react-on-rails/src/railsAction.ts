@@ -300,8 +300,6 @@ const assertBrowserContext = (): void => {
 export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   options: RailsActionOptions<TVariables>,
 ): RailsActionCaller<TVariables, TResponse> {
-  assertBrowserContext();
-
   const method = (options.method ?? 'POST').toUpperCase();
   // DELETE body discard is an action configuration problem, so warn at most once per DELETE action factory.
   let warnedOnDiscardedDeleteBody = method !== 'DELETE' || process.env.NODE_ENV === 'production';
@@ -317,6 +315,8 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
   ): Promise<TResponse> => {
     // The public conditional type only permits omitted variables when TVariables is undefined.
     const typedVariables = variables as TVariables;
+    assertBrowserContext();
+
     const resolvedPath = resolvePath(options.path, typedVariables);
     const requestUrl = resolveSameOriginRequestUrl(resolvedPath);
     if (requestUrl === null) {
