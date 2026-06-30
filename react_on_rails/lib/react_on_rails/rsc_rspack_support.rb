@@ -22,6 +22,11 @@ module ReactOnRails
       *DECLARED_PACKAGE_DEPENDENCY_FIELDS,
       "optionalDependencies"
     ].freeze
+    RSC_RSPACK_UPGRADE_PACKAGE_DEPENDENCY_FIELDS = [
+      *RSC_RSPACK_PACKAGE_DEPENDENCY_FIELDS,
+      "peerDependencies"
+    ].freeze
+    PATH_PROTOCOL_PACKAGE_SPEC_PATTERN = /\A(?:file|link|portal):/
     PACKAGE_NAME_PATTERN = %r{
       \A
       (?:@[a-z0-9][a-z0-9._-]*/)?
@@ -31,8 +36,8 @@ module ReactOnRails
 
     private
 
-    def rsc_rspack_v2_install_command
-      packages = RSC_RSPACK_V2_PACKAGES.map do |package_name|
+    def rsc_rspack_v2_install_command(package_json_path: nil)
+      packages = rsc_rspack_upgrade_packages(package_json_path).map do |package_name|
         "#{package_name}@^#{MINIMUM_RSC_RSPACK_MAJOR}"
       end.join(" ")
 
@@ -48,7 +53,12 @@ module ReactOnRails
       end
     end
 
-    def rsc_rspack_version_requirement_error(rspack_version, error_prefix: nil, include_doctor_recommendation: false)
+    def rsc_rspack_version_requirement_error(
+      rspack_version,
+      error_prefix: nil,
+      include_doctor_recommendation: false,
+      package_json_path: nil
+    )
       detected_version = rspack_version || "not found"
       prefix = "#{error_prefix} " if error_prefix
       doctor_recommendation = "\n\n#{ReactOnRails::DOCTOR_RECOMMENDATION}" if include_doctor_recommendation
@@ -59,10 +69,10 @@ module ReactOnRails
         Detected #{RSC_RSPACK_PACKAGE}: #{detected_version}
 
         Rspack v1 is not supported for React Server Components in React on Rails Pro.
-        Upgrade to Rspack v2 so RSC setup fails fast instead of hitting bundler or runtime surprises.
+        Upgrade to Rspack v2 to ensure RSC works correctly instead of hitting bundler or runtime surprises.
 
         Fix:
-          #{rsc_rspack_v2_install_command}#{doctor_recommendation}
+          #{rsc_rspack_v2_install_command(package_json_path:)}#{doctor_recommendation}
       MSG
     end
 
@@ -74,7 +84,7 @@ module ReactOnRails
     def rsc_installed_package_json(package_root, package_name, &)
       return nil unless valid_rsc_package_name?(package_name)
 
-      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
+      script = "console.log(require.resolve(process.argv[2] + '/package.json'))"
       resolved_path = rsc_resolved_node_package_json_path(package_root, package_name, script, &)
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
@@ -102,7 +112,9 @@ module ReactOnRails
     def rsc_package_major_version(version)
       version_string = version.to_s
       # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
+      return 0 if version_string.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
+      return 0 if version_string.start_with?("workspace:") && !version_string.match?(/\d/)
 
       version_without_alias = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
       major = version_without_alias.match(/\d+/)&.[](0)
@@ -142,8 +154,30 @@ module ReactOnRails
     end
 
     def rsc_normalized_declared_package_version(package_spec)
+      return nil if package_spec.to_s.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
+
       clean_version = package_spec.to_s.gsub(/\A[^0-9]*/, "")
       clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
+    end
+
+    def rsc_rspack_upgrade_packages(package_json_path)
+      declared_packages = rsc_declared_rspack_upgrade_packages(package_json_path)
+      declared_packages.empty? ? RSC_RSPACK_V2_PACKAGES : declared_packages
+    end
+
+    def rsc_declared_rspack_upgrade_packages(package_json_path)
+      return [] if package_json_path.to_s.empty?
+
+      package_json = JSON.parse(File.read(package_json_path))
+      RSC_RSPACK_V2_PACKAGES.select do |package_name|
+        rsc_package_dependency_spec(
+          package_json,
+          package_name,
+          fields: RSC_RSPACK_UPGRADE_PACKAGE_DEPENDENCY_FIELDS
+        )
+      end
+    rescue StandardError
+      []
     end
   end
 end

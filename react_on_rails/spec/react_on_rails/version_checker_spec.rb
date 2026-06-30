@@ -300,8 +300,16 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           installed_rspack_core_version: nil,
           package_manager: nil,
           configuration_error: nil,
+          env_assets_bundler: nil,
           package_json_read_error_after_version_cache: false
         )
+          previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+          if env_assets_bundler.nil?
+            ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+          else
+            ENV["SHAKAPACKER_ASSETS_BUNDLER"] = env_assets_bundler
+          end
+
           Dir.mktmpdir do |root|
             write_rsc_rspack_project_files(
               root,
@@ -320,6 +328,12 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               allow(File).to receive(:read).with(package_json).and_raise(Errno::EACCES)
             end
             VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
+          end
+        ensure
+          if previous_bundler.nil?
+            ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+          else
+            ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
           end
         end
 
@@ -341,6 +355,21 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               package_manager: "npm@10.0.0"
             )
           end.to raise_error(ReactOnRails::Error, %r{npm install --save-dev @rspack/core@\^2})
+        end
+
+        it "does not add undeclared Rspack companion packages to fix instructions" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              package_manager: "npm@10.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            aggregate_failures do
+              expect(error.message).to include("npm install --save-dev @rspack/core@^2")
+              expect(error.message).not_to include("@rspack/cli")
+            end
+          }
         end
 
         it "falls back to yarn instructions when package manager detection fails" do
@@ -399,6 +428,15 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
+        it "rejects path protocol specs even when the path contains a v2-looking version" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "file:../rspack-2.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: file:\.\./rspack-2\.0\.0})
+        end
+
         it "does not treat peer dependencies as installed Rspack" do
           expect do
             validate_rsc_rspack_project(
@@ -419,6 +457,16 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         it "allows Rspack v1 when webpack is active" do
           expect { validate_rsc_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
             .not_to raise_error
+        end
+
+        it "raises when Rspack is selected through SHAKAPACKER_ASSETS_BUNDLER" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "webpack",
+              rspack_core_version: "^1.6.0",
+              env_assets_bundler: "rspack"
+            )
+          end.to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
         end
 
         it "does not read RSC support when webpack is active" do

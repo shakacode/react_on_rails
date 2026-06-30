@@ -3644,7 +3644,11 @@ module ReactOnRails
     end
 
     def rsc_rspack_version_error(rspack_version)
-      rsc_rspack_version_requirement_error(rspack_version, error_prefix: "🚫")
+      rsc_rspack_version_requirement_error(
+        rspack_version,
+        error_prefix: "🚫",
+        package_json_path: package_json_path_for("RSC Rspack version")
+      )
     end
 
     def check_rsc_rspack_lazy_compilation

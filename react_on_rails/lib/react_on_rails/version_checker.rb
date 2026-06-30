@@ -290,7 +290,8 @@ module ReactOnRails
       rsc_rspack_version_requirement_error(
         rspack_version,
         error_prefix: "**ERROR** ReactOnRails:",
-        include_doctor_recommendation: true
+        include_doctor_recommendation: true,
+        package_json_path: node_package_version.package_json
       )
     end
 

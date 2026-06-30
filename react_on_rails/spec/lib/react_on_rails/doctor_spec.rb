@@ -341,6 +341,33 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#active_assets_bundler" do
+    around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      example.run
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
+      end
+    end
+
+    it "honors the command-level Shakapacker assets bundler override" do
+      ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "rspack"
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:active_assets_bundler)).to eq("rspack")
+    end
+
+    it "ignores unsupported command-level Shakapacker assets bundler values" do
+      ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "vite"
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:active_assets_bundler)).to eq("webpack")
+    end
+  end
+
   describe "#parsed_shakapacker_config" do
     it "reads and parses config/shakapacker.yml at most once per Doctor instance" do
       # Exercises Doctor's memoizing super override: several checks consult the
@@ -5314,8 +5341,16 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
       Dir.mktmpdir do |tmpdir|
         Dir.chdir(tmpdir) { example.run }
+      end
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
       end
     end
 
@@ -5336,6 +5371,19 @@ RSpec.describe ReactOnRails::Doctor do
         error_msgs = checker.messages.select { |m| m[:type] == :error }
         expect(error_msgs.any? { |m| m[:content].include?("Rspack v2 or newer") }).to be true
         expect(error_msgs.any? { |m| m[:content].include?("@rspack/core@^2") }).to be true
+      end
+    end
+
+    context "when Rspack is selected for the command through SHAKAPACKER_ASSETS_BUNDLER" do
+      before do
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "rspack"
+        write_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0")
+      end
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Rspack v2 or newer") }).to be true
       end
     end
 
@@ -6038,7 +6086,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(
             "node",
             "-e",
-            "console.log(require.resolve(process.argv[1] + '/package.json'))",
+            "console.log(require.resolve(process.argv[2] + '/package.json'))",
             "react",
             chdir: package_root
           )
@@ -6132,9 +6180,13 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
       Dir.mktmpdir do |tmpdir|
         Dir.chdir(tmpdir) do
           FileUtils.mkdir_p("config/webpack")
+          FileUtils.mkdir_p("config")
+          File.write("config/shakapacker.yml", "default:\n  assets_bundler: webpack\n")
           File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
           File.write("config/webpack/rscWebpackConfig.js", "{}")
           File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
@@ -6157,6 +6209,12 @@ RSpec.describe ReactOnRails::Doctor do
           )
           example.run
         end
+      end
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
       end
     end
 
