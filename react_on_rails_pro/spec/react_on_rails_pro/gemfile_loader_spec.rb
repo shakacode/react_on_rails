@@ -97,7 +97,21 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
         # frozen_string_literal: true
         gem "base_gem", "1.0"
       RUBY
-      override_deps: "# -*- coding: ISO-8859-1 -*-\n# Latin-1 comment with Andr\xE9\n" \
+      override_deps: "# emacs-compatible; -*- coding: ISO-8859-1 -*-\n# Latin-1 comment with Andr\xE9\n" \
+                     "gem \"base_gem\", \"2.0\"\n".b
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"2.0\"]")
+  end
+
+  it "loads a second-line source-encoding magic comment after a shebang" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY,
+        # frozen_string_literal: true
+        gem "base_gem", "1.0"
+      RUBY
+      override_deps: "#!/usr/bin/env ruby\n# encoding: ISO-8859-1\n# Latin-1 comment with Andr\xE9\n" \
                      "gem \"base_gem\", \"2.0\"\n".b
     )
 
@@ -144,6 +158,17 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
 
     expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"1.0\"]")
+  end
+
+  it "ignores second-line source-encoding magic comments without a shebang" do
+    stdout, stderr, status = run_loader(
+      base_deps: "# ordinary comment\n# encoding: ISO-8859-1\n# Latin-1 comment with Andr\xE9\n" \
+                 "gem \"base_gem\", \"1.0\"\n".b
+    )
+
+    expect(status).not_to be_success
+    expect(stdout).to eq("")
+    expect(stderr).to include("Gemfile.development_dependencies is not valid UTF-8")
   end
 
   it "ignores arbitrary magic comment keys before an encoding-looking token" do

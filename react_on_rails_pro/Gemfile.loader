@@ -17,16 +17,20 @@ source_encoding_pattern = /
   \A[ \t]*(?:
     (?:(?:frozen_string_literal|warn_indent|shareable_constant_value)[ \t]*:[^;\n]*;[ \t]*)*
       (?:coding|encoding)[ \t]*:|
-    -\*-[ \t]*.*?(?:coding|encoding)[ \t]*:|
+    .*?-\*-[ \t]*.*?(?:coding|encoding)[ \t]*:|
     (?:vim|vi|ex):.*?(?:fileencoding|fenc|coding|encoding)[ \t]*=
   )[ \t]*([A-Za-z0-9._-]+)
 /nix
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
+shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n
 
 detect_source_encoding = lambda do |path, content|
   detected_encoding = nil
+  first_line, second_line = content.each_line.take(2)
+  candidate_lines = [first_line]
+  candidate_lines << second_line if first_line&.match?(shebang_pattern)
 
-  content.each_line.take(2).each do |line|
+  candidate_lines.compact.each do |line|
     next unless line.match?(magic_comment_prefix_pattern)
 
     comment_body = line.sub(magic_comment_prefix_pattern, "")
