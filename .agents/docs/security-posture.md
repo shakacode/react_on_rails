@@ -56,8 +56,9 @@ The helper resolves trusted GitHub actors from `--trust-config`, repo-local
 intentional policy, while an absent file falls through to the next layer. The
 packaged fallback is fail-closed and empty by default; human maintainers and
 trusted automation belong in a repo-local or user-global trust config. Global
-configs must use owner-qualified `trusted_teams` entries such as
-`OWNER/team-slug`; bare team slugs are only resolved for repo-local configs.
+configs must use `OWNER/team-slug` entries, and only entries whose owner matches
+the scanned repo owner are honored. Bare team slugs are only resolved for
+repo-local configs.
 Workflow commenters such as `github-actions[bot]` are repo-specific trust
 decisions: include the base bot login `github-actions` under
 `trusted_metadata_bots` when maintainers trust those generated comments as

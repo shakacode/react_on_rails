@@ -71,8 +71,8 @@ trusted_teams:
 ```
 
 Repo-local `trusted_teams` entries are team slugs under the repo owner. Global
-trust configs must use owner-qualified team entries such as
-`OWNER/maintainers`.
+trust configs must use `OWNER/team-slug` entries, and only entries whose owner
+matches the scanned repo owner are honored.
 
 ## Auditing Before Editing Trust
 

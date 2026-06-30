@@ -186,7 +186,12 @@ PACKAGED_TRUST_CONFIG = File.expand_path("../trusted-github-actors.yml", __dir__
 USER_TRUST_CONFIG_ENV = "AGENT_WORKFLOWS_TRUST_CONFIG"
 
 def resolved_trust_config(explicit_path)
-  return { path: explicit_path, global: false } if explicit_path && File.exist?(File.expand_path(explicit_path))
+  if explicit_path
+    expanded = File.expand_path(explicit_path)
+    abort "Trust config not found: #{expanded}" unless File.exist?(expanded)
+
+    return { path: expanded, global: false }
+  end
 
   repo_path = repo_trust_config_path
   return { path: repo_path, global: false } if File.exist?(repo_path)
@@ -235,6 +240,8 @@ end
 def load_trust_config(path:, global:)
   path = File.expand_path(path)
   data = File.exist?(path) ? YAML.safe_load_file(path, aliases: false) || {} : {}
+  abort "Invalid trust config #{path}: expected a YAML mapping at the top level" unless data.is_a?(Hash)
+
   trusted_bots = Array(data["trusted_bots"]).to_set { |login| normalized_bot_login(login) }
   trusted_metadata_bots = Array(data["trusted_metadata_bots"]).to_set { |login| normalized_bot_login(login) }
   overlapping_bots = trusted_bots & trusted_metadata_bots

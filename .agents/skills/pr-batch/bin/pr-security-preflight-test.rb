@@ -135,7 +135,7 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_missing_explicit_trust_config_falls_through_to_repo_local_config
+  def test_missing_explicit_trust_config_fails_closed
     with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
       consumer_root = File.join(dir, "consumer")
       missing_explicit_config = File.join(dir, "missing-trusted-github-actors.yml")
@@ -158,9 +158,10 @@ class PrSecurityPreflightTest < Minitest::Test
         chdir: consumer_root
       )
 
-      assert status.success?, out
-      assert_includes out, "SECURITY_PREFLIGHT_OK"
-      refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      refute status.success?, out
+      assert_equal 1, status.exitstatus
+      assert_includes out, "Trust config not found: #{missing_explicit_config}"
+      refute_includes out, "SECURITY_PREFLIGHT_OK"
     end
   end
 
@@ -237,6 +238,18 @@ class PrSecurityPreflightTest < Minitest::Test
       assert_equal 1, status.exitstatus
       assert_includes out, "Invalid trust config"
       assert_includes out, "bot(s) listed in both trusted_bots and trusted_metadata_bots: github-actions"
+    end
+  end
+
+  def test_trust_config_rejects_non_mapping_yaml
+    with_fake_gh("warning-issue") do |env, trust_config_path, _log_path|
+      File.write(trust_config_path, "[]\n")
+
+      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 1, status.exitstatus
+      assert_includes out, "Invalid trust config #{trust_config_path}: expected a YAML mapping at the top level"
     end
   end
 
@@ -1072,7 +1085,6 @@ class PrSecurityPreflightTest < Minitest::Test
       mode_uses_issue_author_payload() {
         case "$1" in
           reaction-only-participant|trusted-hidden-participant|trusted-bot-participant|human-bot-basename-participant|\
-          metadata-bot-comment|metadata-bot-author|\
           paginated-timeline|paginated-timeline-missing-page-info|paginated-timeline-page-fetch-failure|\
           paginated-timeline-cursor-cycle|paginated-timeline-partial-error|paginated-participants)
             return 0
