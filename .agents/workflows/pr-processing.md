@@ -1499,16 +1499,18 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    work is in scope. If no coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - through the resolved `pr-batch` helper, run bounded
-     `agent-coord doctor --json`, then run bounded `agent-coord status --json`
-     as a broad audit/discovery read to list candidate batch/run ids and lanes;
-     do not use this broad read for worker lane readiness or dependency
-     decisions, and do not retry indefinitely
+   - using the bounded coordination helper from the resolved `pr-batch`
+     workflow, run bounded `agent-coord doctor --json`, then run bounded
+     `agent-coord status --json` as a broad audit/discovery read to list
+     candidate batch/run ids and lanes; do not use this broad read for worker
+     lane readiness or dependency decisions, and do not retry indefinitely
    - if the bounded helper or `agent-coord` binary is missing, or bounded
      `agent-coord doctor --json` fails or times out,
-     record `worked_issue_scope: UNKNOWN (setup)`
+     record `worked_issue_scope: UNKNOWN (setup)` and stop; report the missing
+     helper, missing command, timeout, or error needed to recover
    - if bounded `agent-coord doctor --json` passes but broad discovery status
-     fails or times out, record `worked_issue_scope: UNKNOWN (access)`
+     fails or times out, record `worked_issue_scope: UNKNOWN (access)` and
+     stop; report the exact broad discovery command, timeout, or error
    - if broad discovery returns no candidate batch/run ids, or returns
      candidates but cannot verify one, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)`
@@ -1516,7 +1518,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      `UNKNOWN (needs batch confirmation)`; only report candidate ids as
      confirmation targets when backend setup and discovery access both worked
    - ask the user to confirm a candidate before treating any candidate lane list
-     as worked-issue scope
+     as worked-issue scope; once confirmed, continue with the known-batch-id
+     path below
 
    When the batch/run id is known, run bounded `agent-coord doctor --json` and
    bounded `agent-coord status --batch-id <batch-id> --json`, then inspect the
