@@ -341,6 +341,33 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#active_assets_bundler" do
+    around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      example.run
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
+      end
+    end
+
+    it "honors the command-level Shakapacker assets bundler override" do
+      ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "rspack"
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:active_assets_bundler)).to eq("rspack")
+    end
+
+    it "ignores unsupported command-level Shakapacker assets bundler values" do
+      ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "vite"
+      allow(doctor).to receive(:configured_assets_bundler).and_return("webpack")
+
+      expect(doctor.send(:active_assets_bundler)).to eq("webpack")
+    end
+  end
+
   describe "#parsed_shakapacker_config" do
     it "reads and parses config/shakapacker.yml at most once per Doctor instance" do
       # Exercises Doctor's memoizing super override: several checks consult the
@@ -5050,6 +5077,25 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_setup)
         expect(checker.messages.length).to eq(initial_count)
       end
+
+      it "does not reject Rspack v1 when RSC is disabled" do
+        initial_count = checker.messages.length
+
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/shakapacker.yml", "default:\n  assets_bundler: rspack\n")
+            File.write(
+              "package.json",
+              JSON.generate("dependencies" => {}, "devDependencies" => { "@rspack/core" => "^1.6.0" })
+            )
+
+            doctor.send(:check_rsc_setup)
+          end
+        end
+
+        expect(checker.messages.length).to eq(initial_count)
+      end
     end
 
     context "when RSC is enabled with valid setup" do
@@ -5270,6 +5316,139 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_bundler_config)
         error_msgs = checker.messages.select { |m| m[:type] == :error }
         expect(error_msgs.any? { |m| m[:content].include?("RSC bundler config not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_rsc_rspack_version" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    def write_rspack_project(assets_bundler:, rspack_core_version:, dependency_field: "devDependencies")
+      FileUtils.mkdir_p("config")
+      File.write("config/shakapacker.yml", <<~YAML)
+        default:
+          assets_bundler: #{assets_bundler}
+      YAML
+
+      dependencies = { "react" => "19.0.4" }
+      dev_dependencies = {}
+      package_json = { "dependencies" => dependencies, "devDependencies" => dev_dependencies }
+      if rspack_core_version
+        package_json[dependency_field] ||= {}
+        package_json[dependency_field]["@rspack/core"] = rspack_core_version
+      end
+      File.write(
+        "package.json",
+        JSON.generate(package_json)
+      )
+    end
+
+    around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
+      end
+    end
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+      allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      pro_config = double("ProConfig", enable_rsc_support: true)
+      stub_const("ReactOnRailsPro", Module.new)
+      ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+    end
+
+    context "when RSC uses Rspack v1" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Rspack v2 or newer") }).to be true
+        expect(error_msgs.any? { |m| m[:content].include?("@rspack/core@^2") }).to be true
+      end
+    end
+
+    context "when Rspack is selected for the command through SHAKAPACKER_ASSETS_BUNDLER" do
+      before do
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = "rspack"
+        write_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0")
+      end
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Rspack v2 or newer") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack but @rspack/core is missing" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
+
+      it "reports an error with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("Detected @rspack/core: not found") }).to be true
+        expect(error_msgs.any? { |m| m[:content].include?("@rspack/core@^2") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack v2" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+
+      it "reports success" do
+        doctor.send(:check_rsc_rspack_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when RSC uses Rspack v2 from optional dependencies" do
+      before do
+        write_rspack_project(
+          assets_bundler: "rspack",
+          rspack_core_version: "^2.0.0",
+          dependency_field: "optionalDependencies"
+        )
+      end
+
+      it "reports success" do
+        doctor.send(:check_rsc_rspack_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when RSC is disabled" do
+      before do
+        pro_config = double("ProConfig", enable_rsc_support: false)
+        ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+        write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0")
+      end
+
+      it "does not report an Rspack error" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs).to be_empty
+      end
+    end
+
+    context "when the app uses webpack" do
+      before { write_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
+
+      it "does not report an Rspack error" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs).to be_empty
       end
     end
   end
@@ -5563,6 +5742,29 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when React is declared in dependencies and devDependencies" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              '{"dependencies":{"react":"18.2.0"},"devDependencies":{"react":"19.0.4"}}'
+            )
+            example.run
+          end
+        end
+      end
+
+      it "preserves devDependencies precedence for declared package fallback" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+
+        expect(success_msgs.any? { |m| m[:content].include?("React 19.0.4") }).to be true
+        expect(error_msgs).to be_empty
+      end
+    end
+
     context "when react-on-rails-rsc declares a React peer range" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -5645,6 +5847,33 @@ RSpec.describe ReactOnRails::Doctor do
               )
             )
             expect(error_msgs.none? { |msg| msg.include?("requires react") }).to be true
+          end
+        end
+      end
+
+      it "does not treat optionalDependencies as a declared RSC package" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7"
+                },
+                "optionalDependencies" => {
+                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                }
+              )
+            )
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
+            stub_package_root(Dir.pwd)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs.none? { |msg| msg.include?("react-on-rails-rsc is declared") }).to be true
           end
         end
       end
@@ -5994,9 +6223,13 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     around do |example|
+      previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+      ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
       Dir.mktmpdir do |tmpdir|
         Dir.chdir(tmpdir) do
           FileUtils.mkdir_p("config/webpack")
+          FileUtils.mkdir_p("config")
+          File.write("config/shakapacker.yml", "default:\n  assets_bundler: webpack\n")
           File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
           File.write("config/webpack/rscWebpackConfig.js", "{}")
           File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
@@ -6019,6 +6252,12 @@ RSpec.describe ReactOnRails::Doctor do
           )
           example.run
         end
+      end
+    ensure
+      if previous_bundler.nil?
+        ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+      else
+        ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
       end
     end
 

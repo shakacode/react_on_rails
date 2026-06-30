@@ -1,16 +1,21 @@
 # frozen_string_literal: true
 
+require "json"
 require_relative "version_syntax_converter"
+require_relative "shakapacker_config_helpers"
+require_relative "rsc_rspack_support"
 
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each other at runtime.
   class VersionChecker # rubocop:disable Metrics/ClassLength
+    include ShakapackerConfigHelpers
+    include RscRspackSupport
+
     attr_reader :node_package_version
 
     # Semver uses - to separate pre-release, but RubyGems use .
     VERSION_PARTS_REGEX = /(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?/
-
     def self.build
       new(NodePackageVersion.build)
     end
@@ -32,6 +37,7 @@ module ReactOnRails
       validate_package_gem_compatibility!
       validate_exact_version!
       validate_version_match!
+      validate_rsc_rspack_version!
     end
 
     private
@@ -239,6 +245,50 @@ module ReactOnRails
 
         #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
+    end
+
+    def validate_rsc_rspack_version!
+      return unless active_assets_bundler == "rspack"
+      return unless rsc_support_enabled?
+
+      rspack_version = detected_rspack_version_for_rsc
+      return if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+
+      raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+    end
+
+    def detected_rspack_version_for_rsc
+      package_root = File.dirname(node_package_version.package_json)
+      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || package_dependency_spec(RSC_RSPACK_PACKAGE)
+    end
+
+    def rsc_support_enabled?
+      rsc_support_enabled_config_value
+    rescue StandardError => e
+      raise ReactOnRails::Error, <<~MSG.strip
+        **ERROR** ReactOnRails: could not determine whether React Server Components are enabled.
+
+        React on Rails Pro configuration raised while validating RSC/Rspack compatibility:
+          #{e.class}: #{e.message}
+
+        Fix:
+          Ensure ReactOnRailsPro.configuration loads and exposes enable_rsc_support.
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
+      MSG
+    end
+
+    def package_dependency_spec(package_name)
+      rsc_declared_package_version(node_package_version.package_json, package_name)
+    end
+
+    def rsc_rspack_version_error(rspack_version)
+      rsc_rspack_version_requirement_error(
+        rspack_version,
+        error_prefix: "**ERROR** ReactOnRails:",
+        include_doctor_recommendation: true,
+        package_json_path: node_package_version.package_json
+      )
     end
 
     def gem_version
