@@ -194,8 +194,9 @@ module ReactOnRailsProHelper
     end
 
     if collect_chunks
+      html = chunks.join.html_safe
       on_complete.call(chunks)
-      chunks.join.html_safe
+      html
     else
       html.html_safe
     end

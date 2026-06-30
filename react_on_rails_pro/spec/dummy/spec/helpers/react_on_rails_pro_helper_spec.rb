@@ -495,6 +495,25 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
+      it "returns the rendered HTML even if on_complete mutates the buffered chunks" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(
+            component_name,
+            props:,
+            on_complete: ->(buffered_chunks) { buffered_chunks.clear },
+            **component_options
+          )
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(result).to include(chunks.second[:html])
+        expect(result).to include(chunks.third[:html])
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
       it "does not mutate the caller's options hash" do
         completed_chunks = nil
         options = {
