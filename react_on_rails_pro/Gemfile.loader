@@ -15,9 +15,10 @@
 
 source_encoding_pattern = /
   \A[ \t]*(?:
-    (?:[A-Za-z0-9_-]+[ \t]*[:=][^;\n]*;[ \t]*)*(?:coding|encoding)[ \t]*[:=]|
-    -\*-[ \t]*.*(?:coding|encoding)[ \t]*[:=]|
-    (?:vim|vi|ex):.*(?:fileencoding|fenc|coding|encoding)[ \t]*[:=]
+    (?:(?:frozen_string_literal|warn_indent|shareable_constant_value)[ \t]*:[^;\n]*;[ \t]*)*
+      (?:coding|encoding)[ \t]*:|
+    -\*-[ \t]*.*?(?:coding|encoding)[ \t]*:|
+    (?:vim|vi|ex):.*?(?:fileencoding|fenc|coding|encoding)[ \t]*=
   )[ \t]*([A-Za-z0-9._-]+)
 /nix
 magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
@@ -25,7 +26,7 @@ magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
 detect_source_encoding = lambda do |path, content|
   detected_encoding = nil
 
-  content.lines.first(2).each do |line|
+  content.each_line.take(2).each do |line|
     next unless line.match?(magic_comment_prefix_pattern)
 
     comment_body = line.sub(magic_comment_prefix_pattern, "")

@@ -73,6 +73,7 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
 
     expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"2.0\"]")
+    expect(stdout).not_to include("base_gem [\"1.0\"]")
   end
 
   it "loads override fragments with a combined Ruby source-encoding magic comment" do
@@ -87,6 +88,7 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
 
     expect(status).to be_success, stderr
     expect(stdout).to include("base_gem [\"2.0\"]")
+    expect(stdout).not_to include("base_gem [\"1.0\"]")
   end
 
   it "loads override fragments with an Emacs-style Ruby source-encoding magic comment" do
@@ -135,6 +137,19 @@ RSpec.describe "react_on_rails_pro/Gemfile.loader" do
     stdout, stderr, status = run_loader(
       base_deps: <<~RUBY
         # See docs on encoding: US-ASCII before editing this file
+        # UTF-8 comment with an em dash —
+        gem "base_gem", "1.0"
+      RUBY
+    )
+
+    expect(status).to be_success, stderr
+    expect(stdout).to include("base_gem [\"1.0\"]")
+  end
+
+  it "ignores arbitrary magic comment keys before an encoding-looking token" do
+    stdout, stderr, status = run_loader(
+      base_deps: <<~RUBY
+        # custom_key: ignored; encoding: US-ASCII
         # UTF-8 comment with an em dash —
         gem "base_gem", "1.0"
       RUBY
