@@ -273,9 +273,21 @@ while IFS= read -r file; do
   # any character including /.
   # shellcheck disable=SC2221,SC2222
   case "$file" in
-    # Executable agent workflow binstubs are CI/workflow plumbing, not docs.
-    # Keep this before the broader .agents/** metadata arm so future binstub
-    # changes run the validation suites instead of being skipped as docs-only.
+    # Markdown under the binstub directory is still documentation. Keep this
+    # before the executable binstub arm so README-only edits do not force CI.
+    .agents/bin/*.md|.agents/bin/**/*.md)
+      # Don't change DOCS_ONLY flag, just continue
+      ;;
+
+    # Executable agent workflow binstubs and the workflow seam config are
+    # CI/workflow plumbing, not docs. Keep this before the broader .agents/**
+    # metadata arm so future seam changes run validation instead of being
+    # skipped as docs-only.
+    .agents/agent-workflow.yml|.agents/agent-workflow.yaml)
+      DOCS_ONLY=false
+      CI_INFRA_CHANGED=true
+      ;;
+
     .agents/bin/*|.agents/bin/**/*)
       DOCS_ONLY=false
       CI_INFRA_CHANGED=true
