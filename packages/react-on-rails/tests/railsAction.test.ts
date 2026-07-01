@@ -1,7 +1,6 @@
 import {
   createRailsAction,
   type RailsActionCallOptions,
-  type RailsActionMutationFunctionContext,
   RailsActionRequestError,
 } from '../src/railsAction.ts';
 
@@ -91,7 +90,10 @@ if (typeof File !== 'undefined') {
   nonJsonRequestBodyFactories.push(['File', () => new File(['Apollo'], 'apollo.txt')]);
 }
 if (typeof Request !== 'undefined') {
-  nonJsonRequestBodyFactories.push(['Request', () => new Request('/projects')]);
+  nonJsonRequestBodyFactories.push([
+    'Request',
+    () => new Request(new URL('/projects', window.location.href).href),
+  ]);
 }
 if (typeof Response !== 'undefined') {
   nonJsonRequestBodyFactories.push(['Response', () => new Response('Apollo')]);
@@ -174,15 +176,7 @@ describe('createRailsAction', () => {
   });
 
   it('is assignable to a TanStack-style mutation function', () => {
-    type TanStackMutationFunctionContext = {
-      client: unknown;
-      meta: unknown;
-      mutationKey?: readonly unknown[];
-    };
-    type MutationFunction<TData, TVariables> = (
-      variables: TVariables,
-      context: TanStackMutationFunctionContext,
-    ) => Promise<TData>;
+    type MutationFunction<TData, TVariables> = (variables: TVariables) => Promise<TData>;
 
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
@@ -193,51 +187,12 @@ describe('createRailsAction', () => {
     expect(mutationFn).toBe(createProject);
   });
 
-  it('ignores TanStack mutation context fields when resolving fetch options', async () => {
-    const createProject = createRailsAction<{ name: string }, { ok: true }>({
-      path: '/api/projects',
-    });
-
-    await createProject(
-      { name: 'Apollo' },
-      {
-        client: {},
-        meta: {},
-        mutationKey: ['projects', 'create'],
-      },
-    );
-
-    const [, init] = fetchMock.mock.calls[0];
-    expect(init.signal).toBeUndefined();
-    expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
-  });
-
-  it('uses own fetch options when caller options also include TanStack-like keys', async () => {
-    const abortController = new AbortController();
-    const createProject = createRailsAction<{ name: string }, { ok: true }>({
-      path: '/api/projects',
-    });
-    const callOptions = {
-      client: {},
-      meta: {},
-      mutationKey: ['projects', 'create'],
-      headers: { 'X-Request-Source': 'mixed-options' },
-      signal: abortController.signal,
-    } satisfies RailsActionCallOptions & RailsActionMutationFunctionContext;
-
-    await createProject({ name: 'Apollo' }, callOptions);
-
-    const [, init] = fetchMock.mock.calls[0];
-    expect(init.signal).toBe(abortController.signal);
-    expect(headerValue(init.headers, 'X-Request-Source')).toBe('mixed-options');
-  });
-
   it('ignores inherited fetch options on caller options', async () => {
     const abortController = new AbortController();
     const inheritedOptions = Object.create({
       headers: { 'X-Request-Source': 'prototype' },
       signal: abortController.signal,
-    }) as RailsActionMutationFunctionContext;
+    }) as RailsActionCallOptions;
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
     });
@@ -249,7 +204,7 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
   });
 
-  it('resolves relative paths against document.baseURI when a base tag is present', async () => {
+  it('resolves relative paths against the current page when a base tag is present', async () => {
     const base = document.createElement('base');
     base.href = new URL('/v2/', window.location.href).href;
     document.head.appendChild(base);
@@ -262,7 +217,7 @@ describe('createRailsAction', () => {
       await createProject({ name: 'Apollo' });
 
       const [url] = fetchMock.mock.calls[0];
-      expect(url).toBe(new URL('api/projects', document.baseURI).href);
+      expect(url).toBe(new URL('api/projects', window.location.href).href);
     } finally {
       base.remove();
     }

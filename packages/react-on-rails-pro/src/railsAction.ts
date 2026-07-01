@@ -18,9 +18,7 @@ export {
   RailsActionRequestError,
   type RailsActionCallOptions,
   type RailsActionCaller,
-  type RailsActionCallerOptions,
   type RailsActionMethod,
-  type RailsActionMutationFunctionContext,
   type RailsActionOptions,
   type RailsActionPath,
 } from 'react-on-rails/railsAction';

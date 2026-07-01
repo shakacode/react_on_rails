@@ -27,18 +27,10 @@ export interface RailsActionCallOptions {
   signal?: AbortSignal;
 }
 
-export interface RailsActionMutationFunctionContext {
-  client?: unknown;
-  meta?: unknown;
-  mutationKey?: readonly unknown[];
-}
-
-export type RailsActionCallerOptions = RailsActionCallOptions | RailsActionMutationFunctionContext;
-
 // Brackets prevent distribution over union TVariables, preserving a single caller signature.
 export type RailsActionCaller<TVariables, TResponse> = [TVariables] extends [undefined]
-  ? (variables?: undefined, options?: RailsActionCallerOptions) => Promise<TResponse>
-  : (variables: TVariables, options?: RailsActionCallerOptions) => Promise<TResponse>;
+  ? (variables?: undefined, options?: RailsActionCallOptions) => Promise<TResponse>
+  : (variables: TVariables, options?: RailsActionCallOptions) => Promise<TResponse>;
 
 export class RailsActionRequestError<TResponseBody = unknown> extends Error {
   readonly response: Response;
@@ -64,7 +56,7 @@ export class RailsActionRequestError<TResponseBody = unknown> extends Error {
 
 const resolveSameOriginRequestUrl = (url: string): string | null => {
   try {
-    const resolvedUrl = new URL(url, document.baseURI);
+    const resolvedUrl = new URL(url, window.location.href);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&
       resolvedUrl.origin === window.location.origin
@@ -369,17 +361,17 @@ const resolveHeaders = <TVariables>(
 const hasOwnProperty = (value: object, key: PropertyKey): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
-function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'signal'): AbortSignal | undefined;
-function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'headers'): HeadersInit | undefined;
+function callOptionsValue(callOptions: RailsActionCallOptions, key: 'signal'): AbortSignal | undefined;
+function callOptionsValue(callOptions: RailsActionCallOptions, key: 'headers'): HeadersInit | undefined;
 function callOptionsValue(
-  callOptions: RailsActionCallerOptions,
+  callOptions: RailsActionCallOptions,
   key: keyof RailsActionCallOptions,
 ): RailsActionCallOptions[keyof RailsActionCallOptions] | undefined {
   if (typeof callOptions !== 'object' || callOptions === null) {
     return undefined;
   }
 
-  return hasOwnProperty(callOptions, key) ? (callOptions as RailsActionCallOptions)[key] : undefined;
+  return hasOwnProperty(callOptions, key) ? callOptions[key] : undefined;
 }
 
 const assertBrowserContext = (): void => {
@@ -428,7 +420,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
 
   const callRailsAction = async (
     variables?: TVariables,
-    callOptions: RailsActionCallerOptions = {},
+    callOptions: RailsActionCallOptions = {},
   ): Promise<TResponse> => {
     // The public conditional type only permits omitted variables when TVariables is undefined.
     const typedVariables = variables as TVariables;
