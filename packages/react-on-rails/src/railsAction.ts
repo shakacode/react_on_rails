@@ -312,6 +312,8 @@ const assertBrowserContext = (): void => {
  * when that custom Accept header may produce a successful non-JSON response.
  * Omitting `body` sends `variables` as the JSON body verbatim; supply `body` to map or filter fields before
  * serialization.
+ * Body values that would serialize lossy or outside JSON, including nested `undefined`, `BigInt`, and
+ * non-finite numbers, are rejected before `fetch` runs.
  * When `variables` only populate `path`, supply `body: () => null` or a mapper to avoid forwarding them.
  * Return `null` or `undefined` from `body` when the request should not send JSON. DELETE requests never
  * send a JSON body; identify the resource in the URL instead.
