@@ -1510,12 +1510,14 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      record `worked_issue_scope: UNKNOWN (setup)`; stop private backend
      discovery only, report the missing helper, missing command, timeout, or
      error needed to recover, and use structured public `codex-claim` comments
-     as an advisory fallback
+     as an advisory fallback; also report that batch id confirmation is still
+     needed after backend recovery
    - if bounded `agent-coord doctor --json` passes but broad discovery status
      fails or times out, record `worked_issue_scope: UNKNOWN (access)`; stop
      private backend discovery only, report the exact broad discovery command,
      timeout, or error, and use structured public `codex-claim` comments as an
-     advisory fallback
+     advisory fallback; also report that batch id confirmation is still needed
+     after backend recovery
    - if broad discovery returns no candidate batch/run ids, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
      to supply or confirm a batch/run id directly; once the user supplies or
