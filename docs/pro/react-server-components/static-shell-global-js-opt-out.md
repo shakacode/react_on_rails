@@ -35,7 +35,7 @@ continue rendering its stylesheet even when the JavaScript for that pack is
 skipped.
 
 ```erb
-<!-- app/views/layouts/application.html.erb -->
+<%# app/views/layouts/application.html.erb %>
 <% content_for :body_content do %>
   <%= yield %>
 <% end %>
@@ -46,7 +46,7 @@ skipped.
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
-    <%= stylesheet_pack_tag "global", media: "all" %>
+    <% prepend_stylesheet_pack_tag "global" %>
     <%= stylesheet_pack_tag media: "all" %>
   </head>
   <body>
@@ -60,7 +60,11 @@ skipped.
 
 The important split is:
 
-- `stylesheet_pack_tag "global"` stays in the layout for every page.
+- `prepend_stylesheet_pack_tag "global"` keeps the global stylesheet in the
+  layout for every page and orders it before page-specific stylesheet appends.
+- The empty `stylesheet_pack_tag` flushes the accumulated stylesheet queue once,
+  including the global stylesheet and any page-specific stylesheets appended by
+  the view or by React on Rails auto-bundling.
 - `content_for :body_content` captures the page before the `<head>` renders, so
   any stylesheet appends from the page are available to the head flush.
 - `append_javascript_pack_tag "global"` is conditional.
