@@ -77,9 +77,11 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['Function', () => () => 'Apollo'],
   ['Symbol', () => Symbol('Apollo')],
   ['undefined', () => ({ project: { name: undefined } })],
+  ['invalid Date', () => ({ project: { dueOn: new Date(Number.NaN) } })],
   ['non-finite number', () => Number.NaN],
   ['non-finite number', () => Number.POSITIVE_INFINITY],
   ['non-finite number', () => Number.NEGATIVE_INFINITY],
+  ['non-finite Number', () => ({ project: { estimate: Object(Number.POSITIVE_INFINITY) } })],
 ];
 
 if (typeof ReadableStream !== 'undefined') {

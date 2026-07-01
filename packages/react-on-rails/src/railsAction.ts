@@ -154,6 +154,16 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   if (typeof requestBody === 'number' && !Number.isFinite(requestBody)) {
     return 'non-finite number';
   }
+  if (typeof Date !== 'undefined' && requestBody instanceof Date && Number.isNaN(requestBody.getTime())) {
+    return 'invalid Date';
+  }
+  if (
+    typeof Number !== 'undefined' &&
+    requestBody instanceof Number &&
+    !Number.isFinite(requestBody.valueOf())
+  ) {
+    return 'non-finite Number';
+  }
   if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
     return 'FormData';
   }
@@ -224,6 +234,40 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   return null;
 };
 
+const preSerializationNonJsonBodyTypeName = (
+  requestBody: unknown,
+  seenObjects: Set<object> = new Set(),
+): string | null => {
+  const bodyTypeName = nonJsonBodyTypeName(requestBody);
+  if (bodyTypeName !== null) {
+    return bodyTypeName;
+  }
+  if (typeof requestBody !== 'object' || requestBody === null) {
+    return null;
+  }
+
+  const objectBody = requestBody as { toJSON?: unknown };
+  if (typeof objectBody.toJSON === 'function') {
+    return null;
+  }
+  if (seenObjects.has(requestBody)) {
+    return null;
+  }
+  seenObjects.add(requestBody);
+
+  const values = Array.isArray(requestBody)
+    ? requestBody
+    : Object.values(requestBody as Record<string, unknown>);
+  for (const value of values) {
+    const nestedBodyTypeName = preSerializationNonJsonBodyTypeName(value, seenObjects);
+    if (nestedBodyTypeName !== null) {
+      return nestedBodyTypeName;
+    }
+  }
+
+  return null;
+};
+
 const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
   new TypeError(
     `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
@@ -232,10 +276,15 @@ const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
 
 const stringifyJsonBody = (requestBody: unknown): string => {
   try {
+    const bodyTypeName = preSerializationNonJsonBodyTypeName(requestBody);
+    if (bodyTypeName !== null) {
+      throw jsonBodyTypeError(bodyTypeName);
+    }
+
     const serializedBody = JSON.stringify(requestBody, (_key, value: unknown) => {
-      const bodyTypeName = nonJsonBodyTypeName(value);
-      if (bodyTypeName !== null) {
-        throw jsonBodyTypeError(bodyTypeName);
+      const replacedBodyTypeName = nonJsonBodyTypeName(value);
+      if (replacedBodyTypeName !== null) {
+        throw jsonBodyTypeError(replacedBodyTypeName);
       }
 
       return value;
