@@ -82,7 +82,7 @@ Nonces are per-request values; caching renders per-request markup. Two distinct 
 
 ### Fragment caching helpers bake the nonce into the cached fragment
 
-`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes the executable inline scripts **with the nonce of the request that populated the cache**, and the cache key does **not** include the nonce.
+`cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes the executable inline scripts **with the nonce of the request that populated the cache**, and the cache key does **not** include the nonce.
 
 A cache hit therefore serves a stale nonce to a different request, whose CSP header carries a different nonce — the browser blocks those inline scripts and immediate hydration/console replay silently degrade (components still hydrate via the client bundle's normal page-load path, but the strict-CSP guarantee of "zero violations" no longer holds).
 

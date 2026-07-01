@@ -65,6 +65,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    If prerender is set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -96,6 +97,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -166,6 +168,34 @@ module ReactOnRailsProHelper
 
     consumer_stream_async(on_complete:) do
       internal_stream_react_component(component_name, options)
+    end
+  end
+
+  # Renders a stream-capable component through the streaming/RSC renderer, but buffers every chunk
+  # before returning HTML to Rails. Use this for static/cacheable responses that need RSC rendering
+  # without ActionController::Live committing headers on the first streamed byte.
+  def buffered_stream_react_component(component_name, options = {})
+    options = options.dup
+    options[:prerender] = true
+    if options.key?(:immediate_hydration)
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("buffered_stream_react_component")
+      options.delete(:immediate_hydration)
+    end
+
+    on_complete = options.delete(:on_complete)
+    collect_chunks = on_complete.respond_to?(:call)
+    buffer = collect_chunks ? [] : +""
+
+    internal_stream_react_component(component_name, options).each_chunk do |chunk|
+      buffer << chunk.to_s
+    end
+
+    if collect_chunks
+      html = buffer.join.html_safe
+      on_complete.call(buffer)
+      html
+    else
+      buffer.html_safe
     end
   end
 
@@ -262,6 +292,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -274,6 +305,42 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
       fetch_stream_react_component(component_name, raw_options, &block)
+    end
+  end
+
+  # Cached version of buffered_stream_react_component. Unlike cached_stream_react_component,
+  # this returns the complete HTML string from the cache/miss path and does not require
+  # stream_view_containing_react_components. The on_complete callback is unsupported
+  # because cache hits do not replay chunks.
+  def cached_buffered_stream_react_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
+      if raw_options[:on_complete].respond_to?(:call)
+        raise ReactOnRailsPro::Error,
+              "cached_buffered_stream_react_component does not support on_complete; " \
+              "use buffered_stream_react_component for chunk callbacks"
+      end
+
+      normalized_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+      render_options = raw_options.merge(auto_load_bundle: normalized_auto_load_bundle)
+      cache_options = render_options.merge(
+        cache_key: lambda do
+          raw_cache_key = raw_options[:cache_key]
+          cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
+
+          ["buffered_stream_react_component", cache_key_value]
+        end,
+        prerender: true
+      )
+
+      cached_result = fetch_react_component(component_name, cache_options) do
+        options = render_options.merge(
+          props: yield,
+          skip_prerender_cache: true
+        )
+        buffered_stream_react_component(component_name, options)
+      end
+      cached_result.html_safe
     end
   end
 
@@ -340,6 +407,11 @@ module ReactOnRailsProHelper
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
     instrument_method :cached_react_component_hash, type: "ReactOnRails", name: "cached_react_component_hash"
     instrument_method :cached_stream_react_component, type: "ReactOnRails", name: "cached_stream_react_component"
+    instrument_method(
+      :cached_buffered_stream_react_component,
+      type: "ReactOnRails",
+      name: "cached_buffered_stream_react_component"
+    )
   end
 
   private
