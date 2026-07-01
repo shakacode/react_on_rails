@@ -65,7 +65,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    If prerender is set to true, the server bundle digest will be included in the cache key.
-  #    When RSC support is enabled, the RSC bundle digest is also included.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -97,7 +97,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
-  #    When RSC support is enabled, the RSC bundle digest is also included.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -292,7 +292,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
-  #    When RSC support is enabled, the RSC bundle digest is also included.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -315,13 +315,15 @@ module ReactOnRailsProHelper
   def cached_buffered_stream_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
-      if raw_options.key?(:on_complete)
+      if raw_options[:on_complete].respond_to?(:call)
         raise ReactOnRailsPro::Error,
               "cached_buffered_stream_react_component does not support on_complete; " \
               "use buffered_stream_react_component for chunk callbacks"
       end
 
-      cache_options = raw_options.merge(
+      normalized_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+      render_options = raw_options.merge(auto_load_bundle: normalized_auto_load_bundle)
+      cache_options = render_options.merge(
         cache_key: lambda do
           raw_cache_key = raw_options[:cache_key]
           cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
@@ -332,10 +334,9 @@ module ReactOnRailsProHelper
       )
 
       cached_result = fetch_react_component(component_name, cache_options) do
-        options = raw_options.merge(
+        options = render_options.merge(
           props: yield,
-          skip_prerender_cache: true,
-          auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+          skip_prerender_cache: true
         )
         buffered_stream_react_component(component_name, options)
       end

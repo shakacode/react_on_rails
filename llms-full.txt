@@ -7482,7 +7482,7 @@ Here is the doc for helpers `cached_react_component` and `cached_react_component
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    If prerender is set to true, the server bundle digest will be included in the cache key.
-  #    When RSC support is enabled, the RSC bundle digest is also included.
+  #    When RSC support is enabled and the RSC bundle exists, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -7635,7 +7635,7 @@ Like Next.js's default `revalidateTag`, revalidation deletes: the next request r
 
 ## Cache Warming
 
-Prerendered fragment cache keys include deploy bundle digests, which means every deploy creates new cache keys. This is correct — rendered output must match the current server bundle and, when RSC support is enabled, the current RSC bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
+Prerendered fragment cache keys include deploy bundle digests, which means every deploy creates new cache keys. This is correct — rendered output must match the current server bundle and, when RSC support is enabled and the RSC bundle exists, the current RSC bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
 
 The solution is **cache warming**: rendering your highest-traffic pages in the background immediately after deploy, before real users hit those pages.
 

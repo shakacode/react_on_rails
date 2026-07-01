@@ -384,6 +384,30 @@ describe ReactOnRailsPro::Cache, :caching do
       ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
 
+    it "uses a missing RSC bundle sentinel if RSC support is enabled but the bundle is absent" do
+      original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+      ReactOnRailsPro.configuration.enable_rsc_support = true
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_raise(
+        Errno::ENOENT,
+        "missing rsc bundle"
+      )
+
+      result = described_class.base_cache_key("foobar", prerender: true)
+
+      expect(result).to eq(
+        [
+          "foobar",
+          ReactOnRails::VERSION,
+          ReactOnRailsPro::VERSION,
+          "123456",
+          described_class::RSC_BUNDLE_MISSING_CACHE_KEY
+        ]
+      )
+    ensure
+      ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+    end
+
     it "does not require the RSC bundle hash when RSC support is disabled" do
       original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
       ReactOnRailsPro.configuration.enable_rsc_support = false

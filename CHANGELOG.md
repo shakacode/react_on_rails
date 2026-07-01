@@ -46,8 +46,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   returning complete HTML to Rails, so static or cacheable pages can avoid
   `ActionController::Live` response commits when progressive streaming is not
   needed. When RSC support is enabled, prerendered Pro fragment cache keys now
-  include the RSC bundle digest so deploys that update only the RSC bundle
-  invalidate cached RSC output consistently. Fixes
+  include the RSC bundle digest, or a missing-bundle sentinel until that bundle
+  exists, so deploys that update only the RSC bundle invalidate cached RSC output
+  consistently. Fixes
   [Issue 4263](https://github.com/shakacode/react_on_rails/issues/4263).
   [PR 4268](https://github.com/shakacode/react_on_rails/pull/4268) by
   [justin808](https://github.com/justin808).

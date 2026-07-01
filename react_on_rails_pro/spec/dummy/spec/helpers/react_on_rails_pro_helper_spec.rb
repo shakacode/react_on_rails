@@ -1237,6 +1237,43 @@ describe ReactOnRailsProHelper do
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
+      it "uses the configured auto_load_bundle default before the per-call option on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        user_cache_key = ["buffered-stream-cache-auto-load-hit", component_name]
+        captured_auto_load_bundle = nil
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          Rails.cache.write(expected_cache_key, "<div>cached buffered stream</div>", expires_in: 60)
+          allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+            captured_auto_load_bundle = render_options.auto_load_bundle
+          end
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to eq("<div>cached buffered stream</div>")
+        expect(result).to be_html_safe
+        expect(captured_auto_load_bundle).to be(true)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
       it "does not require an RSC bundle hash when RSC support is disabled" do
         original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
         ReactOnRailsPro.configuration.enable_rsc_support = false
@@ -1334,6 +1371,38 @@ describe ReactOnRailsProHelper do
           ReactOnRailsPro::Error,
           /cached_buffered_stream_react_component does not support on_complete/
         )
+      end
+
+      it "allows nil and false on_complete values because they cannot replay cached chunks" do
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component)
+            .and_return("<div>cached buffered stream</div>".html_safe)
+
+          expect do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete-nil", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: nil,
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end.not_to raise_error
+
+          expect do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete-false", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: false,
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end.not_to raise_error
+        end
       end
     end
 
