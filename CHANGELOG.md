@@ -69,6 +69,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
+  The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
+  source-encoding magic comments or a UTF-8 default, and validates content before override-gem
+  scanning and evaluation. This affects any environment that evaluates the Pro Gemfile through
+  Bundler, including local setup and CI, so Pro apps with non-ASCII dependency comments no longer
+  fail under shells where Ruby's default external encoding is US-ASCII. Fixes
+  [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
+  [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
+
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
   The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess
   to UTF-8 **only** under a bare C/POSIX locale, where the locale-derived encoding is US-ASCII — a
