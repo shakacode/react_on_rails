@@ -13,32 +13,37 @@ module ReactOnRails
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
+      # Keep the runtime API compatibility sentence aligned with InstallGenerator#add_legacy_redux_install_warning.
+      # The install path adds recovery docs and command guidance that this standalone warning intentionally omits.
+      LEGACY_REDUX_GENERATOR_WARNING = <<~MSG.strip.freeze
+        The react_on_rails:react_with_redux generator is a hidden legacy Redux generator path and is not
+        recommended for new React on Rails apps.
+        New apps should use the default React on Rails installer without Redux. Runtime Redux APIs such as
+        redux_store remain supported.
+      MSG
+      private_constant :LEGACY_REDUX_GENERATOR_WARNING
 
-      class_option :typescript,
-                   type: :boolean,
-                   default: false,
-                   desc: "Generate TypeScript files",
-                   aliases: "-T"
+      class_option :typescript, type: :boolean, default: false, desc: "Generate TypeScript files", aliases: "-T"
+      class_option :invoked_by_install, type: :boolean, default: false, hide: true
+      class_option :new_app, type: :boolean, default: false, hide: true
+      class_option :rsc, type: :boolean, default: false, hide: true
+      class_option :tailwind, type: :boolean, default: false, hide: true
 
-      class_option :invoked_by_install,
-                   type: :boolean,
-                   default: false,
-                   hide: true
+      # Only this public method is dispatched by Rails; helpers below stay private.
+      def run_generator
+        add_legacy_redux_generator_warning
+        validate_standalone_tailwind
+        create_redux_directories
+        copy_base_files
+        copy_base_redux_files
+        create_appropriate_templates
+        add_redux_npm_dependencies
+        add_redux_specific_messages
+      ensure
+        print_generator_messages unless options[:invoked_by_install]
+      end
 
-      class_option :new_app,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :rsc,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :tailwind,
-                   type: :boolean,
-                   default: false,
-                   hide: true
+      private
 
       def validate_standalone_tailwind
         return unless unsupported_standalone_tailwind?
@@ -128,10 +133,15 @@ module ReactOnRails
         install_packages_with_fallback(regular_packages, dev: false, package_manager:)
       end
 
-      def add_redux_specific_messages
-        return if options.invoked_by_install?
+      def add_legacy_redux_generator_warning
+        return if options[:invoked_by_install]
 
-        # Append Redux-specific post-install instructions
+        GeneratorMessages.add_warning(LEGACY_REDUX_GENERATOR_WARNING)
+      end
+
+      def add_redux_specific_messages
+        return if options[:invoked_by_install]
+
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
                                                                pro: Gem.loaded_specs.key?("react_on_rails_pro"),
@@ -140,21 +150,21 @@ module ReactOnRails
         )
       end
 
-      private
-
       def unsupported_standalone_tailwind?
         return false unless use_tailwind?
         return false if options[:invoked_by_install]
 
         GeneratorMessages.add_error(<<~MSG.strip)
-          🚫 The standalone react_on_rails:react_with_redux generator does not support --tailwind.
-
           Tailwind setup requires the base React on Rails installer so it can create the
           react_on_rails_tailwind pack, stylesheet, dependencies, and webpack/Rspack config.
 
-          Use the install generator for Redux + Tailwind setup:
+          Use the hidden legacy installer path if you intentionally need the Redux scaffold with Tailwind:
 
             rails generate react_on_rails:install --redux --tailwind
+
+          For new apps, run the default installer without Redux:
+
+            rails generate react_on_rails:install --tailwind
         MSG
         true
       end

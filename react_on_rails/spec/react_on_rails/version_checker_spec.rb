@@ -232,6 +232,379 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
         end
       end
 
+      context "when React Server Components are enabled with Rspack" do
+        def write_rsc_rspack_project(root, assets_bundler:, rspack_core_version:, rsc_enabled:)
+          write_rsc_rspack_project_files(root, assets_bundler:, rspack_core_version:)
+          stub_rsc_rspack_project(root, rsc_enabled:)
+        end
+
+        def write_rsc_rspack_project_files(
+          root,
+          assets_bundler:,
+          rspack_core_version:,
+          dependency_field: "devDependencies",
+          rspack_package_versions: {},
+          installed_rspack_core_version: nil,
+          package_manager: nil
+        )
+          FileUtils.mkdir_p(File.join(root, "config"))
+          File.write(File.join(root, "config/shakapacker.yml"), <<~YAML)
+            default:
+              assets_bundler: #{assets_bundler}
+          YAML
+
+          package_json = {
+            "dependencies" => { "react-on-rails-pro" => "17.0.0" },
+            "devDependencies" => {}
+          }
+          package_json["packageManager"] = package_manager if package_manager
+          if rspack_core_version
+            package_json[dependency_field] ||= {}
+            package_json[dependency_field]["@rspack/core"] = rspack_core_version
+          end
+          rspack_package_versions.each do |package_name, package_version|
+            package_json[dependency_field] ||= {}
+            package_json[dependency_field][package_name] = package_version
+          end
+          File.write(
+            File.join(root, "package.json"),
+            JSON.generate(package_json)
+          )
+
+          return unless installed_rspack_core_version
+
+          FileUtils.mkdir_p(File.join(root, "node_modules/@rspack/core"))
+          File.write(
+            File.join(root, "node_modules/@rspack/core/package.json"),
+            JSON.generate("name" => "@rspack/core", "version" => installed_rspack_core_version)
+          )
+        end
+
+        def stub_rsc_rspack_project(root, rsc_enabled:, configuration_error: nil)
+          allow(Rails).to receive(:root).and_return(Pathname.new(root))
+          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+          stub_gem_version("17.0.0")
+
+          stub_const("ReactOnRailsPro", Module.new)
+          stub_const("ReactOnRailsPro::Configuration", Class.new)
+          if configuration_error
+            ReactOnRailsPro.define_singleton_method(:configuration) { raise configuration_error }
+            return
+          end
+
+          pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: rsc_enabled)
+          ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
+        end
+
+        def validate_rsc_rspack_project(
+          assets_bundler:,
+          rspack_core_version:,
+          rsc_enabled: true,
+          dependency_field: "devDependencies",
+          rspack_package_versions: {},
+          installed_rspack_core_version: nil,
+          package_manager: nil,
+          configuration_error: nil,
+          env_assets_bundler: nil,
+          package_json_read_error_after_version_cache: false
+        )
+          previous_bundler = ENV.fetch("SHAKAPACKER_ASSETS_BUNDLER", nil)
+          if env_assets_bundler.nil?
+            ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+          else
+            ENV["SHAKAPACKER_ASSETS_BUNDLER"] = env_assets_bundler
+          end
+
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(
+              root,
+              assets_bundler:,
+              rspack_core_version:,
+              dependency_field:,
+              rspack_package_versions:,
+              installed_rspack_core_version:,
+              package_manager:
+            )
+            stub_rsc_rspack_project(root, rsc_enabled:, configuration_error:)
+            package_json = File.join(root, "package.json")
+            node_package_version = VersionChecker::NodePackageVersion.new(package_json)
+            if package_json_read_error_after_version_cache
+              node_package_version.raw
+              allow(File).to receive(:read).and_call_original
+              allow(File).to receive(:read).with(package_json).and_raise(Errno::EACCES)
+            end
+            VersionChecker.new(node_package_version).validate_version_and_package_compatibility!
+          end
+        ensure
+          if previous_bundler.nil?
+            ENV.delete("SHAKAPACKER_ASSETS_BUNDLER")
+          else
+            ENV["SHAKAPACKER_ASSETS_BUNDLER"] = previous_bundler
+          end
+        end
+
+        def stub_failed_node_package_resolution
+          status = instance_double(Process::Status, success?: false)
+          allow(Open3).to receive(:capture3).and_return(["", "Cannot find module", status])
+        end
+
+        it "raises before boot when active Rspack is v1" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
+        end
+
+        it "normalizes simple declared ranges in Rspack v2 errors" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
+        it "rejects upper-bound declared Rspack ranges" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "<2.0.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <2\.0\.0})
+        end
+
+        it "explains that unsupported npm ranges fail closed unless the installed package resolves to v2" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: ">=2.0.0 <3.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            expect(error.message).to include(
+              "React on Rails cannot statically verify, install dependencies so Node can resolve"
+            )
+          }
+        end
+
+        it "uses the detected package manager in Rspack v2 fix instructions" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              package_manager: "npm@10.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{npm install --save-dev @rspack/core@\^2})
+        end
+
+        it "does not add undeclared Rspack companion packages to fix instructions" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              package_manager: "npm@10.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            aggregate_failures do
+              expect(error.message).to include("npm install --save-dev @rspack/core@^2")
+              expect(error.message).not_to include("@rspack/cli")
+            end
+          }
+        end
+
+        it "includes missing @rspack/core in fix instructions when only a companion package is declared" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: nil,
+              rspack_package_versions: { "@rspack/cli" => "^1.6.0" },
+              package_manager: "npm@10.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error) { |error|
+            aggregate_failures do
+              expect(error.message)
+                .to include("npm install --save-dev @rspack/core@^2 @rspack/cli@^2")
+              expect(error.message).not_to include("@rspack/dev-server")
+            end
+          }
+        end
+
+        it "falls back to yarn instructions when package manager detection fails" do
+          allow(ReactOnRails::Utils).to receive(:detect_package_manager).and_raise(RuntimeError, "unavailable")
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
+            .to raise_error(ReactOnRails::Error, %r{yarn add --dev @rspack/core@\^2})
+        end
+
+        it "raises before boot when active Rspack is missing @rspack/core" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
+        it "fails clearly when package.json cannot be reread for the RSC Rspack version" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              package_json_read_error_after_version_cache: true
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
+        it "allows active Rspack v2" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+            .not_to raise_error
+        end
+
+        it "allows installed Rspack v2 when package.json does not declare @rspack/core" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: nil,
+              installed_rspack_core_version: "2.1.0"
+            )
+          end.not_to raise_error
+        end
+
+        it "allows Node-resolved Rspack v2 when the flat node_modules fallback is absent" do
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(root, assets_bundler: "rspack", rspack_core_version: nil)
+            resolved_package_json = File.join(root, "resolved-packages/@rspack/core/package.json")
+            FileUtils.mkdir_p(File.dirname(resolved_package_json))
+            File.write(
+              resolved_package_json,
+              JSON.generate("name" => "@rspack/core", "version" => "2.1.0")
+            )
+            stub_rsc_rspack_project(root, rsc_enabled: true)
+            node_package_version = VersionChecker::NodePackageVersion.new(File.join(root, "package.json"))
+            status = instance_double(Process::Status, success?: true)
+            allow(Open3).to receive(:capture3)
+              .and_return(["#{resolved_package_json}\n", "", status])
+
+            expect { described_class.new(node_package_version).validate_version_and_package_compatibility! }
+              .not_to raise_error
+            expect(Open3).to have_received(:capture3).with(
+              "node",
+              "-e",
+              "console.log(require.resolve(process.argv[1] + '/package.json'))",
+              "@rspack/core",
+              chdir: root
+            )
+          end
+        end
+
+        it "raises when installed Rspack is v1 even if package.json declares v2" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0",
+              installed_rspack_core_version: "1.6.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
+        it "allows @rspack/core v2 from optional dependencies" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0",
+              dependency_field: "optionalDependencies"
+            )
+          end.not_to raise_error
+        end
+
+        it "allows @rspack/core v2 from a scoped npm alias" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "npm:@rspack/core@^2.0.0"
+            )
+          end.not_to raise_error
+        end
+
+        it "allows generated Rspack v2 prerelease lower-bound specs" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0-0"
+            )
+          end.not_to raise_error
+        end
+
+        it "rejects path protocol specs even when the path contains a v2-looking version" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "file:../rspack-2.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: file:\.\./rspack-2\.0\.0})
+        end
+
+        it "rejects workspace protocol specs even when they contain a v2-looking version" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "workspace:^2.0.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: workspace:\^2\.0\.0})
+        end
+
+        it "does not treat peer dependencies as installed Rspack" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^2.0.0",
+              dependency_field: "peerDependencies"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        end
+
+        it "allows Rspack v1 when RSC is disabled" do
+          expect do
+            validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0",
+                                        rsc_enabled: false)
+          end.not_to raise_error
+        end
+
+        it "allows Rspack v1 when webpack is active" do
+          expect { validate_rsc_rspack_project(assets_bundler: "webpack", rspack_core_version: "^1.6.0") }
+            .not_to raise_error
+        end
+
+        it "raises when Rspack is selected through SHAKAPACKER_ASSETS_BUNDLER" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "webpack",
+              rspack_core_version: "^1.6.0",
+              env_assets_bundler: "rspack"
+            )
+          end.to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
+        end
+
+        it "does not read RSC support when webpack is active" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "webpack",
+              rspack_core_version: "^1.6.0",
+              configuration_error: RuntimeError.new("Pro config unavailable")
+            )
+          end.not_to raise_error
+        end
+
+        it "fails clearly when active Rspack cannot read Pro RSC configuration" do
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              configuration_error: RuntimeError.new("Pro config unavailable")
+            )
+          end.to raise_error(
+            ReactOnRails::Error,
+            /could not determine whether React Server Components are enabled/
+          )
+        end
+      end
+
       context "when package.json file does not exist" do
         let(:node_package_version) do
           instance_double(VersionChecker::NodePackageVersion,

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Build and type-check.
+set -euo pipefail
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+rc=0
+pnpm run build || rc=1
+pnpm run type-check || rc=1
+( cd react_on_rails && bundle exec rake rbs:validate ) || rc=1
+if [ -d react_on_rails_pro ]; then
+  ( cd react_on_rails_pro && bundle exec rake rbs:validate ) || rc=1
+fi
+exit "$rc"

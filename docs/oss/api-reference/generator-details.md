@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off — for example, the default for `-R` is that `redux` is off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -9,7 +9,6 @@ Usage:
   rails generate react_on_rails:install [options]
 
 Options:
-  -R, [--redux], [--no-redux]                      # Install Redux package and Redux version of Hello World Example. Default: false
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
       [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
       [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
@@ -26,65 +25,42 @@ Runtime options:
 
 Description:
 
-The react_on_rails:install generator integrates webpack with rails with ease. You
-can pass the redux option if you'd like to have redux setup for you automatically.
-
-* Redux
-
-    Passing the --redux generator option causes the generated Hello World example
-    to integrate the Redux state container framework. The necessary node modules
-    will be automatically included for you.
-
-* TypeScript
-
-    Passing the --typescript generator option generates TypeScript files (.tsx)
-    instead of JavaScript files (.jsx) and sets up TypeScript configuration.
-
-* Tailwind CSS v4
-
-    Passing the --tailwind generator option installs Tailwind CSS v4,
-    configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the
-    generated SSR HelloWorld page. See
-    [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
-
-* Rspack (default)
-
-    Rspack is the default bundler for fresh installs, providing significantly
-    faster builds (~20x improvement with SWC). Pass --no-rspack (or its alias
-    --webpack) to use Webpack instead. Either way you get a unified
-    configuration that works with both bundlers and a bin/switch-bundler
-    utility to switch between them post-installation.
-
-* Pro
-
-    Passing the --pro generator option sets up React on Rails Pro with Node
-    server rendering, fragment caching, and code-splitting support.
-    Requires the react_on_rails_pro gem (add it to your Gemfile first).
-    Creates the Pro initializer, renderer/node-renderer.js, and adds the Node Renderer
-    process to Procfile.dev.
-
-* RSC (React Server Components)
-
-    Passing the --rsc generator option sets up React Server Components support.
-    This automatically includes Pro setup (--rsc implies --pro). Creates RSC
-    webpack configuration, a HelloServer example component, and RSC routes.
-    Requires React 19 with a compatible `react-on-rails-rsc` version.
-
-*******************************************************************************
-
-
-Then you may run
-
-    `rails s`
+The react_on_rails:install generator integrates a JavaScript bundler with Rails
+with ease. Fresh installs use Rspack by default; pass --no-rspack to use
+Webpack. You can pass the options below to customize the generated example and
+supporting configuration.
 ```
+
+> [!WARNING]
+> The Redux installer path (`--redux` / `-R`) is a hidden legacy escape hatch, not
+> a recommended starter architecture. New apps should start with the
+> `react_component` view helper, React local state or context for island-local UI
+> state, and Rails props or server-state tools such as TanStack Query for data
+> loaded from the server. Use Redux only for an existing Redux app or an advanced
+> multi-island page where separate React roots must coordinate through one shared
+> client store.
+
+Additional option details:
+
+- **TypeScript**: Passing the `--typescript` generator option generates TypeScript files (`.tsx`) instead of JavaScript files (`.jsx`) and sets up TypeScript configuration.
+
+- **Tailwind CSS v4**: Passing the `--tailwind` generator option installs Tailwind CSS v4, configures `@tailwindcss/postcss` for Webpack or Rspack, and styles the generated SSR HelloWorld page. See [Styling with Tailwind CSS v4](../building-features/styling-with-tailwind.md).
+
+- **Rspack (default)**: Rspack is the default bundler for fresh installs, providing significantly faster builds (~20x improvement with SWC). Pass `--no-rspack` (or its alias `--webpack`) to use Webpack instead. Either way you get a unified configuration that works with both bundlers and a `bin/switch-bundler` utility to switch between them post-installation.
+
+- **Pro**: Passing the `--pro` generator option sets up React on Rails Pro with Node server rendering, fragment caching, and code-splitting support. Requires the `react_on_rails_pro` gem (add it to your Gemfile first). Creates the Pro initializer, `renderer/node-renderer.js`, and adds the Node Renderer process to `Procfile.dev`.
+
+- **RSC (React Server Components)**: Passing the `--rsc` generator option sets up React Server Components support. This automatically includes Pro setup (`--rsc` implies `--pro`). Creates RSC webpack configuration, a HelloServer example component, and RSC routes. Requires React 19 with a compatible `react-on-rails-rsc` version.
+
+Then you may run `rails s`.
 
 Another good option is to create a simple test app per the [Tutorial](../getting-started/tutorial.md).
 
 ## Understanding the Organization of the Generated Client Code
 
-The React on Rails generator creates different directory structures depending on whether you use the `--redux` option.
+The React on Rails generator normally creates the simple component structure below. A hidden legacy Redux path remains available for existing apps and recovery work, but it is not the structure recommended for new React on Rails apps.
 
-### Default Structure (Without Redux)
+### Default Structure (Recommended, Without Redux)
 
 The basic generator creates a simple, flat structure optimized for auto-bundling:
 
@@ -104,9 +80,9 @@ app/javascript/
 
 For components that need different client vs. server implementations, use `.client.jsx` and `.server.jsx` suffixes (e.g., `HelloWorld.client.jsx` and `HelloWorld.server.jsx`).
 
-### Redux Structure (With `--redux` Option)
+### Legacy Redux Structure (Hidden `--redux` Path)
 
-The Redux generator creates a more structured organization with familiar Redux patterns:
+The hidden legacy Redux generator creates a more structured organization with familiar Redux patterns:
 
 ```text
 app/javascript/
@@ -130,12 +106,26 @@ app/javascript/
             └── helloWorldStore.js
 ```
 
-This structure follows Redux best practices:
+This legacy structure is useful only when you intentionally maintain Redux:
 
 - **`components/`**: Presentational "dumb" components that receive data via props
 - **`containers/`**: Container "smart" components connected to Redux store
 - **`actions/`** and **`reducers/`**: Standard Redux patterns
 - **`ror_components/`**: Entry point files that initialize Redux and render the app
+
+If you already have a React on Rails app and intentionally need to recreate the legacy Redux example, use the direct hidden generator after the base installer has configured React on Rails:
+
+```bash
+rails generate react_on_rails:react_with_redux
+```
+
+For an app that is already configured for TypeScript, add `--typescript` to generate `.ts` and `.tsx` Redux example files.
+
+> **Note:** The standalone `react_on_rails:react_with_redux` generator does not support `--tailwind`.
+> If you intentionally need the legacy Redux scaffold with Tailwind, run the full installer path instead:
+> `rails generate react_on_rails:install --redux --tailwind`.
+
+For full install recovery of an older Redux-generated app, the hidden `react_on_rails:install --redux` option still exists, but do not use it for greenfield apps.
 
 ### TypeScript Support
 
@@ -206,11 +196,8 @@ For apps with custom webpack configurations, review the generated config templat
 # Rspack (default) with TypeScript
 rails generate react_on_rails:install --typescript
 
-# Webpack with Redux
-rails generate react_on_rails:install --no-rspack --redux
-
-# Explicit Rspack with TypeScript and Redux
-rails generate react_on_rails:install --rspack --typescript --redux
+# Webpack with TypeScript
+rails generate react_on_rails:install --no-rspack --typescript
 ```
 
 For more details on Rspack configuration, see the [Webpack Configuration](../core-concepts/webpack-configuration.md#rspack-vs-webpack) docs.
@@ -245,9 +232,6 @@ For production, configure your license token: `export REACT_ON_RAILS_PRO_LICENSE
 ```bash
 # Pro with TypeScript
 rails generate react_on_rails:install --pro --typescript
-
-# Pro with Redux
-rails generate react_on_rails:install --pro --redux
 
 # Pro with Rspack
 rails generate react_on_rails:install --pro --rspack
@@ -300,12 +284,11 @@ In addition to all Pro files:
 # RSC with TypeScript
 rails generate react_on_rails:install --rsc --typescript
 
-# RSC with Redux (generates both HelloWorldApp and HelloServer)
-rails generate react_on_rails:install --rsc --redux
-
 # RSC with Rspack
 rails generate react_on_rails:install --rsc --rspack
 ```
+
+Do not combine RSC with the hidden legacy Redux installer for new apps. Existing Redux Client Components can continue to work beside RSC when Redux access stays in Client Components; see [RSC context and state migration](../migrating/rsc-context-and-state.md#redux-toolkit).
 
 **Upgrading an existing Pro app to RSC:**
 

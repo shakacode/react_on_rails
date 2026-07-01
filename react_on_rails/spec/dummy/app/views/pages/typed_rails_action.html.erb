@@ -1,0 +1,16 @@
+<% content_for :head do %>
+  <% unless Rails.application.config.action_controller.allow_forgery_protection %>
+    <meta name="csrf-token" content="test-csrf-token">
+  <% end %>
+<% end %>
+
+<%= react_component("TypedRailsActionExample", prerender: false, trace: true, id: "TypedRailsActionExample-react-component-0") %>
+
+<h2>Typed Rails action round trip</h2>
+<p>
+  This form uses <code>createRailsAction</code>
+  (<code>react-on-rails/railsAction</code>) with generated Rails response types
+  from <code>react_on_rails:generate_response_types</code>. It posts JSON to
+  <code>ContactMessagesController#create</code> and maps validation errors from
+  the typed 422 response contract.
+</p>

@@ -30,11 +30,17 @@ self-contained. Keep state-machine changes mirrored across this workflow,
   audits with no ledger, record
   `Audit ledger: not applicable (non-release audit)` in approved issue bodies.
 - Before creating any issue, search existing open issues for the affected PR number and the hidden fingerprint.
-- When batch work is in scope but the batch/run id was not supplied, record
-  `worked_issue_scope: UNKNOWN (needs batch confirmation)`. If candidate
-  discovery cannot verify backend setup or access, record `UNKNOWN (setup)` or
-  `UNKNOWN (access)` with the exact command/error and report that batch id
-  confirmation is still needed after backend recovery.
+- When batch work is in scope but the batch/run id was not supplied, use the
+  resolved `pr-batch` bounded helper to run bounded `agent-coord doctor --json`,
+  then bounded `agent-coord status --json` as a broad audit/discovery read.
+  Do not use that broad read for worker lane readiness or dependency decisions,
+  and do not retry indefinitely. If backend setup or broad discovery access
+  fails, record `worked_issue_scope: UNKNOWN (setup)` or
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error and report
+  that batch id confirmation is still needed after backend recovery. Only record
+  `worked_issue_scope: UNKNOWN (needs batch confirmation)` when backend setup
+  and broad discovery access worked but the candidate batch id still needs user
+  confirmation.
 - For named batch/run audits, run bounded `agent-coord doctor --json`, then
   bounded `agent-coord status --batch-id <batch-id> --json`, and inspect the
   named batch entry as the primary worked-issue scope when available. If
@@ -113,17 +119,38 @@ was not supplied; not applicable = no coordinated batch is in scope.
 First, produce the exact worked-issue scope and merged-PR range:
 - when no coordinated batch/run is in scope, skip `agent-coord` and record
   `worked_issue_scope: not applicable`
-- when batch work is in scope but the batch id is `UNKNOWN`, run bounded
-  `agent-coord doctor --json`, then broad `agent-coord status` through the
-  resolved `pr-batch` bounded helper only as an audit/discovery read to list candidate
-  batch/run ids and lanes. Record
-  `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to confirm
-  a candidate batch/run id before treating any candidate lane list as the
-  worked-issue scope.
-  If candidate discovery cannot verify backend setup or access, record
-  `worked_issue_scope: UNKNOWN (setup)` or
-  `worked_issue_scope: UNKNOWN (access)` instead of
-  `UNKNOWN (needs batch confirmation)`, with the exact command/error.
+- when batch work is in scope but the batch id is `UNKNOWN`:
+  - using the bounded helper from the resolved `PR_BATCH_SKILL_DIR`
+    (`PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"`),
+    run bounded `agent-coord doctor --json`, then run bounded
+    `agent-coord status --json` as a broad audit/discovery read to list
+    candidate batch/run ids and lanes; do not use this broad read for worker
+    lane readiness or dependency decisions, and do not retry indefinitely
+  - if the bounded helper or `agent-coord` binary is missing, or bounded
+    `agent-coord doctor --json` fails or times out, record
+    `worked_issue_scope: UNKNOWN (setup)`; stop private backend discovery only,
+    report the missing helper, missing command, timeout, or error needed to
+    recover, and use structured public `codex-claim` comments as an advisory
+    fallback; also report that batch id confirmation is still needed after
+    backend recovery
+  - if bounded `agent-coord doctor --json` passes but broad discovery status
+    fails or times out, record `worked_issue_scope: UNKNOWN (access)`; stop
+    private backend discovery only, report the exact broad discovery command,
+    timeout, or error, and use structured public `codex-claim` comments as an
+    advisory fallback; also report that batch id confirmation is still needed
+    after backend recovery
+  - if broad discovery returns no candidate batch/run ids, record
+    `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to
+    supply or confirm a batch/run id directly; once I supply or confirm one,
+    continue with the known-batch-id path below
+  - if broad discovery returns one or more candidate batch/run ids, record
+    `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to
+    confirm the in-scope candidate before treating any candidate's lane list as
+    worked-issue scope; once confirmed, continue with the known-batch-id path
+    below
+  - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
+    `UNKNOWN (needs batch confirmation)`; only report candidate ids as
+    confirmation targets when backend setup and discovery access both worked
 - when a batch id is known:
   - run bounded `agent-coord doctor --json`, then bounded
     `agent-coord status --batch-id <batch-id> --json`, then inspect
@@ -135,14 +162,12 @@ First, produce the exact worked-issue scope and merged-PR range:
     blocked, parked, no-PR, done-unmerged, or UNKNOWN
 - if `agent-coord` is missing or bounded `agent-coord doctor --json` fails or
   times out, record `worked_issue_scope: UNKNOWN (setup)` with the exact
-  command/error and
-  use structured public `codex-claim` comments as advisory coverage when
-  available before continuing with GitHub/git evidence for the merged-PR range
-- if bounded `agent-coord doctor --json` passes but targeted batch status fails
-  or times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
-  command/error and
-  use structured public `codex-claim` comments as advisory coverage when
-  available before continuing with GitHub/git evidence for the merged-PR range
+  command/error. If bounded `agent-coord doctor --json` passes but targeted
+  batch status fails or times out, record
+  `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In all
+  UNKNOWN cases, use structured public `codex-claim` comments as advisory
+  coverage when available before continuing with GitHub/git evidence for the
+  merged-PR range.
 - if bounded `agent-coord doctor --json` and targeted batch status both succeed
   but the named batch entry contains no worked issues or lanes, record
   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,
@@ -192,8 +217,8 @@ state to shrink the worked-issue scope; report it as a QA coverage finding or
 Ask me to confirm the included/excluded worked issues, collected QA lanes and QA
 Evidence blocks, advisory `codex-claim` rows, and PR range before deep audit
 unless I explicitly say to proceed. When the scope is
-`UNKNOWN (needs batch confirmation)`, ask me to choose the candidate batch/run id
-before any confirmed worked-issue audit.
+`UNKNOWN (needs batch confirmation)`, ask me to supply a batch/run id or choose
+one of the candidate ids before any confirmed worked-issue audit.
 
 After confirmation, audit each known worked issue, QA lane, or advisory
 `codex-claim` row for:

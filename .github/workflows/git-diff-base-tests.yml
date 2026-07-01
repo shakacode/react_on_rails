@@ -11,6 +11,15 @@ on:
       - 'script/lib/git-diff-base-test.bash'
       - 'script/ci-changes-detector'
       - 'script/ci-changes-detector-test.bash'
+      - 'script/release-forward-port'
+      - 'script/release-forward-port-test.bash'
+      - 'script/release-finish'
+      - 'script/release-finish-test.bash'
+      - 'bin/read-tool-version'
+      - '.tool-versions'
+      - '.minimum.tool-versions'
+      - '.github/actions/read-tool-versions/**'
+      - '.github/actions/setup-ruby/**'
       - '.github/workflows/git-diff-base-tests.yml'
   pull_request:
     paths:
@@ -18,6 +27,15 @@ on:
       - 'script/lib/git-diff-base-test.bash'
       - 'script/ci-changes-detector'
       - 'script/ci-changes-detector-test.bash'
+      - 'script/release-forward-port'
+      - 'script/release-forward-port-test.bash'
+      - 'script/release-finish'
+      - 'script/release-finish-test.bash'
+      - 'bin/read-tool-version'
+      - '.tool-versions'
+      - '.minimum.tool-versions'
+      - '.github/actions/read-tool-versions/**'
+      - '.github/actions/setup-ruby/**'
       - '.github/workflows/git-diff-base-tests.yml'
   workflow_dispatch:
 
@@ -29,11 +47,46 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Set up Ruby for release harnesses
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.ruby-minor-version }}
+          install-libyaml: 'false'
+
       - name: Shellcheck detector scripts and test harnesses
-        run: shellcheck -x script/lib/git-diff-base script/lib/git-diff-base-test.bash script/ci-changes-detector script/ci-changes-detector-test.bash
+        run: |
+          shellcheck -x \
+            bin/read-tool-version \
+            script/lib/git-diff-base \
+            script/lib/git-diff-base-test.bash \
+            script/ci-changes-detector \
+            script/ci-changes-detector-test.bash \
+            script/release-forward-port-test.bash \
+            script/release-finish-test.bash
+
+      - name: Ruby syntax check release scripts
+        run: |
+          set +e
+          ruby -c script/release-forward-port
+          forward_port_status=$?
+          ruby -c script/release-finish
+          finish_status=$?
+          if [ "$forward_port_status" -ne 0 ] || [ "$finish_status" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Run git-diff-base test harness
         run: bash script/lib/git-diff-base-test.bash
 
       - name: Run CI changes detector test harness
         run: bash script/ci-changes-detector-test.bash
+
+      - name: Run release forward-port test harness
+        run: bash script/release-forward-port-test.bash
+
+      - name: Run release finish test harness
+        run: bash script/release-finish-test.bash

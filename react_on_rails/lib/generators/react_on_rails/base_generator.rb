@@ -17,12 +17,13 @@ module ReactOnRails
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
 
-      # --redux
+      # Internal hidden legacy Redux plumbing for install_generator.
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux package and Redux version of Hello World Example",
-                   aliases: "-R"
+                   desc: "Internal legacy Redux scaffolding flag",
+                   aliases: "-R",
+                   hide: true
 
       # --rspack / --no-rspack (Rspack is the default on fresh installs; --no-rspack selects Webpack)
       # IMPORTANT: do NOT add a `default:` here. The absence of a default is load-bearing — Thor

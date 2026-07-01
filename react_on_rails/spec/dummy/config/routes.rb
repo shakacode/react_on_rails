@@ -58,5 +58,6 @@ Rails.application.routes.draw do
 
   # useRailsForm example (issue #3872): client form + JSON mutation endpoint.
   get "rails_form" => "pages#rails_form"
+  get "typed_rails_action" => "pages#typed_rails_action"
   post "contact_messages" => "contact_messages#create"
 end

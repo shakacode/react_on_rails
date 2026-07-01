@@ -32,12 +32,13 @@ module ReactOnRails
       # fetch USAGE file for details generator description
       source_root(File.expand_path(__dir__))
 
-      # --redux
+      # Hidden legacy --redux escape hatch for existing scripted installs.
       class_option :redux,
                    type: :boolean,
                    default: false,
-                   desc: "Install Redux package and Redux version of Hello World Example. Default: false",
-                   aliases: "-R"
+                   desc: "Deprecated legacy Redux install path; use react_on_rails:react_with_redux directly.",
+                   aliases: "-R",
+                   hide: true
 
       # --typescript
       class_option :typescript,
@@ -220,6 +221,8 @@ module ReactOnRails
         # print_generator_messages raises an exception. This prevents ENV pollution
         # that could affect subsequent processes.
         ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
+        # Keep primary failure details first; the legacy Redux advisory is best-effort.
+        add_legacy_redux_install_warning_once_safely
         print_generator_messages
       end
 
@@ -252,9 +255,9 @@ module ReactOnRails
         end
 
         # Component generator logic:
-        # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
-        # - --rsc with --redux: Generate HelloWorldApp (user explicitly wants Redux) + HelloServer
-        # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
+        # - --rsc without hidden legacy Redux: Skip HelloWorld; setup_rsc generates HelloServer.
+        # - Hidden legacy --redux: Generate HelloWorldApp as a one-major escape hatch.
+        # - Without --rsc: Generate the default HelloWorld example unless the legacy flag is present.
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           tailwind: use_tailwind?,
@@ -781,26 +784,92 @@ module ReactOnRails
         @shakapacker_setup_incomplete == true
       end
 
-      def recovery_install_command
-        flags = []
-        flags << "--redux" if options.redux?
-        flags << "--typescript" if options.typescript?
-        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
-        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
-        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
-        flags << (using_rspack? ? "--rspack" : "--no-rspack") if bundler_flag_given?
+      def add_legacy_redux_install_warning
+        return unless options.redux?
 
-        if options.rsc?
-          flags << "--rsc"
-        elsif options.pro?
-          flags << "--pro"
-        end
+        legacy_docs_url = "https://reactonrails.com/docs/api-reference/generator-details/"
+        legacy_guidance, legacy_command =
+          if use_tailwind?
+            [
+              "Existing apps that need Redux with Tailwind should keep using the hidden install path:",
+              recovery_install_command
+            ]
+          else
+            [
+              "Existing apps that need the legacy Redux scaffold can use the hidden react_with_redux generator. " \
+              "That generator is also legacy and emits its own warning:",
+              legacy_redux_generator_command
+            ]
+          end
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          The install --redux option is a hidden legacy Redux generator path and is not recommended
+          for new React on Rails apps.
+          Use the default install generator for new apps. #{legacy_guidance}
+
+              #{legacy_command}
+
+          For legacy Redux recovery details, see #{legacy_docs_url}.
+          Runtime Redux APIs such as redux_store remain supported.
+        MSG
+      end
+
+      def add_legacy_redux_install_warning_once
+        return if @legacy_redux_install_warning_added
+
+        # Set only after enqueueing; safe callers may retry if the warning helper fails.
+        add_legacy_redux_install_warning
+        @legacy_redux_install_warning_added = true
+      end
+
+      def add_legacy_redux_install_warning_once_safely
+        add_legacy_redux_install_warning_once
+      rescue StandardError => e
+        warn "[react_on_rails] Skipped legacy Redux warning: #{e.message}"
+        nil
+      end
+
+      def recovery_install_command
+        flags = optional_install_flags
+        flags << explicit_bundler_install_flag
+        flags << product_stack_install_flag
 
         # Preserve an explicit agent-files opt-out so the suggested re-run doesn't emit
         # AGENTS.md/editor files a user deliberately skipped (--agent-files defaults to on).
         flags << "--no-agent-files" unless options.agent_files?
 
-        ["rails generate react_on_rails:install", *flags].join(" ")
+        ["rails generate react_on_rails:install", *flags.compact].join(" ")
+      end
+
+      def legacy_redux_generator_command
+        flags = []
+        flags << "--typescript" if options.typescript?
+
+        ["rails generate react_on_rails:react_with_redux", *flags].join(" ")
+      end
+
+      def optional_install_flags
+        [
+          ["--redux", options.redux?],
+          ["--typescript", options.typescript?],
+          ["--tailwind", use_tailwind?]
+        ].filter_map { |flag, enabled| flag if enabled }
+      end
+
+      def explicit_bundler_install_flag
+        # Echo the resolved bundler choice (normalized to --rspack/--no-rspack, so a --webpack
+        # alias re-runs as --no-rspack) only when the user passed one explicitly. An unset choice
+        # re-resolves to the fresh-install default on re-run, so we don't pin it here.
+        return unless bundler_flag_given?
+
+        using_rspack? ? "--rspack" : "--no-rspack"
+      end
+
+      def product_stack_install_flag
+        return "--rsc" if options.rsc?
+        return "--pro" if options.pro?
+
+        nil
       end
 
       def rsc_verification_message
@@ -1064,6 +1133,7 @@ module ReactOnRails
           Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once_safely
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
@@ -1088,6 +1158,7 @@ module ReactOnRails
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG
         GeneratorMessages.add_error(error)
+        add_legacy_redux_install_warning_once_safely
         raise Thor::Error, error unless options.ignore_warnings?
       end
 
