@@ -12,6 +12,19 @@ In the RSC world, components are **Server Components by default**. You opt into 
 
 This means the placement of `'use client'` directly determines your bundle size. The goal of restructuring is to push `'use client'` as far down the component tree as possible, to leaf-level interactive elements.
 
+Keep this boundary separate from React on Rails file suffixes and RSC manifest discovery:
+
+- `.client.` and `.server.` suffixes decide which React on Rails bundle imports a file.
+- `'use client'` decides whether React treats that module as a Client Component boundary.
+- `clientReferences` decides which `'use client'` modules the RSC plugin can discover and emit into
+  the client-reference manifests.
+
+Those three controls need to stay aligned. A `.server.jsx` file is not automatically a React Server
+Component, and an empty `clientReferences` list can hide a real Client Component from the manifest
+even when its `'use client'` boundary is placed correctly. For the setup details, see
+[Preparing Your App](rsc-preparing-app.md)
+and [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences).
+
 ### `'use client'` Marks a Boundary, Not a Component Type
 
 A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
@@ -488,7 +501,21 @@ export function ClientWrapper({ children }) {
 
 If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may accumulate chunks from multiple entry paths (including heavy SSR/client paths with unrelated dependencies). This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for wrapper and prop-injection fixes.
 
-### Mistake 4: Confusing `'use client'` with `'use server'`
+### Mistake 4: Emptying `clientReferences` for a mixed RSC app
+
+A static RSC route with no client islands may still render when `clientReferences` is empty, but a
+mixed app can fail later when another route adds a real Client Component. Treat an empty list as a
+static-only build constraint, not a general restructuring pattern.
+
+Browser sidecars do not change this rule. A sidecar is plain browser JavaScript outside the RSC
+payload; its success does not prove the RSC client-reference manifest can hydrate future client
+islands. Keep sidecar behavior separate from RSC client boundaries, and smoke-test at least one RSC
+route with a real Client Component whenever `clientReferences` is narrowed.
+
+See [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences)
+for the decision table and detection steps.
+
+### Mistake 5: Confusing `'use client'` with `'use server'`
 
 - `'use client'` marks a file's components as **Client Components**
 - `'use server'` marks **Server Actions** (functions callable from the client) -- NOT Server Components

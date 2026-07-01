@@ -8,23 +8,24 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                                       |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                               |
-| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                               |
-| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                                   |
-| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                        | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order) |
-| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                                 |
-| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                                 |
-| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
-| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                      |
-| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)             |
-| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                     |
-| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them  | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server) |
-| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                 |
-| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                 |
-| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)              |
-| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                                 |
+| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                                           |
+| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                                           |
+| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                                               |
+| Static RSC route is fast after emptying `clientReferences`, but client islands fail later                      | The RSC client-reference manifest no longer includes needed Client Components                | [Client Reference Scope and Empty `clientReferences`](#client-reference-scope-and-empty-clientreferences) |
+| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                        | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)             |
+| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                                             |
+| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                                             |
+| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
+| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
+| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                         |
+| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                                 |
+| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them  | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server)             |
+| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                             |
+| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                             |
+| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)                          |
+| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                                             |
 
 ## Serialization Boundary Issues
 
@@ -333,6 +334,76 @@ export default function SSRPage({ products }) {
 The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard's import edge clean, while the SSR path can import the full `InteractiveWidgets` module without affecting the RSC manifest for ProductCard.
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
+
+## Client Reference Scope and Empty `clientReferences`
+
+The RSC client manifest maps each `'use client'` module to the browser chunks needed to hydrate that
+Client Component when an RSC payload references it. The `clientReferences` option on
+`RSCWebpackPlugin` controls what the plugin can discover and emit into both
+`react-client-manifest.json` and `react-server-client-manifest.json`; it is not just a performance
+knob.
+
+### The Static-Page Trap
+
+A purely static RSC page with no client islands can render even when the build has no client
+references:
+
+```js
+// Safe only for a build that never renders RSC client islands.
+const rscClientReferences = [];
+```
+
+That can make the static page appear faster because it avoids unrelated client-reference cost.
+However, a later RSC page that imports a `'use client'` search box, button, menu, or form can fail
+because the manifest lacks the reference needed to load and hydrate the island. The failure may not
+appear until someone adds that client island to a route that shares the same build.
+
+Route/page/entry-scoped manifests are the desired long-term fix, tracked in
+[react_on_rails_rsc#134](https://github.com/shakacode/react_on_rails_rsc/issues/134). Related RSC
+sidecar and scoped-loading design work is tracked in
+[react_on_rails_rsc#145](https://github.com/shakacode/react_on_rails_rsc/issues/145).
+
+### Decision Guide
+
+| Scenario                                                 | Safe guidance                                                                                                                                                                                  |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Static RSC page with no client islands, isolated build   | Empty or narrow client references may be acceptable if the affected routes are documented and covered by tests.                                                                                |
+| Mixed RSC app with both static pages and client islands  | Do not globally empty `clientReferences`; use normal app-source discovery until route-scoped manifests exist.                                                                                  |
+| Small RSC page downloads large unrelated chunks          | Inspect `react-client-manifest.json`, reduce `'use client'` boundaries, use thin wrappers or prop injection, and check `clientReferences` scope.                                               |
+| Browser sidecar handles behavior outside the RSC payload | Keep the sidecar distinct from RSC client references; sidecar success does not prove RSC client islands still work.                                                                            |
+| Temporary app workaround is required                     | Document affected routes, add smoke tests for RSC routes with client islands, and link the workaround to [react_on_rails_rsc#134](https://github.com/shakacode/react_on_rails_rsc/issues/134). |
+
+### How to Detect It
+
+- Inspect `react-client-manifest.json` for unexpected entries that explain large downloads, or for a
+  missing entry for a Client Component you expect an RSC route to render.
+- Compare the browser Network tab for a static RSC route before and after narrowing client
+  references. Look for large vendor/app chunks loaded before interaction.
+- If a page with no islands improved after `clientReferences = []`, test a second RSC route that
+  renders a tiny known Client Component from the same build.
+- When available, use the diagnostics requested in
+  [#4296](https://github.com/shakacode/react_on_rails/issues/4296) to inspect client-reference
+  selection.
+- Distinguish this from the Rspack dev-server lazy-compilation issue: if the manifest is empty only
+  in normal `bin/dev` and generated bundles mention `lazy-compilation-proxy`, see
+  [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server).
+
+### Safer Interim Mitigations
+
+- Push `'use client'` boundaries down to real interactive leaves.
+- Remove redundant `'use client'` directives inside already-client subtrees.
+- Use thin client wrapper files for RSC entry paths.
+- Use prop injection to remove shared import edges when a component is used by both RSC and
+  non-RSC paths.
+- Scope `clientReferences` to the app source directory rather than the whole project when broad
+  default scanning is the issue.
+- Isolate static-only builds only when the app can prove no client islands depend on that build.
+- Keep browser sidecars as plain browser JavaScript. The mostly-static sidecar pattern tracked in
+  [#4300](https://github.com/shakacode/react_on_rails/issues/4300) is separate from RSC
+  client-reference discovery.
+- For broader chunk-contamination work, follow this guide's [Chunk Contamination](#chunk-contamination)
+  section and the package-level context in
+  [#4111](https://github.com/shakacode/react_on_rails/issues/4111).
 
 ## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
 
@@ -852,6 +923,7 @@ Fresh generator output includes this guard. If your config has been heavily cust
 | `"createContext is not supported in Server Components"`                                                                      | Using `createContext` or `useContext` in a Server Component                                                                                                                                        | Move context to a `'use client'` provider wrapper                                                                                                                                                                                                                      |
 | `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"`          | TypeScript doesn't recognize async components                                                                                                                                                      | Upgrade to TS 5.1.2+ and `@types/react@19` (or `@types/react` 18.2.8+ for React 18), or omit return type                                                                                                                                                               |
 | RSC page downloads unexpectedly large chunks                                                                                 | A shared `'use client'` module appears in multiple entry paths, so its manifest entry accumulates unrelated chunks                                                                                 | Inspect `react-client-manifest.json` for oversized mappings. Start with a thin `'use client'` wrapper; if the component is shared by both RSC and SSR/client paths, use prop injection to remove shared import edges. See [Chunk Contamination](#chunk-contamination). |
+| RSC client island is missing from the React Client Manifest after narrowing `clientReferences`                               | The plugin scan no longer covers the `'use client'` module needed by that RSC route                                                                                                                | Restore app-source client-reference discovery, or isolate the static-only build and add a client-island smoke test. See [Client Reference Scope and Empty `clientReferences`](#client-reference-scope-and-empty-clientreferences).                                     |
 | `"Text content does not match server-rendered HTML"`                                                                         | Hydration mismatch                                                                                                                                                                                 | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences                                                                                                                                                            |
 | `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.             | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element.                            |
 | `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                          | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                                               |
