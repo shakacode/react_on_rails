@@ -1583,8 +1583,8 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
 5. Ask for confirmation of included and excluded worked issues, collected QA
    lanes and QA Evidence blocks, advisory public `codex-claim` rows, and the PR
    range before deep audit unless the user explicitly says to proceed. When the scope is
-   `UNKNOWN (needs batch confirmation)`, ask the user to choose the candidate
-   batch/run id before any confirmed worked-issue audit.
+   `UNKNOWN (needs batch confirmation)`, ask the user to supply a batch/run id
+   or choose one of the candidate ids before any confirmed worked-issue audit.
 6. For each known worked issue, QA lane, or advisory public `codex-claim` row,
    evaluate whether the implementation, no-PR evidence, QA evidence, blocker, or
    parked disposition satisfied the issue or batch intent; verify the final
