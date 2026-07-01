@@ -21,7 +21,50 @@ module AgentWorkflowSeamDoctorTestHelpers
     Dir.mktmpdir("agent-workflow-seam-doctor-test") do |dir|
       FileUtils.mkdir_p(File.join(dir, ".agents/skills/example"))
       FileUtils.mkdir_p(File.join(dir, ".agents/workflows"))
+      FileUtils.mkdir_p(File.join(dir, ".agents/bin"))
       yield dir
+    end
+  end
+
+  def write_portable_contract(root, omit_scripts: [])
+    body = +"# AGENTS.md\n\n"
+    body << "## Agent Workflow Configuration\n\n"
+    body << "Portable shared skills resolve this repo's commands and policy through:\n\n"
+    body << "- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, `lint`, "
+    body << "`build`, `docs`, `ci-detect`); see [`.agents/bin/README.md`](.agents/bin/README.md).\n"
+    body << "- **Policy / config** — [`.agents/agent-workflow.yml`](.agents/agent-workflow.yml).\n"
+    body << "\n## Commands\n"
+    File.write(File.join(root, "AGENTS.md"), body)
+    write_agent_workflow_config(root)
+    write_agent_workflow_scripts(root, omit: omit_scripts)
+  end
+
+  def write_agent_workflow_config(root, overrides = {})
+    config = {
+      "base_branch" => "main",
+      "hosted_ci_trigger" => "+ci-* PR-comment commands",
+      "ci_parity_environment" => "No dedicated act/local runner image; use bin/ci-local.",
+      "secret_redaction_patterns" => "Redact SECRET, TOKEN, KEY, PASSWORD, and LICENSE.",
+      "trusted_github_actor_boundary" => ".agents/trusted-github-actors.yml does not trust bots by default.",
+      "benchmark_labels" => "benchmark, benchmark-core",
+      "follow_up_prefix" => AgentWorkflowSeamDoctor::FOLLOW_UP_PREFIX,
+      "changelog" => "/CHANGELOG.md, user-visible changes only.",
+      "merge_ledger" => "script/pr-merge-ledger <PR> --strict",
+      "review_gate" => "claude-review",
+      "approval_exempt" => "focused trusted workflow/build/dependency edits",
+      "coordination_backend" => "private shakacode/agent-coordination"
+    }.merge(overrides)
+
+    File.write(File.join(root, ".agents/agent-workflow.yml"), YAML.dump(config))
+  end
+
+  def write_agent_workflow_scripts(root, omit: [])
+    AgentWorkflowSeamDoctor::REQUIRED_COMMAND_SCRIPTS.each do |script_name|
+      next if omit.include?(script_name)
+
+      path = File.join(root, ".agents/bin", script_name)
+      File.write(path, "#!/usr/bin/env bash\nexit 0\n")
+      FileUtils.chmod("+x", path)
     end
   end
 
@@ -50,6 +93,209 @@ end
 
 class AgentWorkflowSeamDoctorConfigTest < Minitest::Test
   include AgentWorkflowSeamDoctorTestHelpers
+
+  def test_portable_contract_without_inline_keys_passes
+    with_repo do |root|
+      write_portable_contract(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+      assert_includes out, "PASS"
+    end
+  end
+
+  def test_portable_contract_missing_script_fails
+    with_repo do |root|
+      write_portable_contract(root, omit_scripts: ["lint"])
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "missing agent workflow command script: .agents/bin/lint"
+    end
+  end
+
+  def test_portable_contract_non_executable_script_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      FileUtils.chmod("-x", File.join(root, ".agents/bin/lint"))
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "agent workflow command script is not executable: .agents/bin/lint"
+    end
+  end
+
+  def test_portable_contract_invalid_yaml_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "base_branch: [\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid .agents/agent-workflow.yml"
+    end
+  end
+
+  def test_portable_contract_disallowed_yaml_class_fails_cleanly
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "base_branch: 2026-06-30\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid .agents/agent-workflow.yml"
+    end
+  end
+
+  def test_portable_contract_yaml_list_not_mapping_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      File.write(File.join(root, ".agents/agent-workflow.yml"), "- item1\n- item2\n")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, ".agents/agent-workflow.yml must be a mapping"
+    end
+  end
+
+  def test_portable_contract_missing_yaml_key_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "follow_up_prefix" => nil)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "missing agent workflow config key: follow_up_prefix"
+      refute_includes out, "invalid agent workflow config value for key: follow_up_prefix"
+    end
+  end
+
+  def test_portable_contract_allows_empty_collection_values
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "benchmark_labels" => [])
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      assert status.success?, out
+      assert_includes out, "PASS"
+    end
+  end
+
+  def test_portable_contract_unresolved_yaml_value_fails
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "benchmark_labels" => "<benchmark labels>")
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved agent workflow config value for key: benchmark_labels"
+    end
+  end
+
+  def test_portable_contract_missing_agents_md_pointer_fails
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "See `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+      assert_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+    end
+  end
+
+  def test_portable_contract_missing_command_readme_pointer_reports_precise_issue
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "Run `.agents/bin/<name>` and see `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+      refute_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+    end
+  end
+
+  def test_portable_contract_missing_generic_command_form_reports_precise_issue
+    with_repo do |root|
+      body = +"# AGENTS.md\n\n"
+      body << "## Agent Workflow Configuration\n\n"
+      body << "See `.agents/bin/README.md` and `.agents/agent-workflow.yml`.\n"
+      body << "\n## Commands\n"
+      File.write(File.join(root, "AGENTS.md"), body)
+      write_agent_workflow_config(root)
+      write_agent_workflow_scripts(root)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+      refute_includes out, "AGENTS.md section must point to .agents/bin/README.md"
+    end
+  end
+
+  def test_portable_contract_null_optional_yaml_key_is_unresolved
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(root, "optional_future_key" => nil)
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "unresolved agent workflow config value for key: optional_future_key"
+      refute_includes out, "missing agent workflow config key: optional_future_key"
+    end
+  end
+
+  def test_portable_contract_follow_up_prefix_must_be_literal_prefix
+    with_repo do |root|
+      write_portable_contract(root)
+      write_agent_workflow_config(
+        root,
+        "follow_up_prefix" => "Follow-up: (default to no new issue; see policy)"
+      )
+      write_skill(root, "No commands here.\n")
+
+      out, status = run_doctor(root)
+
+      refute status.success?
+      assert_includes out, "invalid agent workflow config value for key: follow_up_prefix"
+    end
+  end
 
   def test_complete_seam_without_executable_placeholders_passes
     with_repo do |root|

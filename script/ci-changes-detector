@@ -273,6 +273,26 @@ while IFS= read -r file; do
   # any character including /.
   # shellcheck disable=SC2221,SC2222
   case "$file" in
+    # Markdown under the binstub directory is still documentation. Keep this
+    # before the executable binstub arm so README-only edits do not force CI.
+    .agents/bin/*.md|.agents/bin/**/*.md)
+      # Don't change DOCS_ONLY flag, just continue
+      ;;
+
+    # Executable agent workflow binstubs and the workflow seam config are
+    # CI/workflow plumbing, not docs. Keep this before the broader .agents/**
+    # metadata arm so future seam changes run validation instead of being
+    # skipped as docs-only.
+    .agents/agent-workflow.yml|.agents/agent-workflow.yaml)
+      DOCS_ONLY=false
+      CI_INFRA_CHANGED=true
+      ;;
+
+    .agents/bin/*|.agents/bin/**/*)
+      DOCS_ONLY=false
+      CI_INFRA_CHANGED=true
+      ;;
+
     # Documentation and non-runtime project metadata. None of these affect the
     # gem/package runtime, tests, or benchmarks, so they must NOT fall through to
     # the catch-all below, which forces the entire test + benchmark suite to run
@@ -284,11 +304,11 @@ while IFS= read -r file; do
     #     to miss every category and hit the catch-all, running the full JS+Ruby
     #     suite on a docs-only PR; the markdown was already caught by *.md.
     #   - .github/ISSUE_TEMPLATE/** : GitHub issue templates (repo metadata, not CI infra)
-    #   - .claude/** .agents/** .cursor/** : agent/editor tooling (skills, prompts,
-    #     hooks, workflows). These run locally for coding agents, never in GitHub
-    #     Actions CI, so they don't affect the runtime, tests, or benchmarks. The
-    #     non-extension .claude/skills symlink is what slipped through the catch-all
-    #     and ran benchmarks on the docs-only PR #3717.
+    #   - .claude/** .agents/** .cursor/** : non-executable agent/editor tooling
+    #     (skills, prompts, hooks, workflows). These run locally for coding agents,
+    #     never in GitHub Actions CI, so they don't affect the runtime, tests, or
+    #     benchmarks. The non-extension .claude/skills symlink is what slipped
+    #     through the catch-all and ran benchmarks on the docs-only PR #3717.
     *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs-internal/*|docs-internal/**/*|internal/*|internal/**/*|.github/ISSUE_TEMPLATE/*|.github/ISSUE_TEMPLATE/**/*|.claude/*|.claude/**/*|.agents/*|.agents/**/*|.cursor/*|.cursor/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
