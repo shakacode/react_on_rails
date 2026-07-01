@@ -525,7 +525,7 @@ module ReactOnRails
         non_option_keys = non_option_keys_for(spec)
 
         validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys) if non_option_keys.any?
-        return if non_option_keys.any? || wrapper_keys.length <= 1
+        return if wrapper_keys.length <= 1
 
         raise ReactOnRails::Error, "Response type specs can only use one of :array, :fields, :raw, or :type"
       end
