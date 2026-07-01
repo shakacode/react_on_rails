@@ -8940,6 +8940,47 @@ const mutation = useMutation({
 });
 ```
 
+If your app generates Rails response types with
+`react_on_rails:generate_response_types`, use the package's thin Rails action caller so the mutation
+response stays tied to the Rails-side contract:
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createRailsAction } from 'react-on-rails/railsAction';
+import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+
+type ProjectFormValues = {
+  name: string;
+  status: string;
+};
+
+const createProject = createRailsAction<{ project: ProjectFormValues }, RailsResponseType<'projects.create'>>(
+  {
+    path: '/api/projects',
+  },
+);
+
+function useCreateProjectMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createProject,
+    onSuccess: ({ project }) => {
+      queryClient.setQueryData(['project', String(project.id)], { project });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+    },
+  });
+}
+```
+
+`createRailsAction` shares the same-origin, JSON-only, and CSRF assumptions as the starter's `apiFetch`
+pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
+Rails routes, strong parameters, authorization, or runtime response validation.
+Endpoints should return JSON for 2xx responses unless the caller's response type is `null`; browser
+redirects reject like network failures, so Rails auth failures should return JSON `401` or `403`
+responses for mutation endpoints.
+
 This is cleaner than threading "reload this section" callbacks through many components: the cache is the single place that knows what is stale.
 
 ## TanStack Query and React Server Components
@@ -9114,6 +9155,76 @@ const projectsQuery = useQuery({
 The key string in `RailsResponseTypes` is intentionally independent of the route path. Use a stable
 controller/action-style name such as `projects.index` so later route changes do not churn client types.
 
+## Use With Typed Rails Actions
+
+For mutations, pair the generated response lookup with the CSRF-aware caller from
+`react-on-rails/railsAction`. The helper does not generate routes or validate payloads at runtime; Rails
+still owns the route, strong parameters, authorization, and JSON rendering. The generated type only
+connects the client call site to the response contract you declared in Rails:
+
+```ruby
+ReactOnRails::TypeScriptResponseTypes.define_response(
+  "projects.create",
+  type_name: "ProjectsCreateResponse",
+  fields: {
+    project: "Project"
+  }
+)
+```
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createRailsAction, RailsActionRequestError } from 'react-on-rails/railsAction';
+import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+
+type ProjectFormValues = {
+  name: string;
+  status: string;
+};
+
+type CreateProjectVariables = {
+  project: ProjectFormValues;
+};
+
+type CreateProjectResponse = RailsResponseType<'projects.create'>;
+
+const createProject = createRailsAction<CreateProjectVariables, CreateProjectResponse>({
+  path: '/api/projects',
+});
+
+function NewProjectButton() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: ({ project }) => {
+      queryClient.setQueryData(['project', String(project.id)], { project });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      if (error instanceof RailsActionRequestError && error.response.status === 422) {
+        // Map your app's validation-error JSON into form state here.
+      }
+    },
+  });
+
+  return <button onClick={() => mutation.mutate({ project: { name: 'Apollo', status: 'active' } })}>Create</button>;
+}
+```
+
+React on Rails Pro apps that depend on `react-on-rails-pro` can use the mirrored
+`react-on-rails-pro/railsAction` export.
+
+Use `body` when the Rails endpoint expects a wrapper that differs from the variables passed to
+`mutation.mutate`, and use a `path` function for member actions:
+
+```ts
+const archiveProject = createRailsAction<{ id: number }, RailsResponseType<'projects.archive'>>({
+  method: 'PATCH',
+  path: ({ id }) => `/api/projects/${id}/archive`,
+  body: () => null,
+});
+```
+
 ## Supported Field Specs
 
 | Rails contract spec                  | TypeScript output                 |
@@ -9156,8 +9267,9 @@ fields: {
 ## Boundary
 
 This task generates TypeScript declarations only. It does not validate payloads at runtime, infer schema
-from serializers, create routes, or generate a client caller. Serializer adapters and typed mutation/RPC
-helpers can build on the same `RailsResponseTypes` map later without changing the generated type shape.
+from serializers, create routes, or generate route-specific callers. The optional
+`react-on-rails/railsAction` helper builds on the same `RailsResponseTypes` map by letting the client
+choose `RailsResponseType<'projects.create'>` for the response generic.
 
 ## Related
 

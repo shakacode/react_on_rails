@@ -196,6 +196,47 @@ const mutation = useMutation({
 });
 ```
 
+If your app generates Rails response types with
+`react_on_rails:generate_response_types`, use the package's thin Rails action caller so the mutation
+response stays tied to the Rails-side contract:
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createRailsAction } from 'react-on-rails/railsAction';
+import type { RailsResponseType } from '../generated/react_on_rails_response_types';
+
+type ProjectFormValues = {
+  name: string;
+  status: string;
+};
+
+const createProject = createRailsAction<{ project: ProjectFormValues }, RailsResponseType<'projects.create'>>(
+  {
+    path: '/api/projects',
+  },
+);
+
+function useCreateProjectMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createProject,
+    onSuccess: ({ project }) => {
+      queryClient.setQueryData(['project', String(project.id)], { project });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['metrics'] });
+    },
+  });
+}
+```
+
+`createRailsAction` shares the same-origin, JSON-only, and CSRF assumptions as the starter's `apiFetch`
+pattern, but returns a standalone function that drops directly into `useMutation`. It does not replace
+Rails routes, strong parameters, authorization, or runtime response validation.
+Endpoints should return JSON for 2xx responses unless the caller's response type is `null`; browser
+redirects reject like network failures, so Rails auth failures should return JSON `401` or `403`
+responses for mutation endpoints.
+
 This is cleaner than threading "reload this section" callbacks through many components: the cache is the single place that knows what is stale.
 
 ## TanStack Query and React Server Components
