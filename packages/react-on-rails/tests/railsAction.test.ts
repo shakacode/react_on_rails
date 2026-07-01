@@ -1,6 +1,7 @@
 import {
   createRailsAction,
   type RailsActionCallOptions,
+  type RailsActionMutationFunctionContext,
   RailsActionRequestError,
 } from '../src/railsAction.ts';
 
@@ -176,7 +177,15 @@ describe('createRailsAction', () => {
   });
 
   it('is assignable to a TanStack-style mutation function', () => {
-    type MutationFunction<TData, TVariables> = (variables: TVariables) => Promise<TData>;
+    type MutationFunctionContext = {
+      client: unknown;
+      meta: Record<string, unknown> | undefined;
+      mutationKey?: readonly unknown[];
+    };
+    type MutationFunction<TData, TVariables> = (
+      variables: TVariables,
+      context: MutationFunctionContext,
+    ) => Promise<TData>;
 
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
@@ -187,12 +196,51 @@ describe('createRailsAction', () => {
     expect(mutationFn).toBe(createProject);
   });
 
+  it('ignores TanStack mutation context fields when resolving fetch options', async () => {
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await createProject(
+      { name: 'Apollo' },
+      {
+        client: {},
+        meta: undefined,
+        mutationKey: ['projects', 'create'],
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBeUndefined();
+    expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
+  });
+
+  it('uses own fetch options when caller options also include TanStack-like keys', async () => {
+    const abortController = new AbortController();
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+    const callOptions = {
+      client: {},
+      meta: undefined,
+      mutationKey: ['projects', 'create'],
+      headers: { 'X-Request-Source': 'mixed-options' },
+      signal: abortController.signal,
+    } satisfies RailsActionCallOptions & RailsActionMutationFunctionContext;
+
+    await createProject({ name: 'Apollo' }, callOptions);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.signal).toBe(abortController.signal);
+    expect(headerValue(init.headers, 'X-Request-Source')).toBe('mixed-options');
+  });
+
   it('ignores inherited fetch options on caller options', async () => {
     const abortController = new AbortController();
     const inheritedOptions = Object.create({
       headers: { 'X-Request-Source': 'prototype' },
       signal: abortController.signal,
-    }) as RailsActionCallOptions;
+    }) as RailsActionMutationFunctionContext;
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
     });
