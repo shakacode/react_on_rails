@@ -42,6 +42,10 @@
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
     "./useRailsForm": "./lib/useRailsForm.js",
+    "./railsAction": {
+      "types": "./lib/railsAction.d.ts",
+      "default": "./lib/railsAction.js"
+    },
     "./tanstack-router": {
       "types": "./lib/tanstack-router.d.ts",
       "default": "./lib/tanstack-router.js"

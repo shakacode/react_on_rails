@@ -728,7 +728,7 @@ As of version 13.3.4, bundles inside directories that match `config.components_s
 ## Redux Store Auto-Registration
 
 > [!NOTE]
-> Most applications use React components without Redux. If you don't use Redux stores, you can skip this section entirely.
+> Most applications use React components without Redux. If you don't maintain a legacy Redux app or an advanced multi-island shared store, you can skip this section entirely.
 
 In addition to components, React on Rails can automatically register Redux stores based on file system conventions. This eliminates manual `ReactOnRails.registerStore()` calls and generates individual packs for each store. The feature works the same way as component auto-registration.
 

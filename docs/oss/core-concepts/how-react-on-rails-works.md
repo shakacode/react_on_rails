@@ -8,7 +8,7 @@ Ensure these generated bundle files are in your `.gitignore`, as you never want 
 
 Inside your Rails views, you can now use the `react_component` helper method provided by React on Rails. You can pass props directly to the React component helper.
 
-Optionally, you can also initialize a Redux store with the view or controller helper `redux_store` so that the Redux store can be shared amongst multiple React components.
+For legacy or advanced shared-store pages, you can also initialize a Redux store with the view or controller helper `redux_store` so that separate React roots can coordinate through one client store.
 
 ## Client-Side Rendering vs. Server-Side Rendering
 

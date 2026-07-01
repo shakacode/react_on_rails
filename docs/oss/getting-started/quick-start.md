@@ -190,7 +190,7 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Advanced Features
 
-1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
+1. **[Redux Integration](../building-features/react-and-redux.md)** - Maintain legacy or advanced shared-store integrations
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
 
 ### Pro Features
