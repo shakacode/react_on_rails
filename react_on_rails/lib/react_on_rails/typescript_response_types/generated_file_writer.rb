@@ -22,6 +22,8 @@ module ReactOnRails
         validate_existing_output_directory!(path.dirname)
         tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
         tempfile.write(content)
+        tempfile.flush
+        tempfile.fsync
         tempfile.close
         File.chmod(generated_file_mode, tempfile.path)
         prepare_output_path!
