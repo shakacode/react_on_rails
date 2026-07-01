@@ -155,7 +155,9 @@ policy. Please do not open a public issue for security reports.
 React on Rails is available as open source under the terms of the
 [MIT License](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).
 
-Some advanced features require a React on Rails Pro subscription. See
+React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing.
+No license token is required for evaluation, development, testing, or CI/CD;
+production deployments using Pro features require a paid license. See
 [React on Rails Pro](https://reactonrails.com/docs/pro/) and
 [Pro pricing and sign up](https://pro.reactonrails.com/) for details.
 

@@ -50,7 +50,7 @@ react_on_rails/ (monorepo root)
 
 See [LICENSE.md](../LICENSE.md) for the authoritative list of which directories fall under which license.
 
-### Q: What requires a Pro subscription?
+### Q: What requires a paid Pro license?
 
 **A:** React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing. A paid license is required for production deployments that use Pro features, including:
 
