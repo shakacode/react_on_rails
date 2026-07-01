@@ -78,7 +78,7 @@ const resolveSameOriginRequestUrl = (url: string): string | null => {
   return null;
 };
 
-const JSON_CONTENT_TYPE_PATTERN = /^(application\/json|[^/]+\/[^;]+\+json)(?:\s*;|$)/i;
+const JSON_CONTENT_TYPE_PATTERN = /^(application\/json|[^/]+\/[^;]+\+json)(?:\s*;|\s*$)/i;
 
 const isJsonResponse = (response: Response): boolean =>
   JSON_CONTENT_TYPE_PATTERN.test(response.headers.get('Content-Type') ?? '');

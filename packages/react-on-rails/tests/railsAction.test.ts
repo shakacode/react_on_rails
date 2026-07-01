@@ -333,6 +333,21 @@ describe('createRailsAction', () => {
     await expect(createProject({ name: 'Apollo' })).rejects.toThrow(SyntaxError);
   });
 
+  it('parses JSON responses whose content type has trailing whitespace', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        body: { ok: true },
+        headers: { 'Content-Type': 'application/vnd.api+json   ' },
+      }),
+    );
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+    });
+
+    await expect(createProject({ name: 'Apollo' })).resolves.toEqual({ ok: true });
+  });
+
   it('resolves empty successful JSON responses as null', async () => {
     fetchMock.mockResolvedValueOnce(
       mockResponse({
