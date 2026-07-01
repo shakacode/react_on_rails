@@ -91,14 +91,17 @@ Server components produce HTML that does not need hydration — they have no cli
 
 React Server Components reduce client JavaScript, hydration work, and duplicated data-fetching paths. They do not
 automatically beat an already-warm SSR cache on every first-paint metric. If the existing page uses
-[`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching)
-with [`config.prerender_caching = true`](../building-features/caching.md#level-1-prerender-caching), the fair baseline is
-a warm cache hit, not an uncached SSR request.
+[`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching),
+the fair baseline is a warm fragment-cache hit. If it uses
+[`config.prerender_caching = true`](../building-features/caching.md#level-1-prerender-caching) without fragment caching,
+the fair baseline is a warm prerender-cache hit. Do not compare RSC against an uncached SSR request unless that uncached
+state is the production baseline.
 
 This distinction matters most for mostly static public pages. On a fragment-cache hit, React on Rails Pro can skip prop
-assembly, JSON serialization, and JavaScript evaluation. On a prerender-cache hit, props are still assembled and
-serialized, but the JavaScript render result is reused. Either warm path can be very hard for an RSC conversion to beat
-on TTFB, FCP, or LCP because there may be little server-rendering work left to remove.
+assembly, JSON serialization, and JavaScript evaluation. Fragment-caching helpers skip the prerender cache for that render
+call because the full fragment is already cached. On a prerender-cache hit, props are still assembled and serialized, but
+the JavaScript render result is reused. Either warm path can be very hard for an RSC conversion to beat on TTFB, FCP, or
+LCP because there may be little server-rendering work left to remove.
 
 ### Static landing-page pattern
 
@@ -118,7 +121,6 @@ A cache-optimized landing page often looks like this:
   rendered = cached_react_component_hash(
     "WelcomePage",
     cache_key:,
-    prerender: true,
     auto_load_bundle: false
   ) do
     build_welcome_page_props
@@ -127,14 +129,18 @@ A cache-optimized landing page often looks like this:
 
 <% append_javascript_pack_tag("generated/WelcomePage") %>
 <% append_stylesheet_pack_tag("generated/WelcomePage") %>
-<% preload_pack_asset("generated/WelcomePage.css") %>
+<%= preload_pack_asset("generated/WelcomePage.css") %>
+<%= rendered["html"] %>
+<%= content_for :script_tags, rendered["consoleReplayScript"] %>
 ```
 
 In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
-the critical CSS. An RSC experiment must keep the same data, release, device, locale, CMS state, CSS delivery, font
-preloads, and hero/image priority before claiming that RSC changed rendering performance. Otherwise the comparison is
-apples to oranges: a lower JavaScript payload or lower Total Blocking Time can coexist with worse LCP if the conversion
-delays CSS, fonts, or the LCP resource.
+the critical CSS. That per-call option only disables automatic loading when the app has not enabled
+`config.auto_load_bundle` globally; if the global setting is `true`, preserve the resulting asset behavior in both the SSR
+baseline and the RSC experiment. An RSC experiment must keep the same data, release, device, locale, CMS state, CSS
+delivery, font preloads, and hero/image priority before claiming that RSC changed rendering performance. Otherwise the
+comparison is apples to oranges: a lower JavaScript payload or lower Total Blocking Time can coexist with worse LCP if the
+conversion delays CSS, fonts, or the LCP resource.
 
 ### Cache-state matrix
 
