@@ -68,7 +68,7 @@ heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
 # Production (Docker)
 # Add to docker-compose.yml or Dockerfile ENV
 
-# CI/CD (optional — CI works without a license)
+# CI/CD (optional — CI works without a license token)
 # Add to your CI environment variables if needed
 ```
 
@@ -101,7 +101,7 @@ For production deployments, configure a paid license via the `REACT_ON_RAILS_PRO
 
 ### For CI/CD
 
-CI/CD environments work without a license. If your CI pipeline deploys to production, ensure the production environment has a valid paid license configured.
+CI/CD environments work without a license token. If your CI pipeline deploys to production, ensure the production environment has a valid paid license configured.
 
 ## Verification
 

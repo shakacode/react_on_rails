@@ -65,8 +65,8 @@ React on Rails Pro works **without a license token** for evaluation, development
 
 **A paid license is required only for production deployments.**
 
-- **Evaluation & Development**: Works out of the box — no license needed
-- **CI/CD**: Works without a license
+- **Evaluation & Development**: Works out of the box — no license token needed
+- **CI/CD**: Works without a license token
 - **Production**: Requires a paid license
 
 ### Paid License (Production)

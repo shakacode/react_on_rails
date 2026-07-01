@@ -79,7 +79,7 @@ Production use requires a paid production license.
 
 - **Permitted:** Modifying MIT-licensed code for your own purposes
 - **Not Permitted:** Using those modifications to access Pro features without a valid license
-- **Distinction:** The MIT license grants you modification rights, but ShakaCode Trust-Based Commercial Licensing restricts unauthorized use of Pro features
+- **Distinction:** The MIT license grants you modification rights, but the Pro License restricts unauthorized use of Pro features
 
 ### Q: What about contributing to the project?
 
