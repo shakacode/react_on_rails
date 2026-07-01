@@ -1036,6 +1036,48 @@ test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release-finish-test output"
 }
 
+test_extensionless_ruby_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<~CHANGELOG
+# Change Log
+
+### [Unreleased]
+
+#### Added
+
+- Original fixture.
+CHANGELOG
+
+puts FIXTURE
+RUBY
+  commit_change "add release forward port heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port
+  commit_change "release forward port fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port heredoc output"
+}
+
+test_bash_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat > release.md <<'EOF'
+# Change Log
+
+### [Unreleased]
+EOF
+BASH
+  commit_change "add release forward port bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port-test.bash
+  commit_change "release forward port bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port-test heredoc output"
+}
+
 # Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
 # branch of the release arm (not RELEASE_TOOLING_CHANGED), so it stays
 # non-runtime — rubocop still runs (lint catches comment-affecting style) but the
@@ -1098,6 +1140,8 @@ run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_gene
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
+run_test test_extensionless_ruby_release_tooling_heredoc_fixture_change_runs_release_specs
+run_test test_bash_release_tooling_heredoc_fixture_change_runs_release_specs
 run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
