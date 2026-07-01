@@ -104,6 +104,20 @@ such as:
 Other agent-facing docs (for example `CLAUDE.md`) should contain only tool-specific workflow notes and link back here.
 If there is a conflict, `AGENTS.md` wins.
 
+## React on Rails Pro Guardrails
+
+React on Rails Pro includes the Ruby Pro tree and the Pro npm packages:
+
+- `react_on_rails_pro/`
+- `packages/react-on-rails-pro/`
+- `packages/react-on-rails-pro-node-renderer/`
+
+Before modifying, copying, vendoring, porting, or reimplementing Pro code from
+any of those paths, read and follow the Pro-specific guardrails in
+[`react_on_rails_pro/AGENTS.md`](react_on_rails_pro/AGENTS.md). Those guardrails
+do not replace the Pro license or EULA; they tell agents when to stop and ask
+for explicit licensing confirmation.
+
 ## Freshness And Skill Resolution
 
 Before planning issue/PR work, creating a new branch, or creating a new
