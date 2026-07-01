@@ -104,7 +104,7 @@ React on Rails Pro adds higher-throughput SSR and advanced rendering features on
 top of the open-source gem, including Node renderer support, streaming SSR,
 React Server Components, fragment caching, and TanStack Router SSR.
 
-**Friendly license model:** Try Pro freely in development, test, CI/CD, and
+**ShakaCode Trust-Based Commercial Licensing:** Try Pro freely in development, test, CI/CD, and
 staging. No token is required to evaluate. If no license is configured, Pro
 keeps running and logs license status instead of blocking your app. Production
 deployments require a paid license; see [Pro pricing and sign up](https://pro.reactonrails.com/).
@@ -155,7 +155,9 @@ policy. Please do not open a public issue for security reports.
 React on Rails is available as open source under the terms of the
 [MIT License](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).
 
-Some advanced features require a React on Rails Pro subscription. See
+React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing.
+No license token is required for evaluation, development, testing, or CI/CD;
+production deployments using Pro features require a paid license. See
 [React on Rails Pro](https://reactonrails.com/docs/pro/) and
 [Pro pricing and sign up](https://pro.reactonrails.com/) for details.
 

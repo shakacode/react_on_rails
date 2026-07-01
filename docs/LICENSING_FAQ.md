@@ -11,11 +11,11 @@
   - `react-on-rails` NPM package
   - Core functionality is completely free
 
-- **Pro Licensed (Subscription Required for Production):**
+- **ShakaCode Trust-Based Commercial Licensing (Paid License Required for Production):**
   - `react_on_rails_pro` Ruby gem
   - `react-on-rails-pro` NPM package
   - `react-on-rails-pro-node-renderer` NPM package
-  - Advanced features require a valid subscription
+  - Advanced features can be evaluated without a token; production deployments require a paid license
 
 ### Q: How do I install and use the packages?
 
@@ -50,9 +50,9 @@ react_on_rails/ (monorepo root)
 
 See [LICENSE.md](../LICENSE.md) for the authoritative list of which directories fall under which license.
 
-### Q: What requires a Pro subscription?
+### Q: What requires a paid Pro license?
 
-**A:** Pro features include:
+**A:** React on Rails Pro is offered under ShakaCode Trust-Based Commercial Licensing. A paid license is required for production deployments that use Pro features, including:
 
 - Server-side rendering optimizations
 - Advanced caching strategies
@@ -64,14 +64,14 @@ See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/
 
 ### Q: Can I try Pro features for free?
 
-**A:** Yes! The Pro license allows free use for:
+**A:** Yes! Under ShakaCode Trust-Based Commercial Licensing, no license token is required for:
 
-- Educational/classroom use
-- Personal hobby projects
-- Tutorials and demonstrations
-- Non-production evaluation
+- Evaluation and local development
+- Test environments and CI/CD pipelines
+- Staging and other non-production deployments
+- Educational, tutorial, and demonstration use
 
-Production use requires a valid subscription.
+Production use requires a paid production license.
 
 ### Q: Can I modify the MIT-licensed interface files?
 

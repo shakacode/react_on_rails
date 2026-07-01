@@ -2,9 +2,9 @@
 
 This document explains how to configure your React on Rails Pro license for production use.
 
-## License-Optional Model
+## ShakaCode Trust-Based Commercial Licensing
 
-React on Rails Pro works **without a license** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
+React on Rails Pro works **without a license token** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
 
 **A paid license is required only for production deployments.**
 
@@ -68,7 +68,7 @@ heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
 # Production (Docker)
 # Add to docker-compose.yml or Dockerfile ENV
 
-# CI/CD (optional — CI works without a license)
+# CI/CD (optional — CI works without a license token)
 # Add to your CI environment variables if needed
 ```
 
@@ -101,7 +101,7 @@ For production deployments, configure a paid license via the `REACT_ON_RAILS_PRO
 
 ### For CI/CD
 
-CI/CD environments work without a license. If your CI pipeline deploys to production, ensure the production environment has a valid paid license configured.
+CI/CD environments work without a license token. If your CI pipeline deploys to production, ensure the production environment has a valid paid license configured.
 
 ## Verification
 
@@ -341,10 +341,10 @@ Need help?
 ## FAQ
 
 **Q: Do I need a license for development?**
-A: No. React on Rails Pro works without a license for development, testing, and evaluation.
+A: No. React on Rails Pro works without a license token for development, testing, and evaluation.
 
 **Q: Do I need a license for CI?**
-A: No. CI/CD environments work without a license. Only production deployments require a paid license.
+A: No. CI/CD environments work without a license token. Only production deployments require a paid license.
 
 **Q: Do I need internet to validate the license?**
 A: No! License validation is completely offline using cryptographic signatures.

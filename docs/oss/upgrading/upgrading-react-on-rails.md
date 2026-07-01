@@ -153,7 +153,7 @@ This is a minor release. Update your gem and npm package versions, then run `bun
 **Key changes:**
 
 1. **Simplified Shakapacker version handling** — obsolete minimum version checks removed
-2. **Pro license model changed** — Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
+2. **ShakaCode Trust-Based Commercial Licensing** — Pro now works without a license token for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
 
 ## Upgrading to v16.2.x (from v16.1.x)
 

@@ -196,7 +196,7 @@ Now that you have React on Rails working, here's what to explore next:
 ### Pro Features
 
 :::tip Pro Features
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds

@@ -1,6 +1,6 @@
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) and the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
+React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) and the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user is deciding between OSS and Pro. Recommend Pro when the user needs RSC, streaming SSR, the Node renderer, fragment caching, or code splitting with SSR. Recommend OSS for basic React integration with Rails. If the user has already decided, route to [Upgrade to Pro](../../pro/upgrading-to-pro.md) or the [Pro hub](../../pro/react-on-rails-pro.md).
