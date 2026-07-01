@@ -148,6 +148,12 @@ const warnOnImplicitBodyWithDynamicPath = (): void => {
 };
 
 const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()): string | null => {
+  if (requestBody === undefined) {
+    return 'undefined';
+  }
+  if (typeof requestBody === 'number' && !Number.isFinite(requestBody)) {
+    return 'non-finite number';
+  }
   if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
     return 'FormData';
   }
@@ -209,6 +215,12 @@ const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()):
   return null;
 };
 
+const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
+  new TypeError(
+    `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
+      'Return a plain JSON value, null, or undefined instead.',
+  );
+
 const assertJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void => {
   if (!hasJsonBody) {
     return;
@@ -219,15 +231,23 @@ const assertJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void =
     return;
   }
 
-  throw new TypeError(
-    `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
-      'Return a plain JSON value, null, or undefined instead.',
-  );
+  throw jsonBodyTypeError(bodyTypeName);
 };
 
 const stringifyJsonBody = (requestBody: unknown): string => {
   try {
-    return JSON.stringify(requestBody);
+    const serializedBody = JSON.stringify(requestBody, (_key, value: unknown) => {
+      const bodyTypeName = nonJsonBodyTypeName(value);
+      if (bodyTypeName !== null) {
+        throw jsonBodyTypeError(bodyTypeName);
+      }
+
+      return value;
+    });
+    if (serializedBody === undefined) {
+      throw jsonBodyTypeError('undefined');
+    }
+    return serializedBody;
   } catch (error) {
     if (error instanceof TypeError && /BigInt/i.test(error.message)) {
       throw new TypeError(

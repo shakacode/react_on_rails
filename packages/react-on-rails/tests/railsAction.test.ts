@@ -71,6 +71,10 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['Promise', () => Promise.resolve({ name: 'Apollo' })],
   ['Function', () => () => 'Apollo'],
   ['Symbol', () => Symbol('Apollo')],
+  ['undefined', () => ({ project: { name: undefined } })],
+  ['non-finite number', () => Number.NaN],
+  ['non-finite number', () => Number.POSITIVE_INFINITY],
+  ['non-finite number', () => Number.NEGATIVE_INFINITY],
 ];
 
 if (typeof ReadableStream !== 'undefined') {
@@ -662,7 +666,39 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('wraps BigInt stringify failures from custom toJSON values', async () => {
+  it('rejects non-JSON values returned from custom toJSON methods before fetch', async () => {
+    const customJsonValue = (jsonValue: unknown): { toJSON: () => unknown } => {
+      const value = {};
+      Object.defineProperty(value, 'toJSON', {
+        value: () => jsonValue,
+      });
+      return value as { toJSON: () => unknown };
+    };
+
+    const unsupportedJsonValues: Array<[string, unknown]> = [
+      ['Map', new Map([['name', 'Apollo']])],
+      ['Set', new Set(['Apollo'])],
+      ['Promise', Promise.resolve({ name: 'Apollo' })],
+      ['undefined', undefined],
+      ['non-finite number', Number.NaN],
+      ['non-finite number', Number.POSITIVE_INFINITY],
+      ['non-finite number', Number.NEGATIVE_INFINITY],
+    ];
+
+    for (const [bodyTypeName, jsonValue] of unsupportedJsonValues) {
+      const createProject = createRailsAction<undefined, { ok: true }>({
+        path: '/api/projects',
+        body: () => ({ project: customJsonValue(jsonValue) }),
+      });
+
+      // eslint-disable-next-line no-await-in-loop
+      await expect(createProject()).rejects.toThrow(new RegExp(`resolved to ${bodyTypeName}`));
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects BigInt values returned from custom toJSON methods before fetch', async () => {
     class BigIntJsonValue {
       toJSON(): bigint {
         return BigInt(1);
