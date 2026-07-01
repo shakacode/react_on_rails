@@ -120,7 +120,7 @@ module AgentWorkflowSeamDoctor
       issues.concat(command_script_issues(root))
       issues.concat(yaml_config_issues(root))
     else
-      config = parse_config(agents_text)
+      config = parse_config(agents_text, section)
       issues.concat(missing_key_issues(config))
       issues.concat(unresolved_extra_key_issues(config))
     end
@@ -222,8 +222,8 @@ module AgentWorkflowSeamDoctor
     end
   end
 
-  def parse_config(text)
-    section = extract_section(text)
+  def parse_config(text, section = nil)
+    section ||= extract_section(text)
     return nil if section.nil?
 
     config = {}

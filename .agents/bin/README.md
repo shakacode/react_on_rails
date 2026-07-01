@@ -16,6 +16,11 @@ script are n/a here.
 | `docs`      | Docs checks                                  | `script/check-docs-sidebar` + `bin/check-links`                                                                    |
 | `ci-detect` | CI change detector                           | `script/ci-changes-detector [base-ref]` (default `origin/main`)                                                    |
 
+`validate` intentionally delegates base discovery to `bin/ci-local`; do not pass
+a normal `<base-ref>` argument. See
+[`internal/contributor-info/local-ci-contract.md`](../../internal/contributor-info/local-ci-contract.md)
+for the local CI contract.
+
 Non-command policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
 Workflow-specific checks such as `actionlint` and `yamllint .github/` stay in the
 PR-processing workflow for `.github/**` changes rather than the general build entrypoint.
