@@ -1,0 +1,10 @@
+module ReactOnRails
+  module TypeScriptResponseTypes
+    class GeneratedFileWriter
+      def self.write: (Pathname path, String content) -> void
+
+      def initialize: (Pathname path, String content) -> void
+      def write: () -> void
+    end
+  end
+end
