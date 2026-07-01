@@ -33,6 +33,30 @@ module ReactOnRails
       end
     end
 
+    it "does not remove concurrently created empty output directories when the final write fails" do
+      described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
+
+      Dir.mktmpdir do |dir|
+        allow(Rails).to receive(:root).and_return(Pathname.new(dir))
+        output_path = "generated/nested/rails_response_types.d.ts"
+        generated_root = File.join(dir, "generated")
+        nested_dir = File.join(generated_root, "nested")
+        generated_path = File.join(dir, output_path)
+
+        allow(Dir).to receive(:mkdir).and_wrap_original do |original_method, directory, *args|
+          original_method.call(directory, *args)
+          raise Errno::EEXIST if directory == nested_dir
+        end
+        allow(FileUtils).to receive(:mv).and_call_original
+        allow(FileUtils).to receive(:mv).with(anything, generated_path).and_raise(Errno::ENOSPC)
+
+        expect do
+          described_class.generate(output_path:)
+        end.to raise_error(Errno::ENOSPC)
+        expect(File).to exist(nested_dir)
+      end
+    end
+
     it "rejects output parent symlink swaps before creating the generated file" do
       described_class.define_response("health.show", type_name: "HealthResponse", fields: { ok: :boolean })
 
@@ -54,7 +78,7 @@ module ReactOnRails
             described_class.generate(output_path:)
           end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
           expect(File).not_to exist(escaped_path)
-          expect(File).not_to exist(output_dir)
+          expect(File).to be_symlink(escape_link)
         end
       end
     end
@@ -81,7 +105,7 @@ module ReactOnRails
           end.to raise_error(ReactOnRails::Error, /must be inside Rails\.root/)
           expect(File).not_to exist(escaped_file)
           expect(File).not_to exist(escaped_dir)
-          expect(File).not_to exist(output_dir)
+          expect(File).to be_symlink(output_dir)
         end
       end
     end
