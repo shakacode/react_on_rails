@@ -44,30 +44,53 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    coordinated batch/run is in scope, record
    `worked_issue_scope: not applicable`. If batch work is in scope but the
    batch/run id is unknown:
-   - run bounded `agent-coord doctor --json`, then broad `agent-coord status`
-     through the resolved `pr-batch` bounded helper only as an audit/discovery read to list
-     candidate batch/run ids and lanes
-   - record `worked_issue_scope: UNKNOWN (needs batch confirmation)`
-   - ask for confirmation before treating any candidate as the worked-issue
-     scope
+   - using the bounded helper from the resolved `PR_BATCH_SKILL_DIR`
+     (`PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"`),
+     run bounded `agent-coord doctor --json`, then run bounded
+     `agent-coord status --json` as a broad audit/discovery read to list
+     candidate batch/run ids and lanes; do not use this broad read for worker
+     lane readiness or dependency decisions, and do not retry indefinitely
+   - if the bounded helper or `agent-coord` binary is missing, or bounded
+     `agent-coord doctor --json` fails or times out, record
+     `worked_issue_scope: UNKNOWN (setup)`; stop private backend discovery only,
+     report the missing helper, missing command, timeout, or error needed to
+     recover, and use structured public `codex-claim` comments as an advisory
+     fallback
+   - if bounded `agent-coord doctor --json` passes but broad discovery status
+     fails or times out, record `worked_issue_scope: UNKNOWN (access)`; stop
+     private backend discovery only, report the exact broad discovery command,
+     timeout, or error, and use structured public `codex-claim` comments as an
+     advisory fallback
+   - if broad discovery returns no candidate batch/run ids, record
+     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
+     to supply or confirm a batch/run id directly; once the user supplies or
+     confirms one, continue with the known-batch-id path below
+   - if broad discovery returns candidates but cannot determine which candidate
+     is in scope, record
+     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
+     to confirm one candidate before treating that candidate's lane list as
+     worked-issue scope; once confirmed, continue with the known-batch-id path
+     below
+   - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
+     `UNKNOWN (needs batch confirmation)`; only report candidate ids as
+     confirmation targets when backend setup and discovery access both worked
 
-   If candidate discovery cannot verify backend setup or access,
-   `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
-   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
-   is still needed after backend recovery. When a batch/run id is known, run
-   bounded `agent-coord doctor --json` and bounded
-   `agent-coord status --batch-id <batch-id> --json`, then inspect the named
-   batch entry; use claims, heartbeats, and batch metadata as the primary
+   When a batch/run id is known, run bounded `agent-coord doctor --json` and
+   bounded `agent-coord status --batch-id <batch-id> --json`, then inspect the
+   named batch entry; use claims, heartbeats, and batch metadata as the primary
    worked-issue scope. If `agent-coord` is missing or bounded
    `agent-coord doctor --json` fails or times out, record
-   `worked_issue_scope: UNKNOWN (setup)` with the exact command/error. If
-   bounded `agent-coord doctor --json` passes but targeted batch status fails or
-   times out, record `worked_issue_scope: UNKNOWN (access)` with the exact
-   command/error. In both UNKNOWN cases, use structured public `codex-claim`
+   `worked_issue_scope: UNKNOWN (setup)`. If bounded
+   `agent-coord doctor --json` passes but targeted batch status fails or times
+   out, record `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases,
+   include the exact command/error and use structured public `codex-claim`
    comments as an advisory fallback for possible no-PR, blocked, parked, or
-   done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
-   marked `UNKNOWN` as needed, and do not infer confirmed completeness from
-   merged PRs.
+   done-unmerged lanes before reducing scope to merged PRs. If candidate
+   discovery cannot verify backend setup or access, `UNKNOWN (setup)` or
+   `UNKNOWN (access)` takes precedence over
+   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
+   is still needed after backend recovery. Keep advisory rows marked `UNKNOWN`
+   as needed, and do not infer confirmed completeness from merged PRs.
    When the batch/run id itself is unknown, scope that advisory scan to issues
    and open PRs active within the audit time window; use each claim's `batch:`
    field to surface candidate batch ids, not to filter as confirmed scope until
