@@ -213,6 +213,34 @@ end
 
 The controller just renders — the async prop's query runs in the view's `emit` block (Step 3) so the shell can stream before the query finishes. The controller still owns request-level concerns: authentication, authorization, and any fast props you pass synchronously.
 
+### Buffered Static RSC Responses
+
+For public, static, or cacheable pages where every prop is available before render, use the buffered helper instead of `stream_view_containing_react_components`. It still uses the Pro streaming/RSC renderer internally, so server components and embedded Flight payloads work, but Rails receives the complete HTML string before committing the response:
+
+```erb
+<%= buffered_stream_react_component("MarketingPage",
+      props: @marketing_page_props,
+      id: "marketing-page") %>
+```
+
+Use `cached_buffered_stream_react_component` when the complete static response should be cached with the same cache-key and tag semantics as other Pro cached helpers:
+
+```erb
+<%=
+  cached_buffered_stream_react_component(
+    "MarketingPage",
+    cache_key: ["marketing-page", I18n.locale],
+    cache_tags: ["marketing-page"],
+    cache_options: { expires_in: 30.minutes },
+    id: "marketing-page"
+  ) do
+    @marketing_page_props
+  end
+%>
+```
+
+Buffered rendering is not progressive: the browser receives the page only after every RSC/SSR chunk is available. Prefer `stream_react_component` or `stream_react_component_with_async_props` when early shell flush, slow async props, or progressive Suspense boundaries matter.
+
 ### Browser-Observable RSC Stream Marks
 
 For streamed React Server Component pages, the initial Flight payload is embedded in the HTML stream. It is not a separate browser resource, so `PerformanceResourceTiming` will not show a named RSC payload request for the initial page load. To inspect streamed payload bytes and flush timing from browser tooling without changing that transport, opt in to inline performance marks:

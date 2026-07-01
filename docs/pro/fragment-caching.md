@@ -41,6 +41,12 @@ end %>
 
 A `cached_react_component_hash` variant is also available for cases where you need to extract metadata (like `<title>`) from the rendered output.
 
+### Rails Context And Render Order
+
+Fragment-cached helpers cache the final rendered HTML. That HTML includes the Rails context tag only when the helper call that populated the cache was the first component render in that request. If the same cached fragment is later served in a different view order, the page can either miss the Rails context tag or include a duplicate one.
+
+Keep a stable render order for pages that share a cached component key. If a component may be the only React root on some pages and not others, use distinct cache keys for those layouts or render an uncached React root first so the Rails context ownership is explicit.
+
 ## Tag-Based Revalidation
 
 Cache keys handle "is this entry still current?" at read time. For the write side — "this record changed, bust every cached component that depends on it" — tag the entries and revalidate by tag (the React on Rails Pro analog of Next.js `revalidateTag`):
@@ -74,7 +80,7 @@ ActiveRecord-style tag objects normalize to `collection/id` (for example `posts/
 
 ## Cache Warming
 
-Every deploy creates new cache keys for prerendered components (because the server bundle digest is included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
+Every deploy creates new cache keys for prerendered components (because the server bundle digest, and the RSC bundle digest when RSC support is enabled and the RSC bundle exists, are included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
 
 See the [Cache Warming section](../oss/building-features/caching.md#cache-warming) in the caching guide for implementation patterns and real-world results.
 

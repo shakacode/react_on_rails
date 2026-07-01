@@ -78,7 +78,10 @@ describe ReactOnRailsProHelper do
       "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}"
     end
     let(:base_cache_key_with_prerender) do
-      "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/" \
+      bundle_hashes = [ReactOnRailsPro::Utils.bundle_hash]
+      bundle_hashes << ReactOnRailsPro::Utils.rsc_bundle_hash if ReactOnRailsPro.configuration.enable_rsc_support
+
+      "#{base_component_cache_key}/#{bundle_hashes.join('/')}/" \
         "#{ReactOnRailsPro::Cache.dependencies_cache_key}"
     end
     let(:base_cache_key_without_prerender) do
@@ -414,6 +417,10 @@ describe ReactOnRailsProHelper do
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
+      # Streaming helper specs run without generated SSR bundle files, but the
+      # helpers still read bundle metadata before the HTTP mock responds.
+      # Keep all stream specs on deterministic test hashes.
+      stub_pro_bundle_hashes
 
       chunks_read.clear
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
@@ -432,6 +439,103 @@ describe ReactOnRailsProHelper do
             yielder.call(to_length_prefixed(chunk))
           end
         end
+      end
+    end
+
+    def stub_pro_bundle_hashes
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        bundle_hash: "#{'a' * 32}-test",
+        rsc_bundle_hash: "#{'b' * 32}-test"
+      )
+    end
+
+    describe "#buffered_stream_react_component" do
+      it "buffers all streamed chunks into one normal Rails helper result" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, props:, **component_options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(result).to include(chunks.second[:html])
+        expect(result).to include(chunks.third[:html])
+        expect(result).to script_tag_be_included(rails_context_tag)
+        expect(result).to script_tag_be_included(react_component_specification_tag)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "ignores false on_complete values" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, props:, on_complete: false, **component_options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "calls on_complete with buffered string chunks" do
+        completed_chunks = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(
+            component_name,
+            props:,
+            on_complete: ->(buffered_chunks) { completed_chunks = buffered_chunks },
+            **component_options
+          )
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(completed_chunks).to all(be_a(String))
+        expect(completed_chunks.join).to eq(result)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "returns the rendered HTML even if on_complete mutates the buffered chunks" do
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(
+            component_name,
+            props:,
+            on_complete: ->(buffered_chunks) { buffered_chunks.clear },
+            **component_options
+          )
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(result).to include(chunks.second[:html])
+        expect(result).to include(chunks.third[:html])
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "does not mutate the caller's options hash" do
+        completed_chunks = nil
+        options = {
+          props:,
+          trace: true,
+          id: "#{component_name}-react-component-0",
+          on_complete: ->(buffered_chunks) { completed_chunks = buffered_chunks }
+        }
+        original_options = options.dup
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          result = buffered_stream_react_component(component_name, options)
+        end
+
+        expect(result).to include(react_component_div_with_initial_chunk)
+        expect(completed_chunks).to all(be_a(String))
+        expect(options).to eq(original_options)
       end
     end
 
@@ -1045,6 +1149,260 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count) # Both calls went to Node
 
         expect(second_run_chunks).to eq(first_run_chunks) # Same template/props, same result
+      end
+    end
+
+    describe "#cached_buffered_stream_react_component", :caching do
+      around do |example|
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+      end
+
+      it "caches the fully buffered result without requiring the streaming view context" do
+        props_calls = 0
+        first_result = nil
+        second_result = nil
+        cached_miss_result = nil
+        expected_cache_key = nil
+
+        Sync do
+          mock_request_and_response
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: [
+              "buffered_stream_react_component",
+              ["buffered-stream-cache-spec", component_name]
+            ],
+            prerender: true
+          )
+
+          render_cached = lambda do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-spec", component_name],
+              id: "#{component_name}-react-component-0",
+              trace: true,
+              cache_options: { expires_in: 60 }
+            ) do
+              props_calls += 1
+              props
+            end
+          end
+
+          first_result = render_cached.call
+          cached_miss_result = Rails.cache.read(expected_cache_key)
+          Rails.cache.write(expected_cache_key, String.new(first_result), expires_in: 60)
+          @rendered_rails_context = nil
+          props_calls_before_hit = props_calls
+          second_result = render_cached.call
+          expect(props_calls).to eq(props_calls_before_hit)
+        end
+
+        expect(first_result).to include(chunks.first[:html], chunks.second[:html], chunks.third[:html])
+        expect(second_result).to eq(first_result)
+        expect(first_result).to be_html_safe
+        expect(second_result).to be_html_safe
+        expect(cached_miss_result).to eq(first_result)
+        expect(props_calls).to eq(1)
+        expect(chunks_read.count).to eq(chunks.count)
+      end
+
+      it "uses the configured auto_load_bundle default before the per-call option on cache misses" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>cached buffered stream</div>".html_safe
+          end
+
+          cached_buffered_stream_react_component(
+            component_name,
+            cache_key: ["buffered-stream-cache-auto-load", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(true)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "uses the configured auto_load_bundle default before the per-call option on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        user_cache_key = ["buffered-stream-cache-auto-load-hit", component_name]
+        captured_auto_load_bundle = nil
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          Rails.cache.write(expected_cache_key, "<div>cached buffered stream</div>", expires_in: 60)
+          allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+            captured_auto_load_bundle = render_options.auto_load_bundle
+          end
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to eq("<div>cached buffered stream</div>")
+        expect(result).to be_html_safe
+        expect(captured_auto_load_bundle).to be(true)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "does not require an RSC bundle hash when RSC support is disabled" do
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = false
+        props_calls = 0
+        result = nil
+        expected_cache_key = nil
+
+        Sync do
+          mock_request_and_response
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_raise(
+            Errno::ENOENT,
+            "missing rsc bundle"
+          )
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: [
+              "buffered_stream_react_component",
+              ["buffered-stream-cache-spec-no-rsc", component_name]
+            ],
+            prerender: true
+          )
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: ["buffered-stream-cache-spec-no-rsc", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props_calls += 1
+            props
+          end
+        end
+
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(expected_cache_key)).to eq(result)
+        expect(props_calls).to eq(1)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+      end
+
+      it "does not collide with cached stream entries when RSC support is disabled" do
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = false
+        user_cache_key = ["buffered-stream-cache-collision", component_name]
+        streaming_cache_key = nil
+        buffered_cache_key = nil
+        result = nil
+
+        Sync do
+          mock_request_and_response
+          streaming_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: user_cache_key,
+            prerender: true
+          )
+          buffered_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", user_cache_key],
+            prerender: true
+          )
+          Rails.cache.write(streaming_cache_key, [+"stream chunk"], expires_in: 60)
+
+          result = cached_buffered_stream_react_component(
+            component_name,
+            cache_key: user_cache_key,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(streaming_cache_key)).to eq(["stream chunk"])
+        expect(Rails.cache.read(buffered_cache_key)).to eq(result)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+      end
+
+      it "rejects on_complete because cache hits cannot replay callbacks consistently" do
+        expect do
+          Sync do
+            mock_request_and_response
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: ->(_chunks) {},
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /cached_buffered_stream_react_component does not support on_complete/
+        )
+      end
+
+      it "allows nil and false on_complete values because they cannot replay cached chunks" do
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component)
+            .and_return("<div>cached buffered stream</div>".html_safe)
+
+          expect do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete-nil", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: nil,
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end.not_to raise_error
+
+          expect do
+            cached_buffered_stream_react_component(
+              component_name,
+              cache_key: ["buffered-stream-cache-on-complete-false", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: false,
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end.not_to raise_error
+        end
       end
     end
 
