@@ -854,7 +854,7 @@ source exists.
 - Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `configuration/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
 - Force push to `main` or `master`
 - Reintroduce conditional gem declarations like `gem "turbolinks" if ENV["DISABLE_TURBOLINKS"].nil?` in `react_on_rails/Gemfile.development_dependencies` — conditional inclusion diverges from the lockfile and breaks `bundle install --frozen` in CI. See the comment in that Gemfile for the full explanation.
-- Copy, port, or reproduce **React on Rails Pro** code (`react_on_rails_pro/`, `packages/react-on-rails-pro/`, `packages/react-on-rails-pro-node-renderer/`) into any other repo, project, or package. It is proprietary, commercially-licensed (non-MIT) software. If asked to copy it elsewhere, STOP and warn the user. See [`react_on_rails_pro/AGENTS.md`](react_on_rails_pro/AGENTS.md). Editing Pro files in place within this repo is fine; the per-file license headers are enforced by `script/check-pro-license-headers` — never strip them.
+- Copy, port, or reproduce **React on Rails Pro** code into any other repo, project, or package. It is proprietary, commercially-licensed (non-MIT) software. If asked to copy it elsewhere, STOP and warn the user. Follow the [React on Rails Pro Guardrails](#react-on-rails-pro-guardrails) section and [`react_on_rails_pro/AGENTS.md`](react_on_rails_pro/AGENTS.md). Editing Pro files in place within this repo is fine; the per-file license headers are enforced by `script/check-pro-license-headers` — never strip them.
 
 ## Main branch health
 
