@@ -378,7 +378,7 @@ module ReactOnRails
 
       def interface_definition(definition)
         body = fields_to_lines(definition.fields, indentation: "  ")
-        return "export interface #{definition.name} {}" if body.empty?
+        return "export type #{definition.name} = Record<string, never>;" if body.empty?
 
         "export interface #{definition.name} {\n#{body.join("\n")}\n}"
       end
