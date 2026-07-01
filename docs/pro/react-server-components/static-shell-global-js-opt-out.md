@@ -80,6 +80,23 @@ JavaScript append.
 In a static shell view, provide the opt-out flag and append only the small
 sidecar pack that the page still needs.
 
+If the page uses `stream_react_component`, render the containing view through
+the streaming wrapper so the helper has the async barrier it expects:
+
+```ruby
+# app/controllers/public_controller.rb
+class PublicController < ApplicationController
+  include ActionController::Live
+  include ReactOnRails::Controller
+  include ReactOnRailsPro::Stream
+
+  def home
+    @public_home_props = PublicHomeProps.call
+    stream_view_containing_react_components(template: "public/home")
+  end
+end
+```
+
 ```erb
 <%# app/views/public/home.html.erb %>
 <% provide :skip_global_javascript, "true" %>
@@ -94,6 +111,8 @@ sidecar pack that the page still needs.
 The sidecar should stay narrow. Examples include a newsletter form enhancer, an
 intent-hydration trigger, a consent-aware analytics event, or a small progressive
 enhancement that is truly required on that static shell.
+For the broader controller/view contract, see the
+[Streaming Server Rendering guide](../../oss/building-features/streaming-server-rendering.md).
 
 If the sidecar imports CSS, append its stylesheet too. This relies on the
 `content_for :body_content` layout timing shown above; without that capture, a
