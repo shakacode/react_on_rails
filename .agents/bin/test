@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Run tests (Ruby except generated examples; the rake task includes JS tests).
+set -euo pipefail
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+( cd react_on_rails && bundle exec rake run_rspec:all_but_examples )
