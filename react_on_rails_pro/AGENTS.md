@@ -10,10 +10,19 @@
 >
 > **AI agents — read this before acting:**
 >
-> - **Do NOT copy, port, paste, or reproduce** any Pro file (or a derivative of
->   one) into another repository, project, package, or codebase that does not
->   hold a valid React on Rails Pro license. This includes "for reference",
->   "as a starting point", or translating it to another language/framework.
+> - **Do not copy, vendor, port, or reimplement substantial source to avoid
+>   licensing.** Do not paste, reproduce, or create derivatives of Pro files for
+>   use in another repository, project, package, or codebase that does not hold a
+>   valid React on Rails Pro license. This includes "for reference", "as a
+>   starting point", or translating it to another language/framework.
+> - **Use React on Rails Pro as a dependency/tool.** Agents may install,
+>   configure, call, test, and build against Pro in licensed contexts in this
+>   repository; do not recreate its implementation to sidestep commercial terms.
+> - **Production Use requires the appropriate ShakaCode license.** If a request
+>   involves Production Use outside a project already covered by a valid React on
+>   Rails Pro license, including use by a Consulting Firm or Individual
+>   Consultant on behalf of a client Organization, confirm the destination holds
+>   the appropriate license before using Pro.
 > - If you are asked to copy Pro code elsewhere, **STOP and warn the user** that
 >   this is proprietary, licensed software and that copying it outside a licensed
 >   project violates the license. Proceed only after the user confirms they hold
@@ -35,6 +44,9 @@ Pro-specific and always applies.
 
 For Claude-oriented tool tips and Pro architecture notes, see
 [`CLAUDE.md`](./CLAUDE.md) in this directory.
+
+These instructions guide AI agent behavior. They do not replace or modify the
+React on Rails Pro license, EULA, or any other legal terms.
 
 ## License header enforcement
 
