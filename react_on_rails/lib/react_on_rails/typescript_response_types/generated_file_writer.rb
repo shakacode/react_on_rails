@@ -17,8 +17,8 @@ module ReactOnRails
       end
 
       def write
-        cleanup_directory = highest_missing_ancestor(path.dirname)
-        create_output_directory(path.dirname)
+        created_directories = []
+        create_output_directory(path.dirname, created_directories)
         validate_existing_output_directory!(path.dirname)
         tempfile = Tempfile.new([".react_on_rails_types", ".tmp"], path.dirname)
         tempfile.write(content)
@@ -27,7 +27,7 @@ module ReactOnRails
         prepare_output_path!
         FileUtils.mv(tempfile.path, path.to_s)
       rescue StandardError => error
-        cleanup_generated_file_write(tempfile, cleanup_directory, path.dirname)
+        cleanup_generated_file_write(tempfile, created_directories)
         raise error
       end
 
@@ -45,12 +45,12 @@ module ReactOnRails
         0o666 & ~File.umask
       end
 
-      def cleanup_generated_file_write(tempfile, cleanup_directory, cleanup_leaf)
+      def cleanup_generated_file_write(tempfile, created_directories)
         cleanup_tempfile(tempfile)
       rescue StandardError
         nil
       ensure
-        cleanup_created_directory(cleanup_directory, cleanup_leaf)
+        cleanup_created_directories(created_directories)
       end
 
       def cleanup_tempfile(tempfile)
@@ -60,24 +60,13 @@ module ReactOnRails
         tempfile.unlink if tempfile.path && File.exist?(tempfile.path)
       end
 
-      def cleanup_created_directory(cleanup_directory, cleanup_leaf)
-        return unless cleanup_directory
-
-        current_path = cleanup_leaf
-        loop do
-          break unless same_or_child_path?(current_path, cleanup_directory)
-
-          begin
-            cleanup_path(current_path)
-          rescue Errno::ENOENT
-            nil
-          rescue Errno::ENOTEMPTY, Errno::EEXIST, Errno::ENOTDIR, Errno::EACCES, Errno::EPERM
-            break
-          end
-
-          break if current_path == cleanup_directory
-
-          current_path = current_path.dirname
+      def cleanup_created_directories(created_directories)
+        Array(created_directories).reverse_each do |created_directory|
+          cleanup_path(created_directory)
+        rescue Errno::ENOENT
+          nil
+        rescue Errno::ENOTEMPTY, Errno::EEXIST, Errno::ENOTDIR, Errno::EACCES, Errno::EPERM
+          break
         end
       rescue StandardError
         nil
@@ -91,26 +80,12 @@ module ReactOnRails
         end
       end
 
-      def highest_missing_ancestor(directory)
-        missing_path = nil
-        current_path = directory
-
-        until current_path.exist? || current_path.symlink?
-          missing_path = current_path
-          parent_path = current_path.dirname
-          break if parent_path == current_path
-
-          current_path = parent_path
-        end
-
-        missing_path
-      end
-
-      def create_output_directory(directory)
+      def create_output_directory(directory, created_directories)
         missing_directories(directory).each do |missing_directory|
           validate_existing_output_directory!(missing_directory.dirname)
           begin
             Dir.mkdir(missing_directory.to_s)
+            created_directories << missing_directory
           rescue Errno::EEXIST
             nil
           end
