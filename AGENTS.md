@@ -357,10 +357,6 @@ bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 ```
 
-**Pro RSpec encoding**: `react_on_rails_pro`'s `Gemfile.loader` can die with
-`invalid byte sequence in US-ASCII`. Run Pro specs with a UTF-8 locale:
-`LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 RUBYOPT="-EUTF-8" bundle exec rspec <file>`.
-
 ## Project Structure
 
 | Directory                                        | Purpose                                                                                  |
