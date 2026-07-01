@@ -11,7 +11,7 @@
   - `react-on-rails` NPM package
   - Core functionality is completely free
 
-- **ShakaCode Trust-Based Commercial Licensing (Subscription Required for Production):**
+- **ShakaCode Trust-Based Commercial Licensing (Paid License Required for Production):**
   - `react_on_rails_pro` Ruby gem
   - `react-on-rails-pro` NPM package
   - `react-on-rails-pro-node-renderer` NPM package
