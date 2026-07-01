@@ -89,7 +89,10 @@ The sidecar should stay narrow. Examples include a newsletter form enhancer, an
 intent-hydration trigger, a consent-aware analytics event, or a small progressive
 enhancement that is truly required on that static shell.
 
-If the sidecar imports CSS, append its stylesheet too:
+If the sidecar imports CSS, append its stylesheet too, but only with the
+`content_for :body_content` layout timing described above. A stylesheet append
+from a normal view body runs after the layout `<head>` has already flushed the
+main `stylesheet_pack_tag`, which can cause FOUC.
 
 ```erb
 <% append_stylesheet_pack_tag "public_home_intent_hydration" %>
