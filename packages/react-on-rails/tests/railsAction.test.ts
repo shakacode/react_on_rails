@@ -662,8 +662,30 @@ describe('createRailsAction', () => {
       body: ({ id }) => ({ project: { id } }),
     });
 
-    await expect(createProject({ id: BigInt(1) })).rejects.toThrow(/resolved to BigInt/);
+    await expect(createProject({ id: BigInt(1) })).rejects.toThrow(/contains a BigInt value/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('serializes custom toJSON values without inspecting internal non-JSON state', async () => {
+    class Money {
+      raw = new Map([['internal', true]]);
+
+      constructor(private readonly cents: number) {}
+
+      toJSON(): number {
+        return this.cents / 100;
+      }
+    }
+
+    const createProject = createRailsAction<undefined, { ok: true }>({
+      path: '/api/projects',
+      body: () => ({ project: { budget: new Money(1234) } }),
+    });
+
+    await expect(createProject()).resolves.toEqual({ project: { id: 1 } });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBe(JSON.stringify({ project: { budget: 12.34 } }));
   });
 
   it('rejects non-JSON values returned from custom toJSON methods before fetch', async () => {

@@ -147,7 +147,7 @@ const warnOnImplicitBodyWithDynamicPath = (): void => {
   );
 };
 
-const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()): string | null => {
+const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   if (requestBody === undefined) {
     return 'undefined';
   }
@@ -197,21 +197,6 @@ const nonJsonBodyTypeName = (requestBody: unknown, seenObjects = new WeakSet()):
     return 'Promise';
   }
 
-  if (seenObjects.has(requestBody)) {
-    return null;
-  }
-  seenObjects.add(requestBody);
-
-  const nestedValues = Array.isArray(requestBody)
-    ? requestBody
-    : Object.values(requestBody as Record<string, unknown>);
-  for (const nestedValue of nestedValues) {
-    const nestedTypeName = nonJsonBodyTypeName(nestedValue, seenObjects);
-    if (nestedTypeName !== null) {
-      return nestedTypeName;
-    }
-  }
-
   return null;
 };
 
@@ -220,19 +205,6 @@ const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
     `[createRailsAction] The request body resolved to ${bodyTypeName}, which cannot be JSON serialized correctly. ` +
       'Return a plain JSON value, null, or undefined instead.',
   );
-
-const assertJsonBodyValue = (requestBody: unknown, hasJsonBody: boolean): void => {
-  if (!hasJsonBody) {
-    return;
-  }
-
-  const bodyTypeName = nonJsonBodyTypeName(requestBody);
-  if (bodyTypeName === null) {
-    return;
-  }
-
-  throw jsonBodyTypeError(bodyTypeName);
-};
 
 const stringifyJsonBody = (requestBody: unknown): string => {
   try {
@@ -386,7 +358,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
     const shouldWarnOnDiscardedDeleteBody =
       !warnedOnDiscardedDeleteBody && requestBody !== undefined && requestBody !== null;
     const shouldWarnOnImplicitDynamicPathBody = !warnedOnImplicitDynamicPathBody && hasJsonBody;
-    assertJsonBodyValue(requestBody, hasJsonBody);
+    const serializedRequestBody = hasJsonBody ? stringifyJsonBody(requestBody) : undefined;
     if (shouldWarnOnDiscardedDeleteBody) {
       warnOnDiscardedDeleteBody(requestBody);
       warnedOnDiscardedDeleteBody = true;
@@ -409,7 +381,7 @@ export function createRailsAction<TVariables = undefined, TResponse = unknown>(
           resolveHeaders(options.headers, typedVariables),
           callOptionsValue(callOptions, 'headers'),
         ),
-        body: hasJsonBody ? stringifyJsonBody(requestBody) : undefined,
+        body: serializedRequestBody,
       });
     } catch (fetchError) {
       warnOnPossibleRedirectFetchError(fetchError);
