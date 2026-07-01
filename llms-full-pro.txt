@@ -6336,6 +6336,8 @@ skipped.
 
 ```erb
 <%# app/views/layouts/application.html.erb %>
+<% append_stylesheet_pack_tag "global" %>
+
 <% content_for :body_content do %>
   <%= yield %>
 <% end %>
@@ -6346,7 +6348,6 @@ skipped.
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
-    <% prepend_stylesheet_pack_tag "global" %>
     <%= stylesheet_pack_tag media: "all" %>
   </head>
   <body>
@@ -6360,8 +6361,9 @@ skipped.
 
 The important split is:
 
-- `prepend_stylesheet_pack_tag "global"` keeps the global stylesheet in the
-  layout for every page and orders it before page-specific stylesheet appends.
+- `append_stylesheet_pack_tag "global"` runs before the body capture, so the
+  layout queues the global stylesheet for every page and orders it before
+  page-specific stylesheet appends.
 - The empty `stylesheet_pack_tag` flushes the accumulated stylesheet queue once,
   including the global stylesheet and any page-specific stylesheets appended by
   the view or by React on Rails auto-bundling.
@@ -6418,7 +6420,8 @@ enhancement that is truly required on that static shell.
 For the broader controller/view contract, see the
 [Streaming Server Rendering guide](../../oss/building-features/streaming-server-rendering.md).
 
-If the sidecar imports CSS, append its stylesheet too. This relies on the
+If the sidecar imports CSS, replace the JS-only append line above with a
+stylesheet append plus the same JavaScript append. This relies on the
 `content_for :body_content` layout timing shown above; without that capture, a
 stylesheet append from a normal view body runs after the layout `<head>` has
 already flushed the main `stylesheet_pack_tag`, which can cause FOUC.
