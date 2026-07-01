@@ -94,11 +94,12 @@ describe "ContactMessages (useRailsForm 422 round trip)" do
       expect(generated_types).to include("email?: string[];")
     end
 
-    it "keeps the checked-in response type declaration in sync with the registered contract" do
+    it "keeps the checked-in response type declaration in sync with the repo-formatted contract" do
       generated_types = ReactOnRails::TypeScriptResponseTypes.to_d_ts
+      repo_formatted_types = generated_types.gsub(/^(\s*)"([^"]+)":/, "\\1'\\2':")
       checked_in_types = Rails.root.join("client/app/types/react_on_rails_response_types.d.ts").read
 
-      expect(checked_in_types).to eq(generated_types)
+      expect(checked_in_types).to eq(repo_formatted_types)
     end
   end
 end
