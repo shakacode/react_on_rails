@@ -15,6 +15,7 @@ module ReactOnRails
     RAW_TYPE_GROUP_CLOSES = { "(" => ")", "[" => "]", "{" => "}", "<" => ">" }.freeze
     RAW_TYPE_GROUP_ENDS = RAW_TYPE_GROUP_CLOSES.values.freeze
     RAW_TYPE_STRING_LITERAL_PATTERN = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/
+    RAW_TYPE_TEMPLATE_INTERPOLATION_PATTERN = /\$\{/
     RAW_TYPE_NESTING_TOKEN_PATTERN = /#{RAW_TYPE_STRING_LITERAL_PATTERN.source}|=>|[({\[<]|[)}\]>]|,/
     RAW_TYPE_UNSAFE_LINE_BREAK_PATTERN = /[\r\n\u2028\u2029]/
     RAW_TYPE_UNSAFE_NON_STRING_PATTERN = %r{;|//|/\*|\*/}
@@ -68,6 +69,7 @@ module ReactOnRails
 
       def unsafe_raw_type_expression?(expression)
         expression.match?(RAW_TYPE_UNSAFE_LINE_BREAK_PATTERN) ||
+          expression.match?(RAW_TYPE_TEMPLATE_INTERPOLATION_PATTERN) ||
           expression.gsub(RAW_TYPE_STRING_LITERAL_PATTERN, "").match?(RAW_TYPE_UNSAFE_NON_STRING_PATTERN) ||
           unsafe_raw_type_nesting?(expression)
       end
