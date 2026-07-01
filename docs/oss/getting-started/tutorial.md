@@ -9,7 +9,7 @@ This tutorial starts from the [Quick Start](./quick-start.md) app and builds a s
 - `bin/dev` with HMR during development
 - Optional server rendering with `prerender: true`
 
-Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux Integration](#appendix-redux-integration) when you need a shared client store or you are maintaining an existing Redux setup.
+Redux is still supported, but it is no longer the main path for a first React on Rails app. See [Appendix: Redux and State Choices](#appendix-redux-and-state-choices) when you need a multi-island shared client store or you are maintaining an existing Redux setup.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ Redux is still supported, but it is no longer the main path for a first React on
 - [Optional: Turn On Server Rendering](#optional-turn-on-server-rendering)
 - [Production Build And Deployment](#production-build-and-deployment)
 - [Troubleshooting](#troubleshooting)
-- [Appendix: Redux Integration](#appendix-redux-integration)
+- [Appendix: Redux and State Choices](#appendix-redux-and-state-choices)
 - [What's Next?](#whats-next)
 
 ## Prerequisites
@@ -295,27 +295,25 @@ Temporarily set `prerender: false` to confirm the browser render works, then rem
 <%= react_component("Counter", props: @counter_props, prerender: true, auto_load_bundle: true, trace: true) %>
 ```
 
-## Appendix: Redux Integration
+## Appendix: Redux and State Choices
 
-Use Redux when your app already has Redux conventions, needs a shared client store across many React islands, or benefits from Redux middleware and DevTools. For local UI state, React Hooks are usually simpler.
+Use Redux when your app already has Redux conventions, needs a shared client store across many React islands, or benefits from Redux middleware and DevTools. For most new React on Rails apps, choose the smallest state tool that matches the data:
 
-To generate the Redux example for a new app, run the installer with both TypeScript and Redux:
+- **Local island state:** use React Hooks such as `useState` and `useReducer`, or React Context when nearby components under one React root need the same UI state.
+- **Server state:** pass initial data through Rails controller props, then refresh data through your Rails JSON endpoints, GraphQL layer, or a server-state cache such as [TanStack Query](../building-features/tanstack-query.md).
+- **Multi-island shared client state:** use Redux only when separate React roots on the same page must coordinate through one client store, such as a header counter and body list that update each other without a full page refresh.
 
-```bash
-bin/rails generate react_on_rails:install --typescript --redux
-```
+The installer has a [hidden legacy Redux path](../api-reference/generator-details.md#legacy-redux-structure-hidden---redux-path) for maintaining or recreating older generated apps, but this tutorial does not use it and new apps should not start with `--redux`. The legacy Redux structure has actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
 
-The Redux installer creates a larger structure with actions, reducers, store setup, presentational components, containers, and auto-registered entry points under `ror_components`.
-
-When rendering a Redux-backed component, the Rails side still uses the same view helper style:
+When rendering an existing Redux-backed component, the Rails side still uses the same view helper style:
 
 ```erb
 <%= react_component("HelloWorldApp", props: @hello_world_props, auto_load_bundle: true) %>
 ```
 
-The component is named `HelloWorldApp` because that is what the Redux installer generates. Adjust the component name and props key to match your app's controller setup.
+The component is named `HelloWorldApp` when you are working with the legacy generated Redux example. Adjust the component name and props key to match your app's controller setup.
 
-For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [Redux integration guide](../building-features/react-and-redux.md).
+For manually wired stores or advanced store sharing, use the [`redux_store` helper](../api-reference/redux-store-api.md) and the [legacy Redux reducer guidance](../building-features/react-and-redux.md).
 
 ## What's Next?
 

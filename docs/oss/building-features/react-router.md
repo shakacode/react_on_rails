@@ -37,9 +37,53 @@ React Router v6 offers multiple routing approaches. For React on Rails, we recom
 
 **Note on Data Mode:** React Router's Data Mode (with loaders/actions) is designed for SPAs where the client handles data fetching. Since React on Rails uses Rails controllers to load data and pass it as props to React components, Data Mode would create duplicate data loading. Stick with Declarative Mode to leverage React on Rails' server-side data loading pattern.
 
-## Basic Client-Side Setup with Redux
+## Basic Client-Side Setup
 
-If you're using Redux (created with `rails generate react_on_rails:install --redux`), you can add React Router by wrapping your app:
+Most React Router integrations do not need Redux. Route ordinary components inside one React root, pass initial data from Rails as props, and use your normal server-state approach for follow-up data loading.
+
+**File: `app/javascript/src/RouterApp/RouterRoutes.jsx`**
+
+```jsx
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+
+const Home = ({ name }) => <div>Hello, {name}!</div>;
+const About = () => <div>About</div>;
+
+const RouterRoutes = (props) => (
+  <Routes>
+    <Route path="/hello_world" element={<Home {...props} />} />
+    <Route path="/hello_world/about" element={<About />} />
+  </Routes>
+);
+
+export default RouterRoutes;
+```
+
+`RouterRoutes.jsx` is a shared route tree that expects a router context from its parent. Keep it outside
+`ror_components/` and do not register it directly with React on Rails. Only the files inside
+`ror_components/` are registered entry points.
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.client.jsx`**
+
+```jsx
+import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
+
+import RouterRoutes from '../RouterRoutes';
+
+const RouterApp = (props) => (
+  <BrowserRouter>
+    <RouterRoutes {...props} />
+  </BrowserRouter>
+);
+
+export default RouterApp;
+```
+
+## Legacy Client-Side Setup with Redux
+
+If you're maintaining an app that already uses Redux, including the hidden legacy Redux generator output, you can add React Router by wrapping your app:
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx`**
 
@@ -76,20 +120,56 @@ export default HelloWorldApp;
 
 **Key points:**
 
-- `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
+- In Redux-backed legacy apps, `<Provider>` wraps `<BrowserRouter>` so all routes have Redux access
 - Use `<Routes>` and `<Route>` (not `<Switch>` from React Router v5)
 - Use `element` prop to specify components (not `component` or `render` props from v5)
 - Routes are automatically matched by best fit, not render order
 
-## Server-Side Rendering with React Router
+## Basic Server-Side Rendering with React Router
 
-For server rendering, use `StaticRouter` instead of `BrowserRouter`.
+For server rendering without Redux, use the same route tree with `StaticRouter` instead of `BrowserRouter`.
+This `.client.jsx` / `.server.jsx` split assumes
+[auto-bundling](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md)
+is configured so React on Rails registers the client and server files separately.
+The server entry returns a render function, not JSX directly; see
+[Render-Functions and railsContext](../core-concepts/render-functions-and-railscontext.md).
+
+**File: `app/javascript/src/RouterApp/ror_components/RouterApp.server.jsx`**
+
+```jsx
+import React from 'react';
+import { StaticRouter } from 'react-router-dom/server';
+import RouterRoutes from '../RouterRoutes';
+
+const RouterApp = (props, railsContext) => {
+  const { location } = railsContext;
+
+  // React on Rails calls RouterApp(props, railsContext) to get this function,
+  // then calls createElement(returnedFn, props). This example uses the props
+  // and location captured by closure.
+  return (_props) => (
+    <StaticRouter location={location}>
+      <RouterRoutes {...props} />
+    </StaticRouter>
+  );
+};
+
+export default RouterApp;
+```
+
+> **Note:** Components rendered through `react_component_hash` still need the explicit object return shape
+> instead of the render-function thunk shown here. Keep using `renderToString(...)` and return the object
+> described in [Render-Functions](../core-concepts/render-functions.md), for example
+> `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
+
+## Legacy Server-Side Setup with Redux
+
+If your app still uses the legacy shared Redux store, keep the provider around the `StaticRouter`.
 
 **File: `app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx`**
 
 ```jsx
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom/server';
 import { Provider } from 'react-redux';
 import { Routes, Route } from 'react-router-dom';
@@ -104,7 +184,7 @@ const HelloWorldApp = (props, railsContext) => {
   const store = configureStore(props);
   const { location } = railsContext;
 
-  const html = renderToString(
+  return (_props) => (
     <Provider store={store}>
       <StaticRouter location={location}>
         <Routes>
@@ -114,10 +194,8 @@ const HelloWorldApp = (props, railsContext) => {
           {/* <Route path="/contact" element={<Contact />} /> */}
         </Routes>
       </StaticRouter>
-    </Provider>,
+    </Provider>
   );
-
-  return { renderedHtml: html };
 };
 
 export default HelloWorldApp;
@@ -129,6 +207,10 @@ export default HelloWorldApp;
 - Use `<Routes>` and `<Route>` with `element` prop
 - `location` prop takes a string path from `railsContext`
 - No need for `match()` or `RouterContext` - simplified API
+- Components rendered through `react_component_hash` still need the explicit object return shape
+  instead of the render-function thunk shown here. Keep using `renderToString(...)` and return the
+  object described in [Render-Functions](../core-concepts/render-functions.md), for example
+  `{ renderedHtml: { componentHtml: renderToString(...), ...otherSlots } }`.
 
 ## Rails Routes Configuration
 
