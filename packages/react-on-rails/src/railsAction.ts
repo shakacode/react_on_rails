@@ -35,9 +35,11 @@ export interface RailsActionMutationFunctionContext {
 
 export type RailsActionCallerOptions = RailsActionCallOptions | RailsActionMutationFunctionContext;
 
+type RailsActionNoVariables = ReturnType<() => void>;
+
 // Brackets prevent distribution over union TVariables, preserving a single caller signature.
-export type RailsActionCaller<TVariables, TResponse> = [TVariables] extends [undefined]
-  ? (variables?: undefined, options?: RailsActionCallerOptions) => Promise<TResponse>
+export type RailsActionCaller<TVariables, TResponse> = [TVariables] extends [RailsActionNoVariables]
+  ? (variables?: RailsActionNoVariables, options?: RailsActionCallerOptions) => Promise<TResponse>
   : (variables: TVariables, options?: RailsActionCallerOptions) => Promise<TResponse>;
 
 export class RailsActionRequestError<TResponseBody = unknown> extends Error {
@@ -64,6 +66,7 @@ export class RailsActionRequestError<TResponseBody = unknown> extends Error {
 
 const resolveSameOriginRequestUrl = (url: string): string | null => {
   try {
+    // Ignore document.baseURI so a page-level <base> tag cannot rewrite Rails action paths before the origin check.
     const resolvedUrl = new URL(url, window.location.href);
     if (
       (resolvedUrl.protocol === 'http:' || resolvedUrl.protocol === 'https:') &&

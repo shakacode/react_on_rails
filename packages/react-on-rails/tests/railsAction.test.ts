@@ -196,6 +196,27 @@ describe('createRailsAction', () => {
     expect(mutationFn).toBe(createProject);
   });
 
+  it('is assignable to a TanStack-style no-variable mutation function', () => {
+    type MutationFunctionContext = {
+      client: unknown;
+      meta: Record<string, unknown> | undefined;
+      mutationKey?: readonly unknown[];
+    };
+    type MutationFunction<TData, TVariables> = (
+      variables: TVariables,
+      context: MutationFunctionContext,
+    ) => Promise<TData>;
+
+    const archiveProjects = createRailsAction<undefined, { ok: true }>({
+      path: '/api/projects/archive',
+      method: 'DELETE',
+    });
+
+    const mutationFn: MutationFunction<{ ok: true }, void> = archiveProjects;
+
+    expect(mutationFn).toBe(archiveProjects);
+  });
+
   it('ignores TanStack mutation context fields when resolving fetch options', async () => {
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
@@ -252,7 +273,7 @@ describe('createRailsAction', () => {
     expect(headerValue(init.headers, 'X-Request-Source')).toBeNull();
   });
 
-  it('resolves relative paths against the current page when a base tag is present', async () => {
+  it('ignores base tags and resolves relative paths against the current page URL', async () => {
     const base = document.createElement('base');
     base.href = new URL('/v2/', window.location.href).href;
     document.head.appendChild(base);
