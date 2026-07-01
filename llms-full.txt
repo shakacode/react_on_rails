@@ -9034,11 +9034,10 @@ This first supported path is an explicit Rails contract. Register static contrac
 rake task to emit TypeScript. Keep helper methods or schema constants next to the serializer, query
 object, or controller when that keeps ownership clear, but avoid top-level `define_response` or
 `define_type` calls in reloadable app files because Rails development reloads can run those files again.
-The task loads the Rails environment before its body calls `Rails.application.eager_load!`, so
-initializers run before the task's eager-load step. Keep initializer contracts literal or reference
-non-reloadable constants only; if a contract depends on reloadable app constants, load those constants
-explicitly before registration or move the registration to an app hook that runs after the constants are
-available.
+The task depends on the Rails `:environment` task, so initializers run before declarations are generated.
+Keep initializer contracts literal or reference non-reloadable constants only; if a contract depends on
+reloadable app constants, load those constants explicitly before registration or move the registration to
+an app hook that runs after the constants are available.
 
 ## Define Response Contracts
 
