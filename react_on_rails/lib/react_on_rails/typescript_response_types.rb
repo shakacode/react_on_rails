@@ -68,6 +68,21 @@ module ReactOnRails
         raise ReactOnRails::Error, "Response type fields must be a Hash, got #{fields.class}"
       end
 
+      def deep_dup_type_spec(spec)
+        case spec
+        when Hash
+          spec.each_with_object({}) do |(key, value), copy|
+            copy[deep_dup_type_spec(key)] = deep_dup_type_spec(value)
+          end
+        when Array
+          spec.map { |value| deep_dup_type_spec(value) }
+        when String
+          spec.dup
+        else
+          spec
+        end
+      end
+
       def unsafe_raw_type_expression?(expression)
         non_string_expression = expression.gsub(RAW_TYPE_STRING_LITERAL_PATTERN, "")
 
@@ -301,6 +316,7 @@ module ReactOnRails
           name = normalize_type_name(type_name)
           validate_fields!(fields)
           ensure_unique_type_name!(name)
+          fields = deep_dup_type_spec(fields)
           @types << Definition.new(name:, fields:, response_key: nil)
         end
       end
@@ -313,6 +329,7 @@ module ReactOnRails
           validate_fields!(fields)
           ensure_unique_response_key!(key)
           ensure_unique_type_name!(name)
+          fields = deep_dup_type_spec(fields)
           @responses << Definition.new(name:, fields:, response_key: key)
         end
       end
@@ -526,8 +543,13 @@ module ReactOnRails
 
         validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys) if non_option_keys.any?
         return if wrapper_keys.length <= 1
+        return if non_option_keys.any? && plain_object_wrapper_key_conflict?(wrapper_keys)
 
         raise ReactOnRails::Error, "Response type specs can only use one of :array, :fields, :raw, or :type"
+      end
+
+      def plain_object_wrapper_key_conflict?(wrapper_keys)
+        (wrapper_keys - %i[array fields]).empty?
       end
 
       def validate_non_option_wrapper_keys!(spec, normalized, wrapper_keys, non_option_keys)
