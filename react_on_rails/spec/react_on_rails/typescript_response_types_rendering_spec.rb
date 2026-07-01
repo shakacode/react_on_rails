@@ -50,15 +50,20 @@ module ReactOnRails
 
     it "renders empty registered contracts as strict empty object aliases" do
       described_class.define_type("EmptyMetadata", fields: {})
-      described_class.define_response("empty.show", type_name: "EmptyShowResponse", fields: {})
+      described_class.define_response(
+        "empty.show",
+        type_name: "EmptyShowResponse",
+        fields: { metadata: { fields: {} } }
+      )
 
       declaration = described_class.to_d_ts
 
       expect(declaration).to include("export type EmptyMetadata = Record<string, never>;")
-      expect(declaration).to include("export type EmptyShowResponse = Record<string, never>;")
+      expect(declaration).to include("export interface EmptyShowResponse")
+      expect(declaration).to include("  metadata: Record<string, never>;")
       expect(declaration).to include('  "empty.show": EmptyShowResponse;')
       expect(declaration).not_to include("export interface EmptyMetadata {}")
-      expect(declaration).not_to include("export interface EmptyShowResponse {}")
+      expect(declaration).not_to include("metadata: {};")
     end
   end
 end
