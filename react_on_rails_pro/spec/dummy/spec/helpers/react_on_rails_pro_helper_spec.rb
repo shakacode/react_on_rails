@@ -564,6 +564,19 @@ describe ReactOnRailsProHelper do
         @react_on_rails_rsc_stream_observability = false
       end
 
+      it "marks streaming render options for renderer Server-Timing when stream observability is enabled" do
+        @react_on_rails_rsc_stream_observability = true
+        render_options = send(
+          :create_render_options,
+          component_name,
+          component_options.merge(render_mode: :html_streaming)
+        )
+
+        expect(render_options.internal_option(:rsc_stream_observability)).to be true
+      ensure
+        @react_on_rails_rsc_stream_observability = false
+      end
+
       it "does not trim whitespaces from html" do
         first_chunk_string = +"  <div>Chunk 1: with whitespaces</div>  "
         chunks_with_whitespaces = [

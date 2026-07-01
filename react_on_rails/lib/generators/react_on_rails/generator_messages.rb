@@ -56,7 +56,7 @@ module GeneratorMessages
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
                                            rsc: false, shakapacker_just_installed: false, landing_page: false,
-                                           ci_workflow_generated: false, app_root: Dir.pwd)
+                                           ci_workflow_generated: false, tailwind: false, app_root: Dir.pwd)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section(app_root:)
       ci_section = build_ci_section(app_root:, ci_workflow_generated:)
@@ -65,6 +65,7 @@ module GeneratorMessages
                                                             app_root:)
       render_example = build_render_example(component_name:, route:, rsc:)
       render_label = build_render_label(route:, rsc:)
+      layout_pack_tags = build_layout_pack_tags(tailwind:)
       normalized_route = route.to_s.sub(%r{\A/+}, "")
       visit_url = if landing_page || normalized_route.empty?
                     "http://localhost:3000"
@@ -99,9 +100,7 @@ module GeneratorMessages
         4. Visit: #{Rainbow(visit_url).cyan.underline}#{landing_page_hint}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
-        • Auto-registration enabled - Your layout only needs:
-          <%= javascript_pack_tag %>
-          <%= stylesheet_pack_tag %>
+        #{layout_pack_tags}
 
         #{render_label}
           #{render_example}
@@ -116,6 +115,23 @@ module GeneratorMessages
     end
 
     private
+
+    def build_layout_pack_tags(tailwind:)
+      if tailwind
+        <<~MSG.chomp
+          • Auto-registration enabled - Tailwind is declared from your layout:
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+        MSG
+      else
+        <<~MSG.chomp
+          • Auto-registration enabled - Your layout only needs:
+            <%= javascript_pack_tag %>
+            <%= stylesheet_pack_tag %>
+        MSG
+      end
+    end
 
     def build_render_example(component_name:, route:, rsc:)
       if rsc

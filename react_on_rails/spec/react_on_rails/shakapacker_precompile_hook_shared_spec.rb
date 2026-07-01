@@ -32,6 +32,15 @@ RSpec.describe "Shakapacker precompile hook shared script" do
     $VERBOSE = original_verbose
   end
 
+  # Stub the locale-derived encoding (Encoding.find("locale")). This is the signal utf8_subprocess_env
+  # gates on, and unlike Encoding.default_external it cannot be changed at runtime, so tests must stub
+  # it to simulate a C/POSIX, UTF-8, or national locale.
+  def with_locale_encoding(encoding)
+    allow(Encoding).to receive(:find).and_call_original
+    allow(Encoding).to receive(:find).with("locale").and_return(encoding)
+    yield
+  end
+
   it "preserves setup failures while cleaning any captured env keys" do
     bad_overrides = Object.new
 
@@ -123,13 +132,15 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           true
         end
 
-        with_default_external(Encoding::US_ASCII) do
-          expect { generate_locales_if_needed }.not_to raise_error
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_default_external(Encoding::US_ASCII) do
+            expect { generate_locales_if_needed }.not_to raise_error
+          end
         end
 
         # Without a forced UTF-8 locale, the spawned `bundle exec` dies parsing a Gemfile with
         # non-ASCII bytes ("invalid byte sequence in US-ASCII"), aborting the whole precompile.
-        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8:UTF-8/))
+        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8/))
         expect(captured_env).to include("LANG" => a_string_matching(/UTF-8/i))
         expect(captured_env).to include("LC_ALL" => a_string_matching(/UTF-8/i))
         expect(self).to have_received(:system).with(hash_including("RUBYOPT"), "bundle", "exec", "rake",
@@ -156,11 +167,13 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           true
         end
 
-        with_default_external(Encoding::US_ASCII) do
-          expect { generate_packs_if_needed }.not_to raise_error
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_default_external(Encoding::US_ASCII) do
+            expect { generate_packs_if_needed }.not_to raise_error
+          end
         end
 
-        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8:UTF-8/))
+        expect(captured_env).to include("RUBYOPT" => a_string_matching(/-EUTF-8/))
         expect(self).to have_received(:system).with(hash_including("RUBYOPT"), "bundle", "exec", "rails",
                                                     "react_on_rails:generate_packs", exception: true)
       end
@@ -168,91 +181,170 @@ RSpec.describe "Shakapacker precompile hook shared script" do
   end
 
   describe "#utf8_subprocess_env" do
-    it "defaults LANG/LC_ALL to a UTF-8 locale and adds the UTF-8 Ruby pin when unset" do
-      with_env("LANG" => nil, "LC_ALL" => nil, "RUBYOPT" => nil) do
-        env = utf8_subprocess_env
-        expect(env["LANG"]).to match(/UTF-8/i)
-        expect(env["LC_ALL"]).to match(/UTF-8/i)
-        expect(env["RUBYOPT"]).to eq("-EUTF-8:UTF-8")
+    # Functional env keys (skip-validation, bundle-only toggles) are always applied; the difference
+    # between locales is only whether we *also* inject a UTF-8 locale/encoding to widen the child.
+    context "when the locale encoding is US-ASCII (bare C/POSIX locale)" do
+      it "widens the child to UTF-8 via LANG/LC_ALL and an -EUTF-8 RUBYOPT pin" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => nil) do
+            env = utf8_subprocess_env
+            expect(env["LANG"]).to match(/UTF-8/i)
+            expect(env["LC_ALL"]).to match(/UTF-8/i)
+            expect(env["RUBYOPT"]).to eq("-EUTF-8")
+          end
+        end
       end
-    end
 
-    it "preserves an existing UTF-8 locale and keeps the UTF-8 Ruby pin before existing RUBYOPT" do
-      with_env("LANG" => "en_US.UTF-8", "LC_ALL" => "en_US.UTF-8", "RUBYOPT" => "-W0") do
-        env = utf8_subprocess_env
-        expect(env["LANG"]).to eq("en_US.UTF-8")
-        expect(env["LC_ALL"]).to eq("en_US.UTF-8")
-        expect(env["RUBYOPT"]).to eq("-EUTF-8:UTF-8 -W0")
+      it "prepends the UTF-8 pin before existing non-encoding RUBYOPT flags" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "-W0") do
+            expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 -W0")
+          end
+        end
       end
-    end
 
-    it "merges and lets caller keys extend the base env" do
-      expect(utf8_subprocess_env("FOO" => "bar")).to include(
-        "FOO" => "bar",
-        "RUBYOPT" => a_string_matching(/-EUTF-8:UTF-8/)
-      )
-    end
+      it "honors an encoding already pinned in RUBYOPT rather than overriding or duplicating it" do
+        # A deliberate -EUS-ASCII is the user's explicit choice. Prepending -EUTF-8 would both
+        # disrespect it and make Ruby raise "default_external already set" on the conflicting -E.
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "-EUS-ASCII -W0") do
+            expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUS-ASCII -W0")
+          end
+        end
+      end
 
-    it "strips conflicting RUBYOPT encoding flags before pinning UTF-8" do
-      conflicting_flags = [
-        "-EUS-ASCII",
-        "-E US-ASCII",
-        "--encoding=US-ASCII",
-        "--encoding US-ASCII",
-        "--external-encoding=US-ASCII",
-        "--external-encoding US-ASCII",
-        "--internal-encoding=US-ASCII",
-        "--internal-encoding US-ASCII",
-        "-KU",
-        "-K U",
-        "-Ks"
-      ]
+      it "honors an encoding pinned inside a short-option cluster (no double -E crash)" do
+        # -E can be embedded in a cluster like -wEUS-ASCII or -W0EUS-ASCII (no whitespace before E).
+        # Prepending -EUTF-8 there would make Ruby raise "default_external already set", so these must
+        # be detected and left untouched too.
+        with_locale_encoding(Encoding::US_ASCII) do
+          ["-wEUS-ASCII", "-W0EUS-ASCII", "-dEUS-ASCII"].each do |rubyopt|
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq(rubyopt)
+            end
+          end
+        end
+      end
 
-      conflicting_flags.each do |rubyopt|
-        with_env("RUBYOPT" => "-W0 #{rubyopt}") do
-          expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8:UTF-8 -W0")
+      it "still pins UTF-8 when RUBYOPT only has legacy no-op -K switches" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          ["-Ku", "-wKs", "-dK"].each do |rubyopt|
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 #{rubyopt}")
+            end
+          end
+        end
+      end
+
+      it "honors long-form encoding options" do
+        ["--encoding=US-ASCII", "--encoding US-ASCII",
+         "--external-encoding=US-ASCII", "--external-encoding US-ASCII"].each do |rubyopt|
+          with_locale_encoding(Encoding::US_ASCII) do
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq(rubyopt)
+            end
+          end
+        end
+      end
+
+      it "still pins UTF-8 when RUBYOPT only sets the internal encoding" do
+        ["--internal-encoding=US-ASCII", "--internal-encoding US-ASCII",
+         "-E:US-ASCII", "-E:UTF-8", "-wE:UTF-8"].each do |rubyopt|
+          with_locale_encoding(Encoding::US_ASCII) do
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 #{rubyopt}")
+            end
+          end
+        end
+      end
+
+      it "still pins UTF-8 for argument-taking flags whose operand begins with E/K" do
+        # -r/-I consume their operand, so -rEnglish / -rKconv / -IEpath are NOT encoding requests.
+        # The pin must still be added (a regex that matched any E/K after - would wrongly skip these).
+        with_locale_encoding(Encoding::US_ASCII) do
+          ["-rEnglish", "-rKconv", "-IEpath"].each do |rubyopt|
+            with_env("RUBYOPT" => rubyopt) do
+              expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8 #{rubyopt}")
+            end
+          end
+        end
+      end
+
+      it "also widens when the locale encoding is ASCII-8BIT (musl/empty C charmap)" do
+        # Some libc/Ruby combinations report a binary/empty locale charmap as ASCII-8BIT rather than
+        # US-ASCII; that still means "no real charset", so it must widen the same way.
+        with_locale_encoding(Encoding::ASCII_8BIT) do
+          with_env("RUBYOPT" => nil) do
+            env = utf8_subprocess_env
+            expect(env["LANG"]).to match(/UTF-8/i)
+            expect(env["RUBYOPT"]).to eq("-EUTF-8")
+          end
+        end
+      end
+
+      it "still applies caller-supplied functional env keys while widening" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => nil) do
+            expect(utf8_subprocess_env("REACT_ON_RAILS_SKIP_VALIDATION" => "true")).to include(
+              "REACT_ON_RAILS_SKIP_VALIDATION" => "true",
+              "RUBYOPT" => "-EUTF-8"
+            )
+          end
+        end
+      end
+
+      it "keeps the UTF-8 pin while preserving caller-supplied RUBYOPT in extra" do
+        # The widening is applied last (authoritative), and the caller's extra RUBYOPT is folded
+        # into the widened value rather than silently dropping either set of flags.
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "-W0") do
+            expect(utf8_subprocess_env("RUBYOPT" => "-rbundler/setup")["RUBYOPT"])
+              .to eq("-EUTF-8 -W0 -rbundler/setup")
+            expect(utf8_subprocess_env("RUBYOPT" => nil)["RUBYOPT"]).to eq("-EUTF-8 -W0")
+          end
+        end
+      end
+
+      it "ignores empty RUBYOPT fragments while preserving caller-supplied flags" do
+        with_locale_encoding(Encoding::US_ASCII) do
+          with_env("RUBYOPT" => "") do
+            expect(utf8_subprocess_env("RUBYOPT" => "-rbundler/setup")["RUBYOPT"])
+              .to eq("-EUTF-8 -rbundler/setup")
+          end
         end
       end
     end
 
-    it "strips encoding switches embedded in short-option clusters" do
-      expect(force_utf8_rubyopt("-wEUS-ASCII")).to eq("-EUTF-8:UTF-8 -w")
-      expect(force_utf8_rubyopt("-wE US-ASCII")).to eq("-EUTF-8:UTF-8 -w")
-      expect(force_utf8_rubyopt("-W0EUS-ASCII")).to eq("-EUTF-8:UTF-8 -W0")
-      expect(force_utf8_rubyopt("-wKs")).to eq("-EUTF-8:UTF-8 -w")
-      expect(force_utf8_rubyopt("-wK U")).to eq("-EUTF-8:UTF-8 -w")
-    end
-
-    it "sanitizes caller-supplied RUBYOPT extras instead of dropping the UTF-8 guarantee" do
-      with_env("RUBYOPT" => "-W0") do
-        env = utf8_subprocess_env("RUBYOPT" => "--encoding=US-ASCII --disable-gems")
-
-        expect(env["RUBYOPT"]).to eq("-EUTF-8:UTF-8 --disable-gems")
+    context "when the locale is a real UTF-8 locale" do
+      it "leaves LANG/LC_ALL/RUBYOPT untouched so the child inherits the working locale" do
+        with_locale_encoding(Encoding::UTF_8) do
+          with_env("LANG" => "en_US.UTF-8", "LC_ALL" => "en_US.UTF-8", "RUBYOPT" => "-W0") do
+            env = utf8_subprocess_env("FOO" => "bar")
+            expect(env).to eq("FOO" => "bar")
+            expect(env).not_to have_key("RUBYOPT")
+            expect(env).not_to have_key("LANG")
+            expect(env).not_to have_key("LC_ALL")
+          end
+        end
       end
     end
 
-    it "preserves non-encoding RUBYOPT flags without shell escaping" do
-      with_env("RUBYOPT" => "-IC:\\Ruby\\lib -r json -W0 -EUS-ASCII") do
-        expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8:UTF-8 -IC:\\Ruby\\lib -r json -W0")
-      end
-    end
-
-    it "keeps the UTF-8 pin from being consumed by argument-taking Ruby switches" do
-      expect(force_utf8_rubyopt("-I")).to eq("-EUTF-8:UTF-8 -I")
-      expect(force_utf8_rubyopt("-r")).to eq("-EUTF-8:UTF-8 -r")
-      expect(force_utf8_rubyopt("-I -W0")).to eq("-EUTF-8:UTF-8 -I -W0")
-      expect(force_utf8_rubyopt("-r json")).to eq("-EUTF-8:UTF-8 -r json")
-    end
-
-    it "preserves the UTF-8 guarantee when caller-supplied RUBYOPT is nil" do
-      with_env("RUBYOPT" => "-W0") do
-        expect(utf8_subprocess_env("RUBYOPT" => nil)["RUBYOPT"]).to eq("-EUTF-8:UTF-8")
-      end
-    end
-
-    it "normalizes an existing UTF-8 encoding request without duplicating it" do
-      with_env("RUBYOPT" => "-EUTF-8") do
-        expect(utf8_subprocess_env["RUBYOPT"]).to eq("-EUTF-8:UTF-8")
+    context "when the locale is a real non-UTF-8 national locale (e.g. pt_BR.ISO8859-1)" do
+      # Regression: a developer with an ISO-8859-1/CP1252 locale reads their latin-1 source files
+      # correctly as-is. The previous approach force-pinned -EUTF-8 on every subprocess, which
+      # re-decoded those files as UTF-8 and raised "invalid byte sequence in UTF-8" — an obscure
+      # failure that broke a working setup. US-ASCII is a subset of UTF-8 so widening it is safe;
+      # a national encoding is not, so we must leave it alone.
+      it "does NOT force UTF-8 and passes the caller env through untouched" do
+        with_locale_encoding(Encoding::ISO_8859_1) do
+          with_env("LANG" => "pt_BR.ISO8859-1", "LC_ALL" => "pt_BR.ISO8859-1", "RUBYOPT" => nil) do
+            env = utf8_subprocess_env("REACT_ON_RAILS_SKIP_VALIDATION" => "true")
+            expect(env).to eq("REACT_ON_RAILS_SKIP_VALIDATION" => "true")
+            expect(env).not_to have_key("RUBYOPT")
+            expect(env).not_to have_key("LANG")
+            expect(env).not_to have_key("LC_ALL")
+          end
+        end
       end
     end
   end
@@ -441,12 +533,14 @@ RSpec.describe "Shakapacker precompile hook shared script" do
       allow(self).to receive(:puts)
       allow(self).to receive(:system)
 
-      with_env(
-        "CLIENT_BUNDLE_ONLY" => "true",
-        "SERVER_BUNDLE_ONLY" => "true",
-        "RSC_REFERENCE_DISCOVERY_BUILD" => nil
-      ) do
-        generate_rsc_manifest_client_references_if_needed
+      with_locale_encoding(Encoding::US_ASCII) do
+        with_env(
+          "CLIENT_BUNDLE_ONLY" => "true",
+          "SERVER_BUNDLE_ONLY" => "true",
+          "RSC_REFERENCE_DISCOVERY_BUILD" => nil
+        ) do
+          generate_rsc_manifest_client_references_if_needed
+        end
       end
 
       expect(self).to have_received(:system).with(
@@ -455,9 +549,9 @@ RSpec.describe "Shakapacker precompile hook shared script" do
           "SERVER_BUNDLE_ONLY" => nil,
           "RSC_BUNDLE_ONLY" => "true",
           "RSC_REFERENCE_DISCOVERY_BUILD" => "true",
-          # The discovery build also forces a UTF-8 locale so the shakapacker child does not crash
-          # under a C/POSIX locale parsing a Gemfile with non-ASCII bytes (see utf8_subprocess_env).
-          "RUBYOPT" => a_string_matching(/-EUTF-8:UTF-8/)
+          # Under a bare C/POSIX locale the discovery build widens the shakapacker child to UTF-8 so
+          # it does not crash parsing bundle files with non-ASCII bytes (see utf8_subprocess_env).
+          "RUBYOPT" => a_string_matching(/-EUTF-8/)
         ),
         "/rails/root/bin/shakapacker",
         exception: true

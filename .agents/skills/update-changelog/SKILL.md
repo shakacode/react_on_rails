@@ -1,7 +1,7 @@
 ---
 name: update-changelog
-description: Analyze merged PRs and update the changelog, optionally stamping release, rc, beta, or explicit version headers. Use before releases or when changelog entries are missing.
-argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version]'
+description: Analyze merged PRs and update the changelog, optionally stamping release, rc, beta, or explicit version headers, targeting either main or an active release/X.Y.Z branch. Use before releases or when changelog entries are missing.
+argument-hint: '[classification-sweep BASE_REF..TARGET_REF|release|rc|beta|version] [target=main|release|release/X.Y.Z]'
 ---
 
 # Update Changelog
@@ -18,6 +18,62 @@ This skill accepts an optional mode argument from the invocation text:
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
 - **`classification-sweep`** (`/update-changelog classification-sweep BASE_REF..TARGET_REF`): Print a mechanical review table for every merged PR in the selected range before deciding which changelog entries to add. This read-only agent workflow runs git and GitHub API commands directly; it does not edit the changelog and does not invoke any header-stamping task.
 - **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
+
+This skill also accepts an optional **target** keyword that decides which branch the entries land on and which branch the PR targets:
+
+- **`target=main`** (default): Entries go to `[Unreleased]`, the feature branch is cut from the base branch, and the PR targets the base branch. This is the historical behavior and is unchanged.
+- **`target=release`** or **`target=release/X.Y.Z`**: Entries land on the active release line. The feature branch is cut from `release/X.Y.Z`, the PR targets `release/X.Y.Z` (`gh pr create --base release/X.Y.Z`), and any version stamp goes under the in-progress rc section on that branch. Use this during rc stabilization, when a fix that merged into `release/X.Y.Z` needs its changelog entry on the release line rather than on the base branch.
+
+See **Target: release or main?** below for how the target is resolved (including the prompt that fires when an active release line is detected).
+
+## Target: release or main?
+
+The changelog can be updated against two different branch targets. **Resolve the target before writing or stamping anything** — it determines the branch you cut, the `--base` of the PR, and where entries land.
+
+The two targets:
+
+- **`main` target (default).** Entries accumulate under `### [Unreleased]`, the feature branch is cut from `origin/<BASE_BRANCH>`, and the PR targets the base branch. During a stable development cycle this is the only target, and the skill must not prompt.
+- **`release` target.** During rc stabilization the repo runs an ephemeral `release/X.Y.Z` branch (one per final target, deleted after the final ships; see `AGENTS.md` → **Release-Train Branching And Phase Gating** and `internal/contributor-info/release-train-runbook.md`). A stabilizing fix merges into `release/X.Y.Z`, so its changelog entry belongs on that branch — under the in-progress rc section — not on the base branch. Cut the feature branch from `release/X.Y.Z` and open the PR with `gh pr create --base release/X.Y.Z`.
+
+### Detecting an active release line
+
+Run these read-only checks (resolve `BASE_BRANCH` from `AGENTS.md` → **Agent Workflow Configuration** first):
+
+```bash
+git fetch --prune origin
+# Release lines are ephemeral release/X.Y.Z branches (X.Y.Z = final target, no -rc suffix).
+git branch -r --list 'origin/release/*' | sed 's#^[[:space:]]*origin/##'
+```
+
+The agent-coordination backend also publishes the active phase per line; when it is available (`agent-coord doctor --json` healthy, then a targeted `agent-coord status … --json` that exits 0), an `rc`/`final` phase for a `release/*` target confirms the release line is live. Treat the backend as advisory here — the `release/*` branch list is the authoritative signal for this skill.
+
+### Choosing the target
+
+1. **Explicit `target=` argument wins.** `target=release/X.Y.Z` selects that exact branch (verify it exists on `origin`; abort with a clear message if not). `target=release` with no version resolves the lone active `release/*` branch (abort and ask which one if more than one exists). `target=main` forces the main target with no prompt. If an explicit `target=release` (or `target=release/X.Y.Z`) is requested but **no matching `release/*` branch exists on `origin`**, do not silently fall back to `main` — stop and report, for example: `target=release requested but no release/* branch exists. Start one with `rake "release:start[X.Y.Z]"` (see the release-train runbook), then retry; or use target=main to land on [Unreleased].`
+2. **No `target=` argument, no active `release/*` branch:** default to `main` **without prompting**. This keeps the common development path frictionless.
+3. **No `target=` argument, exactly one active `release/*` branch:** **ask the user "release or main?"** — this is the core decision. Present the detected branch, for example:
+
+   ```text
+   An active release line was detected: release/17.0.0.
+   Should this changelog update target the release line or main?
+     - release: entry lands on release/17.0.0 (PR --base release/17.0.0), under the in-progress rc section
+     - main:    entry lands on [Unreleased] (PR --base <BASE_BRANCH>)  [default]
+   ```
+
+   Wait for the answer before writing entries, stamping a version, or creating a branch.
+
+4. **No `target=` argument, multiple active `release/*` branches:** list them and ask which release line (or `main`) to target; do not guess.
+
+Once the target is `main`, follow the rest of this document exactly as written — nothing else changes. Once the target is `release`, apply the **Release-target adjustments** below: they change the fetch/compare/branch base and the PR base (substituting `release/X.Y.Z` for the base branch); the changelog mechanics themselves — classification, entry formatting, version-stamping, and curation — are unchanged.
+
+### Release-target adjustments
+
+When the resolved target is a `release/X.Y.Z` branch, only these things change relative to the `main` target:
+
+- **Base for fetch/compare and branch creation.** Read and branch from `release/X.Y.Z` instead of the base branch: `git fetch origin release/X.Y.Z`, then cut the feature branch from `origin/release/X.Y.Z`.
+- **Where entries land.** Entries still go under `### [Unreleased]` while you edit; when you stamp the rc header, the version-stamping task moves the `[Unreleased]` entries under the new rc header (it inserts the header right after `### [Unreleased]`). This is the same mechanism as the `main`-target rc flow — only the branch differs. Typically the release target is used with `rc` (or an explicit `X.Y.Z.rc.N`); a bare `release`/stable stamp on a `release/*` branch is the promotion case handled by the release task, not this skill.
+- **PR base.** Open the PR against the release branch: `gh pr create --base release/X.Y.Z`.
+- **Compare links — keep `…main` anchoring (do NOT change the base).** The bottom-of-file compare links (and the `[unreleased]` link) are written by the repo's version-stamping task, which anchors `[unreleased]` at `…main`. **Leave that anchoring as-is for release-target entries.** Rationale: (1) every `release/*` entry is forward-ported into the base branch's `[Unreleased]` anyway (`git cherry-pick -x`, per the runbook), so `…main` is where these entries ultimately live; (2) the `release/X.Y.Z` branch is ephemeral and deleted after the final ships — its transient `[unreleased]` link is not a durable artifact, the tags and the base-branch changelog are; (3) it keeps the version-stamping task untouched, avoiding any change to the parsing/link helpers shared with the forward-port reconciliation flow. So the rc compare link the task adds (e.g. `[17.0.0.rc.1]: …/compare/v17.0.0.rc.0...v17.0.0.rc.1`) is correct as-emitted, and `[unreleased]: …compare/v17.0.0.rc.1...main` is intentionally left pointing at `main`. Do not introduce a release-branch base anchor.
 
 ## When to Use This
 
@@ -297,6 +353,7 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
+- First resolve the **target** (see **Target: release or main?**). For the `main` target use the base branch below. For the `release` target, substitute the resolved `release/X.Y.Z` for `BASE_BRANCH` **throughout the Process section** (here in Step 1 and in Step 3's `git log` / comparison commands), so fetches and post-tag commit scans run against the release line rather than the base branch.
 - Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git fetch origin "${BASE_BRANCH}"` to ensure you have the latest commits
 - After fetching, use `origin/${BASE_BRANCH}` for all comparisons, not the local base branch
 - Read the current changelog to understand the existing structure
@@ -331,6 +388,8 @@ When a new version is released:
 5. Get the tag date with: `git log -1 --format="%Y-%m-%d" TAG_NAME`
 
 #### Step 3: Add new entries for post-tag commits
+
+> For the `release` target, substitute the resolved `release/X.Y.Z` for `BASE_BRANCH` in the commands below (see Step 1), so the post-tag commit scan runs against the release line.
 
 1. Resolve `BASE_BRANCH` from `AGENTS.md` -> **Agent Workflow Configuration**, then run `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}"` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
 2. Extract PR numbers: `git log --oneline "LATEST_TAG..origin/${BASE_BRANCH}" | grep -oE "#[0-9]+" | sort -u`
@@ -383,14 +442,14 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
-5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
+5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**. The branch you start from and the PR base depend on the resolved target (see **Target: release or main?**). Let `INTEGRATION_BRANCH` be the base branch from `AGENTS.md` for the `main` target, or `release/X.Y.Z` for the `release` target:
    - Verify the working tree only has changelog changes; if there are other uncommitted changes, warn the user and stop
-   - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
-   - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
+   - Verify the current branch is `INTEGRATION_BRANCH` (`git branch --show-current`); if not, warn the user and stop. For the `main` target `INTEGRATION_BRANCH` is the base branch (today's behavior); for the `release` target it is the resolved `release/X.Y.Z`, so finalizing while checked out on that release branch is expected and allowed.
+   - Create a feature branch off `INTEGRATION_BRANCH` (e.g., `changelog-16.4.0.rc.10`)
    - Stage only the changelog after resolving the repo's changelog path from `AGENTS.md`: set `CHANGELOG_PATH="${CHANGELOG_PATH:?set CHANGELOG_PATH from AGENTS.md}"`, run `git add "${CHANGELOG_PATH}"`, and commit with message `Update changelog for VERSION` (using the stamped version)
-   - Push and open a PR with the changelog diff as the body
-   - If the push or PR creation fails, the changelog is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
-   - Remind the user to run the repo's release task (no args) after merge to publish and auto-create the GitHub release
+   - Push and open a PR with the changelog diff as the body, targeting `INTEGRATION_BRANCH`. For the `main` target this is the default base; for the `release` target pass it explicitly: `gh pr create --base release/X.Y.Z`
+   - If the push or PR creation fails, the changelog is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create --base "$INTEGRATION_BRANCH"` manually
+   - Remind the user to run the repo's release task (no args) after merge to publish and auto-create the GitHub release. For the `release` target, that release task runs from the `release/X.Y.Z` branch to cut the rc tag (see the release-train runbook); the forward-port step later re-homes the entry into the base branch's `[Unreleased]`.
 
 ### For Prerelease Versions (RC and Beta)
 

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import '../../../stylesheets/application.css';
 
 interface HelloWorldProps {
   name: string;
