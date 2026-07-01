@@ -289,6 +289,17 @@ module.exports = {
 
 > **`clientReferences`**: Always point this at your application source directory. If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`). That can accidentally discover vendored gem templates under paths such as `vendor/bundle` in CI and make webpack compile files that are not part of your app. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
 
+> **Do not use `clientReferences: []` as a global performance setting.** This option is not only
+> a scan-cost knob: it controls which `'use client'` modules the RSC plugin can discover and emit
+> into `react-client-manifest.json` and `react-server-client-manifest.json`. An empty or very narrow
+> list may be acceptable for a static-only build that never renders RSC client islands, but a mixed
+> app needs its client boundaries discoverable so future buttons, menus, forms, and search boxes can
+> hydrate. Prefer scoping to the app source directory now, and follow the route/page/entry-scoped
+> manifest work tracked in
+> [react_on_rails_rsc#134](https://github.com/shakacode/react_on_rails_rsc/issues/134). See
+> [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences)
+> for the decision guide.
+
 > **Generator note (CommonJS only):** The `rails generate react_on_rails:rsc` migration only rewrites webpack configs that use CommonJS (`require`-style) imports. If your config has been converted to ESM (`import`/`export`) syntax, the generator emits an "expected webpack import anchor was not found" warning and you must add `clientReferences` manually as shown above.
 
 > **Upgrade note for apps already on RSC:** `verify_rsc_webpack_transforms` (and the `rails generate react_on_rails:rsc` doctor check) now requires that `RSCWebpackPlugin` be invoked with `clientReferences: rscClientReferences` pointing at `resolve(config.source_path)`. Existing apps that have the plugin without a scoped `clientReferences` option were previously passing verification and will now report `"generated scoped clientReferences in {client,server}WebpackConfig.js"` as a missing transform. To remediate, either (a) re-run `rails generate react_on_rails:rsc` and accept the in-place migration, or (b) manually add the helper and option as shown above — declare `const rscClientReferences = { directory: resolve(config.source_path), recursive: true, include: /\.(js|mjs|cjs|ts|mts|cts|jsx|tsx)$/ };` at module scope and pass `clientReferences: rscClientReferences` into every `RSCWebpackPlugin` invocation.
@@ -631,7 +642,22 @@ The `.server.jsx` file suffix is a **React on Rails auto-bundling convention** -
 
 **Fix:** Add `'use client'` to both `.client.jsx` and `.server.jsx` files during the initial setup (Step 5). Only remove it when you're ready to actually migrate that component to a Server Component.
 
-### Mistake 4: Mutating shared webpack config objects
+### Mistake 4: Treating `clientReferences` as a static-page toggle
+
+Emptying `clientReferences` can make a purely static RSC page appear faster because there are no RSC
+client islands to hydrate. That workaround is unsafe as a shared app default: the same build may
+later render a `'use client'` component, but the manifest will not contain the reference needed to
+load its browser chunks.
+
+**Symptom:** Static RSC pages render, but a page with a client island fails with a missing-module
+manifest error, or the client island never hydrates after `clientReferences` was narrowed.
+
+**Fix:** Scope `clientReferences` to your app source directory instead of emptying it globally. If a
+temporary static-only build is required, document the affected routes and add a smoke test that
+renders at least one RSC client island for any build that is expected to support islands. See
+[Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences).
+
+### Mistake 5: Mutating shared webpack config objects
 
 If your `serverWebpackConfig()` function returns the same object reference on repeated calls, `configureRsc()` will mutate the server config when modifying rules and resolve settings.
 
@@ -639,7 +665,7 @@ If your `serverWebpackConfig()` function returns the same object reference on re
 
 **Fix:** Ensure `serverWebpackConfig()` returns a fresh config object per call. If it doesn't, clone `module.rules` and `resolve` before mutating them in `configureRsc`.
 
-### Mistake 5: Missing `react-server` condition in RSC bundle
+### Mistake 6: Missing `react-server` condition in RSC bundle
 
 If you're writing a custom RSC webpack config (not following Step 4a exactly), forgetting to add `react-server` to `resolve.conditionNames` means React will use its standard server entry points instead of the RSC-specific ones.
 
@@ -656,6 +682,7 @@ After completing all steps, verify everything works:
 - [ ] `rsc-bundle.js` is generated in your `server_bundle_output_path` directory
 - [ ] The app starts without errors (`bin/dev` or equivalent)
 - [ ] Pages render identically to before the migration
+- [ ] If you narrowed `clientReferences`, at least one RSC route with a real Client Component still hydrates
 - [ ] The browser Network tab shows chunked transfer encoding on pages with `stream_react_component`
 - [ ] The `/rsc_payload/` route is accessible (returns an error like "component not found" for unknown components -- that's expected)
 
