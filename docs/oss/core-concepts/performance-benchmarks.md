@@ -87,6 +87,93 @@ Applications that use heavy formatting, parsing, or data-processing libraries on
 
 Server components produce HTML that does not need hydration — they have no client-side JavaScript. Only client components (those with `'use client'`) require hydration. This reduces Total Blocking Time and improves Time to Interactive.
 
+## Benchmarking RSC Against Warm SSR Caches
+
+React Server Components reduce client JavaScript, hydration work, and duplicated data-fetching paths. They do not
+automatically beat an already-warm SSR cache on every first-paint metric. If the existing page uses
+[`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching),
+the fair baseline is a warm fragment-cache hit. If it uses
+[`config.prerender_caching = true`](../building-features/caching.md#level-1-prerender-caching) without fragment caching,
+the fair baseline is a warm prerender-cache hit. Do not compare RSC against an uncached SSR request unless that uncached
+state is the production baseline.
+
+This distinction matters most for mostly static public pages. On a fragment-cache hit, React on Rails Pro can skip prop
+assembly, JSON serialization, and JavaScript evaluation. Fragment-caching helpers skip the prerender cache for that render
+call because the full fragment is already cached. On a prerender-cache hit, props are still assembled and serialized, but
+the JavaScript render result is reused. Either warm path can be very hard for an RSC conversion to beat on TTFB, FCP, or
+LCP because there may be little server-rendering work left to remove.
+
+### Static landing-page pattern
+
+A cache-optimized landing page often looks like this:
+
+```erb
+<%
+  cache_key = [
+    "welcome-page",
+    current_user,
+    device_type_cache_key,
+    release_cache_key,
+    cms_last_updated_at,
+    I18n.locale
+  ]
+
+  rendered = cached_react_component_hash(
+    "WelcomePage",
+    cache_key:,
+    auto_load_bundle: false
+  ) do
+    build_welcome_page_props
+  end
+%>
+
+<% append_javascript_pack_tag("generated/WelcomePage") %>
+<% append_stylesheet_pack_tag("generated/WelcomePage") %>
+<%= preload_pack_asset("generated/WelcomePage.css") %>
+<%= rendered["componentHtml"] %>
+<%= content_for :script_tags, rendered["consoleReplayScript"] %>
+```
+
+In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
+the critical CSS. That per-call option only disables automatic loading when the app has not enabled
+`config.auto_load_bundle` globally; if the global setting is `true`, preserve the resulting asset behavior in both the SSR
+baseline and the RSC experiment. An RSC experiment must keep the same data, release, device, locale, CMS state, CSS
+delivery, font preloads, and hero/image priority before claiming that RSC changed rendering performance. Otherwise the
+comparison is apples to oranges: a lower JavaScript payload or lower Total Blocking Time can coexist with worse LCP if the
+conversion delays CSS, fonts, or the LCP resource.
+
+### Cache-state matrix
+
+Measure each relevant state intentionally and label it in the report:
+
+| Variant           | How to prepare it                                                                                   | What it answers                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Cold uncached SSR | Clear fragment/prerender caches and measure the first request for the SSR page                      | Cost of prop assembly, serialization, and JavaScript rendering before caching    |
+| Warm cached SSR   | Prime the exact cache key, then measure repeated hits; log `RORP_CACHE_HIT` when available          | Repeat-visitor/server steady state for the existing cached implementation        |
+| RSC cold          | Clear relevant Rails/browser/renderer caches and measure the first RSC request                      | First-hit cost of the RSC render, Flight payload generation, and asset discovery |
+| RSC warm          | Prime the RSC route under the same data and browser-cache policy, then measure repeated navigations | Steady state for RSC rendering, hydration, Flight payload, and cached assets     |
+
+Use the same production build mode, data snapshot, asset host, CDN/cache policy, browser cache policy, throttling, and
+sample order for control and experiment. Include both desktop and mobile runs, and keep visual regression checks in the
+same gate as performance checks so a faster page is still the same page.
+
+### Reading RSC wins and non-wins
+
+RSC is most likely to win when the page currently pays a large browser cost: heavy client bundles, long hydration tasks,
+large client-only data parsing, repeated interactive subtrees that can become Server Components, or server-only
+formatting/parsing libraries that can leave the client bundle entirely. Judge those migrations by Total Blocking Time,
+long tasks, JavaScript bytes, hydration/interactivity marks, and navigation responsiveness in addition to LCP.
+
+Warm cached SSR may already be close to optimal when the page is static or cacheable, the cache key is stable, prop
+assembly is skipped by `cached_react_component_hash`, critical CSS/fonts are manually preloaded, and the remaining client
+JavaScript is already small. In that case, an RSC conversion can still be valuable for maintainability or lower browser
+work, but the benchmark should say that clearly instead of framing a warm-cache first-paint tie as an RSC failure.
+
+For RSC pages, also measure what moved into the HTML response. The initial Flight payload is usually embedded in the
+HTML stream rather than fetched as a separate `/rsc_payload/*` resource, so `PerformanceResourceTiming` may show fewer
+JavaScript requests while the navigation response grows. Pair JavaScript byte counts with HTML transfer size, Flight
+payload bytes, FCP/LCP, TBT, and server/renderer timing before drawing conclusions.
+
 ## Real-World Results
 
 > [!NOTE]
