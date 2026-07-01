@@ -4738,7 +4738,7 @@ A cache-optimized landing page often looks like this:
 <% append_javascript_pack_tag("generated/WelcomePage") %>
 <% append_stylesheet_pack_tag("generated/WelcomePage") %>
 <%= preload_pack_asset("generated/WelcomePage.css") %>
-<%= rendered["html"] %>
+<%= rendered["componentHtml"] %>
 <%= content_for :script_tags, rendered["consoleReplayScript"] %>
 ```
 
