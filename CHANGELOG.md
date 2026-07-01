@@ -32,7 +32,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   now render server components through the Pro streaming/RSC renderer while
   returning complete HTML to Rails, so static or cacheable pages can avoid
   `ActionController::Live` response commits when progressive streaming is not
-  needed. Fixes [Issue 4263](https://github.com/shakacode/react_on_rails/issues/4263).
+  needed. When RSC support is enabled, prerendered Pro fragment cache keys now
+  include the RSC bundle digest so deploys that update only the RSC bundle
+  invalidate cached RSC output consistently. Fixes
+  [Issue 4263](https://github.com/shakacode/react_on_rails/issues/4263).
   [PR 4268](https://github.com/shakacode/react_on_rails/pull/4268) by
   [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).

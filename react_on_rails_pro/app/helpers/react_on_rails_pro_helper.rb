@@ -65,6 +65,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    If prerender is set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -96,6 +97,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -290,6 +292,7 @@ module ReactOnRailsProHelper
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    Since prerender is automatically set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -323,9 +326,7 @@ module ReactOnRailsProHelper
           raw_cache_key = raw_options[:cache_key]
           cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
 
-          key_parts = ["buffered_stream_react_component", cache_key_value]
-          key_parts << ReactOnRailsPro::Utils.rsc_bundle_hash if ReactOnRailsPro.configuration.enable_rsc_support
-          key_parts
+          ["buffered_stream_react_component", cache_key_value]
         end,
         prerender: true
       )

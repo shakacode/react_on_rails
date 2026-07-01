@@ -371,6 +371,34 @@ describe ReactOnRailsPro::Cache, :caching do
 
       expect(result).to eq(["foobar", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456"])
     end
+
+    it "has the RSC bundle hash if prerender and RSC support are both enabled" do
+      original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+      ReactOnRailsPro.configuration.enable_rsc_support = true
+      allow(ReactOnRailsPro::Utils).to receive_messages(bundle_hash: "123456", rsc_bundle_hash: "rsc789")
+
+      result = described_class.base_cache_key("foobar", prerender: true)
+
+      expect(result).to eq(["foobar", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456", "rsc789"])
+    ensure
+      ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+    end
+
+    it "does not require the RSC bundle hash when RSC support is disabled" do
+      original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+      ReactOnRailsPro.configuration.enable_rsc_support = false
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_raise(
+        Errno::ENOENT,
+        "missing rsc bundle"
+      )
+
+      result = described_class.base_cache_key("foobar", prerender: true)
+
+      expect(result).to eq(["foobar", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456"])
+    ensure
+      ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+    end
   end
 
   describe ".react_component_cache_key" do
@@ -397,6 +425,22 @@ describe ReactOnRailsPro::Cache, :caching do
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
                             "123456", "abc", "Foobar", cacheable])
+    end
+
+    it "includes both server and RSC bundle hashes when prerendering with RSC support enabled" do
+      original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+      ReactOnRailsPro.configuration.enable_rsc_support = true
+      cacheable = instance_double(TestingCache)
+      allow(cacheable).to receive(:cache_key)
+      allow(ReactOnRailsPro::Utils).to receive_messages(bundle_hash: "123456", rsc_bundle_hash: "rsc789")
+
+      result = described_class.react_component_cache_key("Foobar",
+                                                         cache_key: cacheable, prerender: true)
+
+      expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION, "123456",
+                            "rsc789", "Foobar", cacheable])
+    ensure
+      ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
   end
 

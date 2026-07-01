@@ -4010,7 +4010,7 @@ ActiveRecord-style tag objects normalize to `collection/id` (for example `posts/
 
 ## Cache Warming
 
-Every deploy creates new cache keys for prerendered components (because the server bundle digest is included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
+Every deploy creates new cache keys for prerendered components (because the server bundle digest, and the RSC bundle digest when RSC support is enabled, are included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
 
 See the [Cache Warming section](../oss/building-features/caching.md#cache-warming) in the caching guide for implementation patterns and real-world results.
 

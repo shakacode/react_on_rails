@@ -151,6 +151,7 @@ Here is the doc for helpers `cached_react_component` and `cached_react_component
   # 2. Provide the cache_key option
   #    cache_key: String or Array (or Proc returning a String or Array) containing your cache keys.
   #    If prerender is set to true, the server bundle digest will be included in the cache key.
+  #    When RSC support is enabled, the RSC bundle digest is also included.
   #    The cache_key value is the same as used for conventional Rails fragment caching.
   # 3. Optionally provide the `:cache_options` key with a value of a hash including as
   #    :compress, :expires_in, :race_condition_ttl as documented in the Rails Guides
@@ -284,7 +285,7 @@ end
 
 When a tagged entry has `expires_in`, the index entry's TTL automatically covers it (plus slack). When a tag exceeds the per-tag key cap, the oldest keys are dropped with a logged warning — those entries fall back to plain TTL expiration.
 
-Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by the server-bundle digest in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
+Note that tags solve **data**-driven invalidation only. Deploy invalidation is already handled by deploy bundle digests in the cache key (see [Cache Warming](#cache-warming)) — a deploy cold-starts prerendered fragment caches regardless of tags.
 
 ### Next.js mapping
 
@@ -303,7 +304,7 @@ Like Next.js's default `revalidateTag`, revalidation deletes: the next request r
 
 ## Cache Warming
 
-Fragment cache keys include the server bundle digest, which means every deploy creates new cache keys. This is correct — rendered output must match the current bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
+Prerendered fragment cache keys include deploy bundle digests, which means every deploy creates new cache keys. This is correct — rendered output must match the current server bundle and, when RSC support is enabled, the current RSC bundle — but it means every deploy starts with a cold cache. Under live traffic, this creates a synchronized storm of cache misses: every user request triggers full SSR, database queries for props assembly, and JS evaluation simultaneously.
 
 The solution is **cache warming**: rendering your highest-traffic pages in the background immediately after deploy, before real users hit those pages.
 

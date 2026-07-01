@@ -78,7 +78,10 @@ describe ReactOnRailsProHelper do
       "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}"
     end
     let(:base_cache_key_with_prerender) do
-      "#{base_component_cache_key}/#{ReactOnRailsPro::Utils.bundle_hash}/" \
+      bundle_hashes = [ReactOnRailsPro::Utils.bundle_hash]
+      bundle_hashes << ReactOnRailsPro::Utils.rsc_bundle_hash if ReactOnRailsPro.configuration.enable_rsc_support
+
+      "#{base_component_cache_key}/#{bundle_hashes.join('/')}/" \
         "#{ReactOnRailsPro::Cache.dependencies_cache_key}"
     end
     let(:base_cache_key_without_prerender) do
@@ -1170,8 +1173,7 @@ describe ReactOnRailsProHelper do
             component_name,
             cache_key: [
               "buffered_stream_react_component",
-              ["buffered-stream-cache-spec", component_name],
-              "#{'b' * 32}-test"
+              ["buffered-stream-cache-spec", component_name]
             ],
             prerender: true
           )
