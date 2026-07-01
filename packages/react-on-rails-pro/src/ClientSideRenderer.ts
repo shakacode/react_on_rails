@@ -40,6 +40,7 @@ import { isThenable } from 'react-on-rails/@internal/isThenable';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
+import { isPageUnloadRegistryError } from './CallbackRegistry.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -139,6 +140,12 @@ function waitForGeneratedComponentStylesheets(componentName: string, componentSp
   }
 
   return Promise.all(stylesheetLinks.map(waitForStylesheet)).then(() => undefined);
+}
+
+function resolvePageUnloadRegistryCancellation(error: unknown): void {
+  if (isPageUnloadRegistryError(error)) return;
+
+  throw error;
 }
 
 /**
@@ -261,10 +268,12 @@ class ComponentRenderer {
     // Wait for all store dependencies to be loaded
     this.renderPromise = Promise.all(
       storeDependenciesArray.map((storeName) => StoreRegistry.getOrWaitForStore(storeName)),
-    ).then(() => {
-      if (this.state === 'unmounted') return Promise.resolve();
-      return this.render(el, railsContext);
-    });
+    )
+      .then(() => {
+        if (this.state === 'unmounted') return Promise.resolve();
+        return this.render(el, railsContext);
+      })
+      .catch(resolvePageUnloadRegistryCancellation);
   }
 
   hasStartedRendering(): boolean {
@@ -386,6 +395,8 @@ You should return a React.Component always for the client side entry point.`);
         }
       }
     } catch (e: unknown) {
+      if (isPageUnloadRegistryError(e)) return;
+
       const error = e instanceof Error ? e : new Error(e?.toString() ?? 'Unknown error');
       console.error(error.message);
       error.message = `ReactOnRails encountered an error while rendering component: ${name}. See above error message.`;
@@ -479,14 +490,18 @@ class StoreRenderer {
   }
 
   private async hydrate(railsContext: RailsContext, name: string, props: Record<string, unknown>) {
-    const storeGenerator = await StoreRegistry.getOrWaitForStoreGenerator(name);
-    if (this.state === 'unmounted') {
-      return;
-    }
+    try {
+      const storeGenerator = await StoreRegistry.getOrWaitForStoreGenerator(name);
+      if (this.state === 'unmounted') {
+        return;
+      }
 
-    const store = storeGenerator(props, railsContext);
-    StoreRegistry.setStore(name, store);
-    this.state = 'hydrated';
+      const store = storeGenerator(props, railsContext);
+      StoreRegistry.setStore(name, store);
+      this.state = 'hydrated';
+    } catch (error: unknown) {
+      resolvePageUnloadRegistryCancellation(error);
+    }
   }
 
   hasStartedHydrating(): boolean {

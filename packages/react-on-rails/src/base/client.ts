@@ -47,6 +47,7 @@ interface Registries {
     getStoreGenerator: (name: string) => StoreGenerator;
     setStore: (name: string, store: Store) => void;
     clearHydratedStores: () => void;
+    clearStoreGenerators: () => void;
     storeGenerators: () => Map<string, StoreGenerator>;
     stores: () => Map<string, Store>;
   };
@@ -278,6 +279,10 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
 
     clearHydratedStores(): void {
       StoreRegistry.clearHydratedStores();
+    },
+
+    clearStoreGenerators(): void {
+      StoreRegistry.clearStoreGenerators();
     },
 
     getComponent(name: string): RegisteredComponentEntry {

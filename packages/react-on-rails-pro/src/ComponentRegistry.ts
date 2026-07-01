@@ -73,5 +73,5 @@ export const components = (): Map<string, RegisteredComponentEntry> => component
 
 /** @internal Exported only for tests */
 export function clear(): void {
-  componentRegistry.clear();
+  componentRegistry.clearWithReject(new Error('Cleared component registry before pending waiters resolved.'));
 }

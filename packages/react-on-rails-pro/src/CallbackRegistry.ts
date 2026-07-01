@@ -27,6 +27,12 @@ type WaitingPromiseInfo<T> = {
   promise: Promise<T>;
 };
 
+export const PAGE_UNLOAD_REGISTRY_ERROR_NAME = 'ReactOnRailsProPageUnloadRegistryError';
+
+export function isPageUnloadRegistryError(error: unknown): boolean {
+  return error instanceof Error && error.name === PAGE_UNLOAD_REGISTRY_ERROR_NAME;
+}
+
 export default class CallbackRegistry<T> {
   private readonly registryType: string;
 
@@ -40,38 +46,60 @@ export default class CallbackRegistry<T> {
 
   private timedout = false;
 
+  private pageLoaded = false;
+
+  private timeoutId: NodeJS.Timeout | undefined;
+
   constructor(registryType: string) {
     this.registryType = registryType;
+  }
+
+  private clearPendingTimeout() {
+    if (!this.timeoutId) return;
+
+    clearTimeout(this.timeoutId);
+    this.timeoutId = undefined;
+  }
+
+  private startTimeout() {
+    const registryTimeout = getRailsContext()?.componentRegistryTimeout;
+    if (!registryTimeout) return;
+
+    this.clearPendingTimeout();
+    this.timeoutId = setTimeout(() => this.triggerTimeout(), registryTimeout);
+  }
+
+  private triggerTimeout() {
+    this.timeoutId = undefined;
+    this.timedout = true;
+    this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
+      waitingPromiseInfo.reject(this.createNotFoundError(itemName));
+    });
+    this.waitingPromises.clear();
+    this.notUsedItems.forEach((itemName) => {
+      console.warn(
+        `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
+      );
+    });
   }
 
   private initializeTimeoutEvents() {
     if (this.timeoutEventsInitialized) return;
     this.timeoutEventsInitialized = true;
 
-    let timeoutId: NodeJS.Timeout;
-    const triggerTimeout = () => {
-      this.timedout = true;
-      this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
-        waitingPromiseInfo.reject(this.createNotFoundError(itemName));
-      });
-      this.notUsedItems.forEach((itemName) => {
-        console.warn(
-          `Warning: ${this.registryType} '${itemName}' was registered but never used. This may indicate unused code that can be removed.`,
-        );
-      });
-    };
-
     onPageLoaded(() => {
-      const registryTimeout = getRailsContext()?.componentRegistryTimeout;
-      if (!registryTimeout) return;
-
-      timeoutId = setTimeout(triggerTimeout, registryTimeout);
+      this.pageLoaded = true;
+      this.startTimeout();
     });
 
     onPageUnloaded(() => {
+      this.pageLoaded = false;
+      this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
+        waitingPromiseInfo.reject(this.createPageUnloadError(itemName));
+      });
       this.waitingPromises.clear();
       this.timedout = false;
-      clearTimeout(timeoutId);
+      this.clearPendingTimeout();
     });
   }
 
@@ -111,6 +139,16 @@ export default class CallbackRegistry<T> {
     this.notUsedItems.clear();
   }
 
+  clearWithReject(error: Error): void {
+    this.waitingPromises.forEach((waitingPromiseInfo) => {
+      waitingPromiseInfo.reject(error);
+    });
+    this.waitingPromises.clear();
+    this.clearPendingTimeout();
+    this.clear();
+    this.timedout = false;
+  }
+
   getAll(): Map<string, T> {
     return new Map(this.registeredItems);
   }
@@ -136,6 +174,9 @@ export default class CallbackRegistry<T> {
         promiseReject = reject;
       });
       this.waitingPromises.set(name, { resolve: promiseResolve, reject: promiseReject, promise });
+      if (this.pageLoaded && this.timeoutId === undefined) {
+        this.startTimeout();
+      }
       return promise;
     }
   }
@@ -147,5 +188,11 @@ export default class CallbackRegistry<T> {
         `Registered ${this.registryType} names include [ ${keys} ]. ` +
         `Maybe you forgot to register the ${this.registryType}?`,
     );
+  }
+
+  private createPageUnloadError(itemName: string): Error {
+    const error = this.createNotFoundError(itemName);
+    error.name = PAGE_UNLOAD_REGISTRY_ERROR_NAME;
+    return error;
   }
 }

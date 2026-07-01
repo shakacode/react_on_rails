@@ -94,11 +94,23 @@ export function setStore(name: string, store: Store): void {
 }
 
 /**
- * Internally used function to completely clear hydratedStores Map.
+ * Clear hydrated stores.
  * @public
  */
 export function clearHydratedStores(): void {
-  hydratedStoreRegistry.clear();
+  hydratedStoreRegistry.clearWithReject(
+    new Error('Cleared hydrated store registry before pending waiters resolved.'),
+  );
+}
+
+/**
+ * Reset registered store generators and pending generator waiters.
+ * @public
+ */
+export function clearStoreGenerators(): void {
+  storeGeneratorRegistry.clearWithReject(
+    new Error('Cleared store generator registry before pending waiters resolved.'),
+  );
 }
 
 /**

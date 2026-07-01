@@ -41,6 +41,7 @@ export interface Registries {
     getStoreGenerator: (name: string) => StoreGenerator;
     setStore: (name: string, store: Store) => void;
     clearHydratedStores: () => void;
+    clearStoreGenerators: () => void;
     storeGenerators: () => Map<string, StoreGenerator>;
     stores: () => Map<string, Store>;
   };
@@ -204,6 +205,10 @@ export function createCoreCapability(registries: Registries) {
 
     clearHydratedStores(): void {
       StoreRegistry.clearHydratedStores();
+    },
+
+    clearStoreGenerators(): void {
+      StoreRegistry.clearStoreGenerators();
     },
 
     getComponent(name: string): RegisteredComponentEntry {

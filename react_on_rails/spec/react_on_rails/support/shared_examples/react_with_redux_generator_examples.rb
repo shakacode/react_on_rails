@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
-shared_examples "react_with_redux_generator" do
+shared_examples "react_with_redux_generator" do |options = {}|
+  typescript = options.fetch(:typescript, false)
+  template_extension = typescript ? "ts" : "js"
+  component_extension = typescript ? "tsx" : "jsx"
+
   it "creates redux directories" do
     assert_directory "app/javascript/src/HelloWorldApp/ror_components"
     %w[actions constants containers reducers store].each do |dir|
@@ -21,13 +25,15 @@ shared_examples "react_with_redux_generator" do
   end
 
   it "copies base redux files" do
-    %w[app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.js
-       app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.js
-       app/javascript/src/HelloWorldApp/constants/helloWorldConstants.js
-       app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.js
-       app/javascript/src/HelloWorldApp/store/helloWorldStore.js
-       app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx
-       app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx].each { |file| assert_file(file) }
+    [
+      "app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.#{template_extension}",
+      "app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.#{template_extension}",
+      "app/javascript/src/HelloWorldApp/constants/helloWorldConstants.#{template_extension}",
+      "app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.#{template_extension}",
+      "app/javascript/src/HelloWorldApp/store/helloWorldStore.#{template_extension}",
+      "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.#{component_extension}",
+      "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.#{component_extension}"
+    ].each { |file| assert_file(file) }
   end
 
   it "does not create non-Redux HelloWorld ror_components directory" do

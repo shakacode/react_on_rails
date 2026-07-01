@@ -42,24 +42,21 @@ describe "Message Deduplication", type: :generator do
       end
     end
 
-    context "with Redux installation" do
+    context "with legacy Redux installation" do
       it "shows the success message exactly once" do
         run_generator_test_with_args(%w[--redux], package_json: true)
         output_text = GeneratorMessages.output.join("\n")
 
-        # Count occurrences of the success message
         success_count = output_text.scan("🎉 React on Rails Successfully Installed!").count
         expect(success_count).to(
           eq(1),
-          "Expected success message to appear exactly once with Redux, but appeared #{success_count} times"
+          "Expected success message to appear exactly once, but appeared #{success_count} times"
         )
 
-        # Ensure post-install message components are present
+        expect(output_text).to include("hidden legacy Redux generator path")
+        expect(output_text).to include("HelloWorldApp")
         expect(output_text).to include("📋 QUICK START:")
         expect(output_text).to include("✨ KEY FEATURES:")
-
-        # The message should be from the Redux generator, containing Redux-specific info
-        expect(output_text).to include("HelloWorldApp")
       end
     end
   end

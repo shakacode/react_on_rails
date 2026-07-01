@@ -603,6 +603,11 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   clearHydratedStores(): void;
   /**
+   * Clears registered store generators. Used by internal tests and setup code that must reset global
+   * registration state between runs.
+   */
+  clearStoreGenerators(): void;
+  /**
    * @example
    * ```js
    * ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, "app");

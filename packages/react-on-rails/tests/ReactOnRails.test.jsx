@@ -6,10 +6,13 @@ import * as React from 'react';
 import * as createReactClass from 'create-react-class';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
+import StoreRegistry from '../src/StoreRegistry.ts';
 
 describe('ReactOnRails', () => {
   afterEach(() => {
     ComponentRegistry.clear();
+    StoreRegistry.clearStoreGenerators();
+    StoreRegistry.clearHydratedStores();
   });
 
   it('render returns a virtual DOM element for component', () => {
@@ -158,6 +161,7 @@ describe('ReactOnRails', () => {
           getStoreGenerator: jest.fn(),
           setStore: jest.fn(),
           clearHydratedStores: jest.fn(),
+          clearStoreGenerators: jest.fn(),
           storeGenerators: jest.fn(() => new Map()),
           stores: jest.fn(() => new Map()),
         },
@@ -182,7 +186,24 @@ describe('ReactOnRails', () => {
     expect(() => ReactOnRails.registerStore(false)).toThrow(/null or undefined/);
   });
 
-  it('register store and getStoreGenerator allow registration', () => {
+  it('registerStoreGenerators and getStoreGenerator allow legacy Redux-compatible registration', () => {
+    function reducer() {
+      return {};
+    }
+
+    function storeGenerator(props) {
+      return createStore(reducer, props);
+    }
+
+    ReactOnRails.registerStoreGenerators({ storeGenerator });
+
+    const actual = ReactOnRails.getStoreGenerator('storeGenerator');
+    expect(actual).toEqual(storeGenerator);
+
+    expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
+  });
+
+  it('registerStore remains a legacy alias for store generator registration', () => {
     function reducer() {
       return {};
     }
@@ -193,9 +214,7 @@ describe('ReactOnRails', () => {
 
     ReactOnRails.registerStore({ storeGenerator });
 
-    const actual = ReactOnRails.getStoreGenerator('storeGenerator');
-    expect(actual).toEqual(storeGenerator);
-
+    expect(ReactOnRails.getStoreGenerator('storeGenerator')).toEqual(storeGenerator);
     expect(ReactOnRails.storeGenerators()).toEqual(new Map([['storeGenerator', storeGenerator]]));
   });
 

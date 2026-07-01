@@ -25,6 +25,7 @@ import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@in
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
 import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
+import { PAGE_UNLOAD_REGISTRY_ERROR_NAME } from '../src/CallbackRegistry.ts';
 import {
   clearDefaultRSCProviderFactory,
   setDefaultRSCProviderFactory,
@@ -111,6 +112,12 @@ describe('ClientSideRenderer', () => {
     return storeDataElement;
   }
 
+  function createPageUnloadRegistryError(): Error {
+    const error = new Error('Page unload cancelled registry waiter.');
+    error.name = PAGE_UNLOAD_REGISTRY_ERROR_NAME;
+    return error;
+  }
+
   it('does not cache a component renderer created before railsContext exists', async () => {
     ComponentRegistry.register({
       TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
@@ -136,6 +143,54 @@ describe('ClientSideRenderer', () => {
     addRailsContext();
     await hydrateStore(storeElement);
     expect(storeGenerator).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats page-unload component wait rejection as cancellation', async () => {
+    const getOrWaitForComponentSpy = jest
+      .spyOn(ComponentRegistry, 'getOrWaitForComponent')
+      .mockRejectedValueOnce(createPageUnloadRegistryError());
+    const componentSpec = setupTestComponentDom('dom-id-123');
+    addRailsContext();
+
+    try {
+      await expect(renderOrHydrateComponent(componentSpec)).resolves.toBeUndefined();
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+    } finally {
+      getOrWaitForComponentSpy.mockRestore();
+    }
+  });
+
+  it('treats page-unload store dependency wait rejection as cancellation', async () => {
+    const getOrWaitForStoreSpy = jest
+      .spyOn(StoreRegistry, 'getOrWaitForStore')
+      .mockRejectedValueOnce(createPageUnloadRegistryError());
+    const componentSpec = setupTestComponentDom('dom-id-123');
+    componentSpec.setAttribute('data-store-dependencies', JSON.stringify(['DeferredStore']));
+    addRailsContext();
+
+    try {
+      await expect(renderOrHydrateComponent(componentSpec)).resolves.toBeUndefined();
+      expect(getOrWaitForStoreSpy).toHaveBeenCalledWith('DeferredStore');
+      expect(mockReactHydrateOrRender).not.toHaveBeenCalled();
+    } finally {
+      getOrWaitForStoreSpy.mockRestore();
+    }
+  });
+
+  it('treats page-unload store generator wait rejection as cancellation', async () => {
+    const getOrWaitForStoreGeneratorSpy = jest
+      .spyOn(StoreRegistry, 'getOrWaitForStoreGenerator')
+      .mockRejectedValueOnce(createPageUnloadRegistryError());
+    const storeElement = setupTestStoreDom('DeferredStore');
+    addRailsContext();
+
+    try {
+      await expect(hydrateStore(storeElement)).resolves.toBeUndefined();
+      expect(getOrWaitForStoreGeneratorSpy).toHaveBeenCalledWith('DeferredStore');
+      expect(StoreRegistry.stores().has('DeferredStore')).toBe(false);
+    } finally {
+      getOrWaitForStoreGeneratorSpy.mockRestore();
+    }
   });
 
   it('wraps ordinary non-renderer roots with the registered default RSC provider when RSC payload URL exists', async () => {

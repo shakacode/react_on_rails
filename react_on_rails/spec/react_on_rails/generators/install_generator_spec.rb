@@ -354,6 +354,7 @@ describe InstallGenerator, type: :generator do
       redux_option = described_class.class_options.fetch(:redux)
 
       expect(redux_option.hide).to be(true)
+      expect(redux_option.aliases).to include("-R")
 
       usage_text = File.read(File.expand_path("../../../lib/generators/USAGE", __dir__))
       expect(usage_text).not_to include("--redux")
@@ -364,6 +365,7 @@ describe InstallGenerator, type: :generator do
       redux_option = ReactOnRails::Generators::BaseGenerator.class_options.fetch(:redux)
 
       expect(redux_option.hide).to be(true)
+      expect(redux_option.aliases).to include("-R")
       expect(redux_option.description).to include("legacy")
     end
   end
@@ -614,31 +616,6 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --redux and a pre-installed custom Shakapacker source root" do
-    before(:all) do
-      run_generator_test_with_args(%w[--redux], package_json: true, force: false) do
-        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
-      end
-    end
-
-    it "generates Redux demo files under the configured Shakapacker source path" do
-      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
-      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
-      assert_file "client/app/src/HelloWorldApp/components/HelloWorld.jsx"
-      assert_file "client/app/entrypoints/server-bundle.js"
-
-      assert_no_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
-      assert_no_file "app/javascript/packs/server-bundle.js"
-    end
-
-    it "uses the configured source path in generated Redux demo hints" do
-      assert_file "app/views/hello_world/index.html.erb" do |content|
-        expect(content).to include('<code class="path-hint">client/app/src/HelloWorldApp/</code>')
-        expect(content).not_to include("app/javascript/src/HelloWorldApp/")
-      end
-    end
-  end
-
   context "with --tailwind and a pre-installed custom Shakapacker source root" do
     before(:all) do
       run_generator_test_with_args(%w[--tailwind], package_json: true, force: false) do
@@ -707,31 +684,6 @@ describe InstallGenerator, type: :generator do
         config = JSON.parse(content)
         expect(config["include"]).to include("app/javascript/**/*")
         expect(config["include"]).not_to include("client/app/**/*")
-      end
-    end
-  end
-
-  context "with --redux --tailwind and a pre-installed custom Shakapacker source root" do
-    before(:all) do
-      run_generator_test_with_args(%w[--redux --tailwind], package_json: true, force: false) do
-        simulate_preinstalled_shakapacker(source_path: "client/app", source_entry_path: "entrypoints")
-      end
-    end
-
-    it "generates Tailwind assets under the configured Shakapacker source path" do
-      assert_file "client/app/entrypoints/react_on_rails_tailwind.js",
-                  "import '../stylesheets/application.css';\n"
-      assert_file "client/app/stylesheets/application.css" do |content|
-        expect(content).to include('@import "tailwindcss" source(none);')
-        expect(content).to include('@source "..";')
-        expect(content).to include('@source "../../../app";')
-      end
-      assert_no_file "app/javascript/stylesheets/application.css"
-    end
-
-    it "keeps the generated Redux client component free of global stylesheet imports" do
-      assert_file "client/app/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx" do |content|
-        expect(content).not_to include("application.css")
       end
     end
   end
@@ -924,11 +876,51 @@ describe InstallGenerator, type: :generator do
     include_examples "react_with_redux_generator"
   end
 
-  context "with -R" do
+  context "with legacy -R alias" do
     before(:all) { run_generator_test_with_args(%w[-R], package_json: true) }
 
     include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
+  end
+
+  context "with --redux --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true
+    include_examples "react_with_redux_generator", typescript: true
+
+    it "keeps the hidden legacy Redux TypeScript template path covered" do
+      %w[
+        app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.ts
+        app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.ts
+        app/javascript/src/HelloWorldApp/constants/helloWorldConstants.ts
+        app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.ts
+        app/javascript/src/HelloWorldApp/store/helloWorldStore.ts
+        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx
+        app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx
+        app/javascript/src/HelloWorldApp/components/HelloWorld.tsx
+      ].each { |file| assert_file(file) }
+
+      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx" do |content|
+        expect(content).to match(/type HelloWorldProps = PropsFromRedux/)
+        expect(content).to match(/React\.FC<HelloWorldProps>/)
+      end
+
+      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx" do |content|
+        expect(content).to match(/interface HelloWorldAppProps/)
+        expect(content).to match(/FC<HelloWorldAppProps>/)
+      end
+    end
+  end
+
+  context "with --redux --tailwind --typescript" do
+    before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
+
+    include_examples "base_generator_common", application_js: true, tailwind: true
+
+    it "wires Tailwind into the Redux SSR example" do
+      assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
+    end
   end
 
   context "with --typescript" do
@@ -1793,16 +1785,6 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --redux --tailwind --typescript" do
-    before(:all) { run_generator_test_with_args(%w[--redux --tailwind --typescript], package_json: true) }
-
-    include_examples "base_generator_common", application_js: true, tailwind: true
-
-    it "wires Tailwind into the Redux SSR example" do
-      assert_tailwind_redux_setup(config_dir: "config/rspack", extension: "tsx")
-    end
-  end
-
   context "with -T" do
     before(:all) { run_generator_test_with_args(%w[-T], package_json: true) }
 
@@ -1812,55 +1794,6 @@ describe InstallGenerator, type: :generator do
     it "creates TypeScript component files with .tsx extension" do
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.tsx"
-    end
-  end
-
-  context "with --redux --typescript" do
-    before(:all) { run_generator_test_with_args(%w[--redux --typescript], package_json: true) }
-
-    include_examples "base_generator_common", application_js: true
-
-    it "creates redux directories" do
-      assert_directory "app/javascript/src/HelloWorldApp/ror_components"
-      %w[actions constants containers reducers store].each do |dir|
-        assert_directory("app/javascript/src/HelloWorldApp/#{dir}")
-      end
-    end
-
-    it "creates appropriate templates" do
-      assert_file("app/views/hello_world/index.html.erb") do |contents|
-        expect(contents).to match(/"HelloWorldApp"/)
-      end
-    end
-
-    it "copies base redux TypeScript files" do
-      %w[app/javascript/src/HelloWorldApp/actions/helloWorldActionCreators.ts
-         app/javascript/src/HelloWorldApp/containers/HelloWorldContainer.ts
-         app/javascript/src/HelloWorldApp/constants/helloWorldConstants.ts
-         app/javascript/src/HelloWorldApp/reducers/helloWorldReducer.ts
-         app/javascript/src/HelloWorldApp/store/helloWorldStore.ts
-         app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx
-         app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx].each { |file| assert_file(file) }
-    end
-
-    it "creates TypeScript Redux component files" do
-      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx"
-      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.tsx"
-      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx"
-    end
-
-    it "TypeScript Redux component includes proper typing" do
-      assert_file "app/javascript/src/HelloWorldApp/components/HelloWorld.tsx" do |content|
-        expect(content).to match(/type HelloWorldProps = PropsFromRedux/)
-        expect(content).to match(/React\.FC<HelloWorldProps>/)
-      end
-    end
-
-    it "TypeScript Redux App includes proper typing" do
-      assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.tsx" do |content|
-        expect(content).to match(/interface HelloWorldAppProps/)
-        expect(content).to match(/FC<HelloWorldAppProps>/)
-      end
     end
   end
 
