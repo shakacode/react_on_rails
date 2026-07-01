@@ -767,6 +767,22 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid Dates returned from custom toJSON methods before fetch', async () => {
+    class InvalidDateJsonValue {
+      toJSON(): { dueOn: Date } {
+        return { dueOn: new Date(Number.NaN) };
+      }
+    }
+
+    const createProject = createRailsAction<undefined, { ok: true }>({
+      path: '/api/projects',
+      body: () => new InvalidDateJsonValue(),
+    });
+
+    await expect(createProject()).rejects.toThrow(/resolved to invalid Date/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects nested non-JSON request body values before fetch', async () => {
     const createProject = createRailsAction<{ tags: string[] }, { ok: true }>({
       path: '/api/projects',

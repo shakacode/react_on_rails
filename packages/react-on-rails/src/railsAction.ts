@@ -278,6 +278,16 @@ const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
       'Return a plain JSON value, null, or undefined instead.',
   );
 
+const originalJsonBodyValue = (holder: unknown, key: string, rootBody: unknown): unknown => {
+  if (key === '') {
+    return rootBody;
+  }
+  if (typeof holder !== 'object' || holder === null) {
+    return undefined;
+  }
+  return (holder as Record<string, unknown>)[key];
+};
+
 const stringifyJsonBody = (requestBody: unknown): string => {
   try {
     const bodyTypeName = preSerializationNonJsonBodyTypeName(requestBody);
@@ -285,14 +295,23 @@ const stringifyJsonBody = (requestBody: unknown): string => {
       throw jsonBodyTypeError(bodyTypeName);
     }
 
-    const serializedBody = JSON.stringify(requestBody, (_key, value: unknown) => {
-      const replacedBodyTypeName = nonJsonBodyTypeName(value);
-      if (replacedBodyTypeName !== null) {
-        throw jsonBodyTypeError(replacedBodyTypeName);
-      }
+    const serializedBody = JSON.stringify(
+      requestBody,
+      function replaceJsonBodyValue(this: unknown, key, value: unknown) {
+        const originalValue = originalJsonBodyValue(this, key, requestBody);
+        const originalBodyTypeName = nonJsonBodyTypeName(originalValue);
+        if (originalBodyTypeName !== null) {
+          throw jsonBodyTypeError(originalBodyTypeName);
+        }
 
-      return value;
-    });
+        const replacedBodyTypeName = nonJsonBodyTypeName(value);
+        if (replacedBodyTypeName !== null) {
+          throw jsonBodyTypeError(replacedBodyTypeName);
+        }
+
+        return value;
+      },
+    );
     if (serializedBody === undefined) {
       throw jsonBodyTypeError('undefined');
     }
