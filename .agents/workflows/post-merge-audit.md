@@ -166,10 +166,7 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: UNKNOWN (access)` with the exact command/error. In all
   UNKNOWN cases, use structured public `codex-claim` comments as advisory
   coverage when available before continuing with GitHub/git evidence for the
-  merged-PR range. If candidate discovery cannot verify backend setup or access,
-  `UNKNOWN (setup)` or `UNKNOWN (access)` takes precedence over
-  `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
-  is still needed after backend recovery.
+  merged-PR range.
 - if bounded `agent-coord doctor --json` and targeted batch status both succeed
   but the named batch entry contains no worked issues or lanes, record
   `worked_issue_scope: empty (no coordination lanes found for <BATCH_ID>)`,

@@ -85,12 +85,9 @@ The resolver is read-only. It resolves the default release-candidate base, the h
    out, record `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases,
    include the exact command/error and use structured public `codex-claim`
    comments as an advisory fallback for possible no-PR, blocked, parked, or
-   done-unmerged lanes before reducing scope to merged PRs. If candidate
-   discovery cannot verify backend setup or access, `UNKNOWN (setup)` or
-   `UNKNOWN (access)` takes precedence over
-   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
-   is still needed after backend recovery. Keep advisory rows marked `UNKNOWN`
-   as needed, and do not infer confirmed completeness from merged PRs.
+   done-unmerged lanes before reducing scope to merged PRs. Keep advisory rows
+   marked `UNKNOWN` as needed, and do not infer confirmed completeness from
+   merged PRs.
    When the batch/run id itself is unknown, scope that advisory scan to issues
    and open PRs active within the audit time window; use each claim's `batch:`
    field to surface candidate batch ids, not to filter as confirmed scope until

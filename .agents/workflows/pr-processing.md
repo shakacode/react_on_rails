@@ -1540,14 +1540,10 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
    out, record `worked_issue_scope: UNKNOWN (access)`. In all UNKNOWN cases,
    include the exact command/error and use structured public
    `codex-claim` comments as an advisory fallback for possible no-PR, blocked,
-   parked, or done-unmerged lanes before reducing scope to merged PRs. If
-   candidate discovery cannot verify backend setup or access, `UNKNOWN (setup)`
-   or `UNKNOWN (access)` takes precedence over
-   `UNKNOWN (needs batch confirmation)`; also report that batch id confirmation
-   is still needed after backend recovery. Keep advisory claim rows marked
-   `UNKNOWN` as needed, and report the command, permission, or batch id
-   confirmation needed to recover the worked issue list instead of identifying a
-   confirmed batch subset from PR links or heuristics.
+   parked, or done-unmerged lanes before reducing scope to merged PRs. Keep
+   advisory claim rows marked `UNKNOWN` as needed, and report the command,
+   permission, or batch id confirmation needed to recover the worked issue list
+   instead of identifying a confirmed batch subset from PR links or heuristics.
    If the batch id itself is unknown, scope advisory public-claim discovery to
    issues and open PRs active within the audit time window, and use each claim's
    `batch:` field only to surface candidate ids until the user confirms one.
