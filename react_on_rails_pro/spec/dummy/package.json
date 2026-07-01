@@ -47,7 +47,7 @@
     "node-fetch": "^2.0.0",
     "node-libs-browser": "^2.2.1",
     "nps": "^5.9.3",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.16",
     "postcss-loader": "^7.1.0",
     "prop-types": "^15.7.2",
     "react": "^19.2.7",
@@ -95,7 +95,7 @@
     "preload-webpack-plugin": "^3.0.0-alpha.1",
     "typescript": "^5.2.2",
     "webpack-cli": "^7.0.0",
-    "webpack-dev-server": "^5.2.4"
+    "webpack-dev-server": "^5.2.5"
   },
   "browser": {
     "fs": false
