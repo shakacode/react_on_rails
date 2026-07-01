@@ -789,6 +789,33 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('serializes shared non-circular request body values', async () => {
+    const sharedMetadata = { id: 1 };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, body: { ok: true } }));
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+      body: ({ name }) => ({
+        project: {
+          name,
+          primaryMetadata: sharedMetadata,
+          secondaryMetadata: sharedMetadata,
+        },
+      }),
+    });
+
+    await expect(createProject({ name: 'Apollo' })).resolves.toEqual({ ok: true });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(
+      JSON.stringify({
+        project: {
+          name: 'Apollo',
+          primaryMetadata: { id: 1 },
+          secondaryMetadata: { id: 1 },
+        },
+      }),
+    );
+  });
+
   it('rejects async body mappers before fetch', async () => {
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',

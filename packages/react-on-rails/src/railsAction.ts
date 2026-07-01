@@ -236,7 +236,7 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
 
 const preSerializationNonJsonBodyTypeName = (
   requestBody: unknown,
-  seenObjects: Set<object> = new Set(),
+  activeObjects: Set<object> = new Set(),
 ): string | null => {
   const bodyTypeName = nonJsonBodyTypeName(requestBody);
   if (bodyTypeName !== null) {
@@ -250,22 +250,26 @@ const preSerializationNonJsonBodyTypeName = (
   if (typeof objectBody.toJSON === 'function') {
     return null;
   }
-  if (seenObjects.has(requestBody)) {
+  if (activeObjects.has(requestBody)) {
     return 'circular object';
   }
-  seenObjects.add(requestBody);
+  activeObjects.add(requestBody);
 
-  const values = Array.isArray(requestBody)
-    ? requestBody
-    : Object.values(requestBody as Record<string, unknown>);
-  for (const value of values) {
-    const nestedBodyTypeName = preSerializationNonJsonBodyTypeName(value, seenObjects);
-    if (nestedBodyTypeName !== null) {
-      return nestedBodyTypeName;
+  try {
+    const values = Array.isArray(requestBody)
+      ? requestBody
+      : Object.values(requestBody as Record<string, unknown>);
+    for (const value of values) {
+      const nestedBodyTypeName = preSerializationNonJsonBodyTypeName(value, activeObjects);
+      if (nestedBodyTypeName !== null) {
+        return nestedBodyTypeName;
+      }
     }
-  }
 
-  return null;
+    return null;
+  } finally {
+    activeObjects.delete(requestBody);
+  }
 };
 
 const jsonBodyTypeError = (bodyTypeName: string): TypeError =>
