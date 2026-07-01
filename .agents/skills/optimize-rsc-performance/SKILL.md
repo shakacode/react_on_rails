@@ -156,12 +156,15 @@ Select validation from `AGENTS.md` and the changed files:
 For skill-only changes in this repo, a typical validation set is:
 
 ```bash
-/Users/justin/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
-  /Users/justin/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  .claude/skills/optimize-rsc-performance
 pnpm start format.listDifferent
 git diff --check
 ```
+
+If your environment has a skill validator installed, run it against
+`.claude/skills/optimize-rsc-performance` or
+`.agents/skills/optimize-rsc-performance` as an additional check. Use a
+discoverable local wrapper or path rather than hardcoding contributor-specific
+interpreter or script locations.
 
 ## References
 
