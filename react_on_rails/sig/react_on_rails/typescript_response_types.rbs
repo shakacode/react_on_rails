@@ -5,6 +5,7 @@ module ReactOnRails
     IDENTIFIER_PATTERN: Regexp
     OPTION_KEYS: Array[Symbol]
     WRAPPER_TYPE_KEYS: Array[Symbol]
+    RAW_TYPE_TEMPLATE_INTERPOLATION_PATTERN: Regexp
     RESERVED_TYPE_NAMES: Array[String]
     GENERATED_TYPE_NAMES: Array[String]
     SCALAR_TYPES: Hash[Symbol, String]

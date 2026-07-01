@@ -65,6 +65,18 @@ RSpec.describe "TypeScript response type raw validation" do
     end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
   end
 
+  it "rejects raw TypeScript template literal interpolation" do
+    response_types.define_response(
+      "events.show",
+      type_name: "EventsShowResponse",
+      fields: { slug: { raw: "`project-${string}`" } }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /single-line type expressions/)
+  end
+
   it "rejects raw TypeScript expressions with ECMAScript line separators" do
     response_types.define_response(
       "events.show",
