@@ -1,3 +1,9 @@
+<% content_for :head do %>
+  <% unless Rails.application.config.action_controller.allow_forgery_protection %>
+    <meta name="csrf-token" content="test-csrf-token">
+  <% end %>
+<% end %>
+
 <%= react_component("TypedRailsActionExample", prerender: false, trace: true, id: "TypedRailsActionExample-react-component-0") %>
 
 <h2>Typed Rails action round trip</h2>

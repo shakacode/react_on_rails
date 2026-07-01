@@ -281,18 +281,13 @@ const resolveHeaders = <TVariables>(
 const hasOwnProperty = (value: object, key: PropertyKey): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
-const isMutationFunctionContext = (callOptions: object): boolean =>
-  hasOwnProperty(callOptions, 'client') ||
-  hasOwnProperty(callOptions, 'meta') ||
-  hasOwnProperty(callOptions, 'mutationKey');
-
 function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'signal'): AbortSignal | undefined;
 function callOptionsValue(callOptions: RailsActionCallerOptions, key: 'headers'): HeadersInit | undefined;
 function callOptionsValue(
   callOptions: RailsActionCallerOptions,
   key: keyof RailsActionCallOptions,
 ): RailsActionCallOptions[keyof RailsActionCallOptions] | undefined {
-  if (typeof callOptions !== 'object' || callOptions === null || isMutationFunctionContext(callOptions)) {
+  if (typeof callOptions !== 'object' || callOptions === null) {
     return undefined;
   }
 
