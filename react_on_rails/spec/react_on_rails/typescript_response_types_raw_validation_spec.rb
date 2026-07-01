@@ -347,6 +347,23 @@ RSpec.describe "TypeScript response type raw validation" do
     end.to raise_error(ReactOnRails::Error, /only use one of :array, :fields, :raw, or :type/)
   end
 
+  it "copies response type fields when registering contracts" do
+    project_fields = { id: :number }
+    fields = {
+      project: { fields: project_fields },
+      tags: { array: :string }
+    }
+
+    response_types.define_response("projects.show", type_name: "ProjectsShowResponse", fields:)
+    project_fields[:id] = :string
+    fields.fetch(:tags)[:array] = :number
+
+    declaration = response_types.to_d_ts
+
+    expect(declaration).to include("    id: number;")
+    expect(declaration).to include("  tags: string[];")
+  end
+
   it "preserves plain object fields when wrapper-like keys are paired with regular field names" do
     response_types.define_response(
       "payload.show",
