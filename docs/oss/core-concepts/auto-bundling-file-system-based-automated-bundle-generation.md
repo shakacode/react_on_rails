@@ -291,6 +291,11 @@ React on Rails automatically generates HTML equivalent to:
 
 This enables optimal bundle splitting where each page only loads the CSS and JavaScript needed for the components actually used on that page.
 
+> [!TIP]
+> React on Rails Pro RSC static shells can keep the shared Rails layout and global CSS while opting
+> out of an app-wide global JavaScript pack on selected pages. See
+> [Page-Level Global JavaScript Opt-Out for Static Shells](../../pro/react-server-components/static-shell-global-js-opt-out.md).
+
 ## Complete Working Example
 
 Here's a step-by-step example showing how to set up file-system-based automated bundle generation from scratch:

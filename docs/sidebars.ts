@@ -242,6 +242,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/how-react-server-components-work',
             'pro/react-server-components/rendering-flow',
             'pro/react-server-components/css-and-styling',
+            'pro/react-server-components/static-shell-global-js-opt-out',
             'pro/react-server-components/tutorial',
             'pro/react-server-components/server-side-rendering',
             'pro/react-server-components/add-streaming-and-interactivity',
