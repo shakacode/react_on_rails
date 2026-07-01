@@ -251,7 +251,7 @@ const preSerializationNonJsonBodyTypeName = (
     return null;
   }
   if (seenObjects.has(requestBody)) {
-    return null;
+    return 'circular object';
   }
   seenObjects.add(requestBody);
 

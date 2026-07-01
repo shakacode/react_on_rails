@@ -777,6 +777,18 @@ describe('createRailsAction', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects circular request body values before fetch', async () => {
+    const circularBody: Record<string, unknown> = {};
+    circularBody.self = circularBody;
+    const createProject = createRailsAction<{ name: string }, { ok: true }>({
+      path: '/api/projects',
+      body: () => circularBody,
+    });
+
+    await expect(createProject({ name: 'Apollo' })).rejects.toThrow(/circular object/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects async body mappers before fetch', async () => {
     const createProject = createRailsAction<{ name: string }, { ok: true }>({
       path: '/api/projects',
