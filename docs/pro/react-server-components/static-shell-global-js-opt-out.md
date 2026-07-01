@@ -50,7 +50,7 @@ skipped.
     <%= stylesheet_pack_tag media: "all" %>
   </head>
   <body>
-    <%= content_for(:body_content) %>
+    <%= yield :body_content %>
 
     <% append_javascript_pack_tag "global" unless content_for?(:skip_global_javascript) %>
     <%= javascript_pack_tag defer: true %>
