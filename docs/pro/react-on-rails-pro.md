@@ -37,7 +37,7 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Node renderer](./node-renderer.md)
 - [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
 
-## Friendly License Model
+## ShakaCode Trust-Based Commercial Licensing
 
 Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate the advanced rendering features before making any purchasing decision. If no license is configured, React on Rails Pro keeps running in unlicensed mode and logs license status instead of blocking the app.
 

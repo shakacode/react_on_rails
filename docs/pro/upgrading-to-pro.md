@@ -101,7 +101,7 @@ bundle exec rails generate react_on_rails:install --pro
 
 ## Try Pro Risk-Free
 
-React on Rails Pro uses a **friendly license model**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
+React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing**: try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
 If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
 

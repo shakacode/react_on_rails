@@ -2,7 +2,7 @@
 
 React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**.
 
-**Friendly license model:** Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app.
+**ShakaCode Trust-Based Commercial Licensing:** Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate. If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app.
 
 When you are ready for production, visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license.
 
@@ -127,7 +127,7 @@ gem install react_on_rails_pro --version "<version>"
 
 ## License Configuration (Production Only)
 
-React on Rails Pro uses a friendly license model to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
+React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing** to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
 
 If no license is configured, the app continues running in unlicensed mode and logs license status instead of blocking startup. In production, that log message is a warning because a paid license is required; in non-production environments, it is informational.
 
