@@ -96,6 +96,7 @@ const sidebars: SidebarsConfig = {
             'building-features/forms',
             'building-features/react-and-redux',
             'building-features/tanstack-query',
+            'building-features/generated-rails-response-types',
             'building-features/styling-with-tailwind',
             'building-features/i18n',
             'building-features/images',

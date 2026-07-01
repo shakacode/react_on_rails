@@ -13,31 +13,91 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
-# Load base dependencies
-base_deps_path = File.expand_path("./Gemfile.development_dependencies", __dir__)
-base_deps = File.read(base_deps_path)
-
-# Determine which override file to use
-override_deps_path = if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
-  # In CI environment, use CI dependencies
-  File.expand_path("./Gemfile.ci", __dir__)
-elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
-  # In non-CI environment, use local dependencies if they exist
-  File.expand_path("./Gemfile.local", __dir__)
+source_encoding_patterns = [
+  /(?:\A|[^A-Za-z0-9_])(?:coding|encoding)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix,
+  /\A\s*vim?:.*(?:\A|[^A-Za-z0-9_])(?:fileencoding|fenc|enc)[ \t]*(?::|=)[ \t]*["']?([A-Za-z0-9._-]+)/nix
+].freeze
+magic_comment_prefix_pattern = /\A(?:\xEF\xBB\xBF)?\s*#/n
+shebang_pattern = /\A(?:\xEF\xBB\xBF)?#!/n
+unsupported_source_encoding = lambda do |path, detected_encoding, reason|
+  raise ArgumentError, "#{path} declares unsupported source encoding #{detected_encoding.inspect}: #{reason}"
 end
 
-override_deps = override_deps_path ? File.read(override_deps_path) : ""
+detect_source_encoding = lambda do |path, content|
+  detected_encoding = nil
+  first_line, second_line = content.each_line.take(2)
+  candidate_lines = [first_line]
+  candidate_lines << second_line if first_line&.match?(shebang_pattern)
+
+  candidate_lines.compact.each do |line|
+    next unless line.match?(magic_comment_prefix_pattern)
+
+    comment_body = line.sub(magic_comment_prefix_pattern, "")
+    match = source_encoding_patterns.lazy.filter_map { |pattern| comment_body.match(pattern) }.first
+    next unless match
+
+    detected_encoding = match[1]
+    break
+  end
+
+  if detected_encoding
+    begin
+      encoding = Encoding.find(detected_encoding)
+    rescue ArgumentError => e
+      unsupported_source_encoding.call(path, detected_encoding, e.message)
+    end
+
+    unless encoding.ascii_compatible?
+      unsupported_source_encoding.call(path, detected_encoding, "non-ASCII-compatible source encoding")
+    end
+
+    encoding
+  else
+    Encoding::UTF_8
+  end
+end
+
+read_gemfile_fragment = lambda do |path|
+  content = File.binread(path)
+  encoding = detect_source_encoding.call(path, content)
+  content.force_encoding(encoding)
+  raise ArgumentError, "#{path} is not valid #{encoding.name}" unless content.valid_encoding?
+
+  content
+end
+
+# Load base dependencies
+base_deps_path = File.expand_path("./Gemfile.development_dependencies", __dir__)
+base_deps = read_gemfile_fragment.call(base_deps_path)
+
+# Determine which override file to use
+override_deps_path =
+  if ENV["CI"] == "true" && File.exist?(File.expand_path("./Gemfile.ci", __dir__))
+    # In CI environment, use CI dependencies
+    File.expand_path("./Gemfile.ci", __dir__)
+  elsif File.exist?(File.expand_path("./Gemfile.local", __dir__))
+    # In non-CI environment, use local dependencies if they exist
+    File.expand_path("./Gemfile.local", __dir__)
+  end
+
+override_deps = override_deps_path ? read_gemfile_fragment.call(override_deps_path) : ""
 
 # Parse override gems
 override_gem_names = override_deps.scan(/^\s*gem\s+["']([^"']+)["']/).flatten
 
 # Remove overridden gems from base dependencies
 override_gem_names.each do |gem_name|
-  base_deps.gsub!(/^\s*gem\s+["']#{gem_name}["'].*$/, '')
+  unless gem_name.ascii_only?
+    raise ArgumentError, "#{override_deps_path} declares non-ASCII gem name #{gem_name.inspect}; " \
+                         "gem names must be ASCII"
+  end
+
+  escaped_gem_name = Regexp.escape(gem_name).encode(base_deps.encoding)
+  base_deps.gsub!(/^\s*gem\s+["']#{escaped_gem_name}["'].*$/, "")
 end
 
 # Clean up any blank lines created by removals
-base_deps.gsub!(/^\s*$\n/, '')
+base_deps.gsub!(/^\s*$\n/, "")
 
 # Evaluate the modified base dependencies
 # Using instance_eval with filepath preserves __dir__ in evaluated content,
