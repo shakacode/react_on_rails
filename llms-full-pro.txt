@@ -6336,6 +6336,10 @@ skipped.
 
 ```erb
 <!-- app/views/layouts/application.html.erb -->
+<% content_for :body_content do %>
+  <%= yield %>
+<% end %>
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -6346,7 +6350,7 @@ skipped.
     <%= stylesheet_pack_tag media: "all" %>
   </head>
   <body>
-    <%= yield %>
+    <%= content_for(:body_content) %>
 
     <% append_javascript_pack_tag "global" unless content_for?(:skip_global_javascript) %>
     <%= javascript_pack_tag defer: true %>
@@ -6357,6 +6361,8 @@ skipped.
 The important split is:
 
 - `stylesheet_pack_tag "global"` stays in the layout for every page.
+- `content_for :body_content` captures the page before the `<head>` renders, so
+  any stylesheet appends from the page are available to the head flush.
 - `append_javascript_pack_tag "global"` is conditional.
 - The empty `javascript_pack_tag` still flushes page-specific packs appended by
   the view or by React on Rails auto-bundling.
@@ -6365,9 +6371,9 @@ If the global pack must run before page-specific sidecars on normal pages, use
 `prepend_javascript_pack_tag "global"` with the same guard.
 
 If your layout already uses the
-[`content_for :body_content` pattern](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#2-css-not-loading-fouc---flash-of-unstyled-content)
-to collect auto-loaded styles before the `<head>` renders, keep that structure.
-Only apply the conditional guard around the global JavaScript append.
+[`content_for :body_content` pattern](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#2-css-not-loading-fouc---flash-of-unstyled-content),
+keep that structure and only apply the conditional guard around the global
+JavaScript append.
 
 ## Page Opt-Out
 
@@ -6389,10 +6395,10 @@ The sidecar should stay narrow. Examples include a newsletter form enhancer, an
 intent-hydration trigger, a consent-aware analytics event, or a small progressive
 enhancement that is truly required on that static shell.
 
-If the sidecar imports CSS, append its stylesheet too, but only with the
-`content_for :body_content` layout timing described above. A stylesheet append
-from a normal view body runs after the layout `<head>` has already flushed the
-main `stylesheet_pack_tag`, which can cause FOUC.
+If the sidecar imports CSS, append its stylesheet too. This relies on the
+`content_for :body_content` layout timing shown above; without that capture, a
+stylesheet append from a normal view body runs after the layout `<head>` has
+already flushed the main `stylesheet_pack_tag`, which can cause FOUC.
 
 ```erb
 <% append_stylesheet_pack_tag "public_home_intent_hydration" %>
