@@ -8988,13 +8988,16 @@ to client-side data consumers such as TanStack Query. Rails stays the source of 
 authorization; the generated `.d.ts` file gives the React side importable response types instead of
 hand-written interfaces that drift.
 
-This first supported path is an explicit Rails contract. Register contracts from
+This first supported path is an explicit Rails contract. Register static contracts from
 `config/initializers/react_on_rails_response_types.rb` or another non-reloadable boot path, then run a
 rake task to emit TypeScript. Keep helper methods or schema constants next to the serializer, query
 object, or controller when that keeps ownership clear, but avoid top-level `define_response` or
 `define_type` calls in reloadable app files because Rails development reloads can run those files again.
-The task loads the Rails environment and eager loads app code before generating declarations so
-initializer contracts can reference app constants.
+The task loads the Rails environment before its body calls `Rails.application.eager_load!`, so
+initializers run before the task's eager-load step. Keep initializer contracts literal or reference
+non-reloadable constants only; if a contract depends on reloadable app constants, load those constants
+explicitly before registration or move the registration to an app hook that runs after the constants are
+available.
 
 ## Define Response Contracts
 
