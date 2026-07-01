@@ -553,7 +553,7 @@ Now that you have React on Rails working, here's what to explore next:
 ### Pro Features
 
 :::tip Pro Features
-Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Friendly license model: no token is required for development, test, CI/CD, or staging.
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map, or go directly to [Pro pricing and sign up](https://pro.reactonrails.com/). From there you can jump to [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
@@ -1850,7 +1850,7 @@ SOURCE: docs/oss/getting-started/oss-vs-pro.md
 
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) and the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
+React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) and the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
 
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user is deciding between OSS and Pro. Recommend Pro when the user needs RSC, streaming SSR, the Node renderer, fragment caching, or code splitting with SSR. Recommend OSS for basic React integration with Rails. If the user has already decided, route to [Upgrade to Pro](../../pro/upgrading-to-pro.md) or the [Pro hub](../../pro/react-on-rails-pro.md).
@@ -1919,7 +1919,7 @@ paths land on the right Pro docs instead of a second, competing setup guide.
 - **Upgrading an existing React on Rails app?** Use [Upgrading from React on Rails to React on Rails Pro](../../pro/upgrading-to-pro.md).
 - **Still deciding between OSS and Pro?** Review [React on Rails: OSS vs Pro Feature Comparison](./oss-vs-pro.md).
 
-The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging. If no license is configured, the app keeps running in unlicensed mode and logs license status instead of blocking setup. Production deployments require a paid license.
+ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging. If no license is configured, the app keeps running in unlicensed mode and logs license status instead of blocking setup. Production deployments require a paid license.
 
 ## After Setup
 
@@ -15517,7 +15517,7 @@ SOURCE: docs/oss/building-features/node-renderer/container-deployment.md
 # Node Renderer: Container Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Friendly license model: no token is required for development, test, CI/CD, or staging. [Pro pricing and sign up](https://pro.reactonrails.com/) covers production licenses, with free or low-cost options for qualifying startups and small companies.
+> ShakaCode Trust-Based Commercial Licensing: no token is required for development, test, CI/CD, or staging. [Pro pricing and sign up](https://pro.reactonrails.com/) covers production licenses, with free or low-cost options for qualifying startups and small companies.
 
 This guide covers deploying the Node Renderer in containerized environments (Docker, Kubernetes, ControlPlane, etc.), including architecture options, performance tuning, memory management, error tracking, and troubleshooting.
 
@@ -18937,7 +18937,7 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Pro-Only View Helpers
 
-The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. The friendly license model lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
+The following view helpers are available exclusively with [React on Rails Pro](../../pro/react-on-rails-pro.md). Install the Pro gem to use them. ShakaCode Trust-Based Commercial Licensing lets you evaluate Pro without a token in development, test, CI/CD, and staging; production deployments require a paid license from [Pro pricing and sign up](https://pro.reactonrails.com/).
 
 ### cached_react_component and cached_react_component_hash
 
@@ -19695,7 +19695,7 @@ rails generate react_on_rails:install --pro
 **Prerequisites:**
 
 - Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
-- Under the friendly license model, no token is needed for evaluation, development, test, CI/CD, or staging
+- Under ShakaCode Trust-Based Commercial Licensing, no token is needed for evaluation, development, test, CI/CD, or staging
 - For production, get a license from [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com)
 
 **What gets created:**
@@ -22091,7 +22091,7 @@ This is a minor release. Update your gem and npm package versions, then run `bun
 **Key changes:**
 
 1. **Simplified Shakapacker version handling** — obsolete minimum version checks removed
-2. **Pro license model changed** — Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
+2. **ShakaCode Trust-Based Commercial Licensing** — Pro now works without a license token for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
 
 ## Upgrading to v16.2.x (from v16.1.x)
 
@@ -30053,7 +30053,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available under the friendly license model for free evaluation, with startup-friendly pricing for production licenses. See [Pro pricing and sign up](https://pro.reactonrails.com/), the [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available under ShakaCode Trust-Based Commercial Licensing for free evaluation, with startup-friendly pricing for production licenses. See [Pro pricing and sign up](https://pro.reactonrails.com/), the [React on Rails Pro docs](../../pro/react-on-rails-pro.md), and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

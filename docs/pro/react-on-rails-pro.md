@@ -41,6 +41,8 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 
 Try Pro freely in development, test, CI/CD, and staging. No token is required to evaluate the advanced rendering features before making any purchasing decision. If no license is configured, React on Rails Pro keeps running in unlicensed mode and logs license status instead of blocking the app.
 
+Trust-based means ShakaCode keeps evaluation low-friction and avoids forced runtime lockouts in non-production environments while relying on professional teams to purchase a license before production deployment.
+
 Production deployments require a paid license. See [Pro pricing and sign up](https://pro.reactonrails.com/) for current options. If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
 
 See [Upgrading to Pro](./upgrading-to-pro.md#try-pro-risk-free) for the current licensing and upgrade details.
