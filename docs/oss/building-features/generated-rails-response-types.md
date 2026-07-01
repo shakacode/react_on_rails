@@ -150,7 +150,7 @@ controller/action-style name such as `projects.index` so later route changes do 
 | `:unknown`                           | `unknown`                         |
 | `:null`                              | `null`                            |
 | `"Project"`                          | `Project`                         |
-| `{ raw: "Date" }`                    | `Date`                            |
+| `{ raw: "Record<string, string>" }`   | `Record<string, string>`          |
 | `{ array: "Project" }` or `[:string]` | `Project[]` or `string[]`         |
 | `{ fields: { id: :number } }`        | `{ id: number; }`                 |
 | `{ type: :string, optional: true }`   | `field?: string`                  |
@@ -158,8 +158,8 @@ controller/action-style name such as `projects.index` so later route changes do 
 
 Use symbols for built-in scalar aliases and strings for named TypeScript contract references.
 String references must match a registered contract `type_name`; unknown identifiers fail generation.
-Use `{ raw: "..." }` for built-in or third-party TypeScript types that should be emitted verbatim,
-such as `Date` or `Record<string, string>`.
+Use `{ raw: "..." }` for built-in or third-party JSON-safe TypeScript types that should be emitted
+verbatim, such as `Record<string, string>`.
 
 When an object field itself uses option-like property names (`type`, `array`, `fields`, `raw`, `nullable`, or
 `optional`), wrap it in `fields:` so the contract is unambiguous:
