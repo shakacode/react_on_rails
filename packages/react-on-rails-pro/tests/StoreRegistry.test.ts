@@ -68,6 +68,21 @@ describe('StoreRegistry', () => {
     await expect(StoreRegistry.getOrWaitForStoreGenerator('DeferredStore')).resolves.toBe(storeGenerator);
   });
 
+  it('rejects pending hydrated store waiters when clearing and keeps the registry usable', async () => {
+    const pendingStore = StoreRegistry.getOrWaitForStore('DeferredStore');
+
+    StoreRegistry.clearHydratedStores();
+
+    await expect(pendingStore).rejects.toThrow(
+      'Cleared hydrated store registry before pending waiters resolved.',
+    );
+
+    const hydratedStore = createStore();
+    StoreRegistry.setStore('DeferredStore', hydratedStore);
+
+    await expect(StoreRegistry.getOrWaitForStore('DeferredStore')).resolves.toBe(hydratedStore);
+  });
+
   it('cancels pending store generator timeout when clearing before it fires', async () => {
     jest.useFakeTimers();
     addRailsContext(5);

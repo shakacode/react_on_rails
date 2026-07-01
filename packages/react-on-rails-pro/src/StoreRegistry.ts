@@ -98,7 +98,9 @@ export function setStore(name: string, store: Store): void {
  * @public
  */
 export function clearHydratedStores(): void {
-  hydratedStoreRegistry.clear();
+  hydratedStoreRegistry.clearWithReject(
+    new Error('Cleared hydrated store registry before pending waiters resolved.'),
+  );
 }
 
 /**

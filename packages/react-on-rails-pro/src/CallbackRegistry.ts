@@ -27,6 +27,12 @@ type WaitingPromiseInfo<T> = {
   promise: Promise<T>;
 };
 
+export const PAGE_UNLOAD_REGISTRY_ERROR_NAME = 'ReactOnRailsProPageUnloadRegistryError';
+
+export function isPageUnloadRegistryError(error: unknown): boolean {
+  return error instanceof Error && error.name === PAGE_UNLOAD_REGISTRY_ERROR_NAME;
+}
+
 export default class CallbackRegistry<T> {
   private readonly registryType: string;
 
@@ -89,7 +95,7 @@ export default class CallbackRegistry<T> {
     onPageUnloaded(() => {
       this.pageLoaded = false;
       this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
-        waitingPromiseInfo.reject(this.createNotFoundError(itemName));
+        waitingPromiseInfo.reject(this.createPageUnloadError(itemName));
       });
       this.waitingPromises.clear();
       this.timedout = false;
@@ -182,5 +188,11 @@ export default class CallbackRegistry<T> {
         `Registered ${this.registryType} names include [ ${keys} ]. ` +
         `Maybe you forgot to register the ${this.registryType}?`,
     );
+  }
+
+  private createPageUnloadError(itemName: string): Error {
+    const error = this.createNotFoundError(itemName);
+    error.name = PAGE_UNLOAD_REGISTRY_ERROR_NAME;
+    return error;
   }
 }

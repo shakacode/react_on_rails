@@ -54,4 +54,21 @@ describe('ComponentRegistry', () => {
       isRenderer: false,
     });
   });
+
+  it('rejects pending component waiters when clearing and keeps the registry usable', async () => {
+    const pendingComponent = ComponentRegistry.getOrWaitForComponent('DeferredComponent');
+
+    ComponentRegistry.clear();
+
+    await expect(pendingComponent).rejects.toThrow(
+      'Cleared component registry before pending waiters resolved.',
+    );
+
+    const DeferredComponent = () => null;
+    ComponentRegistry.register({ DeferredComponent });
+
+    await expect(ComponentRegistry.getOrWaitForComponent('DeferredComponent')).resolves.toMatchObject({
+      component: DeferredComponent,
+    });
+  });
 });

@@ -15,10 +15,12 @@
 
 type PageLifecycleCallback = () => void | Promise<void>;
 type CallbackRegistryConstructor = typeof import('../src/CallbackRegistry.ts').default;
+type IsPageUnloadRegistryError = typeof import('../src/CallbackRegistry.ts').isPageUnloadRegistryError;
 
 describe('CallbackRegistry', () => {
   let mockPageUnloadedCallbacks: PageLifecycleCallback[];
   let CallbackRegistry: CallbackRegistryConstructor;
+  let isPageUnloadRegistryError: IsPageUnloadRegistryError;
 
   beforeEach(() => {
     jest.resetModules();
@@ -31,7 +33,10 @@ describe('CallbackRegistry', () => {
     }));
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
-    CallbackRegistry = require('../src/CallbackRegistry.ts').default as CallbackRegistryConstructor;
+    const callbackRegistryModule =
+      require('../src/CallbackRegistry.ts') as typeof import('../src/CallbackRegistry.ts');
+    CallbackRegistry = callbackRegistryModule.default;
+    isPageUnloadRegistryError = callbackRegistryModule.isPageUnloadRegistryError;
   });
 
   afterEach(() => {
@@ -48,8 +53,16 @@ describe('CallbackRegistry', () => {
       void callback();
     });
 
-    await expect(pendingComponent).rejects.toThrow(
-      'Could not find component registered with name DeferredComponent.',
-    );
+    let rejection: unknown;
+    await pendingComponent.catch((error: unknown) => {
+      rejection = error;
+    });
+
+    expect(rejection).toBeInstanceOf(Error);
+    expect(rejection).toMatchObject({
+      name: 'ReactOnRailsProPageUnloadRegistryError',
+      message: expect.stringContaining('Could not find component registered with name DeferredComponent.'),
+    });
+    expect(isPageUnloadRegistryError(rejection)).toBe(true);
   });
 });
