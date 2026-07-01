@@ -88,6 +88,9 @@ export default class CallbackRegistry<T> {
 
     onPageUnloaded(() => {
       this.pageLoaded = false;
+      this.waitingPromises.forEach((waitingPromiseInfo, itemName) => {
+        waitingPromiseInfo.reject(this.createNotFoundError(itemName));
+      });
       this.waitingPromises.clear();
       this.timedout = false;
       this.clearPendingTimeout();
