@@ -71,6 +71,8 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 ```
 
 `getCsrfToken()` reads the token Rails already renders into the page via `csrf_meta_tags`. Because requests are same-origin with the CSRF header, Rails session auth keeps working.
+Pair this helper with [generated Rails response types](./generated-rails-response-types.md) to avoid
+hand-writing `ProjectsResponse` and similar TanStack Query result interfaces.
 
 ## Shared QueryClient Defaults
 

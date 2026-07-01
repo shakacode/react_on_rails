@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **Generated Rails response TypeScript contracts**: Rails apps can now register explicit JSON response
+  contracts with `ReactOnRails::TypeScriptResponseTypes` and run
+  `rake react_on_rails:generate_response_types` to emit importable `.d.ts` declarations plus a
+  `RailsResponseTypes` lookup map for TanStack Query clients. Fixes
+  [Issue 4247](https://github.com/shakacode/react_on_rails/issues/4247). [PR 4259](https://github.com/shakacode/react_on_rails/pull/4259) by [justin808](https://github.com/justin808).
+
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).
 
@@ -41,6 +47,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
+  configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
+  `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
+  so Rspack v1 remains allowed for non-RSC apps, and bundler detection now honors `SHAKAPACKER_ASSETS_BUNDLER`
+  before `config/shakapacker.yml`.
+  [PR 4289](https://github.com/shakacode/react_on_rails/pull/4289) by [justin808](https://github.com/justin808).
 - **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
   `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
   React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
@@ -49,6 +61,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   generated React Server Components example.
 
 #### Fixed
+
+- **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
+  The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
+  source-encoding magic comments or a UTF-8 default, and validates content before override-gem
+  scanning and evaluation. This affects any environment that evaluates the Pro Gemfile through
+  Bundler, including local setup and CI, so Pro apps with non-ASCII dependency comments no longer
+  fail under shells where Ruby's default external encoding is US-ASCII. Fixes
+  [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
+  [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
 
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
   The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess

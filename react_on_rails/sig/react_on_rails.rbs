@@ -15,6 +15,9 @@ module ReactOnRails
   def self.js_code_builder: () -> JsCodeBuilder
   def self.js_code_builder=: (JsCodeBuilder builder) -> JsCodeBuilder
 
+  module TypeScriptResponseTypes
+  end
+
   # Error classes are defined in separate RBS files:
   # - sig/react_on_rails/prerender_error.rbs
   # - sig/react_on_rails/json_parse_error.rbs

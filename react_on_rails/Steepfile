@@ -43,6 +43,8 @@ target :lib do
   check "lib/react_on_rails/rendering_strategy/exec_js_strategy.rb"
   check "lib/react_on_rails/server_rendering_pool.rb"
   check "lib/react_on_rails/test_helper.rb"
+  check "lib/react_on_rails/typescript_response_types.rb"
+  check "lib/react_on_rails/typescript_response_types/generated_file_writer.rb"
   check "lib/react_on_rails/utils.rb"
   check "lib/react_on_rails/version_checker.rb"
 
