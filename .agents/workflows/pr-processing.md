@@ -1520,12 +1520,11 @@ Use this section when reviewing already-merged PRs from concurrent agent work, e
      `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
      to supply or confirm a batch/run id directly; once the user supplies or
      confirms one, continue with the known-batch-id path below
-   - if broad discovery returns candidates but cannot determine which candidate
-     is in scope, record
+   - if broad discovery returns one or more candidate batch/run ids, record
      `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask the user
-     to confirm one candidate before treating that candidate's lane list as
-     worked-issue scope; once confirmed, continue with the known-batch-id path
-     below
+     to confirm the in-scope candidate before treating any candidate's lane list
+     as worked-issue scope; once confirmed, continue with the known-batch-id
+     path below
    - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
      `UNKNOWN (needs batch confirmation)`; only report candidate ids as
      confirmation targets when backend setup and discovery access both worked

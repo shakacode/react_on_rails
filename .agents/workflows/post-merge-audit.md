@@ -141,10 +141,9 @@ First, produce the exact worked-issue scope and merged-PR range:
     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to
     supply or confirm a batch/run id directly; once I supply or confirm one,
     continue with the known-batch-id path below
-  - if broad discovery returns candidates but cannot determine which candidate
-    is in scope, record
+  - if broad discovery returns one or more candidate batch/run ids, record
     `worked_issue_scope: UNKNOWN (needs batch confirmation)` and ask me to
-    confirm one candidate before treating that candidate's lane list as
+    confirm the in-scope candidate before treating any candidate's lane list as
     worked-issue scope; once confirmed, continue with the known-batch-id path
     below
   - `UNKNOWN (setup)` and `UNKNOWN (access)` take precedence over
