@@ -157,8 +157,20 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   if (typeof FormData !== 'undefined' && requestBody instanceof FormData) {
     return 'FormData';
   }
+  if (typeof File !== 'undefined' && requestBody instanceof File) {
+    return 'File';
+  }
   if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
     return 'Blob';
+  }
+  if (typeof Headers !== 'undefined' && requestBody instanceof Headers) {
+    return 'Headers';
+  }
+  if (typeof Request !== 'undefined' && requestBody instanceof Request) {
+    return 'Request';
+  }
+  if (typeof Response !== 'undefined' && requestBody instanceof Response) {
+    return 'Response';
   }
   if (typeof URLSearchParams !== 'undefined' && requestBody instanceof URLSearchParams) {
     return 'URLSearchParams';
@@ -174,6 +186,18 @@ const nonJsonBodyTypeName = (requestBody: unknown): string | null => {
   }
   if (typeof Set !== 'undefined' && requestBody instanceof Set) {
     return 'Set';
+  }
+  if (typeof WeakMap !== 'undefined' && requestBody instanceof WeakMap) {
+    return 'WeakMap';
+  }
+  if (typeof WeakSet !== 'undefined' && requestBody instanceof WeakSet) {
+    return 'WeakSet';
+  }
+  if (typeof Error !== 'undefined' && requestBody instanceof Error) {
+    return requestBody.name || 'Error';
+  }
+  if (typeof RegExp !== 'undefined' && requestBody instanceof RegExp) {
+    return 'RegExp';
   }
   if (typeof requestBody === 'bigint') {
     return 'BigInt';

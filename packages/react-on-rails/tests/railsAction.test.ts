@@ -62,11 +62,16 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
   ['FormData', () => new FormData()],
   ['URLSearchParams', () => new URLSearchParams({ name: 'Apollo' })],
   ['Blob', () => new Blob(['Apollo'], { type: 'text/plain' })],
+  ['Headers', () => new Headers({ 'X-Project': 'Apollo' })],
   ['ArrayBuffer', () => new ArrayBuffer(8)],
   ['Uint8Array', () => new Uint8Array([1, 2, 3])],
   ['DataView', () => new DataView(new ArrayBuffer(8))],
   ['Map', () => new Map([['name', 'Apollo']])],
   ['Set', () => new Set(['Apollo'])],
+  ['WeakMap', () => new WeakMap([[{}, 'Apollo']])],
+  ['WeakSet', () => new WeakSet([{}])],
+  ['Error', () => new Error('Apollo')],
+  ['RegExp', () => /Apollo/],
   ['BigInt', () => BigInt(1)],
   ['Promise', () => Promise.resolve({ name: 'Apollo' })],
   ['Function', () => () => 'Apollo'],
@@ -79,6 +84,15 @@ const nonJsonRequestBodyFactories: Array<[string, () => unknown]> = [
 
 if (typeof ReadableStream !== 'undefined') {
   nonJsonRequestBodyFactories.push(['ReadableStream', () => new ReadableStream()]);
+}
+if (typeof File !== 'undefined') {
+  nonJsonRequestBodyFactories.push(['File', () => new File(['Apollo'], 'apollo.txt')]);
+}
+if (typeof Request !== 'undefined') {
+  nonJsonRequestBodyFactories.push(['Request', () => new Request('/projects')]);
+}
+if (typeof Response !== 'undefined') {
+  nonJsonRequestBodyFactories.push(['Response', () => new Response('Apollo')]);
 }
 
 beforeAll(() => {
