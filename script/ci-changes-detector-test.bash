@@ -363,6 +363,31 @@ test_agent_tooling_changes_are_non_runtime_only() {
   assert_contains "$out" '"benchmarks_changed": false' "agent tooling output"
 }
 
+test_agent_bin_change_runs_ci_infrastructure_without_benchmarks() {
+  setup_repo
+  mkdir -p .agents/bin
+  printf '#!/usr/bin/env ruby\nputs "validate"\n' > .agents/bin/validate
+  commit_change "update agent workflow binstub"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "agent bin output"
+  assert_contains "$out" '"non_runtime_only": false' "agent bin output"
+  assert_contains "$out" '"run_lint": true' "agent bin output"
+  assert_contains "$out" '"run_ruby_tests": true' "agent bin output"
+  assert_contains "$out" '"run_js_tests": true' "agent bin output"
+  assert_contains "$out" '"run_dummy_tests": true' "agent bin output"
+  assert_contains "$out" '"run_generators": true' "agent bin output"
+  assert_contains "$out" '"run_e2e_tests": true' "agent bin output"
+  assert_contains "$out" '"run_pro_lint": true' "agent bin output"
+  assert_contains "$out" '"run_pro_tests": true' "agent bin output"
+  assert_contains "$out" '"run_pro_dummy_tests": true' "agent bin output"
+  assert_contains "$out" '"run_pro_node_renderer_tests": true' "agent bin output"
+  assert_contains "$out" '"run_core_benchmarks": false' "agent bin output"
+  assert_contains "$out" '"run_pro_benchmarks": false' "agent bin output"
+  assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "agent bin output"
+}
+
 # Regression for PR #3697 (the exact file set): a CI-infrastructure PR — a
 # suite-specific workflow YAML plus the detector's own test harness — must still
 # run the relevant TEST suites to validate the change, but must NOT run any
@@ -1043,6 +1068,7 @@ run_test test_docs_internal_non_markdown_file_is_non_runtime_only
 run_test test_docs_internal_image_only_is_non_runtime_only
 run_test test_docs_internal_doc_plus_runtime_source_still_runs_tests
 run_test test_agent_tooling_changes_are_non_runtime_only
+run_test test_agent_bin_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
 run_test test_ci_infra_plus_runtime_source_still_benchmarks
