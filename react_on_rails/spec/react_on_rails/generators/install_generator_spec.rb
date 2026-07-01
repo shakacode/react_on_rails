@@ -349,6 +349,25 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "Redux generator policy" do
+    it "hides the install --redux option from public help and usage text" do
+      redux_option = described_class.class_options.fetch(:redux)
+
+      expect(redux_option.hide).to be(true)
+
+      usage_text = File.read(File.expand_path("../../../lib/generators/USAGE", __dir__))
+      expect(usage_text).not_to include("--redux")
+      expect(usage_text).not_to include("Redux (Optional)")
+    end
+
+    it "marks the base generator Redux option as internal legacy plumbing" do
+      redux_option = ReactOnRails::Generators::BaseGenerator.class_options.fetch(:redux)
+
+      expect(redux_option.hide).to be(true)
+      expect(redux_option.description).to include("legacy")
+    end
+  end
+
   describe "manual generator fixtures" do
     it "keep CI workflow generation inside the generator spec destination" do
       prepare_destination
@@ -4373,6 +4392,20 @@ describe InstallGenerator, type: :generator do
       install_generator.run_generators
     end
 
+    specify "run_generators warns hidden redux users when prerequisites fail" do
+      install_generator = install_generator_fixture(redux: true)
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(false)
+      allow(install_generator).to receive(:print_generator_messages)
+
+      install_generator.run_generators
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("legacy Redux generator path")
+      expect(output_text).to include("React on Rails generator prerequisites not met")
+      expect(output_text.index("legacy Redux generator path"))
+        .to be > output_text.index("React on Rails generator prerequisites not met")
+    end
+
     specify "shows incomplete-installation guidance when shakapacker setup fails" do
       install_generator = install_generator_fixture
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
@@ -4440,6 +4473,7 @@ describe InstallGenerator, type: :generator do
       install_generator = install_generator_fixture(
         redux: true,
         typescript: true,
+        tailwind: true,
         rspack: true,
         rsc: true,
         pro: true,
@@ -4451,7 +4485,7 @@ describe InstallGenerator, type: :generator do
 
       command = install_generator.send(:recovery_install_command)
 
-      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --tailwind --rspack --rsc")
       expect(command).not_to include("--ignore-warnings")
       expect(command).not_to include("--force")
       expect(command).not_to include("--skip")
@@ -4483,6 +4517,113 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
+      expect(output_text).to include("Failed to install Shakapacker")
+      expect(output_text).to include("legacy Redux generator path")
+      expect(output_text.index("legacy Redux generator path"))
+        .to be > output_text.index("Failed to install Shakapacker")
+    end
+
+    specify "hidden install --redux emits a legacy warning" do
+      install_generator = install_generator_fixture(redux: true)
+
+      install_generator.send(:add_legacy_redux_install_warning)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("legacy Redux generator path")
+      expect(output_text).to include("rails generate react_on_rails:react_with_redux")
+    end
+
+    specify "hidden install --redux --typescript legacy warning preserves the TypeScript flag" do
+      install_generator = install_generator_fixture(redux: true, typescript: true)
+
+      install_generator.send(:add_legacy_redux_install_warning)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("rails generate react_on_rails:react_with_redux --typescript")
+    end
+
+    specify "hidden install --redux legacy warning is only added once" do
+      install_generator = install_generator_fixture(redux: true)
+
+      install_generator.send(:add_legacy_redux_install_warning_once)
+      install_generator.send(:add_legacy_redux_install_warning_once)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text.scan("legacy Redux generator path").size).to eq(1)
+    end
+
+    specify "hidden install --redux legacy warning is retried if adding it fails" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning).and_raise(StandardError, "warning failed")
+      expect do
+        install_generator.send(:add_legacy_redux_install_warning_once)
+      end.to raise_error(StandardError, "warning failed")
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning).and_call_original
+      install_generator.send(:add_legacy_redux_install_warning_once)
+
+      expect(GeneratorMessages.messages.join("\n")).to include("legacy Redux generator path")
+    end
+
+    specify "hidden install --redux legacy warning is printed when invoked generators fail" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators).and_raise(Thor::Error, "generator failed")
+      allow(install_generator).to receive(:print_generator_messages)
+
+      expect { install_generator.run_generators }.to raise_error(Thor::Error, "generator failed")
+      expect(GeneratorMessages.messages.join("\n")).to include("legacy Redux generator path")
+    end
+
+    specify "warning failures do not suppress queued generator messages" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators).and_raise(Thor::Error, "generator failed")
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:print_generator_messages)
+      allow(install_generator).to receive(:warn)
+
+      expect { install_generator.run_generators }.to raise_error(Thor::Error, "generator failed")
+      expect(install_generator).to have_received(:print_generator_messages)
+    end
+
+    specify "warning failures do not mask shakapacker gemfile errors" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:warn)
+
+      expect do
+        install_generator.send(:handle_shakapacker_gemfile_error)
+      end.to raise_error(Thor::Error, /Failed to add Shakapacker/)
+    end
+
+    specify "warning failures do not mask shakapacker install errors" do
+      install_generator = install_generator_fixture(redux: true)
+
+      allow(install_generator).to receive(:add_legacy_redux_install_warning)
+        .and_raise(StandardError, "warning failed")
+      allow(install_generator).to receive(:warn)
+
+      expect do
+        install_generator.send(:handle_shakapacker_install_error)
+      end.to raise_error(Thor::Error, /Failed to install Shakapacker/)
+    end
+
+    specify "hidden install --redux --tailwind warning preserves meaningful install flags" do
+      install_generator = install_generator_fixture(redux: true, tailwind: true, typescript: true)
+
+      install_generator.send(:add_legacy_redux_install_warning)
+      output_text = GeneratorMessages.messages.join("\n")
+
+      expect(output_text).to include("Redux with Tailwind")
+      expect(output_text).to include("rails generate react_on_rails:install --redux --typescript --tailwind")
+      expect(output_text).not_to include("react_on_rails:react_with_redux")
     end
 
     specify "shakapacker gemfile error preserves original install flags" do
@@ -4495,6 +4636,18 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
+    end
+
+    specify "shakapacker gemfile error warns for hidden redux recovery" do
+      install_generator = install_generator_fixture(redux: true, ignore_warnings: true)
+
+      install_generator.send(:handle_shakapacker_gemfile_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("Then re-run: rails generate react_on_rails:install --redux")
+      expect(output_text).to include("Failed to add Shakapacker")
+      expect(output_text).to include("legacy Redux generator path")
+      expect(output_text.index("legacy Redux generator path")).to be > output_text.index("Failed to add Shakapacker")
     end
 
     specify "rsc installs include the Pro verification checklist message" do
@@ -4636,24 +4789,65 @@ describe InstallGenerator, type: :generator do
       redux_generator = redux_generator_fixture(tailwind: true)
       GeneratorMessages.clear
 
-      expect { redux_generator.validate_standalone_tailwind }
+      expect { redux_generator.send(:validate_standalone_tailwind) }
         .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
 
       error_text = GeneratorMessages.messages.join("\n")
-      expect(error_text).to include(
-        "standalone react_on_rails:react_with_redux generator does not support --tailwind"
-      )
+      expect(error_text).to include("Tailwind setup requires the base React on Rails installer")
+      expect(error_text).not_to include("standalone react_on_rails:react_with_redux generator does not support")
       expect(error_text).to include("rails generate react_on_rails:install --redux --tailwind")
+      expect(error_text).to include("rails generate react_on_rails:install --tailwind")
     end
 
     it "allows Redux Tailwind setup when invoked by the install generator" do
       redux_generator = redux_generator_fixture(tailwind: true, invoked_by_install: true)
       GeneratorMessages.clear
 
-      expect { redux_generator.validate_standalone_tailwind }.not_to raise_error
+      expect { redux_generator.send(:validate_standalone_tailwind) }.not_to raise_error
       expect(GeneratorMessages.messages.join("\n")).not_to include(
         "standalone react_on_rails:react_with_redux generator does not support --tailwind"
       )
+    end
+
+    it "warns that direct standalone Redux generation is legacy" do
+      redux_generator = redux_generator_fixture
+
+      redux_generator.send(:add_legacy_redux_generator_warning)
+
+      message_text = GeneratorMessages.messages.join("\n")
+      expect(message_text).to include("legacy Redux generator path")
+      expect(message_text).to match(/not\s+recommended for new React on Rails apps/)
+    end
+
+    it "does not warn from the standalone Redux generator when invoked by install" do
+      redux_generator = redux_generator_fixture(invoked_by_install: true)
+      GeneratorMessages.clear
+
+      redux_generator.send(:add_legacy_redux_generator_warning)
+
+      expect(GeneratorMessages.messages.join("\n")).not_to include("legacy Redux generator path")
+    end
+
+    it "queues the standalone Redux warning before fallible scaffold work" do
+      redux_generator = redux_generator_fixture
+      allow(redux_generator).to receive(:create_redux_directories).and_raise(Thor::Error, "copy failed")
+      allow(redux_generator).to receive(:print_generator_messages)
+
+      expect { redux_generator.run_generator }.to raise_error(Thor::Error, "copy failed")
+
+      message_text = GeneratorMessages.messages.join("\n")
+      expect(message_text).to include("legacy Redux generator path")
+      expect(redux_generator).to have_received(:print_generator_messages)
+    end
+
+    it "prints queued messages when standalone Redux Tailwind validation fails" do
+      redux_generator = redux_generator_fixture(tailwind: true)
+      allow(redux_generator).to receive(:print_generator_messages)
+
+      expect { redux_generator.run_generator }
+        .to raise_error(Thor::Error, /react_with_redux generator does not support --tailwind/)
+
+      expect(redux_generator).to have_received(:print_generator_messages)
     end
   end
 

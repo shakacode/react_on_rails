@@ -60,6 +60,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   so Rspack v1 remains allowed for non-RSC apps, and bundler detection now honors `SHAKAPACKER_ASSETS_BUNDLER`
   before `config/shakapacker.yml`.
   [PR 4289](https://github.com/shakacode/react_on_rails/pull/4289) by [justin808](https://github.com/justin808).
+- **Redux is now hidden from the V17 install generator path**: The `react_on_rails:install --redux` option is no longer shown in install generator help or usage text, and recovery guidance no longer recommends `--redux` for new installs. The hidden legacy path and direct `react_on_rails:react_with_redux` generator now warn that Redux scaffolding is legacy while keeping runtime Redux APIs available. Closes [Issue 4272](https://github.com/shakacode/react_on_rails/issues/4272) and [Issue 4273](https://github.com/shakacode/react_on_rails/issues/4273). [PR 4277](https://github.com/shakacode/react_on_rails/pull/4277) by [justin808](https://github.com/justin808).
+
 - **`create-react-on-rails-app` now defaults to Pro for React 19.2 support**: Running
   `npx create-react-on-rails-app my-app` no longer asks setup questions and generates the recommended
   React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
