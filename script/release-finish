@@ -1,0 +1,528 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "open3"
+
+# Orchestrates the release-train runbook's steps 4 (promote) and 5 (close out),
+# wrapping the existing rake promotion guards (`stable_release_branch_allowed?`,
+# `ensure_release_branch_promotes_tagged_rc!`) and the existing
+# `script/release-forward-port` interface with confirmations and a dry-run mode.
+#
+# See internal/contributor-info/release-train-runbook.md steps 4-5 and
+# internal/contributor-info/release-train-automation-design.md (PR 4).
+#
+# Two subcommands, because each phase is a deliberate, separately-confirmed step
+# in the release line and must not run unattended back-to-back:
+#
+#   promote    Step 4: promote the accepted RC at the release-branch tip to the
+#              final tag, in place (no re-cut from main). Verifies the tip equals
+#              the accepted RC tag, collapses the rc->stable CHANGELOG, then runs
+#              `bundle exec rake release[X.Y.Z]` (the rake guards enforce the
+#              dangerous tag/version safety; this script does not re-implement it).
+#   close-out  Step 5: forward-port remaining release-branch commits to main via
+#              `script/release-forward-port` (dry-run, then apply on confirmation),
+#              then delete the ephemeral release branch on origin.
+#
+# The dangerous outward operations (`rake release`, `git push --delete`) are each
+# gated behind an explicit confirmation and are printed-only under --dry-run.
+# rubocop:disable Metrics/ClassLength
+class ReleaseFinish
+  STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
+  SUBCOMMANDS = %w[promote close-out].freeze
+  # Resolve the sibling forward-port helper relative to this script so close-out
+  # works regardless of the current directory (the runbook runs from repo root,
+  # but the throwaway-repo tests run from a temp checkout).
+  FORWARD_PORT_SCRIPT = File.expand_path("release-forward-port", __dir__)
+
+  class UsageError < StandardError; end
+  class GitError < StandardError; end
+  class AbortError < StandardError; end
+
+  def initialize(argv)
+    @argv = argv.dup
+    @options = {
+      dry_run: false,
+      assume_yes: false,
+      version: nil,
+      rc_tag: nil,
+      remote: "origin"
+    }
+    @parser = build_parser
+  end
+
+  def run
+    subcommand = parse_options!
+
+    # parse_options! has already validated subcommand is one of SUBCOMMANDS.
+    case subcommand
+    when "promote" then promote
+    when "close-out" then close_out
+    end
+  rescue OptionParser::ParseError, UsageError => e
+    warn "ERROR: #{e.message}"
+    warn @parser
+    2
+  rescue AbortError => e
+    warn "Aborted: #{e.message}"
+    1
+  rescue GitError => e
+    warn "ERROR: #{e.message}"
+    1
+  end
+
+  private
+
+  # ---------------------------------------------------------------------------
+  # Option parsing
+  # ---------------------------------------------------------------------------
+
+  def parse_options!
+    argv = @argv.dup
+    subcommand = argv.shift
+    if subcommand.nil? || %w[-h --help].include?(subcommand)
+      puts @parser
+      exit 0
+    end
+    raise UsageError, "unknown subcommand: #{subcommand.inspect}" unless SUBCOMMANDS.include?(subcommand)
+
+    @parser.parse!(argv)
+
+    @options[:version] ||= argv.shift
+    raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
+
+    validate_version!
+    subcommand
+  end
+
+  def validate_version!
+    version = @options[:version]
+    raise UsageError, "version X.Y.Z is required (e.g. release-finish promote 17.0.0)" if version.nil? || version.empty?
+    return if version.match?(STABLE_VERSION)
+
+    raise UsageError, "version must be a stable X.Y.Z (got #{version.inspect}); pass the final target, not an rc"
+  end
+
+  def build_parser
+    OptionParser.new do |parser|
+      parser.banner = usage_banner
+
+      parser.on("--version VERSION", "Final target version X.Y.Z (also positional)") do |version|
+        @options[:version] = version
+      end
+      parser.on("--rc-tag TAG", "Accepted RC tag to verify the tip against (default: highest vX.Y.Z.rc.N)") do |tag|
+        @options[:rc_tag] = tag
+      end
+      parser.on("--remote NAME", "Remote for fetch and branch deletion (default: origin)") do |remote|
+        @options[:remote] = remote
+      end
+      parser.on("--dry-run", "Print the exact commands without executing any of them") do
+        @options[:dry_run] = true
+      end
+      parser.on("--yes", "Skip interactive confirmations (still honors --dry-run)") do
+        @options[:assume_yes] = true
+      end
+      parser.on("-h", "--help", "Show this help") do
+        puts parser
+        exit 0
+      end
+    end
+  end
+
+  def usage_banner
+    <<~BANNER
+      Usage: script/release-finish promote   X.Y.Z [--rc-tag vX.Y.Z.rc.N] [--dry-run] [--yes]
+             script/release-finish close-out X.Y.Z [--remote origin] [--dry-run] [--yes]
+
+      Orchestrates the release-train runbook steps 4 (promote) and 5 (close out).
+
+        promote    Verify the release/X.Y.Z tip equals the accepted RC tag, collapse the
+                   rc->stable CHANGELOG, then run `bundle exec rake release[X.Y.Z]`.
+        close-out  Forward-port remaining commits to main via #{FORWARD_PORT_SCRIPT},
+                   then delete release/X.Y.Z on the remote.
+
+      The rake promotion guards enforce the dangerous tag/version safety; this script
+      adds dry-run, confirmations, and on/at-release/clean-tree guards around them.
+    BANNER
+  end
+
+  # ---------------------------------------------------------------------------
+  # promote (step 4)
+  # ---------------------------------------------------------------------------
+
+  def promote
+    version = @options.fetch(:version)
+    release_branch = "release/#{version}"
+
+    section "Promote #{version} (runbook step 4)"
+    run_or_print("git", "fetch", @options.fetch(:remote))
+    ensure_on_release_branch!(release_branch)
+    ensure_clean_worktree!
+
+    rc_tag = resolve_rc_tag!(version)
+    ensure_tip_matches_rc_tag!(rc_tag)
+
+    collapse_changelog_to_stable
+    run_release_task!(version, release_branch, rc_tag)
+
+    finish_dry_run_notice
+    0
+  end
+
+  def resolve_rc_tag!(version)
+    explicit = @options[:rc_tag]
+    if explicit
+      ensure_tag_exists!(explicit)
+      return explicit
+    end
+
+    tag = highest_rc_tag(version)
+    raise AbortError, "no vX.Y.Z.rc.N tag found for #{version}; pass --rc-tag explicitly" if tag.nil?
+
+    puts "Resolved accepted RC tag: #{tag} (highest rc tag for #{version})."
+    tag
+  end
+
+  def highest_rc_tag(version)
+    tags = git_lines("tag", "--list", "v#{version}.rc.*")
+    tags
+      .map { |tag| [rc_index(tag), tag] }
+      .reject { |index, _tag| index.nil? }
+      .max_by { |index, _tag| index }
+      &.last
+  end
+
+  def rc_index(tag)
+    match = tag.match(/\.rc\.(\d+)\z/)
+    match && match[1].to_i
+  end
+
+  def ensure_tip_matches_rc_tag!(rc_tag)
+    # Two checks, because `git diff --stat` compares TREES: an empty or
+    # metadata-only commit layered on top of the accepted RC has the same tree
+    # and would pass the diff alone. First require HEAD to be the exact tagged
+    # commit (identity), then keep the tree check as defense in depth.
+    head_sha = git("rev-parse", "--verify", "HEAD").strip
+    tag_sha = peeled_tag_sha(rc_tag)
+    unless head_sha == tag_sha
+      raise AbortError, <<~ERROR.strip
+        release tip is not the accepted RC commit #{rc_tag}.
+          HEAD:   #{head_sha}
+          #{rc_tag}: #{tag_sha}
+        Even an empty or metadata-only commit on top of the RC breaks the
+        "promote in place, no re-cut" invariant. Reset the branch to the RC tip
+        (git reset --hard #{rc_tag}) or cut and validate a new RC before promoting.
+      ERROR
+    end
+
+    diff = git("diff", "--stat", rc_tag).strip
+    return if diff.empty?
+
+    raise AbortError, <<~ERROR.strip
+      release tip has drifted from the accepted RC tag #{rc_tag}.
+      `git diff --stat #{rc_tag}` is not empty:
+
+      #{diff}
+
+      The final must be the accepted RC promoted in place (no re-cut). Reset the
+      branch to the RC tip or cut a new RC and re-validate before promoting.
+    ERROR
+  end
+
+  def collapse_changelog_to_stable
+    section "Collapse rc CHANGELOG sections into the final ### [#{@options.fetch(:version)}] section"
+    if @options[:dry_run]
+      puts "DRY RUN: would collapse the rc CHANGELOG sections into ### [#{@options.fetch(:version)}]:"
+      puts indent("/update-changelog release   # or: bundle exec rake \"update_changelog[release]\"")
+      return
+    end
+
+    puts "Run the changelog collapse now, before the release task tags the final:"
+    puts indent("/update-changelog release")
+    puts indent("(equivalently: bundle exec rake \"update_changelog[release]\")")
+    puts
+    return if confirm?("Has the rc->stable CHANGELOG collapse been applied and committed?")
+
+    raise AbortError, "collapse the rc CHANGELOG into the final section, commit it, then re-run promote"
+  end
+
+  def run_release_task!(version, release_branch, rc_tag)
+    section "Promote: bundle exec rake release[#{version}]"
+    puts "This tags v#{version} and publishes. The rake guards (stable_release_branch_allowed?,"
+    puts "ensure_release_branch_promotes_tagged_rc!) validate the #{release_branch} tip against #{rc_tag}."
+
+    confirm_outward!(
+      "Run `bundle exec rake \"release[#{version}]\"` now (tags v#{version} and publishes)?",
+      "bundle exec rake \"release[#{version}]\""
+    )
+    run_or_print("bundle", "exec", "rake", "release[#{version}]")
+  end
+
+  # ---------------------------------------------------------------------------
+  # close-out (step 5)
+  # ---------------------------------------------------------------------------
+
+  def close_out
+    version = @options.fetch(:version)
+    release_branch = "release/#{version}"
+    remote = @options.fetch(:remote)
+    source = "#{remote}/#{release_branch}"
+
+    section "Close out #{version} (runbook step 5)"
+    run_or_print("git", "fetch", remote)
+    ensure_on_main!
+    ensure_local_main_matches_remote!(remote)
+    ensure_clean_worktree!
+
+    forward_port_to_main!(source)
+    delete_release_branch!(release_branch, remote)
+
+    finish_dry_run_notice
+    0
+  end
+
+  def forward_port_to_main!(source)
+    section "Forward-port remaining #{source} commits to main"
+    # Always show the REAL plan: release-forward-port --dry-run is read-only (no
+    # checkout, no cherry-pick), so running it even under our own --dry-run gives
+    # the operator the actual forward-port preview rather than a bare command.
+    puts "Dry-run plan first (delegates to #{FORWARD_PORT_SCRIPT}; it skips rc bumps and already-ported fixes):"
+    unless system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main", "--dry-run")
+      raise GitError, "#{FORWARD_PORT_SCRIPT} --dry-run failed; cannot preview the forward-port plan"
+    end
+
+    if @options[:dry_run]
+      puts
+      puts "DRY RUN: the plan above is read-only; the apply step (forward-port without --dry-run) was skipped."
+      return
+    end
+
+    unless confirm?("Apply the forward-port plan above onto main?")
+      raise AbortError, "review the plan and re-run close-out when ready to forward-port"
+    end
+
+    forwarded = system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main")
+    return if forwarded
+
+    raise AbortError,
+          "#{FORWARD_PORT_SCRIPT} did not complete (conflict or MANUAL item). Resolve per the runbook, " \
+          "then re-run close-out; the helper is idempotent and the branch deletion below was not run."
+  end
+
+  def delete_release_branch!(release_branch, remote)
+    section "Delete the ephemeral branch #{release_branch} on #{remote} (tags are the durable record)"
+
+    if @options[:dry_run]
+      puts "DRY RUN: would verify the forward-ported commits are on #{remote}/main, then run:"
+      run_or_print("git", "push", remote, "--delete", release_branch)
+      return
+    end
+
+    # SAFETY: never delete the source branch while its forward-ported commits
+    # exist only on LOCAL main. close-out applies the cherry-picks locally but
+    # deliberately does not push main (main may be protected), so the operator
+    # must push first. Re-fetch and verify local main is now on origin/main
+    # before allowing the delete.
+    ensure_forward_port_durable_on_remote!(remote)
+
+    confirm_outward!(
+      "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
+      "git push #{remote} --delete #{release_branch}"
+    )
+    run_or_print("git", "push", remote, "--delete", release_branch)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Shared guards
+  # ---------------------------------------------------------------------------
+
+  def ensure_on_release_branch!(release_branch)
+    branch = current_branch
+    return if branch == release_branch
+
+    raise AbortError, <<~ERROR.strip
+      not on #{release_branch} (current branch: #{branch.empty? ? 'detached HEAD' : branch}).
+      Promote runs from the release branch itself:
+        git checkout #{release_branch}
+    ERROR
+  end
+
+  def ensure_on_main!
+    branch = current_branch
+    return if branch == "main"
+
+    raise AbortError, <<~ERROR.strip
+      not on main (current branch: #{branch.empty? ? 'detached HEAD' : branch}).
+      Close-out forward-ports onto main:
+        git checkout main && git pull --rebase
+    ERROR
+  end
+
+  # Require local main to equal the freshly-fetched remote main before
+  # forward-porting, so the cherry-picks never land on a stale or diverged main.
+  def ensure_local_main_matches_remote!(remote)
+    local = git("rev-parse", "main").strip
+    remote_main = "#{remote}/main"
+    upstream = git("rev-parse", remote_main).strip
+    return if local == upstream
+
+    raise AbortError, <<~ERROR.strip
+      local main is not in sync with #{remote_main}
+        local:  #{local}
+        remote: #{upstream}
+      Sync before forward-porting so the cherry-picks land on current main:
+        git checkout main && git pull --rebase
+    ERROR
+  end
+
+  # SAFETY GATE for the branch delete: the forward-port applies cherry-picks to
+  # LOCAL main but close-out never pushes main itself (main may be protected), so
+  # the operator must push (or merge the forward-port PR) first. Re-fetch and
+  # require local main — which carries those cherry-picks — to be reachable from
+  # the remote main. If the operator has not pushed, local main holds commits
+  # absent from #{remote}/main and this aborts, making it impossible to delete
+  # the source branch while its unique forward-ported commits exist only locally.
+  # (Cherry-picks get new SHAs, so this checks the pushed local-main tip, not the
+  # original release-branch commit identities, which are never ancestors of main
+  # under the trunk-based -x model.)
+  def ensure_forward_port_durable_on_remote!(remote)
+    run_or_print("git", "fetch", remote)
+    remote_main = "#{remote}/main"
+    local_main = git("rev-parse", "main").strip
+    return if commit_reachable_from?(local_main, remote_main)
+
+    raise AbortError, <<~ERROR.strip
+      the forward-ported commits on local main are not yet on #{remote_main}.
+      Push main before deleting the source branch — its unique commits would
+      otherwise be lost (tags do not preserve the forward-port onto main):
+        git push   # or merge the forward-port PR into main
+      Then re-run: script/release-finish close-out #{@options.fetch(:version)}
+    ERROR
+  end
+
+  def ensure_clean_worktree!
+    return if git("status", "--porcelain").strip.empty?
+
+    raise AbortError, "working tree is not clean; commit, stash, or discard local changes before continuing"
+  end
+
+  def ensure_tag_exists!(tag)
+    return if tag_exists?(tag)
+
+    raise AbortError, "RC tag #{tag} does not exist locally; fetch tags or pass an existing --rc-tag"
+  end
+
+  # ---------------------------------------------------------------------------
+  # Confirmation + execution helpers
+  # ---------------------------------------------------------------------------
+
+  # Confirm before an outward/destructive op, then let the caller's run_or_print
+  # do the single canonical print/exec. Under --dry-run there is nothing to
+  # confirm (run_or_print prints the command). With --yes, skip the prompt.
+  # Otherwise require an interactive y/N, aborting on "no" or when no TTY is
+  # available, so the script never runs an outward op unattended.
+  def confirm_outward!(question, command)
+    return if @options[:dry_run]
+
+    raise AbortError, "declined: #{command}" unless confirm?(question)
+  end
+
+  def confirm?(question)
+    return true if @options[:assume_yes]
+
+    unless $stdin.tty?
+      raise AbortError, "#{question} (no TTY for confirmation; re-run with --yes to proceed or --dry-run to preview)"
+    end
+
+    $stdout.print("#{question} [y/N] ")
+    $stdout.flush
+    answer = $stdin.gets
+    return false if answer.nil?
+
+    answer.strip.casecmp?("y") || answer.strip.casecmp?("yes")
+  end
+
+  # Run a command, or print it under --dry-run. Read-only setup (git fetch, the
+  # forward-port dry-run) flows through here so dry-run prints the full recipe.
+  def run_or_print(*command)
+    if @options[:dry_run]
+      puts "DRY RUN: would run: #{command.join(' ')}"
+      return
+    end
+
+    puts "+ #{command.join(' ')}"
+    return if system(*command)
+
+    raise GitError, "command failed: #{command.join(' ')}"
+  end
+
+  def finish_dry_run_notice
+    return unless @options[:dry_run]
+
+    puts
+    puts "DRY RUN: nothing was executed; no tags, pushes, releases, or branch deletions occurred."
+  end
+
+  # ---------------------------------------------------------------------------
+  # Output helpers
+  # ---------------------------------------------------------------------------
+
+  def section(title)
+    puts
+    puts "== #{title} =="
+  end
+
+  def indent(text)
+    text.lines.map { |line| "    #{line}" }.join
+  end
+
+  # ---------------------------------------------------------------------------
+  # Git helpers (mirroring script/release-forward-port's non-prompting wrappers)
+  # ---------------------------------------------------------------------------
+
+  def current_branch
+    git("rev-parse", "--abbrev-ref", "HEAD").strip
+  end
+
+  def tag_exists?(tag)
+    _stdout, _stderr, status = capture_git("rev-parse", "--verify", "--quiet", "refs/tags/#{tag}")
+    status.success?
+  end
+
+  # The commit a tag points at, dereferencing annotated tags (^{}) so the value
+  # is a commit SHA comparable to a branch HEAD.
+  def peeled_tag_sha(tag)
+    git("rev-parse", "--verify", "#{tag}^{commit}").strip
+  end
+
+  def commit_reachable_from?(commit, ref)
+    _stdout, _stderr, status = capture_git("merge-base", "--is-ancestor", commit, ref)
+    status.success?
+  end
+
+  def git_lines(*)
+    git(*).lines.map(&:strip).reject(&:empty?)
+  end
+
+  def git(*args)
+    stdout, stderr, status = capture_git(*args)
+    raise GitError, git_error(args, stdout, stderr, status) unless status.success?
+
+    stdout
+  end
+
+  def capture_git(*)
+    git_env = { "GIT_TERMINAL_PROMPT" => "0", "GIT_PAGER" => "cat" }
+    Open3.capture3(git_env, "git", *)
+  end
+
+  def git_error(args, stdout, stderr, status)
+    message = ["git #{args.join(' ')} failed with status #{status.exitstatus}"]
+    message << stderr.strip unless stderr.strip.empty?
+    message << stdout.strip unless stdout.strip.empty?
+    message.join(": ")
+  end
+end
+# rubocop:enable Metrics/ClassLength
+
+exit ReleaseFinish.new(ARGV).run if $PROGRAM_NAME == __FILE__

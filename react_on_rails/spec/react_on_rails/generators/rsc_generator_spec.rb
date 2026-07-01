@@ -28,6 +28,36 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when standalone Tailwind flag is passed" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--tailwind", "--force"])
+      end
+    end
+
+    it "rejects standalone Tailwind setup instead of creating a broken layout" do
+      error_text = GeneratorMessages.messages.join("\n")
+
+      expect(error_text).to include("standalone react_on_rails:rsc generator does not support --tailwind")
+      expect(error_text).to include("rails generate react_on_rails:install --rsc --tailwind")
+      assert_no_file "app/views/layouts/react_on_rails_rsc.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+      assert_no_file "app/javascript/packs/react_on_rails_tailwind.js"
+      assert_no_file "app/javascript/stylesheets/application.css"
+    end
+  end
+
   # Integration test for standalone happy path
 
   context "when Pro is installed" do
@@ -3975,6 +4005,300 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with a Tailwind-aware react_on_rails_default layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("react_on_rails_default")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "preserves Tailwind pack tags after regenerating the layout with --force" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('prepend_javascript_pack_tag "react_on_rails_tailwind"')
+        expect(content).to include('stylesheet_pack_tag "react_on_rails_tailwind", media: "all"')
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+
+      assert_no_file "app/views/layouts/react_on_rails_rsc.html.erb"
+    end
+  end
+
+  context "when Pro is installed with an existing HelloServer controller on a non-Tailwind layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "app/javascript/src/HelloServer/ror_components/HelloServer.jsx",
+        "export default function HelloServer() { return null; }\n"
+      )
+      simulate_existing_file("app/controllers/hello_server_controller.rb", <<~RUBY)
+        class HelloServerController < ApplicationController
+          layout "hello_world"
+
+          def index
+          end
+        end
+      RUBY
+      simulate_canonical_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    it "warns that the existing HelloServer controller may need a Tailwind-aware layout" do
+      messages = GeneratorMessages.messages.join("\n")
+
+      expect(messages).to include("HelloServerController already exists")
+      expect(messages).to include("may not use the Tailwind-aware React on Rails layout")
+      expect(messages).to include('prepend_javascript_pack_tag "react_on_rails_tailwind"')
+      expect(messages).to include('stylesheet_pack_tag "react_on_rails_tailwind", media: "all"')
+    end
+  end
+
+  context "when Pro is installed with an existing HelloServer controller on a commented Tailwind layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "app/javascript/src/HelloServer/ror_components/HelloServer.jsx",
+        "export default function HelloServer() { return null; }\n"
+      )
+      simulate_existing_file("app/controllers/hello_server_controller.rb", <<~RUBY)
+        class HelloServerController < ApplicationController
+          layout "hello_world"
+
+          def index
+          end
+        end
+      RUBY
+      simulate_existing_layout("hello_world", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <!--
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+            -->
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    it "warns that the existing HelloServer controller still needs an active Tailwind-aware layout" do
+      messages = GeneratorMessages.messages.join("\n")
+
+      expect(messages).to include("HelloServerController already exists")
+      expect(messages).to include("may not use the Tailwind-aware React on Rails layout")
+    end
+  end
+
+  context "when Pro is installed with an existing HelloServer controller on a Tailwind-aware layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "app/javascript/src/HelloServer/ror_components/HelloServer.jsx",
+        "export default function HelloServer() { return null; }\n"
+      )
+      simulate_existing_file("app/controllers/hello_server_controller.rb", <<~RUBY)
+        class HelloServerController < ApplicationController
+          layout "hello_world"
+
+          def index
+          end
+        end
+      RUBY
+      simulate_existing_layout("hello_world", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    it "does not warn when the existing controller layout has the active Tailwind pack block" do
+      messages = GeneratorMessages.messages.join("\n")
+
+      expect(messages).not_to include("may not use the Tailwind-aware React on Rails layout")
+    end
+  end
+
+  context "when Pro is installed with an existing HelloServer controller " \
+          "inheriting a Tailwind-aware ApplicationController layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("app/controllers/application_controller.rb", <<~RUBY)
+        class ApplicationController < ActionController::Base
+          layout "react_on_rails_default"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "app/javascript/src/HelloServer/ror_components/HelloServer.jsx",
+        "export default function HelloServer() { return null; }\n"
+      )
+      simulate_existing_file("app/controllers/hello_server_controller.rb", <<~RUBY)
+        class HelloServerController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    it "does not warn when the inherited default layout has the active Tailwind pack block" do
+      messages = GeneratorMessages.messages.join("\n")
+
+      expect(messages).not_to include("may not use the Tailwind-aware React on Rails layout")
+    end
+  end
+
+  context "when Pro is installed with an existing HelloServer controller " \
+          "implicitly using the application layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "app/javascript/src/HelloServer/ror_components/HelloServer.jsx",
+        "export default function HelloServer() { return null; }\n"
+      )
+      simulate_existing_file("app/controllers/hello_server_controller.rb", <<~RUBY)
+        class HelloServerController < ApplicationController
+          def index
+          end
+        end
+      RUBY
+      simulate_named_pack_tag_layout("application")
+      simulate_existing_layout("react_on_rails_default", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <% prepend_javascript_pack_tag "react_on_rails_tailwind" %>
+            <%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    it "warns because Rails falls back to application, not react_on_rails_default" do
+      messages = GeneratorMessages.messages.join("\n")
+
+      expect(messages).to include("HelloServerController already exists")
+      expect(messages).to include("may not use the Tailwind-aware React on Rails layout")
+    end
+  end
+
   context "when Pro is installed with a hello_world layout missing a required pack tag" do
     before(:all) do
       prepare_destination
@@ -4006,6 +4330,74 @@ describe RscGenerator, type: :generator do
       assert_file "app/views/layouts/hello_world.html.erb" do |content|
         expect(content).to include('<%= javascript_pack_tag "application" %>')
         expect(content).not_to include("stylesheet_pack_tag")
+      end
+    end
+  end
+
+  context "when Tailwind RSC sees a canonical legacy hello_world layout without Tailwind wiring" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_canonical_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "creates a Tailwind-aware fallback layout instead of reusing the legacy layout" do
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+        expect(content).not_to include("react_on_rails_tailwind")
+      end
+
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+  end
+
+  context "when Tailwind RSC fallback creates a new layout after earlier layouts are unusable" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force", "--tailwind", "--invoked-by-install"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "creates a Tailwind-aware fallback layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<% prepend_javascript_pack_tag "react_on_rails_tailwind" %>')
+        expect(content).to include('<%= stylesheet_pack_tag "react_on_rails_tailwind", media: "all" %>')
+        expect(content).to include("<%= javascript_pack_tag %>")
       end
     end
   end

@@ -43,11 +43,13 @@ At [Popmenu](https://www.shakacode.com/recent-work/popmenu/) (a ShakaCode client
 3. The rendered HTML is returned to Rails and inserted into the view
 4. Workers are pooled and can be automatically restarted to mitigate memory leaks
 
-Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Each request is rendered in its own per-request `sharedExecutionContext`, so concurrent renders never leak data into one another:
+Because rendering runs out-of-process, the renderer scales concurrency across a worker pool instead of blocking the Ruby request cycle. Rails (on an async server such as Puma or Falcon) multiplexes many requests over HTTP/2; the master process forks workers (default: CPU count − 1), auto-restarts crashed ones, and can do scheduled rolling restarts. Framework-owned request state, such as async props, post-SSR hooks, and RSC payload tracking, is stored in per-request `sharedExecutionContext` and tracker instances so concurrent renders do not share that framework state. The diagram below shows how render jobs fan out across reusable Node workers:
 
 <p>
   <img src="images/worker-pool-dispatch.svg" alt="Many concurrent Rails page requests send render jobs to the Node Renderer's dispatcher, which fans them out across a pool of workers that each render several pages at once." width="840" />
 </p>
+
+The JavaScript bundle module graph is still loaded into reusable worker VM contexts. Module-level mutable variables in your app persist for the worker lifetime and can be observed by overlapping renders, so do not store request data there. For RSC-safe request data, use the `React.cache()` patterns in [Sharing Per-Request Data in Server Components](./react-server-components/per-request-data.md).
 
 By contrast, ExecJS renders one request per V8 context and blocks the Ruby thread for the duration. For concurrent _streaming_ specifically, see [Streaming SSR](./streaming-ssr.md).
 
