@@ -333,6 +333,20 @@ RSpec.describe "TypeScript response type raw validation" do
     end.to raise_error(ReactOnRails::Error, /Unrecognized option key\(s\).*:typo/)
   end
 
+  it "reports conflicting wrapper keys even when plain object fields are also present" do
+    response_types.define_response(
+      "payload.show",
+      type_name: "PayloadShowResponse",
+      fields: {
+        value: { type: :string, array: [:integer], count: :number }
+      }
+    )
+
+    expect do
+      response_types.to_d_ts
+    end.to raise_error(ReactOnRails::Error, /only use one of :array, :fields, :raw, or :type/)
+  end
+
   it "preserves plain object fields when wrapper-like keys are paired with regular field names" do
     response_types.define_response(
       "payload.show",
