@@ -451,9 +451,10 @@ For a comprehensive debugging guide covering SSR issues, hydration mismatches, a
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
   config.logging_on_server = true
-  config.server_render_method = 'NodeJS' # for better error messages
 end
 ```
+
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure` rather than through the open-source configuration.
 
 ### Debug webpack configuration
 

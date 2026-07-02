@@ -75,7 +75,6 @@ module ReactOnRails
       webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,
       rendering_props_extension: nil,
-      server_render_method: nil,
       build_test_command: "",
       build_production_command: "",
       random_dom_id: true,
@@ -108,7 +107,7 @@ module ReactOnRails
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
                   :i18n_yml_safe_load_options, :defer_generated_component_packs,
-                  :server_render_method, :random_dom_id, :auto_load_bundle,
+                  :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
@@ -128,7 +127,7 @@ module ReactOnRails
                    build_production_command: nil, generated_component_packs_loading_strategy: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
-                   random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
+                   random_dom_id: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, stores_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil,
                    check_database_on_dev_start: nil)
@@ -166,7 +165,6 @@ module ReactOnRails
       self.webpack_generated_files = webpack_generated_files
       self.rendering_extension = rendering_extension
 
-      self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
       self.stores_subdirectory = stores_subdirectory
       self.auto_load_bundle = auto_load_bundle
@@ -185,7 +183,6 @@ module ReactOnRails
       ensure_webpack_generated_files_exists
       configure_generated_assets_dirs_deprecation
       configure_skip_display_none_deprecation
-      check_server_render_method_is_only_execjs
       error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
       # check_deprecated_settings
       adjust_precompile_task
@@ -387,18 +384,6 @@ module ReactOnRails
         MSG
         raise ReactOnRails::Error, msg
       end
-    end
-
-    def check_server_render_method_is_only_execjs
-      return if server_render_method.blank? ||
-                server_render_method == "ExecJS"
-
-      msg = <<~MSG
-        Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
-        If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
-        for details.
-      MSG
-      raise ReactOnRails::Error, msg
     end
 
     def configure_generated_assets_dirs_deprecation

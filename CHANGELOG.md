@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Removed the inert `config.server_render_method` option**: The open-source configuration no longer accepts `config.server_render_method`. The option never selected a server render method — the open-source gem always renders with ExecJS — and its validator raised `ReactOnRails::Error` at boot for any value other than blank or `"ExecJS"`. Setting it now raises `NoMethodError` at boot, so delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; `rake react_on_rails:doctor` also flags the stale line. For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`. Fixes [Issue 4415](https://github.com/shakacode/react_on_rails/issues/4415). [PR 4415](https://github.com/shakacode/react_on_rails/pull/4415) by [justin808](https://github.com/justin808).
+
 #### Added
 
 - **Generated Rails response TypeScript contracts**: Rails apps can now register explicit JSON response

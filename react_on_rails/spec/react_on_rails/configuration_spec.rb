@@ -62,20 +62,12 @@ module ReactOnRails
     end
 
     describe ".server_render_method" do
-      it "does not throw if the server render method is blank" do
+      it "is removed; setting it raises NoMethodError" do
         expect do
           ReactOnRails.configure do |config|
-            config.server_render_method = ""
+            config.server_render_method = "ExecJS"
           end
-        end.not_to raise_error
-      end
-
-      it "throws if the server render method is node" do
-        expect do
-          ReactOnRails.configure do |config|
-            config.server_render_method = "node"
-          end
-        end.to raise_error(ReactOnRails::Error, /invalid value for `config.server_render_method`/)
+        end.to raise_error(NoMethodError, /server_render_method=/)
       end
     end
 
