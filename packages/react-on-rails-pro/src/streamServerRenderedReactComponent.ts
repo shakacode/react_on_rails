@@ -189,16 +189,25 @@ const streamRenderReactComponent = (
           if (augmentedStack) {
             error.stack = augmentedStack;
           }
-          sendErrorHtml(
-            // onError fires before onShellError and sets renderState.error to the enriched error.
-            // Reuse it when present; otherwise enrich the shell error here as a defensive fallback for
-            // nonstandard or future React callback ordering.
-            //
-            // Current shell-error coverage throws synchronously, so onError sets renderState.error
-            // first. If this fallback is reached after the tracker was already consumed,
-            // enrichWithCapturedRSCDiagnostics returns the original error unchanged.
-            renderState.error instanceof Error ? renderState.error : enrichWithCapturedRSCDiagnostics(error),
-          );
+          // onError fires before onShellError and sets renderState.error to the enriched error.
+          // Reuse it when present; otherwise enrich and report the shell error here as a defensive
+          // fallback for nonstandard or future React callback ordering.
+          let shellError: Error;
+          if (renderState.error instanceof Error) {
+            shellError = renderState.error;
+          } else {
+            shellError = enrichWithCapturedRSCDiagnostics(error);
+            if (isRSCRouteSSRFalseBailoutError(shellError)) {
+              sawRSCRouteSSRFalseBailout = true;
+            } else if (!isConsumerAborted()) {
+              reportError(shellError);
+            }
+          }
+          sendErrorHtml(shellError);
+          // No shell will be piped through injectRSCPayload on this path, so clear any RSC streams
+          // started before the shell error and mark their parser cleanup as expected. Do this after
+          // sendErrorHtml chooses the fallback error so captured diagnostics are still available.
+          streamingTrackers.rscRequestTracker.clear();
         },
         onShellReady() {
           renderState.isShellReady = true;
