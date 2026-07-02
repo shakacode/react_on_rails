@@ -1036,10 +1036,13 @@ test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release-finish-test output"
 }
 
-test_extensionless_ruby_release_tooling_heredoc_fixture_change_runs_release_specs() {
+assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  local script_path="$1"
+  local label="$2"
+
   setup_repo
   mkdir -p script
-  cat > script/release-forward-port <<'RUBY'
+  cat > "$script_path" <<'RUBY'
 #!/usr/bin/env ruby
 FIXTURE = <<~CHANGELOG
 # Change Log
@@ -1053,17 +1056,32 @@ CHANGELOG
 
 puts FIXTURE
 RUBY
-  commit_change "add release forward port heredoc fixture"
-  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port
-  commit_change "release forward port fixture heading"
+  commit_change "add ${label} heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' "$script_path"
+  commit_change "${label} fixture heading"
 
-  assert_release_tooling_contract "$(detector_output)" "release-forward-port heredoc output"
+  assert_release_tooling_contract "$(detector_output)" "${label} heredoc output"
 }
 
-test_bash_release_tooling_heredoc_fixture_change_runs_release_specs() {
+test_release_forward_port_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-forward-port" \
+    "release-forward-port"
+}
+
+test_release_finish_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-finish" \
+    "release-finish"
+}
+
+assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  local script_path="$1"
+  local label="$2"
+
   setup_repo
   mkdir -p script
-  cat > script/release-forward-port-test.bash <<'BASH'
+  cat > "$script_path" <<'BASH'
 #!/usr/bin/env bash
 cat > release.md <<'EOF'
 # Change Log
@@ -1071,11 +1089,23 @@ cat > release.md <<'EOF'
 ### [Unreleased]
 EOF
 BASH
-  commit_change "add release forward port bash heredoc fixture"
-  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port-test.bash
-  commit_change "release forward port bash fixture heading"
+  commit_change "add ${label} bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' "$script_path"
+  commit_change "${label} bash fixture heading"
 
-  assert_release_tooling_contract "$(detector_output)" "release-forward-port-test heredoc output"
+  assert_release_tooling_contract "$(detector_output)" "${label} heredoc output"
+}
+
+test_release_forward_port_test_heredoc_fixture_change_runs_release_specs() {
+  assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-forward-port-test.bash" \
+    "release-forward-port-test"
+}
+
+test_release_finish_test_heredoc_fixture_change_runs_release_specs() {
+  assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-finish-test.bash" \
+    "release-finish-test"
 }
 
 # Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
@@ -1140,8 +1170,10 @@ run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_gene
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
-run_test test_extensionless_ruby_release_tooling_heredoc_fixture_change_runs_release_specs
-run_test test_bash_release_tooling_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_heredoc_fixture_change_runs_release_specs
+run_test test_release_finish_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_test_heredoc_fixture_change_runs_release_specs
+run_test test_release_finish_test_heredoc_fixture_change_runs_release_specs
 run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
