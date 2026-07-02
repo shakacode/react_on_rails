@@ -252,14 +252,30 @@ module ReactOnRails
       return unless rsc_support_enabled?
 
       rspack_version = detected_rspack_version_for_rsc
-      return if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+      rspack_major_version = rsc_package_major_version(rspack_version)
+      return if rspack_major_version >= MINIMUM_RSC_RSPACK_MAJOR
+      if rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+        raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+      end
 
-      raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+      warn_undetermined_rsc_rspack_version(rspack_version)
     end
 
     def detected_rspack_version_for_rsc
       package_root = File.dirname(node_package_version.package_json)
-      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || package_dependency_spec(RSC_RSPACK_PACKAGE)
+      declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
+      declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
+      declared_major_version = rsc_package_major_version(declared_spec)
+      return declared_version if rsc_rspack_version_provably_incompatible?(declared_spec, declared_major_version)
+
+      if rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+        installed_version = rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+        return installed_version if installed_version
+      end
+
+      return declared_version if declared_major_version >= MINIMUM_RSC_RSPACK_MAJOR
+
+      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || declared_spec
     end
 
     def rsc_support_enabled?
@@ -279,7 +295,7 @@ module ReactOnRails
     end
 
     def package_dependency_spec(package_name)
-      rsc_declared_package_version(node_package_version.package_json, package_name)
+      rsc_declared_package_spec(node_package_version.package_json, package_name)
     end
 
     def rsc_rspack_version_error(rspack_version)
@@ -288,6 +304,119 @@ module ReactOnRails
         error_prefix: "**ERROR** ReactOnRails:",
         include_doctor_recommendation: true,
         package_json_path: node_package_version.package_json
+      )
+    end
+
+    def rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+      rspack_spec = rsc_static_rspack_version_spec(rspack_version)
+      return false if rspack_spec.empty?
+      return rsc_rspack_or_range_below_minimum?(rspack_spec) if rspack_spec.include?("||")
+
+      rsc_rspack_single_range_below_minimum?(rspack_spec, rspack_major_version)
+    end
+
+    def rsc_static_rspack_version_spec(rspack_version)
+      rspack_version.to_s.strip.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
+    end
+
+    def rsc_rspack_or_range_below_minimum?(rspack_version)
+      clauses = rspack_version.split("||").map(&:strip).reject(&:empty?)
+      clauses.any? && clauses.all? { |clause| rsc_rspack_single_range_below_minimum?(clause) }
+    end
+
+    def rsc_rspack_single_range_below_minimum?(
+      rspack_version,
+      rspack_major_version = rsc_package_major_version(rspack_version)
+    )
+      return false if rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
+      return rspack_major_version < MINIMUM_RSC_RSPACK_MAJOR if rspack_major_version.positive?
+
+      normalized_version = rsc_normalized_declared_package_version(rspack_version)
+      return normalized_version.split(".").first.to_i < MINIMUM_RSC_RSPACK_MAJOR if normalized_version
+
+      rsc_rspack_major_shorthand_below_minimum?(rspack_version) ||
+        rsc_rspack_upper_bound_below_minimum?(rspack_version) ||
+        rsc_rspack_hyphen_range_below_minimum?(rspack_version) ||
+        rsc_rspack_compound_static_clause_below_minimum?(rspack_version)
+    end
+
+    def rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
+      lower_bound = rspack_version.to_s.strip.match(
+        /\A>=?\s*v?(?<major>\d+)(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?\z/
+      )
+      return false unless lower_bound
+
+      lower_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+    end
+
+    def rsc_rspack_major_shorthand_below_minimum?(rspack_version)
+      shorthand = rspack_version.to_s.strip.match(
+        /\A[~^=]?\s*v?(?<major>\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i
+      )
+      return false unless shorthand
+
+      shorthand[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+    end
+
+    def rsc_rspack_upper_bound_below_minimum?(rspack_version)
+      return false if rspack_version.to_s.include?("||")
+
+      upper_bound_pattern = /(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?/
+      rspack_version.to_s.strip.to_enum(:scan, upper_bound_pattern).any? do
+        upper_bound = Regexp.last_match
+        next true if upper_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+
+        upper_bound[:operator] == "<" &&
+          upper_bound[:major].to_i == MINIMUM_RSC_RSPACK_MAJOR &&
+          [upper_bound[:minor], upper_bound[:patch]].compact.all? { |part| part.to_i.zero? }
+      end
+    end
+
+    def rsc_rspack_hyphen_range_below_minimum?(rspack_version)
+      hyphen_range = rspack_version.to_s.strip.match(
+        /
+          \A
+          v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?
+          \s+-\s+
+          v?(?<upper_major>\d+)(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?
+          \z
+        /x
+      )
+      return false unless hyphen_range
+
+      hyphen_range[:upper_major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+    end
+
+    def rsc_rspack_compound_static_clause_below_minimum?(rspack_version)
+      range = rspack_version.to_s.strip
+      return false unless range.match?(/\s/)
+      return false if range.match?(/\s+-\s+/)
+
+      clause_pattern = /
+        (?:\A|\s)
+        (?<operator>[~^=]|[<>]=?)?
+        \s*
+        v?(?<major>\d+)
+        (?:\.(?:x|\*|\d+))?
+        (?:\.(?:x|\*|\d+))?
+        (?:-[0-9A-Za-z.-]+)?
+        (?=\s|\z)
+      /ix
+      range.to_enum(:scan, clause_pattern).any? do
+        clause = Regexp.last_match
+        operator = clause[:operator].to_s
+        next false if operator.start_with?("<", ">")
+
+        clause[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+      end
+    end
+
+    def warn_undetermined_rsc_rspack_version(rspack_version)
+      detected_version = rspack_version || "not found"
+      Rails.logger&.warn(
+        "[React on Rails] Could not verify #{RSC_RSPACK_PACKAGE} >= v#{MINIMUM_RSC_RSPACK_MAJOR} for RSC " \
+        "(detected: #{detected_version}). Boot will continue; " \
+        "run bundle exec rake react_on_rails:doctor to verify before deploy."
       )
     end
 

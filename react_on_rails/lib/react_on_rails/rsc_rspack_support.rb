@@ -88,6 +88,11 @@ module ReactOnRails
       version if version&.match?(/\A\d+\.\d+\.\d+/)
     end
 
+    def rsc_flat_installed_package_version(package_root, package_name)
+      version = rsc_flat_installed_package_json(package_root, package_name)&.fetch("version", nil)
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
+    end
+
     def rsc_installed_package_json(package_root, package_name, &)
       return nil unless valid_rsc_package_name?(package_name)
 
@@ -96,12 +101,27 @@ module ReactOnRails
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       # Limitation: a stale orphaned directory can still be read if Node resolution fails.
-      resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
+      resolved_path = rsc_flat_installed_package_json_path(package_root, package_name) if resolved_path.empty?
       return nil unless File.exist?(resolved_path)
 
       JSON.parse(File.read(resolved_path))
     rescue StandardError
       nil
+    end
+
+    def rsc_flat_installed_package_json(package_root, package_name)
+      return nil unless valid_rsc_package_name?(package_name)
+
+      package_json_path = rsc_flat_installed_package_json_path(package_root, package_name)
+      return nil unless File.exist?(package_json_path)
+
+      JSON.parse(File.read(package_json_path))
+    rescue StandardError
+      nil
+    end
+
+    def rsc_flat_installed_package_json_path(package_root, package_name)
+      File.join(package_root, "node_modules", package_name, "package.json")
     end
 
     def rsc_support_enabled_config_value
@@ -125,14 +145,18 @@ module ReactOnRails
     end
 
     def rsc_package_major_version(version)
-      version_string = version.to_s
+      version_string = version.to_s.strip
       normalized_version = rsc_normalized_declared_package_version(version_string)
       return normalized_version.split(".").first.to_i if normalized_version
 
+      version_string = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
       # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
       return 0 if version_string.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
       return 0 if version_string.start_with?("workspace:")
+
+      shorthand = version_string.match(/\A[~^=]?\s*v?(\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i)
+      return shorthand[1].to_i if shorthand
 
       # Accept installed semver versions and simple declared lower-bound specs. Other npm ranges or dist-tags
       # fail closed unless Node resolution already proved that the installed package is Rspack v2.
