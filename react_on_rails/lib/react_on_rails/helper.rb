@@ -491,6 +491,7 @@ module ReactOnRails
     end
 
     def create_render_options(react_component_name, options)
+      options = options.dup
       # If no store dependencies are passed, default to all registered stores up till now
       unless options.key?(:store_dependencies)
         store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }

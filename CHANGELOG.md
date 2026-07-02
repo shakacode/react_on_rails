@@ -135,6 +135,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Registry cleanup handles page-unload cancellations safely**: Pending component and store
+  registry waits are now rejected when a page unloads or store generators are cleared, stale registry
+  timeouts are cleared, and expected navigation cancellations are ignored during client rendering while
+  real registration failures still surface. [PR 4282](https://github.com/shakacode/react_on_rails/pull/4282)
+  by [justin808](https://github.com/justin808).
+
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
   source-encoding magic comments or a UTF-8 default, and validates content before override-gem
