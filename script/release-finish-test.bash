@@ -192,7 +192,7 @@ test_promote_dry_run_prints_commands_and_runs_nothing() {
   assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote dry-run"
   assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote dry-run"
   assert_contains "$RF_OUT" "update-changelog release" "promote dry-run"
-  assert_contains "$RF_OUT" "nothing was executed" "promote dry-run"
+  assert_contains "$RF_OUT" "no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed" "promote dry-run"
 }
 
 # The dry-run must never tag, publish, or otherwise mutate the repo.
@@ -203,8 +203,8 @@ test_promote_dry_run_does_not_execute_release() {
   run_rf promote 1.0.0 --dry-run
 
   assert_status 0 "$RF_STATUS" "promote dry-run no-op status"
-  # Dry-run prints the fetch rather than running it (no real outward git ops).
-  assert_contains "$RF_OUT" "DRY RUN: would run: git fetch origin" "promote dry-run should not really fetch"
+  # Dry-run performs the read-only fetch so tag resolution matches the real run.
+  assert_contains "$RF_OUT" "+ git fetch origin" "promote dry-run should fetch before resolving tags"
   # No new v1.0.0 (final) tag, and HEAD unchanged.
   if git rev-parse -q --verify refs/tags/v1.0.0 >/dev/null 2>&1; then
     fail "promote dry-run created the final tag v1.0.0"
@@ -297,6 +297,39 @@ test_promote_aborts_when_explicit_rc_tag_absent() {
   assert_contains "$RF_OUT" "v1.0.0.rc.9 does not exist" "promote bad explicit tag"
 }
 
+push_tag_to_origin_only() {
+  local tag="$1"
+  if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
+    git tag "$tag"
+  fi
+  git push -q origin "refs/tags/$tag"
+  git tag -d "$tag" >/dev/null
+}
+
+test_promote_dry_run_fetches_remote_only_rc_tag() {
+  setup_release_repo
+  push_tag_to_origin_only v1.0.0.rc.0
+
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 0 "$RF_STATUS" "promote remote-only rc status"
+  assert_contains "$RF_OUT" "+ git fetch origin" "promote remote-only rc fetch"
+  assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote remote-only rc"
+  assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote remote-only rc release"
+}
+
+test_promote_dry_run_uses_newer_remote_rc_tag() {
+  setup_release_repo
+  push_tag_to_origin_only v1.0.0.rc.1
+
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 0 "$RF_STATUS" "promote newer remote rc status"
+  assert_contains "$RF_OUT" "+ git fetch origin" "promote newer remote rc fetch"
+  assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.1" "promote newer remote rc"
+  assert_not_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote newer remote rc"
+}
+
 # Highest rc index wins when several rc tags exist.
 test_promote_selects_highest_rc_tag() {
   setup_release_repo
@@ -334,11 +367,12 @@ test_close_out_dry_run_prints_plan_and_runs_nothing() {
 
   assert_status 0 "$RF_STATUS" "close-out dry-run status"
   assert_contains "$RF_OUT" "Close out 1.0.0 (runbook step 5)" "close-out dry-run"
+  assert_contains "$RF_OUT" "+ git fetch origin" "close-out dry-run should fetch before sync checks"
   # The real forward-port DRY-RUN plan is shown (it resolves origin/release/1.0.0).
   assert_contains "$RF_OUT" "Release forward-port plan" "close-out dry-run"
   assert_contains "$RF_OUT" "PICK" "close-out dry-run picks the fix"
   assert_contains "$RF_OUT" 'DRY RUN: would run: git push origin --delete release/1.0.0' "close-out dry-run"
-  assert_contains "$RF_OUT" "nothing was executed" "close-out dry-run"
+  assert_contains "$RF_OUT" "no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed" "close-out dry-run"
 }
 
 # The forward-port plan must exclude rc version-bump style commits; here it only
@@ -444,6 +478,36 @@ test_close_out_aborts_when_local_main_behind_origin() {
   assert_contains "$RF_OUT" "local main is not in sync" "close-out stale-main message"
 }
 
+advance_origin_main_without_fetching() {
+  local origin_dir="$PWD/../origin.git"
+  local writer_dir="$PWD/../origin-writer"
+
+  git clone -q "$origin_dir" "$writer_dir"
+  git -C "$writer_dir" checkout -q main
+  git -C "$writer_dir" config user.email test@example.com
+  git -C "$writer_dir" config user.name "Release Finish Test"
+  printf 'newer remote main\n' > "$writer_dir/newer-remote-main.txt"
+  git -C "$writer_dir" add .
+  git -C "$writer_dir" commit -qm "Advance remote main"
+  git -C "$writer_dir" push -q origin main
+}
+
+test_close_out_dry_run_fetches_before_main_sync_check() {
+  setup_release_repo
+  git checkout -q main
+  local stale_origin_main
+  stale_origin_main="$(git rev-parse origin/main)"
+  advance_origin_main_without_fetching
+
+  assert_equal "$stale_origin_main" "$(git rev-parse origin/main)" "precondition: origin/main is stale locally"
+  run_rf close-out 1.0.0 --dry-run
+
+  assert_status 1 "$RF_STATUS" "close-out dry-run stale-origin status"
+  assert_contains "$RF_OUT" "+ git fetch origin" "close-out dry-run stale-origin fetch"
+  assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out dry-run stale-origin message"
+  assert_not_contains "$RF_OUT" "Release forward-port plan" "close-out stale-origin should stop before preview"
+}
+
 # --- close-out: guard — not on main ----------------------------------------
 
 test_close_out_aborts_when_not_on_main() {
@@ -510,6 +574,8 @@ run_test test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree
 run_test test_promote_aborts_on_dirty_worktree
 run_test test_promote_aborts_when_no_rc_tag_found
 run_test test_promote_aborts_when_explicit_rc_tag_absent
+run_test test_promote_dry_run_fetches_remote_only_rc_tag
+run_test test_promote_dry_run_uses_newer_remote_rc_tag
 run_test test_promote_selects_highest_rc_tag
 run_test test_promote_without_tty_and_without_yes_aborts_before_release
 run_test test_close_out_dry_run_prints_plan_and_runs_nothing
@@ -517,6 +583,7 @@ run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
 run_test test_close_out_refuses_delete_when_forward_port_only_local
 run_test test_close_out_aborts_when_local_main_behind_origin
+run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
 run_test test_rejects_rc_version_argument
