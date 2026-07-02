@@ -11,8 +11,24 @@ permissions:
   issues: read
 
 concurrency:
-  group: ci-required-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: >-
+    ${{
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+      github.event.label.name != 'ready-for-hosted-ci' &&
+      github.event.label.name != 'force-full-hosted-ci' &&
+      format('ci-required-ignored-label-{0}', github.run_id) ||
+      format('ci-required-{0}', github.event.pull_request.number || github.ref)
+    }}
+  cancel-in-progress: >-
+    ${{
+      github.event_name != 'pull_request' ||
+      (
+        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+        github.event.label.name == 'ready-for-hosted-ci' ||
+        github.event.label.name == 'force-full-hosted-ci'
+      )
+    }}
 
 jobs:
   required-pr-gate:

@@ -5,7 +5,9 @@ on:
     types: [created]
 
 concurrency:
-  group: ci-command-${{ github.event.issue.number }}
+  # GitHub keeps at most one pending run per concurrency group. Scope the group
+  # to the triggering comment so queued +ci-* comments are all handled.
+  group: ci-command-${{ github.event.issue.number }}-${{ github.event.comment.id }}
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +47,8 @@ jobs:
               '+ci-status',
               '+ci-help'
             ];
+            const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            const permissionByLogin = new Map();
 
             function commandText(commentBody) {
               return commentBody
@@ -97,24 +101,35 @@ jobs:
               }
             }
 
-            async function hasWriteAccess() {
+            async function hasWriteAccessFor(username) {
+              if (permissionByLogin.has(username)) {
+                return permissionByLogin.get(username);
+              }
+
               let permission;
               try {
                 ({ data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
                   owner,
                   repo,
-                  username: actor
+                  username
                 }));
               } catch (error) {
                 if ([403, 404].includes(error.status)) {
-                  console.log(`Unable to read permission for ${actor}: ${error.status}`);
+                  console.log(`Unable to read permission for ${username}: ${error.status}`);
+                  permissionByLogin.set(username, false);
                   return false;
                 }
 
                 throw error;
               }
 
-              return ['admin', 'write'].includes(permission.permission);
+              const hasWritePermission = ['admin', 'write'].includes(permission.permission);
+              permissionByLogin.set(username, hasWritePermission);
+              return hasWritePermission;
+            }
+
+            async function hasWriteAccess() {
+              return hasWriteAccessFor(actor);
             }
 
             async function getPullRequest() {
@@ -267,6 +282,42 @@ jobs:
               return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
+            async function listNewerCiCommands() {
+              const newerCiCommands = [];
+              for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+                sort: 'created',
+                direction: 'asc'
+              })) {
+                for (const comment of page.data) {
+                  if (comment.id <= commentId ||
+                      comment.user?.type === 'Bot' ||
+                      !trustedCommandAssociations.has(comment.author_association) ||
+                      !(await hasWriteAccessFor(comment.user.login))) {
+                    continue;
+                  }
+
+                  const parsed = parseCommand(comment.body || '');
+                  if (parsed && validCommands.includes(parsed.command)) {
+                    newerCiCommands.push({
+                      command: parsed.command,
+                      id: comment.id
+                    });
+                  }
+                }
+              }
+
+              return newerCiCommands;
+            }
+
+            async function hasNewerCiCommand(commandNames) {
+              const commands = await listNewerCiCommands();
+              return commands.some(({ command }) => commandNames.includes(command));
+            }
+
             function helpBody() {
               return [
                 '## CI Commands',
@@ -353,15 +404,28 @@ jobs:
               }
 
               let labelAdded = false;
+              let forceFullLabelAdded = false;
+              let labelMessageOverride = '';
               if (succeeded.length > 0) {
-                try {
-                  await addHostedCiLabels(forceFull);
-                  labelAdded = true;
-                } catch (error) {
-                  failed.push({
-                    workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
-                    error: error.message
-                  });
+                if (await hasNewerCiCommand(['+ci-stop-hosted', '+ci-skip-hosted'])) {
+                  labelMessageOverride =
+                    'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
+                } else {
+                  const shouldAddForceFullLabel = forceFull && !(await hasNewerCiCommand(['+ci-stop-full']));
+                  try {
+                    await addHostedCiLabels(shouldAddForceFullLabel);
+                    labelAdded = true;
+                    forceFullLabelAdded = shouldAddForceFullLabel;
+                    if (forceFull && !shouldAddForceFullLabel) {
+                      labelMessageOverride =
+                        'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                    }
+                  } catch (error) {
+                    failed.push({
+                      workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                      error: error.message
+                    });
+                  }
                 }
               }
 
@@ -370,13 +434,13 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
-              const labelMessage = labelAdded && forceFull
+              const labelMessage = labelMessageOverride || (labelAdded && forceFullLabelAdded
                 ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
                 : labelAdded
                   ? 'Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI until `+ci-stop-hosted` is used.'
-                : succeeded.length > 0
-                  ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
-                  : 'Hosted CI labels were not added because no workflows were triggered.';
+                  : succeeded.length > 0
+                    ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
+                  : 'Hosted CI labels were not added because no workflows were triggered.');
 
               await postComment([
                 forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
@@ -397,6 +461,11 @@ jobs:
             }
 
             async function handleSkipHosted(pr, args) {
+              if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted-CI waiver because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removedHostedCi = await removeHostedCiLabels();
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
@@ -415,6 +484,11 @@ jobs:
             }
 
             async function handleStopHosted() {
+              if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removed = await removeHostedCiLabels();
               await postComment([
                 '## Hosted CI Mode Disabled',
@@ -428,6 +502,11 @@ jobs:
             }
 
             async function handleStopFull() {
+              if (await hasNewerCiCommand(['+ci-force-full'])) {
+                await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
+                return;
+              }
+
               const removed = await removeForceFullHostedCiLabel();
               await postComment([
                 '## Force-Full Hosted CI Disabled',
