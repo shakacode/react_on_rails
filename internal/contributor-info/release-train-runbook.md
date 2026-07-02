@@ -9,6 +9,7 @@ because it coordinates maintainer-only go/no-go decisions and private validation
 
 - [`releasing.md`](releasing.md) — the mechanical `rake release` steps (version bumps, publishing, tags).
 - [`rc-testing-plan.md`](rc-testing-plan.md) — the hard-gate / smoke-evidence validation that decides whether an RC is good.
+- [`release-verification-runbook.md`](release-verification-runbook.md) — the behavioral verification lanes (upgrade dry-run, debut-feature abuse pass, stress/soak, changelog and artifact audits) run against each RC.
 - [`agent-coordination-backend.md`](agent-coordination-backend.md) — how the current phase is published to agents.
 
 `AGENTS.md` carries the short, canonical policy (the phase→gate table and the branching rules an agent
@@ -202,7 +203,10 @@ gh pr create --base release/17.0.0 --title "Fix SSR regression" --body "..."
 
 Merge stabilizing PRs into `release/X.Y.Z`, then cut the next RC tag (`v17.0.0.rc.1`, …) from the
 branch tip when maintainers want a new candidate to validate. Re-run the hard-gate validation in
-[`rc-testing-plan.md`](rc-testing-plan.md) for each RC.
+[`rc-testing-plan.md`](rc-testing-plan.md) for each RC, and run the behavioral lanes in
+[`release-verification-runbook.md`](release-verification-runbook.md) (upgrade dry-run,
+debut-feature abuse pass, stress/soak, changelog and artifact audits) — they must be green or
+explicitly waived before step 4 promotes the RC.
 
 > Targeting confusion is the most common mistake here. A fix opened against `main` during the RC phase
 > does **not** reach the release unless it is forward-ported in step 3 (run in reverse: cherry-pick
