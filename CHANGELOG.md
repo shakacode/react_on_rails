@@ -57,6 +57,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 4263](https://github.com/shakacode/react_on_rails/issues/4263).
   [PR 4268](https://github.com/shakacode/react_on_rails/pull/4268) by
   [justin808](https://github.com/justin808).
+- **[Pro]** **Cached static RSC public-page helper and diagnostics**:
+  `cached_static_rsc_component` caches stripped static RSC HTML for public pages
+  that intentionally skip the generated page pack, while respecting
+  `auto_load_bundle: false` and preserving explicit sidecar assets. Static RSC
+  render diagnostics report cache hit/miss state, redacted cache-key digests,
+  HTML and stripped payload bytes, emitted asset bytes, and RSC client-reference
+  entries for performance investigations. Fixes
+  [Issue 4295](https://github.com/shakacode/react_on_rails/issues/4295) and
+  [Issue 4296](https://github.com/shakacode/react_on_rails/issues/4296).
+  [PR 4386](https://github.com/shakacode/react_on_rails/pull/4386) by
+  [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **`Server-Timing` attribution for streamed RSC responses**: When `rsc_stream_observability: true`, the streamed RSC response now also carries a `Server-Timing` response header with a `ror_stream_shell` metric (Rails shell render, including the blocking wait for each component's first renderer chunk), set in the narrow window before `ActionController::Live` commits headers and appended to any existing `Server-Timing` entries. The Node renderer additionally emits a `ror_renderer_prepare` metric (execution-context build plus render start) on its HTTP response. This is the server/renderer-side complement to the browser performance marks above, letting a reviewer attribute the streamed `responseEnd` tail to a specific phase rather than guessing. Total/stream-complete time stays on the `react-on-rails:rsc:stream` mark because `ActionController::Live` does not support HTTP trailers. Closes [Issue 4239](https://github.com/shakacode/react_on_rails/issues/4239). [PR 4251](https://github.com/shakacode/react_on_rails/pull/4251) by [justin808](https://github.com/justin808).

@@ -84,6 +84,8 @@ Nonces are per-request values; caching renders per-request markup. Two distinct 
 
 `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes the executable inline scripts **with the nonce of the request that populated the cache**, and the cache key does **not** include the nonce.
 
+`cached_static_rsc_component` strips embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS` before caching, so those payload scripts are not served with stale nonces. Any other executable inline scripts preserved in the cached HTML still follow this nonce caveat.
+
 A cache hit therefore serves a stale nonce to a different request, whose CSP header carries a different nonce — the browser blocks those inline scripts and immediate hydration/console replay silently degrade (components still hydrate via the client bundle's normal page-load path, but the strict-CSP guarantee of "zero violations" no longer holds).
 
 **Recommendation**: do not combine the fragment-caching helpers with a nonce-enforcing `script-src` until this is addressed. If you need both, exclude fragment-cached components from strict enforcement (e.g., `content_security_policy_report_only` while migrating) and watch your CSP violation reports.

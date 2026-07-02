@@ -19,9 +19,14 @@
 
 require "react_on_rails/helper"
 require "async/promise"
+require "digest"
+require "json"
+require "nokogiri"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
+  STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
+
   def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
       cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
@@ -344,6 +349,32 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Cached static RSC rendering for public pages that use a sidecar pack instead of
+  # hydrating the generated page pack. The cached value is the buffered HTML after
+  # removing embedded RSC payload bootstrap scripts.
+  def cached_static_rsc_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      raw_options = raw_options.dup
+      diagnostics_context = static_rsc_diagnostics_context(raw_options)
+
+      check_caching_options!(raw_options, block)
+      check_cached_static_rsc_options!(raw_options)
+
+      render_options = raw_options.merge(auto_load_bundle: static_rsc_auto_load_bundle(raw_options))
+      cache_options = static_rsc_cache_options(raw_options, render_options)
+
+      cached_result = render_cached_static_rsc_component(
+        component_name,
+        cache_options,
+        render_options,
+        diagnostics_context,
+        &block
+      )
+      emit_static_rsc_render_diagnostics(component_name, render_options, diagnostics_context, cached_result)
+      cached_result.html_safe
+    end
+  end
+
   # Renders a React component asynchronously, returning an AsyncValue immediately.
   # Multiple async_react_component calls will execute their HTTP rendering requests
   # concurrently instead of sequentially.
@@ -412,9 +443,393 @@ module ReactOnRailsProHelper
       type: "ReactOnRails",
       name: "cached_buffered_stream_react_component"
     )
+    instrument_method(
+      :cached_static_rsc_component,
+      type: "ReactOnRails",
+      name: "cached_static_rsc_component"
+    )
   end
 
   private
+
+  def check_cached_static_rsc_options!(raw_options)
+    return unless raw_options[:on_complete].respond_to?(:call)
+
+    raise ReactOnRailsPro::Error,
+          "cached_static_rsc_component does not support on_complete; " \
+          "use buffered_stream_react_component for chunk callbacks"
+  end
+
+  def static_rsc_auto_load_bundle(raw_options)
+    return raw_options[:auto_load_bundle] if raw_options.key?(:auto_load_bundle)
+
+    ReactOnRails.configuration.auto_load_bundle
+  end
+
+  def static_rsc_cache_options(raw_options, render_options)
+    render_options.merge(
+      cache_key: lambda do
+        raw_cache_key = raw_options[:cache_key]
+        cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
+
+        ["static_rsc_component", cache_key_value]
+      end,
+      prerender: true
+    )
+  end
+
+  def static_rsc_diagnostics_context(raw_options)
+    diagnostics_config = raw_options.delete(:rsc_render_diagnostics)
+    diagnostic_packs = raw_options.delete(:rsc_diagnostic_packs)
+    diagnostic_packs ||= diagnostics_config[:packs] if diagnostics_config.is_a?(Hash)
+
+    {
+      config: diagnostics_config,
+      packs: diagnostic_packs,
+      cache: {},
+      payload: {},
+      started_at: Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    }
+  end
+
+  def render_cached_static_rsc_component(component_name, cache_options, render_options, diagnostics_context, &block)
+    fetch_static_rsc_component(component_name, cache_options, render_options, diagnostics_context[:cache]) do
+      static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context, &block)
+    end
+  end
+
+  def static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context)
+    options = render_options.merge(
+      props: yield,
+      skip_prerender_cache: true
+    )
+    strip_static_rsc_payload_scripts(
+      buffered_stream_react_component(component_name, options),
+      diagnostics: diagnostics_context[:payload]
+    )
+  end
+
+  def fetch_static_rsc_component(component_name, cache_options, render_options, cache_diagnostics, &)
+    cache_enabled = ReactOnRailsPro::Cache.use_cache?(cache_options)
+    cache_diagnostics[:enabled] = cache_enabled
+    cache_diagnostics[:hit] = false
+
+    return yield unless cache_enabled
+
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    raw_cache_options = cache_options[:cache_options]
+    cache_diagnostics[:key_digest] = static_rsc_cache_key_digest(cache_key)
+    cache_diagnostics[:write_expired] = ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+    Rails.logger.debug { "React on Rails Pro static RSC cache_key is #{cache_key.inspect}" }
+
+    return yield if cache_diagnostics[:write_expired]
+
+    fetch_static_rsc_component_cache_entry(
+      component_name,
+      cache_options,
+      render_options,
+      cache_diagnostics,
+      cache_key,
+      &
+    )
+  end
+
+  def fetch_static_rsc_component_cache_entry(
+    component_name,
+    cache_options,
+    render_options,
+    cache_diagnostics,
+    cache_key
+  )
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(cache_options[:cache_options])
+    cache_hit = true
+    normalized_cache_tags = []
+    result = Rails.cache.fetch(cache_key, cache_write_options) do
+      cache_hit = false
+      normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(cache_options[:cache_tags])
+      yield
+    end
+
+    unless cache_hit
+      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+    end
+    load_static_rsc_generated_pack_on_cache_hit(component_name, render_options) if cache_hit
+
+    cache_diagnostics[:hit] = cache_hit
+    result
+  end
+
+  def load_static_rsc_generated_pack_on_cache_hit(component_name, render_options)
+    render_options_object = ReactOnRails::ReactComponent::RenderOptions.new(
+      react_component_name: component_name,
+      options: render_options
+    )
+    load_pack_for_generated_component(component_name, render_options_object)
+  end
+
+  def strip_static_rsc_payload_scripts(html, diagnostics: nil)
+    raw_html = html.to_s
+    stripped_script_count = 0
+    stripped_script_bytes = 0
+    fragment = Nokogiri::HTML5.fragment(raw_html)
+
+    fragment.css("script").each do |script_node|
+      next unless static_rsc_payload_script?(script_node)
+
+      stripped_script_count += 1
+      stripped_script_bytes += script_node.to_html.bytesize
+      script_node.remove
+    end
+
+    stripped_html = fragment.to_html
+
+    diagnostics&.merge!(
+      raw_bytes: raw_html.bytesize,
+      bootstrap_script_count: stripped_script_count,
+      bootstrap_script_bytes: stripped_script_bytes
+    )
+
+    stripped_html.html_safe
+  end
+
+  def static_rsc_payload_script?(script_node)
+    return false unless executable_script_type?(script_node["type"])
+
+    stripped_body = script_node.content.to_s.strip
+
+    stripped_body.match?(/\Adelete\s*\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
+      stripped_body.match?(/\A\(\(\s*self\.REACT_ON_RAILS_RSC_PAYLOADS\b/) ||
+      stripped_body.match?(/\A\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
+      stripped_body.match?(/\Aconsole\.(?:error|info|log|warn)\.apply\(\s*console\s*,\s*\[\s*["']\[SERVER\]/)
+  end
+
+  def executable_script_type?(script_type)
+    return true if script_type.blank?
+
+    script_type = script_type.to_s.downcase.strip
+    script_type.empty? ||
+      script_type == "module" ||
+      script_type.end_with?("javascript") ||
+      script_type == "text/ecmascript" ||
+      script_type == "application/ecmascript"
+  end
+
+  def emit_static_rsc_render_diagnostics(component_name, render_options, diagnostics_context, cached_result)
+    diagnostics_config = diagnostics_context[:config]
+    return unless static_rsc_render_diagnostics_enabled?(diagnostics_config)
+
+    summary = static_rsc_render_diagnostics_summary(
+      component_name,
+      render_options,
+      diagnostics_context,
+      cached_result
+    )
+
+    diagnostics_config.call(summary) if diagnostics_config.respond_to?(:call)
+    ActiveSupport::Notifications.instrument(STATIC_RSC_RENDER_DIAGNOSTIC_EVENT, summary)
+    log_static_rsc_render_diagnostics(summary, diagnostics_config)
+  rescue StandardError => e
+    Rails.logger.warn(
+      "[ReactOnRailsPro] Failed to emit static RSC diagnostics: #{e.class}: #{e.message}"
+    )
+  end
+
+  def static_rsc_render_diagnostics_enabled?(diagnostics_config)
+    return false if diagnostics_config == false
+
+    !diagnostics_config.nil? || Rails.env.development? || ReactOnRailsPro.configuration.tracing
+  end
+
+  def log_static_rsc_render_diagnostics(summary, diagnostics_config)
+    return unless Rails.logger.info?
+    return unless diagnostics_config == true || diagnostics_config.is_a?(Hash) || Rails.env.development? ||
+                  ReactOnRailsPro.configuration.tracing
+
+    Rails.logger.info { "[ReactOnRailsPro] RSC render summary: #{summary.to_json}" }
+  end
+
+  def static_rsc_render_diagnostics_summary(component_name, render_options, diagnostics_context, cached_result)
+    cache_diagnostics = diagnostics_context[:cache]
+    payload_diagnostics = diagnostics_context[:payload]
+    cached_html = cached_result.to_s
+    {
+      component: component_name,
+      render_mode: "static_rsc",
+      auto_load_bundle: render_options[:auto_load_bundle],
+      server_render_ms: static_rsc_elapsed_ms(diagnostics_context[:started_at]),
+      cache: static_rsc_cache_diagnostics_payload(cache_diagnostics),
+      html: {
+        raw_bytes: payload_diagnostics[:raw_bytes],
+        cached_bytes: cached_html.bytesize
+      },
+      rsc_payload: {
+        bootstrap_script_count: payload_diagnostics[:bootstrap_script_count],
+        bootstrap_script_bytes: payload_diagnostics[:bootstrap_script_bytes],
+        stripped: static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
+      },
+      emitted_assets: static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostics_context[:packs]),
+      client_references: static_rsc_client_reference_diagnostics(cache_hit: cache_diagnostics[:hit])
+    }
+  end
+
+  def static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
+    # Cache hits come from this helper's cache namespace, whose writes strip bootstrap scripts.
+    return true if cache_diagnostics[:hit]
+
+    payload_diagnostics[:bootstrap_script_count].to_i.positive?
+  end
+
+  def static_rsc_cache_diagnostics_payload(cache_diagnostics)
+    {
+      enabled: cache_diagnostics[:enabled],
+      hit: cache_diagnostics[:hit],
+      key_digest: cache_diagnostics[:key_digest],
+      write_expired: cache_diagnostics[:write_expired]
+    }
+  end
+
+  def static_rsc_elapsed_ms(started_at)
+    ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at) * 1000).round(3)
+  end
+
+  def static_rsc_cache_key_digest(cache_key)
+    expanded_key = ActiveSupport::Cache.expand_cache_key(cache_key)
+    Digest::SHA256.hexdigest(expanded_key)
+  end
+
+  def static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostic_packs)
+    diagnostics = { packs: [], js: [], css: [], unavailable: [] }
+    pack_names = static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs, diagnostics)
+    diagnostics[:packs] = pack_names
+
+    pack_names.each do |pack_name|
+      append_static_rsc_pack_asset_diagnostics(diagnostics, pack_name, type: :javascript, required: true)
+      append_static_rsc_pack_asset_diagnostics(diagnostics, pack_name, type: :stylesheet, required: false)
+    end
+
+    diagnostics
+  end
+
+  def static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs, diagnostics = nil)
+    pack_names = []
+    if render_options[:auto_load_bundle]
+      begin
+        pack_names << generated_component_pack_name(component_name)
+      rescue StandardError => e
+        diagnostics&.dig(:unavailable)&.push(
+          {
+            pack: component_name.to_s,
+            type: :generated_component_pack,
+            reason: "#{e.class}: #{e.message}"
+          }
+        )
+      end
+    end
+    pack_names.concat(Array.wrap(diagnostic_packs).flatten.compact.map(&:to_s))
+    pack_names.uniq
+  end
+
+  def append_static_rsc_pack_asset_diagnostics(diagnostics, pack_name, type:, required:)
+    key = type == :javascript ? :js : :css
+    preload_sources_for_pack(pack_name, type:, required:).each do |source|
+      diagnostics[key] << static_rsc_asset_diagnostic_entry(pack_name, source)
+    end
+  rescue StandardError => e
+    diagnostics[:unavailable] << {
+      pack: pack_name,
+      type:,
+      reason: "#{e.class}: #{e.message}"
+    }
+  end
+
+  def static_rsc_asset_diagnostic_entry(pack_name, source)
+    source_path = preload_manifest_source(source)
+    {
+      pack: pack_name,
+      name: static_rsc_asset_name(source_path),
+      href: static_rsc_asset_href(source),
+      bytes: static_rsc_asset_bytes(source_path)
+    }
+  end
+
+  def static_rsc_asset_name(source_path)
+    source_path.to_s.split(/[?#]/, 2).first.delete_prefix("/")
+  end
+
+  def static_rsc_asset_href(source)
+    preload_source_path(source)
+  rescue StandardError
+    preload_manifest_source(source)
+  end
+
+  def static_rsc_asset_bytes(source_path)
+    clean_source_path = source_path.to_s.split(/[?#]/, 2).first
+    return if clean_source_path.match?(%r{\A(?:[a-z][a-z\d+.-]*:)?//}i)
+
+    candidates = static_rsc_asset_path_candidates(clean_source_path)
+    candidate = candidates.find { |path| File.file?(path) }
+    File.size(candidate) if candidate
+  rescue StandardError
+    nil
+  end
+
+  def static_rsc_asset_path_candidates(clean_source_path)
+    relative_source_path = clean_source_path.delete_prefix("/")
+    shakapacker_config = current_shakapacker_instance.config
+    public_output_path = Pathname.new(shakapacker_config.public_output_path.to_s)
+    public_path = Pathname.new(shakapacker_config.public_path.to_s)
+    public_output_prefix = public_output_path.relative_path_from(public_path).to_s
+
+    [
+      public_output_path.join(relative_source_path.delete_prefix("#{public_output_prefix}/")),
+      public_path.join(relative_source_path),
+      Rails.root.join("public", relative_source_path)
+    ].uniq
+  rescue StandardError
+    [Rails.root.join("public", clean_source_path.delete_prefix("/"))]
+  end
+
+  def static_rsc_client_reference_diagnostics(cache_hit: false)
+    return { count: nil, entries: [], unavailable_reason: "cache_hit" } if cache_hit
+
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      return { count: 0, entries: [], unavailable_reason: "rsc_support_disabled" }
+    end
+
+    manifest_path = ReactOnRailsPro::Utils.react_client_manifest_file_path
+    return { count: nil, entries: [], unavailable_reason: "manifest_path_unavailable" } if manifest_path.blank?
+    if manifest_path.match?(%r{\A(?:[a-z][a-z\d+.-]*:)?//}i)
+      return { count: nil, entries: [], unavailable_reason: "manifest_served_by_dev_server" }
+    end
+
+    manifest = JSON.parse(File.read(manifest_path))
+    entries = static_rsc_client_reference_entries(static_rsc_client_reference_manifest(manifest))
+    { count: entries.size, entries: }
+  rescue StandardError => e
+    { count: nil, entries: [], unavailable_reason: "#{e.class}: #{e.message}" }
+  end
+
+  def static_rsc_client_reference_manifest(manifest)
+    if manifest.is_a?(Hash) && manifest["filePathToModuleMetadata"].is_a?(Hash)
+      return manifest["filePathToModuleMetadata"]
+    end
+
+    manifest
+  end
+
+  def static_rsc_client_reference_entries(manifest)
+    return [] unless manifest.is_a?(Hash)
+
+    entries = manifest.map do |name, metadata|
+      entry = { name: name.to_s }
+      if metadata.is_a?(Hash)
+        entry[:id] = metadata["id"] if metadata.key?("id")
+        entry[:chunks] = Array.wrap(metadata["chunks"]).compact.map(&:to_s) if metadata.key?("chunks")
+      end
+      entry
+    end
+    entries.sort_by { |entry| entry[:name] }
+  end
 
   def fetch_stream_react_component(component_name, raw_options, &)
     auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
