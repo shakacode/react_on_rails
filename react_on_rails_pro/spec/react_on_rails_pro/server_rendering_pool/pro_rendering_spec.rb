@@ -170,14 +170,6 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
           @store[key] = yield
         end
 
-        def read(key)
-          @store[key]
-        end
-
-        def write(key, value, _options = {})
-          @store[key] = value
-        end
-
         def value_for(key)
           @store.fetch(key)
         end
