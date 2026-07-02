@@ -174,6 +174,7 @@ function scheduleWhenVisible(domNode: Element, callback: () => void): () => void
       const target = entries[0]?.target;
       if (target && !target.isConnected) {
         observer.disconnect();
+        callback();
         return;
       }
       const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0);
