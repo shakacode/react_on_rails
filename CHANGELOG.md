@@ -83,6 +83,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
+  bypasses renders that use async props, so per-request async stream output cannot be replayed from
+  another request's cached stream. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
+
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
