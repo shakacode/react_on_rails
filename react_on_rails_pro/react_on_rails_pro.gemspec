@@ -49,7 +49,6 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 3.3.0"
 
-  s.add_runtime_dependency "addressable"
   s.add_runtime_dependency "async", ">= 2.29"
   s.add_runtime_dependency "async-http", "~> 0.95"
   s.add_runtime_dependency "execjs", "~> 2.9"
@@ -57,7 +56,6 @@ Gem::Specification.new do |s|
   # Pro's only JWT call site (LicenseValidator) pins algorithm: "RS256" with
   # public-key verification, which is safe on jwt 2.x as well as 3.x.
   s.add_runtime_dependency "jwt", ">= 2.5", "< 4"
-  s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   s.add_development_dependency "bundler"
   s.add_development_dependency "commonmarker"
