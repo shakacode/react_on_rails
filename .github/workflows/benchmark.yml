@@ -93,15 +93,6 @@ concurrency:
 
 jobs:
   detect-changes:
-    # Label-triggered PR benchmark runs should only react to benchmark control labels.
-    if: |
-      github.event_name != 'pull_request' ||
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'benchmark' ||
-      github.event.label.name == 'benchmark-core' ||
-      github.event.label.name == 'benchmark-pro' ||
-      github.event.label.name == 'benchmark-pro-node-renderer' ||
-      github.event.label.name == 'hosted-ci-no-benchmarks'
     permissions:
       contents: read
       actions: read
