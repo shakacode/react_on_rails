@@ -110,6 +110,18 @@ class RelationLikeTag
   end
 end
 
+class BatchDeleteMemoryStore < ActiveSupport::Cache::MemoryStore
+  attr_reader :delete_multi_entries_calls
+
+  private
+
+  def delete_multi_entries(entries, **options)
+    @delete_multi_entries_calls ||= []
+    @delete_multi_entries_calls << entries.dup
+    super
+  end
+end
+
 describe ReactOnRailsPro::Cache::TagIndex, :caching do
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
 
@@ -127,6 +139,12 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     described_class.instance_variable_set(:@warned_missing_expiry_cache_keys, {})
     described_class.instance_variable_set(:@warned_private_key_api_mutex, Mutex.new)
     described_class.instance_variable_set(:@warned_private_key_api, {})
+  end
+
+  def use_batch_delete_store
+    BatchDeleteMemoryStore.new.tap do |store|
+      allow(Rails).to receive(:cache).and_return(store)
+    end
   end
 
   describe ".normalize_tags" do
@@ -324,7 +342,19 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read("entry/two")).to be_nil
     end
 
+    it "uses delete_multi for stores that override Rails' batch deletion hook" do
+      store = use_batch_delete_store
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", {})
+      described_class.register(["t"], "entry/two", {})
+
+      expect(described_class.revalidate("t")).to eq(2)
+      expect(store.delete_multi_entries_calls).to eq([%w[entry/one entry/two]])
+    end
+
     it "coerces nil delete_multi results from custom stores to zero deletes" do
+      use_batch_delete_store
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", {})
       allow(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).and_return(nil)
@@ -333,6 +363,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
     end
 
     it "counts deleted entries from custom stores that return undeleted keys" do
+      use_batch_delete_store
       Rails.cache.write("entry/one", "one")
       Rails.cache.write("entry/two", "two")
       described_class.register(["t"], "entry/one", {})
@@ -357,15 +388,158 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
-    it "deletes the index before cached entries to shrink the revalidation race window" do
+    it "keeps the index when cached entry deletion raises so revalidation can be retried" do
+      use_batch_delete_store
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/two", { expires_in: 3600 })
+      original_delete_multi = Rails.cache.method(:delete_multi)
+      attempts = 0
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        attempts += 1
+        raise StandardError, "delete_multi failed" if attempts == 1
+
+        original_delete_multi.call(keys, namespace:)
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(index_payload("t")["keys"]).to eq(%w[entry/one entry/two])
+      expect(Rails.cache.read("entry/one")).to eq("one")
+      expect(Rails.cache.read("entry/two")).to eq("two")
+
+      expect(described_class.revalidate("t")).to eq(2)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to be_nil
+      expect(index_payload("t")).to be_nil
+    end
+
+    it "keeps restored failure indexes capped while prioritizing entries whose deletion failed" do
+      use_batch_delete_store
+      allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_max_keys).and_return(2)
+      Rails.cache.write("entry/old-one", "old-one")
+      Rails.cache.write("entry/old-two", "old-two")
+      described_class.register(["t"], "entry/old-one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/old-two", { expires_in: 3600 })
+
+      allow(Rails.cache).to receive(:delete_multi) do
+        Rails.cache.write("entry/new-one", "new-one")
+        Rails.cache.write("entry/new-two", "new-two")
+        described_class.register(["t"], "entry/new-one", { expires_in: 3600 })
+        described_class.register(["t"], "entry/new-two", { expires_in: 3600 })
+        raise StandardError, "delete_multi failed"
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(index_payload("t")["keys"]).to eq(%w[entry/old-one entry/old-two])
+      expect(logger_mock).to have_received(:warn).once
+    end
+
+    it "restores only undeleted original keys after partial per-key deletion failure" do
+      Rails.cache.write("entry/one", "old-one")
+      Rails.cache.write("entry/two", "old-two")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/two", { expires_in: 3600 })
+      original_delete = Rails.cache.method(:delete)
+      failed_entry_two_delete = false
+      repopulated_entry_one = false
+
+      allow(Rails.cache).to receive(:delete) do |key, **options|
+        if key == "entry/one"
+          original_delete.call(key, **options).tap do
+            unless repopulated_entry_one
+              repopulated_entry_one = true
+              Rails.cache.write("entry/one", "new-one")
+              described_class.register(["t"], "entry/one", { expires_in: 3600 })
+            end
+          end
+        elsif key == "entry/two" && !failed_entry_two_delete
+          failed_entry_two_delete = true
+          raise StandardError, "entry/two delete failed"
+        else
+          original_delete.call(key, **options)
+        end
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "entry/two delete failed")
+      expect(Rails.cache.read("entry/one")).to eq("new-one")
+      expect(Rails.cache.read("entry/two")).to eq("old-two")
+      expect(index_payload("t")["keys"]).to eq(%w[entry/one entry/two])
+
+      expect(described_class.revalidate("t")).to eq(2)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to be_nil
+      expect(index_payload("t")).to be_nil
+    end
+
+    it "logs when the restored failure index write returns false instead of raising" do
+      use_batch_delete_store
+      Rails.cache.write("entry/one", "one")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      index_key = described_class.index_key("t")
+      warning_messages = []
+
+      allow(logger_mock).to receive(:warn) do |message = nil, &block|
+        warning_messages << (message || block.call)
+      end
+      allow(Rails.cache).to receive(:delete_multi).and_raise(StandardError, "delete_multi failed")
+      allow(Rails.cache).to receive(:write).and_call_original
+      allow(Rails.cache)
+        .to receive(:write)
+        .with(index_key, kind_of(Hash), hash_including(:expires_in))
+        .and_return(false)
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(warning_messages.join("\n")).to include("cache tag index restore write returned false")
+    end
+
+    it "deletes the index before cached entries to avoid dropping same-key repopulations" do
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", { expires_in: 3600 })
       index_key = described_class.index_key("t")
 
       expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
-      expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
+      expect(Rails.cache).to receive(:delete).with("entry/one", namespace: nil).ordered.and_call_original
 
       expect(described_class.revalidate("t")).to eq(1)
+    end
+
+    it "preserves entries registered while revalidation is deleting the previous snapshot" do
+      use_batch_delete_store
+      Rails.cache.write("entry/one", "one")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      original_delete_multi = Rails.cache.method(:delete_multi)
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        deleted = original_delete_multi.call(keys, namespace:)
+        Rails.cache.write("entry/new", "new")
+        described_class.register(["t"], "entry/new", { expires_in: 3600 })
+        deleted
+      end
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/new")).to eq("new")
+      expect(index_payload("t")["keys"]).to eq(["entry/new"])
+    end
+
+    it "preserves same-key entries registered while revalidation is deleting the previous snapshot" do
+      use_batch_delete_store
+      Rails.cache.write("entry/one", "old")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      original_delete_multi = Rails.cache.method(:delete_multi)
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        deleted = original_delete_multi.call(keys, namespace:)
+        Rails.cache.write("entry/one", "new")
+        described_class.register(["t"], "entry/one", { expires_in: 3600 })
+        deleted
+      end
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to eq("new")
+      expect(index_payload("t")["keys"]).to eq(["entry/one"])
     end
 
     it "caps keys per tag at cache_tag_index_max_keys, dropping the oldest" do

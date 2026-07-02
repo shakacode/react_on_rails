@@ -39,6 +39,18 @@ module ReactOnRailsPro
     #   an error. This also covers :null_store and per-process :memory_store.
     # rubocop:disable Metrics/ClassLength
     class TagIndex
+      class EntryDeletionError < StandardError
+        attr_reader :keys_to_restore, :original_error
+
+        def initialize(original_error, keys_to_restore)
+          @keys_to_restore = keys_to_restore
+          @original_error = original_error
+          super(original_error.message)
+          set_backtrace(original_error.backtrace)
+        end
+      end
+      private_constant :EntryDeletionError
+
       INDEX_KEY_PREFIX = "rorp:tag:v1:"
       # Keep the index entry alive slightly longer than the cache entries it
       # points at, so an entry never outlives its index registration.
@@ -168,8 +180,7 @@ module ReactOnRailsPro
 
           now = Time.now.to_f
           expires_at = [existing_expires_at, now + index_ttl(cache_options)].compact.max
-          ttl = [expires_at - now, 1].max
-          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
+          write_index(key, keys, expires_at)
         end
 
         def read_index(key)
@@ -260,15 +271,52 @@ module ReactOnRailsPro
 
         def revalidate_tag(tag)
           key = index_key(tag)
-          keys, _expires_at = read_index(key)
+          keys, expires_at = read_index(key)
           return 0 if keys.empty?
 
-          Rails.cache.delete(key)
-          deleted = delete_entries(keys)
+          deleted = delete_entries_with_restorable_index(tag, key, keys, expires_at)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
           deleted
+        end
+
+        def write_index(key, keys, expires_at)
+          expires_at ||= Time.now.to_f + ReactOnRailsPro.configuration.cache_tag_index_expires_in.to_f
+          ttl = [expires_at - Time.now.to_f, 1].max
+          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
+        end
+
+        def delete_entries_with_restorable_index(tag, key, keys, expires_at)
+          Rails.cache.delete(key)
+          delete_entries(keys)
+        rescue EntryDeletionError => e
+          restore_index_after_revalidation_failure(tag, key, e.keys_to_restore, expires_at)
+          raise e.original_error
+        rescue StandardError
+          restore_index_after_revalidation_failure(tag, key, keys, expires_at)
+          raise
+        end
+
+        def restore_index_after_revalidation_failure(tag, key, keys_to_restore, expires_at)
+          current_keys, current_expires_at = read_index(key)
+          restored_keys = merge_restored_keys(current_keys, keys_to_restore)
+          enforce_max_keys(tag, restored_keys)
+          restored_expires_at = [current_expires_at, expires_at].compact.max
+          restore_result = write_index(key, restored_keys, restored_expires_at)
+          unless restore_result
+            raise ReactOnRailsPro::Error,
+                  "cache tag index restore write returned #{restore_result.inspect}"
+          end
+        rescue StandardError => e
+          Rails.logger.warn do
+            "[ReactOnRailsPro] failed to restore cache tag index after revalidation failure: " \
+              "#{e.class}: #{e.message}"
+          end
+        end
+
+        def merge_restored_keys(current_keys, keys_to_restore)
+          (current_keys + keys_to_restore).reverse.uniq.reverse
         end
 
         # The recorded keys carry their full logical name (including any
@@ -278,11 +326,26 @@ module ReactOnRailsPro
         # per-key deletes on older stores.
         # Returns an Integer count of deleted cache entries.
         def delete_entries(keys)
-          if Rails.cache.respond_to?(:delete_multi)
+          if Rails.cache.respond_to?(:delete_multi) && !base_delete_multi?(Rails.cache)
             coerce_delete_multi_count(Rails.cache.delete_multi(keys, namespace: nil), keys)
           else
-            keys.count { |key| Rails.cache.delete(key, namespace: nil) }
+            delete_entries_individually(keys)
           end
+        end
+
+        def base_delete_multi?(store)
+          !store.respond_to?(:delete_multi_entries, true) ||
+            store.method(:delete_multi_entries).owner == ActiveSupport::Cache::Store
+        end
+
+        def delete_entries_individually(keys)
+          deleted = 0
+          keys.each_with_index do |key, index|
+            deleted += 1 if Rails.cache.delete(key, namespace: nil)
+          rescue StandardError => e
+            raise EntryDeletionError.new(e, keys[index..])
+          end
+          deleted
         end
 
         def coerce_delete_multi_count(result, keys)
