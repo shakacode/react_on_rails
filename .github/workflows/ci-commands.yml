@@ -292,9 +292,19 @@ jobs:
               return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
+            function newerCommandScanSince() {
+              const createdAt = Date.parse(commentCreatedAt);
+              if (Number.isNaN(createdAt)) {
+                return undefined;
+              }
+
+              return new Date(Math.max(0, createdAt - 60000)).toISOString();
+            }
+
             async function newerCiCommands(commandNames, { waitForVisibility = true } = {}) {
               const commandNameSet = new Set(commandNames);
               const newerCommands = new Set();
+              const since = newerCommandScanSince();
 
               // Give GitHub's comments API a short visibility window so a later
               // stop/skip command wins over an older run-hosted command that is
@@ -310,7 +320,7 @@ jobs:
                 per_page: 100,
                 sort: 'created',
                 direction: 'asc',
-                since: commentCreatedAt
+                ...(since ? { since } : {})
               })) {
                 for (const comment of page.data) {
                   const commenterLogin = comment.user?.login;
