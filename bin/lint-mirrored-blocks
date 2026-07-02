@@ -705,6 +705,19 @@ def literals_on_line(line)
   literals
 end
 
+# Collect literals from a value region [start_index, end_index). Stacked MIRROR VALUES OF:
+# markers (a region can be pinned to several targets) and any nested END marker are skipped
+# so tokens inside those comment lines (e.g. a target path) never leak into the guarded set.
+def collect_region_literals(lines, start_index, end_index)
+  values = []
+  (start_index...end_index).each do |i|
+    next if lines[i].match?(VALUES_MARKER_PATTERN) || lines[i].match?(VALUES_END_PATTERN)
+
+    values.concat(literals_on_line(lines[i]))
+  end
+  values
+end
+
 def parse_values_marker(path, lines, marker_index, errors)
   target_path = values_target_path_from(lines[marker_index])
   unless target_path
@@ -720,8 +733,7 @@ def parse_values_marker(path, lines, marker_index, errors)
     return nil
   end
 
-  values = []
-  ((marker_index + 1)...end_index).each { |i| values.concat(literals_on_line(lines[i])) }
+  values = collect_region_literals(lines, marker_index + 1, end_index)
   if values.empty?
     errors << "#{path}:#{marker_index + 1}: no string or integer literals found in " \
               "'#{VALUES_MARKER}' region (lines #{marker_index + 2}-#{end_index})"
