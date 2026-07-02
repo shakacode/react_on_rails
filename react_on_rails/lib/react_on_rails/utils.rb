@@ -41,10 +41,6 @@ module ReactOnRails
       [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
     end
 
-    def self.server_rendering_is_enabled?
-      ReactOnRails.configuration.server_bundle_js_file.present?
-    end
-
     # Invokes command, exiting with a detailed message if there's a failure.
     def self.invoke_and_exit_if_failed(cmd, failure_message)
       stdout, stderr, status = Open3.capture3(cmd)
@@ -164,16 +160,6 @@ module ReactOnRails
     def self.command_available?(command)
       which_command = running_on_windows? ? "where" : "which"
       !!system(which_command, command, out: File::NULL, err: File::NULL)
-    end
-
-    def self.rails_version_less_than(version)
-      @rails_version_less_than ||= {}
-
-      return @rails_version_less_than[version] if @rails_version_less_than.key?(version)
-
-      @rails_version_less_than[version] = begin
-        Gem::Version.new(Rails.version) < Gem::Version.new(version)
-      end
     end
 
     module Required
