@@ -233,12 +233,12 @@ class ReleaseFinish
     section "Collapse rc CHANGELOG sections into the final ### [#{@options.fetch(:version)}] section"
     if @options[:dry_run]
       puts "DRY RUN: would collapse the rc CHANGELOG sections into ### [#{@options.fetch(:version)}]:"
-      puts indent("/update-changelog release   # or: bundle exec rake \"update_changelog[release]\"")
+      puts indent('$react-on-rails-update-changelog release   # or: bundle exec rake "update_changelog[release]"')
       return
     end
 
     puts "Run the changelog collapse now, before the release task tags the final:"
-    puts indent("/update-changelog release")
+    puts indent("$react-on-rails-update-changelog release")
     puts indent("(equivalently: bundle exec rake \"update_changelog[release]\")")
     puts
     return if confirm?("Has the rc->stable CHANGELOG collapse been applied and committed?")

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Print the directory for a repo-pinned helper copy or an installed/shared skill.
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: .agents/bin/shared-skill-dir <skill-name>" >&2
+  exit 2
+fi
+
+skill="$1"
+case "$skill" in
+  ""|*[!A-Za-z0-9_.-]*)
+    echo "shared-skill-dir: invalid skill name: $skill" >&2
+    exit 2
+    ;;
+esac
+
+root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+
+repo_candidate="${root}/.agents/skills/${skill}"
+if [ -f "${repo_candidate}/SKILL.md" ] || [ -d "${repo_candidate}/bin" ]; then
+  printf '%s\n' "$repo_candidate"
+  exit 0
+fi
+
+candidates=()
+if [ -n "${AGENT_WORKFLOWS_ROOT:-}" ]; then
+  candidates+=("${AGENT_WORKFLOWS_ROOT}/skills/${skill}")
+fi
+candidates+=("${CODEX_HOME:-${HOME}/.codex}/skills/${skill}")
+candidates+=("${CLAUDE_HOME:-${HOME}/.claude}/skills/${skill}")
+candidates+=("${HOME}/src/agent-workflows/skills/${skill}")
+
+for candidate in "${candidates[@]}"; do
+  if [ -f "${candidate}/SKILL.md" ]; then
+    printf '%s\n' "$candidate"
+    exit 0
+  fi
+done
+
+echo "shared-skill-dir: could not find skill or helper copy '${skill}'" >&2
+echo "Keep a repo-pinned .agents/skills/${skill}/bin helper copy, set AGENT_WORKFLOWS_ROOT, or install the shared skill pack." >&2
+exit 1

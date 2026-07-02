@@ -24,7 +24,7 @@ on them; do not re-implement.
   (~line 2145) already falls back to `extract_latest_changelog_version`: with no
   version arg, `bundle exec rake release` uses the top `### [X.Y.Z]` changelog
   header when it is newer than `version.rb` (or equal-but-untagged). So once
-  `/update-changelog rc` has stamped `### [17.0.0.rc.0]`, a bare
+  `$react-on-rails-update-changelog rc` has stamped `### [17.0.0.rc.0]`, a bare
   `bundle exec rake release` cuts rc.0. The runbook's explicit
   `release[17.0.0.rc.0]` form is optional. → **Doc-only fix** (folded into PR 1).
 - **Promotion is already release-branch-aware.** `ensure_release_branch_promotes_tagged_rc!`
@@ -51,13 +51,13 @@ on them; do not re-implement.
 Four focused PRs in release-train lifecycle order, plus a deferred blog post. Each
 PR is independently shippable.
 
-| PR  | Name                                                                | Touches                                                                                          |
-| --- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| 1   | `release start` — auto-create `release/X.Y.Z` on an rc cut          | `rakelib/release.rake`, runbook, helper spec                                                     |
-| 2   | `/update-changelog` release-vs-main target                          | `.agents/skills/update-changelog/SKILL.md`, maybe `react_on_rails/rakelib/update_changelog.rake` |
-| 3   | `release-forward-port` re-homes changelog entries to `[Unreleased]` | `script/release-forward-port` (+ test)                                                           |
-| 4   | `release finish` — promote + close-out scripts                      | new `script/release-finish` (+ test), runbook                                                    |
-| 5   | Blog post (deferred until 1–4 ship)                                 | local/untracked draft only                                                                       |
+| PR  | Name                                                                | Touches                                                                                                                                               |
+| --- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `release start` — auto-create `release/X.Y.Z` on an rc cut          | `rakelib/release.rake`, runbook, helper spec                                                                                                          |
+| 2   | release-vs-main changelog target                                    | repo-local `$react-on-rails-update-changelog`, maybe the installed/shared `$update-changelog` skill or `react_on_rails/rakelib/update_changelog.rake` |
+| 3   | `release-forward-port` re-homes changelog entries to `[Unreleased]` | `script/release-forward-port` (+ test)                                                                                                                |
+| 4   | `release finish` — promote + close-out scripts                      | new `script/release-finish` (+ test), runbook                                                                                                         |
+| 5   | Blog post (deferred until 1–4 ship)                                 | local/untracked draft only                                                                                                                            |
 
 ---
 
@@ -94,7 +94,7 @@ Both paths share one helper, so behavior is identical.
 6. Create + publish + switch: `git checkout -b release/X.Y.Z origin/main` then
    `git push -u origin release/X.Y.Z`.
 7. Print next steps: wait for ≥1 CI run on the branch tip; ensure the rc changelog
-   header is present (`/update-changelog rc` on the branch — PR 2); then
+   header is present (`$react-on-rails-update-changelog rc` on the branch - PR 2); then
    `bundle exec rake release` to cut rc.0 (version read from `CHANGELOG.md`).
 8. Optional 2nd arg `dry_run` mirroring `release`: print the plan, create nothing.
 
@@ -156,7 +156,7 @@ existing style):
 
 ---
 
-## PR 2 — `/update-changelog` release-vs-main target (approach)
+## PR 2 — Changelog Release-Vs-Main Target (approach)
 
 **Problem.** The skill's finalize step hard-stops unless you're on `main`. During
 rc stabilization, a fix's changelog entry must land on `release/X.Y.Z`, not `main`.
@@ -170,10 +170,10 @@ rc stabilization, a fix's changelog entry must land on `release/X.Y.Z`, not `mai
   under the in-progress rc section (the rc stamping moves `[Unreleased]` entries
   under the new header).
 
-`/update-changelog` **asks "release or main?"** when an active release line is
-detected (per the request). The `update_changelog.rake` task is largely
-branch-agnostic (edits `CHANGELOG.md` in place); the skill drives branch/PR
-targeting.
+`$react-on-rails-update-changelog` **asks "release or main?"** when an active
+release line is detected (per the request). The `update_changelog.rake` task is
+largely branch-agnostic (edits `CHANGELOG.md` in place); the repo-local skill
+drives branch/PR targeting until this behavior belongs in the shared pack.
 
 **Open detail for PR-2 design:** compare-link base. Links hardcode `…main`
 ([`update_changelog.rake`](../../react_on_rails/rakelib/update_changelog.rake)
@@ -215,7 +215,8 @@ rake promotion guards with confirmations:
 
 - **Promote (step 4):** `git checkout release/X.Y.Z`; verify the tip equals the
   accepted RC (`git diff --stat` against `vX.Y.Z.rc.N` is empty); collapse rc →
-  stable changelog (`/update-changelog release`); `bundle exec rake release[X.Y.Z]`
+  stable changelog (`$react-on-rails-update-changelog release`);
+  `bundle exec rake release[X.Y.Z]`
   (all promotion guards already enforced in `release.rake`).
 - **Close out (step 5):** forward-port remaining commits to `main` (uses PR 3),
   then `git push origin --delete release/X.Y.Z` (tags are the durable record).

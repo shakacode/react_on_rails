@@ -6,8 +6,8 @@ repository for shared claim, heartbeat, and batch dependency state.
 Keep authoritative JSON schema definitions and examples in the private backend
 repository. This React on Rails repository carries the operator-facing contract
 and public workflow rules in [AGENTS.md](../../AGENTS.md),
-[.agents/skills/pr-batch/SKILL.md](../../.agents/skills/pr-batch/SKILL.md),
-[.agents/skills/triage/SKILL.md](../../.agents/skills/triage/SKILL.md), and
+the installed/shared `$pr-batch` skill,
+the installed/shared `$triage` skill, and
 [.agents/workflows/pr-processing.md](../../.agents/workflows/pr-processing.md).
 
 Until the private repo has tagged releases, use `agent-coord version --json` and
@@ -43,14 +43,14 @@ active shell `PATH` if the shell has not reloaded its profile yet.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
-preflights through `.agents/skills/pr-batch/bin/agent-coord-bounded` with the
+preflights through `PR_BATCH_SKILL_DIR="$(.agents/bin/shared-skill-dir pr-batch)"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded"` with the
 same targeted status subcommand so a slow private read becomes explicit degraded
 state instead of an indefinite wait:
 
 ```bash
-.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 doctor --json
-.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo OWNER/REPO --target TARGET --json
-.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id BATCH_ID --json
+PR_BATCH_SKILL_DIR="$(.agents/bin/shared-skill-dir pr-batch)"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json
+PR_BATCH_SKILL_DIR="$(.agents/bin/shared-skill-dir pr-batch)"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo OWNER/REPO --target TARGET --json
+PR_BATCH_SKILL_DIR="$(.agents/bin/shared-skill-dir pr-batch)"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id BATCH_ID --json
 ```
 
 Use broad `agent-coord status` only for audit-mode triage sweeps and post-merge

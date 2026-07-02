@@ -127,7 +127,7 @@ Execution flow when terminal access is available:
      `gh api --paginate repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, created_at: .created_at, html_url: .html_url}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 8).
   - Full PR — fetch all review data with the helper (replaces the per-endpoint `gh api ... | jq` blocks and the `reviewThreads` GraphQL query):
-    `ADDRESS_REVIEW_SKILL_DIR="${ADDRESS_REVIEW_SKILL_DIR:-.agents/skills/address-review}"; "${ADDRESS_REVIEW_SKILL_DIR}/bin/fetch-pr-review-data" "${PR_NUMBER}" --repo "${REPO}" > review-data.json`
+    `ADDRESS_REVIEW_SKILL_DIR="${ADDRESS_REVIEW_SKILL_DIR:-$(.agents/bin/shared-skill-dir address-review)}"; "${ADDRESS_REVIEW_SKILL_DIR}/bin/fetch-pr-review-data" "${PR_NUMBER}" --repo "${REPO}" > review-data.json`
      It emits one JSON document: `review_cutoff_at` (see step 3); `review_summaries` (`{id, type: "review_summary", body, state, user, created_at, html_url}`, non-empty bodies only); `inline_comments` (`{id, node_id, type: "review", path, body, line, start_line, user, in_reply_to_id, created_at, html_url, thread_id, is_resolved}`, with `thread_id`/`is_resolved` already joined by `node_id` — no separate GraphQL query needed); `issue_comments` (`{id, node_id, type: "issue", body, user, created_at, html_url}`, including summary/status markers for filtering); and `review_threads` (`{thread_id, is_resolved, comments: [{node_id, id}]}`).
    - Treat actionable review summary bodies as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 8).
    - When `REVIEW_CUTOFF_AT` is set for a full-PR scan:
@@ -167,7 +167,7 @@ Execution flow when terminal access is available:
    - Preserve comment IDs and thread IDs for later replies and thread resolution.
    - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
    - For lockfile dependency drift feedback, apply the blocking triage rule from
-     the **Triage rules** section in `.agents/skills/address-review/SKILL.md`.
+     the **Triage rules** section in the installed/shared `$address-review` skill.
    - **Claim verification**: Before finalizing `MUST-FIX` classification, verify the reviewer's factual claims against the actual codebase. If local code inspection confirms the code already handles the concern (claim is demonstrably wrong), classify as `SKIPPED` per the rule above. If the evidence is ambiguous or you have only partial confidence the claim is wrong, downgrade to `DISCUSS` and note the discrepancy. If you have access to AI-powered codebase search tools (e.g., Greptile), use them to cross-reference claims for additional confidence, but treat their output as a signal — corroborated claims stay `MUST-FIX`, clearly contradicted claims go to `SKIPPED`, and inconclusive results go to `DISCUSS`.
    - Track only `MUST-FIX` items as your working checklist.
    - Use one checklist entry per must-fix item or deduplicated issue.
@@ -201,7 +201,7 @@ Execution flow when terminal access is available:
    - Do not post the PR summary checkpoint yet. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 
 8. Execute the chosen action:
-   <!-- Keep this action-routing section in sync with .agents/skills/address-review/SKILL.md Step 8. -->
+   <!-- Keep this action-routing section in sync with the installed/shared `$address-review` skill Step 8. -->
    - **`a` — Apply, stage, and recommend**: Fix all `MUST-FIX` and `OPTIONAL` items inline after the user selects `a`, or automatically when `autopilot` was requested at initiation. Run relevant checks and the self-review gate. Stage only the intended changed files with explicit `git add` paths instead of committing them. Do **not** commit, push, post GitHub replies, resolve review threads, create follow-up issues, or post the PR summary checkpoint. Return a local summary with: fixed `MUST-FIX` items, fixed `OPTIONAL` items, staged files, validation commands/results, unresolved/skipped items, and detailed `DISCUSS` recommendations. Each `DISCUSS` recommendation must include the reviewer/comment link, recommended decision (`fix now`, `defer`, `decline`, or `ask user`), rationale/evidence, risk/tradeoff, and concrete next step. If validation fails after reasonable local repair, still report the staged-file state clearly and mark the PR as not ready for commit/push.
    - **`f`**:
      Pre-reply subflow: steps 1-7 below end at the commit/push-before-reply gate.

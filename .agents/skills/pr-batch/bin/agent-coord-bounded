@@ -37,36 +37,13 @@ rescue Errno::ESRCH
   nil
 end
 
-def process_group_alive?(pid)
-  Process.kill(0, -pid)
-  true
-rescue Errno::ESRCH
-  false
-rescue Errno::EPERM
-  true
-end
-
-def wait_for_process_group_exit(pid, deadline)
-  while Time.now < deadline
-    return true unless process_group_alive?(pid)
-
-    sleep 0.05
-  end
-
-  !process_group_alive?(pid)
-end
-
 def terminate_process_group(pid, signal: "TERM", grace_seconds: 1, kill_grace_seconds: 1)
-  term_deadline = Time.now + grace_seconds
   signal_process_group(pid, signal)
-  status = wait_for_child(pid, term_deadline)
-  return status if wait_for_process_group_exit(pid, term_deadline)
+  status = wait_for_child(pid, Time.now + grace_seconds)
 
   # The direct child may exit before helper processes in its process group.
   signal_process_group(pid, "KILL")
-  kill_deadline = Time.now + kill_grace_seconds
-  status ||= wait_for_child(pid, kill_deadline)
-  wait_for_process_group_exit(pid, kill_deadline)
+  status ||= wait_for_child(pid, Time.now + kill_grace_seconds)
 
   status
 end
@@ -76,13 +53,6 @@ def exit_code_for_status(status)
   return 128 + status.termsig if status.signaled?
 
   status.exitstatus || 1
-end
-
-def flush_captured_output(stdout_file, stderr_file)
-  stdout_file.rewind
-  stderr_file.rewind
-  print stdout_file.read
-  $stderr.print(stderr_file.read)
 end
 
 options = {}
@@ -144,7 +114,6 @@ begin
   loop do
     if interrupted_signal
       terminate_process_group(pid, signal: interrupted_signal)
-      flush_captured_output(stdout_file, stderr_file)
       exit(128 + Signal.list.fetch(interrupted_signal))
     end
 
@@ -164,19 +133,20 @@ begin
 
   if interrupted_signal
     terminate_process_group(pid, signal: interrupted_signal)
-    flush_captured_output(stdout_file, stderr_file)
     exit(128 + Signal.list.fetch(interrupted_signal))
   end
 
   terminate_process_group(pid) if timed_out
 
   if timed_out
-    flush_captured_output(stdout_file, stderr_file)
     warn "agent-coord-bounded: timed out after #{timeout}s: #{Shellwords.join(command)}"
     exit 124
   end
 
-  flush_captured_output(stdout_file, stderr_file)
+  stdout_file.rewind
+  stderr_file.rewind
+  print stdout_file.read
+  $stderr.print(stderr_file.read)
 
   exit(exit_code_for_status(status))
 ensure
