@@ -19,7 +19,6 @@ module ReactOnRails
     def self.default_troubleshooting_section: () -> String
     def self.server_bundle_js_file_path: () -> String
     def self.running_on_windows?: () -> bool
-    def self.rails_version_less_than: (String version) -> bool
     def self.source_path: () -> String
     def self.public_bundles_full_path: () -> String
     def self.generated_assets_full_path: () -> String

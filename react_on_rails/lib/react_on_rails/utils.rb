@@ -162,16 +162,6 @@ module ReactOnRails
       !!system(which_command, command, out: File::NULL, err: File::NULL)
     end
 
-    def self.rails_version_less_than(version)
-      @rails_version_less_than ||= {}
-
-      return @rails_version_less_than[version] if @rails_version_less_than.key?(version)
-
-      @rails_version_less_than[version] = begin
-        Gem::Version.new(Rails.version) < Gem::Version.new(version)
-      end
-    end
-
     module Required
       def required(arg_name)
         raise ReactOnRails::Error, "#{arg_name} is required"
