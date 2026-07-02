@@ -31,6 +31,7 @@ import {
 } from '../src/RSCRouteSSRFalseBailoutError.ts';
 import RSCRoute from '../src/RSCRoute.tsx';
 import { isServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
+import { flushMacrotasks } from './testUtils.ts';
 
 class TestErrorBoundary extends React.Component<
   {
@@ -492,6 +493,185 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(container.textContent).not.toContain('Retry deferred route');
     } finally {
       clearDefaultRSCProviderFactory();
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
+  it('wraps synchronous payload key creation failures in ServerComponentFetchError on the client', async () => {
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+    const getServerComponent = jest.fn(() => Promise.resolve(<div>Should not load</div>));
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    let capturedError: Error | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <RSCProvider>
+            <TestErrorBoundary
+              onError={(error) => {
+                capturedError = error;
+              }}
+            >
+              <React.Suspense fallback={<div>Loading deferred route...</div>}>
+                <RSCRoute componentName="CircularRoute" componentProps={circularProps} ssr={false} />
+              </React.Suspense>
+            </TestErrorBoundary>
+          </RSCProvider>,
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(isServerComponentFetchError(capturedError)).toBe(true);
+      if (!isServerComponentFetchError(capturedError)) {
+        throw new Error('Expected a ServerComponentFetchError');
+      }
+      expect(capturedError.serverComponentName).toBe('CircularRoute');
+      expect(capturedError.serverComponentProps).toBe(circularProps);
+      expect(capturedError.originalError).toBeInstanceOf(TypeError);
+      expect(getServerComponent).not.toHaveBeenCalled();
+    } finally {
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
+  it('wraps synchronous getServerComponent throws in ServerComponentFetchError on the client', async () => {
+    const syncError = new Error('sync provider boom');
+    const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
+      throw syncError;
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    let capturedError: Error | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <RSCProvider>
+            <TestErrorBoundary
+              onError={(error) => {
+                capturedError = error;
+              }}
+            >
+              <React.Suspense fallback={<div>Loading deferred route...</div>}>
+                <RSCRoute componentName="SyncThrowRoute" componentProps={{ id: 7 }} ssr={false} />
+              </React.Suspense>
+            </TestErrorBoundary>
+          </RSCProvider>,
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        // The provider evicts synchronously-rejected payload promises one
+        // macrotask after the rejection; flush so no eviction timer leaks
+        // past unmount.
+        await flushMacrotasks();
+      });
+
+      expect(isServerComponentFetchError(capturedError)).toBe(true);
+      if (!isServerComponentFetchError(capturedError)) {
+        throw new Error('Expected a ServerComponentFetchError');
+      }
+      expect(capturedError.message).toBe('sync provider boom');
+      expect(capturedError.serverComponentName).toBe('SyncThrowRoute');
+      expect(capturedError.serverComponentProps).toEqual({ id: 7 });
+      expect(capturedError.originalError).toBe(syncError);
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+    } finally {
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
+  it('keeps the inner route context when a nested route fails synchronously', async () => {
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+    const getServerComponent = jest.fn(() =>
+      Promise.resolve(<RSCRoute componentName="InnerRoute" componentProps={circularProps} />),
+    );
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    let capturedError: Error | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <RSCProvider>
+            <TestErrorBoundary
+              onError={(error) => {
+                capturedError = error;
+              }}
+            >
+              <React.Suspense fallback={<div>Loading deferred route...</div>}>
+                <RSCRoute componentName="OuterRoute" componentProps={{ id: 1 }} ssr={false} />
+              </React.Suspense>
+            </TestErrorBoundary>
+          </RSCProvider>,
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(isServerComponentFetchError(capturedError)).toBe(true);
+      if (!isServerComponentFetchError(capturedError)) {
+        throw new Error('Expected a ServerComponentFetchError');
+      }
+      // The inner route's boundary wraps the failure first; the outer route's
+      // boundary must pass it through instead of re-wrapping with the outer
+      // component's context.
+      expect(capturedError.serverComponentName).toBe('InnerRoute');
+      expect(capturedError.serverComponentProps).toBe(circularProps);
+      expect(capturedError.originalError).toBeInstanceOf(TypeError);
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+    } finally {
       const mountedRoot = root;
       try {
         if (mountedRoot) {

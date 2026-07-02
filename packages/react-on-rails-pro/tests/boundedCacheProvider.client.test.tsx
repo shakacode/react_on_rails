@@ -1459,7 +1459,12 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     syncThrowIds.add(0);
-    expect(() => rscApi.getComponent('Card', { id: 0 })).toThrow('sync boom 0');
+    await act(async () => {
+      await expect(rscApi.getComponent('Card', { id: 0 })).rejects.toThrow('sync boom 0');
+      // The cached rejection is evicted one macrotask later; flush so the next
+      // same-key load starts fresh instead of reusing the rejected promise.
+      await flushMacrotasks();
+    });
 
     const replacement = await startLoad(0);
     await resolveLoad(replacement, <span>replacement 0</span>);
