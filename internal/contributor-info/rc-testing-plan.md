@@ -74,10 +74,16 @@ The tracking issue is the single source of truth for:
    `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`.
 3. Open RC bump PRs in every hard-gate app that consumes the changed package.
 4. Run local smoke where practical before relying on CI.
-5. Record evidence in the tracking issue for each hard gate.
-6. File issues for every suspected RC regression or blocked smoke path.
-7. Treat AI review checks as advisory unless they identify a real bug.
-8. Make the final go/no-go call only after every hard gate is green or explicitly waived.
+5. Run the behavioral verification lanes in
+   [`release-verification-runbook.md`](release-verification-runbook.md) (upgrade dry-run,
+   debut-feature abuse pass, stress/soak, changelog and artifact audits) and post each lane
+   report to the tracking issue.
+6. Record evidence in the tracking issue for each hard gate.
+7. File issues for every suspected RC regression or blocked smoke path.
+8. Treat AI review checks as advisory unless they identify a real bug.
+9. Make the final go/no-go call only after every hard gate is green or explicitly waived, and
+   every behavioral lane is green or explicitly waived (Lane 4b artifact defects cannot be
+   waived).
 
 ## Required Pass Criteria
 
