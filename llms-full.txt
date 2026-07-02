@@ -14426,7 +14426,7 @@ Then:
    you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
-We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
+We use ShakaPerf for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
 
 ### Reading the result
 
@@ -18892,6 +18892,8 @@ Because preload hints belong in `<head>`, pass component names that are known be
 This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and `javascript_pack_tag` calls in the layout so the browser still applies and executes the assets.
 
 When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
+
+With Shakapacker versions before 8.4 that do not expose `config.integrity`, preload links are still emitted without `integrity` attributes. React on Rails only adds preload SRI attributes when Shakapacker exposes integrity settings and marks them enabled.
 
 ---
 
