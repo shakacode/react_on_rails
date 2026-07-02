@@ -259,35 +259,40 @@ module ReactOnRailsPro
 
         def revalidate_tag(tag)
           key = index_key(tag)
-          keys, _expires_at = read_index(key)
+          keys, expires_at = read_index(key)
           return 0 if keys.empty?
 
-          deleted = delete_entries(keys)
-          remove_revalidated_entries_from_index(key, keys)
+          deleted = delete_entries_with_restorable_index(key, keys, expires_at)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
           deleted
         end
 
-        def remove_revalidated_entries_from_index(key, revalidated_keys)
-          current_keys, current_expires_at = read_index(key)
-          return if current_keys.empty?
-
-          revalidated_key_set = revalidated_keys.to_h { |revalidated_key| [revalidated_key, true] }
-          remaining_keys = current_keys.reject { |current_key| revalidated_key_set[current_key] }
-
-          if remaining_keys.empty?
-            Rails.cache.delete(key)
-          else
-            write_index(key, remaining_keys, current_expires_at)
-          end
-        end
-
         def write_index(key, keys, expires_at)
           expires_at ||= Time.now.to_f + ReactOnRailsPro.configuration.cache_tag_index_expires_in.to_f
           ttl = [expires_at - Time.now.to_f, 1].max
           Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
+        end
+
+        def delete_entries_with_restorable_index(key, keys, expires_at)
+          Rails.cache.delete(key)
+          delete_entries(keys)
+        rescue StandardError
+          restore_index_after_revalidation_failure(key, keys, expires_at)
+          raise
+        end
+
+        def restore_index_after_revalidation_failure(key, keys, expires_at)
+          current_keys, current_expires_at = read_index(key)
+          restored_keys = (current_keys + keys).uniq
+          restored_expires_at = [current_expires_at, expires_at].compact.max
+          write_index(key, restored_keys, restored_expires_at)
+        rescue StandardError => e
+          Rails.logger.warn do
+            "[ReactOnRailsPro] failed to restore cache tag index after revalidation failure: " \
+              "#{e.class}: #{e.message}"
+          end
         end
 
         # The recorded keys carry their full logical name (including any

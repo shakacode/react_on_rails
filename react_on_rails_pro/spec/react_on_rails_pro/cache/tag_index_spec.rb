@@ -383,13 +383,13 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
-    it "deletes cached entries before the index so deletion failures leave retry metadata" do
+    it "deletes the index before cached entries to avoid dropping same-key repopulations" do
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", { expires_in: 3600 })
       index_key = described_class.index_key("t")
 
-      expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
       expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
+      expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
 
       expect(described_class.revalidate("t")).to eq(1)
     end
@@ -410,6 +410,23 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(Rails.cache.read("entry/one")).to be_nil
       expect(Rails.cache.read("entry/new")).to eq("new")
       expect(index_payload("t")["keys"]).to eq(["entry/new"])
+    end
+
+    it "preserves same-key entries registered while revalidation is deleting the previous snapshot" do
+      Rails.cache.write("entry/one", "old")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      original_delete_multi = Rails.cache.method(:delete_multi)
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        deleted = original_delete_multi.call(keys, namespace:)
+        Rails.cache.write("entry/one", "new")
+        described_class.register(["t"], "entry/one", { expires_in: 3600 })
+        deleted
+      end
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to eq("new")
+      expect(index_payload("t")["keys"]).to eq(["entry/one"])
     end
 
     it "caps keys per tag at cache_tag_index_max_keys, dropping the oldest" do
