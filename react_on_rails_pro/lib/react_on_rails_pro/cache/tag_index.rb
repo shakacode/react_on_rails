@@ -262,7 +262,7 @@ module ReactOnRailsPro
           keys, expires_at = read_index(key)
           return 0 if keys.empty?
 
-          deleted = delete_entries_with_restorable_index(key, keys, expires_at)
+          deleted = delete_entries_with_restorable_index(tag, key, keys, expires_at)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
@@ -275,17 +275,22 @@ module ReactOnRailsPro
           Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
         end
 
-        def delete_entries_with_restorable_index(key, keys, expires_at)
+        def delete_entries_with_restorable_index(tag, key, keys, expires_at)
           Rails.cache.delete(key)
           delete_entries(keys)
         rescue StandardError
-          restore_index_after_revalidation_failure(key, keys, expires_at)
+          restore_index_after_revalidation_failure(tag, key, keys, expires_at)
           raise
         end
 
-        def restore_index_after_revalidation_failure(key, keys, expires_at)
+        def restore_index_after_revalidation_failure(tag, key, keys, expires_at)
           current_keys, current_expires_at = read_index(key)
-          restored_keys = (current_keys + keys).uniq
+          restored_keys = keys.dup
+          current_keys.each do |current_key|
+            restored_keys.delete(current_key)
+            restored_keys << current_key
+          end
+          enforce_max_keys(tag, restored_keys)
           restored_expires_at = [current_expires_at, expires_at].compact.max
           write_index(key, restored_keys, restored_expires_at)
         rescue StandardError => e

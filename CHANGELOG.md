@@ -84,9 +84,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **Tag revalidation keeps retry metadata after entry delete failures**:
-  `ReactOnRailsPro.revalidate_tag` now deletes tagged cache entries before deleting the tag index,
-  so a transient cache-store delete failure leaves the index available for a retry instead of
-  orphaning stale entries until their TTL expires. Fixes
+  `ReactOnRailsPro.revalidate_tag` now restores the tag index before re-raising when tagged
+  cache-entry deletion fails, so transient cache-store failures leave retry metadata instead
+  of orphaning stale entries until their TTL expires. Fixes
   [Issue 4317](https://github.com/shakacode/react_on_rails/issues/4317).
   [PR 4375](https://github.com/shakacode/react_on_rails/pull/4375) by
   [justin808](https://github.com/justin808).

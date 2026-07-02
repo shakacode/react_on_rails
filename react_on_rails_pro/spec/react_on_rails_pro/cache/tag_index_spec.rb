@@ -383,6 +383,26 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
+    it "keeps restored failure indexes capped while preserving newer registrations" do
+      allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_max_keys).and_return(2)
+      Rails.cache.write("entry/old-one", "old-one")
+      Rails.cache.write("entry/old-two", "old-two")
+      described_class.register(["t"], "entry/old-one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/old-two", { expires_in: 3600 })
+
+      allow(Rails.cache).to receive(:delete_multi) do
+        Rails.cache.write("entry/new-one", "new-one")
+        Rails.cache.write("entry/new-two", "new-two")
+        described_class.register(["t"], "entry/new-one", { expires_in: 3600 })
+        described_class.register(["t"], "entry/new-two", { expires_in: 3600 })
+        raise StandardError, "delete_multi failed"
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(index_payload("t")["keys"]).to eq(%w[entry/new-one entry/new-two])
+      expect(logger_mock).to have_received(:warn).once
+    end
+
     it "deletes the index before cached entries to avoid dropping same-key repopulations" do
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", { expires_in: 3600 })
