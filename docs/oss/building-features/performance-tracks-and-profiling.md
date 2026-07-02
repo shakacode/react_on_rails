@@ -124,7 +124,7 @@ Then:
    you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
-We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
+We use ShakaPerf for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
 
 ### Reading the result
 

@@ -91,6 +91,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
   [justin808](https://github.com/justin808).
 
+- **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
+  skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
+  `NoMethodError` while still emitting preload hints. Fixes
+  [Issue 4369](https://github.com/shakacode/react_on_rails/issues/4369).
+  [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
@@ -103,6 +110,26 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   enqueue and `renderComplete` behavior. Fixes
   [Issue 4314](https://github.com/shakacode/react_on_rails/issues/4314).
   [PR 4352](https://github.com/shakacode/react_on_rails/pull/4352) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC preload replay survives cache eviction**: Preloaded RSC payloads now remain
+  replayable after route cache eviction, preventing stale preload state from breaking refetches.
+  Fixes [Issue 4326](https://github.com/shakacode/react_on_rails/issues/4326).
+  [PR 4353](https://github.com/shakacode/react_on_rails/pull/4353) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Incremental stream timers stay aligned with active chunks**: Healthy pull-mode
+  incremental streams are no longer closed by stale request or finish timers while chunks keep
+  progressing, while abandoned streams remain bounded by an idle watchdog. Fixes
+  [Issue 4310](https://github.com/shakacode/react_on_rails/issues/4310) and
+  [Issue 4311](https://github.com/shakacode/react_on_rails/issues/4311).
+  [PR 4354](https://github.com/shakacode/react_on_rails/pull/4354) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC Rspack boot validation warns on undetermined versions**: Boot now warns and continues when
+  the active Rspack version cannot be determined, while strict doctor checks and provable Rspack v1
+  failures still fail closed. Fixes [Issue 4340](https://github.com/shakacode/react_on_rails/issues/4340).
+  [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
