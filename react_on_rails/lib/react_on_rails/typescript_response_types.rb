@@ -380,8 +380,8 @@ module ReactOnRails
       def initialize(registry)
         types = registry.types
         @responses = registry.responses
-        @definitions = (types + responses).freeze
-        @definition_names = definitions.to_h { |definition| [definition.name, true] }.freeze
+        @definitions = (types + @responses).freeze
+        @definition_names = @definitions.to_h { |definition| [definition.name, true] }.freeze
       end
 
       def to_d_ts
