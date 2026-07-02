@@ -394,6 +394,19 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: \^1\.0\.0 \|\| ~1\.6\.0})
         end
 
+        it "warns and allows boot for declared Rspack OR ranges that can select v2" do
+          stub_failed_node_package_resolution
+
+          expect_rsc_rspack_boot_warning("^1.0.0 || ^2.0.0") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: "^1.0.0 || ^2.0.0"
+              )
+            end.not_to raise_error
+          end
+        end
+
         it "rejects aliased declared Rspack ranges below v2" do
           stub_failed_node_package_resolution
 

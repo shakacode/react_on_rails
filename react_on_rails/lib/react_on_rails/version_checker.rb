@@ -330,7 +330,7 @@ module ReactOnRails
       rspack_major_version = rsc_package_major_version(rspack_version)
     )
       return false if rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
-      return true if rspack_major_version.positive?
+      return rspack_major_version < MINIMUM_RSC_RSPACK_MAJOR if rspack_major_version.positive?
 
       normalized_version = rsc_normalized_declared_package_version(rspack_version)
       return normalized_version.split(".").first.to_i < MINIMUM_RSC_RSPACK_MAJOR if normalized_version
