@@ -35,12 +35,12 @@ jobs:
             DIFF_BASE="${{ github.event.before }}"
           fi
 
-          # Handle initial commits where before SHA is all zeros
-          if [[ "$DIFF_BASE" =~ ^0+$ ]]; then
+          # Handle manual runs or initial commits where the base is absent or all zeros.
+          if [ -z "$DIFF_BASE" ] || [[ "$DIFF_BASE" =~ ^0+$ ]]; then
             DIFF_BASE="origin/main"
           fi
 
-          if [ "$DIFF_BASE" != "origin/main" ]; then
+          if [ "$DIFF_BASE" != "origin/main" ] && ! git cat-file -e "$DIFF_BASE^{commit}"; then
             git fetch origin "$DIFF_BASE"
           fi
 
@@ -53,16 +53,15 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             # Pinned fallback used when the GitHub API call fails (rate limit / outage)
             # so the cache key stays stable and the download step still has a version to pin to.
-            echo "::warning::GitHub API unavailable; falling back to pinned actionlint $fallback_version. Consider updating this pin."
             fallback_version="v1.7.7"
             if response=$(curl -sf -H "Authorization: token ${{ github.token }}" https://api.github.com/repos/rhysd/actionlint/releases/latest); then
               actionlint_version=$(echo "$response" | jq -r .tag_name)
               if [ -z "$actionlint_version" ] || [ "$actionlint_version" = "null" ]; then
-                echo "Failed to parse Actionlint version; using pinned fallback $fallback_version"
+                echo "::warning::Failed to parse Actionlint version; using pinned fallback $fallback_version"
                 actionlint_version="$fallback_version"
               fi
             else
-              echo "curl to GitHub API failed; using pinned fallback $fallback_version"
+              echo "::warning::GitHub API unavailable; falling back to pinned actionlint $fallback_version. Consider updating this pin."
               actionlint_version="$fallback_version"
             fi
             echo "actionlint_version=$actionlint_version" >> "$GITHUB_OUTPUT"
