@@ -25,9 +25,8 @@ module ReactOnRailsPro
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
-      def fetch_react_component(component_name, options)
-        options = options.dup
-        on_cache_hit = options.delete(:on_cache_hit)
+      def fetch_react_component(component_name, options = nil, on_cache_hit: nil, **keyword_options)
+        options = options ? options.merge(keyword_options) : keyword_options
 
         return yield unless use_cache?(options)
 

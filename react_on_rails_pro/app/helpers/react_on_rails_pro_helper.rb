@@ -25,11 +25,10 @@ module ReactOnRailsProHelper
   def fetch_react_component(component_name, options, &)
     ReactOnRailsPro::Cache.fetch_react_component(
       component_name,
-      options.merge(
-        on_cache_hit: lambda do |cached_component_name, cached_options|
-          load_pack_for_cached_react_component(cached_component_name, cached_options)
-        end
-      ),
+      options,
+      on_cache_hit: lambda do |cached_component_name, cached_options|
+        load_pack_for_cached_react_component(cached_component_name, cached_options)
+      end,
       &
     )
   end

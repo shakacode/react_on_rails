@@ -116,11 +116,10 @@ describe ReactOnRailsPro::Cache, :caching do
       fetch_component = lambda do
         described_class.fetch_react_component(
           "MyComponent",
-          options.merge(
-            on_cache_hit: lambda do |hit_component_name, hit_options|
-              cache_hits << [hit_component_name, hit_options]
-            end
-          )
+          options,
+          on_cache_hit: lambda do |hit_component_name, hit_options|
+            cache_hits << [hit_component_name, hit_options]
+          end
         ) do
           create_component_code.call
         end
