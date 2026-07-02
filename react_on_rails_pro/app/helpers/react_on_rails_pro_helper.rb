@@ -668,7 +668,7 @@ module ReactOnRailsProHelper
         stripped: static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
       },
       emitted_assets: static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostics_context[:packs]),
-      client_references: static_rsc_client_reference_diagnostics
+      client_references: static_rsc_client_reference_diagnostics(cache_hit: cache_diagnostics[:hit])
     }
   end
 
@@ -775,7 +775,9 @@ module ReactOnRailsProHelper
     [Rails.root.join("public", clean_source_path.delete_prefix("/"))]
   end
 
-  def static_rsc_client_reference_diagnostics
+  def static_rsc_client_reference_diagnostics(cache_hit: false)
+    return { count: nil, entries: [], unavailable_reason: "cache_hit" } if cache_hit
+
     unless ReactOnRailsPro.configuration.enable_rsc_support
       return { count: 0, entries: [], unavailable_reason: "rsc_support_disabled" }
     end

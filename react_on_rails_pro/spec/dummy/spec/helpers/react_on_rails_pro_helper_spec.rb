@@ -1621,6 +1621,9 @@ describe ReactOnRailsProHelper do
             props
           end
         end
+        expect(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .once
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
 
         Sync do
           stub_pro_bundle_hashes
@@ -1649,6 +1652,11 @@ describe ReactOnRailsProHelper do
           bootstrap_script_count: nil,
           bootstrap_script_bytes: nil,
           stripped: true
+        )
+        expect(diagnostics.second[:client_references]).to include(
+          count: nil,
+          entries: [],
+          unavailable_reason: "cache_hit"
         )
         expect(diagnostics.second[:html]).to include(cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize)
         expect(notifications.first[:component]).to eq(component_name)
