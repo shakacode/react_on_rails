@@ -336,7 +336,8 @@ module ReactOnRails
 
       rsc_rspack_major_shorthand_below_minimum?(rspack_version) ||
         rsc_rspack_upper_bound_below_minimum?(rspack_version) ||
-        rsc_rspack_hyphen_range_below_minimum?(rspack_version)
+        rsc_rspack_hyphen_range_below_minimum?(rspack_version) ||
+        rsc_rspack_compound_static_clause_below_minimum?(rspack_version)
     end
 
     def rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
@@ -384,6 +385,30 @@ module ReactOnRails
       return false unless hyphen_range
 
       hyphen_range[:upper_major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+    end
+
+    def rsc_rspack_compound_static_clause_below_minimum?(rspack_version)
+      range = rspack_version.to_s.strip
+      return false unless range.match?(/\s/)
+      return false if range.match?(/\s+-\s+/)
+
+      clause_pattern = /
+        (?:\A|\s)
+        (?<operator>[~^=]|[<>]=?)?
+        \s*
+        v?(?<major>\d+)
+        (?:\.(?:x|\*|\d+))?
+        (?:\.(?:x|\*|\d+))?
+        (?:-[0-9A-Za-z.-]+)?
+        (?=\s|\z)
+      /ix
+      range.to_enum(:scan, clause_pattern).any? do
+        clause = Regexp.last_match
+        operator = clause[:operator].to_s
+        next false if operator.start_with?("<", ">")
+
+        clause[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+      end
     end
 
     def warn_undetermined_rsc_rspack_version(rspack_version)

@@ -421,6 +421,17 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.0\.0 - 1\.9\.9})
         end
 
+        it "rejects declared compound Rspack ranges with static v1 clauses" do
+          stub_failed_node_package_resolution
+
+          aggregate_failures do
+            ["^1.0.0 <3.0.0", "~1.6.0 <3.0.0", "1.x <3.0.0"].each do |rspack_core_version|
+              expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version:) }
+                .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: #{Regexp.escape(rspack_core_version)}})
+            end
+          end
+        end
+
         it "rejects exact declared Rspack versions below v1" do
           stub_failed_node_package_resolution
 
