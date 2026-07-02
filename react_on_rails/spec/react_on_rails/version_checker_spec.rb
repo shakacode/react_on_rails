@@ -534,6 +534,19 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           expect(Open3).not_to have_received(:capture3)
         end
 
+        it "allows compatible aliased shorthand Rspack ranges without Node resolution" do
+          allow(Open3).to receive(:capture3)
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "npm:@rspack/core@^2"
+            )
+          end.not_to raise_error
+
+          expect(Open3).not_to have_received(:capture3)
+        end
+
         it "warns and allows boot when the RSC Rspack version is undeterminable" do
           allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
 

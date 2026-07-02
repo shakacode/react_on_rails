@@ -145,10 +145,11 @@ module ReactOnRails
     end
 
     def rsc_package_major_version(version)
-      version_string = version.to_s
+      version_string = version.to_s.strip
       normalized_version = rsc_normalized_declared_package_version(version_string)
       return normalized_version.split(".").first.to_i if normalized_version
 
+      version_string = version_string.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
       # Path-based protocol specs cannot be statically verified; reject them unless Node resolution found v2.
       return 0 if version_string.match?(PATH_PROTOCOL_PACKAGE_SPEC_PATTERN)
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
