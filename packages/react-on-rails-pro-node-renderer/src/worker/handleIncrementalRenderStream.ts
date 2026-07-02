@@ -151,6 +151,10 @@ export interface IncrementalRenderStreamHandlerOptions {
   waitForStopReading?: () => Promise<void>;
 }
 
+function reportResponseStartError(err: unknown) {
+  errorReporter.error(err instanceof Error ? err : new Error(String(err)));
+}
+
 /**
  * Handles incremental rendering requests with streaming JSON data.
  * The first object triggers rendering, subsequent objects provide incremental updates.
@@ -240,6 +244,7 @@ export async function handleIncrementalRenderStream(
                 const { response, shouldContinue: continueFlag } = result;
 
                 onResponseStartPromise = Promise.resolve(onResponseStart(response));
+                onResponseStartPromise.catch(reportResponseStartError);
 
                 if (!continueFlag) {
                   return;
