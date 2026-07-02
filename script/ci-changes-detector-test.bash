@@ -1036,6 +1036,320 @@ test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators() {
   assert_release_tooling_contract "$(detector_output)" "release-finish-test output"
 }
 
+assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  local script_path="$1"
+  local label="$2"
+
+  setup_repo
+  mkdir -p script
+  cat > "$script_path" <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<~CHANGELOG
+# Change Log
+
+### [Unreleased]
+
+#### Added
+
+- Original fixture.
+CHANGELOG
+
+puts FIXTURE
+RUBY
+  commit_change "add ${label} heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' "$script_path"
+  commit_change "${label} fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "${label} heredoc output"
+}
+
+test_release_forward_port_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-forward-port" \
+    "release-forward-port"
+}
+
+test_release_finish_heredoc_fixture_change_runs_release_specs() {
+  assert_ruby_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-finish" \
+    "release-finish"
+}
+
+test_release_forward_port_plain_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<changelog
+# Change Log
+
+### [Unreleased]
+changelog
+
+puts FIXTURE
+RUBY
+  commit_change "add release-forward-port plain heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port
+  commit_change "release-forward-port plain heredoc heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port plain heredoc output"
+}
+
+test_release_finish_method_plain_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish <<'RUBY'
+#!/usr/bin/env ruby
+puts <<CHANGELOG
+# Change Log
+
+### [Unreleased]
+CHANGELOG
+RUBY
+  commit_change "add release-finish method plain heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-finish
+  commit_change "release-finish method plain heredoc heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish method plain heredoc output"
+}
+
+test_release_forward_port_quoted_numeric_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<-'123'
+# Change Log
+
+### [Unreleased]
+123
+
+puts FIXTURE
+RUBY
+  commit_change "add release-forward-port quoted numeric heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port
+  commit_change "release-forward-port quoted numeric heredoc heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port quoted numeric heredoc output"
+}
+
+test_release_forward_port_plain_heredoc_indented_delimiter_text_stays_in_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<CHANGELOG
+# Change Log
+  CHANGELOG
+# Body after indented delimiter text
+CHANGELOG
+
+puts FIXTURE
+RUBY
+  commit_change "add release-forward-port plain heredoc with indented delimiter text"
+  perl -0pi -e 's/# Body after indented delimiter text/# Changed body after indented delimiter text/' \
+    script/release-forward-port
+  commit_change "release-forward-port plain heredoc later body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-forward-port plain heredoc indented delimiter text output"
+}
+
+test_release_forward_port_multiple_heredocs_on_one_line_track_later_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+puts <<~MAIN, <<~RELEASE
+# Main
+MAIN
+# Release
+RELEASE
+RUBY
+  commit_change "add release-forward-port multiple heredoc fixture"
+  perl -0pi -e 's/# Release/# Release changed/' script/release-forward-port
+  commit_change "release-forward-port second heredoc body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-forward-port multiple heredoc output"
+}
+
+assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs() {
+  local script_path="$1"
+  local label="$2"
+
+  setup_repo
+  mkdir -p script
+  cat > "$script_path" <<'BASH'
+#!/usr/bin/env bash
+cat <<'EOF' > release.md
+# Change Log
+
+### [Unreleased]
+EOF
+BASH
+  commit_change "add ${label} bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' "$script_path"
+  commit_change "${label} bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "${label} heredoc output"
+}
+
+test_release_forward_port_test_heredoc_fixture_change_runs_release_specs() {
+  assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-forward-port-test.bash" \
+    "release-forward-port-test"
+}
+
+test_release_finish_test_heredoc_fixture_change_runs_release_specs() {
+  assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs \
+    "script/release-finish-test.bash" \
+    "release-finish-test"
+}
+
+test_release_forward_port_test_lowercase_bash_heredoc_fixture_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<'fixture' > release.md
+# Change Log
+
+### [Unreleased]
+fixture
+BASH
+  commit_change "add release-forward-port-test lowercase bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port-test.bash
+  commit_change "release-forward-port-test lowercase bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port-test lowercase bash heredoc output"
+}
+
+test_release_forward_port_test_hyphenated_bash_heredoc_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<'CHANGE-LOG' > release.md
+# Change Log
+
+### [Unreleased]
+CHANGE-LOG
+BASH
+  commit_change "add release-forward-port-test hyphenated bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-forward-port-test.bash
+  commit_change "release-forward-port-test hyphenated bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-forward-port-test hyphenated bash heredoc output"
+}
+
+test_release_forward_port_test_unquoted_hyphenated_bash_heredoc_terminates_before_later_comment() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<release-fixture > release.md
+# Change Log
+release-fixture
+
+echo "done"
+BASH
+  commit_change "add release-forward-port-test unquoted hyphenated bash heredoc fixture"
+  perl -0pi -e 's/echo "done"/# Explain the release test.\necho "done"/' \
+    script/release-forward-port-test.bash
+  commit_change "release-forward-port-test comment after unquoted hyphenated bash heredoc"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_lint": true' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_generators": false' "release-forward-port-test unquoted hyphenated comment output"
+}
+
+test_release_forward_port_test_arithmetic_shift_comment_only_change_stays_non_runtime() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+flags=1
+mask=2
+value=$((flags << mask))
+echo "$value"
+BASH
+  commit_change "add release-forward-port-test arithmetic shift fixture"
+  perl -0pi -e 's/echo "\$value"/# Explain the release test.\necho "\$value"/' \
+    script/release-forward-port-test.bash
+  commit_change "release-forward-port-test comment after arithmetic shift"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_lint": true' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_generators": false' "release-forward-port-test arithmetic shift comment output"
+}
+
+test_release_finish_test_compact_bash_heredoc_redirect_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<'fixture'>release.md
+# Change Log
+
+### [Unreleased]
+fixture
+BASH
+  commit_change "add release-finish-test compact bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-finish-test.bash
+  commit_change "release-finish-test compact bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish-test compact bash heredoc output"
+}
+
+test_release_finish_test_backslash_bash_heredoc_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<\fixture > release.md
+# Change Log
+
+### [Unreleased]
+fixture
+BASH
+  commit_change "add release-finish-test backslash bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-finish-test.bash
+  commit_change "release-finish-test backslash bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish-test backslash bash heredoc output"
+}
+
+test_release_finish_test_multiple_bash_heredocs_on_one_line_track_later_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<MAIN <<RELEASE
+# Main
+MAIN
+# Release
+RELEASE
+BASH
+  commit_change "add release-finish-test multiple bash heredoc fixture"
+  perl -0pi -e 's/# Release/# Release changed/' script/release-finish-test.bash
+  commit_change "release-finish-test second bash heredoc body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-finish-test multiple bash heredoc output"
+}
+
 # Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
 # branch of the release arm (not RELEASE_TOOLING_CHANGED), so it stays
 # non-runtime — rubocop still runs (lint catches comment-affecting style) but the
@@ -1059,6 +1373,52 @@ test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint() {
   assert_contains "$out" '"run_lint": true' "release comment output"
   assert_contains "$out" '"run_ruby_tests": false' "release comment output"
   assert_contains "$out" '"run_generators": false' "release comment output"
+}
+
+test_release_tooling_shovel_operator_comment_only_change_stays_non_runtime() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+items = []
+items << release_item
+puts items
+RUBY
+  commit_change "add release script with shovel operator"
+  perl -0pi -e 's/items = \[\]/# Explain the release items.\nitems = []/' script/release-forward-port
+  commit_change "release script comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release shovel comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release shovel comment output"
+  assert_contains "$out" '"run_lint": true' "release shovel comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release shovel comment output"
+  assert_contains "$out" '"run_generators": false' "release shovel comment output"
+}
+
+test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+USAGE = <<~USAGE
+# Usage
+USAGE
+
+puts "ok"
+RUBY
+  commit_change "add release script with heredoc"
+  perl -0pi -e 's/puts "ok"/# Explain the release script.\nputs "ok"/' script/release-forward-port
+  commit_change "release script outside-heredoc comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release outside-heredoc comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_lint": true' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_generators": false' "release outside-heredoc comment output"
 }
 
 # Regression guard: a CHANGELOG.md-only change is documentation (matched by the
@@ -1098,7 +1458,25 @@ run_test test_release_finish_script_change_runs_ruby_tests_and_lint_without_gene
 run_test test_release_forward_port_script_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_forward_port_test_change_runs_ruby_tests_and_lint_without_generators
 run_test test_release_finish_test_change_runs_ruby_tests_and_lint_without_generators
+run_test test_release_forward_port_heredoc_fixture_change_runs_release_specs
+run_test test_release_finish_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_plain_heredoc_fixture_change_runs_release_specs
+run_test test_release_finish_method_plain_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_quoted_numeric_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_plain_heredoc_indented_delimiter_text_stays_in_body
+run_test test_release_forward_port_multiple_heredocs_on_one_line_track_later_body
+run_test test_release_forward_port_test_heredoc_fixture_change_runs_release_specs
+run_test test_release_finish_test_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_test_lowercase_bash_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_test_hyphenated_bash_heredoc_change_runs_release_specs
+run_test test_release_forward_port_test_unquoted_hyphenated_bash_heredoc_terminates_before_later_comment
+run_test test_release_forward_port_test_arithmetic_shift_comment_only_change_stays_non_runtime
+run_test test_release_finish_test_compact_bash_heredoc_redirect_change_runs_release_specs
+run_test test_release_finish_test_backslash_bash_heredoc_change_runs_release_specs
+run_test test_release_finish_test_multiple_bash_heredocs_on_one_line_track_later_body
 run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
+run_test test_release_tooling_shovel_operator_comment_only_change_stays_non_runtime
+run_test test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime
 run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
