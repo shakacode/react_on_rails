@@ -183,15 +183,25 @@ diff_line_is_comment_or_blank() {
 source_file_has_multiline_string_construct() {
   local file="$1"
   local content
+  local bash_heredoc_pattern
+  local ruby_heredoc_pattern
 
   content="$(git show "$CURRENT_REF:$file" 2>/dev/null || cat "$file" 2>/dev/null || true)"
 
   case "$file" in
-    *.rb|Gemfile|*.rake|script/release-forward-port|script/release-finish|script/release-forward-port-test.bash|script/release-finish-test.bash)
-      # Extensionless release tooling reuses Ruby-style heredoc detection
-      # because its fixtures can contain `#` lines that look comment-only in a
-      # unified diff.
-      grep -Eq "<<[-~]?[[:space:]]*['\"]?[A-Za-z_][A-Za-z0-9_]*" <<< "$content"
+    *.rb|Gemfile|*.rake|script/release-forward-port|script/release-finish)
+      # Release tooling fixtures can contain `#` lines that look comment-only in
+      # a unified diff. Ruby heredoc markers are adjacent to `<<`, `<<-`, or
+      # `<<~`; requiring that adjacency avoids ordinary `items << item` shovels.
+      ruby_heredoc_pattern="<<[-~]?([A-Za-z_][A-Za-z0-9_]*|['\"][^'\"]+['\"])"
+      grep -Eq "$ruby_heredoc_pattern" <<< "$content"
+      ;;
+    script/release-forward-port-test.bash|script/release-finish-test.bash)
+      # In shell scripts, `<<`/`<<-` introduce heredocs and may be followed by
+      # later redirection, e.g. `cat <<'EOF' > release.md` or
+      # `cat <<'EOF'>release.md`.
+      bash_heredoc_pattern="<<-?[[:space:]]*([A-Za-z_][A-Za-z0-9_]*|['\"][^'\"]+['\"])([[:space:]<>|&;()]|$)"
+      grep -Eq "$bash_heredoc_pattern" <<< "$content"
       ;;
     *.js|*.jsx|*.ts|*.tsx)
       grep -q '`' <<< "$content"
