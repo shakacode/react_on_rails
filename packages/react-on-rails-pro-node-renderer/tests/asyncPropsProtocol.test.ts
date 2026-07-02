@@ -139,6 +139,12 @@ describe('async props protocol constants', () => {
 
   it('releases the execution context and destroys the started stream when pull catch-up throws', async () => {
     const sourceStream = new PassThrough();
+    let injectableStream: PassThrough | undefined;
+    const originalPipe = sourceStream.pipe.bind(sourceStream);
+    jest.spyOn(sourceStream, 'pipe').mockImplementation((destination, options) => {
+      injectableStream = destination as PassThrough;
+      return originalPipe(destination, options);
+    });
     const releaseExecutionContext = jest.fn();
     const sharedExecutionContext = new Map<string, unknown>([
       [
@@ -179,6 +185,8 @@ describe('async props protocol constants', () => {
     });
     expect(sink).toBeUndefined();
     expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+    expect(injectableStream).toBeDefined();
+    expect(injectableStream?.destroyed).toBe(true);
     expect(sourceStream.destroyed).toBe(true);
   });
 });

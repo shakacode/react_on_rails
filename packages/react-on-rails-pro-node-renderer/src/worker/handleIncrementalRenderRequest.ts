@@ -227,6 +227,7 @@ export async function handleIncrementalRenderRequest(
     }
 
     let finalResponse = response;
+    let pullModeStream: PassThrough | undefined;
 
     try {
       // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
@@ -241,6 +242,7 @@ export async function handleIncrementalRenderRequest(
         // Create injectable PassThrough — sits after the length-prefixed transform.
         // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
         const injectableStream = new PassThrough();
+        pullModeStream = injectableStream;
         const writeRenderCompleteAndEnd = () => {
           if (injectableStream.destroyed || injectableStream.writableEnded) return;
           try {
@@ -352,10 +354,22 @@ export async function handleIncrementalRenderRequest(
       };
     } catch (error) {
       try {
-        if (finalResponse.stream && !finalResponse.stream.destroyed) {
+        if (pullModeStream && !pullModeStream.destroyed) {
+          pullModeStream.destroy();
+        }
+        if (
+          finalResponse.stream &&
+          finalResponse.stream !== pullModeStream &&
+          !finalResponse.stream.destroyed
+        ) {
           finalResponse.stream.destroy();
         }
-        if (response.stream && response.stream !== finalResponse.stream && !response.stream.destroyed) {
+        if (
+          response.stream &&
+          response.stream !== finalResponse.stream &&
+          response.stream !== pullModeStream &&
+          !response.stream.destroyed
+        ) {
           response.stream.destroy();
         }
       } finally {
