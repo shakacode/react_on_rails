@@ -41,10 +41,6 @@ module ReactOnRails
       [true, "true", "yes", 1, "1", "t"].include?(value.instance_of?(String) ? value.downcase : value)
     end
 
-    def self.server_rendering_is_enabled?
-      ReactOnRails.configuration.server_bundle_js_file.present?
-    end
-
     # Invokes command, exiting with a detailed message if there's a failure.
     def self.invoke_and_exit_if_failed(cmd, failure_message)
       stdout, stderr, status = Open3.capture3(cmd)
