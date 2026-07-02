@@ -13,7 +13,12 @@
 
 module ReactOnRailsPro
   class Cache
-    def self.fetch_react_component: (String component_name, Hash[Symbol, untyped] options) { () -> untyped } -> untyped
+    def self.fetch_react_component: (
+      String component_name,
+      ?Hash[Symbol, untyped] options,
+      ?on_cache_hit: ^(String, Hash[Symbol, untyped]) -> untyped,
+      **untyped keyword_options
+    ) { () -> untyped } -> untyped
 
     def self.use_cache?: (Hash[Symbol, untyped] options) -> bool
 

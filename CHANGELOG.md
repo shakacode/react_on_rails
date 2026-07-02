@@ -96,6 +96,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Cached component hits load generated packs consistently**:
+  Pro cached component helpers now share the `ReactOnRailsPro::Cache.fetch_react_component` path and
+  run the cache-hit pack-loading callback, so cached `cached_react_component` and
+  `cached_react_component_hash` output preserves generated pack behavior. Fixes
+  [Issue 4316](https://github.com/shakacode/react_on_rails/issues/4316).
+  [PR 4384](https://github.com/shakacode/react_on_rails/pull/4384) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Dropped pull-mode prop requests are logged**: Streaming SSR now warns when the Node
   renderer sends a `propRequest` control frame without an emitter or with a missing, empty, or
   oversized `propName`, making dropped pull-mode requests diagnosable while preserving valid

@@ -107,6 +107,30 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(Rails.cache.fetch(string_cache_key)[:component_html]).to eq(html)
     end
 
+    it "runs the cache hit callback so callers can load generated packs for cached values" do
+      result = "<div>Something</div>"
+      options = { if: true, cache_key: "the_cache_key", auto_load_bundle: true }
+      create_component_code = instance_double(TestingCache, call: result)
+      cache_hits = []
+
+      fetch_component = lambda do
+        described_class.fetch_react_component(
+          "MyComponent",
+          options,
+          on_cache_hit: lambda do |hit_component_name, hit_options|
+            cache_hits << [hit_component_name, hit_options]
+          end
+        ) do
+          create_component_code.call
+        end
+      end
+
+      expect(fetch_component.call).to eq(result)
+      expect(fetch_component.call).to eq(result)
+      expect(create_component_code).to have_received(:call).once
+      expect(cache_hits).to eq([["MyComponent", options]])
+    end
+
     it "fetches the value from the cache if cache_key is a lambda" do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)
