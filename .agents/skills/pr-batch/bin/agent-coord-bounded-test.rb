@@ -27,14 +27,17 @@ class AgentCoordBoundedTest < Minitest::Test
   def test_times_out_and_reports_unknown_friendly_status
     with_fake_agent_coord(<<~RUBY) do |env|
       puts "partial json output"
+      $stderr.puts "partial stderr output"
       $stdout.flush
+      $stderr.flush
       sleep 5
     RUBY
-      stdout, stderr, status = run_script(env, "--timeout", "0.2", "doctor", "--json")
+      stdout, stderr, status = run_script(env, "--timeout", "1", "doctor", "--json")
 
       assert_equal 124, status.exitstatus
-      assert_empty stdout
-      assert_includes stderr, "agent-coord-bounded: timed out after 0.2s"
+      assert_equal "partial json output\n", stdout
+      assert_includes stderr, "partial stderr output"
+      assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
       assert_includes stderr, "agent-coord doctor --json"
     end
   end
@@ -116,15 +119,21 @@ class AgentCoordBoundedTest < Minitest::Test
   def test_terminates_agent_coord_process_group_when_interrupted
     Dir.mktmpdir("agent-coord-bounded-test") do |dir|
       child_pid_file = File.join(dir, "child.pid")
+      wrapper_stdout_file = File.join(dir, "wrapper.stdout")
+      wrapper_stderr_file = File.join(dir, "wrapper.stderr")
       wrapper_pid = nil
       child_pid = nil
 
       with_fake_agent_coord(<<~RUBY, "AGENT_COORD_CHILD_PID" => child_pid_file) do |env|
+        puts "interrupted stdout output"
+        $stderr.puts "interrupted stderr output"
+        $stdout.flush
+        $stderr.flush
         File.write(ENV.fetch("AGENT_COORD_CHILD_PID"), Process.pid.to_s)
         sleep 10
       RUBY
         wrapper_pid = Process.spawn(env, RbConfig.ruby, SCRIPT, "--timeout", "20", "status",
-                                    out: File::NULL, err: File::NULL)
+                                    out: wrapper_stdout_file, err: wrapper_stderr_file)
 
         assert wait_until(timeout: 5) { File.size?(child_pid_file) }, "fake agent-coord did not start"
 
@@ -133,6 +142,8 @@ class AgentCoordBoundedTest < Minitest::Test
         _, status = Process.waitpid2(wrapper_pid)
 
         assert_equal 143, status.exitstatus
+        assert_equal "interrupted stdout output\n", File.read(wrapper_stdout_file)
+        assert_includes File.read(wrapper_stderr_file), "interrupted stderr output"
         assert wait_until(timeout: 5) { !process_alive?(child_pid) }, "fake agent-coord survived wrapper termination"
       ensure
         Process.kill("KILL", wrapper_pid) if wrapper_pid && process_alive?(wrapper_pid)
