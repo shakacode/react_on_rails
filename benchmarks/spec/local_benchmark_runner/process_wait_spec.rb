@@ -21,6 +21,23 @@ RSpec.describe LocalBenchmarkRunner::ProcessWait do
       end
     end
 
+    it "accepts an open port when the wrapper process has already exited" do
+      server = TCPServer.new("localhost", 0)
+      pid = Process.spawn("sh", "-c", "exit 0")
+      sleep 0.05
+
+      expect do
+        described_class.wait_for_port(pid, server.addr[1], "Rails server", timeout: 2, sleep_interval: 0.01)
+      end.not_to raise_error
+    ensure
+      server&.close
+      begin
+        Process.wait(pid, Process::WNOHANG) if pid
+      rescue Errno::ECHILD
+        nil
+      end
+    end
+
     it "treats timeout as elapsed seconds when polling faster than once per second" do
       pid = Process.spawn("sh", "-c", "sleep 1")
 

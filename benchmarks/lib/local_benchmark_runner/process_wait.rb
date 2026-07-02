@@ -12,10 +12,11 @@ module LocalBenchmarkRunner
       attempt = 0
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       loop do
+        return if port_open?(port)
+
         if (status = reap_if_exited(pid))
           raise "#{label} (pid #{pid}) exited during startup#{exit_detail(status)}"
         end
-        return if port_open?(port)
 
         remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
         raise "#{label} failed to start within #{timeout}s" if remaining <= 0
