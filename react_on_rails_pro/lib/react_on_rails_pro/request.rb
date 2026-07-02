@@ -24,11 +24,13 @@ module ReactOnRailsPro
       # Mutex for thread-safe connection management.
       # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
       CONNECTION_MUTEX = Mutex.new
+      UPLOAD_ASSETS_MUTEX = Mutex.new
 
       def reset_connection
         CONNECTION_MUTEX.synchronize do
           new_conn = create_connection
           old_conn = @connection
+          ReactOnRailsPro::RendererHttpClient.bump_client_generation
           @connection = new_conn
           old_conn&.close
         end
@@ -170,16 +172,18 @@ module ReactOnRailsPro
           target_bundles << pool.rsc_bundle_hash
         end
 
-        form = form_with_assets_and_bundle
-        # TODO: targetBundles is only kept for backward compatibility with older node renderers
-        # (protocol 2.0.0) that require it. The new node renderer derives target directories from
-        # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
-        # Note: it's not mandatory to keep this until then — users are expected to upgrade the
-        # node renderer and react_on_rails gem to the same version together — but it's an easy
-        # backward compatibility safeguard.
-        form["targetBundles"] = target_bundles
+        with_asset_upload_single_flight(target_bundles) do
+          form = form_with_assets_and_bundle
+          # TODO: targetBundles is only kept for backward compatibility with older node renderers
+          # (protocol 2.0.0) that require it. The new node renderer derives target directories from
+          # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
+          # Note: it's not mandatory to keep this until then — users are expected to upgrade the
+          # node renderer and react_on_rails gem to the same version together — but it's an easy
+          # backward compatibility safeguard.
+          form["targetBundles"] = target_bundles
 
-        perform_request("/upload-assets", form:)
+          perform_request("/upload-assets", form:)
+        end
       end
 
       def asset_exists_on_vm_renderer?(filename)
@@ -377,6 +381,64 @@ module ReactOnRailsPro
           data[:pushProps] = Array(push_props)
         end
         data
+      end
+
+      def with_asset_upload_single_flight(target_bundles, &)
+        key = Array(target_bundles).map(&:to_s).freeze
+        leader = false
+
+        state = UPLOAD_ASSETS_MUTEX.synchronize do
+          upload_assets_in_progress[key] || begin
+            leader = true
+            upload_assets_in_progress[key] = {
+              condition: ConditionVariable.new,
+              complete: false,
+              error: nil,
+              response: nil
+            }
+          end
+        end
+
+        if leader
+          perform_asset_upload_single_flight(key, state, &)
+        else
+          wait_for_asset_upload_single_flight(state)
+        end
+      end
+
+      def perform_asset_upload_single_flight(key, state)
+        error = nil
+        response = nil
+
+        begin
+          response = yield
+        rescue StandardError => e
+          error = e
+          raise
+        ensure
+          UPLOAD_ASSETS_MUTEX.synchronize do
+            state[:error] = error
+            state[:response] = response
+            state[:complete] = true
+            upload_assets_in_progress.delete(key)
+            state[:condition].broadcast
+          end
+        end
+
+        response
+      end
+
+      def upload_assets_in_progress
+        @upload_assets_in_progress ||= {}
+      end
+
+      def wait_for_asset_upload_single_flight(state)
+        UPLOAD_ASSETS_MUTEX.synchronize do
+          state[:condition].wait(UPLOAD_ASSETS_MUTEX) until state[:complete]
+          raise state[:error] if state[:error]
+
+          state[:response]
+        end
       end
 
       def create_connection

@@ -237,6 +237,40 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe ".upload_assets" do
+    it "deduplicates concurrent upload work for the same target bundle hashes" do
+      call_count = 0
+      call_count_mutex = Mutex.new
+      upload_started = Queue.new
+      result_mutex = Mutex.new
+      results = []
+
+      upload_block = proc do
+        call_count_mutex.synchronize { call_count += 1 }
+        upload_started << true
+        sleep(0.05)
+        :uploaded
+      end
+
+      leader = Thread.new do
+        result = described_class.send(:with_asset_upload_single_flight, ["server-hash"], &upload_block)
+        result_mutex.synchronize { results << result }
+      end
+      upload_started.pop
+      followers = Array.new(4) do
+        Thread.new do
+          result = described_class.send(:with_asset_upload_single_flight, ["server-hash"], &upload_block)
+          result_mutex.synchronize { results << result }
+        end
+      end
+
+      ([leader] + followers).each(&:join)
+
+      expect(call_count).to eq(1)
+      expect(results).to eq(Array.new(5, :uploaded))
+    end
+  end
+
   describe "get_form_body_for_file" do
     let(:url_path) { "http://localhost:3035/webpack/development/server-bundle.js" }
 
@@ -348,6 +382,21 @@ describe ReactOnRailsPro::Request do
       described_class.reset_connection
 
       expect(described_class.send(:connection)).to eq(new_connection)
+    end
+
+    it "advances the renderer client generation on reset" do
+      old_connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      new_connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      generation_before_reset = ReactOnRailsPro::RendererHttpClient.client_generation
+
+      described_class.instance_variable_set(:@connection, old_connection)
+
+      allow(described_class).to receive(:create_connection).and_return(new_connection)
+      allow(old_connection).to receive(:close)
+
+      described_class.reset_connection
+
+      expect(ReactOnRailsPro::RendererHttpClient.client_generation).to eq(generation_before_reset + 1)
     end
 
     it "propagates close errors during reset" do

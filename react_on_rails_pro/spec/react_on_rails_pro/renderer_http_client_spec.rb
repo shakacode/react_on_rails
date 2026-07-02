@@ -95,8 +95,39 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(chunks).to eq(["Bundle ", "Required"])
     end
 
-    it "replays streamed chunks and re-raises executor errors after a failed consume" do
-      response = described_class.new do |yielder, _status_assigner|
+    it "does not retain successful pass-through stream chunks after consumption" do
+      response = described_class.new do |yielder, status_assigner|
+        status_assigner.call(200)
+        yielder.call("First ")
+        yielder.call("Second")
+      end
+      chunks = []
+
+      response.each { |chunk| chunks << chunk }
+
+      expect(chunks).to eq(["First ", "Second"])
+      expect(response.body).to eq("")
+    end
+
+    it "retains streamed error chunks so error handlers can read the body" do
+      response = described_class.new do |yielder, status_assigner|
+        status_assigner.call(500)
+        yielder.call("Renderer ")
+        yielder.call("failed")
+      end
+      chunks = []
+
+      expect do
+        response.each { |chunk| chunks << chunk }
+      end.to raise_error(ReactOnRailsPro::RendererHttpClient::HTTPError)
+
+      expect(chunks).to eq(["Renderer ", "failed"])
+      expect(response.body).to eq("Renderer failed")
+    end
+
+    it "re-raises executor errors after a failed successful stream without replaying unbuffered chunks" do
+      response = described_class.new do |yielder, status_assigner|
+        status_assigner.call(200)
         yielder.call("Partial")
         raise "Renderer crashed"
       end
@@ -111,7 +142,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect do
         response.each { |chunk| chunks << chunk }
       end.to raise_error(RuntimeError, "Renderer crashed")
-      expect(chunks).to eq(["Partial"])
+      expect(chunks).to eq([])
     end
   end
 
@@ -132,17 +163,18 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         }
 
         headers, body = described_class.build_multipart_body(form, boundary: "rorp-test-boundary")
+        body_content = body.join
 
         expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
-        expect(headers).not_to include(["content-length", body.bytesize.to_s])
-        expect(body).to include('name="password"')
-        expect(body).to include("secret")
-        expect(body).to include('name="targetBundles[]"')
-        expect(body).to include("server")
-        expect(body).to include("rsc")
-        expect(body).to include('name="bundle_server"; filename="server.js"')
-        expect(body).to include("Content-Type: text/javascript")
-        expect(body).to include("console.log('bundle');")
+        expect(headers.map(&:first)).not_to include("content-length")
+        expect(body_content).to include('name="password"')
+        expect(body_content).to include("secret")
+        expect(body_content).to include('name="targetBundles[]"')
+        expect(body_content).to include("server")
+        expect(body_content).to include("rsc")
+        expect(body_content).to include('name="bundle_server"; filename="server.js"')
+        expect(body_content).to include("Content-Type: text/javascript")
+        expect(body_content).to include("console.log('bundle');")
       end
     end
 
@@ -158,14 +190,15 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         },
         boundary: "rorp-test-boundary"
       )
+      body_content = body.join
 
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
-      expect(body).to include('name="field\"name"')
-      expect(body).to include('name="bundle"; filename="server\"bundle.js"')
-      expect(body).to include("Content-Type: text/javascriptX-Injected: true\r\n")
-      expect(body).not_to include("field\"name\r\n")
-      expect(body).not_to include("server\"\r\nbundle.js")
-      expect(body).not_to include("\r\nX-Injected")
+      expect(body_content).to include('name="field\"name"')
+      expect(body_content).to include('name="bundle"; filename="server\"bundle.js"')
+      expect(body_content).to include("Content-Type: text/javascriptX-Injected: true\r\n")
+      expect(body_content).not_to include("field\"name\r\n")
+      expect(body_content).not_to include("server\"\r\nbundle.js")
+      expect(body_content).not_to include("\r\nX-Injected")
     end
 
     it "strips CRLF without quoted-string escaping content type values" do
@@ -179,9 +212,10 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         },
         boundary: "rorp-test-boundary"
       )
+      body_content = body.join
 
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
-      expect(body).to include("Content-Type: text/html; charset=\"utf-8\"\r\n")
+      expect(body_content).to include("Content-Type: text/html; charset=\"utf-8\"\r\n")
     end
 
     it "supports binary uploaded file bodies" do
@@ -201,10 +235,37 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
           boundary: "rorp-test-boundary"
         )
       end.not_to raise_error
+      body_content = body.join
 
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
-      expect(body.encoding).to eq(Encoding::BINARY)
-      expect(body.b).to include(binary_payload)
+      expect(body_content.encoding).to eq(Encoding::BINARY)
+      expect(body_content.b).to include(binary_payload)
+    end
+
+    it "streams Pathname file parts in bounded chunks" do
+      file_payload = "a" * 65_537
+
+      Tempfile.create(["react-on-rails-pro-large", ".js"]) do |file|
+        file.write(file_payload)
+        file.rewind
+
+        _headers, body = described_class.build_multipart_body(
+          {
+            "bundle" => {
+              body: Pathname.new(file.path),
+              content_type: "text/javascript",
+              filename: "server.js"
+            }
+          },
+          boundary: "rorp-test-boundary"
+        )
+
+        chunks = []
+        body.each { |chunk| chunks << chunk }
+
+        expect(chunks).not_to include(file_payload)
+        expect(chunks.join).to include(file_payload)
+      end
     end
 
     it "encodes UTF-8 scalar and IO file parts into the binary multipart body" do
@@ -219,11 +280,12 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         },
         boundary: "rorp-test-boundary"
       )
+      body_content = body.join
 
       expect(headers).to include(["content-type", "multipart/form-data; boundary=rorp-test-boundary"])
-      expect(body.encoding).to eq(Encoding::BINARY)
-      expect(body.b).to include("sëcret".b)
-      expect(body.b).to include("console.log('héllo');".b)
+      expect(body_content.encoding).to eq(Encoding::BINARY)
+      expect(body_content.b).to include("sëcret".b)
+      expect(body_content.b).to include("console.log('héllo');".b)
     end
   end
 
@@ -260,7 +322,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         expect(headers).to contain_exactly(
           a_collection_containing_exactly("content-type", a_string_starting_with("multipart/form-data; boundary="))
         )
-        expect(body).to include('name="bundle_server"; filename="server.js"')
+        expect(body.join).to include('name="bundle_server"; filename="server.js"')
       end
     end
   end
@@ -286,7 +348,74 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe "#post" do
-    it "uses the configured default stream limit when pool_size is nil" do
+    it "reuses one persistent async-http client across no-scheduler non-streaming posts" do
+      stub_const(
+        "FakePersistentBody",
+        Class.new do
+          attr_reader :closed
+
+          def initialize(chunks)
+            @chunks = chunks
+            @closed = false
+          end
+
+          def each(&block)
+            @chunks.each(&block)
+          end
+
+          def close
+            @closed = true
+          end
+        end
+      )
+      stub_const(
+        "FakePersistentResponse",
+        Struct.new(:status, :body)
+      )
+      stub_const(
+        "FakePersistentClient",
+        Class.new do
+          def post(_path, headers:, body:); end
+
+          def close; end
+        end
+      )
+
+      first_body = FakePersistentBody.new(["first"])
+      second_body = FakePersistentBody.new(["second"])
+      async_client = instance_double(FakePersistentClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(async_client)
+      allow(Async::HTTP::Client).to receive(:open).and_raise("ephemeral client should not be used")
+      allow(async_client).to receive(:post).and_return(
+        FakePersistentResponse.new(200, first_body),
+        FakePersistentResponse.new(200, second_body)
+      )
+      allow(async_client).to receive(:close)
+
+      first_response = client.post("/render", json: { renderingRequest: "first" })
+      second_response = client.post("/render", json: { renderingRequest: "second" })
+
+      expect(first_response.body).to eq("first")
+      expect(second_response.body).to eq("second")
+      expect(first_body.closed).to be(true)
+      expect(second_body.closed).to be(true)
+      expect(Async::HTTP::Client).to have_received(:new).once.with(
+        endpoint,
+        protocol: :fake_protocol,
+        retries: 0,
+        limit: 1
+      )
+      expect(async_client).to have_received(:post).twice
+
+      client.close
+      expect(async_client).to have_received(:close)
+    end
+
+    it "uses the configured default stream limit for no-scheduler streaming requests when pool_size is nil" do
       stub_const("FakeAsyncOpenClient", Class.new)
       stub_const("FakeAsyncEndpoint", Class.new)
 
@@ -303,7 +432,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Async::HTTP::Client).to receive(:open).and_yield(async_client)
 
       yielded_client = nil
-      client.__send__(:with_client, outer_scheduler: nil) { |opened_client| yielded_client = opened_client }
+      client.__send__(:with_client, outer_scheduler: nil, stream: true) do |opened_client|
+        yielded_client = opened_client
+      end
 
       expect(Async::HTTP::Client).to have_received(:open).with(
         endpoint,
@@ -375,7 +506,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(async_client).to have_received(:post).once
       expect(response.status).to eq(200)
       expect(chunks).to eq(%w[render ed])
-      expect(response.body).to eq("rendered")
+      expect(response.body).to eq("")
       expect(response_body.closed).to be(true)
     end
 
@@ -653,7 +784,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(yielded_clients).to eq([fake_async_client, fake_async_client])
     end
 
-    it "creates a new client when Fiber.scheduler is not available (fallback mode)" do
+    it "creates a new client for each no-scheduler streaming request" do
       stub_const("FakeEphemeralClient", Class.new { def get(_path); end })
       fake_client = instance_double(FakeEphemeralClient)
       endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
@@ -670,9 +801,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         block.call(fake_client)
       end
 
-      # outer_scheduler: nil triggers ephemeral mode
-      client.__send__(:with_client, outer_scheduler: nil) { |_c| nil }
-      client.__send__(:with_client, outer_scheduler: nil) { |_c| nil }
+      # No-scheduler streaming requests keep the response on the caller's reactor and use ephemeral clients.
+      client.__send__(:with_client, outer_scheduler: nil, stream: true) { |_c| nil }
+      client.__send__(:with_client, outer_scheduler: nil, stream: true) { |_c| nil }
 
       expect(open_calls).to eq(2)
     end
@@ -740,6 +871,69 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
 
       expect(yielded_client).to be(new_client)
+    end
+
+    it "closes and replaces scheduler clients from older generations" do
+      stub_const("FakeGenerationalClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+      old_client = FakeGenerationalClient.new
+      new_client = FakeGenerationalClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(old_client, new_client)
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+      described_class.bump_client_generation
+
+      yielded_client = nil
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
+
+      expect(old_client.closed).to be(true)
+      expect(yielded_client).to be(new_client)
+    end
+
+    it "sweeps stale scheduler clients for old origins on the next scheduler lookup" do
+      stub_const("FakeOldOriginClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+      old_origin_client = FakeOldOriginClient.new
+      current_origin_client = FakeOldOriginClient.new
+      old_endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      current_endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      old_connection = described_class.new(
+        origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1
+      )
+      current_connection = described_class.new(
+        origin: "http://localhost:3900", pool_size: 1, connect_timeout: 1, read_timeout: 1
+      )
+
+      allow(old_connection).to receive(:endpoint_for).and_return(old_endpoint)
+      allow(current_connection).to receive(:endpoint_for).and_return(current_endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(old_origin_client, current_origin_client)
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      old_connection.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+      described_class.bump_client_generation
+
+      current_connection.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+
+      expect(old_origin_client.closed).to be(true)
     end
 
     it "close is a no-op when Fiber.scheduler is not available" do
