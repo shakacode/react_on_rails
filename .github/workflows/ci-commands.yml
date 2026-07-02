@@ -33,6 +33,7 @@ jobs:
             const repo = context.repo.repo;
             const issueNumber = context.issue.number;
             const commentId = context.payload.comment.id;
+            const commentCreatedAt = context.payload.comment.created_at;
             const actor = context.actor;
             const repoFullName = `${owner}/${repo}`;
             const hostedCiLabel = 'ready-for-hosted-ci';
@@ -103,6 +104,10 @@ jobs:
             }
 
             async function hasWriteAccessFor(username) {
+              if (!username) {
+                return false;
+              }
+
               if (permissionByLogin.has(username)) {
                 return permissionByLogin.get(username);
               }
@@ -287,14 +292,16 @@ jobs:
               return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
-            async function newerCiCommands(commandNames) {
+            async function newerCiCommands(commandNames, { waitForVisibility = true } = {}) {
               const commandNameSet = new Set(commandNames);
               const newerCommands = new Set();
 
               // Give GitHub's comments API a short visibility window so a later
               // stop/skip command wins over an older run-hosted command that is
               // still dispatching workflows.
-              await sleep(newerCommandVisibilityDelayMs);
+              if (waitForVisibility) {
+                await sleep(newerCommandVisibilityDelayMs);
+              }
 
               for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
                 owner,
@@ -302,13 +309,17 @@ jobs:
                 issue_number: issueNumber,
                 per_page: 100,
                 sort: 'created',
-                direction: 'asc'
+                direction: 'asc',
+                since: commentCreatedAt
               })) {
                 for (const comment of page.data) {
+                  const commenterLogin = comment.user?.login;
+
                   if (comment.id <= commentId ||
                       comment.user?.type === 'Bot' ||
+                      !commenterLogin ||
                       !trustedCommandAssociations.has(comment.author_association) ||
-                      !(await hasWriteAccessFor(comment.user.login))) {
+                      !(await hasWriteAccessFor(commenterLogin))) {
                     continue;
                   }
 
@@ -331,6 +342,10 @@ jobs:
 
             async function hasNewerCiCommand(commandNames) {
               return (await newerCiCommands(commandNames)).size > 0;
+            }
+
+            async function hasNewerCiCommandBeforeMutation(commandNames) {
+              return (await newerCiCommands(commandNames, { waitForVisibility: false })).size > 0;
             }
 
             function helpBody() {
@@ -422,29 +437,39 @@ jobs:
               let forceFullLabelAdded = false;
               let labelMessageOverride = '';
               if (succeeded.length > 0) {
-                const newerCommands = await newerCiCommands([
+                const labelControlCommands = [
                   '+ci-stop-hosted',
                   '+ci-skip-hosted',
                   '+ci-stop-full'
-                ]);
+                ];
+                const newerCommands = await newerCiCommands(labelControlCommands);
                 if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
                   labelMessageOverride =
                     'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
                 } else {
-                  const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
-                  try {
-                    await addHostedCiLabels(shouldAddForceFullLabel);
-                    labelAdded = true;
-                    forceFullLabelAdded = shouldAddForceFullLabel;
-                    if (forceFull && !shouldAddForceFullLabel) {
-                      labelMessageOverride =
-                        'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                  for (const command of await newerCiCommands(labelControlCommands, { waitForVisibility: false })) {
+                    newerCommands.add(command);
+                  }
+
+                  if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
+                    labelMessageOverride =
+                      'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
+                  } else {
+                    const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
+                    try {
+                      await addHostedCiLabels(shouldAddForceFullLabel);
+                      labelAdded = true;
+                      forceFullLabelAdded = shouldAddForceFullLabel;
+                      if (forceFull && !shouldAddForceFullLabel) {
+                        labelMessageOverride =
+                          'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                      }
+                    } catch (error) {
+                      failed.push({
+                        workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                        error: error.message
+                      });
                     }
-                  } catch (error) {
-                    failed.push({
-                      workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
-                      error: error.message
-                    });
                   }
                 }
               }
@@ -486,6 +511,11 @@ jobs:
                 return;
               }
 
+              if (await hasNewerCiCommandBeforeMutation(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted-CI waiver because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removedHostedCi = await removeHostedCiLabels();
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
@@ -509,6 +539,11 @@ jobs:
                 return;
               }
 
+              if (await hasNewerCiCommandBeforeMutation(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removed = await removeHostedCiLabels();
               await postComment([
                 '## Hosted CI Mode Disabled',
@@ -523,6 +558,11 @@ jobs:
 
             async function handleStopFull() {
               if (await hasNewerCiCommand(['+ci-force-full'])) {
+                await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
+                return;
+              }
+
+              if (await hasNewerCiCommandBeforeMutation(['+ci-force-full'])) {
                 await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
                 return;
               }

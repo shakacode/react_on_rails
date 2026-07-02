@@ -722,6 +722,34 @@ async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
   assert.match(core.failed[0], /prior-synthetic-base/);
 }
 
+async function testNoRunPushHopLimitStopsAtConfiguredLimitWithTrail() {
+  const quietMain = 'quiet-main';
+  const priorQuietMain = 'prior-quiet-main';
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {
+      [quietMain]: priorQuietMain,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: quietMain,
+    excludeWorkflowsInput: '',
+    maxNoRunsHops: 1,
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /after 1 no-run candidate commits/);
+  assert.match(core.failed[0], /quiet-main/);
+  assert.match(core.failed[0], /prior-quiet-main/);
+}
+
 async function testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure() {
   const syntheticBase = 'synthetic-base';
   const realFailure = 'real-failure';
@@ -964,6 +992,7 @@ async function main() {
   await testJobListNetworkFailureSetsHelpfulFailure();
   await testNoRunSyntheticChainLooksThroughToParentFailure();
   await testNoRunHopLimitStopsAtConfiguredLimitWithTrail();
+  await testNoRunPushHopLimitStopsAtConfiguredLimitWithTrail();
   await testCompareUnprocessableSyntheticBaseLooksThroughToParentFailure();
   await testCompareTransientFailureSetsHelpfulFailure();
   await testCompareNetworkFailureSetsHelpfulFailure();
