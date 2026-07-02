@@ -101,12 +101,21 @@ runs:
               return false;
             }
 
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pullRequest.number,
-              per_page: 100
-            });
+            let comments;
+            try {
+              comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                per_page: 100
+              });
+            } catch (error) {
+              core.warning(
+                'Unable to read PR comments for Dependabot hosted-CI trust check; ' +
+                  `treating hosted CI as not trusted: ${error.message || error}`
+              );
+              return false;
+            }
             let latestStart = null;
             let latestStop = null;
 
