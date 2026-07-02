@@ -60,11 +60,15 @@ type PromiseController = {
  */
 type PropRequestEmitter = (propName: string) => void;
 
+// Shared-execution-context keys + max pull-prop name length: the node renderer reads these
+// same keys off the execution context, so both definitions must list the identical values.
+// MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/handleIncrementalRenderRequest.ts
 const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 const PULL_ENABLED_KEY = 'pullEnabled';
 const PUSH_PROPS_KEY = 'pushProps';
 const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 const MAX_PULL_PROP_NAME_LENGTH = 256;
+// MIRROR VALUES END
 
 class AsyncPropsManager {
   private static readonly MAX_BUFFERED_REQUESTS = 500;

@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Removed the inert `config.server_render_method` option**: The open-source configuration no longer accepts `config.server_render_method`. The option never selected a server render method — the open-source gem always renders with ExecJS — and its validator raised `ReactOnRails::Error` at boot for any value other than blank or `"ExecJS"`. Setting it now raises `NoMethodError` at boot, so delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; `rake react_on_rails:doctor` also flags the stale line. For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`. Fixes [Issue 4415](https://github.com/shakacode/react_on_rails/issues/4415). [PR 4423](https://github.com/shakacode/react_on_rails/pull/4423) by [justin808](https://github.com/justin808).
+
 #### Added
 
 - **Generated Rails response TypeScript contracts**: Rails apps can now register explicit JSON response
@@ -94,6 +98,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
+  bypasses renders that use async props, so per-request async stream output cannot be replayed from
+  another request's cached stream. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
+
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
@@ -105,6 +116,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
   [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Incremental render setup failures release renderer context**:
+  The Pro node renderer now releases the execution context and destroys started streams when
+  pull-mode incremental render setup fails, preventing orphaned renderer work after response-start
+  errors. Fixes [Issue 4312](https://github.com/shakacode/react_on_rails/issues/4312).
+  [PR 4383](https://github.com/shakacode/react_on_rails/pull/4383) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Dropped pull-mode prop requests are logged**: Streaming SSR now warns when the Node
@@ -134,6 +152,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   failures still fail closed. Fixes [Issue 4340](https://github.com/shakacode/react_on_rails/issues/4340).
   [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
   [justin808](https://github.com/justin808).
+
+- **[Pro]** **Registry cleanup handles page-unload cancellations safely**: Pending component and store
+  registry waits are now rejected when a page unloads or store generators are cleared, stale registry
+  timeouts are cleared, and expected navigation cancellations are ignored during client rendering while
+  real registration failures still surface. [PR 4282](https://github.com/shakacode/react_on_rails/pull/4282)
+  by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby

@@ -139,6 +139,19 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         def each; end
       end
     end
+    let(:fake_stream_class) do
+      Class.new do
+        def initialize(chunks)
+          @chunks = chunks
+        end
+
+        def each_chunk(&block)
+          return enum_for(:each_chunk) unless block
+
+          @chunks.each(&block)
+        end
+      end
+    end
     let(:pool) { instance_double(pool_class) }
     let(:cache_store) do
       Class.new do
@@ -300,6 +313,27 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
                 upstream_stream,
                 cache_options:)
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+      end
+
+      it "does not replay a cached stream when async props can emit per-request data" do
+        async_props_block = proc { |emit| emit.call("currentUser", "request-user") }
+        first_options = build_render_options(streaming: true, internal_options: { async_props_block: })
+        second_options = build_render_options(streaming: true, internal_options: { async_props_block: })
+
+        allow(pool).to receive(:exec_server_render_js)
+          .and_return(
+            fake_stream_class.new(%w[shell user-a]),
+            fake_stream_class.new(%w[shell user-b])
+          )
+
+        first_chunks = []
+        described_class.exec_server_render_js(js_code, first_options).each_chunk { |chunk| first_chunks << chunk }
+        second_chunks = []
+        described_class.exec_server_render_js(js_code, second_options).each_chunk { |chunk| second_chunks << chunk }
+
+        expect(first_chunks).to eq(%w[shell user-a])
+        expect(second_chunks).to eq(%w[shell user-b])
+        expect(pool).to have_received(:exec_server_render_js).twice
       end
     end
   end

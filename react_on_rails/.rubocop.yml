@@ -12,7 +12,6 @@ AllCops:
   Exclude:
     - 'spec/dummy/bin/*'
     - 'spec/react_on_rails/dummy-for-generators/**/*'  # Generated fixture contains intentionally invalid Ruby
-    - 'spike/**/*'  # Exploratory spike code outside lib/ — not part of the production surface
 
 Naming/FileName:
   Exclude:

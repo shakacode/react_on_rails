@@ -87,9 +87,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.2.0
         version: 16.3.0(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.0.7(react@19.0.7))(react@19.0.7)
-      '@tsconfig/node14':
-        specifier: ^14.1.2
-        version: 14.1.8
+      '@tsconfig/node18':
+        specifier: ^18.2.4
+        version: 18.2.6
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14
@@ -3533,8 +3533,8 @@ packages:
   '@tsconfig/create-react-app@2.0.11':
     resolution: {integrity: sha512-vvIx+rDshVTVyA0l8OAjt8LCFUX0xhp6I5me1ggoQCg4Lny0xLG2Y1aXC7b76TCAq5hbUwTRhKF1RR33Yl7mkA==}
 
-  '@tsconfig/node14@14.1.8':
-    resolution: {integrity: sha512-SjGT+qPvh8Uhc849yNMD0ZIPr69AyB7Z46nMqhrI3gCVocd6mhI0jP4YE4onO/ufpmengRfTxNMpdpKEp2xRIg==}
+  '@tsconfig/node18@18.2.6':
+    resolution: {integrity: sha512-eAWQzAjPj18tKnDzmWstz4OyWewLUNBm9tdoN9LayzoboRktYx3Enk1ZXPmThj55L7c4VWYq/Bzq0A51znZfhw==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -14023,7 +14023,7 @@ snapshots:
 
   '@tsconfig/create-react-app@2.0.11': {}
 
-  '@tsconfig/node14@14.1.8': {}
+  '@tsconfig/node18@18.2.6': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
