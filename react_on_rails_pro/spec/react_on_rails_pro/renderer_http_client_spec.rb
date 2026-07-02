@@ -952,6 +952,41 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(yielded_client).to be(new_client)
     end
 
+    it "closes scheduler clients created by stale connection instances after a reset" do
+      stub_const("FakeOwnedSchedulerClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+      old_client = FakeOwnedSchedulerClient.new
+      current_client = FakeOwnedSchedulerClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      old_connection = described_class.new(
+        origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1
+      )
+      current_connection = described_class.new(
+        origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1
+      )
+
+      allow(old_connection).to receive(:endpoint_for).and_return(endpoint)
+      allow(current_connection).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(old_client, current_client)
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      described_class.bump_client_generation
+      old_connection.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+
+      yielded_client = nil
+      current_connection.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
+
+      expect(old_client.closed).to be(true)
+      expect(yielded_client).to be(current_client)
+    end
+
     it "sweeps stale scheduler clients for old origins on the next scheduler lookup" do
       stub_const("FakeOldOriginClient", Class.new do
         attr_reader :closed

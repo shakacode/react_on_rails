@@ -612,7 +612,7 @@ module ReactOnRailsPro
       # Create new client and store it
       endpoint = endpoint_for(@origin)
       client = Async::HTTP::Client.new(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit)
-      clients[@origin] = { generation: self.class.client_generation, client: }
+      clients[@origin] = { generation: self.class.client_generation, owner: self, client: }
       scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, clients)
       client
     end
@@ -634,6 +634,9 @@ module ReactOnRailsPro
       clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
       return unless clients
 
+      entry = clients[@origin]
+      return if scheduler_client_owner(entry) && scheduler_client_owner(entry) != self
+
       client = scheduler_client_from_entry(clients.delete(@origin))
       scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, nil) if clients.empty?
 
@@ -643,8 +646,9 @@ module ReactOnRailsPro
 
     def sweep_stale_scheduler_clients(clients)
       generation = self.class.client_generation
-      clients.delete_if do |_origin, entry|
-        stale = scheduler_client_generation(entry) != generation
+      clients.delete_if do |origin, entry|
+        stale = scheduler_client_generation(entry) != generation ||
+                (origin == @origin && scheduler_client_owner(entry) != self)
         scheduler_client_from_entry(entry)&.close if stale
         stale
       end
@@ -658,6 +662,10 @@ module ReactOnRailsPro
 
     def scheduler_client_generation(entry)
       entry.is_a?(Hash) ? entry[:generation] : nil
+    end
+
+    def scheduler_client_owner(entry)
+      entry.is_a?(Hash) ? entry[:owner] : nil
     end
 
     def close_thread_clients
