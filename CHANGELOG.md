@@ -105,6 +105,26 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4352](https://github.com/shakacode/react_on_rails/pull/4352) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **RSC preload replay survives cache eviction**: Preloaded RSC payloads now remain
+  replayable after route cache eviction, preventing stale preload state from breaking refetches.
+  Fixes [Issue 4326](https://github.com/shakacode/react_on_rails/issues/4326).
+  [PR 4353](https://github.com/shakacode/react_on_rails/pull/4353) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Incremental stream timers stay aligned with active chunks**: Healthy pull-mode
+  incremental streams are no longer closed by stale request or finish timers while chunks keep
+  progressing, while abandoned streams remain bounded by an idle watchdog. Fixes
+  [Issue 4310](https://github.com/shakacode/react_on_rails/issues/4310) and
+  [Issue 4311](https://github.com/shakacode/react_on_rails/issues/4311).
+  [PR 4354](https://github.com/shakacode/react_on_rails/pull/4354) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC Rspack boot validation warns on undetermined versions**: Boot now warns and continues when
+  the active Rspack version cannot be determined, while strict doctor checks and provable Rspack v1
+  failures still fail closed. Fixes [Issue 4340](https://github.com/shakacode/react_on_rails/issues/4340).
+  [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
   source-encoding magic comments or a UTF-8 default, and validates content before override-gem
