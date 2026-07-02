@@ -138,7 +138,7 @@ run_test() {
 # Build a throwaway repo that looks like a release line: main with a version
 # file, a release/X.Y.Z branch carrying a fix and a vX.Y.Z.rc.N tag, and a local
 # "origin" remote that is a SEPARATE throwaway clone in the same tmp tree, so
-# `git fetch origin` and the forward-port `origin/release/X.Y.Z` ref resolve with
+# `git fetch -- origin` and the forward-port `origin/release/X.Y.Z` ref resolve with
 # no network. The remote is a local bare repo: a real `git push` would only ever
 # touch that throwaway, never a network remote — and these tests never reach an
 # unguarded push anyway.
@@ -204,12 +204,23 @@ test_promote_dry_run_does_not_execute_release() {
 
   assert_status 0 "$RF_STATUS" "promote dry-run no-op status"
   # Dry-run performs the read-only fetch so tag resolution matches the real run.
-  assert_contains "$RF_OUT" "+ git fetch origin" "promote dry-run should fetch before resolving tags"
+  assert_contains "$RF_OUT" "+ git fetch -- origin" "promote dry-run should fetch before resolving tags"
   # No new v1.0.0 (final) tag, and HEAD unchanged.
   if git rev-parse -q --verify refs/tags/v1.0.0 >/dev/null 2>&1; then
     fail "promote dry-run created the final tag v1.0.0"
   fi
   assert_equal "$head_before" "$(git rev-parse HEAD)" "promote dry-run HEAD unchanged"
+}
+
+test_promote_dry_run_treats_option_like_remote_as_remote_name() {
+  setup_release_repo
+
+  run_rf promote 1.0.0 --dry-run --remote=--no-tags
+
+  assert_status 1 "$RF_STATUS" "promote option-like remote status"
+  assert_contains "$RF_OUT" "+ git fetch -- --no-tags" "promote option-like remote fetch"
+  assert_contains "$RF_OUT" "command failed: git fetch -- --no-tags" "promote option-like remote"
+  assert_not_contains "$RF_OUT" "Resolved accepted RC tag" "promote option-like remote should stop at fetch"
 }
 
 # --- promote: explicit rc tag ----------------------------------------------
@@ -313,7 +324,7 @@ test_promote_dry_run_fetches_remote_only_rc_tag() {
   run_rf promote 1.0.0 --dry-run
 
   assert_status 0 "$RF_STATUS" "promote remote-only rc status"
-  assert_contains "$RF_OUT" "+ git fetch origin" "promote remote-only rc fetch"
+  assert_contains "$RF_OUT" "+ git fetch -- origin" "promote remote-only rc fetch"
   assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote remote-only rc"
   assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote remote-only rc release"
 }
@@ -325,7 +336,7 @@ test_promote_dry_run_uses_newer_remote_rc_tag() {
   run_rf promote 1.0.0 --dry-run
 
   assert_status 0 "$RF_STATUS" "promote newer remote rc status"
-  assert_contains "$RF_OUT" "+ git fetch origin" "promote newer remote rc fetch"
+  assert_contains "$RF_OUT" "+ git fetch -- origin" "promote newer remote rc fetch"
   assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.1" "promote newer remote rc"
   assert_not_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote newer remote rc"
 }
@@ -367,7 +378,7 @@ test_close_out_dry_run_prints_plan_and_runs_nothing() {
 
   assert_status 0 "$RF_STATUS" "close-out dry-run status"
   assert_contains "$RF_OUT" "Close out 1.0.0 (runbook step 5)" "close-out dry-run"
-  assert_contains "$RF_OUT" "+ git fetch origin" "close-out dry-run should fetch before sync checks"
+  assert_contains "$RF_OUT" "+ git fetch -- origin" "close-out dry-run should fetch before sync checks"
   # The real forward-port DRY-RUN plan is shown (it resolves origin/release/1.0.0).
   assert_contains "$RF_OUT" "Release forward-port plan" "close-out dry-run"
   assert_contains "$RF_OUT" "PICK" "close-out dry-run picks the fix"
@@ -503,7 +514,7 @@ test_close_out_dry_run_fetches_before_main_sync_check() {
   run_rf close-out 1.0.0 --dry-run
 
   assert_status 1 "$RF_STATUS" "close-out dry-run stale-origin status"
-  assert_contains "$RF_OUT" "+ git fetch origin" "close-out dry-run stale-origin fetch"
+  assert_contains "$RF_OUT" "+ git fetch -- origin" "close-out dry-run stale-origin fetch"
   assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out dry-run stale-origin message"
   assert_not_contains "$RF_OUT" "Release forward-port plan" "close-out stale-origin should stop before preview"
 }
@@ -567,6 +578,7 @@ test_help_exits_zero() {
 
 run_test test_promote_dry_run_prints_commands_and_runs_nothing
 run_test test_promote_dry_run_does_not_execute_release
+run_test test_promote_dry_run_treats_option_like_remote_as_remote_name
 run_test test_promote_accepts_explicit_rc_tag
 run_test test_promote_aborts_when_not_on_release_branch
 run_test test_promote_aborts_when_tip_drifted_from_rc_tag

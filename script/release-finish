@@ -467,10 +467,10 @@ class ReleaseFinish
     # Fetch is read-only for the worktree and release branches, and the dry-run
     # plan must resolve tags and remote-tracking refs from the same state as a
     # real run.
-    puts "+ git fetch #{remote}"
-    return if system("git", "fetch", remote)
+    puts "+ git fetch -- #{remote}"
+    return if system("git", "fetch", "--", remote)
 
-    raise GitError, "command failed: git fetch #{remote}"
+    raise GitError, "command failed: git fetch -- #{remote}"
   end
 
   # ---------------------------------------------------------------------------
