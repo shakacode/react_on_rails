@@ -125,7 +125,7 @@ describe('restartWorkers', () => {
     await expect(restartPromise).resolves.toBeUndefined();
   });
 
-  it('clears the scheduled restart flag when a worker emits an error before exit', async () => {
+  it('preserves the scheduled restart flag when a selected worker emits an error before exit', async () => {
     jest.useFakeTimers();
     const staleWorker = buildWorker(1);
     const nextWorker = buildWorker(2);
@@ -139,7 +139,7 @@ describe('restartWorkers', () => {
     jest.runOnlyPendingTimers();
     await Promise.resolve();
 
-    expect(staleWorker.isScheduledRestart).toBe(false);
+    expect(staleWorker.isScheduledRestart).toBe(true);
     expect(nextWorker.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE, expect.any(Function));
 
     nextWorker.emit('exit');
