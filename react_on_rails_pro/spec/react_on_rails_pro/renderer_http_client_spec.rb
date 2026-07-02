@@ -422,6 +422,19 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(async_client).to have_received(:close)
     end
 
+    it "rejects no-scheduler requests after close without opening a new persistent thread client" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(Fiber).to receive(:scheduler).and_return(nil)
+      allow(described_class::PersistentThreadClient).to receive(:new)
+
+      client.close
+
+      expect { client.post("/render", json: { renderingRequest: "late" }) }
+        .to raise_error(described_class::ConnectionError, "renderer HTTP client is closed")
+      expect(described_class::PersistentThreadClient).not_to have_received(:new)
+    end
+
     it "uses the configured default stream limit for no-scheduler streaming requests when pool_size is nil" do
       stub_const("FakeAsyncOpenClient", Class.new)
       stub_const("FakeAsyncEndpoint", Class.new)
@@ -913,14 +926,12 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       expect(fake_async_client.closed).to be(true)
 
-      # Next call should create a new client
       new_client = FakeClosableClient.new
       allow(Async::HTTP::Client).to receive(:new).and_return(new_client)
 
-      yielded_client = nil
-      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c }
-
-      expect(yielded_client).to be(new_client)
+      expect { client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil } }
+        .to raise_error(described_class::ConnectionError, "renderer HTTP client is closed")
+      expect(new_client.closed).to be_nil
     end
 
     it "closes and replaces scheduler clients from older generations" do

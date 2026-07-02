@@ -500,9 +500,12 @@ module ReactOnRailsPro
       @force_h2c = force_http2 && URI.parse(origin).scheme == "http"
       @thread_clients = {}.compare_by_identity
       @thread_clients_mutex = Mutex.new
+      @closed = false
+      @closed_mutex = Mutex.new
     end
 
     def post(path, form: nil, json: nil, stream: false)
+      ensure_open!
       headers, body = request_body(form:, json:)
       build_response(stream:) do |yielder, status_assigner|
         execute_request(:post, path, [headers, body], stream:, response_handlers: [yielder, status_assigner])
@@ -510,6 +513,7 @@ module ReactOnRailsPro
     end
 
     def get(path)
+      ensure_open!
       build_response(stream: false) do |yielder, status_assigner|
         execute_request(:get, path, [[], nil], stream: false, response_handlers: [yielder, status_assigner])
       end
@@ -522,6 +526,7 @@ module ReactOnRailsPro
     # The caller writes NDJSON lines to output while concurrently reading response
     # chunks. Calling output.close sends END_STREAM on the HTTP/2 stream.
     def post_bidi(path, headers:)
+      ensure_open!
       writable = Protocol::HTTP::Body::Writable.new
       response = build_response(stream: true) do |yielder, status_assigner|
         execute_request(:post, path, [headers, writable], stream: true, response_handlers: [yielder, status_assigner])
@@ -530,6 +535,8 @@ module ReactOnRailsPro
     end
 
     def close
+      return unless mark_closed
+
       scheduler = Fiber.scheduler
       evict_client_from_scheduler(scheduler) if scheduler
       close_thread_clients
@@ -554,6 +561,22 @@ module ReactOnRailsPro
       # Streaming requests stay lazy; the caller drives the exchange via Response#each.
       response.body unless stream
       response
+    end
+
+    def ensure_open!
+      @closed_mutex.synchronize { raise_if_closed }
+    end
+
+    def mark_closed
+      @closed_mutex.synchronize do
+        return false if @closed
+
+        @closed = true
+      end
+    end
+
+    def raise_if_closed
+      raise ConnectionError, "renderer HTTP client is closed" if @closed
     end
 
     def execute_request(method, path, request_body, stream:, response_handlers:)
@@ -601,29 +624,37 @@ module ReactOnRailsPro
     end
 
     def scheduler_scoped_client(scheduler)
-      # Fiber.scheduler is per-OS-thread, and within a thread fibers are cooperatively
-      # scheduled (only one runs at a time). No mutex needed for per-scheduler operations.
-      clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
-      clients ||= {}
-      sweep_stale_scheduler_clients(clients)
-      entry = clients[@origin]
-      return scheduler_client_from_entry(entry) if entry
+      @closed_mutex.synchronize do
+        raise_if_closed
 
-      # Create new client and store it
-      endpoint = endpoint_for(@origin)
-      client = Async::HTTP::Client.new(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit)
-      clients[@origin] = { generation: self.class.client_generation, owner: self, client: }
-      scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, clients)
-      client
+        # Fiber.scheduler is per-OS-thread, and within a thread fibers are cooperatively
+        # scheduled (only one runs at a time). No mutex needed for per-scheduler operations.
+        clients = scheduler.instance_variable_get(SCHEDULER_CLIENTS_KEY)
+        clients ||= {}
+        sweep_stale_scheduler_clients(clients)
+        entry = clients[@origin]
+        return scheduler_client_from_entry(entry) if entry
+
+        # Create new client and store it
+        endpoint = endpoint_for(@origin)
+        client = Async::HTTP::Client.new(endpoint, protocol: endpoint.protocol, retries: 0, limit: pool_limit)
+        clients[@origin] = { generation: self.class.client_generation, owner: self, client: }
+        scheduler.instance_variable_set(SCHEDULER_CLIENTS_KEY, clients)
+        client
+      end
     end
 
     def persistent_thread_client
       stale_clients = nil
-      client = @thread_clients_mutex.synchronize do
-        stale_clients = sweep_dead_thread_clients
-        @thread_clients[Thread.current] ||= begin
-          endpoint = endpoint_for(@origin)
-          PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+      client = @closed_mutex.synchronize do
+        raise_if_closed
+
+        @thread_clients_mutex.synchronize do
+          stale_clients = sweep_dead_thread_clients
+          @thread_clients[Thread.current] ||= begin
+            endpoint = endpoint_for(@origin)
+            PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+          end
         end
       end
       stale_clients.each(&:close)
