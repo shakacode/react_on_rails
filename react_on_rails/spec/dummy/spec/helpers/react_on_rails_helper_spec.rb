@@ -1583,6 +1583,7 @@ describe ReactOnRailsHelper do
       end
 
       before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         allow(render_options).to receive(:auto_load_bundle).and_return(true)
         allow(helper).to receive(:preload_sources_for_stylesheet_pack)
           .with("generated/HelloWorld")
@@ -1598,6 +1599,22 @@ describe ReactOnRailsHelper do
 
         expect(script["data-generated-stylesheet-hrefs"])
           .to eq(["/webpack/test/css/shared-generated-pack-deadbeef.css"].to_json)
+      end
+    end
+
+    context "when auto-loaded generated stylesheet hrefs run without Pro" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        allow(render_options).to receive(:auto_load_bundle).and_return(true)
+        allow(helper).to receive(:preload_sources_for_stylesheet_pack)
+      end
+
+      it "does not compute or emit Pro-only generated stylesheet metadata" do
+        result = helper.send(:generate_component_script, render_options)
+        script = Nokogiri::HTML.fragment(result).css("script.js-react-on-rails-component").first
+
+        expect(script["data-generated-stylesheet-hrefs"]).to be_nil
+        expect(helper).not_to have_received(:preload_sources_for_stylesheet_pack)
       end
     end
   end
