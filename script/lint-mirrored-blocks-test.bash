@@ -217,9 +217,59 @@ EOF
   assert_contains "$output" "beta" "drift output"
 }
 
+# Regression: an ordinary (non-marker) comment inside a value region carrying a fake
+# quoted token / number must NOT become part of the contract (no false drift). Covers
+# Ruby `#`, JS `//`, and single-line `/* */`.
+test_prose_comment_token_does_not_leak() {
+  setup_repo
+  cat > packages/react-on-rails/src/a.ts <<'EOF'
+// MIRROR VALUES OF: packages/react-on-rails-pro/src/b.ts
+const X = ['alpha', 'beta']; // local note about 'notAValue' and 123
+/* another 'ghost' 456 */
+// MIRROR VALUES END
+EOF
+  cat > packages/react-on-rails-pro/src/b.ts <<'EOF'
+// MIRROR VALUES OF: packages/react-on-rails/src/a.ts
+const X = ['alpha', 'beta'];
+// MIRROR VALUES END
+EOF
+  commit_all
+  local output
+  output="$(ruby bin/lint-mirrored-blocks 2>&1)"
+  local rc=$?
+  [ "$rc" -eq 0 ] || fail "prose-comment token caused false drift, exit $rc: $output"
+  assert_not_contains "$output" "notAValue" "output"
+  assert_not_contains "$output" "ghost" "output"
+}
+
+# Regression: a comment that mentions the value missing from the array must NOT mask
+# real drift. a.ts dropped 'beta' from its array but names it in a comment; the drift
+# against b.ts must still be reported.
+test_prose_comment_does_not_mask_real_drift() {
+  setup_repo
+  cat > packages/react-on-rails/src/a.ts <<'EOF'
+// MIRROR VALUES OF: packages/react-on-rails-pro/src/b.ts
+const X = ['alpha']; // dropped 'beta' here on purpose
+// MIRROR VALUES END
+EOF
+  cat > packages/react-on-rails-pro/src/b.ts <<'EOF'
+// MIRROR VALUES OF: packages/react-on-rails/src/a.ts
+const X = ['alpha', 'beta'];
+// MIRROR VALUES END
+EOF
+  commit_all
+  local output
+  output="$(ruby bin/lint-mirrored-blocks 2>&1)"
+  local rc=$?
+  [ "$rc" -ne 0 ] || fail "real drift (a.ts missing beta) was masked by a comment mentioning beta: $output"
+  assert_contains "$output" "beta" "drift output"
+}
+
 run_test test_stacked_markers_agree_pass
 run_test test_stacked_marker_line_token_does_not_leak
 run_test test_marker_line_token_does_not_mask_real_drift
+run_test test_prose_comment_token_does_not_leak
+run_test test_prose_comment_does_not_mask_real_drift
 
 echo
 echo "lint-mirrored-blocks tests: $TESTS_RUN run, $TESTS_FAILED failed"

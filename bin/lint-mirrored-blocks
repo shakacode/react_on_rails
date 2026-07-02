@@ -693,9 +693,41 @@ def values_target_path_from(line)
   clean_repo_path(match[1].sub(/[.,;:)\]]+\z/, ""))
 end
 
+QUOTE_CHARS = ["'", '"', "`"].freeze
+
+# True when index begins a Ruby (`#`), JS/TS line (`//`) or single-line block (`/* ... */`)
+# comment (outside any string — callers gate on that).
+def comment_start_at?(line, index)
+  char = line[index]
+  char == "#" || (char == "/" && ["/", "*"].include?(line[index + 1]))
+end
+
+# Return the code portion of a line with any trailing comment removed. Comment openers inside
+# a quoted string (e.g. a URL like 'http://x') are ignored. Only single-line comments are
+# handled — a value region spanning a multi-line /* ... */ is not supported and would leak its
+# tail; regions are single-line constant declarations, so this is sufficient.
+def strip_line_comment(line)
+  quote = nil
+  index = 0
+  while index < line.length
+    char = line[index]
+    if quote
+      quote = nil if char == quote
+    elsif QUOTE_CHARS.include?(char)
+      quote = char
+    elsif comment_start_at?(line, index)
+      return line[0...index]
+    end
+    index += 1
+  end
+  line
+end
+
 # Collect quoted-string and integer literals from one line of a value region.
 # %w[...]/%i[...] words are unquoted, so expand them to individual string values.
-def literals_on_line(line)
+# Trailing comments are stripped first so prose tokens never enter the contract.
+def literals_on_line(raw_line)
+  line = strip_line_comment(raw_line)
   literals = []
   line.scan(PERCENT_WORD_ARRAY_PATTERN) { |_open, body| literals.concat(body.split(/\s+/).reject(&:empty?)) }
   # Remove the %w/%i bodies before scanning quoted strings so their contents are not double counted.
