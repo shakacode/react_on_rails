@@ -514,7 +514,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           stub_failed_node_package_resolution
 
           aggregate_failures do
-            %w[^1 ~1 1].each do |rspack_core_version|
+            %w[^1 ~1 1 =1].each do |rspack_core_version|
               expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version:) }
                 .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: #{Regexp.escape(rspack_core_version)}})
             end
@@ -525,7 +525,7 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           allow(Open3).to receive(:capture3)
 
           aggregate_failures do
-            %w[^2 ~2 2 2.x].each do |rspack_core_version|
+            %w[^2 ~2 2 2.x =2].each do |rspack_core_version|
               expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version:) }
                 .not_to raise_error
             end

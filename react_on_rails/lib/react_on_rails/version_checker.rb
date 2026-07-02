@@ -351,7 +351,7 @@ module ReactOnRails
 
     def rsc_rspack_major_shorthand_below_minimum?(rspack_version)
       shorthand = rspack_version.to_s.strip.match(
-        /\A[~^]?\s*v?(?<major>\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i
+        /\A[~^=]?\s*v?(?<major>\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i
       )
       return false unless shorthand
 
