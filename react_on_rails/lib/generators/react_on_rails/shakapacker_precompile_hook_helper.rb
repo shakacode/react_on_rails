@@ -386,6 +386,14 @@ module ReactOnRails
         YAML.safe_load(rendered_content, permitted_classes: [Symbol], aliases: true)
       rescue ShakapackerYmlErbError
         raise
+      rescue ArgumentError => e
+        # The gemspec floor is Ruby >= 3.3.0, which bundles Psych >= 5.x, where the
+        # `aliases:` keyword is always supported. An ArgumentError here means an
+        # unusually old, explicitly pinned Psych (< 3.1) lacks that keyword. Surface
+        # this loudly rather than swallowing it into {}, which would silently discard
+        # the entire shakapacker.yml and fall back to defaults.
+        raise ArgumentError, "Could not parse #{SHAKAPACKER_YML_PATH}: #{e.message}. " \
+                             "psych >= 3.1 (bundled with Ruby >= 2.6) is required for YAML alias support."
       rescue ScriptError, StandardError
         {}
       end
