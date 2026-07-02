@@ -870,6 +870,37 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(thread_clients[Thread.current]).to be(current_client)
     end
 
+    it "does not abort the current request when stale no-scheduler client cleanup fails" do
+      stub_const("FakeThreadCleanupClient", Class.new do
+        attr_reader :closed
+
+        def initialize(error = nil)
+          @error = error
+          @closed = false
+        end
+
+        def close
+          @closed = true
+          raise @error if @error
+        end
+      end)
+      cleanup_error = StandardError.new("stale close failed")
+      stale_client = FakeThreadCleanupClient.new(cleanup_error)
+      current_client = FakeThreadCleanupClient.new
+      dead_thread = Thread.new { nil }
+      dead_thread.join
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      client.instance_variable_set(:@thread_clients, { dead_thread => stale_client }.compare_by_identity)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(described_class::PersistentThreadClient).to receive(:new).and_return(current_client)
+
+      expect(client.__send__(:persistent_thread_client)).to be(current_client)
+      expect(stale_client.closed).to be(true)
+      expect(client.instance_variable_get(:@thread_clients).values).to eq([current_client])
+    end
+
     it "does not block closing a persistent client whose worker thread exited first" do
       persistent_client = described_class::PersistentThreadClient.allocate
       dead_worker = Thread.new { nil }
@@ -1040,6 +1071,45 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       expect(old_client.closed).to be(true)
       expect(yielded_client).to be(new_client)
+    end
+
+    it "replaces stale scheduler clients even when stale cleanup fails" do
+      stub_const("FakeFailingStaleSchedulerClient", Class.new do
+        attr_reader :closed
+
+        def initialize(error = nil)
+          @error = error
+          @closed = false
+        end
+
+        def close
+          @closed = true
+          raise @error if @error
+        end
+      end)
+      cleanup_error = StandardError.new("stale scheduler close failed")
+      old_client = FakeFailingStaleSchedulerClient.new(cleanup_error)
+      new_client = FakeFailingStaleSchedulerClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(old_client, new_client)
+
+      fake_scheduler = Object.new
+      allow(Fiber).to receive(:scheduler).and_return(fake_scheduler)
+
+      client.__send__(:with_client, outer_scheduler: fake_scheduler) { |_c| nil }
+      described_class.bump_client_generation
+
+      yielded_client = nil
+      expect { client.__send__(:with_client, outer_scheduler: fake_scheduler) { |c| yielded_client = c } }
+        .not_to raise_error
+
+      clients = fake_scheduler.instance_variable_get(:@__ror_pro_http_clients__)
+      expect(old_client.closed).to be(true)
+      expect(yielded_client).to be(new_client)
+      expect(clients["http://localhost:3800"][:client]).to be(new_client)
     end
 
     it "closes scheduler clients created by stale connection instances after a reset" do

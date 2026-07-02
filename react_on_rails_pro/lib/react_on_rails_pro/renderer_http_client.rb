@@ -670,7 +670,7 @@ module ReactOnRailsPro
           end
         end
       end
-      stale_clients.each(&:close)
+      close_stale_clients(stale_clients, context: "dead no-scheduler client sweep")
       client
     end
 
@@ -690,12 +690,14 @@ module ReactOnRailsPro
 
     def sweep_stale_scheduler_clients(clients)
       generation = self.class.client_generation
+      stale_clients = []
       clients.delete_if do |origin, entry|
         stale = scheduler_client_generation(entry) != generation ||
                 (origin == @origin && scheduler_client_owner(entry) != self)
-        scheduler_client_from_entry(entry)&.close if stale
+        stale_clients << scheduler_client_from_entry(entry) if stale
         stale
       end
+      close_stale_clients(stale_clients, context: "scheduler client sweep")
     end
 
     def scheduler_client_from_entry(entry)
@@ -725,6 +727,25 @@ module ReactOnRailsPro
       end
 
       raise close_error if close_error
+    end
+
+    def close_stale_clients(clients, context:)
+      clients.each do |client|
+        client&.close
+      rescue StandardError => e
+        log_stale_client_close_error(context, e)
+      end
+    end
+
+    def log_stale_client_close_error(context, error)
+      return unless defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger.respond_to?(:warn)
+
+      Rails.logger.warn(
+        "[ReactOnRailsPro] Failed to close stale renderer HTTP client during #{context}: " \
+        "#{error.class}: #{error.message}"
+      )
+    rescue StandardError
+      nil
     end
 
     def sweep_dead_thread_clients
