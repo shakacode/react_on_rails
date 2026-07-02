@@ -9,8 +9,8 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 LINTER="$REPO_ROOT/bin/lint-mirrored-blocks"
 
 TESTS_RUN=0
@@ -102,10 +102,25 @@ run_test() {
 # Create a temp git repo whose MIRROR_ROOTS include the two package roots the
 # linter already scans, then copy in the real linter. The linter reads
 # `git ls-files`, so fixtures must be tracked.
+#
+# Safety: run_test always invokes the test functions (and therefore setup_repo)
+# from inside a fresh mktemp sandbox. As defence in depth, refuse to run if the
+# current directory is at or under the real checkout — this guarantees
+# `git init` / `git config` can never reinitialize or rewrite the real repo's
+# .git or git identity even if setup_repo is ever called from the wrong place.
 setup_repo() {
+  local cwd
+  cwd="$(pwd -P)"
+  case "$cwd/" in
+    "$REPO_ROOT"/*)
+      echo "setup_repo refused: cwd '$cwd' is inside the real checkout '$REPO_ROOT'" >&2
+      return 1
+      ;;
+  esac
   git init -b main >/dev/null 2>&1
-  git config user.email test@example.com
-  git config user.name "Mirror Lint Test"
+  # --local scopes the identity to this sandbox's .git; global config is untouched.
+  git config --local user.email test@example.com
+  git config --local user.name "Mirror Lint Test"
   mkdir -p bin packages/react-on-rails/src packages/react-on-rails-pro/src
   cp "$LINTER" bin/lint-mirrored-blocks
   chmod +x bin/lint-mirrored-blocks
@@ -201,8 +216,6 @@ EOF
   [ "$rc" -ne 0 ] || fail "real drift (a.ts missing beta) was masked by a marker-line token: $output"
   assert_contains "$output" "beta" "drift output"
 }
-
-setup_repo >/dev/null 2>&1 || true
 
 run_test test_stacked_markers_agree_pass
 run_test test_stacked_marker_line_token_does_not_leak
