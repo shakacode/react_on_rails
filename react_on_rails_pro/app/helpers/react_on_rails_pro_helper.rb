@@ -698,8 +698,9 @@ module ReactOnRailsProHelper
   end
 
   def static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostic_packs)
-    pack_names = static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs)
-    diagnostics = { packs: pack_names, js: [], css: [], unavailable: [] }
+    diagnostics = { packs: [], js: [], css: [], unavailable: [] }
+    pack_names = static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs, diagnostics)
+    diagnostics[:packs] = pack_names
 
     pack_names.each do |pack_name|
       append_static_rsc_pack_asset_diagnostics(diagnostics, pack_name, type: :javascript, required: true)
@@ -709,9 +710,21 @@ module ReactOnRailsProHelper
     diagnostics
   end
 
-  def static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs)
+  def static_rsc_diagnostic_pack_names(component_name, render_options, diagnostic_packs, diagnostics = nil)
     pack_names = []
-    pack_names << generated_component_pack_name(component_name) if render_options[:auto_load_bundle]
+    if render_options[:auto_load_bundle]
+      begin
+        pack_names << generated_component_pack_name(component_name)
+      rescue StandardError => e
+        diagnostics&.dig(:unavailable)&.push(
+          {
+            pack: component_name.to_s,
+            type: :generated_component_pack,
+            reason: "#{e.class}: #{e.message}"
+          }
+        )
+      end
+    end
     pack_names.concat(Array.wrap(diagnostic_packs).flatten.compact.map(&:to_s))
     pack_names.uniq
   end

@@ -1664,6 +1664,52 @@ describe ReactOnRailsProHelper do
         ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
       end
 
+      it "emits diagnostics when auto-load generated pack diagnostics cannot derive a pack name" do
+        diagnostics = []
+        notifications = []
+        invalid_component_name = "Blog/PostCard"
+        subscriber = ActiveSupport::Notifications.subscribe(
+          "render_static_rsc_component.react_on_rails_pro"
+        ) do |_event_name, _started, _finished, _event_id, payload|
+          notifications << payload
+        end
+
+        allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return("<div>static rsc</div>".html_safe)
+
+          cached_static_rsc_component(
+            invalid_component_name,
+            cache_key: ["static-rsc-cache-spec", invalid_component_name],
+            auto_load_bundle: true,
+            id: "blog-post-card-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(diagnostics.size).to eq(1)
+        expect(notifications.size).to eq(1)
+        expect(diagnostics.first[:component]).to eq(invalid_component_name)
+        expect(diagnostics.first[:auto_load_bundle]).to be(true)
+        expect(diagnostics.first[:emitted_assets]).to include(packs: [], js: [], css: [])
+        expect(diagnostics.first[:emitted_assets][:unavailable]).to include(
+          a_hash_including(
+            pack: invalid_component_name,
+            type: :generated_component_pack,
+            reason: /ArgumentError: react_on_rails_preload_links/
+          )
+        )
+        expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
       it "includes best-effort manifest asset and RSC client-reference diagnostics" do
         diagnostics = []
         client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
