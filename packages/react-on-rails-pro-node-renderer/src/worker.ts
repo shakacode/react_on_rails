@@ -73,6 +73,9 @@ const INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS = 1_000;
 // retain VM source-map registrations for the same idle period.
 const STREAM_CONTEXT_RELEASE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS;
 const INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS = STREAM_CONTEXT_RELEASE_TIMEOUT_MS;
+// Pull-mode clients can legitimately pause longer than the normal chunk window;
+// this coarse deadman only bounds abandoned request/response pairs.
+const INCREMENTAL_PULL_MODE_IDLE_TIMEOUT_MS = STREAM_CHUNK_TIMEOUT_MS * 15;
 // Uncomment the below for testing timeouts:
 // import { delay } from './shared/utils.js';
 //
@@ -656,7 +659,9 @@ export default function run(config: Partial<Config>) {
     let incrementalResponseFinished = false;
     let incrementalExecutionContextReleased = false;
     let pullModeRequestCanIdle = false;
+    let incrementalRequestClosePromise: Promise<void> | undefined;
     let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let incrementalPullModeIdleTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let stopIncrementalRequestReader: (() => void) | undefined;
     let incrementalTracingContext: TracingContext | undefined;
 
@@ -667,6 +672,15 @@ export default function run(config: Partial<Config>) {
 
       clearTimeout(incrementalResponseFinishTimeoutId);
       incrementalResponseFinishTimeoutId = undefined;
+    };
+
+    const clearIncrementalPullModeIdleTimeout = () => {
+      if (!incrementalPullModeIdleTimeoutId) {
+        return;
+      }
+
+      clearTimeout(incrementalPullModeIdleTimeoutId);
+      incrementalPullModeIdleTimeoutId = undefined;
     };
 
     const shouldStopReadingIncrementalRequest = () =>
@@ -704,6 +718,7 @@ export default function run(config: Partial<Config>) {
 
     const markIncrementalResponseFinished = () => {
       clearIncrementalResponseFinishTimeout();
+      clearIncrementalPullModeIdleTimeout();
       incrementalResponseFinished = true;
       wakeIncrementalRequestReader();
       releaseIncrementalExecutionContextWhenDone();
@@ -737,6 +752,109 @@ export default function run(config: Partial<Config>) {
       }, INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS);
     };
 
+    const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        timeoutId = setTimeout(() => resolve('timeout'), timeoutMs);
+      });
+
+      const result = await Promise.race([closeRequestPromise.then(() => 'closed' as const), timeoutPromise]);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      if (result === 'timeout') {
+        log.warn({
+          msg: 'Timed out waiting for incremental render close hook after response started',
+          timeoutMs,
+        });
+      }
+    };
+
+    const closeIncrementalRequest = async ({
+      timeoutMs = INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+    }: { timeoutMs?: number } = {}) => {
+      if (!incrementalSink || incrementalRequestClosed) {
+        return;
+      }
+      clearIncrementalPullModeIdleTimeout();
+      if (incrementalRequestClosePromise) {
+        await incrementalRequestClosePromise;
+        return;
+      }
+      const sink = incrementalSink;
+
+      incrementalRequestClosePromise = (async () => {
+        await waitForIncrementalRequestClose(
+          Promise.resolve()
+            .then(() => sink.handleRequestClosed())
+            .catch((closeError: unknown) => {
+              log.error({
+                msg: 'Error while closing incremental render request after response started',
+                error: closeError,
+              });
+            }),
+          timeoutMs,
+        );
+      })();
+
+      try {
+        await incrementalRequestClosePromise;
+      } finally {
+        incrementalRequestClosePromise = undefined;
+        incrementalRequestClosed = true;
+        clearIncrementalPullModeIdleTimeout();
+        scheduleIncrementalResponseFinishTimeout();
+        releaseIncrementalExecutionContextWhenDone();
+      }
+    };
+
+    const shouldWatchPullModeIdleProgress = () =>
+      pullModeRequestCanIdle &&
+      responseStarted &&
+      !incrementalRequestClosed &&
+      !incrementalResponseFinished &&
+      !incrementalExecutionContextReleased &&
+      !!incrementalSink &&
+      !res.raw.destroyed &&
+      !res.raw.writableEnded;
+
+    const scheduleIncrementalPullModeIdleTimeout = () => {
+      if (incrementalPullModeIdleTimeoutId || !shouldWatchPullModeIdleProgress()) {
+        return;
+      }
+
+      incrementalPullModeIdleTimeoutId = setTimeout(() => {
+        incrementalPullModeIdleTimeoutId = undefined;
+        if (!shouldWatchPullModeIdleProgress()) {
+          return;
+        }
+
+        log.warn({
+          msg: 'Timed out waiting for pull-mode incremental render progress after response started',
+          timeoutMs: INCREMENTAL_PULL_MODE_IDLE_TIMEOUT_MS,
+        });
+
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
+        void closeIncrementalRequest({
+          timeoutMs: INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
+        });
+        markIncrementalResponseFinished();
+      }, INCREMENTAL_PULL_MODE_IDLE_TIMEOUT_MS);
+    };
+
+    const refreshIncrementalPullModeIdleTimeout = () => {
+      if (!shouldWatchPullModeIdleProgress()) {
+        clearIncrementalPullModeIdleTimeout();
+        return;
+      }
+
+      clearIncrementalPullModeIdleTimeout();
+      scheduleIncrementalPullModeIdleTimeout();
+    };
+
     const refreshIncrementalResponseFinishTimeout = () => {
       if (
         !incrementalRequestClosed ||
@@ -754,6 +872,7 @@ export default function run(config: Partial<Config>) {
     const trackIncrementalResponseProgress = (stream: NonNullable<ResponseResult['stream']>) => {
       const progressStream = new Transform({
         transform(chunk, encoding, callback) {
+          refreshIncrementalPullModeIdleTimeout();
           refreshIncrementalResponseFinishTimeout();
           callback(null, chunk);
         },
@@ -787,56 +906,12 @@ export default function run(config: Partial<Config>) {
         !res.raw.destroyed &&
         !res.raw.writableEnded
       ) {
+        scheduleIncrementalPullModeIdleTimeout();
         return Number.POSITIVE_INFINITY;
       }
 
+      clearIncrementalPullModeIdleTimeout();
       return STREAM_CHUNK_TIMEOUT_MS;
-    };
-
-    const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const timeoutPromise = new Promise<'timeout'>((resolve) => {
-        timeoutId = setTimeout(() => resolve('timeout'), timeoutMs);
-      });
-
-      const result = await Promise.race([closeRequestPromise.then(() => 'closed' as const), timeoutPromise]);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-
-      if (result === 'timeout') {
-        log.warn({
-          msg: 'Timed out waiting for incremental render close hook after response started',
-          timeoutMs,
-        });
-      }
-    };
-
-    const closeIncrementalRequest = async ({
-      timeoutMs = INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS,
-    }: { timeoutMs?: number } = {}) => {
-      if (!incrementalSink || incrementalRequestClosed) {
-        return;
-      }
-      const sink = incrementalSink;
-
-      try {
-        await waitForIncrementalRequestClose(
-          Promise.resolve()
-            .then(() => sink.handleRequestClosed())
-            .catch((closeError: unknown) => {
-              log.error({
-                msg: 'Error while closing incremental render request after response started',
-                error: closeError,
-              });
-            }),
-          timeoutMs,
-        );
-      } finally {
-        incrementalRequestClosed = true;
-        scheduleIncrementalResponseFinishTimeout();
-        releaseIncrementalExecutionContextWhenDone();
-      }
     };
 
     try {
@@ -903,6 +978,7 @@ export default function run(config: Partial<Config>) {
                 return;
               }
 
+              refreshIncrementalPullModeIdleTimeout();
               try {
                 await incrementalSink.add(obj);
               } catch (err) {

@@ -17,7 +17,7 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import path from 'path';
 import querystring from 'querystring';
-import { Readable } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
@@ -1497,6 +1497,156 @@ describe('worker', () => {
         expect(res.payload).toBe('first chunksecond chunkthird chunk');
         expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
       } finally {
+        responseStream.destroy();
+        handleSpy.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
+    test('closes a stalled pull-mode incremental stream after the idle watchdog expires', async () => {
+      jest.useFakeTimers();
+
+      const requestStream = new PassThrough();
+      const responseStream = new Readable({
+        read() {
+          // Test leaves the response open to simulate a renderer that stopped producing chunks.
+        },
+      });
+      const handleRequestClosed = jest.fn().mockResolvedValue(undefined);
+      const releaseExecutionContext = jest.fn();
+      const handleSpy = jest.spyOn(incremental, 'handleIncrementalRenderRequest').mockResolvedValue({
+        response: {
+          status: 200,
+          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+          stream: responseStream,
+        },
+        sink: {
+          add: jest.fn(),
+          handleRequestClosed,
+          executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+        },
+      });
+
+      try {
+        const app = createWorkerApp();
+        const payload = {
+          gemVersion,
+          protocolVersion,
+          password: 'my_password',
+          renderingRequest: 'ReactOnRails.dummy',
+          dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+          pullEnabled: true,
+        };
+
+        const responsePromise = app
+          .inject()
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .payload(requestStream)
+          .headers({
+            'Content-Type': 'application/x-ndjson',
+          })
+          .end();
+        const responseResultPromise = responsePromise.catch((error: unknown) => error);
+
+        requestStream.write(createNDJSONPayload(payload));
+        await waitForMockCalls(handleSpy, 1);
+
+        await jest.advanceTimersByTimeAsync(STREAM_CHUNK_TIMEOUT_MS);
+        expect(handleRequestClosed).not.toHaveBeenCalled();
+        expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(STREAM_CHUNK_TIMEOUT_MS * 14);
+        await waitForMockCalls(handleRequestClosed, 1);
+
+        const responseResult = await responseResultPromise;
+
+        expect(responseResult).toBeInstanceOf(Error);
+        expect((responseResult as Error).message).toContain('response destroyed before completion');
+        expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+      } finally {
+        requestStream.destroy();
+        responseStream.destroy();
+        handleSpy.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
+    test('does not fire the pull-mode idle watchdog while the request close hook is running', async () => {
+      jest.useFakeTimers();
+
+      const requestStream = new PassThrough();
+      const responseStream = new Readable({
+        read() {
+          // Test pushes chunks manually after the request close hook completes.
+        },
+      });
+      let finishRequestClose: (() => void) | undefined;
+      const handleRequestClosed = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRequestClose = resolve;
+          }),
+      );
+      const releaseExecutionContext = jest.fn();
+      const handleSpy = jest.spyOn(incremental, 'handleIncrementalRenderRequest').mockResolvedValue({
+        response: {
+          status: 200,
+          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+          stream: responseStream,
+        },
+        sink: {
+          add: jest.fn(),
+          handleRequestClosed,
+          executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+        },
+      });
+
+      try {
+        const app = createWorkerApp();
+        const payload = {
+          gemVersion,
+          protocolVersion,
+          password: 'my_password',
+          renderingRequest: 'ReactOnRails.dummy',
+          dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+          pullEnabled: true,
+        };
+
+        const responsePromise = app
+          .inject()
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .payload(requestStream)
+          .headers({
+            'Content-Type': 'application/x-ndjson',
+          })
+          .end();
+        const responseResultPromise = responsePromise.catch((error: unknown) => error);
+
+        requestStream.write(createNDJSONPayload(payload));
+        await waitForMockCalls(handleSpy, 1);
+
+        await jest.advanceTimersByTimeAsync(STREAM_CHUNK_TIMEOUT_MS * 15 - 500);
+        requestStream.end();
+        await waitForMockCalls(handleRequestClosed, 1);
+
+        await jest.advanceTimersByTimeAsync(500);
+        expect(responseStream.destroyed).toBe(false);
+        expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+        finishRequestClose?.();
+        await jest.advanceTimersByTimeAsync(0);
+        responseStream.push('finished after close hook');
+        responseStream.push(null);
+        await jest.advanceTimersByTimeAsync(0);
+
+        const responseResult = await responseResultPromise;
+
+        expect(responseResult).not.toBeInstanceOf(Error);
+        expect(responseResult.statusCode).toBe(200);
+        expect(responseResult.payload).toBe('finished after close hook');
+        expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+      } finally {
+        requestStream.destroy();
         responseStream.destroy();
         handleSpy.mockRestore();
         jest.useRealTimers();
