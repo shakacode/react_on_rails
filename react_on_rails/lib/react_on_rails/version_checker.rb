@@ -263,18 +263,17 @@ module ReactOnRails
 
     def detected_rspack_version_for_rsc
       package_root = File.dirname(node_package_version.package_json)
+      declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
+      declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
+      declared_major_version = rsc_package_major_version(declared_spec)
+      return declared_version if rsc_rspack_version_provably_incompatible?(declared_spec, declared_major_version)
+
       if rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
         installed_version = rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
         return installed_version if installed_version
       end
 
-      declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
-      declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
-      declared_major_version = rsc_package_major_version(declared_spec)
-      if declared_major_version >= MINIMUM_RSC_RSPACK_MAJOR ||
-         rsc_rspack_version_provably_incompatible?(declared_spec, declared_major_version)
-        return declared_version
-      end
+      return declared_version if declared_major_version >= MINIMUM_RSC_RSPACK_MAJOR
 
       rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || declared_spec
     end

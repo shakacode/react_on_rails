@@ -487,6 +487,18 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        it "rejects incompatible declarations before stale flat node_modules packages" do
+          stub_failed_node_package_resolution
+
+          expect do
+            validate_rsc_rspack_project(
+              assets_bundler: "rspack",
+              rspack_core_version: "^1.6.0",
+              installed_rspack_core_version: "2.1.0"
+            )
+          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
+        end
+
         it "rejects shorthand declared Rspack v1 ranges" do
           stub_failed_node_package_resolution
 
