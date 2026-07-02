@@ -391,10 +391,10 @@ module ReactOnRailsPro
           upload_assets_in_progress[key] || begin
             leader = true
             upload_assets_in_progress[key] = {
-              condition: ConditionVariable.new,
               complete: false,
               error: nil,
-              response: nil
+              response: nil,
+              waiters: []
             }
           end
         end
@@ -409,6 +409,7 @@ module ReactOnRailsPro
       def perform_asset_upload_single_flight(key, state)
         error = nil
         response = nil
+        waiters = nil
 
         begin
           response = yield
@@ -421,9 +422,10 @@ module ReactOnRailsPro
             state[:response] = response
             state[:complete] = true
             upload_assets_in_progress.delete(key)
-            state[:condition].broadcast
+            waiters = state[:waiters]
           end
         end
+        waiters.each { |waiter| waiter << true }
 
         response
       end
@@ -433,8 +435,18 @@ module ReactOnRailsPro
       end
 
       def wait_for_asset_upload_single_flight(state)
+        waiter = Queue.new
+        complete = UPLOAD_ASSETS_MUTEX.synchronize do
+          if state[:complete]
+            true
+          else
+            state[:waiters] << waiter
+            false
+          end
+        end
+        waiter.pop unless complete
+
         UPLOAD_ASSETS_MUTEX.synchronize do
-          state[:condition].wait(UPLOAD_ASSETS_MUTEX) until state[:complete]
           raise state[:error] if state[:error]
 
           state[:response]
