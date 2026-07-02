@@ -263,8 +263,10 @@ module ReactOnRails
 
     def detected_rspack_version_for_rsc
       package_root = File.dirname(node_package_version.package_json)
-      flat_installed_version = rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
-      return flat_installed_version if flat_installed_version
+      if rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+        installed_version = rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+        return installed_version if installed_version
+      end
 
       declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
       declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
@@ -307,6 +309,26 @@ module ReactOnRails
     end
 
     def rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+      rspack_spec = rsc_static_rspack_version_spec(rspack_version)
+      return false if rspack_spec.empty?
+      return rsc_rspack_or_range_below_minimum?(rspack_spec) if rspack_spec.include?("||")
+
+      rsc_rspack_single_range_below_minimum?(rspack_spec, rspack_major_version)
+    end
+
+    def rsc_static_rspack_version_spec(rspack_version)
+      rspack_version.to_s.strip.sub(%r{\Anpm:(?:@[^/]+/)?[^@]+@}, "")
+    end
+
+    def rsc_rspack_or_range_below_minimum?(rspack_version)
+      clauses = rspack_version.split("||").map(&:strip).reject(&:empty?)
+      clauses.any? && clauses.all? { |clause| rsc_rspack_single_range_below_minimum?(clause) }
+    end
+
+    def rsc_rspack_single_range_below_minimum?(
+      rspack_version,
+      rspack_major_version = rsc_package_major_version(rspack_version)
+    )
       return false if rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
       return true if rspack_major_version.positive?
 
@@ -314,7 +336,8 @@ module ReactOnRails
       return normalized_version.split(".").first.to_i < MINIMUM_RSC_RSPACK_MAJOR if normalized_version
 
       rsc_rspack_major_shorthand_below_minimum?(rspack_version) ||
-        rsc_rspack_upper_bound_below_minimum?(rspack_version)
+        rsc_rspack_upper_bound_below_minimum?(rspack_version) ||
+        rsc_rspack_hyphen_range_below_minimum?(rspack_version)
     end
 
     def rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
@@ -347,6 +370,21 @@ module ReactOnRails
           upper_bound[:major].to_i == MINIMUM_RSC_RSPACK_MAJOR &&
           [upper_bound[:minor], upper_bound[:patch]].compact.all? { |part| part.to_i.zero? }
       end
+    end
+
+    def rsc_rspack_hyphen_range_below_minimum?(rspack_version)
+      hyphen_range = rspack_version.to_s.strip.match(
+        /
+          \A
+          v?\d+(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?
+          \s+-\s+
+          v?(?<upper_major>\d+)(?:\.\d+){0,2}(?:-[0-9A-Za-z.-]+)?
+          \z
+        /x
+      )
+      return false unless hyphen_range
+
+      hyphen_range[:upper_major].to_i < MINIMUM_RSC_RSPACK_MAJOR
     end
 
     def warn_undetermined_rsc_rspack_version(rspack_version)

@@ -387,6 +387,27 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: < 2\.0\.0})
         end
 
+        it "rejects declared Rspack OR ranges whose alternatives are all below v2" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.0.0 || ~1.6.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: \^1\.0\.0 \|\| ~1\.6\.0})
+        end
+
+        it "rejects aliased declared Rspack ranges below v2" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "npm:@rspack/core@^1") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: npm:@rspack/core@\^1})
+        end
+
+        it "rejects declared Rspack hyphen ranges below v2" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "1.0.0 - 1.9.9") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.0\.0 - 1\.9\.9})
+        end
+
         it "rejects exact declared Rspack versions below v1" do
           stub_failed_node_package_resolution
 
@@ -425,6 +446,31 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
               "@rspack/core",
               chdir: root
             )
+          end
+        end
+
+        it "uses Node resolution before a stale flat node_modules package" do
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(
+              root,
+              assets_bundler: "rspack",
+              rspack_core_version: "latest",
+              installed_rspack_core_version: "2.1.0"
+            )
+            resolved_package_json = File.join(root, "resolved-packages/@rspack/core/package.json")
+            FileUtils.mkdir_p(File.dirname(resolved_package_json))
+            File.write(
+              resolved_package_json,
+              JSON.generate("name" => "@rspack/core", "version" => "1.6.0")
+            )
+            stub_rsc_rspack_project(root, rsc_enabled: true)
+            node_package_version = VersionChecker::NodePackageVersion.new(File.join(root, "package.json"))
+            status = instance_double(Process::Status, success?: true)
+            allow(Open3).to receive(:capture3)
+              .and_return(["#{resolved_package_json}\n", "", status])
+
+            expect { described_class.new(node_package_version).validate_version_and_package_compatibility! }
+              .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: 1\.6\.0})
           end
         end
 
