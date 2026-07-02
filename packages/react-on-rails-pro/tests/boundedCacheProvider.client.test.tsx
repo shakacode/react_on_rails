@@ -1459,7 +1459,10 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     syncThrowIds.add(0);
-    expect(() => rscApi.getComponent('Card', { id: 0 })).toThrow('sync boom 0');
+    await act(async () => {
+      await expect(rscApi.getComponent('Card', { id: 0 })).rejects.toThrow('sync boom 0');
+      await flushMacrotasks();
+    });
 
     const replacement = await startLoad(0);
     await resolveLoad(replacement, <span>replacement 0</span>);
