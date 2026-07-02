@@ -168,8 +168,7 @@ module ReactOnRailsPro
 
           now = Time.now.to_f
           expires_at = [existing_expires_at, now + index_ttl(cache_options)].compact.max
-          ttl = [expires_at - now, 1].max
-          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
+          write_index(key, keys, expires_at)
         end
 
         def read_index(key)
@@ -264,11 +263,31 @@ module ReactOnRailsPro
           return 0 if keys.empty?
 
           deleted = delete_entries(keys)
-          Rails.cache.delete(key)
+          remove_revalidated_entries_from_index(key, keys)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end
           deleted
+        end
+
+        def remove_revalidated_entries_from_index(key, revalidated_keys)
+          current_keys, current_expires_at = read_index(key)
+          return if current_keys.empty?
+
+          revalidated_key_set = revalidated_keys.to_h { |revalidated_key| [revalidated_key, true] }
+          remaining_keys = current_keys.reject { |current_key| revalidated_key_set[current_key] }
+
+          if remaining_keys.empty?
+            Rails.cache.delete(key)
+          else
+            write_index(key, remaining_keys, current_expires_at)
+          end
+        end
+
+        def write_index(key, keys, expires_at)
+          expires_at ||= Time.now.to_f + ReactOnRailsPro.configuration.cache_tag_index_expires_in.to_f
+          ttl = [expires_at - Time.now.to_f, 1].max
+          Rails.cache.write(key, { "keys" => keys, "expires_at" => expires_at }, expires_in: ttl)
         end
 
         # The recorded keys carry their full logical name (including any
