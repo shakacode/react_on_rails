@@ -1,7 +1,0 @@
-module ReactOnRails
-  module RenderingStrategy
-    def execute: (RenderRequest render_request) -> untyped
-    def reset: () -> void
-    def reset_if_bundle_changed: () -> void
-  end
-end

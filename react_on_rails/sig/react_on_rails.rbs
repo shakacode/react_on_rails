@@ -9,12 +9,6 @@ module ReactOnRails
   def self.configure: () { (Configuration) -> void } -> void
   def self.configuration: () -> Configuration
 
-  def self.rendering_strategy: () -> RenderingStrategy
-  def self.rendering_strategy=: (RenderingStrategy strategy) -> RenderingStrategy
-
-  def self.js_code_builder: () -> JsCodeBuilder
-  def self.js_code_builder=: (JsCodeBuilder builder) -> JsCodeBuilder
-
   module TypeScriptResponseTypes
   end
 
