@@ -54,8 +54,8 @@ module ReactOnRailsPro
     def stream_view_containing_react_components(
       template:, close_stream_at_end: true, content_type: nil, rsc_stream_observability: false, **render_options
     )
-      require_streaming_dependencies
       previous_rsc_stream_observability_state = current_rsc_stream_observability_state
+      require_streaming_dependencies
       warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
       initialize_rsc_stream_observability_state(rsc_stream_observability)
 
