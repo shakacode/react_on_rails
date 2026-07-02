@@ -683,23 +683,26 @@ module ReactOnRailsPro
     def persistent_thread_client
       stale_clients = nil
       client_to_close = nil
-      client = @thread_clients_mutex.synchronize do
-        raise_if_closed_threadsafe
+      client = begin
+        @thread_clients_mutex.synchronize do
+          raise_if_closed_threadsafe
 
-        stale_clients = sweep_dead_thread_clients
-        @thread_clients[Thread.current] || begin
-          endpoint = endpoint_for(@origin)
-          new_client = PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+          stale_clients = sweep_dead_thread_clients
+          @thread_clients[Thread.current] || begin
+            endpoint = endpoint_for(@origin)
+            new_client = PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
 
-          if closed?
-            client_to_close = new_client
-            nil
-          else
-            @thread_clients[Thread.current] = new_client
+            if closed?
+              client_to_close = new_client
+              nil
+            else
+              @thread_clients[Thread.current] = new_client
+            end
           end
         end
+      ensure
+        close_stale_clients(stale_clients, context: "dead no-scheduler client sweep") if stale_clients
       end
-      close_stale_clients(stale_clients, context: "dead no-scheduler client sweep")
       close_stale_clients([client_to_close], context: "late no-scheduler client close") if client_to_close
       raise_if_closed_threadsafe unless client
 

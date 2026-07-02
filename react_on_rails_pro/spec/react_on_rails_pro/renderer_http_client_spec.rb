@@ -901,6 +901,31 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(client.instance_variable_get(:@thread_clients).values).to eq([current_client])
     end
 
+    it "closes swept stale no-scheduler clients when replacement bootstrap fails" do
+      stub_const("FakeBootstrapFailureThreadClient", Class.new do
+        attr_reader :closed
+
+        def initialize
+          @closed = false
+        end
+
+        def close
+          @closed = true
+        end
+      end)
+      stale_client = FakeBootstrapFailureThreadClient.new
+      dead_thread = Thread.new { nil }
+      dead_thread.join
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      client.instance_variable_set(:@thread_clients, { dead_thread => stale_client }.compare_by_identity)
+      allow(client).to receive(:endpoint_for).and_raise(StandardError, "bootstrap failed")
+
+      expect { client.__send__(:persistent_thread_client) }.to raise_error(StandardError, "bootstrap failed")
+      expect(stale_client.closed).to be(true)
+      expect(client.instance_variable_get(:@thread_clients)).to be_empty
+    end
+
     it "does not block closing a persistent client whose worker thread exited first" do
       persistent_client = described_class::PersistentThreadClient.allocate
       dead_worker = Thread.new { nil }
