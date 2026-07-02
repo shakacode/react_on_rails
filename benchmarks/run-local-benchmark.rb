@@ -23,10 +23,10 @@ require "English"
 require "fileutils"
 require "optparse"
 require "shellwords"
-require "socket"
 
 require_relative "generate_matrix"
 require_relative "lib/bencher_runner"
+require_relative "lib/local_benchmark_runner/process_wait"
 
 REPO_ROOT = File.expand_path("..", __dir__)
 SERVER_PORT = 3001
@@ -36,9 +36,9 @@ SERVER_PORT = 3001
 RENDERER_PORT = 3800
 # How long to wait for the production server (and, for pro, the renderer) to bind. A cold
 # production Puma boot eager-loads the whole app before listening, which is slow on the first
-# run after a fresh build — observed ~83s on a 2021 M1 Max, vs ~2s warm. wait_for_port still
-# checks the process is alive each second, so a real crash fails fast; this generous ceiling
-# only affects a slow-but-alive boot. Override with BENCHMARK_SERVER_BOOT_TIMEOUT if needed.
+# run after a fresh build — observed ~83s on a 2021 M1 Max, vs ~2s warm. wait_for_port reaps
+# an exited direct child each second, so a real crash fails fast; this generous ceiling only
+# affects a slow-but-alive boot. Override with BENCHMARK_SERVER_BOOT_TIMEOUT if needed.
 SERVER_BOOT_TIMEOUT = ENV.fetch("BENCHMARK_SERVER_BOOT_TIMEOUT", "240").then do |raw|
   seconds = Integer(raw, exception: false)
   next seconds if seconds&.positive?
@@ -150,32 +150,11 @@ def run!(command, chdir: REPO_ROOT, env: {})
 end
 
 def wait_for_port(pid, port, label)
-  attempt = 0
-  while attempt < SERVER_BOOT_TIMEOUT
-    raise "#{label} (pid #{pid}) exited during startup" unless process_alive?(pid)
-    return if port_open?(port)
-
-    attempt += 1
-    puts "  attempt #{attempt}/#{SERVER_BOOT_TIMEOUT}: #{label} (port #{port}) not ready yet..."
-    sleep 1
-  end
-  raise "#{label} failed to start within #{SERVER_BOOT_TIMEOUT}s"
+  LocalBenchmarkRunner::ProcessWait.wait_for_port(pid, port, label, timeout: SERVER_BOOT_TIMEOUT)
 end
 
 def port_open?(port)
-  TCPSocket.new("localhost", port).close
-  true
-rescue StandardError
-  false
-end
-
-def process_alive?(pid)
-  Process.kill(0, pid)
-  true
-rescue Errno::ESRCH
-  false
-rescue Errno::EPERM
-  true # Process exists but is owned by another user — still alive, just unsignalable.
+  LocalBenchmarkRunner::ProcessWait.port_open?(port)
 end
 
 web_concurrency = [cpu_count - 1, 1].max
