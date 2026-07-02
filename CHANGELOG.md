@@ -83,6 +83,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
+  like the default `:immediate` mode instead of raising, while invalid explicit values still fail
+  fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
+  [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
   source-encoding magic comments or a UTF-8 default, and validates content before override-gem
