@@ -30,9 +30,11 @@ runs:
     - name: Select hosted CI mode
       id: select
       uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+      env:
+        FORCE_FULL_HOSTED: ${{ inputs.force-full-hosted }}
       with:
         script: |
-          const forceFullInput = '${{ inputs.force-full-hosted }}'.toLowerCase() === 'true';
+          const forceFullInput = (process.env.FORCE_FULL_HOSTED || '').toLowerCase() === 'true';
           const pullRequest = context.payload.pull_request;
           const labels = [];
 

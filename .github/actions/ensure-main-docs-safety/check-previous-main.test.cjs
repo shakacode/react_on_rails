@@ -391,7 +391,7 @@ async function testNoRunSyntheticBaseLooksThroughToParentFailure() {
   assert.match(core.failed[0], /main commit real-failure still has failing workflows/);
 }
 
-async function testNoRunPushBaseAllowsQuietMainSkip() {
+async function testNoRunPushBaseLooksThroughToParentFailure() {
   const quietMain = 'quiet-main';
   const olderFailure = 'older-failure';
   const realRun = run({ id: 17, sha: olderFailure, name: 'Main push lint', conclusion: 'failure' });
@@ -415,8 +415,37 @@ async function testNoRunPushBaseAllowsQuietMainSkip() {
     createdAfter: '2026-01-01T00:00:00.000Z',
   });
 
+  assert.equal(core.failed.length, 1);
+  assert.match(core.failed[0], /main commit older-failure still has failing workflows/);
+  assert.match(core.failed[0], /Skipped candidate commits[\s\S]*- quiet-main/);
+}
+
+async function testNoRunPushBaseLooksThroughToParentSuccess() {
+  const quietMain = 'quiet-main';
+  const greenParent = 'green-parent';
+  const greenRun = run({ id: 27, sha: greenParent, name: 'Main push lint' });
+  const github = makeGithub({
+    pages: [[greenRun]],
+    jobsByRunId: {
+      27: [successJob()],
+    },
+    parentsBySha: {
+      [quietMain]: greenParent,
+    },
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: quietMain,
+    excludeWorkflowsInput: '',
+    createdAfter: '2026-01-01T00:00:00.000Z',
+  });
+
   assert.deepEqual(core.failed, []);
-  assert.match(core.infoMessages.at(-1), /Allowing docs-only skip/);
+  assert.match(core.infoMessages.at(-1), /completed without failures/);
 }
 
 async function testNoRunSyntheticBaseAllowsQuietParentSkip() {
@@ -556,6 +585,28 @@ async function testWorkflowRunsQueryTrustedEventsAndHeadShaOnly() {
   );
 }
 
+async function testDefaultWorkflowRunQueryHasNoLookbackWindow() {
+  const workflowRunListOptions = [];
+  const github = makeGithub({
+    pages: [],
+    jobsByRunId: {},
+    parentsBySha: {},
+    workflowRunListOptions,
+  });
+  const core = makeCore();
+
+  await checkPreviousMainCommitStatus({
+    github,
+    context,
+    core,
+    previousSha: 'quiet-main',
+    excludeWorkflowsInput: '',
+  });
+
+  assert.equal(workflowRunListOptions.length, 2);
+  assert.equal(workflowRunListOptions.every((options) => !Object.hasOwn(options, 'created')), true);
+}
+
 async function testWorkflowRunListNetworkFailureSetsHelpfulFailure() {
   const workflowRunError = new Error('read ECONNRESET');
   const github = makeGithub({
@@ -663,7 +714,7 @@ async function testNoRunHopLimitStopsAtConfiguredLimitWithTrail() {
   });
 
   assert.equal(core.failed.length, 1);
-  assert.match(core.failed[0], /after 1 no-run merge queue candidate commits/);
+  assert.match(core.failed[0], /after 1 no-run candidate commits/);
   assert.match(core.failed[0], /synthetic-base/);
   assert.match(core.failed[0], /prior-synthetic-base/);
 }
@@ -899,11 +950,13 @@ async function main() {
 
   await testGuardOnlyFailuresLookThroughToParentFailure();
   await testNoRunSyntheticBaseLooksThroughToParentFailure();
-  await testNoRunPushBaseAllowsQuietMainSkip();
+  await testNoRunPushBaseLooksThroughToParentFailure();
+  await testNoRunPushBaseLooksThroughToParentSuccess();
   await testNoRunSyntheticBaseAllowsQuietParentSkip();
   await testReachableMergeQueueRunFailureIsChecked();
   await testWorkflowDispatchRunDoesNotHideFailingTrustedRun();
   await testWorkflowRunsQueryTrustedEventsAndHeadShaOnly();
+  await testDefaultWorkflowRunQueryHasNoLookbackWindow();
   await testWorkflowRunListNetworkFailureSetsHelpfulFailure();
   await testJobListNetworkFailureSetsHelpfulFailure();
   await testNoRunSyntheticChainLooksThroughToParentFailure();

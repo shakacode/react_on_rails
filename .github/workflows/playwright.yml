@@ -4,8 +4,25 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: >-
+    ${{
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+      github.event.label.name != 'ready-for-hosted-ci' &&
+      github.event.label.name != 'force-full-hosted-ci' &&
+      format('{0}-ignored-label-{1}', github.workflow, github.run_id) ||
+      github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) ||
+      format('{0}-{1}', github.workflow, github.sha)
+    }}
+  cancel-in-progress: >-
+    ${{
+      github.event_name == 'pull_request' &&
+      (
+        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+        github.event.label.name == 'ready-for-hosted-ci' ||
+        github.event.label.name == 'force-full-hosted-ci'
+      )
+    }}
 
 on:
   push:
@@ -25,7 +42,13 @@ on:
 jobs:
   detect-changes:
     # Branch deletion push events have no checkoutable release ref.
-    if: github.event_name != 'push' || github.event.deleted != true
+    # Label-triggered PR runs should only react to hosted-CI control labels.
+    if: |
+      (github.event_name != 'push' || github.event.deleted != true) &&
+      (github.event_name != 'pull_request' ||
+       (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+       github.event.label.name == 'ready-for-hosted-ci' ||
+       github.event.label.name == 'force-full-hosted-ci')
     permissions:
       contents: read
       actions: read
