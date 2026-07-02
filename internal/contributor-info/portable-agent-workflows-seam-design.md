@@ -28,7 +28,7 @@ consumer repo
   AGENTS.md                           canonical policy plus Agent Workflow Configuration seam
   .agents/bin/agent-workflow-seam-doctor
                                       optional local checker for the seam contract
-  .agents/skills/...                  repo-local overrides, compatibility copies, or domain skills
+  .agents/skills/...                  repo-specific skills or explicit overrides
   .agents/workflows/...               repo-local workflow files only when the repo needs them
 ```
 
@@ -39,10 +39,11 @@ install the shared `pr-batch`, `verify`, `address-review`, and changelog skills
 once into Codex or Claude and use them in any repo. The skill then reads the
 target repo's `AGENTS.md` seam to resolve concrete commands and policy.
 
-Repository-pinned copies remain an optional escape hatch for environments that
-need exact workflow text in the checkout, such as cloud agents that cannot use a
-user skill install. They are not the default design and should be justified by a
-specific reproducibility or execution-environment need.
+Repository-pinned shared skill copies remain an optional escape hatch for
+environments that need exact workflow text in the checkout, such as cloud agents
+that cannot use a user skill install. They are not the default design; in React
+on Rails, keeping shared copies duplicates installed Codex picker entries and
+should be justified by a specific reproducibility or execution-environment need.
 
 ## The Seam
 
@@ -86,7 +87,8 @@ are task inputs, not repo-seam values.
 that is not the primary problem. The primary problem is whether a portable skill
 can safely resolve repo-specific behavior. A subtree also makes the `.agents/`
 prefix all-or-nothing, which is awkward when a repo has real local skills such
-as React on Rails' `stress-test`.
+as React on Rails' `stress-test`, `optimize-rsc-performance`, and
+`react-on-rails-update-changelog`.
 
 Use a repository-pinned copy only when the execution environment cannot depend
 on user-installed shared skills or when the repo intentionally wants to review

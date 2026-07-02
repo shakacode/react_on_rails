@@ -64,6 +64,8 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
+PRO_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails_pro/spec/dummy/Gemfile"
+PRO_EXECJS_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile"
 cd "$ROOT_DIR"
 
 detect_base_ref() {
@@ -116,6 +118,8 @@ bundle_command() {
 FAILED_JOBS=()
 OSS_DEPS_READY=false
 PRO_DEPS_READY=false
+JS_BUILD_RAN=false
+JS_BUILD_READY=false
 
 # Internal implementation: runs a shell command string via the shell, so
 # compound commands (e.g. "cd X && make") work. Prefer the argv-based helper
@@ -197,6 +201,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_GENERATORS=$(echo "$DETECTOR_JSON" | jq -r '.run_generators // false')
       RUN_PRO_LINT=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_lint // false')
       RUN_PRO_TESTS=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_tests // false')
+      RUN_PRO_DUMMY=$(echo "$DETECTOR_JSON" | jq -r '.run_pro_dummy_tests // false')
       DOCS_ONLY=$(echo "$DETECTOR_JSON" | jq -r '.docs_only // false')
 
       if [ "$DOCS_ONLY" = "true" ]; then
@@ -230,6 +235,7 @@ if [ "$RUN_ALL" = false ]; then
       RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
       RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
       RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
+      RUN_PRO_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Dummy app integration tests" && echo true || echo false)
     fi
   else
     # jq not available, use text parsing with warning
@@ -254,6 +260,7 @@ if [ "$RUN_ALL" = false ]; then
     RUN_GENERATORS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ Generator tests" && echo true || echo false)
     RUN_PRO_LINT=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Lint" && echo true || echo false)
     RUN_PRO_TESTS=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro tests" && echo true || echo false)
+    RUN_PRO_DUMMY=$(echo "$DETECTOR_OUTPUT" | grep -q "✓ React on Rails Pro Dummy app integration tests" && echo true || echo false)
   fi
 else
   echo -e "${YELLOW}Running ALL CI checks (--all mode)${NC}"
@@ -265,7 +272,24 @@ else
   RUN_GENERATORS=true
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
+  RUN_PRO_DUMMY=true
 fi
+
+ensure_js_build() {
+  if [ "$JS_BUILD_RAN" = true ]; then
+    [ "$JS_BUILD_READY" = true ]
+    return
+  fi
+
+  JS_BUILD_RAN=true
+  if run_job "JavaScript Package Build" "pnpm run build"; then
+    JS_BUILD_READY=true
+  else
+    JS_BUILD_READY=false
+  fi
+
+  [ "$JS_BUILD_READY" = true ]
+}
 
 ensure_pro_dependencies() {
   if [ "$PRO_DEPS_READY" = true ]; then
@@ -283,11 +307,40 @@ ensure_pro_dependencies() {
       echo -e "${YELLOW}⚠ Pro dependencies installation failed, skipping Pro tests${NC}"
       RUN_PRO_LINT=false
       RUN_PRO_TESTS=false
+      RUN_PRO_DUMMY=false
       return 1
     fi
   fi
 
   PRO_DEPS_READY=true
+}
+
+ensure_pro_dummy_dependencies() {
+  if [ ! -d "react_on_rails_pro/spec/dummy" ]; then
+    return 1
+  fi
+
+  if ! (cd "$ROOT_DIR/react_on_rails_pro/spec/dummy" && bundle_command "$PRO_DUMMY_GEMFILE" bundle check >/dev/null 2>&1); then
+    echo -e "${YELLOW}Installing React on Rails Pro dummy dependencies...${NC}"
+    if ! (cd "$ROOT_DIR/react_on_rails_pro/spec/dummy" && bundle_command "$PRO_DUMMY_GEMFILE" bundle install); then
+      echo -e "${YELLOW}⚠ Pro dummy dependency installation failed, skipping Pro dummy test build${NC}"
+      return 1
+    fi
+  fi
+}
+
+ensure_pro_execjs_dummy_dependencies() {
+  if [ ! -d "react_on_rails_pro/spec/execjs-compatible-dummy" ]; then
+    return 1
+  fi
+
+  if ! (cd "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy" && bundle_command "$PRO_EXECJS_DUMMY_GEMFILE" bundle check >/dev/null 2>&1); then
+    echo -e "${YELLOW}Installing React on Rails Pro ExecJS-compatible dummy dependencies...${NC}"
+    if ! (cd "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy" && bundle_command "$PRO_EXECJS_DUMMY_GEMFILE" bundle install); then
+      echo -e "${YELLOW}⚠ Pro ExecJS-compatible dummy dependency installation failed, skipping its Rspack test build${NC}"
+      return 1
+    fi
+  fi
 }
 
 ensure_oss_dependencies() {
@@ -340,9 +393,42 @@ if [ "$RUN_LINT" = true ]; then
   run_job "TypeScript Type Check" "pnpm run type-check"
 fi
 
+if [ "$RUN_PRO_LINT" = true ] || [ "$RUN_PRO_TESTS" = true ] || [ "$RUN_PRO_DUMMY" = true ]; then
+  if [ ! -d "react_on_rails_pro" ]; then
+    echo -e "${YELLOW}React on Rails Pro directory not found. Skipping Pro checks.${NC}"
+    RUN_PRO_LINT=false
+    RUN_PRO_TESTS=false
+    RUN_PRO_DUMMY=false
+  fi
+fi
+
 # Run JS unit tests
 if [ "$RUN_JS" = true ]; then
+  ensure_js_build || true
   run_job "JS Unit Tests" "pnpm test"
+fi
+
+if [ "$RUN_PRO_DUMMY" = true ]; then
+  if [ "$FAST_MODE" = true ]; then
+    echo -e "${YELLOW}Skipping React on Rails Pro dummy app integration tests in --fast mode${NC}"
+    echo ""
+  else
+    if ensure_js_build && ensure_pro_dependencies && ensure_pro_dummy_dependencies; then
+      run_job "React on Rails Pro Dummy React Resolution Check" "node script/check-single-react-resolution.mjs react_on_rails/spec/dummy react_on_rails_pro/spec/dummy"
+      run_job "React on Rails Pro ExecJS Dummy React 18 Check" "node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18"
+      run_job "React on Rails Pro Dummy Generate Packs" "cd react_on_rails_pro/spec/dummy && bundle_command \"$PRO_DUMMY_GEMFILE\" bundle exec rake react_on_rails:generate_packs"
+      run_job "React on Rails Pro Dummy Generated Pack Smoke" "test -s react_on_rails_pro/spec/dummy/client/app/generated/server-bundle-generated.js"
+      run_job "React on Rails Pro Dummy Webpack Test Build" "cd react_on_rails_pro/spec/dummy && pnpm run build:test"
+      run_job "React on Rails Pro Dummy Rspack Test Build" "cd react_on_rails_pro/spec/dummy && pnpm run build:test:rspack"
+    fi
+
+    if ensure_js_build && ensure_pro_dependencies && ensure_pro_execjs_dummy_dependencies; then
+      mkdir -p "$ROOT_DIR/tmp"
+      EXECJS_RSPACK_LOG="$ROOT_DIR/tmp/execjs-rspack-build.log"
+      run_job "React on Rails Pro ExecJS Dummy Rspack Test Build" "cd react_on_rails_pro/spec/execjs-compatible-dummy && rm -rf public/packs-test && SHAKAPACKER_ASSETS_BUNDLER=rspack RAILS_ENV=test NODE_ENV=test ./bin/shakapacker 2>&1 | tee \"$EXECJS_RSPACK_LOG\""
+      run_job "React on Rails Pro ExecJS Dummy Rspack Smoke" "test -s react_on_rails_pro/spec/execjs-compatible-dummy/public/packs-test/manifest.json && grep -qF '[Shakapacker] Completed rspack build' \"$EXECJS_RSPACK_LOG\""
+    fi
+  fi
 fi
 
 # Run Ruby gem tests
@@ -382,15 +468,6 @@ if [ "$RUN_GENERATORS" = true ]; then
     echo ""
   else
     run_job "Generator Tests" "cd react_on_rails && bundle_command \"$OSS_GEMFILE\" bundle exec rake run_rspec:shakapacker_examples"
-  fi
-fi
-
-# Run React on Rails Pro linting
-if [ "$RUN_PRO_LINT" = true ] || [ "$RUN_PRO_TESTS" = true ]; then
-  if [ ! -d "react_on_rails_pro" ]; then
-    echo -e "${YELLOW}React on Rails Pro directory not found. Skipping Pro checks.${NC}"
-    RUN_PRO_LINT=false
-    RUN_PRO_TESTS=false
   fi
 fi
 

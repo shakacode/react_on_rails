@@ -307,8 +307,35 @@ RSpec.describe "bin/ci-switch-config" do
 
       File.write(package_json_path, JSON.pretty_generate("dependencies" => dependencies))
 
-      Open3.capture3(fake_script_path, "status", chdir: tmpdir)
+      runtime_bin = install_fake_runtime_bin(tmpdir)
+      Open3.capture3(
+        {
+          "PATH" => [runtime_bin, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(File::PATH_SEPARATOR),
+          "BASH_ENV" => nil,
+          "ENV" => nil,
+          "__MISE_DIFF" => nil
+        },
+        fake_script_path,
+        "status",
+        chdir: tmpdir
+      )
     end
+  end
+
+  def install_fake_runtime_bin(tmpdir)
+    runtime_bin = File.join(tmpdir, "fake-bin")
+    FileUtils.mkdir_p(runtime_bin)
+
+    {
+      "ruby" => "ruby 3.4.8 (test fake)\n",
+      "node" => "v22.12.0\n"
+    }.each do |command, output|
+      command_path = File.join(runtime_bin, command)
+      File.write(command_path, "#!/bin/sh\nprintf '%s\\n' #{Shellwords.escape(output.chomp)}\n")
+      FileUtils.chmod("+x", command_path)
+    end
+
+    runtime_bin
   end
 
   def with_ci_switch_tool_versions_repo

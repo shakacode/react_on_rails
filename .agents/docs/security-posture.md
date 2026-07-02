@@ -47,7 +47,8 @@ replaces ordinary least-privilege controls.
 The `pr-batch` security preflight is defense in depth. Run the resolved
 `pr-security-preflight` helper before assigning public issue or PR targets to
 workers. It catches obvious and provenance-based risks such as untrusted,
-hidden, or unidentifiable participants.
+hidden, or unidentifiable participants. Pass `--strict-trust` when those actor
+findings must block worker launch instead of remaining advisory audit context.
 
 A clean preflight is not a trust decision. Pattern and regex-style detection can
 miss indirect, transformed, deleted, or carefully worded prompt-injection

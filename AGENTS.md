@@ -17,13 +17,26 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   templates, first consider whether the change belongs in
   `shakacode/agent-workflows` rather than this repo; keep local edits focused on
   React on Rails-specific policy, seams, or overrides.
-- `.agents/skills/`: repo-local skill copies/overrides plus repo-specific skills;
-  `.claude/skills` is a symlink here so Claude Code exposes the same workflows as
-  slash commands in this checkout.
+- `.agents/skills/`: repo-specific skills, explicit overrides, and
+  launcher-only `bin/` shims for old helper paths. Keep shared workflow
+  `SKILL.md` files installed in the user's or agent's normal skill directory;
+  duplicating them here creates duplicate Codex skill picker entries. Current
+  repo-specific skills include `$stress-test`, `$optimize-rsc-performance`, and
+  `$react-on-rails-update-changelog`.
+- `.claude/skills`: symlink to `.agents/skills` so Claude Code exposes the
+  repo-specific local skills kept by this checkout. Shared skills should come
+  from the installed shared pack, not this symlink.
 - `.agents/workflows/`: repo-local workflow files for Codex, GPT, and other
-  non-Claude tools when this checkout needs local copies or overrides.
-- `.agents/.rubocop.yml`: lint seam for repo-local shared workflow copies. Keep
-  it aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
+  non-Claude tools when this checkout needs copy/paste workflows or overrides.
+- `.agents/bin/shared-skill-dir`: helper for workflow files that need helper
+  scripts from the installed/shared skill pack without keeping duplicate
+  repo-local skill copies.
+- `.agents/skills/*/bin`: compatibility launchers for shared helper scripts that
+  older installed skill text may still reference via `.agents/skills/<skill>/bin`.
+  These directories intentionally do not include duplicate shared `SKILL.md`
+  files.
+- `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
+  aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
 - If a tool or skill picker only exposes installed/global skills, treat those
   skills as launchers. Installed/global skills never override this repo's
@@ -44,17 +57,51 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `internal/contributor-info/agent-pr-batch-skills.md`: contributor guide for choosing and sequencing `$plan-issue-triage`, `$plan-pr-batch`, and `$pr-batch`
 - `internal/contributor-info/multi-batch-operations.md`: operator guide for running multiple batches across machines, launch surfaces, and repos
 - `internal/contributor-info/issue-evaluation.md`: principles for deciding whether issues and proposed fixes are worth implementing
-- When deciding whether an issue or proposed fix is worth doing, use `.agents/skills/evaluate-issue/SKILL.md`; a short invocation is `$evaluate-issue` or "Is this issue worth fixing?"
-- When the user wants a ready prompt for review-only GitHub issue triage or an all-open-issues audit, use `.agents/skills/plan-issue-triage/SKILL.md`; a short invocation is `$plan-issue-triage` or "Plan an issue triage"
-- When the user wants a generated whole-surface issue/PR inventory, dependency graph, and capacity-aware batch split, use `.agents/skills/triage/SKILL.md`; a short invocation is `$triage` or "Run triage"
-- When the user wants to choose issues or PRs for a future agent/Codex/Claude batch, use `.agents/skills/plan-pr-batch/SKILL.md` to produce a ready `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a PR batch"
-- When the user wants a multi-issue or multi-PR agent/Codex/Claude batch, use `.agents/skills/pr-batch/SKILL.md`; a short invocation is `$pr-batch`, "Run an agent batch", "Run a Codex batch", or "Run a Claude batch"
+- When deciding whether an issue or proposed fix is worth doing, use the
+  installed/shared `$evaluate-issue` skill; a short invocation is
+  `$evaluate-issue` or "Is this issue worth fixing?"
+- When the user wants a ready prompt for review-only GitHub issue triage or an
+  all-open-issues audit, use the installed/shared `$plan-issue-triage` skill; a
+  short invocation is `$plan-issue-triage` or "Plan an issue triage"
+- When the user wants a generated whole-surface issue/PR inventory, dependency
+  graph, and capacity-aware batch split, use the installed/shared `$triage`
+  skill; a short invocation is `$triage` or "Run triage"
+- When the user wants to choose issues or PRs for a future agent/Codex/Claude
+  batch, use the installed/shared `$plan-pr-batch` skill to produce a ready
+  `$pr-batch` goal; a short invocation is `$plan-pr-batch` or "Plan a PR batch"
+- When the user wants a multi-issue or multi-PR agent/Codex/Claude batch, use the
+  installed/shared `$pr-batch` skill; a short invocation is `$pr-batch`,
+  "Run an agent batch", "Run a Codex batch", or "Run a Claude batch"
 - When the user wants to stop or cancel an in-flight Codex/Claude batch (for example to relaunch it with updated skills), follow the **Cancelling Or Stopping A Batch** protocol in `.agents/workflows/pr-processing.md#cancelling-or-stopping-a-batch`; there is no short skill invocation for this coordinator action
-- When the user wants to audit merged batch work, missed reviews, release-candidate risk, or possible bad merges, use `.agents/skills/post-merge-audit/SKILL.md`; reusable prompts live in `.agents/workflows/post-merge-audit.md`
-- When the user wants an adversarial PR review, red-team review, Claude/Codex comparison review, or a stricter pre-merge gate, use `.agents/skills/adversarial-pr-review/SKILL.md`; reusable prompts live in `.agents/workflows/adversarial-pr-review.md`
+- When the user wants to audit merged batch work, missed reviews,
+  release-candidate risk, or possible bad merges, use the installed/shared
+  `$post-merge-audit` skill; reusable prompts live in
+  `.agents/workflows/post-merge-audit.md`
+- When the user wants an adversarial PR review, red-team review, Claude/Codex
+  comparison review, or a stricter pre-merge gate, use the installed/shared
+  `$adversarial-pr-review` skill; reusable prompts live in
+  `.agents/workflows/adversarial-pr-review.md`
 - When the user assigns an issue, PR, review-fix pass, or merge queue to an agent, follow `.agents/workflows/pr-processing.md`
-- When the user asks to address PR review comments, use `.agents/skills/address-review/SKILL.md`; `.agents/workflows/address-review.md` remains a copy/paste prompt for assistants without skill support
-- When the user wants to manually verify a bug-fix PR by reproducing the failure before the fix and confirming it is gone after (with captured evidence or screenshots, optionally posted to the PR and issue), use `.agents/skills/verify-pr-fix/SKILL.md`; a short invocation is `$verify-pr-fix` or "manually verify this fix"
+- When the user asks to address PR review comments, use the installed/shared
+  `$address-review` skill; `.agents/workflows/address-review.md` remains a
+  copy/paste prompt for assistants without skill support
+- When the user wants to manually verify a bug-fix PR by reproducing the failure
+  before the fix and confirming it is gone after (with captured evidence or
+  screenshots, optionally posted to the PR and issue), use the installed/shared
+  `$verify-pr-fix` skill; a short invocation is `$verify-pr-fix` or
+  "manually verify this fix"
+- When the user explicitly asks for destructive React on Rails stress testing,
+  use the repo-local `.agents/skills/stress-test/SKILL.md`; a short invocation is
+  `$stress-test`
+- When the user plans, implements, validates, or reviews RSC page performance
+  optimization in this repo, use the repo-local
+  `.agents/skills/optimize-rsc-performance/SKILL.md`; a short invocation is
+  `$optimize-rsc-performance`
+- When React on Rails release-train changelog work needs `target=release` or a
+  PR targeting `release/X.Y.Z`, use the repo-local
+  `.agents/skills/react-on-rails-update-changelog/SKILL.md`; a short invocation
+  is `$react-on-rails-update-changelog`. For ordinary mainline changelog updates
+  on `main`, use the installed/shared `$update-changelog` skill.
 - Default simplify model: `claude-opus-4-8`
 
 ## External Flagship Demo Coordination
@@ -143,11 +190,14 @@ When checking user-installed shared skills outside this checkout, add
 `--shared <agent-workflows-root>`; for example, a clone of
 `https://github.com/shakacode/agent-workflows`.
 
-If a workflow explicitly needs a repo-local `.agents/skills/...` or
-`.agents/workflows/...` file and that file is missing in the checkout but present
-on `origin/main`, update the worktree before continuing; if it is still missing,
-report the repo workflow state as `UNKNOWN` instead of silently using a global
-skill fallback.
+If a workflow explicitly needs a repo-local `.agents/skills/...` file, it should
+be a repo-specific local skill such as `stress-test` or
+`optimize-rsc-performance`, release-branch changelog handling such as
+`react-on-rails-update-changelog`, a launcher-only helper shim, or a deliberate
+override. Shared workflow skills normally resolve from the installed/shared
+pack. If a required repo-local skill or `.agents/workflows/...` file is missing
+in the checkout but present on `origin/main`, update the worktree before
+continuing; if it is still missing, report the repo workflow state as `UNKNOWN`.
 
 For user-installed shared skills, check the installed pack with:
 
@@ -162,39 +212,21 @@ in one step, run:
 upgrade-agent-workflows --host codex --consumer-root "$(pwd)"
 ```
 
+<!-- prettier-ignore-start -->
 ## Agent Workflow Configuration
 
 Portable shared skills resolve this repo's commands and policy through:
+- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
+- **Policy / config** — `.agents/agent-workflow.yml`.
 
-- **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, `lint`,
-  `build`, `docs`, `ci-detect`); see [`.agents/bin/README.md`](.agents/bin/README.md).
-  These listed scripts are required; capabilities without a listed script are n/a here.
-- **Policy / config** — [`.agents/agent-workflow.yml`](.agents/agent-workflow.yml)
-  (base branch, hosted-CI trigger, benchmark labels, changelog, merge ledger, review
-  gate, secret redaction, coordination backend, and other non-command keys).
+## Workflow Policy Notes
+<!-- prettier-ignore-end -->
 
-Compatibility for older repo-local skills that still name the former inline keys:
-
-- **Base branch** → `.agents/agent-workflow.yml` key `base_branch`
-- **Pre-push local validation** → `.agents/bin/validate`
-- **CI change detector** → `.agents/bin/ci-detect`
-- **Hosted-CI trigger** → `.agents/agent-workflow.yml` key `hosted_ci_trigger`
-- **CI parity environment** → `.agents/agent-workflow.yml` key `ci_parity_environment`
-- **Secret redaction patterns** → `.agents/agent-workflow.yml` key `secret_redaction_patterns`
-- **Trusted GitHub actor boundary** → `.agents/agent-workflow.yml` key `trusted_github_actor_boundary`
-- **Benchmark labels** → `.agents/agent-workflow.yml` key `benchmark_labels`
-- **Follow-up issue prefix** → `.agents/agent-workflow.yml` key `follow_up_prefix`
-- **Changelog** → `.agents/agent-workflow.yml` key `changelog`
-- **Lint / format** → `.agents/bin/lint`
-- **Merge ledger** → `.agents/agent-workflow.yml` key `merge_ledger`
-- **Docs checks** → `.agents/bin/docs`
-- **Tests** → `.agents/bin/test`
-- **Build / type checks** → `.agents/bin/build`
-- **Review gate** → `.agents/agent-workflow.yml` key `review_gate`
-- **Approval-exempt change categories** → `.agents/agent-workflow.yml` key `approval_exempt`
-- **Coordination backend** → `.agents/agent-workflow.yml` key `coordination_backend`
-
-The shared source lives at
+The concrete React on Rails values for base branch, local validation, hosted CI,
+review gate, changelog policy, coordination backend, and similar shared-skill
+seams live in `.agents/agent-workflow.yml`. Shared skill helper scripts resolve
+through `.agents/bin/shared-skill-dir` when a workflow file needs an executable
+from the installed/shared pack. The shared source lives at
 [`shakacode/agent-workflows`](https://github.com/shakacode/agent-workflows); see
 [`internal/contributor-info/agent-workflow-adoption.md`](internal/contributor-info/agent-workflow-adoption.md).
 
@@ -222,15 +254,17 @@ agent-coord status --batch-id <batch-id> --json
 ```
 
 When the repo workflow calls for bounded reads, pass the same targeted status
-subcommand through `.agents/skills/pr-batch/bin/agent-coord-bounded` so a slow
-private read becomes explicit degraded state instead of an indefinite wait:
+subcommand through the installed/shared `pr-batch` helper so a slow private read
+becomes explicit degraded state instead of an indefinite wait:
 
 ```bash
+PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
+
 # Specific issue/PR lane
-.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
+"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo shakacode/react_on_rails --target <issue-or-pr> --json
 
 # Batch lane/dependency state
-.agents/skills/pr-batch/bin/agent-coord-bounded --timeout 20 status --batch-id <batch-id> --json
+"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json
 ```
 
 Do not use broad `agent-coord status` for routine lane checks. Broad private
@@ -920,7 +954,11 @@ Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, b
 
 ### Changelog classification taxonomy
 
-The `update-changelog` skill classifies each merged PR by `Category`. Allowed values (copy exactly, including spaces, hyphens, and casing):
+The installed/shared `$update-changelog` skill classifies each merged PR by
+`Category` for ordinary mainline changelog work. Use the repo-local
+`$react-on-rails-update-changelog` skill when changelog work must target
+`release/X.Y.Z`. Allowed values (copy exactly, including spaces, hyphens, and
+casing):
 
 - `product code`: OSS gem/npm package runtime, generators, public types, public config, or user-facing examples.
 - `Pro runtime`: proprietary Pro package/runtime behavior, RSC integration, Node renderer behavior, Pro-generated config, Pro package compatibility.
