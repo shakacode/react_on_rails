@@ -5,6 +5,10 @@ inputs:
     description: 'Whether this manual dispatch should bypass optimized hosted-CI selection.'
     required: false
     default: 'false'
+  base-ref:
+    description: 'Pull request base branch for workflow_dispatch-triggered hosted CI.'
+    required: false
+    default: ''
 outputs:
   hosted_ci_requested:
     description: 'Whether the PR has the ready-for-hosted-ci label.'
@@ -32,9 +36,11 @@ runs:
       uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
       env:
         FORCE_FULL_HOSTED: ${{ inputs.force-full-hosted }}
+        DISPATCH_BASE_REF: ${{ inputs.base-ref }}
       with:
         script: |
           const forceFullInput = (process.env.FORCE_FULL_HOSTED || '').toLowerCase() === 'true';
+          const dispatchBaseRef = process.env.DISPATCH_BASE_REF || '';
           const pullRequest = context.payload.pull_request;
           const labels = [];
 
@@ -51,7 +57,7 @@ runs:
           const forceFullHostedCiRequested = labels.includes('force-full-hosted-ci');
           const shouldForceFullHostedCi = forceFullInput || forceFullHostedCiRequested;
           const eventName = context.eventName;
-          const baseRef = pullRequest?.base?.ref || '';
+          const baseRef = pullRequest?.base?.ref || dispatchBaseRef;
           const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
           const isReleasePullRequest = releaseBranchPrefixes.some((prefix) => baseRef.startsWith(prefix));
           const isReleaseBranchPush = eventName === 'push' &&
