@@ -83,6 +83,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
+  each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
+  documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
+  shutdown deadline; and stale scheduled-restart workers no longer break the restart loop. Fixes
+  [Issue 4365](https://github.com/shakacode/react_on_rails/issues/4365),
+  [Issue 4366](https://github.com/shakacode/react_on_rails/issues/4366),
+  [Issue 4367](https://github.com/shakacode/react_on_rails/issues/4367), and
+  [Issue 4368](https://github.com/shakacode/react_on_rails/issues/4368).
+  [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
+  [justin808](https://github.com/justin808).
+
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
