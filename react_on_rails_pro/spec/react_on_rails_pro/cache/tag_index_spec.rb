@@ -403,6 +403,39 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(logger_mock).to have_received(:warn).once
     end
 
+    it "restores only undeleted original keys after partial per-key deletion failure" do
+      Rails.cache.write("entry/one", "old-one")
+      Rails.cache.write("entry/two", "old-two")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/two", { expires_in: 3600 })
+      original_delete = Rails.cache.method(:delete)
+      failed_entry_two_delete = false
+
+      allow(Rails.cache).to receive(:delete) do |key, **options|
+        if key == "entry/one"
+          original_delete.call(key, **options).tap do
+            Rails.cache.write("entry/one", "new-one")
+            described_class.register(["t"], "entry/one", { expires_in: 3600 })
+          end
+        elsif key == "entry/two" && !failed_entry_two_delete
+          failed_entry_two_delete = true
+          raise StandardError, "entry/two delete failed"
+        else
+          original_delete.call(key, **options)
+        end
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "entry/two delete failed")
+      expect(Rails.cache.read("entry/one")).to eq("new-one")
+      expect(Rails.cache.read("entry/two")).to eq("old-two")
+      expect(index_payload("t")["keys"]).to eq(["entry/two"])
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to eq("new-one")
+      expect(Rails.cache.read("entry/two")).to be_nil
+      expect(index_payload("t")).to be_nil
+    end
+
     it "logs when the restored failure index write returns false instead of raising" do
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", { expires_in: 3600 })
@@ -429,7 +462,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       index_key = described_class.index_key("t")
 
       expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
-      expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
+      expect(Rails.cache).to receive(:delete).with("entry/one", namespace: nil).ordered.and_call_original
 
       expect(described_class.revalidate("t")).to eq(1)
     end
