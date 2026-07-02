@@ -15,7 +15,7 @@
 
 import cluster from 'cluster';
 import { FastifyInstance } from './types.js';
-import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 import log from '../shared/log.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS, runWorkerShutdownHooks } from './shutdownHooks.js';
 
@@ -34,6 +34,7 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
   let activeRequestsCount = 0;
   let isShuttingDown = false;
   let isDestroying = false;
+  const activeRequests = new WeakSet();
 
   const destroyWorkerAfterShutdownHooks = (context: string) => {
     if (isDestroying) {
@@ -78,10 +79,30 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
     }
   };
 
-  // Helper to decrement counter and potentially kill worker
-  const decrementAndMaybeShutdown = (context: string) => {
+  const acknowledgeGracefulShutdown = () => {
+    try {
+      worker.send(SHUTDOWN_WORKER_ACK_MESSAGE);
+    } catch (error: unknown) {
+      if (errorCode(error) === 'ERR_IPC_CHANNEL_CLOSED') {
+        log.debug('Worker #%d IPC channel was already closed before graceful shutdown ACK', worker.id);
+      } else {
+        log.warn({ msg: 'Error sending graceful shutdown ACK from worker', error });
+      }
+    }
+  };
+
+  const decrementAndMaybeShutdown = (request: object, context: string) => {
+    if (!activeRequests.delete(request)) {
+      log.debug('Worker #%d: request already completed before %s', worker.id, context);
+      return;
+    }
+
     activeRequestsCount -= 1;
-    if (isShuttingDown && activeRequestsCount === 0) {
+    if (activeRequestsCount < 0) {
+      log.warn('Worker #%d active request count is negative after %s', worker.id, context);
+    }
+
+    if (isShuttingDown && activeRequestsCount <= 0) {
       log.debug('Worker #%d has no active requests after %s, killing the worker', worker.id, context);
       destroyWorkerAfterShutdownHooks(context);
     }
@@ -90,8 +111,9 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
   process.on('message', (msg) => {
     if (msg === SHUTDOWN_WORKER_MESSAGE) {
       log.debug('Worker #%d received graceful shutdown message', worker.id);
+      acknowledgeGracefulShutdown();
       isShuttingDown = true;
-      if (activeRequestsCount === 0) {
+      if (activeRequestsCount <= 0) {
         log.debug('Worker #%d has no active requests, killing the worker', worker.id);
         destroyWorkerAfterShutdownHooks('shutdown message');
       } else {
@@ -105,27 +127,26 @@ const handleGracefulShutdown = (app: FastifyInstance) => {
     }
   });
 
-  app.addHook('onRequest', (_req, _reply, done) => {
+  app.addHook('onRequest', (req, _reply, done) => {
+    activeRequests.add(req);
     activeRequestsCount += 1;
     done();
   });
 
-  app.addHook('onResponse', (_req, _reply, done) => {
-    decrementAndMaybeShutdown('onResponse');
+  app.addHook('onResponse', (req, _reply, done) => {
+    decrementAndMaybeShutdown(req, 'onResponse');
     done();
   });
 
-  // Handle client abort - onResponse is NOT called when client disconnects
-  app.addHook('onRequestAbort', (_req, done) => {
+  app.addHook('onRequestAbort', (req, done) => {
     log.debug('Worker #%d: request aborted by client', worker.id);
-    decrementAndMaybeShutdown('onRequestAbort');
+    decrementAndMaybeShutdown(req, 'onRequestAbort');
     done();
   });
 
-  // Handle request timeout - onResponse is NOT called when request times out
-  app.addHook('onTimeout', (_req, _reply, done) => {
+  app.addHook('onTimeout', (req, _reply, done) => {
     log.debug('Worker #%d: request timed out', worker.id);
-    decrementAndMaybeShutdown('onTimeout');
+    decrementAndMaybeShutdown(req, 'onTimeout');
     done();
   });
 };

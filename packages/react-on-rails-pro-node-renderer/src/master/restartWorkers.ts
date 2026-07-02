@@ -18,10 +18,11 @@
  * @module master/restartWorkers
  */
 
-import cluster from 'cluster';
+import cluster, { type Worker } from 'cluster';
 import log from '../shared/log.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
+const MILLISECONDS_IN_SECOND = 1000;
 const MILLISECONDS_IN_MINUTE = 60000;
 
 declare module 'cluster' {
@@ -30,46 +31,97 @@ declare module 'cluster' {
   }
 }
 
+function currentWorker(workerId: string): Worker | undefined {
+  const worker = cluster.workers?.[workerId];
+  if (!worker) {
+    log.debug('Worker #%s is no longer available for scheduled restart', workerId);
+    return undefined;
+  }
+  if (worker.isDead()) {
+    log.debug('Worker #%d is already dead before scheduled restart', worker.id);
+    return undefined;
+  }
+  return worker;
+}
+
 export default async function restartWorkers(
   delayBetweenIndividualWorkerRestarts: number,
   gracefulWorkerRestartTimeout: number | undefined,
 ) {
   log.info('Started scheduled restart of workers');
 
-  if (!cluster.workers) {
-    throw new Error('No workers to restart');
+  const workerIds = Object.keys(cluster.workers ?? {});
+  if (workerIds.length === 0) {
+    log.warn('No workers to restart');
+    return;
   }
-  for (const worker of Object.values(cluster.workers).filter((w) => !!w)) {
-    log.debug('Kill worker #%d', worker.id);
-    worker.isScheduledRestart = true;
 
-    worker.send(SHUTDOWN_WORKER_MESSAGE);
+  for (const workerId of workerIds) {
+    const worker = currentWorker(workerId);
+    if (worker) {
+      const workerToRestart = worker;
+      log.debug('Kill worker #%d', workerToRestart.id);
+      workerToRestart.isScheduledRestart = true;
 
-    // It's inteded to restart worker in sequence, it shouldn't happens in parallel
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise<void>((resolve) => {
-      let timeout: NodeJS.Timeout;
+      // It's intended to restart worker in sequence, it shouldn't happen in parallel
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>((resolve) => {
+        let timeout: NodeJS.Timeout | undefined;
+        let isResolved = false;
+        let finish = () => {};
 
-      const onExit = () => {
-        clearTimeout(timeout);
-        resolve();
-      };
-      worker.on('exit', onExit);
+        const onExit = () => {
+          finish();
+        };
 
-      // Zero means no timeout
-      if (gracefulWorkerRestartTimeout) {
-        timeout = setTimeout(() => {
-          log.debug('Worker #%d timed out, forcing kill it', worker.id);
-          worker.destroy();
-          worker.off('exit', onExit);
+        const onError = (err: Error) => {
+          log.warn({ msg: 'Error while waiting for scheduled worker restart', err });
+        };
+
+        const onSendError = (err: Error | null) => {
+          if (!err || isResolved) return;
+
+          workerToRestart.isScheduledRestart = false;
+          log.warn({ msg: 'Error sending scheduled graceful shutdown message to worker', err });
+          finish();
+        };
+
+        finish = () => {
+          if (isResolved) return;
+          isResolved = true;
+          if (timeout) clearTimeout(timeout);
+          workerToRestart.off('exit', onExit);
+          workerToRestart.off('error', onError);
           resolve();
-        }, gracefulWorkerRestartTimeout);
-      }
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await new Promise((resolve) => {
-      setTimeout(resolve, delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE);
-    });
+        };
+
+        workerToRestart.on('exit', onExit);
+        workerToRestart.on('error', onError);
+
+        try {
+          workerToRestart.send(SHUTDOWN_WORKER_MESSAGE, onSendError);
+        } catch (err: unknown) {
+          workerToRestart.isScheduledRestart = false;
+          log.warn({ msg: 'Error sending scheduled graceful shutdown message to worker', err });
+          finish();
+          return;
+        }
+        if (isResolved) return;
+
+        // Zero means no timeout
+        if (gracefulWorkerRestartTimeout) {
+          timeout = setTimeout(() => {
+            log.debug('Worker #%d timed out, forcing kill it', workerToRestart.id);
+            workerToRestart.destroy();
+            finish();
+          }, gracefulWorkerRestartTimeout * MILLISECONDS_IN_SECOND);
+        }
+      });
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => {
+        setTimeout(resolve, delayBetweenIndividualWorkerRestarts * MILLISECONDS_IN_MINUTE);
+      });
+    }
   }
 
   log.info('Finished scheduled restart of workers');

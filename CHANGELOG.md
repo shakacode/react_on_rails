@@ -88,6 +88,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
+  each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
+  documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
+  shutdown deadline; and stale scheduled-restart workers no longer break the restart loop. Fixes
+  [Issue 4365](https://github.com/shakacode/react_on_rails/issues/4365),
+  [Issue 4366](https://github.com/shakacode/react_on_rails/issues/4366),
+  [Issue 4367](https://github.com/shakacode/react_on_rails/issues/4367), and
+  [Issue 4368](https://github.com/shakacode/react_on_rails/issues/4368).
+  [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
   bypasses renders that use async props, so per-request async stream output cannot be replayed from
   another request's cached stream. Fixes
