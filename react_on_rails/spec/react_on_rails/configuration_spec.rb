@@ -71,6 +71,36 @@ module ReactOnRails
       end
     end
 
+    describe ".generated_assets_dirs" do
+      it "is removed; setting it raises NoMethodError" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.generated_assets_dirs = "public/webpack"
+          end
+        end.to raise_error(NoMethodError, /generated_assets_dirs=/)
+      end
+    end
+
+    describe ".skip_display_none" do
+      it "is removed; setting it raises NoMethodError" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.skip_display_none = true
+          end
+        end.to raise_error(NoMethodError, /skip_display_none=/)
+      end
+    end
+
+    describe ".defer_generated_component_packs" do
+      it "is removed; setting it raises NoMethodError (use generated_component_packs_loading_strategy)" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.defer_generated_component_packs = true
+          end
+        end.to raise_error(NoMethodError, /defer_generated_component_packs=/)
+      end
+    end
+
     describe ".build_production_command" do
       context "when using Shakapacker 8" do
         it "fails when \"shakapacker_precompile\" is truly and \"build_production_command\" is truly" do
