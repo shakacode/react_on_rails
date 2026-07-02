@@ -23,38 +23,15 @@ require "async/promise"
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
   def fetch_react_component(component_name, options, &)
-    if ReactOnRailsPro::Cache.use_cache?(options)
-      cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
-      Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-      cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
-      if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
-        return render_expired_cache_miss(cache_key, &)
-      end
-
-      cache_hit = true
-      normalized_cache_tags = []
-      result = Rails.cache.fetch(cache_key, cache_options) do
-        cache_hit = false
-        normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-        yield
-      end
-      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
-      if cache_hit
-        render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-          react_component_name: component_name,
-          options:
-        )
-        load_pack_for_generated_component(component_name, render_options)
-      end
-      # Pass back the cache key in the results only if the result is a Hash
-      if result.is_a?(Hash)
-        result[:RORP_CACHE_KEY] = cache_key
-        result[:RORP_CACHE_HIT] = cache_hit
-      end
-      result
-    else
-      yield
-    end
+    ReactOnRailsPro::Cache.fetch_react_component(
+      component_name,
+      options.merge(
+        on_cache_hit: lambda do |cached_component_name, cached_options|
+          load_pack_for_cached_react_component(cached_component_name, cached_options)
+        end
+      ),
+      &
+    )
   end
 
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -416,6 +393,14 @@ module ReactOnRailsProHelper
 
   private
 
+  def load_pack_for_cached_react_component(component_name, options)
+    render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+      react_component_name: component_name,
+      options:
+    )
+    load_pack_for_generated_component(component_name, render_options)
+  end
+
   def fetch_stream_react_component(component_name, raw_options, &)
     auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
 
@@ -581,15 +566,6 @@ module ReactOnRailsProHelper
     end
 
     ReactOnRailsPro::AsyncValue.new(task:)
-  end
-
-  def render_expired_cache_miss(cache_key)
-    result = yield
-    if result.is_a?(Hash)
-      result[:RORP_CACHE_KEY] = cache_key
-      result[:RORP_CACHE_HIT] = false
-    end
-    result
   end
 
   def prepare_async_render_options(raw_options)
