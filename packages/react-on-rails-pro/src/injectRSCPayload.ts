@@ -19,7 +19,10 @@ import { resolve as resolvePath } from 'path';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createEmbeddedPayloadKey } from './utils.ts';
-import RSCRequestTracker from './RSCRequestTracker.ts';
+import RSCRequestTracker, {
+  hasExpectedRSCStreamCleanup,
+  shouldReportRSCStreamTruncation,
+} from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 import {
@@ -1502,12 +1505,22 @@ export default function injectRSCPayload(
               // Schedule fallback in case flush() is never called.
               scheduleFlushFallback();
             };
+            let rscStreamEndedCleanly = false;
             try {
               for await (const chunk of stream ?? []) {
                 const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
                 parser.feed(chunkBuf, handleParsedChunk);
               }
+              rscStreamEndedCleanly = true;
             } finally {
+              if (
+                rscStreamEndedCleanly &&
+                stream &&
+                !hasExpectedRSCStreamCleanup(stream) &&
+                shouldReportRSCStreamTruncation(stream)
+              ) {
+                parser.flush();
+              }
               resolveRSCClientStylesheetInferenceForStream();
             }
           })(),

@@ -62,6 +62,16 @@ const createMockRSCStream = (chunks: string[] | { [key: number]: string | string
   return passThrough;
 };
 
+const createTruncatedMockRSCStream = (content: string) => {
+  const passThrough = new PassThrough();
+  setTimeout(() => {
+    const encoded = new TextEncoder().encode(toLengthPrefixed(content).slice(0, -1));
+    passThrough.push(encoded);
+    passThrough.push(null);
+  }, 0);
+  return passThrough;
+};
+
 const createMockRSCStreamWithMetadataChunks = (
   chunks: Array<{ content: string; metadata: Record<string, unknown> }>,
 ) => {
@@ -172,6 +182,17 @@ const collectStreamDataByChunk = (stream: Readable) => {
   return { allData, chunks, firstChunk };
 };
 
+const waitForMacrotask = () =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+const waitForStreamClose = (stream: Readable) =>
+  new Promise<void>((resolve, reject) => {
+    stream.once('close', resolve);
+    stream.once('error', reject);
+  });
+
 const injectWithOptions = (
   html: Readable,
   tracker: RSCRequestTracker,
@@ -268,6 +289,103 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data2"}'));
+  });
+
+  it('warns when an RSC payload stream ends mid-record', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const mockRSC = createTruncatedMockRSCStream('{"test": "truncated"}');
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    try {
+      const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+      const resultStr = await collectStreamData(result);
+
+      expect(resultStr).toContain(expectedInitializationScript);
+      expect(resultStr).not.toContain(expectedPayloadPushScript('{"test": "truncated"}'));
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('ignores missing RSC payload streams without rejecting the combined stream', async () => {
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTestWithStreams([]);
+    jest.spyOn(rscRequestTracker, 'onRSCPayloadGenerated').mockImplementation((callback) => {
+      callback({ componentName: 'test', props: {}, stream: undefined } as unknown as Parameters<
+        typeof callback
+      >[0]);
+    });
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+
+    await expect(collectStreamData(result)).resolves.toContain(
+      '<html><body><div>Hello, world!</div></body></html>',
+    );
+  });
+
+  it('does not warn when tracker cleanup ends an active RSC payload stream', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const source = new PassThrough();
+    const rscRequestTracker = new RSCRequestTracker(
+      {} as RailsContextWithServerStreamingCapabilities,
+      async () => source as never,
+    );
+    const stream1 = await rscRequestTracker.getRSCPayloadStream('test', {});
+    stream1.resume();
+    const mockHTML = new PassThrough();
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, 'test-node');
+    const resultClosed = waitForStreamClose(result);
+
+    try {
+      result.resume();
+      mockHTML.write('<html><body><div>Hello, world!</div>');
+      await waitForMacrotask();
+      source.push(new TextEncoder().encode(toLengthPrefixed('{"test": "truncated"}').slice(0, -1)));
+      await waitForMacrotask();
+
+      rscRequestTracker.clear();
+      mockHTML.destroy();
+      await resultClosed;
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('warns when an HTML abort is followed by an unmarked truncated RSC stream', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const mockRSC = new PassThrough();
+    const mockHTML = {
+      pipe(destination: PassThrough & { flush?: () => void }) {
+        setTimeout(() => {
+          destination.write('<html><body><div>Hello, world!</div>');
+          destination.flush?.();
+          mockRSC.push(new TextEncoder().encode(toLengthPrefixed('{"test": "truncated"}').slice(0, -1)));
+          destination.destroy();
+          mockRSC.push(null);
+        }, 0);
+        return destination;
+      },
+    } as Readable;
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultClosed = waitForStreamClose(result);
+
+    try {
+      result.resume();
+      await resultClosed;
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {

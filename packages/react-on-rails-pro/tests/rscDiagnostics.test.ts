@@ -18,7 +18,7 @@
  */
 
 import { text } from 'stream/consumers';
-import { Readable } from 'stream';
+import { PassThrough, Readable } from 'stream';
 
 import transformRSCStream from '../src/transformRSCNodeStream.ts';
 import {
@@ -76,6 +76,53 @@ describe('RSC diagnostics', () => {
     expect(diagnosticError.message).toContain('Original error: useState is not a function');
     expect(diagnosticError.message).toContain('Module: /app/components/CommentsToggle.jsx');
     expect(diagnosticError.stack).toContain(diagnosticStack);
+  });
+
+  it('warns when the transformed length-prefixed stream ends mid-record', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const completeRecord = Buffer.from(encodeLengthPrefixedChunk({}, 'truncated Flight payload'), 'utf8');
+    const source = Readable.from([completeRecord.subarray(0, completeRecord.length - 1)]);
+
+    try {
+      await expect(text(transformRSCStream(source))).resolves.toBe('');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not warn when an upstream error closes the transformed stream mid-record', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const completeRecord = Buffer.from(encodeLengthPrefixedChunk({}, 'truncated Flight payload'), 'utf8');
+    const source = new PassThrough();
+    source.on('error', () => {});
+
+    try {
+      const transformedText = text(transformRSCStream(source));
+      source.write(completeRecord.subarray(0, completeRecord.length - 1));
+      source.destroy(new Error('upstream failed'));
+
+      await expect(transformedText).resolves.toBe('');
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('does not warn when the transformed stream ends after a trailing CR separator fragment', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const source = Readable.from([`${encodeLengthPrefixedChunk({}, 'complete Flight payload')}\r`]);
+
+    try {
+      await expect(text(transformRSCStream(source))).resolves.toBe('complete Flight payload');
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('merges a generic React stream failure with the original RSC bundle diagnostic', () => {
