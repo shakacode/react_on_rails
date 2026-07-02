@@ -916,6 +916,49 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       end.not_to raise_error
     end
 
+    it "raises instead of blocking when a persistent client worker exits before completing a request" do
+      persistent_client = described_class::PersistentThreadClient.allocate
+      dead_worker = Thread.new { nil }
+      dead_worker.join
+
+      persistent_client.instance_variable_set(:@queue, Queue.new)
+      persistent_client.instance_variable_set(:@closed, false)
+      persistent_client.instance_variable_set(:@closed_mutex, Mutex.new)
+      persistent_client.instance_variable_set(:@thread, dead_worker)
+
+      expect do
+        Timeout.timeout(0.2) do
+          persistent_client.__send__(:request, :get, "/render", headers: {}, body: nil)
+        end
+      end.to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, /worker thread exited/)
+    end
+
+    it "does not hold the close-state mutex while bootstrapping a persistent client" do
+      stub_const("SlowBootstrapThreadClient", Class.new { def close; end })
+      current_client = SlowBootstrapThreadClient.new
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      bootstrap_started = Queue.new
+      finish_bootstrap = Queue.new
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(described_class::PersistentThreadClient).to receive(:new) do
+        bootstrap_started << true
+        finish_bootstrap.pop
+        current_client
+      end
+
+      worker = Thread.new { client.__send__(:persistent_thread_client) }
+      bootstrap_started.pop
+
+      expect do
+        Timeout.timeout(0.2) { client.__send__(:ensure_open!) }
+      end.not_to raise_error
+
+      finish_bootstrap << true
+      expect(worker.value).to be(current_client)
+    end
+
     it "attempts to close every persistent no-scheduler client before re-raising close errors" do
       stub_const("FakeCloseFailureThreadClient", Class.new do
         attr_reader :closed

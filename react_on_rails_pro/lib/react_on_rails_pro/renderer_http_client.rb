@@ -222,7 +222,7 @@ module ReactOnRailsPro
           @queue << [:request, method, path, headers, body, result]
         end
 
-        status, payload = result.pop
+        status, payload = wait_for_request_result(result)
         raise payload if status == :error
 
         payload
@@ -278,6 +278,21 @@ module ReactOnRailsPro
         end
 
         [:ok, nil]
+      end
+
+      def wait_for_request_result(result)
+        loop do
+          return result.pop(true)
+        rescue ThreadError
+          break unless @thread.alive?
+
+          @thread.join(0.01)
+        end
+
+        [
+          :error,
+          ConnectionError.new("renderer HTTP client worker thread exited before completing request")
+        ]
       end
 
       def close_client(client, result)
@@ -579,6 +594,14 @@ module ReactOnRailsPro
       @closed_mutex.synchronize { raise_if_closed }
     end
 
+    def raise_if_closed_threadsafe
+      @closed_mutex.synchronize { raise_if_closed }
+    end
+
+    def closed?
+      @closed_mutex.synchronize { @closed }
+    end
+
     def mark_closed
       @closed_mutex.synchronize do
         return false if @closed
@@ -659,18 +682,27 @@ module ReactOnRailsPro
 
     def persistent_thread_client
       stale_clients = nil
-      client = @closed_mutex.synchronize do
-        raise_if_closed
+      client_to_close = nil
+      client = @thread_clients_mutex.synchronize do
+        raise_if_closed_threadsafe
 
-        @thread_clients_mutex.synchronize do
-          stale_clients = sweep_dead_thread_clients
-          @thread_clients[Thread.current] ||= begin
-            endpoint = endpoint_for(@origin)
-            PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+        stale_clients = sweep_dead_thread_clients
+        @thread_clients[Thread.current] || begin
+          endpoint = endpoint_for(@origin)
+          new_client = PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+
+          if closed?
+            client_to_close = new_client
+            nil
+          else
+            @thread_clients[Thread.current] = new_client
           end
         end
       end
       close_stale_clients(stale_clients, context: "dead no-scheduler client sweep")
+      close_stale_clients([client_to_close], context: "late no-scheduler client close") if client_to_close
+      raise_if_closed_threadsafe unless client
+
       client
     end
 
