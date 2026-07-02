@@ -88,6 +88,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Sync RSC route failures surface as `ServerComponentFetchError`**: Synchronous throws
+  in the RSC payload path (payload key creation on BigInt/circular props, sync
+  `getServerComponent` throws, `fetchRSC` request preparation) previously bypassed
+  `RSCRouteErrorBoundary`, so user error boundaries received raw `TypeError`s without component
+  metadata. All sync and async failure paths now funnel through the boundary, and a nested route's
+  already-wrapped error passes through without re-wrapping. Fixes
+  [Issue 4372](https://github.com/shakacode/react_on_rails/issues/4372).
+  [PR 4438](https://github.com/shakacode/react_on_rails/pull/4438) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
   bypasses renders that use async props, so per-request async stream output cannot be replayed from
   another request's cached stream. Fixes
