@@ -257,11 +257,14 @@ module ReactOnRailsPro
       end
 
       def handle_request(client, message)
+        result = nil
         _type, method, path, headers, body, result = message
         raw_response = method == :post ? client.post(path, headers:, body:) : client.get(path, headers:)
 
         result << [:ok, buffer_response(raw_response)]
       rescue StandardError => e
+        raise unless result
+
         result << [:error, e]
       end
 

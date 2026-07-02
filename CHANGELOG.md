@@ -90,6 +90,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Renderer HTTP transport no longer buffers successful streams or duplicate bundle uploads**:
+  Pro renderer requests now pass successful streaming response chunks through without retaining them in Ruby
+  memory, reuse a persistent async-http client for plain Puma non-streaming requests, reset scheduler-scoped
+  clients when the shared renderer connection is reset, and stream/deduplicate same-bundle uploads. Fixes
+  [Issue 4360](https://github.com/shakacode/react_on_rails/issues/4360),
+  [Issue 4361](https://github.com/shakacode/react_on_rails/issues/4361),
+  [Issue 4362](https://github.com/shakacode/react_on_rails/issues/4362), and
+  [Issue 4363](https://github.com/shakacode/react_on_rails/issues/4363).
+  [PR 4394](https://github.com/shakacode/react_on_rails/pull/4394) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
