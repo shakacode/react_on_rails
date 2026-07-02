@@ -604,7 +604,10 @@ async function testDefaultWorkflowRunQueryHasNoLookbackWindow() {
   });
 
   assert.equal(workflowRunListOptions.length, 2);
-  assert.equal(workflowRunListOptions.every((options) => !Object.hasOwn(options, 'created')), true);
+  assert.equal(
+    workflowRunListOptions.every((options) => !Object.hasOwn(options, 'created')),
+    true,
+  );
 }
 
 async function testWorkflowRunListNetworkFailureSetsHelpfulFailure() {

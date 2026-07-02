@@ -127,7 +127,10 @@ async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, ev
   }
 
   try {
-    for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, listOptions)) {
+    for await (const response of github.paginate.iterator(
+      github.rest.actions.listWorkflowRunsForRepo,
+      listOptions,
+    )) {
       const pageRuns = response.data;
       const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
 
