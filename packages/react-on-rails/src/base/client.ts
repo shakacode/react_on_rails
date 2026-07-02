@@ -38,6 +38,27 @@ interface Registries {
   };
 }
 
+// Pro-only methods that `createCoreCapability` includes as stubs but the historical base
+// surface omits. This list drives the runtime key-stripping in `createBaseClientObject`.
+// `satisfies readonly (keyof ReactOnRailsInternal)[]` makes a typo or a stale name a compile
+// error, and the `assertProOnlyMethodsMatchOmit` guard inside `createBaseClientObject` pins this
+// list to the `Omit<...>` in `BaseClientObjectType` so the runtime list and the exported type can
+// never drift.
+const PRO_ONLY_METHODS = [
+  'getOrWaitForComponent',
+  'getOrWaitForStore',
+  'getOrWaitForStoreGenerator',
+  'reactOnRailsStoreLoaded',
+  'streamServerRenderedReactComponent',
+  'serverRenderRSCReactComponent',
+  'addAsyncPropsCapabilityToComponentProps',
+  'getOrCreateAsyncPropsManager',
+] as const satisfies readonly (keyof ReactOnRailsInternal)[];
+
+// The omitted set below is kept in lockstep with the runtime `PRO_ONLY_METHODS` list by a
+// compile-time guard inside `createBaseClientObject` (see `assertProOnlyMethodsMatchOmit`), so the
+// exported type and the runtime key-stripping can never drift. This is a plain `//` comment (not
+// JSDoc) so it stays out of the published `.d.ts`, keeping the declared surface byte-identical.
 /**
  * Base client object type that includes all core ReactOnRails methods except Pro-specific ones.
  * Derived from ReactOnRailsInternal by omitting Pro-only methods.
@@ -110,21 +131,29 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     return cachedObject;
   }
 
+  // Compile-time drift guard (function-local so it emits nothing to the published `.d.ts`).
+  // Proves the runtime `PRO_ONLY_METHODS` list covers EXACTLY the keys that `BaseClientObjectType`
+  // omits from `ReactOnRailsInternal` — no more, no less. If a new Pro-only stub is added to
+  // `createCoreCapability` and only one side is updated (the runtime list OR the `Omit<...>`
+  // union), the two unions stop being mutually assignable, `AssertMatch` resolves to `never`, and
+  // `satisfies AssertMatch` fails to compile. `Exclude<keyof I, keyof BaseClientObjectType>`
+  // recovers the omitted-key set because `Omit` drops exactly those keys.
+  type OmittedBaseKeys = Exclude<keyof ReactOnRailsInternal, keyof BaseClientObjectType>;
+  type ProOnlyMethodName = (typeof PRO_ONLY_METHODS)[number];
+  type AssertMatch = [OmittedBaseKeys] extends [ProOnlyMethodName]
+    ? [ProOnlyMethodName] extends [OmittedBaseKeys]
+      ? true
+      : never
+    : never;
+  const assertProOnlyMethodsMatchOmit = true satisfies AssertMatch;
+  void assertProOnlyMethodsMatchOmit;
+
   // Delegate the core method implementations to `createCoreCapability` (the canonical source),
-  // then re-shape to the historical base surface: strip the Pro-only stubs and add the
-  // client-side lifecycle stubs that `createReactOnRails` overrides at initialization. The
-  // stripped names are kept in sync with the `Omit<...>` in BaseClientObjectType so the shim
-  // object's enumerable keys match what old Pro consumers received.
-  const proOnlyMethods = new Set<string>([
-    'getOrWaitForComponent',
-    'getOrWaitForStore',
-    'getOrWaitForStoreGenerator',
-    'reactOnRailsStoreLoaded',
-    'streamServerRenderedReactComponent',
-    'serverRenderRSCReactComponent',
-    'addAsyncPropsCapabilityToComponentProps',
-    'getOrCreateAsyncPropsManager',
-  ]);
+  // then re-shape to the historical base surface: strip the Pro-only stubs (using the shared
+  // `PRO_ONLY_METHODS` list that the drift guard above pins to `BaseClientObjectType`, so runtime
+  // and type can never drift) and add the client-side lifecycle stubs that `createReactOnRails`
+  // overrides at initialization.
+  const proOnlyMethods = new Set<string>(PRO_ONLY_METHODS);
   const core = createCoreCapability(registries);
   const obj = Object.fromEntries(
     Object.entries(core).filter(([key]) => !proOnlyMethods.has(key)),
