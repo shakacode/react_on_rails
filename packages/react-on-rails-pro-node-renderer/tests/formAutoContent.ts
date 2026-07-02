@@ -40,15 +40,25 @@ type FormAutoContentResult = {
   headers: Record<string, string>;
 };
 
-function getField(o: unknown, field: string): unknown {
-  if (typeof o === 'object' && o !== null && Object.hasOwnProperty.call(o, field)) {
-    return (o as Record<string, unknown>)[field];
-  }
-  return undefined;
+function hasOwn(o: unknown, field: string): boolean {
+  return typeof o === 'object' && o !== null && Object.hasOwnProperty.call(o, field);
 }
 
+function getField(o: unknown, field: string): unknown {
+  return hasOwn(o, field) ? (o as Record<string, unknown>)[field] : undefined;
+}
+
+/**
+ * Unwrap a `{ value, options? }` field wrapper, else return the raw field.
+ *
+ * NOTE: this intentionally diverges from the upstream form-auto-content, which
+ * used `getField(o, 'value') || o` and therefore returned the whole wrapper
+ * object when `value` was falsy (`0`, `false`, `''`). As the authoritative
+ * builder for these tests we detect the wrapper by presence of the `value` key,
+ * so falsy values round-trip correctly.
+ */
 function getValue(o: unknown): unknown {
-  return getField(o, 'value') || o;
+  return hasOwn(o, 'value') ? (o as Record<string, unknown>).value : o;
 }
 
 function getOptions(o: unknown): FormData.AppendOptions | undefined {
@@ -68,25 +78,27 @@ export default function formAutoContent(json: FormFields): FormAutoContentResult
     throw new Error('Input must be a json object');
   }
 
+  // Unwrap every field once (arrays unfolded, `{ value, options }` wrappers
+  // resolved) so the multipart and urlencoded paths stay consistent.
+  const entries = Object.keys(json)
+    .flatMap((k) => unfold(json, k))
+    .map(({ k, v }) => ({ k, value: getValue(v), options: getOptions(v) }));
+
   const form = new FormData();
   let hasFile = false;
 
-  Object.keys(json)
-    .flatMap((k) => unfold(json, k))
-    .forEach(({ k, v }) => {
-      const value = getValue(v);
-      const options = getOptions(v);
-      form.append(k, value as never, options as never);
+  entries.forEach(({ k, value, options }) => {
+    form.append(k, value as never, options as never);
 
-      const isStreamOrBuffer =
-        !!value &&
-        ((typeof (value as { pipe?: unknown }).pipe === 'function' &&
-          (value as { readable?: boolean }).readable !== false) ||
-          Buffer.isBuffer(value));
-      if (isStreamOrBuffer) {
-        hasFile = true;
-      }
-    });
+    const isStreamOrBuffer =
+      !!value &&
+      ((typeof (value as { pipe?: unknown }).pipe === 'function' &&
+        (value as { readable?: boolean }).readable !== false) ||
+        Buffer.isBuffer(value));
+    if (isStreamOrBuffer) {
+      hasFile = true;
+    }
+  });
 
   if (hasFile) {
     return {
@@ -95,8 +107,23 @@ export default function formAutoContent(json: FormFields): FormAutoContentResult
     };
   }
 
+  // Mirror the multipart extraction in the urlencoded fallback: stringify the
+  // unwrapped values, not the raw json, so a `{ value, options }` field with no
+  // file no longer serializes as "[object Object]".
+  const urlencoded: Record<string, unknown> = {};
+  entries.forEach(({ k, value }) => {
+    const existing = urlencoded[k];
+    if (existing === undefined) {
+      urlencoded[k] = value;
+    } else if (Array.isArray(existing)) {
+      existing.push(value);
+    } else {
+      urlencoded[k] = [existing, value];
+    }
+  });
+
   return {
-    payload: Readable.from(stringify(json as Record<string, string>)),
+    payload: Readable.from(stringify(urlencoded as Record<string, string>)),
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
   };
 }
