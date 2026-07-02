@@ -673,6 +673,7 @@ module ReactOnRailsProHelper
   end
 
   def static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
+    # Cache hits come from this helper's cache namespace, whose writes strip bootstrap scripts.
     return true if cache_diagnostics[:hit]
 
     payload_diagnostics[:bootstrap_script_count].to_i.positive?
