@@ -862,18 +862,7 @@ Location of `node_modules` directory. With Shakapacker, this should typically be
 config.node_modules_location = ""  # Shakapacker default
 ```
 
-#### server_render_method
-
-**Type:** String
-**Default:** `nil`
-
-Server rendering method. Only `"ExecJS"` is currently supported:
-
-```ruby
-config.server_render_method = nil  # Uses ExecJS
-```
-
-For alternative server rendering methods, contact [justin@shakacode.com](mailto:justin@shakacode.com).
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure`.
 
 For deprecated configuration options, see [configuration-deprecated.md](configuration-deprecated.md).
 
