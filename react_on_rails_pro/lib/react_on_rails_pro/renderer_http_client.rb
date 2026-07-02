@@ -207,7 +207,7 @@ module ReactOnRailsPro
           @queue << [:close, result]
         end
 
-        status, payload = result.pop
+        status, payload = wait_for_close_result(result)
         @thread.join
         raise payload if status == :error
       end
@@ -266,6 +266,18 @@ module ReactOnRailsPro
         raise unless result
 
         result << [:error, e]
+      end
+
+      def wait_for_close_result(result)
+        loop do
+          return result.pop(true)
+        rescue ThreadError
+          break unless @thread.alive?
+
+          @thread.join(0.01)
+        end
+
+        [:ok, nil]
       end
 
       def close_client(client, result)

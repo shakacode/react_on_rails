@@ -269,6 +269,69 @@ describe ReactOnRailsPro::Request do
       expect(call_count).to eq(1)
       expect(results).to eq(Array.new(5, :uploaded))
     end
+
+    it "releases followers with the leader error when upload work fails" do
+      upload_started = Queue.new
+      allow_failure = Queue.new
+      leader_errors = Queue.new
+      follower_errors = Queue.new
+      upload_error = StandardError.new("upload failed")
+
+      leader = Thread.new do
+        described_class.send(:with_asset_upload_single_flight, ["server-hash"]) do
+          upload_started << true
+          allow_failure.pop
+          raise upload_error
+        end
+      rescue StandardError => e
+        leader_errors << e
+      end
+
+      upload_started.pop
+      follower = Thread.new do
+        described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
+      rescue StandardError => e
+        follower_errors << e
+      end
+
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1
+      upload_assets_mutex = described_class.singleton_class.const_get(:UPLOAD_ASSETS_MUTEX)
+      loop do
+        waiter_count = upload_assets_mutex.synchronize do
+          described_class.send(:upload_assets_in_progress).values.first&.fetch(:waiters)&.length.to_i
+        end
+        break if waiter_count == 1
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+          raise "follower did not register for single-flight upload"
+        end
+
+        sleep 0.001
+      end
+
+      allow_failure << true
+
+      expect(leader.join(1)).to eq(leader)
+      expect(follower.join(1)).to eq(follower)
+      expect(leader_errors.pop).to be(upload_error)
+      expect(follower_errors.pop).to be(upload_error)
+    ensure
+      leader&.kill if leader&.alive?
+      follower&.kill if follower&.alive?
+    end
+
+    it "keeps upload single-flight keys distinct when copied asset contents change" do
+      asset_path = "public/webpack/production/asset-manifest.json"
+      FileUtils.mkdir_p(File.dirname(asset_path))
+      File.write(asset_path, '{"asset":"one"}')
+
+      initial_key = described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path])
+
+      File.write(asset_path, '{"asset":"two"}')
+
+      expect(described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]))
+        .not_to eq(initial_key)
+    end
   end
 
   describe "get_form_body_for_file" do

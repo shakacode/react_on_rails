@@ -13,6 +13,7 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "digest"
 require "uri"
 require_relative "renderer_http_client"
 require_relative "stream_request"
@@ -172,8 +173,10 @@ module ReactOnRailsPro
           target_bundles << pool.rsc_bundle_hash
         end
 
-        with_asset_upload_single_flight(target_bundles) do
-          form = form_with_assets_and_bundle
+        assets_to_copy = assets_to_copy_for_upload
+
+        with_asset_upload_single_flight(upload_assets_single_flight_key(target_bundles, assets_to_copy)) do
+          form = form_with_assets_and_bundle(assets_to_copy:)
           # TODO: targetBundles is only kept for backward compatibility with older node renderers
           # (protocol 2.0.0) that require it. The new node renderer derives target directories from
           # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
@@ -287,7 +290,7 @@ module ReactOnRailsPro
         form
       end
 
-      def populate_form_with_bundle_and_assets(form, check_bundle:)
+      def populate_form_with_bundle_and_assets(form, check_bundle:, assets_to_copy: assets_to_copy_for_upload)
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
         add_bundle_to_form(
@@ -308,7 +311,7 @@ module ReactOnRailsPro
           )
         end
 
-        add_assets_to_form(form)
+        add_assets_to_form(form, assets_to_copy:)
       end
 
       def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:)
@@ -321,7 +324,7 @@ module ReactOnRailsPro
         }
       end
 
-      def add_assets_to_form(form)
+      def assets_to_copy_for_upload
         assets_to_copy = (ReactOnRailsPro.configuration.assets_to_copy || []).dup
         # react_client_manifest and react_server_manifest files are needed to generate react server components payload
         if ReactOnRailsPro.configuration.enable_rsc_support
@@ -329,6 +332,10 @@ module ReactOnRailsPro
           assets_to_copy << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
         end
 
+        assets_to_copy
+      end
+
+      def add_assets_to_form(form, assets_to_copy:)
         return form unless assets_to_copy.present?
 
         assets_to_copy.each_with_index do |asset_path, idx|
@@ -354,9 +361,9 @@ module ReactOnRailsPro
         form
       end
 
-      def form_with_assets_and_bundle
+      def form_with_assets_and_bundle(assets_to_copy: assets_to_copy_for_upload)
         form = common_form_data
-        populate_form_with_bundle_and_assets(form, check_bundle: true)
+        populate_form_with_bundle_and_assets(form, check_bundle: true, assets_to_copy:)
         form
       end
 
@@ -383,8 +390,27 @@ module ReactOnRailsPro
         data
       end
 
-      def with_asset_upload_single_flight(target_bundles, &)
-        key = Array(target_bundles).map(&:to_s).freeze
+      def upload_assets_single_flight_key(target_bundles, assets_to_copy)
+        [
+          "bundles",
+          Array(target_bundles).length.to_s,
+          *Array(target_bundles).map(&:to_s),
+          "assets",
+          assets_to_copy.length.to_s,
+          *assets_to_copy.map { |asset_path| upload_asset_fingerprint(asset_path) }
+        ].freeze
+      end
+
+      def upload_asset_fingerprint(asset_path)
+        path = asset_path.to_s
+        return "url:#{path}" if http_url?(path)
+        return "missing:#{path}" unless File.exist?(path)
+
+        "file:#{path}:#{Digest::SHA256.file(path).hexdigest}"
+      end
+
+      def with_asset_upload_single_flight(key_parts, &)
+        key = Array(key_parts).map(&:to_s).freeze
         leader = false
 
         state = UPLOAD_ASSETS_MUTEX.synchronize do
@@ -409,7 +435,6 @@ module ReactOnRailsPro
       def perform_asset_upload_single_flight(key, state)
         error = nil
         response = nil
-        waiters = nil
 
         begin
           response = yield
@@ -417,15 +442,15 @@ module ReactOnRailsPro
           error = e
           raise
         ensure
-          UPLOAD_ASSETS_MUTEX.synchronize do
+          waiters = UPLOAD_ASSETS_MUTEX.synchronize do
             state[:error] = error
             state[:response] = response
             state[:complete] = true
             upload_assets_in_progress.delete(key)
-            waiters = state[:waiters]
+            state[:waiters]
           end
+          waiters.each { |waiter| waiter << true }
         end
-        waiters.each { |waiter| waiter << true }
 
         response
       end

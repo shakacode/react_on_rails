@@ -16,6 +16,7 @@
 require_relative "spec_helper"
 require "react_on_rails_pro/renderer_http_client"
 require "stringio"
+require "timeout"
 
 RSpec.describe ReactOnRailsPro::RendererHttpClient do
   describe ReactOnRailsPro::RendererHttpClient::ConnectTimeoutWrapper do
@@ -834,6 +835,21 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       thread_clients = client.instance_variable_get(:@thread_clients)
       expect(thread_clients.keys).to eq([Thread.current])
       expect(thread_clients[Thread.current]).to be(current_client)
+    end
+
+    it "does not block closing a persistent client whose worker thread exited first" do
+      persistent_client = described_class::PersistentThreadClient.allocate
+      dead_worker = Thread.new { nil }
+      dead_worker.join
+
+      persistent_client.instance_variable_set(:@queue, Queue.new)
+      persistent_client.instance_variable_set(:@closed, false)
+      persistent_client.instance_variable_set(:@closed_mutex, Mutex.new)
+      persistent_client.instance_variable_set(:@thread, dead_worker)
+
+      expect do
+        Timeout.timeout(0.2) { persistent_client.close }
+      end.not_to raise_error
     end
 
     it "stores clients per origin on the same scheduler" do
