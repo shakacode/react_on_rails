@@ -263,8 +263,8 @@ module ReactOnRailsPro
           keys, _expires_at = read_index(key)
           return 0 if keys.empty?
 
-          Rails.cache.delete(key)
           deleted = delete_entries(keys)
+          Rails.cache.delete(key)
           Rails.logger.debug do
             "[ReactOnRailsPro] revalidate_tag #{tag.inspect}: deleted #{deleted} of #{keys.size} indexed entries"
           end

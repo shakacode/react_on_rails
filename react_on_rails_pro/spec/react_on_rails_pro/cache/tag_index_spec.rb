@@ -357,13 +357,39 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
-    it "deletes the index before cached entries to shrink the revalidation race window" do
+    it "keeps the index when cached entry deletion raises so revalidation can be retried" do
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      described_class.register(["t"], "entry/two", { expires_in: 3600 })
+      original_delete_multi = Rails.cache.method(:delete_multi)
+      attempts = 0
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        attempts += 1
+        raise StandardError, "delete_multi failed" if attempts == 1
+
+        original_delete_multi.call(keys, namespace:)
+      end
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(index_payload("t")["keys"]).to eq(%w[entry/one entry/two])
+      expect(Rails.cache.read("entry/one")).to eq("one")
+      expect(Rails.cache.read("entry/two")).to eq("two")
+
+      expect(described_class.revalidate("t")).to eq(2)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to be_nil
+      expect(index_payload("t")).to be_nil
+    end
+
+    it "deletes cached entries before the index so deletion failures leave retry metadata" do
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", { expires_in: 3600 })
       index_key = described_class.index_key("t")
 
-      expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
       expect(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).ordered.and_call_original
+      expect(Rails.cache).to receive(:delete).with(index_key).ordered.and_call_original
 
       expect(described_class.revalidate("t")).to eq(1)
     end
