@@ -704,7 +704,14 @@ module ReactOnRailsPro
         @thread_clients.values.tap { @thread_clients = {}.compare_by_identity }
       end
 
-      clients.each(&:close)
+      close_error = nil
+      clients.each do |client|
+        client.close
+      rescue StandardError => e
+        close_error ||= e
+      end
+
+      raise close_error if close_error
     end
 
     def sweep_dead_thread_clients

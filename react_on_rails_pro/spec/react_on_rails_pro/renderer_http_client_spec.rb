@@ -871,6 +871,36 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       end.not_to raise_error
     end
 
+    it "attempts to close every persistent no-scheduler client before re-raising close errors" do
+      stub_const("FakeCloseFailureThreadClient", Class.new do
+        attr_reader :closed
+
+        def initialize(error = nil)
+          @error = error
+          @closed = false
+        end
+
+        def close
+          @closed = true
+          raise @error if @error
+        end
+      end)
+      close_error = StandardError.new("first close failed")
+      failing_client = FakeCloseFailureThreadClient.new(close_error)
+      remaining_client = FakeCloseFailureThreadClient.new
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      client.instance_variable_set(
+        :@thread_clients,
+        { Object.new => failing_client, Object.new => remaining_client }.compare_by_identity
+      )
+
+      expect { client.close }.to raise_error(close_error)
+      expect(failing_client.closed).to be(true)
+      expect(remaining_client.closed).to be(true)
+      expect(client.instance_variable_get(:@thread_clients)).to be_empty
+    end
+
     it "stores clients per origin on the same scheduler" do
       stub_const("FakeOriginClient", Class.new { def get(_path); end })
       endpoint1 = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
