@@ -125,21 +125,32 @@ describe('restartWorkers', () => {
     await expect(restartPromise).resolves.toBeUndefined();
   });
 
-  it('preserves the scheduled restart flag when a selected worker emits an error before exit', async () => {
+  it('preserves the scheduled restart timeout when a selected worker emits an error before exit', async () => {
     jest.useFakeTimers();
     const staleWorker = buildWorker(1);
     const nextWorker = buildWorker(2);
     const restartWorkers = loadRestartWorkers({ 1: staleWorker, 2: nextWorker });
 
-    const restartPromise = restartWorkers(0, undefined);
+    const restartPromise = restartWorkers(0, 30);
     await Promise.resolve();
 
     staleWorker.emit('error', new Error('worker IPC error'));
     await Promise.resolve();
+
+    expect(staleWorker.isScheduledRestart).toBe(true);
+    expect(nextWorker.send).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(29_999);
+    await Promise.resolve();
+
+    expect(staleWorker.destroy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
     jest.runOnlyPendingTimers();
     await Promise.resolve();
 
-    expect(staleWorker.isScheduledRestart).toBe(true);
+    expect(staleWorker.destroy).toHaveBeenCalledTimes(1);
     expect(nextWorker.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE, expect.any(Function));
 
     nextWorker.emit('exit');
