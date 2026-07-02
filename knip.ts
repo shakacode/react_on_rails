@@ -14,11 +14,17 @@ const config: KnipConfig = {
       ],
       project: ['*.{js,mjs,ts}', 'test/shakaperf/**/*.ts'],
       ignoreBinaries: [
-        // Has to be installed globally
-        'yalc',
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
+        // pnpm script inside react_on_rails_pro/spec/dummy (that tree is excluded from
+        // knip via the react_on_rails_pro/** ignore below); invoked by pro-integration-tests.yml.
+        'e2e-test:rsc',
+        // GitHub CLI, preinstalled on GitHub Actions runners; invoked by update-llms-full.yml.
+        'gh',
+        // Task runner invoked by the `start`/`lint` package.json scripts. `knip --production`
+        // strips this devDependency and would otherwise report `nps` as an unlisted binary.
+        'nps',
         // Local binaries
         'bin/.*',
       ],
@@ -50,11 +56,6 @@ const config: KnipConfig = {
         // SWC transpiler dependencies used by Shakapacker in dummy apps
         '@swc/core',
         'swc-loader',
-        // Used via nps (package-scripts.yml) which knip doesn't fully analyze
-        'nps',
-        // Used for package validation but not directly imported
-        '@arethetypeswrong/cli',
-        'publint',
         // Used by the release gate workflow via `pnpm exec shaka-perf`; Knip does
         // not detect that CLI usage from the GitHub Actions shell command.
         'shaka-perf',
@@ -64,7 +65,7 @@ const config: KnipConfig = {
     // Create React on Rails app package workspace
     'packages/create-react-on-rails-app': {
       entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!'],
-      project: ['src/**/*.ts', 'tests/**/*.ts', 'jest.config.js'],
+      project: ['src/**/*.ts', 'tests/**/*.ts'],
       ignore: ['lib/**', 'node_modules/**'],
     },
 
@@ -162,19 +163,16 @@ const config: KnipConfig = {
         'tests/fixtures/**',
         // Build output directories that should be ignored
         'lib/**',
-        // Pro features exported for external consumption
-        'src/streamServerRenderedReactComponent.ts:transformRenderStreamChunksToResultObject',
-        'src/streamServerRenderedReactComponent.ts:streamServerRenderedComponent',
-        'src/ServerComponentFetchError.ts:isServerComponentFetchError',
-        'src/RSCRoute.tsx:RSCRouteProps',
-        'src/streamServerRenderedReactComponent.ts:StreamingTrackers',
       ],
     },
     'react_on_rails/spec/dummy': {
       entry: [
         'app/assets/config/manifest.js!',
         'client/app/packs/**/*.{js,jsx,ts,tsx}!',
-        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.ts
+        // Not sure why this isn't detected as a dependency of client/app/packs/server-bundle.ts.
+        // The file is produced by `rake react_on_rails:generate_packs` (run in CI before knip),
+        // so knip only reports this entry as an unmatched pattern on a fresh checkout without
+        // generated packs. Keep it: the entry does real work in CI where the file exists.
         'client/app/generated/server-bundle-generated.js!',
         'config/webpack/{production,development,test}.js',
         // Declaring this as webpack.config instead doesn't work correctly
@@ -213,8 +211,6 @@ const config: KnipConfig = {
         'Assets/*': ['client/app/assets/*'],
       },
       ignoreBinaries: [
-        // Has to be installed globally
-        'yalc',
         // Local binaries
         'bin/.*',
       ],
@@ -223,12 +219,11 @@ const config: KnipConfig = {
         '@rescript/react',
         // The Babel plugin fails to detect it
         'babel-plugin-transform-react-remove-prop-types',
-        // Loaded only when REACT_COMPILER=1 in babel.config.js (which Knip ignores above), so
-        // it is never seen as used by static analysis. See docs/oss/building-features/react-compiler.md.
-        'babel-plugin-react-compiler',
-        // Required by @babel/plugin-transform-runtime for polyfills (used by webpack)
+        // Required by @babel/plugin-transform-runtime for polyfills (used by webpack).
+        // Only flagged as unused by `knip --production`, which strips the dev-only usage.
         '@babel/runtime',
-        // Used in webpack server config for CSS extraction
+        // Used in webpack server config for CSS extraction.
+        // Only flagged as unused by `knip --production`, which strips the dev-only usage.
         'mini-css-extract-plugin',
         // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
         'webpack-merge',
@@ -256,6 +251,8 @@ const config: KnipConfig = {
       ],
     },
   },
+  // These test-only reset helpers are used across files (imported by test setup), but
+  // `knip --production` strips test files and would report them as unused exports.
   ignoreIssues: {
     'packages/react-on-rails-pro-node-renderer/src/shared/tracing.ts': ['exports'],
     'packages/react-on-rails-pro-node-renderer/src/worker/fastifyConfig.ts': ['exports'],

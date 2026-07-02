@@ -295,11 +295,11 @@ ReactOnRails.configure do |config|
   # - :defer: Defers script execution until after page load
   config.generated_component_packs_loading_strategy = :async
 
-  # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
-  # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-  # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
-  # config.defer_generated_component_packs = false
+  # 🚫 REMOVED in v17.0.0: `defer_generated_component_packs` now raises NoMethodError at boot.
+  # Use `generated_component_packs_loading_strategy` (above) instead:
+  #   `defer_generated_component_packs = true`  → `generated_component_packs_loading_strategy = :defer`
+  #   `defer_generated_component_packs = false` → `generated_component_packs_loading_strategy = :sync`
+  # See CHANGELOG.md and the [upgrade guide](../upgrading/upgrading-react-on-rails.md) for more details.
 
   ################################################################################
   # DEPRECATED CONFIGURATION
@@ -862,18 +862,7 @@ Location of `node_modules` directory. With Shakapacker, this should typically be
 config.node_modules_location = ""  # Shakapacker default
 ```
 
-#### server_render_method
-
-**Type:** String
-**Default:** `nil`
-
-Server rendering method. Only `"ExecJS"` is currently supported:
-
-```ruby
-config.server_render_method = nil  # Uses ExecJS
-```
-
-For alternative server rendering methods, contact [justin@shakacode.com](mailto:justin@shakacode.com).
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure`.
 
 For deprecated configuration options, see [configuration-deprecated.md](configuration-deprecated.md).
 

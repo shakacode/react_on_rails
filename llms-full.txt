@@ -14420,7 +14420,7 @@ Then:
    you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
-We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
+We use ShakaPerf for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
 
 ### Reading the result
 
@@ -17813,11 +17813,11 @@ ReactOnRails.configure do |config|
   # - :defer: Defers script execution until after page load
   config.generated_component_packs_loading_strategy = :async
 
-  # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
-  # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-  # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
-  # config.defer_generated_component_packs = false
+  # 🚫 REMOVED in v17.0.0: `defer_generated_component_packs` now raises NoMethodError at boot.
+  # Use `generated_component_packs_loading_strategy` (above) instead:
+  #   `defer_generated_component_packs = true`  → `generated_component_packs_loading_strategy = :defer`
+  #   `defer_generated_component_packs = false` → `generated_component_packs_loading_strategy = :sync`
+  # See CHANGELOG.md and the [upgrade guide](../upgrading/upgrading-react-on-rails.md) for more details.
 
   ################################################################################
   # DEPRECATED CONFIGURATION
@@ -18380,18 +18380,7 @@ Location of `node_modules` directory. With Shakapacker, this should typically be
 config.node_modules_location = ""  # Shakapacker default
 ```
 
-#### server_render_method
-
-**Type:** String
-**Default:** `nil`
-
-Server rendering method. Only `"ExecJS"` is currently supported:
-
-```ruby
-config.server_render_method = nil  # Uses ExecJS
-```
-
-For alternative server rendering methods, contact [justin@shakacode.com](mailto:justin@shakacode.com).
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure`.
 
 For deprecated configuration options, see [configuration-deprecated.md](configuration-deprecated.md).
 
@@ -18775,27 +18764,38 @@ This configuration option has been removed. React on Rails Pro now performs earl
 
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 
-## Deprecated Options
-
 ### defer_generated_component_packs
 
-**Type:** Boolean
-**Default:** `false`
-**Status:** ⚠️ DEPRECATED
+**Status:** ⚠️ REMOVED in v17.0.0
 
-**Renamed to:** `generated_component_packs_loading_strategy = :defer`
+Deprecated in v16 and removed in v17. Setting `config.defer_generated_component_packs` now raises `NoMethodError` at boot. Use `config.generated_component_packs_loading_strategy` instead.
 
 **Migration:**
 
 ```ruby
-# Old (deprecated):
-config.defer_generated_component_packs = true
+# Old (removed):
+config.defer_generated_component_packs = true   # → :defer
+config.defer_generated_component_packs = false  # → :sync
 
 # New:
-config.generated_component_packs_loading_strategy = :defer
+config.generated_component_packs_loading_strategy = :defer  # or :sync
 ```
 
+If you delete the line without setting `generated_component_packs_loading_strategy`, the default strategy applies (`:async` for Pro when Shakapacker supports async loading, otherwise `:defer`), which may differ from the previous deferred behavior.
+
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for more details.
+
+### generated_assets_dirs
+
+**Status:** ⚠️ REMOVED in v17.0.0
+
+Deprecated in v16 and removed in v17. Setting `config.generated_assets_dirs` now raises `NoMethodError` at boot. Delete the line — public asset paths are determined automatically from `public_output_path` in `config/shakapacker.yml`.
+
+### skip_display_none
+
+**Status:** ⚠️ REMOVED in v17.0.0
+
+Deprecated in v16 and removed in v17. Setting `config.skip_display_none` now raises `NoMethodError` at boot. Delete the line — it had no runtime effect.
 
 ## Need Help?
 
@@ -18886,6 +18886,8 @@ Because preload hints belong in `<head>`, pass component names that are known be
 This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and `javascript_pack_tag` calls in the layout so the browser still applies and executes the assets.
 
 When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
+
+With Shakapacker versions before 8.4 that do not expose `config.integrity`, preload links are still emitted without `integrity` attributes. React on Rails only adds preload SRI attributes when Shakapacker exposes integrity settings and marks them enabled.
 
 ---
 
@@ -21548,9 +21550,10 @@ For a comprehensive debugging guide covering SSR issues, hydration mismatches, a
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
   config.logging_on_server = true
-  config.server_render_method = 'NodeJS' # for better error messages
 end
 ```
+
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure` rather than through the open-source configuration.
 
 ### Debug webpack configuration
 
@@ -22139,6 +22142,13 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
 
 - **Ruby 3.3+ is required.** Upgrade Ruby before moving to React on Rails v17. React on Rails v16 remains the supported line for applications that must stay on Ruby 3.2 or older.
 - **React on Rails Pro already required Ruby 3.3+.** v17 aligns the open-source gem, Pro gem, create-app validator, and CI minimum matrix on the same Ruby floor.
+- **Three deprecated configuration options were removed.** They were deprecated in v16 and are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
+  - `config.generated_assets_dirs` — delete the line. Public asset paths are determined automatically from `public_output_path` in `config/shakapacker.yml`.
+  - `config.skip_display_none` — delete the line. It had no runtime effect.
+  - `config.defer_generated_component_packs` — replaced by `config.generated_component_packs_loading_strategy`. This one changes behavior, so map it explicitly:
+    - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
+    - `config.defer_generated_component_packs = false` → `config.generated_component_packs_loading_strategy = :sync`
+    - If you simply delete the line without setting `generated_component_packs_loading_strategy`, the default strategy applies (`:async` for Pro when Shakapacker supports it, otherwise `:defer`), which may differ from the deferred behavior you were relying on.
 
 ### Migration Steps
 

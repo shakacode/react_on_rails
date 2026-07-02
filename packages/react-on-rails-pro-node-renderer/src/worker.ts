@@ -335,7 +335,7 @@ function applyFastifyConfigWithHealthEndpointMigrationHint(
         'to the built-in health endpoints. See docs/oss/building-features/node-renderer/health-checks.md.';
 
       log.error({ err: error, route: conflictingPath }, message);
-      const migrationError = new Error(message) as Error & { cause?: unknown };
+      const migrationError = new Error(message);
       migrationError.cause = error;
       throw migrationError;
     }

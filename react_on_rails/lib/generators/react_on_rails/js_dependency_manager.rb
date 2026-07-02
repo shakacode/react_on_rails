@@ -281,42 +281,51 @@ module ReactOnRails
         MSG
       end
 
-      def add_css_dependencies
-        say "Installing CSS handling dependencies..."
-        return if add_packages(CSS_DEPENDENCIES)
+      # Installs a named group of packages, degrading gracefully per the module's
+      # error-handling philosophy (warn + manual-install instructions, never raise).
+      #
+      # @param installing_label [String] noun phrase for the "Installing ..." status line
+      # @param failure_label [String] noun phrase for the "Failed to add ..." / "Error adding ..." warnings
+      # @param packages [Array<String>] package specifiers to add
+      # @param dev [Boolean] whether to add as dev dependencies
+      # @param plural [Boolean] whether the manual-install sentence says "them" (true) or "it" (false)
+      # @param failure_note [String, nil] extra sentence emitted only in the non-exception failure path
+      # @return [Boolean] true when all packages were added, false otherwise
+      def install_dependency_group(installing_label, failure_label, packages, dev: false, plural: true,
+                                   failure_note: nil)
+        say "Installing #{installing_label}..."
+        return true if add_packages(packages, dev:)
 
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add CSS dependencies.
-
-          You can install them manually by running:
-            #{manual_add_packages_command(CSS_DEPENDENCIES)}
-        MSG
+        GeneratorMessages.add_warning(
+          dependency_group_failure_message("Failed to add #{failure_label}.", packages, dev:, plural:,
+                                                                                        note: failure_note)
+        )
+        false
       rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding CSS dependencies: #{e.message}
+        GeneratorMessages.add_warning(
+          dependency_group_failure_message("Error adding #{failure_label}: #{e.message}", packages, dev:,
+                                                                                                    plural:)
+        )
+        false
+      end
 
-          You can install them manually by running:
-            #{manual_add_packages_command(CSS_DEPENDENCIES)}
-        MSG
+      def dependency_group_failure_message(headline, packages, dev:, plural: true, note: nil)
+        pronoun = plural ? "them" : "it"
+        [
+          "⚠️  #{headline}",
+          "",
+          note,
+          "You can install #{pronoun} manually by running:",
+          "  #{manual_add_packages_command(packages, dev:)}"
+        ].compact.join("\n")
+      end
+
+      def add_css_dependencies
+        install_dependency_group("CSS handling dependencies", "CSS dependencies", CSS_DEPENDENCIES)
       end
 
       def add_tailwind_dependencies
-        say "Installing Tailwind CSS v4 dependencies..."
-        return if add_packages(TAILWIND_DEPENDENCIES)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add Tailwind CSS dependencies.
-
-          You can install them manually by running:
-            #{manual_add_packages_command(TAILWIND_DEPENDENCIES)}
-        MSG
-      rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding Tailwind CSS dependencies: #{e.message}
-
-          You can install them manually by running:
-            #{manual_add_packages_command(TAILWIND_DEPENDENCIES)}
-        MSG
+        install_dependency_group("Tailwind CSS v4 dependencies", "Tailwind CSS dependencies", TAILWIND_DEPENDENCIES)
       end
 
       def add_tailwind_dependencies_if_requested
@@ -327,82 +336,29 @@ module ReactOnRails
       end
 
       def add_rspack_dependencies
-        say "Installing Rspack core dependencies..."
-        return if add_packages(RSPACK_DEPENDENCIES)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add Rspack dependencies.
-
-          You can install them manually by running:
-            #{manual_add_packages_command(RSPACK_DEPENDENCIES)}
-        MSG
-      rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding Rspack dependencies: #{e.message}
-
-          You can install them manually by running:
-            #{manual_add_packages_command(RSPACK_DEPENDENCIES)}
-        MSG
+        install_dependency_group("Rspack core dependencies", "Rspack dependencies", RSPACK_DEPENDENCIES)
       end
 
       def add_swc_dependencies
-        say "Installing SWC transpiler dependencies (20x faster than Babel)..."
-        return if add_packages(SWC_DEPENDENCIES, dev: true)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add SWC dependencies.
-
-          SWC is the default JavaScript transpiler for Shakapacker 9.3.0+.
-          You can install them manually by running:
-            #{manual_add_packages_command(SWC_DEPENDENCIES, dev: true)}
-        MSG
-      rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding SWC dependencies: #{e.message}
-
-          You can install them manually by running:
-            #{manual_add_packages_command(SWC_DEPENDENCIES, dev: true)}
-        MSG
+        install_dependency_group(
+          "SWC transpiler dependencies (20x faster than Babel)", "SWC dependencies", SWC_DEPENDENCIES,
+          dev: true, failure_note: "SWC is the default JavaScript transpiler for Shakapacker 9.3.0+."
+        )
       end
 
+      # Returns true/false so the caller (install_generator) can decide whether to warn about
+      # incomplete Babel compatibility after switching from SWC. Do not change to the `return if`
+      # pattern the other groups use.
       def add_babel_react_dependencies
-        say "Installing Babel React preset dependency..."
-        return true if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add Babel React preset dependency.
-
-          You can install it manually by running:
-            #{manual_add_packages_command(BABEL_REACT_DEPENDENCIES, dev: true)}
-        MSG
-        false
-      rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding Babel React preset dependency: #{e.message}
-
-          You can install it manually by running:
-            #{manual_add_packages_command(BABEL_REACT_DEPENDENCIES, dev: true)}
-        MSG
-        false
+        install_dependency_group(
+          "Babel React preset dependency", "Babel React preset dependency", BABEL_REACT_DEPENDENCIES,
+          dev: true, plural: false
+        )
       end
 
       def add_typescript_dependencies
-        say "Installing TypeScript dependencies..."
-        return if add_packages(TYPESCRIPT_DEPENDENCIES, dev: true)
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Failed to add TypeScript dependencies.
-
-          You can install them manually by running:
-            #{manual_add_packages_command(TYPESCRIPT_DEPENDENCIES, dev: true)}
-        MSG
-      rescue StandardError => e
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Error adding TypeScript dependencies: #{e.message}
-
-          You can install them manually by running:
-            #{manual_add_packages_command(TYPESCRIPT_DEPENDENCIES, dev: true)}
-        MSG
+        install_dependency_group("TypeScript dependencies", "TypeScript dependencies", TYPESCRIPT_DEPENDENCIES,
+                                 dev: true)
       end
 
       def add_pro_dependencies

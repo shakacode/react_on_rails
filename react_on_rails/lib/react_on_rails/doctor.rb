@@ -1415,13 +1415,6 @@ module ReactOnRails
         end
       end
 
-      # Deprecated defer setting
-      defer_match = content.match(/config\.defer_generated_component_packs\s*=\s*([^\s\n,]+)/)
-      if defer_match
-        checker.add_warning("  ⚠️  defer_generated_component_packs: #{defer_match[1]} (DEPRECATED)")
-        checker.add_info("    💡 Use generated_component_packs_loading_strategy = :defer instead")
-      end
-
       # Auto load bundle
       if runtime_config
         checker.add_info("  auto_load_bundle: true") if runtime_config.auto_load_bundle
@@ -1571,7 +1564,6 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def analyze_custom_extensions(content, runtime_config = nil)
       extension_messages = []
       has_rendering_extension = false
@@ -1581,17 +1573,11 @@ module ReactOnRails
         if runtime_config.rendering_props_extension.present?
           extension_messages << "  rendering_props_extension: Custom props logic detected"
         end
-        if runtime_config.server_render_method.present?
-          extension_messages << "  server_render_method: #{runtime_config.server_render_method}"
-        end
       else
         has_rendering_extension = /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
         if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
           extension_messages << "  rendering_props_extension: Custom props logic detected"
         end
-
-        server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
-        extension_messages << "  server_render_method: #{server_method_match[1]}" if server_method_match
       end
 
       return unless has_rendering_extension || extension_messages.any?
@@ -1603,7 +1589,6 @@ module ReactOnRails
       end
       extension_messages.each { |msg| checker.add_info(msg) }
     end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def check_deprecated_configuration_settings
       return unless File.exist?("config/initializers/react_on_rails.rb")
@@ -1611,20 +1596,25 @@ module ReactOnRails
       content = File.read("config/initializers/react_on_rails.rb")
       deprecated_settings = []
 
-      # Check for deprecated settings
+      # Check for removed settings (raise NoMethodError at boot if still present)
       if content.include?("config.generated_assets_dirs")
-        deprecated_settings << "generated_assets_dirs (use generated_assets_dir)"
+        deprecated_settings << "generated_assets_dirs (removed in 17.0; delete this line - asset paths " \
+                               "come from shakapacker.yml public_output_path)"
       end
       if content.include?("config.skip_display_none")
-        deprecated_settings << "skip_display_none (remove from configuration)"
+        deprecated_settings << "skip_display_none (removed in 17.0; delete this line)"
       end
       if content.include?("config.defer_generated_component_packs")
-        deprecated_settings << "defer_generated_component_packs (use generated_component_packs_loading_strategy)"
+        deprecated_settings << "defer_generated_component_packs (removed in 17.0; delete this line and use " \
+                               "generated_component_packs_loading_strategy = :defer or :sync)"
+      end
+      if content.include?("config.server_render_method")
+        deprecated_settings << "server_render_method (removed; delete this line - always renders with ExecJS)"
       end
 
       return unless deprecated_settings.any?
 
-      checker.add_info("\n⚠️  Deprecated Configuration Settings:")
+      checker.add_info("\n⚠️  Removed Configuration Settings (delete these lines - they raise NoMethodError at boot):")
       deprecated_settings.each do |setting|
         checker.add_warning("  #{setting}")
       end

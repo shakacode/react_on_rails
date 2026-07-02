@@ -368,7 +368,9 @@ function trackRendererMount(domNodeId: string, domNode: Element, result: Rendere
  * delegates to a renderer registered by the user.
  */
 function renderElement(el: Element, railsContext: RailsContext): void {
-  // This must match lib/react_on_rails/helper.rb
+  // This must match the data-* attributes emitted by lib/react_on_rails/pro_helper.rb.
+  // Covered end-to-end by every spec/dummy client-rendering test (renaming either side fails
+  // loudly), so no MIRROR VALUES guard is added here.
   const name = el.getAttribute('data-component-name') || '';
   const domNodeId = domNodeIdForEl(el);
   const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};

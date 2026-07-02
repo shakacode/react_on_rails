@@ -15,6 +15,8 @@ on:
       - 'script/release-forward-port-test.bash'
       - 'script/release-finish'
       - 'script/release-finish-test.bash'
+      - 'bin/lint-mirrored-blocks'
+      - 'script/lint-mirrored-blocks-test.bash'
       - 'bin/read-tool-version'
       - '.tool-versions'
       - '.minimum.tool-versions'
@@ -31,6 +33,8 @@ on:
       - 'script/release-forward-port-test.bash'
       - 'script/release-finish'
       - 'script/release-finish-test.bash'
+      - 'bin/lint-mirrored-blocks'
+      - 'script/lint-mirrored-blocks-test.bash'
       - 'bin/read-tool-version'
       - '.tool-versions'
       - '.minimum.tool-versions'
@@ -66,7 +70,8 @@ jobs:
             script/ci-changes-detector \
             script/ci-changes-detector-test.bash \
             script/release-forward-port-test.bash \
-            script/release-finish-test.bash
+            script/release-finish-test.bash \
+            script/lint-mirrored-blocks-test.bash
 
       - name: Ruby syntax check release scripts
         run: |
@@ -90,3 +95,6 @@ jobs:
 
       - name: Run release finish test harness
         run: bash script/release-finish-test.bash
+
+      - name: Run mirrored-blocks lint test harness
+        run: bash script/lint-mirrored-blocks-test.bash

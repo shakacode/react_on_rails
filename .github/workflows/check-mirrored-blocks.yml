@@ -7,16 +7,25 @@ permissions:
 "on":
   push:
     branches: [main]
+    # Keep these paths in one-to-one sync with MIRROR_ROOTS in bin/lint-mirrored-blocks
+    # (each root maps to `<root>/**`). If MIRROR_ROOTS changes, update both lists below.
     paths:
       - 'bin/lint-mirrored-blocks'
       - 'packages/react-on-rails/**'
       - 'packages/react-on-rails-pro/**'
+      - 'packages/react-on-rails-pro-node-renderer/src/**'
+      - 'react_on_rails/lib/**'
+      - 'react_on_rails_pro/lib/**'
       - '.github/workflows/check-mirrored-blocks.yml'
   pull_request:
+    # Keep in sync with MIRROR_ROOTS in bin/lint-mirrored-blocks (see note above).
     paths:
       - 'bin/lint-mirrored-blocks'
       - 'packages/react-on-rails/**'
       - 'packages/react-on-rails-pro/**'
+      - 'packages/react-on-rails-pro-node-renderer/src/**'
+      - 'react_on_rails/lib/**'
+      - 'react_on_rails_pro/lib/**'
       - '.github/workflows/check-mirrored-blocks.yml'
   merge_group:
   workflow_dispatch:

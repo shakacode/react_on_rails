@@ -38,7 +38,7 @@
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
-    "@tsconfig/node14": "^14.1.2",
+    "@tsconfig/node18": "^18.2.4",
     "@types/jest": "^29.5.14",
     "@types/k6": "^2.0.0",
     "@types/node": "^20.17.16",
