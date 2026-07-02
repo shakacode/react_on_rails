@@ -15,11 +15,9 @@
 
 import cluster from 'cluster';
 import { FastifyInstance } from './types.js';
-import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 import log from '../shared/log.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS, runWorkerShutdownHooks } from './shutdownHooks.js';
-
-const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
 
 function errorCode(error: unknown): string | undefined {
   const code = (error as { code?: unknown })?.code;

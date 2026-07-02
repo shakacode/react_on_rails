@@ -14,10 +14,8 @@
  */
 
 import { WORKER_STARTUP_FAILURE, type WorkerStartupFailureMessage } from '../src/shared/workerMessages';
-import { SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from '../src/worker/shutdownHooks';
-
-const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
 
 type MockWorker = {
   id: number;
@@ -642,6 +640,20 @@ describe('master graceful shutdown on external signals via masterRun wiring', ()
     findShutdownTimeout(harness, 2000).callback();
 
     expect(harness.mockWorkerProcesses.first.kill).not.toHaveBeenCalled();
+    expect(harness.mockWorkerProcesses.second.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('forgets graceful-shutdown ACKs when workers exit', () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    harness.clusterHandlers.message({ id: 1, process: { exitCode: null } }, SHUTDOWN_WORKER_ACK_MESSAGE);
+    harness.clusterHandlers.exit({ id: 1, process: { exitCode: 0 } });
+    findShutdownTimeout(harness, 2000).callback();
+
+    expect(harness.mockWorkerProcesses.first.kill).toHaveBeenCalledWith('SIGKILL');
     expect(harness.mockWorkerProcesses.second.kill).toHaveBeenCalledWith('SIGKILL');
     expect(harness.processExitSpy).not.toHaveBeenCalled();
   });

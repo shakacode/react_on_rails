@@ -28,11 +28,10 @@ import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
-import { SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from './worker/shutdownHooks.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
-const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
 // How often to scan for orphaned upload directories.
 const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 // How old a directory must be before it is considered orphaned.
@@ -286,6 +285,8 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
+    gracefulShutdownAcknowledgedWorkerIds.delete(worker.id);
+
     // Once a startup failure has been detected, abort regardless of whether
     // this particular exit was from the failing worker, a scheduled restart,
     // or an unrelated crash. Don't fork any more workers. If an external signal

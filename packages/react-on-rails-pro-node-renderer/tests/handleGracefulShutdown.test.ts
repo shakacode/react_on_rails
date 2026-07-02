@@ -13,9 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
-
-const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
 
 type HookHandler = (...args: unknown[]) => void;
 type MockWorker = { id: number; destroy: jest.Mock; disconnect: jest.Mock; send: jest.Mock };
