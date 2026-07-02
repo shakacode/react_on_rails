@@ -378,24 +378,23 @@ module ReactOnRails
       include TypeSpecHelpers
 
       def initialize(registry)
-        @registry = registry
+        types = registry.types
+        @responses = registry.responses
+        @definitions = (types + responses).freeze
+        @definition_names = definitions.to_h { |definition| [definition.name, true] }.freeze
       end
 
       def to_d_ts
         lines = [GENERATED_HEADER, "", JSON_VALUE_DEFINITION]
         definitions.each { |definition| lines.push("", interface_definition(definition)) }
         lines.push("", response_map_definition)
-        lines.push("", response_helpers) unless registry.responses.empty?
+        lines.push("", response_helpers) unless responses.empty?
         "#{lines.join("\n")}\n"
       end
 
       private
 
-      attr_reader :registry
-
-      def definitions
-        registry.types + registry.responses
-      end
+      attr_reader :definitions, :definition_names, :responses
 
       def interface_definition(definition)
         body = fields_to_lines(definition.fields, indentation: "  ")
@@ -405,9 +404,9 @@ module ReactOnRails
       end
 
       def response_map_definition
-        return "export interface RailsResponseTypes {}" if registry.responses.empty?
+        return "export interface RailsResponseTypes {}" if responses.empty?
 
-        body = registry.responses.map do |response|
+        body = responses.map do |response|
           "  #{quote_property(response.response_key)}: #{response.name};"
         end
         "export interface RailsResponseTypes {\n#{body.join("\n")}\n}"
@@ -498,7 +497,7 @@ module ReactOnRails
           raise ReactOnRails::Error, "TypeScript type reference must be a valid identifier: #{name.inspect}"
         end
 
-        return type_name if definitions.any? { |definition| definition.name == type_name }
+        return type_name if definition_names.key?(type_name)
 
         raise ReactOnRails::Error, "Unknown TypeScript type reference: #{name.inspect}"
       end
