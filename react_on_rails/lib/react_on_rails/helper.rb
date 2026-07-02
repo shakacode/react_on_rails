@@ -594,7 +594,7 @@ module ReactOnRails
       integrity = preload_source_integrity(source)
       return attributes unless integrity.present?
 
-      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      cross_origin = shakapacker_integrity_config[:cross_origin]
       attributes.merge(integrity:, crossorigin: cross_origin.nil? ? preload_crossorigin : cross_origin)
     end
 
@@ -610,14 +610,21 @@ module ReactOnRails
     end
 
     def preload_source_integrity(source)
-      return unless current_shakapacker_instance.config.integrity[:enabled]
+      return unless shakapacker_integrity_config[:enabled]
 
       preload_manifest_value(source, "integrity")
     end
 
     def preload_crossorigin
-      cross_origin = current_shakapacker_instance.config.integrity[:cross_origin]
+      cross_origin = shakapacker_integrity_config[:cross_origin]
       cross_origin.nil? ? "anonymous" : cross_origin
+    end
+
+    def shakapacker_integrity_config
+      config = current_shakapacker_instance.config
+      return {} unless config.respond_to?(:integrity)
+
+      config.integrity || {}
     end
 
     def modulepreload_source?(source)
