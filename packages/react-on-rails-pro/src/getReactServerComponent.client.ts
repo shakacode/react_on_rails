@@ -249,8 +249,9 @@ const createRSCStreamFromArray = (payloads: string[]) => {
       payloads.forEach(handleChunk);
       // eslint-disable-next-line no-param-reassign
       payloads.push = (...chunks) => {
+        Array.prototype.push.apply(payloads, chunks);
         chunks.forEach(handleChunk);
-        return chunks.length;
+        return payloads.length;
       };
       streamController = controller;
     },
