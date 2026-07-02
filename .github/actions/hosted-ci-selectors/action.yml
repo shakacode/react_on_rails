@@ -65,6 +65,7 @@ runs:
           const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
           const hostedStartCommands = new Set(['+ci-run-hosted', '+ci-force-full']);
           const hostedStopCommands = new Set(['+ci-stop-hosted', '+ci-skip-hosted']);
+          const permissionByLogin = new Map();
 
           function commandText(commentBody) {
             return (commentBody || '')
@@ -96,6 +97,34 @@ runs:
             return Number(comment.id || 0) > Number(current.id || 0);
           }
 
+          async function hasWriteAccessFor(username) {
+            if (!username) {
+              return false;
+            }
+
+            if (permissionByLogin.has(username)) {
+              return permissionByLogin.get(username);
+            }
+
+            let hasWriteAccess = false;
+            try {
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username
+              });
+              hasWriteAccess = ['admin', 'write'].includes(permission.permission);
+            } catch (error) {
+              core.warning(
+                `Unable to verify ${username} write permission for Dependabot hosted-CI trust check; ` +
+                  `treating the command as untrusted: ${error.message || error}`
+              );
+            }
+
+            permissionByLogin.set(username, hasWriteAccess);
+            return hasWriteAccess;
+          }
+
           async function hasTrustedDependabotHostedRequest() {
             if (!pullRequest) {
               return false;
@@ -121,6 +150,10 @@ runs:
 
             for (const comment of comments) {
               if (!trustedCommandAssociations.has(comment.author_association)) {
+                continue;
+              }
+
+              if (!(await hasWriteAccessFor(comment.user?.login))) {
                 continue;
               }
 
