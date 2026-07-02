@@ -17,13 +17,17 @@ import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import path from 'path';
 import querystring from 'querystring';
+import { Readable } from 'stream';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { configureFastify, disableHttp2 } from '../src/worker';
 import * as vm from '../src/worker/vm';
+import type { ExecutionContext } from '../src/worker/vm';
 import * as errorReporter from '../src/shared/errorReporter';
+import { STREAM_CHUNK_TIMEOUT_MS } from '../src/shared/constants';
 import { __resetTracingForTest, setupTracing, type TracingContext } from '../src/shared/tracing';
+import * as incremental from '../src/worker/handleIncrementalRenderRequest';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -51,6 +55,28 @@ const { protocolVersion } = packageJson;
 const railsEnv = 'test';
 
 disableHttp2();
+
+const flushMicrotasks = async () => {
+  for (let i = 0; i < 5; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.resolve();
+  }
+};
+
+const waitForMockCalls = async (mockFn: jest.Mock, expectedCalls: number) => {
+  for (let i = 0; i < 50; i += 1) {
+    if (mockFn.mock.calls.length >= expectedCalls) {
+      return;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await jest.advanceTimersByTimeAsync(1);
+    // eslint-disable-next-line no-await-in-loop
+    await flushMicrotasks();
+  }
+
+  expect(mockFn).toHaveBeenCalledTimes(expectedCalls);
+};
 
 // Helper to create worker with standard options
 const createWorker = (options: Parameters<typeof worker>[0] = {}) =>
@@ -1408,6 +1434,73 @@ describe('worker', () => {
       expect(res.statusCode).toBe(200);
       expect(res.headers['cache-control']).toBe('public, max-age=31536000');
       expect(res.payload).toBe('{"html":"Dummy Object"}');
+    });
+
+    test('keeps an incremental response alive when response chunks arrive after request EOF', async () => {
+      jest.useFakeTimers();
+
+      const responseStream = new Readable({
+        read() {
+          // Test pushes chunks manually.
+        },
+      });
+      const handleRequestClosed = jest.fn().mockResolvedValue(undefined);
+      const releaseExecutionContext = jest.fn();
+      const handleSpy = jest.spyOn(incremental, 'handleIncrementalRenderRequest').mockResolvedValue({
+        response: {
+          status: 200,
+          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+          stream: responseStream,
+        },
+        sink: {
+          add: jest.fn(),
+          handleRequestClosed,
+          executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+        },
+      });
+
+      try {
+        const app = createWorkerApp();
+        const payload = {
+          gemVersion,
+          protocolVersion,
+          password: 'my_password',
+          renderingRequest: 'ReactOnRails.dummy',
+          dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+        };
+
+        const responsePromise = app
+          .inject()
+          .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+          .payload(createNDJSONPayload(payload))
+          .headers({
+            'Content-Type': 'application/x-ndjson',
+          })
+          .end();
+
+        await waitForMockCalls(handleSpy, 1);
+        await waitForMockCalls(handleRequestClosed, 1);
+
+        responseStream.push('first chunk');
+        await jest.advanceTimersByTimeAsync(STREAM_CHUNK_TIMEOUT_MS - 1);
+
+        responseStream.push('second chunk');
+        await jest.advanceTimersByTimeAsync(1);
+
+        responseStream.push('third chunk');
+        responseStream.push(null);
+        await jest.advanceTimersByTimeAsync(0);
+
+        const res = await responsePromise;
+
+        expect(res.statusCode).toBe(200);
+        expect(res.payload).toBe('first chunksecond chunkthird chunk');
+        expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+      } finally {
+        responseStream.destroy();
+        handleSpy.mockRestore();
+        jest.useRealTimers();
+      }
     });
   });
 });

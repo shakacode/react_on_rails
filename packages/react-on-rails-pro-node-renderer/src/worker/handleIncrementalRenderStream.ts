@@ -37,14 +37,27 @@ export class StreamChunkTimeoutError extends Error {
  */
 async function* withChunkTimeout<T>(
   iterator: AsyncIterable<T>,
-  timeoutMs: number,
+  getTimeoutMs: () => number,
 ): AsyncGenerator<T, void, undefined> {
   const asyncIterator = iterator[Symbol.asyncIterator]();
 
   while (true) {
     let timeoutId: NodeJS.Timeout | undefined;
+    const timeoutMs = getTimeoutMs();
 
     try {
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await asyncIterator.next();
+        if (result.done) {
+          return;
+        }
+
+        yield result.value;
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
       // eslint-disable-next-line no-await-in-loop
       const result = await Promise.race([
         asyncIterator.next(),
@@ -92,6 +105,7 @@ export interface IncrementalRenderStreamHandlerOptions {
   onResponseStart: (response: ResponseResult) => Promise<void> | void;
   onUpdateReceived: (updateData: unknown) => Promise<void> | void;
   onRequestEnded: () => Promise<void> | void;
+  getChunkTimeoutMs?: () => number;
 }
 
 /**
@@ -102,7 +116,14 @@ export async function handleIncrementalRenderStream(
   options: IncrementalRenderStreamHandlerOptions,
 ): Promise<void> {
   return subSpan({ name: 'ror.incremental.stream' }, async () => {
-    const { request, onRenderRequestReceived, onResponseStart, onUpdateReceived, onRequestEnded } = options;
+    const {
+      request,
+      onRenderRequestReceived,
+      onResponseStart,
+      onUpdateReceived,
+      onRequestEnded,
+      getChunkTimeoutMs = () => STREAM_CHUNK_TIMEOUT_MS,
+    } = options;
 
     let hasReceivedFirstObject = false;
     const decoder = new StringDecoder('utf8');
@@ -111,10 +132,7 @@ export async function handleIncrementalRenderStream(
     let onResponseStartPromise: Promise<void> | null = null;
 
     try {
-      for await (const chunk of withChunkTimeout(
-        request.raw as AsyncIterable<Buffer>,
-        STREAM_CHUNK_TIMEOUT_MS,
-      )) {
+      for await (const chunk of withChunkTimeout(request.raw as AsyncIterable<Buffer>, getChunkTimeoutMs)) {
         const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
         totalBytesReceived += chunkBuffer.length;
 

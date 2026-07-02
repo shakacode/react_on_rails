@@ -655,6 +655,7 @@ export default function run(config: Partial<Config>) {
     let incrementalRequestClosed = false;
     let incrementalResponseFinished = false;
     let incrementalExecutionContextReleased = false;
+    let pullModeRequestCanIdle = false;
     let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let incrementalTracingContext: TracingContext | undefined;
 
@@ -714,6 +715,62 @@ export default function run(config: Partial<Config>) {
         }
         markIncrementalResponseFinished();
       }, INCREMENTAL_RESPONSE_FINISH_TIMEOUT_MS);
+    };
+
+    const refreshIncrementalResponseFinishTimeout = () => {
+      if (
+        !incrementalRequestClosed ||
+        incrementalResponseFinished ||
+        incrementalExecutionContextReleased ||
+        !incrementalSink
+      ) {
+        return;
+      }
+
+      clearIncrementalResponseFinishTimeout();
+      scheduleIncrementalResponseFinishTimeout();
+    };
+
+    const trackIncrementalResponseProgress = (stream: NonNullable<ResponseResult['stream']>) => {
+      const progressStream = new Transform({
+        transform(chunk, encoding, callback) {
+          refreshIncrementalResponseFinishTimeout();
+          callback(null, chunk);
+        },
+      });
+      const forwardSourceError = (error: Error) => progressStream.destroy(error);
+      const endProgressStream = () => {
+        if (!progressStream.writableEnded && !progressStream.destroyed) {
+          progressStream.end();
+        }
+      };
+
+      stream.once('close', endProgressStream);
+      stream.once('error', forwardSourceError);
+      progressStream.once('close', () => {
+        stream.off('close', endProgressStream);
+        stream.off('error', forwardSourceError);
+        if (!progressStream.writableEnded && !stream.destroyed) {
+          stream.destroy();
+        }
+      });
+      stream.pipe(progressStream);
+
+      return progressStream;
+    };
+
+    const getIncrementalRequestChunkTimeoutMs = () => {
+      if (
+        pullModeRequestCanIdle &&
+        responseStarted &&
+        !incrementalResponseFinished &&
+        !res.raw.destroyed &&
+        !res.raw.writableEnded
+      ) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      return STREAM_CHUNK_TIMEOUT_MS;
     };
 
     const waitForIncrementalRequestClose = async (closeRequestPromise: Promise<void>, timeoutMs: number) => {
@@ -798,6 +855,7 @@ export default function run(config: Partial<Config>) {
               try {
                 const { response, sink } = await handleIncrementalRenderRequest(initial);
                 incrementalSink = sink;
+                pullModeRequestCanIdle = !!incrementalSink && tempReqBody.pullEnabled === true;
 
                 return {
                   response,
@@ -836,13 +894,14 @@ export default function run(config: Partial<Config>) {
             onResponseStart: async (response: ResponseResult) => {
               responseStarted = true;
               if (response.stream) {
+                const responseStream = trackIncrementalResponseProgress(response.stream);
                 const markFinished = runWhenStreamFinishes(
-                  response.stream,
+                  responseStream,
                   res,
                   markIncrementalResponseFinished,
                 );
                 try {
-                  await setResponse(response, res);
+                  await setResponse({ ...response, stream: responseStream }, res);
                 } catch (error) {
                   markFinished();
                   throw error;
@@ -860,6 +919,7 @@ export default function run(config: Partial<Config>) {
             onRequestEnded: async () => {
               await closeIncrementalRequest();
             },
+            getChunkTimeoutMs: getIncrementalRequestChunkTimeoutMs,
           });
         },
         startSsrRequestOptions({ renderingRequest: 'ReactOnRails.incrementalRender' }),
