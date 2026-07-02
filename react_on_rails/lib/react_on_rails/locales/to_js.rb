@@ -8,7 +8,7 @@ module ReactOnRails
       LEGACY_DEFAULT_IMPORT = /\A\s*import\s+\{\s*defineMessages\s*\}\s+from\s+["']react-intl["'];?/
       private_constant :LEGACY_DEFAULT_IMPORT
 
-      GENERATED_PREAMBLE_LINE = %r{\A\s*(?://|/\*|\*|\*/|["'][^"']*["'];?\s*\z)}
+      GENERATED_PREAMBLE_LINE = %r{\A\s*(?://|(?:"use (?:client|strict)";?|'use (?:client|strict)';?)\s*\z)}
       private_constant :GENERATED_PREAMBLE_LINE
 
       private
