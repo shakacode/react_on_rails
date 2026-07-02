@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "spec_helper"
+require "timeout"
 require "fakefs/safe"
 
 describe ReactOnRailsPro::Request do
@@ -237,6 +238,170 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe ".upload_assets" do
+    before do
+      described_class.instance_variable_set(:@upload_assets_in_progress, nil)
+      described_class.instance_variable_set(:@upload_asset_fingerprints, nil)
+    end
+
+    it "deduplicates concurrent upload work for the same target bundle hashes" do
+      call_count = 0
+      call_count_mutex = Mutex.new
+      upload_started = Queue.new
+      result_mutex = Mutex.new
+      results = []
+
+      upload_block = proc do
+        call_count_mutex.synchronize { call_count += 1 }
+        upload_started << true
+        sleep(0.05)
+        :uploaded
+      end
+
+      leader = Thread.new do
+        result = described_class.send(:with_asset_upload_single_flight, ["server-hash"], &upload_block)
+        result_mutex.synchronize { results << result }
+      end
+      upload_started.pop
+      followers = Array.new(4) do
+        Thread.new do
+          result = described_class.send(:with_asset_upload_single_flight, ["server-hash"], &upload_block)
+          result_mutex.synchronize { results << result }
+        end
+      end
+
+      ([leader] + followers).each(&:join)
+
+      expect(call_count).to eq(1)
+      expect(results).to eq(Array.new(5, :uploaded))
+    end
+
+    it "releases followers with the leader error when upload work fails" do
+      upload_started = Queue.new
+      allow_failure = Queue.new
+      leader_errors = Queue.new
+      follower_errors = Queue.new
+      upload_error = StandardError.new("upload failed")
+
+      leader = Thread.new do
+        described_class.send(:with_asset_upload_single_flight, ["server-hash"]) do
+          upload_started << true
+          allow_failure.pop
+          raise upload_error
+        end
+      rescue StandardError => e
+        leader_errors << e
+      end
+
+      upload_started.pop
+      follower = Thread.new do
+        described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
+      rescue StandardError => e
+        follower_errors << e
+      end
+
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1
+      upload_assets_mutex = described_class.singleton_class.const_get(:UPLOAD_ASSETS_MUTEX)
+      loop do
+        waiter_count = upload_assets_mutex.synchronize do
+          described_class.send(:upload_assets_in_progress).values.first&.fetch(:waiters)&.length.to_i
+        end
+        break if waiter_count == 1
+
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+          raise "follower did not register for single-flight upload"
+        end
+
+        sleep 0.001
+      end
+
+      allow_failure << true
+
+      expect(leader.join(1)).to eq(leader)
+      expect(follower.join(1)).to eq(follower)
+      expect(leader_errors.pop).to be(upload_error)
+      expect(follower_errors.pop).to be(upload_error)
+    ensure
+      leader&.kill if leader&.alive?
+      follower&.kill if follower&.alive?
+    end
+
+    it "lets upload followers wait without blocking the fiber scheduler" do
+      require "async"
+
+      call_count = 0
+      results = []
+
+      Timeout.timeout(1) do
+        Async do |task|
+          upload_assets_mutex = described_class.singleton_class.const_get(:UPLOAD_ASSETS_MUTEX)
+
+          leader = task.async do
+            described_class.send(:with_asset_upload_single_flight, ["server-hash"]) do
+              call_count += 1
+              task.sleep(0.01)
+              :uploaded
+            end
+          end
+
+          loop do
+            upload_in_progress = upload_assets_mutex.synchronize do
+              described_class.send(:upload_assets_in_progress).any?
+            end
+            break if upload_in_progress
+
+            task.sleep(0.001)
+          end
+
+          follower = task.async do
+            described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
+          end
+
+          results << leader.wait
+          results << follower.wait
+        end
+      end
+
+      expect(call_count).to eq(1)
+      expect(results).to eq(%i[uploaded uploaded])
+    end
+
+    it "hashes copied asset contents once across concurrent key generation for the same file state" do
+      asset_path = "public/webpack/production/asset-manifest.json"
+      FileUtils.mkdir_p(File.dirname(asset_path))
+      File.write(asset_path, '{"asset":"one"}')
+
+      digest_calls = 0
+      digest_calls_mutex = Mutex.new
+      allow(Digest::SHA256).to receive(:file).and_wrap_original do |original_method, path|
+        digest_calls_mutex.synchronize { digest_calls += 1 }
+        sleep(0.05)
+        original_method.call(path)
+      end
+
+      threads = Array.new(5) do
+        Thread.new { described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]) }
+      end
+      keys = threads.map(&:value)
+
+      expect(keys.uniq.length).to eq(1)
+      expect(digest_calls).to eq(1)
+    end
+
+    it "keeps upload single-flight keys distinct when copied asset contents change" do
+      asset_path = "public/webpack/production/asset-manifest.json"
+      FileUtils.mkdir_p(File.dirname(asset_path))
+      File.write(asset_path, '{"asset":"one"}')
+
+      initial_key = described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path])
+
+      File.write(asset_path, '{"asset":"two","size":"changed"}')
+
+      expect(described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]))
+        .not_to eq(initial_key)
+    end
+  end
+
   describe "get_form_body_for_file" do
     let(:url_path) { "http://localhost:3035/webpack/development/server-bundle.js" }
 
@@ -348,6 +513,21 @@ describe ReactOnRailsPro::Request do
       described_class.reset_connection
 
       expect(described_class.send(:connection)).to eq(new_connection)
+    end
+
+    it "advances the renderer client generation on reset" do
+      old_connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      new_connection = instance_double(ReactOnRailsPro::RendererHttpClient)
+      generation_before_reset = ReactOnRailsPro::RendererHttpClient.client_generation
+
+      described_class.instance_variable_set(:@connection, old_connection)
+
+      allow(described_class).to receive(:create_connection).and_return(new_connection)
+      allow(old_connection).to receive(:close)
+
+      described_class.reset_connection
+
+      expect(ReactOnRailsPro::RendererHttpClient.client_generation).to eq(generation_before_reset + 1)
     end
 
     it "propagates close errors during reset" do

@@ -38,6 +38,14 @@ module ReactOnRailsPro
       def connect: (untyped remote_address, **untyped options) ?{ (untyped) -> untyped } -> untyped
     end
 
+    class MultipartBody
+      def <<: (untyped chunk) -> untyped
+
+      def read: () -> String?
+
+      def close: (?StandardError? error) -> untyped
+    end
+
     class Response
       attr_reader status: Integer?
 
@@ -58,12 +66,16 @@ module ReactOnRailsPro
 
     def self.split_url: (String url) -> [String, String]
 
+    def self.client_generation: () -> Integer
+
+    def self.bump_client_generation: () -> Integer
+
     def self.build_multipart_body: (
       Hash[untyped, untyped] form,
       ?boundary: String
-    ) -> [Array[[String, String]], String]
+    ) -> [Array[[String, String]], MultipartBody]
 
-    def self.build_form_body: (Hash[untyped, untyped] form) -> [Array[[String, String]], String]
+    def self.build_form_body: (Hash[untyped, untyped] form) -> [Array[[String, String]], MultipartBody | String]
 
     def initialize: (
       origin: String,
