@@ -308,7 +308,22 @@ module ReactOnRails
     def rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
       return true if rspack_major_version.positive?
 
-      rspack_version.to_s.match?(/\A<\s*v?#{MINIMUM_RSC_RSPACK_MAJOR}(?:\.0)?(?:\.0)?\z/o)
+      normalized_version = rsc_normalized_declared_package_version(rspack_version)
+      return normalized_version.split(".").first.to_i < MINIMUM_RSC_RSPACK_MAJOR if normalized_version
+
+      rsc_rspack_upper_bound_below_minimum?(rspack_version)
+    end
+
+    def rsc_rspack_upper_bound_below_minimum?(rspack_version)
+      upper_bound = rspack_version.to_s.strip.match(
+        /\A(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?\z/
+      )
+      return false unless upper_bound
+      return true if upper_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+
+      upper_bound[:operator] == "<" &&
+        upper_bound[:major].to_i == MINIMUM_RSC_RSPACK_MAJOR &&
+        [upper_bound[:minor], upper_bound[:patch]].compact.all? { |version_part| version_part.to_i.zero? }
     end
 
     def warn_undetermined_rsc_rspack_version(rspack_version)
