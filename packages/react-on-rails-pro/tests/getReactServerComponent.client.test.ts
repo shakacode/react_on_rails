@@ -31,6 +31,32 @@ const loadClientModule = async (createFromReadableStream = jest.fn()) => {
 };
 
 const fetchMock = fetch as jest.MockedFunction<typeof fetch>;
+const decoder = new TextDecoder();
+
+const readStreamText = async (stream: ReadableStream<Uint8Array>) => {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let done = false;
+
+  while (!done) {
+    // eslint-disable-next-line no-await-in-loop
+    const readResult = await reader.read();
+    done = readResult.done;
+    if (readResult.value) {
+      chunks.push(readResult.value);
+    }
+  }
+
+  const byteLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const combined = new Uint8Array(byteLength);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  });
+
+  return decoder.decode(combined);
+};
 
 const setDocumentReadyState = (readyState: DocumentReadyState) => {
   Object.defineProperty(document, 'readyState', {
@@ -129,6 +155,53 @@ describe('fetchRSC HTTP responses', () => {
         props: JSON.stringify(componentProps),
       })}`,
     );
+  });
+});
+
+describe('getReactServerComponent preloaded payload replay', () => {
+  afterEach(() => {
+    delete window.REACT_ON_RAILS_RSC_PAYLOADS;
+    delete window.REACT_ON_RAILS_RSC_ERRORS;
+    fetchMock.mockReset();
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.resetModules();
+  });
+
+  it('retains late streamed chunks so the same preloaded payload can be replayed after cache eviction', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { default: getReactServerComponent } = await loadClientModule(createFromReadableStream);
+    const { createEmbeddedPayloadKey } = await import('../src/utils.ts');
+    const originalReadyState = document.readyState;
+    const domNodeId = 'rsc-root';
+    const componentName = 'ReplayablePanel';
+    const componentProps = { selectedId: 1 };
+    const rscPayloadKey = createEmbeddedPayloadKey(componentName, componentProps, domNodeId);
+    const payloads = ['first'];
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [rscPayloadKey]: payloads,
+    };
+
+    setDocumentReadyState('loading');
+
+    try {
+      const getComponent = getReactServerComponent(domNodeId, {
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      } as RailsContext);
+      const firstRenderPromise = getComponent({ componentName, componentProps });
+      const pushResult = payloads.push('second', 'third');
+
+      setDocumentReadyState('complete');
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+
+      await expect(firstRenderPromise).resolves.toBe('firstsecondthird');
+      expect(pushResult).toBe(3);
+      expect([...payloads]).toEqual(['first', 'second', 'third']);
+      await expect(getComponent({ componentName, componentProps })).resolves.toBe('firstsecondthird');
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(createFromReadableStream).toHaveBeenCalledTimes(2);
+    } finally {
+      setDocumentReadyState(originalReadyState);
+    }
   });
 });
 
