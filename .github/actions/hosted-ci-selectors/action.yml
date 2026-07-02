@@ -62,7 +62,75 @@ runs:
           const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
           const isSameRepoPullRequest = !pullRequest || headRepoFullName === repoFullName;
           const isDependabotPullRequest = pullRequest?.user?.login === 'dependabot[bot]';
-          const canDispatchHostedCiForPullRequest = isSameRepoPullRequest && !isDependabotPullRequest;
+          const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+          const hostedStartCommands = new Set(['+ci-run-hosted', '+ci-force-full']);
+          const hostedStopCommands = new Set(['+ci-stop-hosted', '+ci-skip-hosted']);
+
+          function commandText(commentBody) {
+            return (commentBody || '')
+              .replace(/```[\s\S]*?```/g, '')
+              .replace(/~~~[\s\S]*?~~~/g, '')
+              .split('\n')
+              .filter((line) => !/^\s*>/.test(line))
+              .join('\n');
+          }
+
+          function parseCommand(commentBody) {
+            const match = commandText(commentBody)
+              .match(/(?:^|\n)\s*(\+ci-[a-z0-9][a-z0-9-]*)(?:[ \t]+([^\n]*))?/i);
+
+            return match?.[1]?.toLowerCase() || null;
+          }
+
+          function newerComment(comment, current) {
+            if (!current) {
+              return true;
+            }
+
+            const commentTime = Date.parse(comment.created_at || '');
+            const currentTime = Date.parse(current.created_at || '');
+            if (commentTime !== currentTime) {
+              return commentTime > currentTime;
+            }
+
+            return Number(comment.id || 0) > Number(current.id || 0);
+          }
+
+          async function hasTrustedDependabotHostedRequest() {
+            if (!pullRequest) {
+              return false;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pullRequest.number,
+              per_page: 100
+            });
+            let latestStart = null;
+            let latestStop = null;
+
+            for (const comment of comments) {
+              if (!trustedCommandAssociations.has(comment.author_association)) {
+                continue;
+              }
+
+              const command = parseCommand(comment.body);
+              if (hostedStartCommands.has(command) && newerComment(comment, latestStart)) {
+                latestStart = comment;
+              } else if (hostedStopCommands.has(command) && newerComment(comment, latestStop)) {
+                latestStop = comment;
+              }
+            }
+
+            return Boolean(latestStart && (!latestStop || newerComment(latestStart, latestStop)));
+          }
+
+          const trustedDependabotHostedRequest = isDependabotPullRequest ?
+            await hasTrustedDependabotHostedRequest() :
+            false;
+          const canDispatchHostedCiForPullRequest = isSameRepoPullRequest &&
+            (!isDependabotPullRequest || trustedDependabotHostedRequest);
           const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
           const isReleasePullRequest = releaseBranchPrefixes.some((prefix) => baseRef.startsWith(prefix));
           const isReleaseBranchPush = eventName === 'push' &&
