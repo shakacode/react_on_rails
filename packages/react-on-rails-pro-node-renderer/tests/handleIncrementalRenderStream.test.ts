@@ -516,6 +516,62 @@ describe('handleIncrementalRenderStream', () => {
       }
     });
 
+    it('does not wait for iterator return when stopping a suspended request read', async () => {
+      jest.useFakeTimers();
+
+      try {
+        const controlledStream = createControlledStream();
+        controlledStream.cancel.mockImplementation(() => new Promise(() => {}));
+        let stopReading = false;
+        let resolveStopReading: (() => void) | undefined;
+        const stopReadingPromise = new Promise<void>((resolve) => {
+          resolveStopReading = resolve;
+        });
+        const onRenderRequestReceived = jest.fn().mockResolvedValue({
+          response: createMockResponse(),
+          shouldContinue: true,
+        });
+        const onUpdateReceived = jest.fn().mockResolvedValue(undefined);
+        const onRequestEnded = jest.fn();
+
+        const renderPromise = handleIncrementalRenderStream({
+          request: { raw: controlledStream.raw },
+          onRenderRequestReceived,
+          onResponseStart: jest.fn(),
+          onUpdateReceived,
+          onRequestEnded,
+          getChunkTimeoutMs: () => Number.POSITIVE_INFINITY,
+          shouldStopReading: () => stopReading,
+          waitForStopReading: () => stopReadingPromise,
+        });
+        const renderOutcome = renderPromise.then(
+          () => 'resolved' as const,
+          (error: unknown) => error,
+        );
+
+        controlledStream.push(Buffer.from(`${JSON.stringify({ id: 1 })}\n`));
+        await flushMicrotasks();
+        expect(onRenderRequestReceived).toHaveBeenCalledTimes(1);
+
+        stopReading = true;
+        resolveStopReading?.();
+        const boundedOutcome = Promise.race([
+          renderOutcome,
+          new Promise<'timed-out'>((resolve) => {
+            setTimeout(() => resolve('timed-out'), 1);
+          }),
+        ]);
+        await jest.advanceTimersByTimeAsync(1);
+
+        await expect(boundedOutcome).resolves.toBe('resolved');
+        expect(onUpdateReceived).not.toHaveBeenCalled();
+        expect(onRequestEnded).toHaveBeenCalledTimes(1);
+        expect(controlledStream.cancel).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('throws StreamChunkTimeoutError when a chunk takes too long', async () => {
       const mockRequest = {
         raw: {

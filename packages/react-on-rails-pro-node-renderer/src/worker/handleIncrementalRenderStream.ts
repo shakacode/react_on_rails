@@ -42,11 +42,20 @@ async function* withChunkTimeout<T>(
   waitForStopReading?: () => Promise<void>,
 ): AsyncGenerator<T, void, undefined> {
   const asyncIterator = iterator[Symbol.asyncIterator]();
+  const stopIterator = () => {
+    try {
+      const returnPromise = asyncIterator.return?.();
+      if (returnPromise) {
+        void Promise.resolve(returnPromise).catch(() => undefined);
+      }
+    } catch {
+      // The caller has already decided to stop reading; cleanup failures should not keep the response open.
+    }
+  };
 
   while (true) {
     if (shouldStopReading()) {
-      // eslint-disable-next-line no-await-in-loop
-      await asyncIterator.return?.();
+      stopIterator();
       return;
     }
 
@@ -64,8 +73,7 @@ async function* withChunkTimeout<T>(
           : nextChunkPromise);
         if (result === 'stop-reading') {
           if (shouldStopReading()) {
-            // eslint-disable-next-line no-await-in-loop
-            await asyncIterator.return?.();
+            stopIterator();
             return;
           }
 
