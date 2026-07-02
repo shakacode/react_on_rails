@@ -96,6 +96,27 @@ module ReactOnRails
           expect(File.mtime(default_path)).not_to eq(ref_time)
           expect(File.mtime(translations_path)).not_to eq(ref_time)
         end
+
+        it "doesn't read or match the whole default file for current generated files" do
+          ref_time = Time.current + 1.minute
+          File.write(default_path, <<~JS)
+            const defaultLocale = "en";
+
+            const defaultMessages = {};
+
+            import { defineMessages } from "react-intl";
+
+            export { defaultMessages, defaultLocale };
+          JS
+          FileUtils.touch(translations_path, mtime: ref_time)
+          FileUtils.touch(default_path, mtime: ref_time)
+
+          expect(File).not_to receive(:read).with(default_path)
+
+          described_class.new
+          expect(File.mtime(default_path)).to eq(ref_time)
+          expect(File.mtime(translations_path)).to eq(ref_time)
+        end
       end
     end
 
