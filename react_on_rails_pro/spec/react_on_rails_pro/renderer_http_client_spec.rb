@@ -330,10 +330,15 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
   describe ".get" do
     it "does not force HTTP/2 for arbitrary dev-server asset URLs" do
-      response = described_class::Response.new(status: 200, body: ["asset"])
+      response = described_class::Response.new do |yielder, status_assigner|
+        status_assigner.call(200)
+        yielder.call("asset")
+      end
+      closed_response_status = nil
       client = instance_double(described_class, get: response)
 
       allow(described_class).to receive(:new).and_return(client)
+      allow(client).to receive(:close) { closed_response_status = response.status }
 
       expect(described_class.get("http://localhost:3035/packs/server.js", connect_timeout: 1, read_timeout: 2))
         .to be(response)
@@ -345,6 +350,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         read_timeout: 2,
         force_http2: false
       )
+      expect(closed_response_status).to eq(200)
     end
   end
 

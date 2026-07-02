@@ -367,13 +367,18 @@ module ReactOnRailsPro
       def get(url, connect_timeout:, read_timeout:)
         origin, path = split_url(url)
 
-        new(
+        client = new(
           origin:,
           pool_size: 1,
           connect_timeout:,
           read_timeout:,
           force_http2: false
-        ).get(path)
+        )
+        response = client.get(path)
+        response.body
+        response
+      ensure
+        client&.close
       end
 
       def split_url(url)
