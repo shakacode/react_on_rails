@@ -60,10 +60,6 @@ module ReactOnRailsPro
       @pull_requests = PullRequestQueue.new(@pushed_props) if pull_enabled
     end
 
-    def pull_enabled?
-      @pull_enabled
-    end
-
     # Sends an async prop to the Node renderer.
     # The prop value is JSON-serialized and sent as an NDJSON line.
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
