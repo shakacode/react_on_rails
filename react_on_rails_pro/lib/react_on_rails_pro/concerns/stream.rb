@@ -127,6 +127,8 @@ module ReactOnRailsPro
     end
 
     def restore_rsc_stream_observability_state(state)
+      return if state.nil?
+
       @react_on_rails_rsc_stream_observability = state[:enabled]
       @react_on_rails_rsc_stream_started_at = state[:started_at]
       @react_on_rails_rsc_stream_initial_chunk_bytes = state[:initial_chunk_bytes]
