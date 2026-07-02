@@ -83,6 +83,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Response-start send failures are reported during abandoned incremental renders**:
+  The Pro node renderer now observes and reports rejected response-start/send promises when
+  incremental render request handling stops early or errors after a response starts, while still
+  propagating those failures on clean stream completion. Fixes
+  [Issue 4364](https://github.com/shakacode/react_on_rails/issues/4364).
+  [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
