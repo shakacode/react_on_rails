@@ -34,7 +34,7 @@ import path from 'path';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import os from 'os';
-import formAutoContent from 'form-auto-content';
+import formAutoContent from './formAutoContent';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
