@@ -349,6 +349,20 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           allow(Open3).to receive(:capture3).and_return(["", "Cannot find module", status])
         end
 
+        def expect_rsc_rspack_boot_warning(detected_version)
+          allow(Rails.logger).to receive(:warn)
+
+          yield
+
+          expect(Rails.logger).to have_received(:warn).with(
+            a_string_including(
+              "[React on Rails] Could not verify @rspack/core >= v2 for RSC",
+              "(detected: #{detected_version})",
+              "react_on_rails:doctor"
+            )
+          )
+        end
+
         it "raises before boot when active Rspack is v1" do
           expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0") }
             .to raise_error(ReactOnRails::Error, /RSC with Rspack requires Rspack v2 or newer/)
@@ -366,19 +380,26 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <2\.0\.0})
         end
 
-        it "explains that unsupported npm ranges fail closed unless the installed package resolves to v2" do
+        it "warns and allows boot when the RSC Rspack version is undeterminable" do
+          allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
+
+          expect_rsc_rspack_boot_warning("^2") do
+            expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2") }
+              .not_to raise_error
+          end
+        end
+
+        it "warns and allows boot for unsupported npm ranges when the installed package cannot be resolved" do
           stub_failed_node_package_resolution
 
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: ">=2.0.0 <3.0.0"
-            )
-          end.to raise_error(ReactOnRails::Error) { |error|
-            expect(error.message).to include(
-              "React on Rails cannot statically verify, install dependencies so Node can resolve"
-            )
-          }
+          expect_rsc_rspack_boot_warning(">=2.0.0 <3.0.0") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: ">=2.0.0 <3.0.0"
+              )
+            end.not_to raise_error
+          end
         end
 
         it "uses the detected package manager in Rspack v2 fix instructions" do
@@ -406,23 +427,19 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           }
         end
 
-        it "includes missing @rspack/core in fix instructions when only a companion package is declared" do
+        it "warns and allows boot when only a companion Rspack package is declared" do
           stub_failed_node_package_resolution
 
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: nil,
-              rspack_package_versions: { "@rspack/cli" => "^1.6.0" },
-              package_manager: "npm@10.0.0"
-            )
-          end.to raise_error(ReactOnRails::Error) { |error|
-            aggregate_failures do
-              expect(error.message)
-                .to include("npm install --save-dev @rspack/core@^2 @rspack/cli@^2")
-              expect(error.message).not_to include("@rspack/dev-server")
-            end
-          }
+          expect_rsc_rspack_boot_warning("not found") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: nil,
+                rspack_package_versions: { "@rspack/cli" => "^1.6.0" },
+                package_manager: "npm@10.0.0"
+              )
+            end.not_to raise_error
+          end
         end
 
         it "falls back to yarn instructions when package manager detection fails" do
@@ -432,22 +449,33 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{yarn add --dev @rspack/core@\^2})
         end
 
-        it "raises before boot when active Rspack is missing @rspack/core" do
-          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
-            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        it "warns and allows boot when active Rspack is missing @rspack/core" do
+          expect_rsc_rspack_boot_warning("not found") do
+            expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: nil) }
+              .not_to raise_error
+          end
         end
 
-        it "fails clearly when package.json cannot be reread for the RSC Rspack version" do
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: "^1.6.0",
-              package_json_read_error_after_version_cache: true
-            )
-          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        it "warns and allows boot when package.json cannot be reread for the RSC Rspack version" do
+          expect_rsc_rspack_boot_warning("not found") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: "^1.6.0",
+                package_json_read_error_after_version_cache: true
+              )
+            end.not_to raise_error
+          end
         end
 
         it "allows active Rspack v2" do
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
+            .not_to raise_error
+        end
+
+        it "does not shell out to Node when package.json statically proves active Rspack v2" do
+          expect(Open3).not_to receive(:capture3)
+
           expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2.0.0") }
             .not_to raise_error
         end
@@ -529,34 +557,40 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
-        it "rejects path protocol specs even when the path contains a v2-looking version" do
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: "file:../rspack-2.0.0"
-            )
-          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: file:\.\./rspack-2\.0\.0})
+        it "warns and allows boot for path protocol specs even when the path contains a v2-looking version" do
+          expect_rsc_rspack_boot_warning("file:../rspack-2.0.0") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: "file:../rspack-2.0.0"
+              )
+            end.not_to raise_error
+          end
         end
 
-        it "rejects workspace protocol specs even when they contain a v2-looking version" do
+        it "warns and allows boot for workspace protocol specs even when they contain a v2-looking version" do
           stub_failed_node_package_resolution
 
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: "workspace:^2.0.0"
-            )
-          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: workspace:\^2\.0\.0})
+          expect_rsc_rspack_boot_warning("workspace:^2.0.0") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: "workspace:^2.0.0"
+              )
+            end.not_to raise_error
+          end
         end
 
-        it "does not treat peer dependencies as installed Rspack" do
-          expect do
-            validate_rsc_rspack_project(
-              assets_bundler: "rspack",
-              rspack_core_version: "^2.0.0",
-              dependency_field: "peerDependencies"
-            )
-          end.to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: not found})
+        it "warns and allows boot when @rspack/core is only declared as a peer dependency" do
+          expect_rsc_rspack_boot_warning("not found") do
+            expect do
+              validate_rsc_rspack_project(
+                assets_bundler: "rspack",
+                rspack_core_version: "^2.0.0",
+                dependency_field: "peerDependencies"
+              )
+            end.not_to raise_error
+          end
         end
 
         it "allows Rspack v1 when RSC is disabled" do

@@ -252,14 +252,28 @@ module ReactOnRails
       return unless rsc_support_enabled?
 
       rspack_version = detected_rspack_version_for_rsc
-      return if rspack_version && rsc_package_major_version(rspack_version) >= MINIMUM_RSC_RSPACK_MAJOR
+      rspack_major_version = rsc_package_major_version(rspack_version)
+      return if rspack_major_version >= MINIMUM_RSC_RSPACK_MAJOR
+      if rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+        raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+      end
 
-      raise ReactOnRails::Error, rsc_rspack_version_error(rspack_version)
+      warn_undetermined_rsc_rspack_version(rspack_version)
     end
 
     def detected_rspack_version_for_rsc
       package_root = File.dirname(node_package_version.package_json)
-      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || package_dependency_spec(RSC_RSPACK_PACKAGE)
+      flat_installed_version = rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
+      return flat_installed_version if flat_installed_version
+
+      declared_version = package_dependency_spec(RSC_RSPACK_PACKAGE)
+      declared_major_version = rsc_package_major_version(declared_version)
+      if declared_major_version.positive? ||
+         rsc_rspack_version_provably_incompatible?(declared_version, declared_major_version)
+        return declared_version
+      end
+
+      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || declared_version
     end
 
     def rsc_support_enabled?
@@ -288,6 +302,21 @@ module ReactOnRails
         error_prefix: "**ERROR** ReactOnRails:",
         include_doctor_recommendation: true,
         package_json_path: node_package_version.package_json
+      )
+    end
+
+    def rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+      return true if rspack_major_version.positive?
+
+      rspack_version.to_s.match?(/\A<\s*v?#{MINIMUM_RSC_RSPACK_MAJOR}(?:\.0)?(?:\.0)?\z/o)
+    end
+
+    def warn_undetermined_rsc_rspack_version(rspack_version)
+      detected_version = rspack_version || "not found"
+      Rails.logger&.warn(
+        "[React on Rails] Could not verify #{RSC_RSPACK_PACKAGE} >= v#{MINIMUM_RSC_RSPACK_MAJOR} for RSC " \
+        "(detected: #{detected_version}). Boot will continue; " \
+        "run bundle exec rake react_on_rails:doctor to verify before deploy."
       )
     end
 

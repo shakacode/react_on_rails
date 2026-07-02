@@ -88,6 +88,11 @@ module ReactOnRails
       version if version&.match?(/\A\d+\.\d+\.\d+/)
     end
 
+    def rsc_flat_installed_package_version(package_root, package_name)
+      version = rsc_flat_installed_package_json(package_root, package_name)&.fetch("version", nil)
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
+    end
+
     def rsc_installed_package_json(package_root, package_name, &)
       return nil unless valid_rsc_package_name?(package_name)
 
@@ -96,12 +101,27 @@ module ReactOnRails
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       # Limitation: a stale orphaned directory can still be read if Node resolution fails.
-      resolved_path = File.join(package_root, "node_modules", package_name, "package.json") if resolved_path.empty?
+      resolved_path = rsc_flat_installed_package_json_path(package_root, package_name) if resolved_path.empty?
       return nil unless File.exist?(resolved_path)
 
       JSON.parse(File.read(resolved_path))
     rescue StandardError
       nil
+    end
+
+    def rsc_flat_installed_package_json(package_root, package_name)
+      return nil unless valid_rsc_package_name?(package_name)
+
+      package_json_path = rsc_flat_installed_package_json_path(package_root, package_name)
+      return nil unless File.exist?(package_json_path)
+
+      JSON.parse(File.read(package_json_path))
+    rescue StandardError
+      nil
+    end
+
+    def rsc_flat_installed_package_json_path(package_root, package_name)
+      File.join(package_root, "node_modules", package_name, "package.json")
     end
 
     def rsc_support_enabled_config_value
