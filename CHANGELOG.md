@@ -83,6 +83,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
+  bypasses renders that use async props, so per-request async stream output cannot be replayed from
+  another request's cached stream. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
