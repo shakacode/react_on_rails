@@ -844,6 +844,51 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#create_render_options" do
+    let(:component_name) { "App" }
+
+    before do
+      helper.instance_variable_set(:@react_on_rails_rsc_stream_observability, true)
+    end
+
+    after do
+      helper.instance_variable_set(:@react_on_rails_rsc_stream_observability, false)
+    end
+
+    it "does not mutate a frozen options hash when store dependencies are supplied" do
+      options = {
+        store_dependencies: ["appStore"],
+        render_mode: :html_streaming
+      }.freeze
+
+      render_options = nil
+      expect do
+        render_options = helper.send(:create_render_options, component_name, options)
+      end.not_to raise_error
+
+      expect(render_options.internal_option(:rsc_stream_observability)).to be true
+      expect(options).not_to have_key(:rsc_stream_observability)
+    end
+
+    it "does not leak stream observability into a reused options hash" do
+      options = {
+        store_dependencies: ["appStore"],
+        render_mode: :html_streaming
+      }
+
+      render_options = helper.send(:create_render_options, component_name, options)
+
+      expect(render_options.internal_option(:rsc_stream_observability)).to be true
+      expect(options).not_to have_key(:rsc_stream_observability)
+
+      helper.instance_variable_set(:@react_on_rails_rsc_stream_observability, false)
+      render_options = helper.send(:create_render_options, component_name, options)
+
+      expect(render_options.internal_option(:rsc_stream_observability)).to be_nil
+      expect(options).not_to have_key(:rsc_stream_observability)
+    end
+  end
+
   describe "#server_render_js error serialization" do
     let(:runtime_available) do
       ExecJS.runtime&.available?
