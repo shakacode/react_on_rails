@@ -1426,7 +1426,9 @@ describe ReactOnRailsProHelper do
         <<~HTML
           <div id="#{component_name}-react-component-0">Static RSC HTML</div>
           <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"];(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]</script>
+          <script>(self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"]||={"hasErrors":true,"renderingError":{"message":"boom","stack":"stack trace"}}</script>
           <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</script>
+          <script>console.warn.apply(console, ["[SERVER] static cache warning"]);</script>
           <script type="application/json" data-react-on-rails-component="StaticRSC">{"value":"component prop mentions REACT_ON_RAILS_RSC_PAYLOADS"}</script>
           <script>window.ReactOnRailsReveal && window.ReactOnRailsReveal("#{component_name}")</script>
           <script src="/packs/generated/PublicPageClientEffects.js"></script>
@@ -1454,7 +1456,9 @@ describe ReactOnRailsProHelper do
 
         expect(result).to include("Static RSC HTML")
         expect(result).not_to include("delete (self.REACT_ON_RAILS_RSC_ERRORS")
+        expect(result).not_to include("renderingError")
         expect(result).not_to include(".push(\"flight chunk\")")
+        expect(result).not_to include("static cache warning")
         expect(result).to include("component prop mentions REACT_ON_RAILS_RSC_PAYLOADS")
         expect(result).to include("ReactOnRailsReveal")
         expect(result).to include("PublicPageClientEffects.js")
@@ -1637,7 +1641,7 @@ describe ReactOnRailsProHelper do
           cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize
         )
         expect(diagnostics.first[:rsc_payload]).to include(
-          bootstrap_script_count: 2,
+          bootstrap_script_count: 4,
           stripped: true
         )
         expect(diagnostics.first[:rsc_payload][:bootstrap_script_bytes]).to be_positive
@@ -1655,10 +1659,12 @@ describe ReactOnRailsProHelper do
       it "includes best-effort manifest asset and RSC client-reference diagnostics" do
         diagnostics = []
         client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        asset_paths = []
         asset_paths = [
-          Rails.root.join("public/packs-test/js/vendor-abc123.js"),
-          Rails.root.join("public/packs-test/js/public-page-effects.js"),
-          Rails.root.join("public/packs-test/css/public-page-effects.css")
+          custom_public_root.join("packs-test/js/vendor-abc123.js"),
+          custom_public_root.join("packs-test/js/public-page-effects.js"),
+          custom_public_root.join("packs-test/css/public-page-effects.css")
         ]
 
         FileUtils.mkdir_p(client_manifest_path.dirname)
@@ -1682,7 +1688,8 @@ describe ReactOnRailsProHelper do
         shakapacker_config = instance_double(
           Shakapacker::Configuration,
           integrity: { enabled: false },
-          public_output_path: Rails.root.join("public/packs-test")
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
         )
         shakapacker_instance = instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config)
         allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
@@ -1739,6 +1746,7 @@ describe ReactOnRailsProHelper do
       ensure
         FileUtils.rm_f(client_manifest_path)
         asset_paths.each { |asset_path| FileUtils.rm_f(asset_path) }
+        FileUtils.rm_rf(custom_public_root)
       end
     end
 

@@ -21,12 +21,11 @@ require "react_on_rails/helper"
 require "async/promise"
 require "digest"
 require "json"
+require "nokogiri"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
-  STATIC_RSC_PAYLOAD_SCRIPT_PATTERN =
-    %r{<script\b(?<attributes>[^>]*)>(?<body>(?:(?!</script>).)*)</script>}im
 
   def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
@@ -572,14 +571,17 @@ module ReactOnRailsProHelper
     raw_html = html.to_s
     stripped_script_count = 0
     stripped_script_bytes = 0
-    stripped_html = raw_html.gsub(STATIC_RSC_PAYLOAD_SCRIPT_PATTERN) do |script|
-      match = Regexp.last_match
-      next script unless static_rsc_payload_script?(match[:attributes], match[:body])
+    fragment = Nokogiri::HTML5.fragment(raw_html)
+
+    fragment.css("script").each do |script_node|
+      next unless static_rsc_payload_script?(script_node)
 
       stripped_script_count += 1
-      stripped_script_bytes += script.bytesize
-      ""
+      stripped_script_bytes += script_node.to_html.bytesize
+      script_node.remove
     end
+
+    stripped_html = fragment.to_html
 
     diagnostics&.merge!(
       raw_bytes: raw_html.bytesize,
@@ -590,21 +592,21 @@ module ReactOnRailsProHelper
     stripped_html.html_safe
   end
 
-  def static_rsc_payload_script?(attributes, body)
-    return false unless executable_script_type?(attributes)
+  def static_rsc_payload_script?(script_node)
+    return false unless executable_script_type?(script_node["type"])
 
-    stripped_body = body.to_s.strip
-    return false unless stripped_body.include?("self.REACT_ON_RAILS_RSC_PAYLOADS")
+    stripped_body = script_node.content.to_s.strip
 
     stripped_body.match?(/\Adelete\s*\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
-      stripped_body.match?(/\A\(\(\s*self\.REACT_ON_RAILS_RSC_PAYLOADS\b/)
+      stripped_body.match?(/\A\(\(\s*self\.REACT_ON_RAILS_RSC_PAYLOADS\b/) ||
+      stripped_body.match?(/\A\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
+      stripped_body.match?(/\Aconsole\.(?:error|info|log|warn)\.apply\(\s*console\s*,\s*\[\s*["']\[SERVER\]/)
   end
 
-  def executable_script_type?(attributes)
-    type_match = attributes.to_s.match(/\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i)
-    return true unless type_match
+  def executable_script_type?(script_type)
+    return true if script_type.blank?
 
-    script_type = (type_match[1] || type_match[2] || type_match[3]).to_s.downcase.strip
+    script_type = script_type.to_s.downcase.strip
     script_type.empty? ||
       script_type == "module" ||
       script_type.end_with?("javascript") ||
@@ -750,12 +752,27 @@ module ReactOnRailsProHelper
     clean_source_path = source_path.to_s.split(/[?#]/, 2).first
     return if clean_source_path.match?(%r{\A(?:[a-z][a-z\d+.-]*:)?//}i)
 
-    candidates = []
-    candidates << Rails.root.join("public", clean_source_path.delete_prefix("/"))
+    candidates = static_rsc_asset_path_candidates(clean_source_path)
     candidate = candidates.find { |path| File.file?(path) }
     File.size(candidate) if candidate
   rescue StandardError
     nil
+  end
+
+  def static_rsc_asset_path_candidates(clean_source_path)
+    relative_source_path = clean_source_path.delete_prefix("/")
+    shakapacker_config = current_shakapacker_instance.config
+    public_output_path = Pathname.new(shakapacker_config.public_output_path.to_s)
+    public_path = Pathname.new(shakapacker_config.public_path.to_s)
+    public_output_prefix = public_output_path.relative_path_from(public_path).to_s
+
+    [
+      public_output_path.join(relative_source_path.delete_prefix("#{public_output_prefix}/")),
+      public_path.join(relative_source_path),
+      Rails.root.join("public", relative_source_path)
+    ].uniq
+  rescue StandardError
+    [Rails.root.join("public", clean_source_path.delete_prefix("/"))]
   end
 
   def static_rsc_client_reference_diagnostics
