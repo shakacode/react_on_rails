@@ -168,6 +168,8 @@ if (searchTarget) {
 Keep accessibility and fallback behavior explicit:
 
 - Support keyboard activation, not only pointer clicks.
+- Make intent targets keyboard-focusable before hydration: use a real `button`/`a`, or add
+  `tabindex="0"` and an appropriate `role` to a non-interactive placeholder.
 - Preserve focus order and visible focus styles before and after hydration.
 - Provide a no-JS or slow-JS fallback for required flows, such as a normal form action or link.
 - Replay the first intent so the user does not need to click or type twice.
