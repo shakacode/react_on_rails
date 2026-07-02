@@ -5,7 +5,6 @@ module ReactOnRails
     def self.truthy_presence: (untyped obj) -> untyped
     def self.wrap_message: (String msg, ?Symbol color) -> String
     def self.object_to_boolean: (untyped value) -> bool
-    def self.server_rendering_is_enabled?: () -> bool
     def self.invoke_and_exit_if_failed: (String cmd, String failure_message) -> Array[String]
     def self.server_bundle_path_is_http?: () -> bool
     def self.bundle_js_file_path: (String bundle_name) -> String
@@ -20,8 +19,6 @@ module ReactOnRails
     def self.default_troubleshooting_section: () -> String
     def self.server_bundle_js_file_path: () -> String
     def self.running_on_windows?: () -> bool
-    def self.rails_version_less_than: (String version) -> bool
-    def self.rails_version_less_than_4_1_1?: () -> bool
     def self.source_path: () -> String
     def self.public_bundles_full_path: () -> String
     def self.generated_assets_full_path: () -> String

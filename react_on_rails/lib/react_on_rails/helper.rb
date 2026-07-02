@@ -1044,10 +1044,6 @@ module ReactOnRails
       result
     end
 
-    def replay_console_option(val)
-      val.nil? ? ReactOnRails.configuration.replay_console : val
-    end
-
     def in_mailer?
       return false unless defined?(controller)
       return false unless defined?(ActionMailer::Base)
