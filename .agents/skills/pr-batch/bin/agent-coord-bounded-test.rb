@@ -181,6 +181,47 @@ class AgentCoordBoundedTest < Minitest::Test
     end
   end
 
+  def test_timeout_replays_helper_output_before_killing_process_group
+    Dir.mktmpdir("agent-coord-bounded-test") do |dir|
+      helper_pid_file = File.join(dir, "helper.pid")
+      helper_pid = nil
+
+      with_fake_agent_coord(<<~RUBY, "AGENT_COORD_HELPER_PID" => helper_pid_file) do |env|
+        helper_code = <<~'HELPER'
+          trap("TERM") do
+            sleep 0.2
+            puts "helper stdout after TERM"
+            $stderr.puts "helper stderr after TERM"
+            $stdout.flush
+            $stderr.flush
+            exit! 0
+          end
+          File.write(ENV.fetch("AGENT_COORD_HELPER_PID"), Process.pid.to_s)
+          sleep 10
+        HELPER
+        helper_pid = Process.spawn({ "AGENT_COORD_HELPER_PID" => ENV.fetch("AGENT_COORD_HELPER_PID") },
+                                   #{RbConfig.ruby.dump}, "-e", helper_code)
+        Process.detach(helper_pid)
+        deadline = Time.now + 5
+        sleep 0.05 until File.size?(ENV.fetch("AGENT_COORD_HELPER_PID")) || Time.now >= deadline
+        sleep 10
+      RUBY
+        stdout, stderr, status = run_script(env, "--timeout", "1", "status")
+
+        assert_equal 124, status.exitstatus
+        assert_includes stdout, "helper stdout after TERM"
+        assert_includes stderr, "helper stderr after TERM"
+        assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
+        assert wait_until(timeout: 5) { File.size?(helper_pid_file) }, "fake helper did not start"
+
+        helper_pid = File.read(helper_pid_file).to_i
+        assert wait_until(timeout: 5) { !process_alive?(helper_pid) }, "helper survived process-group cleanup"
+      ensure
+        Process.kill("KILL", helper_pid) if helper_pid && process_alive?(helper_pid)
+      end
+    end
+  end
+
   def test_process_alive_treats_eperm_as_alive
     original_kill = Process.method(:kill)
     # This patches Process globally for the duration of the assertion; the
