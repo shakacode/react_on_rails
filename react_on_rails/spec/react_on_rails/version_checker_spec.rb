@@ -394,6 +394,44 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <1\.6\.0})
         end
 
+        it "allows Node-resolved Rspack v2 for open lower-bound ranges below v2" do
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(root, assets_bundler: "rspack", rspack_core_version: ">=1.6.0")
+            resolved_package_json = File.join(root, "resolved-packages/@rspack/core/package.json")
+            FileUtils.mkdir_p(File.dirname(resolved_package_json))
+            File.write(
+              resolved_package_json,
+              JSON.generate("name" => "@rspack/core", "version" => "2.1.0")
+            )
+            stub_rsc_rspack_project(root, rsc_enabled: true)
+            node_package_version = VersionChecker::NodePackageVersion.new(File.join(root, "package.json"))
+            status = instance_double(Process::Status, success?: true)
+            allow(Open3).to receive(:capture3)
+              .and_return(["#{resolved_package_json}\n", "", status])
+
+            expect { described_class.new(node_package_version).validate_version_and_package_compatibility! }
+              .not_to raise_error
+            expect(Open3).to have_received(:capture3).with(
+              "node",
+              "-e",
+              "console.log(require.resolve(process.argv[1] + '/package.json'))",
+              "@rspack/core",
+              chdir: root
+            )
+          end
+        end
+
+        it "rejects shorthand declared Rspack v1 ranges" do
+          stub_failed_node_package_resolution
+
+          aggregate_failures do
+            %w[^1 ~1 1].each do |rspack_core_version|
+              expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version:) }
+                .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: #{Regexp.escape(rspack_core_version)}})
+            end
+          end
+        end
+
         it "warns and allows boot when the RSC Rspack version is undeterminable" do
           allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
 

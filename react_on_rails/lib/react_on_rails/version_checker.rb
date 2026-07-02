@@ -266,14 +266,15 @@ module ReactOnRails
       flat_installed_version = rsc_flat_installed_package_version(package_root, RSC_RSPACK_PACKAGE)
       return flat_installed_version if flat_installed_version
 
-      declared_version = package_dependency_spec(RSC_RSPACK_PACKAGE)
-      declared_major_version = rsc_package_major_version(declared_version)
-      if declared_major_version.positive? ||
-         rsc_rspack_version_provably_incompatible?(declared_version, declared_major_version)
+      declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
+      declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
+      declared_major_version = rsc_package_major_version(declared_spec)
+      if declared_major_version >= MINIMUM_RSC_RSPACK_MAJOR ||
+         rsc_rspack_version_provably_incompatible?(declared_spec, declared_major_version)
         return declared_version
       end
 
-      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || declared_version
+      rsc_installed_package_version(package_root, RSC_RSPACK_PACKAGE) || declared_spec
     end
 
     def rsc_support_enabled?
@@ -293,7 +294,7 @@ module ReactOnRails
     end
 
     def package_dependency_spec(package_name)
-      rsc_declared_package_version(node_package_version.package_json, package_name)
+      rsc_declared_package_spec(node_package_version.package_json, package_name)
     end
 
     def rsc_rspack_version_error(rspack_version)
@@ -306,24 +307,48 @@ module ReactOnRails
     end
 
     def rsc_rspack_version_provably_incompatible?(rspack_version, rspack_major_version)
+      return false if rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
       return true if rspack_major_version.positive?
 
       normalized_version = rsc_normalized_declared_package_version(rspack_version)
       return normalized_version.split(".").first.to_i < MINIMUM_RSC_RSPACK_MAJOR if normalized_version
 
-      rsc_rspack_upper_bound_below_minimum?(rspack_version)
+      rsc_rspack_major_shorthand_below_minimum?(rspack_version) ||
+        rsc_rspack_upper_bound_below_minimum?(rspack_version)
+    end
+
+    def rsc_rspack_open_lower_bound_below_minimum?(rspack_version)
+      lower_bound = rspack_version.to_s.strip.match(
+        /\A>=?\s*v?(?<major>\d+)(?:\.\d+){0,2}(?:[-+][0-9A-Za-z.-]+)?\z/
+      )
+      return false unless lower_bound
+
+      lower_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+    end
+
+    def rsc_rspack_major_shorthand_below_minimum?(rspack_version)
+      shorthand = rspack_version.to_s.strip.match(
+        /\A[~^]?\s*v?(?<major>\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i
+      )
+      return false unless shorthand
+
+      shorthand[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
     end
 
     def rsc_rspack_upper_bound_below_minimum?(rspack_version)
-      upper_bound = rspack_version.to_s.strip.match(
-        /\A(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?\z/
-      )
-      return false unless upper_bound
-      return true if upper_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+      return false if rspack_version.to_s.include?("||")
 
-      upper_bound[:operator] == "<" &&
-        upper_bound[:major].to_i == MINIMUM_RSC_RSPACK_MAJOR &&
-        [upper_bound[:minor], upper_bound[:patch]].compact.all? { |version_part| version_part.to_i.zero? }
+      rspack_version.to_s.strip.split(/\s+/).any? do |candidate|
+        upper_bound = candidate.match(
+          /\A(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?\z/
+        )
+        next false unless upper_bound
+        next true if upper_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
+
+        upper_bound[:operator] == "<" &&
+          upper_bound[:major].to_i == MINIMUM_RSC_RSPACK_MAJOR &&
+          [upper_bound[:minor], upper_bound[:patch]].compact.all? { |part| part.to_i.zero? }
+      end
     end
 
     def warn_undetermined_rsc_rspack_version(rspack_version)
