@@ -155,7 +155,7 @@ class ReleaseFinish
     release_branch = "release/#{version}"
 
     section "Promote #{version} (runbook step 4)"
-    run_or_print("git", "fetch", @options.fetch(:remote))
+    fetch_remote!(@options.fetch(:remote))
     ensure_on_release_branch!(release_branch)
     ensure_clean_worktree!
 
@@ -269,7 +269,7 @@ class ReleaseFinish
     source = "#{remote}/#{release_branch}"
 
     section "Close out #{version} (runbook step 5)"
-    run_or_print("git", "fetch", remote)
+    fetch_remote!(remote)
     ensure_on_main!
     ensure_local_main_matches_remote!(remote)
     ensure_clean_worktree!
@@ -386,7 +386,7 @@ class ReleaseFinish
   # original release-branch commit identities, which are never ancestors of main
   # under the trunk-based -x model.)
   def ensure_forward_port_durable_on_remote!(remote)
-    run_or_print("git", "fetch", remote)
+    fetch_remote!(remote)
     remote_main = "#{remote}/main"
     local_main = git("rev-parse", "main").strip
     return if commit_reachable_from?(local_main, remote_main)
@@ -460,7 +460,17 @@ class ReleaseFinish
     return unless @options[:dry_run]
 
     puts
-    puts "DRY RUN: nothing was executed; no tags, pushes, releases, or branch deletions occurred."
+    puts "DRY RUN: no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed."
+  end
+
+  def fetch_remote!(remote)
+    # Fetch is read-only for the worktree and release branches, and the dry-run
+    # plan must resolve tags and remote-tracking refs from the same state as a
+    # real run.
+    puts "+ git fetch -- #{remote}"
+    return if system("git", "fetch", "--", remote)
+
+    raise GitError, "command failed: git fetch -- #{remote}"
   end
 
   # ---------------------------------------------------------------------------
