@@ -220,6 +220,44 @@ describe ReactOnRailsHelper do
       expect(links.first["crossorigin"]).to eq("anonymous")
     end
 
+    context "when Shakapacker does not expose integrity settings" do
+      let(:shakapacker_config) do
+        Object.new.tap do |config|
+          def config.nested_entries?
+            true
+          end
+        end
+      end
+
+      it "emits preload links without integrity attributes" do
+        allow(manifest).to receive(:lookup_pack_with_chunks!)
+          .with("generated/ModernComponent", type: :javascript)
+          .and_return([
+                        {
+                          "src" => "/packs/generated/ModernComponent-123.mjs",
+                          "integrity" => "sha384-modern"
+                        }
+                      ])
+        allow(manifest).to receive(:lookup_pack_with_chunks)
+          .with("generated/ModernComponent", type: :stylesheet)
+          .and_return([
+                        {
+                          "src" => "/packs/generated/ModernComponent-456.css",
+                          "integrity" => "sha384-style"
+                        }
+                      ])
+
+        links = preload_link_nodes(helper.react_on_rails_preload_links("modern_component"))
+
+        expect(links.map { |link| link["href"] }).to eq(
+          ["/packs/generated/ModernComponent-123.mjs", "/packs/generated/ModernComponent-456.css"]
+        )
+        expect(links.first["rel"]).to eq("modulepreload")
+        expect(links.first["crossorigin"]).to eq("anonymous")
+        expect(links.map { |link| link["integrity"] }).to eq([nil, nil])
+      end
+    end
+
     it "preserves configured crossorigin values on modulepreload tags without integrity" do
       allow(manifest).to receive(:lookup_pack_with_chunks!)
         .with("generated/ModernComponent", type: :javascript)

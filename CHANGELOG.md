@@ -94,6 +94,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
+  skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
+  `NoMethodError` while still emitting preload hints. Fixes
+  [Issue 4369](https://github.com/shakacode/react_on_rails/issues/4369).
+  [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
