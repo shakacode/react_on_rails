@@ -214,6 +214,11 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     // Early force-kill of workers that cannot drain (blocked event loop).
     // Their SIGKILL-induced exits complete the disconnect, which lets the
     // normal waitForWorkerExits path below finish the shutdown promptly.
+    // ACK means the worker accepted shutdown and disconnected itself from new
+    // requests; it may still be draining an active render. Keep ACKed workers
+    // alive until the hard deadline so graceful drain can finish. Deployments
+    // with shorter supervisor grace windows can still terminate the master
+    // before that hard deadline and should tune the supervisor window.
     const forceKillTimer = setTimeout(() => {
       forceKillSurvivingWorkers(workersAtShutdown, { skipAcknowledgedWorkers: true });
     }, SHUTDOWN_WORKER_FORCE_KILL_TIMEOUT_MS);
