@@ -254,7 +254,9 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(request.http_status).to eq(200)
     end
 
-    it "ignores propRequest control messages without a non-empty string propName" do
+    it "warns and ignores propRequest control messages without a non-empty string propName" do
+      logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(logger)
       emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
       invalid_missing_name = to_length_prefixed("", "messageType" => "propRequest")
       invalid_empty_name = to_length_prefixed("", "messageType" => "propRequest", "propName" => "")
@@ -267,6 +269,34 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       emitter.render_complete!
 
       expect(emitter.pull_requests.dequeue).to eq("users")
+      expect(emitter.pull_requests.dequeue).to be_nil
+      expect(logger).to have_received(:warn)
+        .with("[ReactOnRailsPro] Dropping propRequest control message: invalid propName.")
+        .exactly(3).times
+    end
+
+    it "warns when propRequest control messages arrive without an emitter" do
+      logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(logger)
+      response = mock_ok_response(to_length_prefixed("", "messageType" => "propRequest", "propName" => "users"))
+
+      yielded = []
+      request.send(:process_response_chunks, response) { |chunk| yielded << chunk }
+
+      expect(yielded).to be_empty
+      expect(logger).to have_received(:warn)
+        .with("[ReactOnRailsPro] Dropping propRequest control message: emitter unavailable.")
+        .once
+    end
+
+    it "closes pull request queues when renderComplete control messages arrive" do
+      emitter = ReactOnRailsPro::AsyncPropsEmitter.new("bundle-12345", StringIO.new, pull_enabled: true)
+      response = mock_ok_response(to_length_prefixed("", "messageType" => "renderComplete"))
+      request.instance_variable_set(:@emitter, emitter)
+
+      request.send(:process_response_chunks, response) { |_| nil }
+
+      expect(emitter.pull_requests).to be_closed
       expect(emitter.pull_requests.dequeue).to be_nil
     end
 

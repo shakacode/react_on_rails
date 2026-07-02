@@ -109,7 +109,7 @@ module ReactOnRailsPro
     end
   end
 
-  class StreamRequest
+  class StreamRequest # rubocop:disable Metrics/ClassLength
     MAX_PULL_PROP_NAME_LENGTH = 256
     # Keep aligned with ReactOnRails::LengthPrefixedParser::CONTROL_MESSAGE_TYPES,
     # which parses these same control frames from the shared wire format.
@@ -241,17 +241,31 @@ module ReactOnRailsPro
     end
 
     def route_control_message(parsed)
-      return unless @emitter
-
       case parsed["messageType"]
       when "propRequest"
-        prop_name = parsed["propName"]
-        @emitter.pull_requests&.enqueue(prop_name) if prop_name.is_a?(String) &&
-                                                      !prop_name.empty? &&
-                                                      prop_name.length <= MAX_PULL_PROP_NAME_LENGTH
+        route_prop_request(parsed)
       when "renderComplete"
-        @emitter.render_complete!
+        @emitter&.render_complete!
       end
+    end
+
+    def route_prop_request(parsed)
+      unless @emitter
+        Rails.logger.warn("[ReactOnRailsPro] Dropping propRequest control message: emitter unavailable.")
+        return
+      end
+
+      prop_name = parsed["propName"]
+      unless valid_pull_prop_name?(prop_name)
+        Rails.logger.warn("[ReactOnRailsPro] Dropping propRequest control message: invalid propName.")
+        return
+      end
+
+      @emitter.pull_requests&.enqueue(prop_name)
+    end
+
+    def valid_pull_prop_name?(prop_name)
+      prop_name.is_a?(String) && !prop_name.empty? && prop_name.length <= MAX_PULL_PROP_NAME_LENGTH
     end
 
     # Retrying after first chunk would duplicate content in the page.

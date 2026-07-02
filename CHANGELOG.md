@@ -89,6 +89,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Dropped pull-mode prop requests are logged**: Streaming SSR now warns when the Node
+  renderer sends a `propRequest` control frame without an emitter or with a missing, empty, or
+  oversized `propName`, making dropped pull-mode requests diagnosable while preserving valid
+  enqueue and `renderComplete` behavior. Fixes
+  [Issue 4314](https://github.com/shakacode/react_on_rails/issues/4314).
+  [PR 4352](https://github.com/shakacode/react_on_rails/pull/4352) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
   source-encoding magic comments or a UTF-8 default, and validates content before override-gem
