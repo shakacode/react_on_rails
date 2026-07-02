@@ -136,4 +136,49 @@ describe('async props protocol constants', () => {
 
     expect(sourceStream.destroyed).toBe(true);
   });
+
+  it('releases the execution context and destroys the started stream when pull catch-up throws', async () => {
+    const sourceStream = new PassThrough();
+    const releaseExecutionContext = jest.fn();
+    const sharedExecutionContext = new Map<string, unknown>([
+      [
+        ASYNC_PROPS_MANAGER_KEY,
+        {
+          catchUpPropRequests: () => {
+            throw new Error('pull catch-up exploded');
+          },
+        },
+      ],
+    ]);
+
+    jest.spyOn(handleRenderRequestModule, 'handleRenderRequest').mockResolvedValue({
+      response: {
+        headers: { 'Cache-Control': 'public, max-age=31536000' },
+        status: 200,
+        stream: sourceStream,
+      },
+      executionContext: {
+        sharedExecutionContext,
+        runInVM: jest.fn(),
+        release: releaseExecutionContext,
+      } as unknown as ExecutionContext,
+    });
+
+    const { response, sink } = await handleIncrementalRenderRequest({
+      firstRequestChunk: {
+        renderingRequest: 'ReactOnRails.dummy',
+        pullEnabled: true,
+      },
+      bundleTimestamp: 'pull-catch-up-regression',
+    });
+
+    expect(response).toEqual({
+      status: 500,
+      headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+      data: 'pull catch-up exploded',
+    });
+    expect(sink).toBeUndefined();
+    expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+    expect(sourceStream.destroyed).toBe(true);
+  });
 });
