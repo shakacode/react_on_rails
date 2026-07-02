@@ -265,7 +265,518 @@ function stylesheetTagsForRSCClientChunks(
   return stylesheetTags;
 }
 
-function splitIncompleteHtmlTagTail(htmlString: string) {
+// Retain containers where injected payload scripts would not execute until after the closing tag.
+const RAW_TEXT_TAG_NAMES = [
+  'iframe',
+  'noembed',
+  'noframes',
+  'noscript',
+  'script',
+  'style',
+  'template',
+  'textarea',
+  'title',
+  'xmp',
+];
+
+const RAW_TEXT_CLOSING_TAG_PATTERNS = new Map(
+  RAW_TEXT_TAG_NAMES.map((tagName) => [tagName, new RegExp(`</${tagName}(?=[\\s>])[^>]*>`, 'gi')]),
+);
+const RAW_TEXT_TAG_NAME_SET = new Set(RAW_TEXT_TAG_NAMES);
+const SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN = /<script(?=[\s>/])/gi;
+const CDATA_OPEN = '<![CDATA[';
+const CDATA_CLOSE = ']]>';
+
+type TemplateIgnoredTailScanState =
+  | { kind: 'comment' }
+  | { kind: 'cdata' }
+  | {
+      kind: 'rawText';
+      tagName: string;
+    };
+
+type RetainedIncompleteHtmlTailScanState =
+  | { kind: 'comment'; closingSearchStart: number }
+  | { kind: 'cdata'; closingSearchStart: number }
+  | { kind: 'rawText'; tagName: string; closingSearchStart: number }
+  | {
+      kind: 'template';
+      closingSearchStart: number;
+      depth: number;
+      ignoredTailScanState?: TemplateIgnoredTailScanState;
+    };
+
+type SplitIncompleteHtmlTailResult = {
+  completeHtml: string;
+  incompleteHtmlTagTail: string;
+  incompleteHtmlTailScanState?: RetainedIncompleteHtmlTailScanState;
+};
+
+type ScriptDataState = 'normal' | 'escaped' | 'doubleEscaped';
+
+function findHtmlTagEnd(htmlString: string, tagStart: number) {
+  let quote: string | undefined;
+
+  for (let index = tagStart + 1; index < htmlString.length; index += 1) {
+    const character = htmlString[index];
+    if (quote) {
+      if (character === quote) quote = undefined;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '>') {
+      return index + 1;
+    }
+  }
+
+  return undefined;
+}
+
+function parseHtmlTag(htmlString: string, tagStart: number, tagEnd: number) {
+  const tag = htmlString.slice(tagStart, tagEnd);
+  const tagMatch = tag.match(/^<\s*(\/)?\s*([a-z][\w:-]*)(?=[\s>/])/i);
+  if (!tagMatch) return undefined;
+
+  return {
+    isClosingTag: tagMatch[1] === '/',
+    tagName: tagMatch[2].toLowerCase(),
+  };
+}
+
+function findScriptDoubleEscapeOpenIndex(htmlString: string, startIndex: number) {
+  SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.lastIndex = startIndex;
+  const match = SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.exec(htmlString);
+  return match ? match.index : -1;
+}
+
+function updateScriptDataState(segment: string, initialState: ScriptDataState): ScriptDataState {
+  let state = initialState;
+  let searchIndex = 0;
+
+  while (searchIndex < segment.length) {
+    if (state === 'normal') {
+      const escapedStart = segment.indexOf('<!--', searchIndex);
+      if (escapedStart === -1) break;
+
+      state = 'escaped';
+      searchIndex = escapedStart + 4;
+    } else if (state === 'escaped') {
+      const escapedEnd = segment.indexOf('-->', searchIndex);
+      const doubleEscapeStart = findScriptDoubleEscapeOpenIndex(segment, searchIndex);
+
+      if (escapedEnd !== -1 && (doubleEscapeStart === -1 || escapedEnd < doubleEscapeStart)) {
+        state = 'normal';
+        searchIndex = escapedEnd + 3;
+      } else if (doubleEscapeStart !== -1) {
+        state = 'doubleEscaped';
+        searchIndex = SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.lastIndex;
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return state;
+}
+
+function findScriptClosingTagEnd(htmlString: string, startIndex: number) {
+  const closingTagPattern = RAW_TEXT_CLOSING_TAG_PATTERNS.get('script');
+  if (!closingTagPattern) return undefined;
+
+  let contentScanStart = startIndex;
+  let scriptDataState: ScriptDataState = 'normal';
+  closingTagPattern.lastIndex = startIndex;
+
+  for (
+    let closingTagMatch = closingTagPattern.exec(htmlString);
+    closingTagMatch;
+    closingTagMatch = closingTagPattern.exec(htmlString)
+  ) {
+    scriptDataState = updateScriptDataState(
+      htmlString.slice(contentScanStart, closingTagMatch.index),
+      scriptDataState,
+    );
+
+    if (scriptDataState === 'doubleEscaped') {
+      scriptDataState = 'escaped';
+      contentScanStart = closingTagPattern.lastIndex;
+    } else {
+      return closingTagPattern.lastIndex;
+    }
+  }
+
+  return undefined;
+}
+
+function findRawTextClosingTagEnd(htmlString: string, tagName: string, startIndex: number) {
+  if (tagName === 'script') return findScriptClosingTagEnd(htmlString, startIndex);
+
+  const closingTagPattern = RAW_TEXT_CLOSING_TAG_PATTERNS.get(tagName);
+  if (!closingTagPattern) return undefined;
+
+  closingTagPattern.lastIndex = startIndex;
+  const closingTagMatch = closingTagPattern.exec(htmlString);
+  return closingTagMatch ? closingTagPattern.lastIndex : undefined;
+}
+
+function findCommentClosingTagSearchStart(htmlString: string, searchStart: number) {
+  return Math.max(searchStart, htmlString.length - 2);
+}
+
+function findCdataClosingTagSearchStart(htmlString: string, searchStart: number) {
+  return Math.max(searchStart, htmlString.length - (CDATA_CLOSE.length - 1));
+}
+
+function findRawTextClosingTagSearchStart(htmlString: string, tagName: string, searchStart: number) {
+  if (tagName === 'script') return searchStart;
+
+  const closingTagPrefixPattern = new RegExp(`</${escapeRegExpLiteral(tagName)}(?=[\\s>])`, 'gi');
+  closingTagPrefixPattern.lastIndex = searchStart;
+  let closingTagPrefixMatch = closingTagPrefixPattern.exec(htmlString);
+  let lastClosingTagPrefixStart: number | undefined;
+  while (closingTagPrefixMatch) {
+    lastClosingTagPrefixStart = closingTagPrefixMatch.index;
+    closingTagPrefixMatch = closingTagPrefixPattern.exec(htmlString);
+  }
+
+  if (lastClosingTagPrefixStart !== undefined) return lastClosingTagPrefixStart;
+
+  return Math.max(searchStart, htmlString.length - `</${tagName}`.length);
+}
+
+function scanTemplateTail(
+  htmlString: string,
+  startIndex: number,
+  initialDepth = 1,
+  initialIgnoredTailScanState?: TemplateIgnoredTailScanState,
+) {
+  let depth = initialDepth;
+  let searchIndex = startIndex;
+  let closingSearchStart = startIndex;
+  let ignoredTailScanState = initialIgnoredTailScanState;
+
+  while (searchIndex < htmlString.length) {
+    if (ignoredTailScanState?.kind === 'comment') {
+      const commentEnd = htmlString.indexOf('-->', searchIndex);
+      if (commentEnd === -1) {
+        return {
+          closingSearchStart: findCommentClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = commentEnd + 3;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'cdata') {
+      const cdataEnd = htmlString.indexOf(CDATA_CLOSE, searchIndex);
+      if (cdataEnd === -1) {
+        return {
+          closingSearchStart: findCdataClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = cdataEnd + CDATA_CLOSE.length;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'rawText') {
+      const closingTagEnd = findRawTextClosingTagEnd(htmlString, ignoredTailScanState.tagName, searchIndex);
+      if (closingTagEnd === undefined) {
+        return {
+          closingSearchStart: findRawTextClosingTagSearchStart(
+            htmlString,
+            ignoredTailScanState.tagName,
+            searchIndex,
+          ),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else {
+      const tagStart = htmlString.indexOf('<', searchIndex);
+      if (tagStart === -1) break;
+
+      if (htmlString.startsWith('<!--', tagStart)) {
+        const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+        if (commentEnd === -1) {
+          return {
+            closingSearchStart: findCommentClosingTagSearchStart(htmlString, tagStart + 4),
+            depth,
+            ignoredTailScanState: { kind: 'comment' as const },
+          };
+        }
+
+        searchIndex = commentEnd + 3;
+        closingSearchStart = searchIndex;
+      } else if (htmlString.startsWith(CDATA_OPEN, tagStart)) {
+        const cdataEnd = htmlString.indexOf(CDATA_CLOSE, tagStart + CDATA_OPEN.length);
+        if (cdataEnd === -1) {
+          return {
+            closingSearchStart: findCdataClosingTagSearchStart(htmlString, tagStart + CDATA_OPEN.length),
+            depth,
+            ignoredTailScanState: { kind: 'cdata' as const },
+          };
+        }
+
+        searchIndex = cdataEnd + CDATA_CLOSE.length;
+        closingSearchStart = searchIndex;
+      } else {
+        const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+        if (tagEnd === undefined) {
+          return { closingSearchStart: tagStart, depth };
+        }
+
+        const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+        if (!parsedTag) {
+          searchIndex = tagStart + 1;
+        } else if (parsedTag.tagName === 'template') {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+          depth += parsedTag.isClosingTag ? -1 : 1;
+          if (depth === 0) {
+            return { closingTagEnd: searchIndex, closingSearchStart, depth };
+          }
+        } else if (!parsedTag.isClosingTag && RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+          const closingTagEnd = findRawTextClosingTagEnd(htmlString, parsedTag.tagName, tagEnd);
+          if (closingTagEnd === undefined) {
+            return {
+              closingSearchStart: findRawTextClosingTagSearchStart(htmlString, parsedTag.tagName, tagEnd),
+              depth,
+              ignoredTailScanState: { kind: 'rawText' as const, tagName: parsedTag.tagName },
+            };
+          }
+
+          searchIndex = closingTagEnd;
+          closingSearchStart = searchIndex;
+        } else {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+        }
+      }
+    }
+  }
+
+  return { closingSearchStart, depth, ignoredTailScanState };
+}
+
+function findUnclosedRawTextElementTail(htmlString: string) {
+  let searchIndex = 0;
+
+  while (searchIndex < htmlString.length) {
+    const tagStart = htmlString.indexOf('<', searchIndex);
+    if (tagStart === -1) return undefined;
+
+    if (htmlString.startsWith('<!--', tagStart)) {
+      const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+      if (commentEnd === -1) {
+        return {
+          start: tagStart,
+          scanState: {
+            kind: 'comment' as const,
+            closingSearchStart: findCommentClosingTagSearchStart(htmlString, tagStart + 4) - tagStart,
+          },
+        };
+      }
+
+      searchIndex = commentEnd + 3;
+    } else if (htmlString.startsWith(CDATA_OPEN, tagStart)) {
+      const cdataEnd = htmlString.indexOf(CDATA_CLOSE, tagStart + CDATA_OPEN.length);
+      if (cdataEnd === -1) {
+        return {
+          start: tagStart,
+          scanState: {
+            kind: 'cdata' as const,
+            closingSearchStart:
+              findCdataClosingTagSearchStart(htmlString, tagStart + CDATA_OPEN.length) - tagStart,
+          },
+        };
+      }
+
+      searchIndex = cdataEnd + CDATA_CLOSE.length;
+    } else {
+      const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+      if (tagEnd === undefined) return undefined;
+
+      const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+      if (!parsedTag) {
+        searchIndex = tagStart + 1;
+      } else if (parsedTag.isClosingTag || !RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+        searchIndex = tagEnd;
+      } else if (parsedTag.tagName === 'template') {
+        const templateScan = scanTemplateTail(htmlString, tagEnd);
+        if (templateScan.closingTagEnd === undefined) {
+          return {
+            start: tagStart,
+            scanState: {
+              kind: 'template' as const,
+              closingSearchStart: templateScan.closingSearchStart - tagStart,
+              depth: templateScan.depth,
+              ignoredTailScanState: templateScan.ignoredTailScanState,
+            },
+          };
+        }
+
+        searchIndex = templateScan.closingTagEnd;
+      } else {
+        const closingTagEnd = findRawTextClosingTagEnd(htmlString, parsedTag.tagName, tagEnd);
+        if (closingTagEnd === undefined) {
+          return {
+            start: tagStart,
+            scanState: {
+              kind: 'rawText' as const,
+              tagName: parsedTag.tagName,
+              closingSearchStart:
+                findRawTextClosingTagSearchStart(htmlString, parsedTag.tagName, tagEnd) - tagStart,
+            },
+          };
+        }
+
+        searchIndex = closingTagEnd;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function splitNewUnclosedRawTextElementTail(htmlString: string): SplitIncompleteHtmlTailResult | undefined {
+  const rawTextElementTail = findUnclosedRawTextElementTail(htmlString);
+  if (rawTextElementTail === undefined) return undefined;
+
+  return {
+    completeHtml: htmlString.slice(0, rawTextElementTail.start),
+    incompleteHtmlTagTail: htmlString.slice(rawTextElementTail.start),
+    incompleteHtmlTailScanState: rawTextElementTail.scanState,
+  };
+}
+
+function splitAfterClosedRetainedRawTextOrCommentTail(htmlString: string, closingEnd: number) {
+  const suffix = htmlString.slice(closingEnd);
+  const suffixTail = splitNewUnclosedRawTextElementTail(suffix);
+  if (!suffixTail) {
+    return {
+      completeHtml: htmlString,
+      incompleteHtmlTagTail: '',
+    };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, closingEnd) + suffixTail.completeHtml,
+    incompleteHtmlTagTail: suffixTail.incompleteHtmlTagTail,
+    incompleteHtmlTailScanState: suffixTail.incompleteHtmlTailScanState,
+  };
+}
+
+function splitRetainedUnclosedRawTextOrCommentTail(
+  htmlString: string,
+  retainedTailScanState: RetainedIncompleteHtmlTailScanState,
+): SplitIncompleteHtmlTailResult | undefined {
+  if (retainedTailScanState.kind === 'comment') {
+    const commentEnd = htmlString.indexOf('-->', retainedTailScanState.closingSearchStart);
+    if (commentEnd === -1) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'comment',
+          closingSearchStart: findCommentClosingTagSearchStart(
+            htmlString,
+            retainedTailScanState.closingSearchStart,
+          ),
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, commentEnd + 3);
+  }
+
+  if (retainedTailScanState.kind === 'cdata') {
+    const cdataEnd = htmlString.indexOf(CDATA_CLOSE, retainedTailScanState.closingSearchStart);
+    if (cdataEnd === -1) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'cdata',
+          closingSearchStart: findCdataClosingTagSearchStart(
+            htmlString,
+            retainedTailScanState.closingSearchStart,
+          ),
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, cdataEnd + CDATA_CLOSE.length);
+  }
+
+  if (retainedTailScanState.kind === 'template') {
+    const templateScan = scanTemplateTail(
+      htmlString,
+      retainedTailScanState.closingSearchStart,
+      retainedTailScanState.depth,
+      retainedTailScanState.ignoredTailScanState,
+    );
+    if (templateScan.closingTagEnd === undefined) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'template',
+          closingSearchStart: templateScan.closingSearchStart,
+          depth: templateScan.depth,
+          ignoredTailScanState: templateScan.ignoredTailScanState,
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, templateScan.closingTagEnd);
+  }
+
+  const closingTagEnd = findRawTextClosingTagEnd(
+    htmlString,
+    retainedTailScanState.tagName,
+    retainedTailScanState.closingSearchStart,
+  );
+  if (closingTagEnd === undefined) {
+    return {
+      completeHtml: '',
+      incompleteHtmlTagTail: htmlString,
+      incompleteHtmlTailScanState: {
+        kind: 'rawText',
+        tagName: retainedTailScanState.tagName,
+        closingSearchStart: findRawTextClosingTagSearchStart(
+          htmlString,
+          retainedTailScanState.tagName,
+          retainedTailScanState.closingSearchStart,
+        ),
+      },
+    };
+  }
+
+  return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, closingTagEnd);
+}
+
+function splitUnclosedRawTextElementTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+): SplitIncompleteHtmlTailResult | undefined {
+  if (retainedTailScanState) {
+    const retainedTail = splitRetainedUnclosedRawTextOrCommentTail(htmlString, retainedTailScanState);
+    if (retainedTail) return retainedTail;
+  }
+
+  return splitNewUnclosedRawTextElementTail(htmlString);
+}
+
+function findTrailingIncompleteHtmlTagStart(htmlString: string) {
   // Streaming renderer output is expected to be well-formed HTML where bare "<"
   // characters are tag starts. Observability mode holds any trailing incomplete
   // tag so flush marks never split a tag boundary.
@@ -273,18 +784,70 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
   // Application inline scripts that stream a bare "<" operator across chunks are
   // outside this guard's assumptions.
-  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastTagStart = htmlString.lastIndexOf('<');
+  let searchIndex = 0;
+  while (searchIndex < htmlString.length) {
+    const tagStart = htmlString.indexOf('<', searchIndex);
+    if (tagStart === -1) return undefined;
 
-  // The streamed payload is well-formed HTML, so a trailing "<" means a split tag rather than text content.
-  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
-    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+    if (htmlString.startsWith('<!--', tagStart)) {
+      const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+      if (commentEnd === -1) return tagStart;
+
+      searchIndex = commentEnd + 3;
+    } else if (htmlString.startsWith(CDATA_OPEN, tagStart)) {
+      const cdataEnd = htmlString.indexOf(CDATA_CLOSE, tagStart + CDATA_OPEN.length);
+      if (cdataEnd === -1) return tagStart;
+
+      searchIndex = cdataEnd + CDATA_CLOSE.length;
+    } else {
+      const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+      if (tagEnd === undefined) return tagStart;
+
+      const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+      if (parsedTag && !parsedTag.isClosingTag && RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+        if (parsedTag.tagName === 'template') {
+          const templateScan = scanTemplateTail(htmlString, tagEnd);
+          if (templateScan.closingTagEnd === undefined) return tagStart;
+
+          searchIndex = templateScan.closingTagEnd;
+        } else {
+          const closingTagEnd = findRawTextClosingTagEnd(htmlString, parsedTag.tagName, tagEnd);
+          if (closingTagEnd === undefined) return tagStart;
+
+          searchIndex = closingTagEnd;
+        }
+      } else {
+        searchIndex = tagEnd;
+      }
+    }
   }
 
+  return undefined;
+}
+
+function splitTrailingIncompleteHtmlTagTail(htmlString: string): SplitIncompleteHtmlTailResult {
+  const incompleteTagStart = findTrailingIncompleteHtmlTagStart(htmlString);
+  if (incompleteTagStart === undefined) return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+
+  const incompleteHtmlTagTail = htmlString.slice(incompleteTagStart);
   return {
-    completeHtml: htmlString.slice(0, lastTagStart),
-    incompleteHtmlTagTail: htmlString.slice(lastTagStart),
+    completeHtml: htmlString.slice(0, incompleteTagStart),
+    incompleteHtmlTagTail,
   };
+}
+
+function splitIncompleteHtmlTagTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
+  const rawTextTail = splitUnclosedRawTextElementTail(htmlString, retainedTailScanState);
+  if (rawTextTail) {
+    if (rawTextTail.incompleteHtmlTagTail) return rawTextTail;
+
+    return splitTrailingIncompleteHtmlTagTail(rawTextTail.completeHtml);
+  }
+
+  return splitTrailingIncompleteHtmlTagTail(htmlString);
 }
 
 const LINK_TAG_PREFIX = '<link';
@@ -297,15 +860,14 @@ function isLinkTagTail(normalizedTail: string) {
   return LINK_TAG_BOUNDARIES.has(normalizedTail.charAt(LINK_TAG_PREFIX.length));
 }
 
-function splitIncompleteLinkTagTail(htmlString: string) {
-  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastTagStart = htmlString.lastIndexOf('<');
+function splitIncompleteLinkTagTail(htmlString: string): SplitIncompleteHtmlTailResult {
+  const incompleteTagStart = findTrailingIncompleteHtmlTagStart(htmlString);
 
-  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+  if (incompleteTagStart === undefined) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
-  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
+  const incompleteHtmlTagTail = htmlString.slice(incompleteTagStart);
   const normalizedTail = incompleteHtmlTagTail.toLowerCase();
 
   if (!isLinkTagTail(normalizedTail)) {
@@ -313,9 +875,23 @@ function splitIncompleteLinkTagTail(htmlString: string) {
   }
 
   return {
-    completeHtml: htmlString.slice(0, lastTagStart),
+    completeHtml: htmlString.slice(0, incompleteTagStart),
     incompleteHtmlTagTail,
   };
+}
+
+function splitIncompleteLinkOrRawTextTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
+  const rawTextTail = splitUnclosedRawTextElementTail(htmlString, retainedTailScanState);
+  if (rawTextTail) {
+    if (rawTextTail.incompleteHtmlTagTail) return rawTextTail;
+
+    return splitIncompleteLinkTagTail(rawTextTail.completeHtml);
+  }
+
+  return splitIncompleteLinkTagTail(htmlString);
 }
 
 type IncompleteHtmlTailMode = 'none' | 'link' | 'tag';
@@ -343,7 +919,41 @@ function promoteStylesheetPreloadTag(linkTag: string) {
   return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
 }
 
-function hasIncompleteUTF8Tail(buffer: Buffer) {
+function utf8ContinuationByteCount(leadByte: number) {
+  if (leadByte >= 0xc2 && leadByte <= 0xdf) return 1;
+  if (leadByte >= 0xe0 && leadByte <= 0xef) return 2;
+  if (leadByte >= 0xf0 && leadByte <= 0xf4) return 3;
+
+  return undefined;
+}
+
+function findPreviousIncompleteUTF8TailStartIndex(buffer: Buffer, tailStart: number) {
+  let previousLeadByteIndex = tailStart - 1;
+  let continuationBytes = 0;
+
+  while (
+    previousLeadByteIndex >= 0 &&
+    buffer[previousLeadByteIndex] >= 0x80 &&
+    buffer[previousLeadByteIndex] <= 0xbf
+  ) {
+    continuationBytes += 1;
+    previousLeadByteIndex -= 1;
+  }
+
+  if (previousLeadByteIndex < 0) {
+    return continuationBytes > 0 ? 0 : undefined;
+  }
+
+  const leadByte = buffer[previousLeadByteIndex];
+  if (leadByte <= 0x7f) return undefined;
+
+  const expectedContinuationBytes = utf8ContinuationByteCount(leadByte);
+  if (expectedContinuationBytes === undefined) return undefined;
+
+  return continuationBytes < expectedContinuationBytes ? previousLeadByteIndex : undefined;
+}
+
+function findIncompleteUTF8TailStartIndex(buffer: Buffer) {
   let continuationBytes = 0;
   let leadByteIndex = buffer.length - 1;
 
@@ -353,50 +963,84 @@ function hasIncompleteUTF8Tail(buffer: Buffer) {
   }
 
   if (leadByteIndex < 0) {
-    return continuationBytes > 0;
+    return continuationBytes > 0 ? 0 : undefined;
   }
 
   const leadByte = buffer[leadByteIndex];
-  if (leadByte <= 0x7f) return false;
+  if (leadByte <= 0x7f) return undefined;
 
-  let expectedContinuationBytes = 0;
-  if (leadByte >= 0xc2 && leadByte <= 0xdf) {
-    expectedContinuationBytes = 1;
-  } else if (leadByte >= 0xe0 && leadByte <= 0xef) {
-    expectedContinuationBytes = 2;
-  } else if (leadByte >= 0xf0 && leadByte <= 0xf4) {
-    expectedContinuationBytes = 3;
-  } else {
-    return false;
+  const expectedContinuationBytes = utf8ContinuationByteCount(leadByte);
+  if (expectedContinuationBytes === undefined) return undefined;
+
+  if (continuationBytes >= expectedContinuationBytes) return undefined;
+
+  let tailStart = leadByteIndex;
+  let previousTailStart = findPreviousIncompleteUTF8TailStartIndex(buffer, tailStart);
+  while (previousTailStart !== undefined) {
+    tailStart = previousTailStart;
+    previousTailStart = findPreviousIncompleteUTF8TailStartIndex(buffer, tailStart);
   }
 
-  return continuationBytes < expectedContinuationBytes;
+  return tailStart;
 }
 
-function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMode: IncompleteHtmlTailMode) {
-  if (incompleteHtmlTailMode !== 'none' && hasIncompleteUTF8Tail(html)) {
-    return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
+function applyStreamedStylesheetPreloadGating(
+  html: Buffer,
+  incompleteHtmlTailMode: IncompleteHtmlTailMode,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
+  let stringSafeHtmlBuffer = html;
+  let incompleteUTF8TailBuffer: Buffer = Buffer.alloc(0);
+  if (incompleteHtmlTailMode !== 'none') {
+    const incompleteUTF8TailStartIndex = findIncompleteUTF8TailStartIndex(html);
+    if (incompleteUTF8TailStartIndex !== undefined) {
+      stringSafeHtmlBuffer = html.subarray(0, incompleteUTF8TailStartIndex);
+      incompleteUTF8TailBuffer = html.subarray(incompleteUTF8TailStartIndex);
+    }
   }
 
-  const htmlString = html.toString();
+  const htmlString = stringSafeHtmlBuffer.toString();
   let completeHtml = htmlString;
   let nextIncompleteHtmlTagTail = '';
+  let nextIncompleteHtmlTailScanState: RetainedIncompleteHtmlTailScanState | undefined;
   if (incompleteHtmlTailMode === 'tag') {
-    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
-      splitIncompleteHtmlTagTail(htmlString));
+    ({
+      completeHtml,
+      incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+      incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+    } = splitIncompleteHtmlTagTail(htmlString, retainedTailScanState));
   } else if (incompleteHtmlTailMode === 'link') {
-    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
-      splitIncompleteLinkTagTail(htmlString));
+    ({
+      completeHtml,
+      incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+      incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+    } = splitIncompleteLinkOrRawTextTail(htmlString, retainedTailScanState));
+    if (!nextIncompleteHtmlTagTail && incompleteUTF8TailBuffer.length > 0) {
+      ({
+        completeHtml,
+        incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+        incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+      } = splitTrailingIncompleteHtmlTagTail(completeHtml));
+    }
   }
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
     (linkTag) =>
       shouldPromoteStylesheetPreloadTag(linkTag) ? promoteStylesheetPreloadTag(linkTag) : linkTag,
   );
+  const completeHtmlByteLength = Buffer.byteLength(completeHtml, 'utf8');
+  const completeHtmlBuffer =
+    completeHtmlByteLength === html.length ? html : stringSafeHtmlBuffer.subarray(0, completeHtmlByteLength);
+  const incompleteHtmlTailBuffer = Buffer.concat([
+    nextIncompleteHtmlTagTail ? stringSafeHtmlBuffer.subarray(completeHtmlByteLength) : Buffer.alloc(0),
+    incompleteUTF8TailBuffer,
+  ]);
 
   return {
-    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteHtmlTagTail ? html : Buffer.from(gatedHtml),
-    hasIncompleteHtmlTail: Boolean(nextIncompleteHtmlTagTail),
+    gatedHtmlBuffer: gatedHtml === completeHtml ? completeHtmlBuffer : Buffer.from(gatedHtml),
+    incompleteHtmlTailBuffer,
+    incompleteHtmlTailScanState:
+      incompleteHtmlTailBuffer.length > 0 ? nextIncompleteHtmlTailScanState : undefined,
   };
 }
 
@@ -469,9 +1113,12 @@ export default function injectRSCPayload(
    */
   const htmlBuffers: Buffer[] = [];
   // Observability mode holds any split tag so inline mark scripts never land in
-  // the middle of markup. Without observability, preserve the older link-only
-  // hold used by stylesheet preload promotion.
+  // the middle of markup. Without observability, hold link tails plus open
+  // raw-text elements so payload scripts never flush inside app script/style text.
+  // If the app leaves such a container open, streaming intentionally buffers the
+  // remaining HTML until final flush rather than injecting scripts into it.
   let incompleteHtmlTailMode: IncompleteHtmlTailMode = rscStreamObservability ? 'tag' : 'link';
+  let retainedHtmlTailScanState: RetainedIncompleteHtmlTailScanState | undefined;
 
   /**
    * Buffer for stylesheet links inferred from RSC client chunk references.
@@ -526,10 +1173,11 @@ export default function injectRSCPayload(
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const htmlBuffer = Buffer.concat(htmlBuffers);
-    const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
-      htmlBuffer,
-      incompleteHtmlTailMode,
-    );
+    const {
+      gatedHtmlBuffer,
+      incompleteHtmlTailBuffer,
+      incompleteHtmlTailScanState: nextRetainedHtmlTailScanState,
+    } = applyStreamedStylesheetPreloadGating(htmlBuffer, incompleteHtmlTailMode, retainedHtmlTailScanState);
     const shouldDeferRevealHtml =
       rscPromise &&
       shouldInferRSCClientStylesheets &&
@@ -548,16 +1196,25 @@ export default function injectRSCPayload(
       rscPayloadSize +
       payloadMarkScriptBytes;
 
-    if (hasIncompleteHtmlTail) {
-      return;
-    }
+    const retainDeferredHtmlAndIncompleteTail = () => {
+      if (incompleteHtmlTailBuffer.length === 0) return;
 
-    if (deferredRevealHtmlBuffer && flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
+      htmlBuffers.length = 0;
+      if (deferredRevealHtmlBuffer) {
+        htmlBuffers.push(deferredRevealHtmlBuffer);
+      }
+      htmlBuffers.push(incompleteHtmlTailBuffer);
+      retainedHtmlTailScanState = deferredRevealHtmlBuffer ? undefined : nextRetainedHtmlTailScanState;
+    };
+
+    if (flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
+      retainDeferredHtmlAndIncompleteTail();
       return;
     }
 
     // Skip flush if no data is buffered
     if (totalSizeWithoutFlushMark === 0) {
+      retainDeferredHtmlAndIncompleteTail();
       return;
     }
 
@@ -642,8 +1299,13 @@ export default function injectRSCPayload(
     rscInitializationBuffers.length = 0;
     rscClientStylesheetBuffers.length = 0;
     htmlBuffers.length = 0;
+    retainedHtmlTailScanState = undefined;
     if (deferredRevealHtmlBuffer) {
       htmlBuffers.push(deferredRevealHtmlBuffer);
+    }
+    if (incompleteHtmlTailBuffer.length > 0) {
+      htmlBuffers.push(incompleteHtmlTailBuffer);
+      retainedHtmlTailScanState = deferredRevealHtmlBuffer ? undefined : nextRetainedHtmlTailScanState;
     }
     rscPayloadBuffers.length = 0;
     rscPayloadMarkBuffers.length = 0;
@@ -651,6 +1313,7 @@ export default function injectRSCPayload(
 
   const endResultStream = () => {
     incompleteHtmlTailMode = 'none';
+    retainedHtmlTailScanState = undefined;
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer
