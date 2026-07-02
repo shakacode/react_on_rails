@@ -239,6 +239,11 @@ describe ReactOnRailsPro::Request do
   end
 
   describe ".upload_assets" do
+    before do
+      described_class.instance_variable_set(:@upload_assets_in_progress, nil)
+      described_class.instance_variable_set(:@upload_asset_fingerprints, nil)
+    end
+
     it "deduplicates concurrent upload work for the same target bundle hashes" do
       call_count = 0
       call_count_mutex = Mutex.new
@@ -361,6 +366,28 @@ describe ReactOnRailsPro::Request do
       expect(results).to eq(%i[uploaded uploaded])
     end
 
+    it "hashes copied asset contents once across concurrent key generation for the same file state" do
+      asset_path = "public/webpack/production/asset-manifest.json"
+      FileUtils.mkdir_p(File.dirname(asset_path))
+      File.write(asset_path, '{"asset":"one"}')
+
+      digest_calls = 0
+      digest_calls_mutex = Mutex.new
+      allow(Digest::SHA256).to receive(:file).and_wrap_original do |original_method, path|
+        digest_calls_mutex.synchronize { digest_calls += 1 }
+        sleep(0.05)
+        original_method.call(path)
+      end
+
+      threads = Array.new(5) do
+        Thread.new { described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]) }
+      end
+      keys = threads.map(&:value)
+
+      expect(keys.uniq.length).to eq(1)
+      expect(digest_calls).to eq(1)
+    end
+
     it "keeps upload single-flight keys distinct when copied asset contents change" do
       asset_path = "public/webpack/production/asset-manifest.json"
       FileUtils.mkdir_p(File.dirname(asset_path))
@@ -368,7 +395,7 @@ describe ReactOnRailsPro::Request do
 
       initial_key = described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path])
 
-      File.write(asset_path, '{"asset":"two"}')
+      File.write(asset_path, '{"asset":"two","size":"changed"}')
 
       expect(described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]))
         .not_to eq(initial_key)

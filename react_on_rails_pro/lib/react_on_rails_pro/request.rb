@@ -74,6 +74,7 @@ module ReactOnRailsPro
       # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
       CONNECTION_MUTEX = Mutex.new
       UPLOAD_ASSETS_MUTEX = Mutex.new
+      UPLOAD_ASSET_FINGERPRINT_MUTEX = Mutex.new
 
       def reset_connection
         CONNECTION_MUTEX.synchronize do
@@ -454,7 +455,17 @@ module ReactOnRailsPro
         return "url:#{path}" if http_url?(path)
         return "missing:#{path}" unless File.exist?(path)
 
-        "file:#{path}:#{Digest::SHA256.file(path).hexdigest}"
+        stat = File.stat(path)
+        cache_key = [path, stat.size, stat.mtime.to_r, stat.ctime.to_r].freeze
+
+        UPLOAD_ASSET_FINGERPRINT_MUTEX.synchronize do
+          cached = upload_asset_fingerprints[path]
+          return cached[:fingerprint] if cached && cached[:cache_key] == cache_key
+
+          fingerprint = "file:#{path}:#{Digest::SHA256.file(path).hexdigest}"
+          upload_asset_fingerprints[path] = { cache_key:, fingerprint: }
+          fingerprint
+        end
       end
 
       def with_asset_upload_single_flight(key_parts, &)
@@ -505,6 +516,10 @@ module ReactOnRailsPro
 
       def upload_assets_in_progress
         @upload_assets_in_progress ||= {}
+      end
+
+      def upload_asset_fingerprints
+        @upload_asset_fingerprints ||= {}
       end
 
       def wait_for_asset_upload_single_flight(state)
