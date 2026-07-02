@@ -156,6 +156,43 @@ describe('fetchRSC HTTP responses', () => {
       })}`,
     );
   });
+
+  it('returns a rejected promise instead of throwing when request preparation fails synchronously', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+
+    let fetchResult!: ReturnType<typeof fetchRSC>;
+    expect(() => {
+      fetchResult = fetchRSC({
+        componentName: 'BrokenPropsPanel',
+        componentProps: circularProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      });
+    }).not.toThrow();
+    await expect(fetchResult).rejects.toThrow(
+      'Failed to prepare RSC request for component "BrokenPropsPanel"',
+    );
+    await expect(fetchResult).rejects.toMatchObject({ cause: expect.any(TypeError) });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a rejected promise instead of throwing when rscPayloadGenerationUrlPath is missing', async () => {
+    const { fetchRSC } = await loadClientModule();
+
+    let fetchResult!: ReturnType<typeof fetchRSC>;
+    expect(() => {
+      fetchResult = fetchRSC({
+        componentName: 'MissingPathPanel',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '',
+      });
+    }).not.toThrow();
+    await expect(fetchResult).rejects.toThrow(
+      'Cannot fetch RSC payload for component "MissingPathPanel": rscPayloadGenerationUrlPath is not configured.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('getReactServerComponent preloaded payload replay', () => {
