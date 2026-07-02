@@ -410,6 +410,7 @@ jobs:
                 pull_request_base_sha: pr.base.sha,
                 ...(forceFull ? { force_full_hosted: 'true' } : {})
               };
+              const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
               const workflows = [
                 ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
                 ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
@@ -424,15 +425,53 @@ jobs:
                 ])
               ];
 
-              const dispatchResults = await Promise.allSettled(
-                workflows.map(([workflowName, workflowFile, inputs]) =>
-                  github.rest.actions.createWorkflowDispatch({
+              function legacyCompatibleInputs(workflowInputs) {
+                return Object.fromEntries(
+                  Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
+                );
+              }
+
+              function isUnexpectedInputError(error) {
+                const message = error?.message || '';
+                return error?.status === 422 &&
+                  /unexpected inputs?|provided inputs?/.test(message.toLowerCase()) &&
+                  [...baseContextInputNames].some((name) => message.includes(name));
+              }
+
+              async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
+                try {
+                  await github.rest.actions.createWorkflowDispatch({
                     owner,
                     repo,
                     workflow_id: workflowFile,
                     ref: pr.head.ref,
-                    inputs
-                  }).then(() => ({ file: workflowFile, name: workflowName }))
+                    inputs: workflowInputs
+                  });
+
+                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: false };
+                } catch (error) {
+                  if (!isUnexpectedInputError(error)) {
+                    throw error;
+                  }
+
+                  core.warning(
+                    `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
+                  );
+                  await github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: workflowFile,
+                    ref: pr.head.ref,
+                    inputs: legacyCompatibleInputs(workflowInputs)
+                  });
+
+                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: true };
+                }
+              }
+
+              const dispatchResults = await Promise.allSettled(
+                workflows.map(([workflowName, workflowFile, inputs]) =>
+                  createWorkflowDispatchWithFallback(workflowName, workflowFile, inputs)
                 )
               );
 
@@ -496,6 +535,10 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
+              const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
+              const fallbackMessage = fallbackCount > 0
+                ? `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
+                : '';
               const labelMessage = labelMessageOverride || (labelAdded && forceFullLabelAdded
                 ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
                 : labelAdded
@@ -511,6 +554,7 @@ jobs:
                 forceFull
                   ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
+                fallbackMessage,
                 labelMessage,
                 '',
                 'View progress in the Actions tab.',
