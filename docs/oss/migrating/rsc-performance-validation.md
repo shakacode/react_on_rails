@@ -3,9 +3,9 @@
 Use this playbook when an RSC migration is intended to improve page performance. It defines the
 evidence package reviewers need before treating an RSC conversion as a performance win.
 
-> **Part of the [RSC Migration Series](migrating-to-rsc.md)** | Pair with
-> [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) when the numbers point to large
-> chunks, stylesheet ordering, or client-reference surprises.
+> **Part 9 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous:
+> [Flight Payload Optimization](rsc-flight-payload.md) | Next:
+> [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)
 
 ## Start With a Local Control and Experiment
 

@@ -4,8 +4,8 @@ Use this pattern when a public page can render almost all useful content as stat
 needs a few browser behaviors. The goal is to keep the static shell and CSS on the critical path while
 loading only a small, explicit browser entry for progressive enhancement.
 
-> **Part of the [RSC Migration Series](migrating-to-rsc.md)** | Validate this pattern with the
-> [RSC Performance Validation Playbook](rsc-performance-validation.md).
+> **Part 10 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous:
+> [RSC Performance Validation Playbook](rsc-performance-validation.md)
 
 ## When to Use This Pattern
 
@@ -60,8 +60,9 @@ and the public follow-up is [#4297](https://github.com/shakacode/react_on_rails/
 ```erb
 <%# app/views/layouts/application.html.erb %>
 <% unless content_for?(:skip_global_javascript) %>
-  <%= javascript_pack_tag "global" %>
+  <% append_javascript_pack_tag "global" %>
 <% end %>
+<%= javascript_pack_tag defer: true %>
 ```
 
 ```erb
@@ -120,6 +121,8 @@ intent.
 
 ```js
 const searchTarget = document.querySelector('[data-public-search]');
+const props = readJsonScript('public-page-effects-props');
+let hydrating = false;
 
 async function hydrateSearch(firstEvent) {
   const [{ default: SearchIsland }, { createRoot }, React] = await Promise.all([
@@ -132,17 +135,27 @@ async function hydrateSearch(firstEvent) {
   root.render(React.createElement(SearchIsland, { props, firstEventType: firstEvent.type }));
 }
 
-function onIntent(event) {
-  searchTarget.removeEventListener('click', onIntent);
-  searchTarget.removeEventListener('focusin', onIntent);
-  searchTarget.removeEventListener('keydown', onKeydown);
-  hydrateSearch(event).catch((error) => {
+async function onIntent(event) {
+  if (hydrating) return;
+
+  hydrating = true;
+  try {
+    await hydrateSearch(event);
+    searchTarget.removeEventListener('click', onIntent);
+    searchTarget.removeEventListener('focusin', onIntent);
+    searchTarget.removeEventListener('keydown', onKeydown);
+  } catch (error) {
     console.error('Failed to load search island', error);
-  });
+  } finally {
+    hydrating = false;
+  }
 }
 
 function onKeydown(event) {
-  if (event.key === 'Enter' || event.key === ' ') onIntent(event);
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+
+  event.preventDefault();
+  onIntent(event);
 }
 
 if (searchTarget) {

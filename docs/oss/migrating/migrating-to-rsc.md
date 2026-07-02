@@ -125,7 +125,7 @@ How to prove that an RSC conversion improved the page users actually see. Covers
 - Warm cached SSR baselines for pages that already use React on Rails Pro caching
 - Visual regression checks paired with Lighthouse and resource metrics
 - Package-stack discipline for published, canary, RC, and diagnostic builds
-- Required PR metrics and the HiChee #9513 case study
+- Required PR metrics and the public-page case study
 
 ### 10. [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)
 
