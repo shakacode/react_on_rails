@@ -109,6 +109,8 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [Data fetching](../../oss/migrating/rsc-data-fetching.md) — migrating from client-side to server-side data access
 - [Third-party libraries](../../oss/migrating/rsc-third-party-libs.md) — dealing with library compatibility
 - [Troubleshooting](../../oss/migrating/rsc-troubleshooting.md) — common issues and solutions
+- [RSC performance validation](../../oss/migrating/rsc-performance-validation.md) — control/experiment methodology, visual regression gates, and PR metrics for performance claims
+- [Mostly static RSC shell with a tiny sidecar](../../oss/migrating/rsc-static-shell-sidecar.md) — public-page pattern for static RSC HTML plus narrow browser behavior
 
 ## Deep Dives
 
