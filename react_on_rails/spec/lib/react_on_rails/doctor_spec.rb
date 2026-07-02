@@ -5362,8 +5362,9 @@ RSpec.describe ReactOnRails::Doctor do
       allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
       allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
       allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-      pro_config = double("ProConfig", enable_rsc_support: true)
       stub_const("ReactOnRailsPro", Module.new)
+      stub_const("ReactOnRailsPro::Configuration", Class.new { attr_reader :enable_rsc_support })
+      pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: true)
       ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
     end
 
@@ -5428,9 +5429,28 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when the RSC Rspack version is undeterminable" do
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "latest") }
+
+      it "keeps doctor fail-closed with Rspack v2 fix instructions" do
+        doctor.send(:check_rsc_rspack_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+
+        expect(error_msgs).to include(
+          a_hash_including(
+            content: a_string_including(
+              "RSC with Rspack requires Rspack v2 or newer",
+              "Detected @rspack/core: latest",
+              "@rspack/core@^2"
+            )
+          )
+        )
+      end
+    end
+
     context "when RSC is disabled" do
       before do
-        pro_config = double("ProConfig", enable_rsc_support: false)
+        pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: false)
         ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
         write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^1.6.0")
       end
