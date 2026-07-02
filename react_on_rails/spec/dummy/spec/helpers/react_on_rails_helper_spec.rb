@@ -1538,6 +1538,7 @@ describe ReactOnRailsHelper do
       end
 
       before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         allow(render_options).to receive(:auto_load_bundle).and_return(true)
         allow(helper).to receive(:preload_sources_for_stylesheet_pack)
           .with("generated/HelloWorld")
