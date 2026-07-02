@@ -10,7 +10,7 @@ on:
       - 'release/**'
     # Always trigger on main/release branches; docs-only detection handles skipping heavy jobs
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
     inputs:
@@ -23,13 +23,7 @@ on:
 jobs:
   detect-changes:
     # Branch deletion push events have no checkoutable release ref.
-    # Label-triggered PR runs should only react to hosted-CI control labels.
-    if: |
-      (github.event_name != 'push' || github.event.deleted != true) &&
-      (github.event_name != 'pull_request' ||
-       (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-       github.event.label.name == 'ready-for-hosted-ci' ||
-       github.event.label.name == 'force-full-hosted-ci')
+    if: github.event_name != 'push' || github.event.deleted != true
     permissions:
       contents: read
       actions: read
