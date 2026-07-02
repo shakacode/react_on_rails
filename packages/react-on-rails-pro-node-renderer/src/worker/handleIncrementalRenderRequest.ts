@@ -357,23 +357,17 @@ export async function handleIncrementalRenderRequest(
         if (pullModeStream && !pullModeStream.destroyed) {
           pullModeStream.destroy();
         }
-        if (
-          finalResponse.stream &&
-          finalResponse.stream !== pullModeStream &&
-          !finalResponse.stream.destroyed
-        ) {
-          finalResponse.stream.destroy();
-        }
-        if (
-          response.stream &&
-          response.stream !== finalResponse.stream &&
-          response.stream !== pullModeStream &&
-          !response.stream.destroyed
-        ) {
+        if (response.stream && response.stream !== pullModeStream && !response.stream.destroyed) {
           response.stream.destroy();
         }
-      } finally {
+      } catch (err) {
+        log.error({ msg: 'Error cleaning up incremental render setup failure', err });
+      }
+
+      try {
         executionContext.release();
+      } catch (err) {
+        log.error({ msg: 'Error releasing execution context after incremental render setup failure', err });
       }
 
       throw error;
