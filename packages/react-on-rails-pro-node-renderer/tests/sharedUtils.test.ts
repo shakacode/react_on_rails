@@ -14,7 +14,7 @@
  */
 
 import path from 'path';
-import { getRequestBundleFilePath } from '../src/shared/utils';
+import { assetFilenamePathComponent, getRequestBundleFilePath } from '../src/shared/utils';
 import { resetForTest, serverBundleCachePath } from './helper';
 
 const testName = 'sharedUtils';
@@ -39,6 +39,32 @@ describe('shared utils', () => {
 
     test.each(['.server.abc123', '-server.abc123'])('rejects Ruby-unsafe bundle hash "%s"', (bundleHash) => {
       expect(() => getRequestBundleFilePath(bundleHash)).toThrow('Invalid bundle timestamp path component');
+    });
+  });
+
+  describe('assetFilenamePathComponent', () => {
+    test.each(['loadable-stats.json', 'react-client-manifest.json', 'asset_name-123.json'])(
+      'accepts asset filename "%s"',
+      (filename) => {
+        expect(assetFilenamePathComponent(filename)).toBe(filename);
+      },
+    );
+
+    test.each([
+      '',
+      '.',
+      '..',
+      '../loadable-stats.json',
+      '..\\loadable-stats.json',
+      'assets/loadable-stats.json',
+      'assets\\loadable-stats.json',
+      '/tmp/loadable-stats.json',
+      'C:\\tmp\\loadable-stats.json',
+      'foo\0bar',
+      'foo\nbar',
+      'foo\x7Fbar',
+    ])('rejects asset filename path "%s"', (filename) => {
+      expect(() => assetFilenamePathComponent(filename)).toThrow('Invalid asset filename path component');
     });
   });
 });

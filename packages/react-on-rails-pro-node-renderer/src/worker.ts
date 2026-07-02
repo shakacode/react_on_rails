@@ -58,6 +58,7 @@ import {
   ResponseResult,
   saveMultipartFile,
   Asset,
+  assetFilenamePathComponent,
   getAssetPath,
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
@@ -1165,6 +1166,17 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
+    let assetFilename: string;
+    try {
+      assetFilename = assetFilenamePathComponent(filename);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : `Invalid asset filename path component: ${filename}`;
+      log.info(message);
+      await setResponse(badRequestResponseResult(message), res);
+      return;
+    }
+
     // Handle targetBundles as either a string or an array
     const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
     if (!targetBundles || targetBundles.length === 0) {
@@ -1177,7 +1189,7 @@ export default function run(config: Partial<Config>) {
     // Check if the asset exists in each of the target bundles
     const results = await Promise.all(
       targetBundles.map(async (bundleHash) => {
-        const assetPath = getAssetPath(bundleHash, filename);
+        const assetPath = getAssetPath(bundleHash, assetFilename);
         const exists = await fileExistsAsync(assetPath);
 
         if (exists) {
