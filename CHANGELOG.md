@@ -96,6 +96,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Incremental render setup failures release renderer context**:
+  The Pro node renderer now releases the execution context and destroys started streams when
+  pull-mode incremental render setup fails, preventing orphaned renderer work after response-start
+  errors. Fixes [Issue 4312](https://github.com/shakacode/react_on_rails/issues/4312).
+  [PR 4383](https://github.com/shakacode/react_on_rails/pull/4383) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Dropped pull-mode prop requests are logged**: Streaming SSR now warns when the Node
   renderer sends a `propRequest` control frame without an emitter or with a missing, empty, or
   oversized `propName`, making dropped pull-mode requests diagnosable while preserving valid
