@@ -48,6 +48,7 @@ module ReactOnRails
     end
 
     def generated_stylesheet_hrefs_json(render_options)
+      return unless ReactOnRails::Utils.react_on_rails_pro?
       return unless render_options.auto_load_bundle
 
       pack_name = "generated/#{render_options.react_component_name}"
