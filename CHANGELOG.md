@@ -83,6 +83,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Tag revalidation keeps retry metadata after entry delete failures**:
+  `ReactOnRailsPro.revalidate_tag` now deletes tagged cache entries before deleting the tag index,
+  so a transient cache-store delete failure leaves the index available for a retry instead of
+  orphaning stale entries until their TTL expires. Fixes
+  [Issue 4317](https://github.com/shakacode/react_on_rails/issues/4317).
+  [PR 4375](https://github.com/shakacode/react_on_rails/pull/4375) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
