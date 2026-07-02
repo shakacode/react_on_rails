@@ -38,17 +38,50 @@ export class StreamChunkTimeoutError extends Error {
 async function* withChunkTimeout<T>(
   iterator: AsyncIterable<T>,
   getTimeoutMs: () => number,
+  shouldStopReading: () => boolean,
+  waitForStopReading?: () => Promise<void>,
 ): AsyncGenerator<T, void, undefined> {
   const asyncIterator = iterator[Symbol.asyncIterator]();
 
   while (true) {
+    if (shouldStopReading()) {
+      // eslint-disable-next-line no-await-in-loop
+      await asyncIterator.return?.();
+      return;
+    }
+
     let timeoutId: NodeJS.Timeout | undefined;
     const timeoutMs = getTimeoutMs();
 
     try {
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        const nextChunkPromise = asyncIterator.next();
+        const stopReadingPromise = waitForStopReading?.().then(() => 'stop-reading' as const);
+
         // eslint-disable-next-line no-await-in-loop
-        const result = await asyncIterator.next();
+        const result = await (stopReadingPromise
+          ? Promise.race([nextChunkPromise, stopReadingPromise])
+          : nextChunkPromise);
+        if (result === 'stop-reading') {
+          if (shouldStopReading()) {
+            // eslint-disable-next-line no-await-in-loop
+            await asyncIterator.return?.();
+            return;
+          }
+
+          // The stop signal was stale. Keep waiting for the in-flight read to settle
+          // before starting another read on the same async iterator.
+          // eslint-disable-next-line no-await-in-loop
+          const nextResult = await nextChunkPromise;
+          if (nextResult.done) {
+            return;
+          }
+
+          yield nextResult.value;
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
         if (result.done) {
           return;
         }
@@ -106,6 +139,8 @@ export interface IncrementalRenderStreamHandlerOptions {
   onUpdateReceived: (updateData: unknown) => Promise<void> | void;
   onRequestEnded: () => Promise<void> | void;
   getChunkTimeoutMs?: () => number;
+  shouldStopReading?: () => boolean;
+  waitForStopReading?: () => Promise<void>;
 }
 
 /**
@@ -123,6 +158,8 @@ export async function handleIncrementalRenderStream(
       onUpdateReceived,
       onRequestEnded,
       getChunkTimeoutMs = () => STREAM_CHUNK_TIMEOUT_MS,
+      shouldStopReading = () => false,
+      waitForStopReading,
     } = options;
 
     let hasReceivedFirstObject = false;
@@ -132,7 +169,12 @@ export async function handleIncrementalRenderStream(
     let onResponseStartPromise: Promise<void> | null = null;
 
     try {
-      for await (const chunk of withChunkTimeout(request.raw as AsyncIterable<Buffer>, getChunkTimeoutMs)) {
+      for await (const chunk of withChunkTimeout(
+        request.raw as AsyncIterable<Buffer>,
+        getChunkTimeoutMs,
+        shouldStopReading,
+        waitForStopReading,
+      )) {
         const chunkBuffer = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
         totalBytesReceived += chunkBuffer.length;
 

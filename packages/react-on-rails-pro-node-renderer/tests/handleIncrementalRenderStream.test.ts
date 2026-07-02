@@ -38,9 +38,14 @@ function createControlledStream(): {
   raw: AsyncIterable<Buffer>;
   push: (chunk: Buffer) => void;
   end: () => void;
+  cancel: jest.Mock<Promise<IteratorResult<Buffer>>, []>;
 } {
   const queuedResults: IteratorResult<Buffer>[] = [];
   let resolveNext: ((result: IteratorResult<Buffer>) => void) | undefined;
+  const cancel = jest.fn(() => {
+    emit({ value: undefined, done: true });
+    return Promise.resolve({ value: undefined, done: true });
+  });
 
   const emit = (result: IteratorResult<Buffer>) => {
     if (resolveNext) {
@@ -67,11 +72,13 @@ function createControlledStream(): {
               resolveNext = resolve;
             });
           },
+          return: cancel,
         };
       },
     },
     push: (chunk: Buffer) => emit({ value: chunk, done: false }),
     end: () => emit({ value: undefined, done: true }),
+    cancel,
   };
 }
 
@@ -452,6 +459,58 @@ describe('handleIncrementalRenderStream', () => {
 
         await expect(renderOutcome).resolves.toBe('resolved');
         expect(onRequestEnded).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('allows callers to stop a suspended request read when the response finishes first', async () => {
+      jest.useFakeTimers();
+
+      try {
+        const controlledStream = createControlledStream();
+        let stopReading = false;
+        let resolveStopReading: (() => void) | undefined;
+        const stopReadingPromise = new Promise<void>((resolve) => {
+          resolveStopReading = resolve;
+        });
+        const onRenderRequestReceived = jest.fn().mockResolvedValue({
+          response: createMockResponse(),
+          shouldContinue: true,
+        });
+        const onUpdateReceived = jest.fn().mockResolvedValue(undefined);
+        const onRequestEnded = jest.fn();
+
+        const renderPromise = handleIncrementalRenderStream({
+          request: { raw: controlledStream.raw },
+          onRenderRequestReceived,
+          onResponseStart: jest.fn(),
+          onUpdateReceived,
+          onRequestEnded,
+          getChunkTimeoutMs: () => Number.POSITIVE_INFINITY,
+          shouldStopReading: () => stopReading,
+          waitForStopReading: () => stopReadingPromise,
+        });
+        const renderOutcome = renderPromise.then(
+          () => 'resolved' as const,
+          (error: unknown) => error,
+        );
+
+        controlledStream.push(Buffer.from(`${JSON.stringify({ id: 1 })}\n`));
+        await flushMicrotasks();
+        expect(onRenderRequestReceived).toHaveBeenCalledTimes(1);
+
+        await jest.advanceTimersByTimeAsync(STREAM_CHUNK_TIMEOUT_MS + 1);
+        expect(onRequestEnded).not.toHaveBeenCalled();
+
+        stopReading = true;
+        resolveStopReading?.();
+        await flushMicrotasks();
+
+        await expect(renderOutcome).resolves.toBe('resolved');
+        expect(onUpdateReceived).not.toHaveBeenCalled();
+        expect(onRequestEnded).toHaveBeenCalledTimes(1);
+        expect(controlledStream.cancel).toHaveBeenCalledTimes(1);
       } finally {
         jest.useRealTimers();
       }

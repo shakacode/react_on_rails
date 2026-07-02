@@ -657,6 +657,7 @@ export default function run(config: Partial<Config>) {
     let incrementalExecutionContextReleased = false;
     let pullModeRequestCanIdle = false;
     let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let stopIncrementalRequestReader: (() => void) | undefined;
     let incrementalTracingContext: TracingContext | undefined;
 
     const clearIncrementalResponseFinishTimeout = () => {
@@ -666,6 +667,24 @@ export default function run(config: Partial<Config>) {
 
       clearTimeout(incrementalResponseFinishTimeoutId);
       incrementalResponseFinishTimeoutId = undefined;
+    };
+
+    const shouldStopReadingIncrementalRequest = () =>
+      pullModeRequestCanIdle && responseStarted && incrementalResponseFinished;
+
+    const wakeIncrementalRequestReader = () => {
+      stopIncrementalRequestReader?.();
+      stopIncrementalRequestReader = undefined;
+    };
+
+    const waitForIncrementalRequestReaderStop = () => {
+      if (shouldStopReadingIncrementalRequest()) {
+        return Promise.resolve();
+      }
+
+      return new Promise<void>((resolve) => {
+        stopIncrementalRequestReader = resolve;
+      });
     };
 
     const releaseIncrementalExecutionContextWhenDone = () => {
@@ -686,6 +705,7 @@ export default function run(config: Partial<Config>) {
     const markIncrementalResponseFinished = () => {
       clearIncrementalResponseFinishTimeout();
       incrementalResponseFinished = true;
+      wakeIncrementalRequestReader();
       releaseIncrementalExecutionContextWhenDone();
     };
 
@@ -920,6 +940,8 @@ export default function run(config: Partial<Config>) {
               await closeIncrementalRequest();
             },
             getChunkTimeoutMs: getIncrementalRequestChunkTimeoutMs,
+            shouldStopReading: shouldStopReadingIncrementalRequest,
+            waitForStopReading: waitForIncrementalRequestReaderStop,
           });
         },
         startSsrRequestOptions({ renderingRequest: 'ReactOnRails.incrementalRender' }),
