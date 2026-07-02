@@ -226,125 +226,160 @@ export async function handleIncrementalRenderRequest(
       return { response };
     }
 
-    // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
-    // so AsyncPropsManager (inside VM) can emit propRequests to the response stream.
     let finalResponse = response;
-    const { pullEnabled, pushProps } = firstRequestChunk;
-    if (pullEnabled && response.stream) {
-      const sourceStream = response.stream;
-      const { sharedExecutionContext } = executionContext;
-      sharedExecutionContext.set(PULL_ENABLED_KEY, true);
-      sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
+    let pullModeSharedExecutionContext: Map<string, unknown> | undefined;
+    let pullModeStream: PassThrough | undefined;
 
-      // Create injectable PassThrough — sits after the length-prefixed transform.
-      // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
-      const injectableStream = new PassThrough();
-      const writeRenderCompleteAndEnd = () => {
-        if (injectableStream.destroyed || injectableStream.writableEnded) return;
-        try {
-          injectableStream.write(formatRenderCompleteChunk());
-        } catch (err) {
-          log.warn({ msg: 'Failed to write renderComplete chunk', err });
-        }
-        injectableStream.end();
-      };
+    try {
+      // Set up pull mode if enabled: inject propRequest emitter into sharedExecutionContext
+      // so AsyncPropsManager (inside VM) can emit propRequests to the response stream.
+      const { pullEnabled, pushProps } = firstRequestChunk;
+      if (pullEnabled && response.stream) {
+        const sourceStream = response.stream;
+        const { sharedExecutionContext } = executionContext;
+        pullModeSharedExecutionContext = sharedExecutionContext;
+        sharedExecutionContext.set(PULL_ENABLED_KEY, true);
+        sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
 
-      // Register event handlers BEFORE pipe() to guarantee we catch 'end'
-      // even if the source stream has already buffered all its data.
-      sourceStream.on('end', () => {
-        if (injectableStream.writableNeedDrain) {
-          injectableStream.once('drain', writeRenderCompleteAndEnd);
-          return;
-        }
-        writeRenderCompleteAndEnd();
-      });
-      sourceStream.on('error', (err) => {
-        injectableStream.destroy(err);
-      });
-      // Fastify destroys the returned stream when the browser/Rails client disconnects.
-      // Propagate that premature teardown back through the pull wrapper so upstream
-      // React/RSC work and async prop fetches abort just like the non-pull path.
-      injectableStream.once('close', () => {
-        if (!injectableStream.writableEnded && !sourceStream.destroyed) {
-          sourceStream.destroy();
-        }
-      });
-
-      // { end: false } prevents pipe from auto-closing injectableStream when
-      // the source ends — we write renderComplete in the 'end' handler above.
-      sourceStream.pipe(injectableStream, { end: false });
-
-      // Set the emitter callback — AsyncPropsManager calls this from inside the VM
-      sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
-        if (injectableStream.destroyed || injectableStream.writableEnded) {
-          log.warn({ msg: 'Skipping propRequest after stream closed', propName });
-          return;
-        }
-        if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
-          log.warn({
-            msg: 'Skipping oversized propRequest',
-            propNameLength: propName.length,
-            maxPropNameLength: MAX_PULL_PROP_NAME_LENGTH,
-          });
-          return;
-        }
-        try {
-          injectableStream.write(formatPropRequestChunk(propName));
-        } catch (err) {
-          log.error({ msg: 'Failed to write propRequest chunk', propName, err });
-        }
-      });
-
-      const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY);
-      catchUpAsyncPropsManagerPullBridge(manager);
-
-      finalResponse = { ...response, stream: injectableStream };
-    }
-
-    // Return the result with a sink that uses the execution context
-    return {
-      response: finalResponse,
-      sink: {
-        executionContext,
-        add: async (chunk: unknown) => {
+        // Create injectable PassThrough — sits after the length-prefixed transform.
+        // Both HTML chunks (from React) and propRequest chunks (from us) flow through it.
+        const injectableStream = new PassThrough();
+        pullModeStream = injectableStream;
+        const writeRenderCompleteAndEnd = () => {
+          if (injectableStream.destroyed || injectableStream.writableEnded) return;
           try {
-            assertIsUpdateChunk(chunk);
-            await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
-              const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
-              const result = await executionContext.runInVM(chunk.updateChunk, bundlePath);
+            injectableStream.write(formatRenderCompleteChunk());
+          } catch (err) {
+            log.warn({ msg: 'Failed to write renderComplete chunk', err });
+          }
+          injectableStream.end();
+        };
+
+        // Register event handlers BEFORE pipe() to guarantee we catch 'end'
+        // even if the source stream has already buffered all its data.
+        sourceStream.on('end', () => {
+          if (injectableStream.writableNeedDrain) {
+            injectableStream.once('drain', writeRenderCompleteAndEnd);
+            return;
+          }
+          writeRenderCompleteAndEnd();
+        });
+        sourceStream.on('error', (err) => {
+          injectableStream.destroy(err);
+        });
+        // Fastify destroys the returned stream when the browser/Rails client disconnects.
+        // Propagate that premature teardown back through the pull wrapper so upstream
+        // React/RSC work and async prop fetches abort just like the non-pull path.
+        injectableStream.once('close', () => {
+          if (!injectableStream.writableEnded && !sourceStream.destroyed) {
+            sourceStream.destroy();
+          }
+        });
+
+        // { end: false } prevents pipe from auto-closing injectableStream when
+        // the source ends — we write renderComplete in the 'end' handler above.
+        sourceStream.pipe(injectableStream, { end: false });
+
+        // Set the emitter callback — AsyncPropsManager calls this from inside the VM
+        sharedExecutionContext.set(PROP_REQUEST_EMITTER_KEY, (propName: string) => {
+          if (injectableStream.destroyed || injectableStream.writableEnded) {
+            log.warn({ msg: 'Skipping propRequest after stream closed', propName });
+            return;
+          }
+          if (propName.length > MAX_PULL_PROP_NAME_LENGTH) {
+            log.warn({
+              msg: 'Skipping oversized propRequest',
+              propNameLength: propName.length,
+              maxPropNameLength: MAX_PULL_PROP_NAME_LENGTH,
+            });
+            return;
+          }
+          try {
+            injectableStream.write(formatPropRequestChunk(propName));
+          } catch (err) {
+            log.error({ msg: 'Failed to write propRequest chunk', propName, err });
+          }
+        });
+
+        const manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY);
+        catchUpAsyncPropsManagerPullBridge(manager);
+
+        finalResponse = { ...response, stream: injectableStream };
+      }
+
+      // Return the result with a sink that uses the execution context
+      return {
+        response: finalResponse,
+        sink: {
+          executionContext,
+          add: async (chunk: unknown) => {
+            try {
+              assertIsUpdateChunk(chunk);
+              await subSpan({ name: 'ror.incremental.process_chunk' }, async () => {
+                const bundlePath = getRequestBundleFilePath(chunk.bundleTimestamp);
+                const result = await executionContext.runInVM(chunk.updateChunk, bundlePath);
+                if (isErrorRenderResult(result)) {
+                  throw new Error(result.exceptionMessage);
+                }
+              });
+            } catch (err) {
+              if (err instanceof InvalidIncrementalRenderChunkError) {
+                log.error({ msg: 'Invalid incremental render chunk', err, chunk });
+              } else {
+                log.error({ msg: 'Error running incremental render chunk', err, chunk });
+              }
+            }
+          },
+          handleRequestClosed: async () => {
+            if (!onRequestClosedUpdateChunk) {
+              return;
+            }
+
+            const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
+            try {
+              const result = await executionContext.runInVM(
+                onRequestClosedUpdateChunk.updateChunk,
+                bundlePath,
+              );
               if (isErrorRenderResult(result)) {
                 throw new Error(result.exceptionMessage);
               }
-            });
-          } catch (err) {
-            if (err instanceof InvalidIncrementalRenderChunkError) {
-              log.error({ msg: 'Invalid incremental render chunk', err, chunk });
-            } else {
-              log.error({ msg: 'Error running incremental render chunk', err, chunk });
+            } catch (err: unknown) {
+              log.error({
+                msg: 'Error running onRequestClosedUpdateChunk',
+                err,
+                onRequestClosedUpdateChunk,
+              });
             }
-          }
+          },
         },
-        handleRequestClosed: async () => {
-          if (!onRequestClosedUpdateChunk) {
-            return;
-          }
+      };
+    } catch (error) {
+      if (pullModeSharedExecutionContext) {
+        pullModeSharedExecutionContext.delete(PULL_ENABLED_KEY);
+        pullModeSharedExecutionContext.delete(PUSH_PROPS_KEY);
+        pullModeSharedExecutionContext.delete(PROP_REQUEST_EMITTER_KEY);
+      }
 
-          const bundlePath = getRequestBundleFilePath(onRequestClosedUpdateChunk.bundleTimestamp);
-          try {
-            const result = await executionContext.runInVM(onRequestClosedUpdateChunk.updateChunk, bundlePath);
-            if (isErrorRenderResult(result)) {
-              throw new Error(result.exceptionMessage);
-            }
-          } catch (err: unknown) {
-            log.error({
-              msg: 'Error running onRequestClosedUpdateChunk',
-              err,
-              onRequestClosedUpdateChunk,
-            });
-          }
-        },
-      },
-    };
+      try {
+        if (pullModeStream && !pullModeStream.destroyed) {
+          pullModeStream.destroy();
+        }
+        if (response.stream && response.stream !== pullModeStream && !response.stream.destroyed) {
+          response.stream.destroy();
+        }
+      } catch (err) {
+        log.error({ msg: 'Error cleaning up incremental render setup failure', err });
+      }
+
+      try {
+        executionContext.release();
+      } catch (err) {
+        log.error({ msg: 'Error releasing execution context after incremental render setup failure', err });
+      }
+
+      throw error;
+    }
   } catch (error) {
     // Handle any unexpected errors
     const errorMessage = error instanceof Error ? error.message : String(error);
