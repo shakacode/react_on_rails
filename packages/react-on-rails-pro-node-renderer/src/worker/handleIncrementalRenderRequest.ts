@@ -24,11 +24,13 @@ import type { ExecutionContext } from './vm';
 import { formatPropRequestChunk, formatRenderCompleteChunk } from './streamingUtils';
 
 // These keys must match the constants in AsyncPropsManager.ts (react-on-rails-pro package)
+// MIRROR VALUES OF: packages/react-on-rails-pro/src/AsyncPropsManager.ts
 export const PULL_ENABLED_KEY = 'pullEnabled';
 export const PUSH_PROPS_KEY = 'pushProps';
 export const PROP_REQUEST_EMITTER_KEY = 'propRequestEmitter';
 export const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
 export const MAX_PULL_PROP_NAME_LENGTH = 256;
+// MIRROR VALUES END
 
 export type IncrementalRenderSink = {
   /** Called for every subsequent NDJSON object after the first one */
