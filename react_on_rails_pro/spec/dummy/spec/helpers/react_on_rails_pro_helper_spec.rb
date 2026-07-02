@@ -1660,7 +1660,6 @@ describe ReactOnRailsProHelper do
         diagnostics = []
         client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
         custom_public_root = Rails.root.join("tmp/static-rsc-public")
-        asset_paths = []
         asset_paths = [
           custom_public_root.join("packs-test/js/vendor-abc123.js"),
           custom_public_root.join("packs-test/js/public-page-effects.js"),
@@ -1744,9 +1743,8 @@ describe ReactOnRailsProHelper do
           ]
         )
       ensure
-        FileUtils.rm_f(client_manifest_path)
-        asset_paths.each { |asset_path| FileUtils.rm_f(asset_path) }
-        FileUtils.rm_rf(custom_public_root)
+        FileUtils.rm_f(Rails.root.join("tmp/static-rsc-client-manifest.json"))
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
       end
     end
 
