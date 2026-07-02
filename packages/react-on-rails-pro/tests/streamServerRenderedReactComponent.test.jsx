@@ -28,6 +28,7 @@ import wrapServerComponentRenderer from '../src/wrapServerComponentRenderer/serv
 import RSCRoute from '../src/RSCRoute.tsx';
 import { RSC_ROUTE_SSR_FALSE_BAILOUT_DIGEST } from '../src/RSCRouteSSRFalseBailoutError.ts';
 import { mergeRSCStreamDiagnosticError } from '../src/rscDiagnostics.ts';
+import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 
 jest.mock('react-on-rails/ReactDOMServer', () => {
   const actual = jest.requireActual('react-on-rails/ReactDOMServer');
@@ -513,6 +514,39 @@ describe('streamServerRenderedReactComponent', () => {
     });
   };
 
+  const setupShellErrorFallbackRSCDiagnosticStreamTest = () => {
+    const ShellErrorFallbackComponent = () => <main>Shell error fallback component</main>;
+
+    const renderFunction = (_props, railsContext) => {
+      const diagnosticError = new Error(
+        `[ReactOnRails] RSC bundle rendering failed.\n` +
+          `Component: ShellErrorFallbackComponent\n` +
+          `Module: /app/components/ShellErrorFallbackComponent.jsx\n` +
+          `Original error: ${GENERIC_RSC_DEFERRED_ERROR_MESSAGE}`,
+      );
+      diagnosticError.name = 'ReactOnRailsRSCStreamError';
+      railsContext.recordRSCDiagnostic('ShellErrorFallbackComponent', diagnosticError);
+      return ShellErrorFallbackComponent;
+    };
+
+    ReactOnRails.register({
+      ShellErrorFallbackComponent: wrapServerComponentRenderer(renderFunction, 'ShellErrorFallbackComponent'),
+    });
+    renderToPipeableStream.mockImplementationOnce((_element, options) => {
+      options.onShellError(new Error(GENERIC_RSC_DEFERRED_ERROR_MESSAGE));
+      return { pipe: jest.fn(), abort: jest.fn() };
+    });
+
+    return streamServerRenderedReactComponent({
+      name: 'ShellErrorFallbackComponent',
+      domNodeId: 'shellErrorFallbackComponentDomId',
+      trace: false,
+      throwJsErrors: true,
+      railsContext: testingRailsContext,
+      generateRSCPayload: jest.fn(),
+    });
+  };
+
   // Collects every emitted `error` event into an array so a render that surfaces multiple errors
   // (e.g. two failing Suspense boundaries) does not silently drop all but the last.
   //
@@ -661,6 +695,20 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks).toHaveLength(1);
     expect(chunks[0].html).toContain('RSC bundle rendering failed');
     expect(chunks[0].html).toContain('Component: ShellErrorComponent');
+    expect(chunks[0].hasErrors).toBe(true);
+    expect(chunks[0].isShellReady).toBe(false);
+  });
+
+  it('enriches shell-error fallback HTML when onShellError runs before onError (#3475)', async () => {
+    const renderResult = setupShellErrorFallbackRSCDiagnosticStreamTest();
+    const { chunks, errors } = await collectStreamResult(renderResult);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('RSC bundle rendering failed');
+    expect(errors[0].message).toContain('Component: ShellErrorFallbackComponent');
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].html).toContain('RSC bundle rendering failed');
+    expect(chunks[0].html).toContain('Component: ShellErrorFallbackComponent');
     expect(chunks[0].hasErrors).toBe(true);
     expect(chunks[0].isShellReady).toBe(false);
   });
@@ -972,6 +1020,24 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[0].consoleReplayScript).toBe('');
     expect(chunks[0].hasErrors).toBe(true);
     expect(chunks[0].isShellReady).toBe(false);
+  });
+
+  it('clears tracked RSC streams when shell rendering fails before payload injection is wired', async () => {
+    const clearSpy = jest.spyOn(RSCRequestTracker.prototype, 'clear');
+    const { renderResult, chunks } = setupStreamTest({ throwSyncError: true });
+
+    try {
+      await new Promise((resolve) => {
+        renderResult.once('end', resolve);
+      });
+
+      expect(clearSpy).toHaveBeenCalledTimes(1);
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].hasErrors).toBe(true);
+      expect(chunks[0].isShellReady).toBe(false);
+    } finally {
+      clearSpy.mockRestore();
+    }
   });
 
   it('emits an error if there is an error in the async content and throwJsErrors is true', async () => {
