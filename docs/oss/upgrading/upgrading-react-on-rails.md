@@ -109,6 +109,13 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
 
 - **Ruby 3.3+ is required.** Upgrade Ruby before moving to React on Rails v17. React on Rails v16 remains the supported line for applications that must stay on Ruby 3.2 or older.
 - **React on Rails Pro already required Ruby 3.3+.** v17 aligns the open-source gem, Pro gem, create-app validator, and CI minimum matrix on the same Ruby floor.
+- **Three deprecated configuration options were removed.** They were deprecated in v16 and are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
+  - `config.generated_assets_dirs` — delete the line. Public asset paths are determined automatically from `public_output_path` in `config/shakapacker.yml`.
+  - `config.skip_display_none` — delete the line. It had no runtime effect.
+  - `config.defer_generated_component_packs` — replaced by `config.generated_component_packs_loading_strategy`. This one changes behavior, so map it explicitly:
+    - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
+    - `config.defer_generated_component_packs = false` → `config.generated_component_packs_loading_strategy = :sync`
+    - If you simply delete the line without setting `generated_component_packs_loading_strategy`, the default strategy applies (`:async` for Pro when Shakapacker supports it, otherwise `:defer`), which may differ from the deferred behavior you were relying on.
 
 ### Migration Steps
 
