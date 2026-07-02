@@ -91,6 +91,31 @@ BENCH_CORE_CHANGED=false
 BENCH_PRO_CHANGED=false
 BENCH_PRO_NODE_RENDERER_CHANGED=false
 
+is_release_tooling_path() {
+  case "$1" in
+    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+release_tooling_heredoc_language() {
+  case "$1" in
+    rakelib/release.rake|script/release-forward-port|script/release-finish)
+      printf '%s\n' "ruby"
+      ;;
+    script/release-forward-port-test.bash|script/release-finish-test.bash)
+      printf '%s\n' "bash"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 comment_line_is_runtime_directive() {
   local line="$1"
   local trimmed="${line#"${line%%[![:space:]]*}"}"
@@ -183,25 +208,16 @@ diff_line_is_comment_or_blank() {
 source_file_has_multiline_string_construct() {
   local file="$1"
   local content
-  local bash_heredoc_pattern
   local ruby_heredoc_pattern
 
   content="$(git show "$CURRENT_REF:$file" 2>/dev/null || cat "$file" 2>/dev/null || true)"
 
   case "$file" in
-    *.rb|Gemfile|*.rake|script/release-forward-port|script/release-finish)
-      # Release tooling fixtures can contain `#` lines that look comment-only in
-      # a unified diff. Ruby heredoc markers are adjacent to `<<`, `<<-`, or
-      # `<<~`; requiring that adjacency avoids ordinary `items << item` shovels.
+    *.rb|Gemfile|*.rake)
+      # Ruby heredoc markers are adjacent to `<<`, `<<-`, or `<<~`; requiring
+      # that adjacency avoids ordinary `items << item` shovels.
       ruby_heredoc_pattern="<<[-~]?([A-Za-z_][A-Za-z0-9_]*|['\"][^'\"]+['\"])"
       grep -Eq "$ruby_heredoc_pattern" <<< "$content"
-      ;;
-    script/release-forward-port-test.bash|script/release-finish-test.bash)
-      # In shell scripts, `<<`/`<<-` introduce heredocs and may be followed by
-      # later redirection, e.g. `cat <<'EOF' > release.md` or
-      # `cat <<'EOF'>release.md`.
-      bash_heredoc_pattern="<<-?[[:space:]]*([A-Za-z_][A-Za-z0-9_]*|['\"][^'\"]+['\"])([[:space:]<>|&;()]|$)"
-      grep -Eq "$bash_heredoc_pattern" <<< "$content"
       ;;
     *.js|*.jsx|*.ts|*.tsx)
       grep -q '`' <<< "$content"
@@ -209,16 +225,171 @@ source_file_has_multiline_string_construct() {
     *)
       return 1
       ;;
-  esac
+	  esac
+	}
+
+heredoc_body_line_numbers() {
+  local language="$1"
+  local line
+  local line_number=0
+  local pending_delimiters=()
+  local pending_indent_modes=()
+  local delimiter
+  local delimiter_indent_mode
+  local candidate
+  local matched
+  local operator
+  local remaining
+  local ruby_heredoc_regex="(<<[-~]?)([A-Za-z_][A-Za-z0-9_]*|'[^']+'|\"[^\"]+\")"
+  local bash_heredoc_regex="(^|[^<])(<<-?)[[:space:]]*((\\\\)?[A-Za-z_][A-Za-z0-9_]*|'[^']+'|\"[^\"]+\")"
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_number=$((line_number + 1))
+
+    if [ "${#pending_delimiters[@]}" -gt 0 ]; then
+      delimiter="${pending_delimiters[0]}"
+      delimiter_indent_mode="${pending_indent_modes[0]}"
+      printf '%s\n' "$line_number"
+      candidate="$line"
+      case "$delimiter_indent_mode" in
+        whitespace)
+          candidate="${candidate#"${candidate%%[![:space:]]*}"}"
+          ;;
+        tabs)
+          while [[ "$candidate" == $'\t'* ]]; do
+            candidate="${candidate#$'\t'}"
+          done
+          ;;
+      esac
+      if [ "$candidate" = "$delimiter" ]; then
+        pending_delimiters=("${pending_delimiters[@]:1}")
+        pending_indent_modes=("${pending_indent_modes[@]:1}")
+      fi
+      continue
+    fi
+
+    remaining="$line"
+    case "$language" in
+      ruby)
+        while [[ "$remaining" =~ $ruby_heredoc_regex ]]; do
+          operator="${BASH_REMATCH[1]}"
+          delimiter="${BASH_REMATCH[2]}"
+          matched="${BASH_REMATCH[0]}"
+          case "$delimiter" in
+            \"*\"|\'*\')
+              delimiter="${delimiter:1:${#delimiter}-2}"
+              ;;
+          esac
+          pending_delimiters+=("$delimiter")
+          if [ "$operator" = "<<" ]; then
+            pending_indent_modes+=("none")
+          else
+            pending_indent_modes+=("whitespace")
+          fi
+          remaining="${remaining#*"$matched"}"
+        done
+        ;;
+      bash)
+        while [[ "$remaining" =~ $bash_heredoc_regex ]]; do
+          operator="${BASH_REMATCH[2]}"
+          delimiter="${BASH_REMATCH[3]}"
+          matched="${BASH_REMATCH[0]}"
+          delimiter="${delimiter#\\}"
+          case "$delimiter" in
+            \"*\"|\'*\')
+              delimiter="${delimiter:1:${#delimiter}-2}"
+              ;;
+          esac
+          pending_delimiters+=("$delimiter")
+          if [ "$operator" = "<<-" ]; then
+            pending_indent_modes+=("tabs")
+          else
+            pending_indent_modes+=("none")
+          fi
+          remaining="${remaining#*"$matched"}"
+        done
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
+}
+
+line_number_list_contains() {
+  local line_numbers="$1"
+  local target="$2"
+
+  [ -n "$line_numbers" ] && grep -Fxq "$target" <<< "$line_numbers"
+}
+
+diff_touches_release_tooling_heredoc_body() {
+  local file="$1"
+  local diff_output="$2"
+  local language
+  local current_content
+  local base_content
+  local current_heredoc_body_lines
+  local base_heredoc_body_lines
+  local diff_line
+  local old_line=0
+  local new_line=0
+  local hunk_header_regex='^@@[[:space:]]-([0-9]+)(,([0-9]+))?[[:space:]]\+([0-9]+)(,([0-9]+))?[[:space:]]@@'
+
+  language="$(release_tooling_heredoc_language "$file")" || return 1
+  current_content="$(git show "$CURRENT_REF:$file" 2>/dev/null || cat "$file" 2>/dev/null || true)"
+  base_content="$(git show "$MERGE_BASE:$file" 2>/dev/null || true)"
+  current_heredoc_body_lines="$(heredoc_body_line_numbers "$language" <<< "$current_content")"
+  base_heredoc_body_lines="$(heredoc_body_line_numbers "$language" <<< "$base_content")"
+
+  while IFS= read -r diff_line; do
+    case "$diff_line" in
+      '@@ '*)
+        if [[ "$diff_line" =~ $hunk_header_regex ]]; then
+          old_line="${BASH_REMATCH[1]}"
+          new_line="${BASH_REMATCH[4]}"
+        fi
+        ;;
+      '+++ '*|'--- '*)
+        continue
+        ;;
+      '+'*)
+        if line_number_list_contains "$current_heredoc_body_lines" "$new_line"; then
+          return 0
+        fi
+        new_line=$((new_line + 1))
+        ;;
+      '-'*)
+        if line_number_list_contains "$base_heredoc_body_lines" "$old_line"; then
+          return 0
+        fi
+        old_line=$((old_line + 1))
+        ;;
+      ' '*)
+        old_line=$((old_line + 1))
+        new_line=$((new_line + 1))
+        ;;
+    esac
+  done <<< "$diff_output"
+
+  return 1
+}
+
+diff_touches_multiline_string_construct() {
+  local file="$1"
+  local diff_output="$2"
+
+  if is_release_tooling_path "$file"; then
+    diff_touches_release_tooling_heredoc_body "$file" "$diff_output"
+    return
+  fi
+
+  source_file_has_multiline_string_construct "$file"
 }
 
 source_file_comment_only_change() {
   local file="$1"
   local diff_output
-
-  if source_file_has_multiline_string_construct "$file"; then
-    return 1
-  fi
 
   diff_output="$(git diff --no-ext-diff --unified=0 "$MERGE_BASE" "$CURRENT_REF" -- "$file")"
   case "$diff_output" in
@@ -227,6 +398,10 @@ source_file_comment_only_change() {
       return 1
       ;;
   esac
+
+  if diff_touches_multiline_string_construct "$file" "$diff_output"; then
+    return 1
+  fi
 
   local changed_line saw_changed_line=false in_block_comment=false in_ruby_block_comment=false
   while IFS= read -r changed_line; do
@@ -280,6 +455,40 @@ while IFS= read -r file; do
   # A here-string yields a single empty line for empty input, so skip blank lines —
   # otherwise an empty diff would fall into the catch-all below and trigger every job.
   [ -z "$file" ] && continue
+
+  # Release tooling (rake release tasks + their helper scripts). The ONLY
+  # automated coverage for these paths is the release rspec suite
+  # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
+  # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED (runs
+  # those specs) plus RELEASE_TOOLING_CHANGED (runs rubocop) rather than the
+  # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
+  # RUN_GENERATORS=true, which makes required-pr-gate force the full hosted
+  # matrix (Generator/Playwright/Integration/JS) — none of which exercise
+  # release tooling (see script/ci-required-hosted-gate). This branch is
+  # deliberately NOT generator-/JS-sensitive: it sets no GENERATORS_CHANGED or
+  # JS_CHANGED, so run_generators / run_js_tests stay false and hosted CI is
+  # optional rather than gate-forced. RELEASE_TOOLING_CHANGED only drives
+  # RUN_LINT (release tooling is Ruby/Bash that rubocop covers); it is kept
+  # separate from RSPEC_CHANGED so the lint trigger does not leak to unrelated
+  # core/Pro spec-only changes. It must run before the script/* CI-infra arm
+  # (which would otherwise swallow script/release-*). Sets no BENCH_* flag:
+  # release tooling is never shipped in the gem and cannot move runtime
+  # performance. NOTE: the bare `script/release` stub (a 3-line
+  # `echo "See rake -D release"`) is intentionally NOT included in
+  # is_release_tooling_path — it has no release-spec coverage, so it stays in the
+  # script/* CI-infra arm rather than claiming a test suite that does not
+  # exercise it.
+  if is_release_tooling_path "$file"; then
+    DOCS_ONLY=false
+    if source_file_comment_only_change "$file"; then
+      SOURCE_COMMENT_ONLY_CHANGED=true
+    else
+      RSPEC_CHANGED=true
+      RELEASE_TOOLING_CHANGED=true
+    fi
+    continue
+  fi
+
   # *.md and docs/* intentionally overlap (docs/foo.md matches both); *.md wins
   # because it comes first. Several later branches (generators, Ruby core,
   # specs) also pair top-level and **/* globs for clarity even though * matches
@@ -496,38 +705,6 @@ while IFS= read -r file; do
     react_on_rails_pro/.rubocop.yml|react_on_rails_pro/.eslintrc*|react_on_rails_pro/eslint.config.*|react_on_rails_pro/.prettierrc*|react_on_rails_pro/.prettierignore|react_on_rails_pro/tsconfig.json|react_on_rails_pro/.editorconfig|react_on_rails_pro/package-scripts.yml)
       DOCS_ONLY=false
       PRO_LINT_CONFIG_CHANGED=true
-      ;;
-
-    # Release tooling (rake release tasks + their helper scripts). The ONLY
-    # automated coverage for these paths is the release rspec suite
-    # (react_on_rails/spec/react_on_rails/release_rake_helpers_spec.rb and
-    # release_forward_port_script_spec.rb), so route them to RSPEC_CHANGED (runs
-    # those specs) plus RELEASE_TOOLING_CHANGED (runs rubocop) rather than the
-    # CI-infrastructure arm below. That arm's catch-all-equivalent behavior set
-    # RUN_GENERATORS=true, which makes required-pr-gate force the full hosted
-    # matrix (Generator/Playwright/Integration/JS) — none of which exercise
-    # release tooling (see script/ci-required-hosted-gate). This arm is
-    # deliberately NOT generator-/JS-sensitive: it sets no GENERATORS_CHANGED or
-    # JS_CHANGED, so run_generators / run_js_tests stay false and hosted CI is
-    # optional rather than gate-forced. RELEASE_TOOLING_CHANGED only drives
-    # RUN_LINT (release tooling is Ruby/Bash that rubocop covers); it is kept
-    # separate from RSPEC_CHANGED so the lint trigger does not leak to unrelated
-    # core/Pro spec-only changes. It must precede the script/* CI-infra arm
-    # (which would otherwise swallow script/release-*) and follow the more
-    # specific source/spec arms above. Sets no BENCH_* flag: release tooling is
-    # never shipped in the gem and cannot move runtime performance.
-    # NOTE: the bare `script/release` stub (a 3-line `echo "See rake -D release"`)
-    # is intentionally NOT listed here — it has no release-spec coverage, so it
-    # stays in the script/* CI-infra arm below rather than claiming a test suite
-    # that does not exercise it.
-    rakelib/release.rake|script/release-forward-port|script/release-forward-port-test.bash|script/release-finish|script/release-finish-test.bash)
-      DOCS_ONLY=false
-      if source_file_comment_only_change "$file"; then
-        SOURCE_COMMENT_ONLY_CHANGED=true
-      else
-        RSPEC_CHANGED=true
-        RELEASE_TOOLING_CHANGED=true
-      fi
       ;;
 
     # CI infrastructure files (scripts, workflows, CI configs).

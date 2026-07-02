@@ -1133,6 +1133,49 @@ RUBY
   assert_release_tooling_contract "$(detector_output)" "release-forward-port quoted numeric heredoc output"
 }
 
+test_release_forward_port_plain_heredoc_indented_delimiter_text_stays_in_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+FIXTURE = <<CHANGELOG
+# Change Log
+  CHANGELOG
+# Body after indented delimiter text
+CHANGELOG
+
+puts FIXTURE
+RUBY
+  commit_change "add release-forward-port plain heredoc with indented delimiter text"
+  perl -0pi -e 's/# Body after indented delimiter text/# Changed body after indented delimiter text/' \
+    script/release-forward-port
+  commit_change "release-forward-port plain heredoc later body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-forward-port plain heredoc indented delimiter text output"
+}
+
+test_release_forward_port_multiple_heredocs_on_one_line_track_later_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+puts <<~MAIN, <<~RELEASE
+# Main
+MAIN
+# Release
+RELEASE
+RUBY
+  commit_change "add release-forward-port multiple heredoc fixture"
+  perl -0pi -e 's/# Release/# Release changed/' script/release-forward-port
+  commit_change "release-forward-port second heredoc body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-forward-port multiple heredoc output"
+}
+
 assert_bash_release_tooling_heredoc_fixture_change_runs_release_specs() {
   local script_path="$1"
   local label="$2"
@@ -1220,6 +1263,44 @@ BASH
   assert_release_tooling_contract "$(detector_output)" "release-finish-test compact bash heredoc output"
 }
 
+test_release_finish_test_backslash_bash_heredoc_change_runs_release_specs() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<\fixture > release.md
+# Change Log
+
+### [Unreleased]
+fixture
+BASH
+  commit_change "add release-finish-test backslash bash heredoc fixture"
+  perl -0pi -e 's/# Change Log/# Release Change Log/' script/release-finish-test.bash
+  commit_change "release-finish-test backslash bash fixture heading"
+
+  assert_release_tooling_contract "$(detector_output)" "release-finish-test backslash bash heredoc output"
+}
+
+test_release_finish_test_multiple_bash_heredocs_on_one_line_track_later_body() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-finish-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<MAIN <<RELEASE
+# Main
+MAIN
+# Release
+RELEASE
+BASH
+  commit_change "add release-finish-test multiple bash heredoc fixture"
+  perl -0pi -e 's/# Release/# Release changed/' script/release-finish-test.bash
+  commit_change "release-finish-test second bash heredoc body heading"
+
+  assert_release_tooling_contract \
+    "$(detector_output)" \
+    "release-finish-test multiple bash heredoc output"
+}
+
 # Comment-only change to release tooling takes the SOURCE_COMMENT_ONLY_CHANGED
 # branch of the release arm (not RELEASE_TOOLING_CHANGED), so it stays
 # non-runtime — rubocop still runs (lint catches comment-affecting style) but the
@@ -1267,6 +1348,30 @@ RUBY
   assert_contains "$out" '"run_generators": false' "release shovel comment output"
 }
 
+test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port <<'RUBY'
+#!/usr/bin/env ruby
+USAGE = <<~USAGE
+# Usage
+USAGE
+
+puts "ok"
+RUBY
+  commit_change "add release script with heredoc"
+  perl -0pi -e 's/puts "ok"/# Explain the release script.\nputs "ok"/' script/release-forward-port
+  commit_change "release script outside-heredoc comment"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release outside-heredoc comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_lint": true' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release outside-heredoc comment output"
+  assert_contains "$out" '"run_generators": false' "release outside-heredoc comment output"
+}
+
 # Regression guard: a CHANGELOG.md-only change is documentation (matched by the
 # *.md docs arm) and must stay skippable — docs_only / non_runtime_only true,
 # every run_* false. Release stamping touches CHANGELOG.md, so this keeps that
@@ -1309,13 +1414,18 @@ run_test test_release_finish_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_plain_heredoc_fixture_change_runs_release_specs
 run_test test_release_finish_method_plain_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_quoted_numeric_heredoc_fixture_change_runs_release_specs
+run_test test_release_forward_port_plain_heredoc_indented_delimiter_text_stays_in_body
+run_test test_release_forward_port_multiple_heredocs_on_one_line_track_later_body
 run_test test_release_forward_port_test_heredoc_fixture_change_runs_release_specs
 run_test test_release_finish_test_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_test_lowercase_bash_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_test_hyphenated_bash_heredoc_change_runs_release_specs
 run_test test_release_finish_test_compact_bash_heredoc_redirect_change_runs_release_specs
+run_test test_release_finish_test_backslash_bash_heredoc_change_runs_release_specs
+run_test test_release_finish_test_multiple_bash_heredocs_on_one_line_track_later_body
 run_test test_release_tooling_comment_only_change_is_non_runtime_but_keeps_lint
 run_test test_release_tooling_shovel_operator_comment_only_change_stays_non_runtime
+run_test test_release_tooling_comment_only_change_outside_existing_heredoc_stays_non_runtime
 run_test test_changelog_only_change_is_non_runtime_only
 run_test test_docs_changes_are_non_runtime_only
 run_test test_internal_non_markdown_docs_are_non_runtime_only
