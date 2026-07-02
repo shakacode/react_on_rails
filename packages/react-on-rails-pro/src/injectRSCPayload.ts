@@ -265,30 +265,915 @@ function stylesheetTagsForRSCClientChunks(
   return stylesheetTags;
 }
 
-const RAW_TEXT_TAG_NAMES = ['script', 'style', 'textarea', 'title'];
+// Retain containers where injected payload scripts would not execute until after the closing tag.
+const RAW_TEXT_TAG_NAMES = [
+  'iframe',
+  'noembed',
+  'noframes',
+  'noscript',
+  'script',
+  'style',
+  'template',
+  'textarea',
+  'title',
+  'xmp',
+];
 
-const RAW_TEXT_TAG_PATTERN = new RegExp(`<(\\/?)(${RAW_TEXT_TAG_NAMES.join('|')})\\b[^>]*>`, 'gi');
+const RAW_TEXT_CLOSING_TAG_PREFIX_PATTERNS = new Map(
+  RAW_TEXT_TAG_NAMES.map((tagName) => [tagName, new RegExp(`</${tagName}(?=[\\s>/])`, 'gi')]),
+);
+const RAW_TEXT_TAG_NAME_SET = new Set(RAW_TEXT_TAG_NAMES);
+const FOREIGN_CONTENT_TAG_NAME_SET = new Set(['math', 'svg']);
+const SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN = /<script(?=[\s>/])/gi;
+const SCRIPT_SCAN_OVERLAP_LENGTH = Math.max('<!--'.length, '-->'.length, '<script'.length, '</script'.length);
+const CDATA_OPEN = '<![CDATA[';
+const CDATA_CLOSE = ']]>';
 
-function findUnclosedRawTextElementStart(htmlString: string) {
-  let openRawTextElement: { start: number; tagName: string } | undefined;
-  let match = RAW_TEXT_TAG_PATTERN.exec(htmlString);
-  while (match) {
-    const isClosingTag = match[1] === '/';
-    const tagName = match[2].toLowerCase();
-    if (isClosingTag) {
-      if (openRawTextElement?.tagName === tagName) {
-        openRawTextElement = undefined;
-      }
-    } else {
-      openRawTextElement = { start: match.index, tagName };
+type TemplateIgnoredTailScanState =
+  | { kind: 'comment' }
+  | { kind: 'cdata' }
+  | {
+      kind: 'template';
+      depth: number;
+      ignoredTailScanState?: TemplateIgnoredTailScanState;
     }
-    match = RAW_TEXT_TAG_PATTERN.exec(htmlString);
+  | {
+      kind: 'foreignContent';
+      tagName: string;
+      depth: number;
+      ignoredTailScanState?: TemplateIgnoredTailScanState;
+    }
+  | {
+      kind: 'rawText';
+      tagName: string;
+      scriptDataState?: ScriptDataState;
+    };
+
+type RetainedIncompleteHtmlTailScanState =
+  | { kind: 'comment'; closingSearchStart: number }
+  | { kind: 'cdata'; closingSearchStart: number }
+  | {
+      kind: 'foreignContent';
+      tagName: string;
+      closingSearchStart: number;
+      depth: number;
+      ignoredTailScanState?: TemplateIgnoredTailScanState;
+    }
+  | {
+      kind: 'rawText';
+      tagName: string;
+      closingSearchStart: number;
+      scriptDataState?: ScriptDataState;
+    }
+  | {
+      kind: 'template';
+      closingSearchStart: number;
+      depth: number;
+      ignoredTailScanState?: TemplateIgnoredTailScanState;
+    };
+
+type SplitIncompleteHtmlTailResult = {
+  completeHtml: string;
+  incompleteHtmlTagTail: string;
+  incompleteHtmlTailScanState?: RetainedIncompleteHtmlTailScanState;
+};
+
+type ScriptDataState = 'normal' | 'escaped' | 'doubleEscaped';
+
+type RawTextClosingTagScanResult = {
+  closingTagEnd?: number;
+  closingSearchStart: number;
+  scriptDataState?: ScriptDataState;
+};
+
+type ContainerTailScanResult = {
+  closingTagEnd?: number;
+  closingSearchStart: number;
+  depth: number;
+  ignoredTailScanState?: TemplateIgnoredTailScanState;
+};
+
+function findHtmlTagEnd(htmlString: string, tagStart: number) {
+  let quote: string | undefined;
+
+  for (let index = tagStart + 1; index < htmlString.length; index += 1) {
+    const character = htmlString[index];
+    if (quote) {
+      if (character === quote) quote = undefined;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '>') {
+      return index + 1;
+    }
   }
 
-  return openRawTextElement?.start;
+  return undefined;
 }
 
-function splitIncompleteHtmlTagTail(htmlString: string) {
+function isHtmlWhitespace(character: string) {
+  return (
+    character === '\t' || character === '\n' || character === '\f' || character === '\r' || character === ' '
+  );
+}
+
+function isHtmlSelfClosingStartTag(tag: string, attributesStartIndex: number) {
+  let state:
+    | 'beforeAttribute'
+    | 'attributeName'
+    | 'afterAttributeName'
+    | 'beforeAttributeValue'
+    | 'attributeValueQuoted'
+    | 'afterAttributeValueQuoted'
+    | 'attributeValueUnquoted'
+    | 'selfClosingStartTag' = 'beforeAttribute';
+  let quote: '"' | "'" | undefined;
+
+  for (let index = attributesStartIndex; index < tag.length - 1; index += 1) {
+    const character = tag[index];
+
+    if (state === 'attributeValueQuoted') {
+      if (character === quote) {
+        quote = undefined;
+        state = 'afterAttributeValueQuoted';
+      }
+    } else if (isHtmlWhitespace(character)) {
+      if (state === 'attributeName') {
+        state = 'afterAttributeName';
+      } else if (state === 'attributeValueUnquoted' || state === 'afterAttributeValueQuoted') {
+        state = 'beforeAttribute';
+      } else if (state === 'selfClosingStartTag') {
+        state = 'beforeAttribute';
+      }
+    } else if (state === 'beforeAttribute') {
+      state = character === '/' ? 'selfClosingStartTag' : 'attributeName';
+    } else if (state === 'attributeName') {
+      if (character === '=') state = 'beforeAttributeValue';
+    } else if (state === 'afterAttributeName') {
+      if (character === '=') {
+        state = 'beforeAttributeValue';
+      } else {
+        state = character === '/' ? 'selfClosingStartTag' : 'attributeName';
+      }
+    } else if (state === 'beforeAttributeValue') {
+      if (character === '"' || character === "'") {
+        quote = character;
+        state = 'attributeValueQuoted';
+      } else {
+        state = 'attributeValueUnquoted';
+      }
+    } else if (state === 'afterAttributeValueQuoted') {
+      state = character === '/' ? 'selfClosingStartTag' : 'attributeName';
+    } else if (state === 'selfClosingStartTag') {
+      state = character === '/' ? 'selfClosingStartTag' : 'attributeName';
+    }
+  }
+
+  return state === 'selfClosingStartTag';
+}
+
+function parseHtmlTag(htmlString: string, tagStart: number, tagEnd: number) {
+  const tag = htmlString.slice(tagStart, tagEnd);
+  const tagMatch = tag.match(/^<\s*(\/)?\s*([a-z][\w:-]*)(?=[\s>/])/i);
+  if (!tagMatch) return undefined;
+
+  const isClosingTag = tagMatch[1] === '/';
+
+  return {
+    isClosingTag,
+    isSelfClosingStartTag: !isClosingTag && isHtmlSelfClosingStartTag(tag, tagMatch[0].length),
+    tagName: tagMatch[2].toLowerCase(),
+  };
+}
+
+function findScriptDoubleEscapeOpenIndex(htmlString: string, startIndex: number) {
+  SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.lastIndex = startIndex;
+  const match = SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.exec(htmlString);
+  return match ? match.index : -1;
+}
+
+function updateScriptDataState(segment: string, initialState: ScriptDataState): ScriptDataState {
+  let state = initialState;
+  let searchIndex = 0;
+
+  while (searchIndex < segment.length) {
+    if (state === 'normal') {
+      const escapedStart = segment.indexOf('<!--', searchIndex);
+      if (escapedStart === -1) break;
+
+      state = 'escaped';
+      searchIndex = escapedStart + 4;
+    } else if (state === 'escaped') {
+      const escapedEnd = segment.indexOf('-->', searchIndex);
+      const doubleEscapeStart = findScriptDoubleEscapeOpenIndex(segment, searchIndex);
+
+      if (escapedEnd !== -1 && (doubleEscapeStart === -1 || escapedEnd < doubleEscapeStart)) {
+        state = 'normal';
+        searchIndex = escapedEnd + 3;
+      } else if (doubleEscapeStart !== -1) {
+        state = 'doubleEscaped';
+        searchIndex = SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN.lastIndex;
+      } else {
+        break;
+      }
+    } else if (state === 'doubleEscaped') {
+      const escapedEnd = segment.indexOf('-->', searchIndex);
+      if (escapedEnd === -1) break;
+
+      state = 'normal';
+      searchIndex = escapedEnd + 3;
+    } else {
+      break;
+    }
+  }
+
+  return state;
+}
+
+function scanScriptClosingTag(
+  htmlString: string,
+  startIndex: number,
+  initialScriptDataState: ScriptDataState = 'normal',
+): RawTextClosingTagScanResult {
+  const closingTagPrefixPattern = RAW_TEXT_CLOSING_TAG_PREFIX_PATTERNS.get('script');
+  if (!closingTagPrefixPattern) {
+    return { closingSearchStart: startIndex, scriptDataState: initialScriptDataState };
+  }
+
+  let contentScanStart = startIndex;
+  let scriptDataState = initialScriptDataState;
+  closingTagPrefixPattern.lastIndex = startIndex;
+
+  for (
+    let closingTagMatch = closingTagPrefixPattern.exec(htmlString);
+    closingTagMatch;
+    closingTagMatch = closingTagPrefixPattern.exec(htmlString)
+  ) {
+    scriptDataState = updateScriptDataState(
+      htmlString.slice(contentScanStart, closingTagMatch.index),
+      scriptDataState,
+    );
+
+    const closingTagEnd = findHtmlTagEnd(htmlString, closingTagMatch.index);
+    if (closingTagEnd === undefined) {
+      return { closingSearchStart: closingTagMatch.index, scriptDataState };
+    }
+
+    if (scriptDataState === 'doubleEscaped') {
+      scriptDataState = 'escaped';
+      contentScanStart = closingTagEnd;
+      closingTagPrefixPattern.lastIndex = closingTagEnd;
+    } else {
+      return { closingTagEnd, closingSearchStart: closingTagEnd, scriptDataState };
+    }
+  }
+
+  const safeScanEnd = Math.max(contentScanStart, htmlString.length - SCRIPT_SCAN_OVERLAP_LENGTH);
+  scriptDataState = updateScriptDataState(htmlString.slice(contentScanStart, safeScanEnd), scriptDataState);
+
+  return { closingSearchStart: safeScanEnd, scriptDataState };
+}
+
+function findRawTextClosingTagSearchStart(htmlString: string, tagName: string, searchStart: number) {
+  if (tagName === 'script') return searchStart;
+
+  return Math.max(searchStart, htmlString.length - `</${tagName}`.length);
+}
+
+function scanRawTextClosingTag(
+  htmlString: string,
+  tagName: string,
+  startIndex: number,
+  initialScriptDataState?: ScriptDataState,
+): RawTextClosingTagScanResult {
+  if (tagName === 'script') return scanScriptClosingTag(htmlString, startIndex, initialScriptDataState);
+
+  const closingTagPrefixPattern = RAW_TEXT_CLOSING_TAG_PREFIX_PATTERNS.get(tagName);
+  if (!closingTagPrefixPattern) return { closingSearchStart: startIndex };
+
+  closingTagPrefixPattern.lastIndex = startIndex;
+  const closingTagMatch = closingTagPrefixPattern.exec(htmlString);
+  if (!closingTagMatch) {
+    return {
+      closingSearchStart: findRawTextClosingTagSearchStart(htmlString, tagName, startIndex),
+    };
+  }
+
+  const closingTagEnd = findHtmlTagEnd(htmlString, closingTagMatch.index);
+  if (closingTagEnd === undefined) return { closingSearchStart: closingTagMatch.index };
+
+  return { closingTagEnd, closingSearchStart: closingTagEnd };
+}
+
+function findRawTextClosingTagEnd(htmlString: string, tagName: string, startIndex: number) {
+  return scanRawTextClosingTag(htmlString, tagName, startIndex).closingTagEnd;
+}
+
+function findCommentClosingTagSearchStart(htmlString: string, searchStart: number) {
+  return Math.max(searchStart, htmlString.length - 2);
+}
+
+function findCdataClosingTagSearchStart(htmlString: string, searchStart: number) {
+  return Math.max(searchStart, htmlString.length - (CDATA_CLOSE.length - 1));
+}
+
+function scanForeignContentTail(
+  htmlString: string,
+  startIndex: number,
+  tagName: string,
+  initialDepth = 1,
+  initialIgnoredTailScanState?: TemplateIgnoredTailScanState,
+): ContainerTailScanResult {
+  let depth = initialDepth;
+  let searchIndex = startIndex;
+  let closingSearchStart = startIndex;
+  let ignoredTailScanState = initialIgnoredTailScanState;
+
+  while (searchIndex < htmlString.length) {
+    if (ignoredTailScanState?.kind === 'comment') {
+      const commentEnd = htmlString.indexOf('-->', searchIndex);
+      if (commentEnd === -1) {
+        return {
+          closingSearchStart: findCommentClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = commentEnd + 3;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'cdata') {
+      const cdataEnd = htmlString.indexOf(CDATA_CLOSE, searchIndex);
+      if (cdataEnd === -1) {
+        return {
+          closingSearchStart: findCdataClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = cdataEnd + CDATA_CLOSE.length;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'rawText') {
+      const closingTagScan = scanRawTextClosingTag(
+        htmlString,
+        ignoredTailScanState.tagName,
+        searchIndex,
+        ignoredTailScanState.scriptDataState,
+      );
+      if (closingTagScan.closingTagEnd === undefined) {
+        return {
+          closingSearchStart: closingTagScan.closingSearchStart,
+          depth,
+          ignoredTailScanState: {
+            ...ignoredTailScanState,
+            scriptDataState: closingTagScan.scriptDataState,
+          },
+        };
+      }
+
+      searchIndex = closingTagScan.closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'template') {
+      // scanTemplateTail is hoisted; the recursive scanner state can nest templates inside foreign content.
+      // eslint-disable-next-line no-use-before-define
+      const templateScan = scanTemplateTail(
+        htmlString,
+        searchIndex,
+        ignoredTailScanState.depth,
+        ignoredTailScanState.ignoredTailScanState,
+      );
+      if (templateScan.closingTagEnd === undefined) {
+        return {
+          closingSearchStart: templateScan.closingSearchStart,
+          depth,
+          ignoredTailScanState: {
+            kind: 'template' as const,
+            depth: templateScan.depth,
+            ignoredTailScanState: templateScan.ignoredTailScanState,
+          },
+        };
+      }
+
+      searchIndex = templateScan.closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else {
+      const tagStart = htmlString.indexOf('<', searchIndex);
+      if (tagStart === -1) break;
+
+      if (htmlString.startsWith('<!--', tagStart)) {
+        const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+        if (commentEnd === -1) {
+          return {
+            closingSearchStart: findCommentClosingTagSearchStart(htmlString, tagStart + 4),
+            depth,
+            ignoredTailScanState: { kind: 'comment' as const },
+          };
+        }
+
+        searchIndex = commentEnd + 3;
+        closingSearchStart = searchIndex;
+      } else if (htmlString.startsWith(CDATA_OPEN, tagStart)) {
+        const cdataEnd = htmlString.indexOf(CDATA_CLOSE, tagStart + CDATA_OPEN.length);
+        if (cdataEnd === -1) {
+          return {
+            closingSearchStart: findCdataClosingTagSearchStart(htmlString, tagStart + CDATA_OPEN.length),
+            depth,
+            ignoredTailScanState: { kind: 'cdata' as const },
+          };
+        }
+
+        searchIndex = cdataEnd + CDATA_CLOSE.length;
+        closingSearchStart = searchIndex;
+      } else {
+        const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+        if (tagEnd === undefined) return { closingSearchStart: tagStart, depth };
+
+        const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+        if (!parsedTag) {
+          searchIndex = tagStart + 1;
+        } else if (!parsedTag.isClosingTag && parsedTag.isSelfClosingStartTag) {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+        } else if (parsedTag.tagName === tagName) {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+          depth += parsedTag.isClosingTag ? -1 : 1;
+          if (depth === 0) {
+            return { closingTagEnd: searchIndex, closingSearchStart, depth };
+          }
+        } else if (!parsedTag.isClosingTag && parsedTag.tagName === 'template') {
+          // scanTemplateTail is hoisted; foreign-content scanning must ignore nested template contents.
+          // eslint-disable-next-line no-use-before-define
+          const templateScan = scanTemplateTail(htmlString, tagEnd);
+          if (templateScan.closingTagEnd === undefined) {
+            return {
+              closingSearchStart: templateScan.closingSearchStart,
+              depth,
+              ignoredTailScanState: {
+                kind: 'template' as const,
+                depth: templateScan.depth,
+                ignoredTailScanState: templateScan.ignoredTailScanState,
+              },
+            };
+          }
+
+          searchIndex = templateScan.closingTagEnd;
+          closingSearchStart = searchIndex;
+        } else if (!parsedTag.isClosingTag && RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+          const closingTagScan = scanRawTextClosingTag(htmlString, parsedTag.tagName, tagEnd);
+          if (closingTagScan.closingTagEnd === undefined) {
+            return {
+              closingSearchStart: closingTagScan.closingSearchStart,
+              depth,
+              ignoredTailScanState: {
+                kind: 'rawText' as const,
+                tagName: parsedTag.tagName,
+                scriptDataState: closingTagScan.scriptDataState,
+              },
+            };
+          }
+
+          searchIndex = closingTagScan.closingTagEnd;
+          closingSearchStart = searchIndex;
+        } else {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+        }
+      }
+    }
+  }
+
+  return { closingSearchStart, depth, ignoredTailScanState };
+}
+
+function scanTemplateTail(
+  htmlString: string,
+  startIndex: number,
+  initialDepth = 1,
+  initialIgnoredTailScanState?: TemplateIgnoredTailScanState,
+): ContainerTailScanResult {
+  let depth = initialDepth;
+  let searchIndex = startIndex;
+  let closingSearchStart = startIndex;
+  let ignoredTailScanState = initialIgnoredTailScanState;
+
+  while (searchIndex < htmlString.length) {
+    if (ignoredTailScanState?.kind === 'comment') {
+      const commentEnd = htmlString.indexOf('-->', searchIndex);
+      if (commentEnd === -1) {
+        return {
+          closingSearchStart: findCommentClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = commentEnd + 3;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'cdata') {
+      const cdataEnd = htmlString.indexOf(CDATA_CLOSE, searchIndex);
+      if (cdataEnd === -1) {
+        return {
+          closingSearchStart: findCdataClosingTagSearchStart(htmlString, searchIndex),
+          depth,
+          ignoredTailScanState,
+        };
+      }
+
+      searchIndex = cdataEnd + CDATA_CLOSE.length;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'rawText') {
+      const closingTagScan = scanRawTextClosingTag(
+        htmlString,
+        ignoredTailScanState.tagName,
+        searchIndex,
+        ignoredTailScanState.scriptDataState,
+      );
+      if (closingTagScan.closingTagEnd === undefined) {
+        return {
+          closingSearchStart: closingTagScan.closingSearchStart,
+          depth,
+          ignoredTailScanState: {
+            ...ignoredTailScanState,
+            scriptDataState: closingTagScan.scriptDataState,
+          },
+        };
+      }
+
+      searchIndex = closingTagScan.closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'template') {
+      const templateScan = scanTemplateTail(
+        htmlString,
+        searchIndex,
+        ignoredTailScanState.depth,
+        ignoredTailScanState.ignoredTailScanState,
+      );
+      if (templateScan.closingTagEnd === undefined) {
+        return {
+          closingSearchStart: templateScan.closingSearchStart,
+          depth,
+          ignoredTailScanState: {
+            kind: 'template' as const,
+            depth: templateScan.depth,
+            ignoredTailScanState: templateScan.ignoredTailScanState,
+          },
+        };
+      }
+
+      searchIndex = templateScan.closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else if (ignoredTailScanState?.kind === 'foreignContent') {
+      const foreignContentScan = scanForeignContentTail(
+        htmlString,
+        searchIndex,
+        ignoredTailScanState.tagName,
+        ignoredTailScanState.depth,
+        ignoredTailScanState.ignoredTailScanState,
+      );
+      if (foreignContentScan.closingTagEnd === undefined) {
+        return {
+          closingSearchStart: foreignContentScan.closingSearchStart,
+          depth,
+          ignoredTailScanState: {
+            kind: 'foreignContent' as const,
+            tagName: ignoredTailScanState.tagName,
+            depth: foreignContentScan.depth,
+            ignoredTailScanState: foreignContentScan.ignoredTailScanState,
+          },
+        };
+      }
+
+      searchIndex = foreignContentScan.closingTagEnd;
+      closingSearchStart = searchIndex;
+      ignoredTailScanState = undefined;
+    } else {
+      const tagStart = htmlString.indexOf('<', searchIndex);
+      if (tagStart === -1) break;
+
+      if (htmlString.startsWith('<!--', tagStart)) {
+        const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+        if (commentEnd === -1) {
+          return {
+            closingSearchStart: findCommentClosingTagSearchStart(htmlString, tagStart + 4),
+            depth,
+            ignoredTailScanState: { kind: 'comment' as const },
+          };
+        }
+
+        searchIndex = commentEnd + 3;
+        closingSearchStart = searchIndex;
+      } else {
+        const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+        if (tagEnd === undefined) {
+          return { closingSearchStart: tagStart, depth };
+        }
+
+        const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+        if (!parsedTag) {
+          searchIndex = tagStart + 1;
+        } else if (parsedTag.tagName === 'template') {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+          depth += parsedTag.isClosingTag ? -1 : 1;
+          if (depth === 0) {
+            return { closingTagEnd: searchIndex, closingSearchStart, depth };
+          }
+        } else if (
+          !parsedTag.isClosingTag &&
+          !parsedTag.isSelfClosingStartTag &&
+          FOREIGN_CONTENT_TAG_NAME_SET.has(parsedTag.tagName)
+        ) {
+          const foreignContentScan = scanForeignContentTail(htmlString, tagEnd, parsedTag.tagName);
+          if (foreignContentScan.closingTagEnd === undefined) {
+            return {
+              closingSearchStart: foreignContentScan.closingSearchStart,
+              depth,
+              ignoredTailScanState: {
+                kind: 'foreignContent' as const,
+                tagName: parsedTag.tagName,
+                depth: foreignContentScan.depth,
+                ignoredTailScanState: foreignContentScan.ignoredTailScanState,
+              },
+            };
+          }
+
+          searchIndex = foreignContentScan.closingTagEnd;
+          closingSearchStart = searchIndex;
+        } else if (!parsedTag.isClosingTag && RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+          const closingTagScan = scanRawTextClosingTag(htmlString, parsedTag.tagName, tagEnd);
+          if (closingTagScan.closingTagEnd === undefined) {
+            return {
+              closingSearchStart: closingTagScan.closingSearchStart,
+              depth,
+              ignoredTailScanState: {
+                kind: 'rawText' as const,
+                tagName: parsedTag.tagName,
+                scriptDataState: closingTagScan.scriptDataState,
+              },
+            };
+          }
+
+          searchIndex = closingTagScan.closingTagEnd;
+          closingSearchStart = searchIndex;
+        } else {
+          searchIndex = tagEnd;
+          closingSearchStart = searchIndex;
+        }
+      }
+    }
+  }
+
+  return { closingSearchStart, depth, ignoredTailScanState };
+}
+
+function findUnclosedRawTextElementTail(htmlString: string) {
+  let searchIndex = 0;
+
+  while (searchIndex < htmlString.length) {
+    const tagStart = htmlString.indexOf('<', searchIndex);
+    if (tagStart === -1) return undefined;
+
+    if (htmlString.startsWith('<!--', tagStart)) {
+      const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+      if (commentEnd === -1) {
+        return {
+          start: tagStart,
+          scanState: {
+            kind: 'comment' as const,
+            closingSearchStart: findCommentClosingTagSearchStart(htmlString, tagStart + 4) - tagStart,
+          },
+        };
+      }
+
+      searchIndex = commentEnd + 3;
+    } else {
+      const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+      if (tagEnd === undefined) return undefined;
+
+      const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+      if (!parsedTag) {
+        searchIndex = tagStart + 1;
+      } else if (
+        !parsedTag.isClosingTag &&
+        !parsedTag.isSelfClosingStartTag &&
+        FOREIGN_CONTENT_TAG_NAME_SET.has(parsedTag.tagName)
+      ) {
+        const foreignContentScan = scanForeignContentTail(htmlString, tagEnd, parsedTag.tagName);
+        if (foreignContentScan.closingTagEnd === undefined) {
+          return {
+            start: tagStart,
+            scanState: {
+              kind: 'foreignContent' as const,
+              tagName: parsedTag.tagName,
+              closingSearchStart: foreignContentScan.closingSearchStart - tagStart,
+              depth: foreignContentScan.depth,
+              ignoredTailScanState: foreignContentScan.ignoredTailScanState,
+            },
+          };
+        }
+
+        searchIndex = foreignContentScan.closingTagEnd;
+      } else if (parsedTag.isClosingTag || !RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+        searchIndex = tagEnd;
+      } else if (parsedTag.tagName === 'template') {
+        const templateScan = scanTemplateTail(htmlString, tagEnd);
+        if (templateScan.closingTagEnd === undefined) {
+          return {
+            start: tagStart,
+            scanState: {
+              kind: 'template' as const,
+              closingSearchStart: templateScan.closingSearchStart - tagStart,
+              depth: templateScan.depth,
+              ignoredTailScanState: templateScan.ignoredTailScanState,
+            },
+          };
+        }
+
+        searchIndex = templateScan.closingTagEnd;
+      } else {
+        const closingTagScan = scanRawTextClosingTag(htmlString, parsedTag.tagName, tagEnd);
+        if (closingTagScan.closingTagEnd === undefined) {
+          return {
+            start: tagStart,
+            scanState: {
+              kind: 'rawText' as const,
+              tagName: parsedTag.tagName,
+              closingSearchStart: closingTagScan.closingSearchStart - tagStart,
+              scriptDataState: closingTagScan.scriptDataState,
+            },
+          };
+        }
+
+        searchIndex = closingTagScan.closingTagEnd;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function splitNewUnclosedRawTextElementTail(htmlString: string): SplitIncompleteHtmlTailResult | undefined {
+  const rawTextElementTail = findUnclosedRawTextElementTail(htmlString);
+  if (rawTextElementTail === undefined) return undefined;
+
+  return {
+    completeHtml: htmlString.slice(0, rawTextElementTail.start),
+    incompleteHtmlTagTail: htmlString.slice(rawTextElementTail.start),
+    incompleteHtmlTailScanState: rawTextElementTail.scanState,
+  };
+}
+
+function splitAfterClosedRetainedRawTextOrCommentTail(htmlString: string, closingEnd: number) {
+  const suffix = htmlString.slice(closingEnd);
+  const suffixTail = splitNewUnclosedRawTextElementTail(suffix);
+  if (!suffixTail) {
+    return {
+      completeHtml: htmlString,
+      incompleteHtmlTagTail: '',
+    };
+  }
+
+  return {
+    completeHtml: htmlString.slice(0, closingEnd) + suffixTail.completeHtml,
+    incompleteHtmlTagTail: suffixTail.incompleteHtmlTagTail,
+    incompleteHtmlTailScanState: suffixTail.incompleteHtmlTailScanState,
+  };
+}
+
+function splitRetainedUnclosedRawTextOrCommentTail(
+  htmlString: string,
+  retainedTailScanState: RetainedIncompleteHtmlTailScanState,
+): SplitIncompleteHtmlTailResult | undefined {
+  if (retainedTailScanState.kind === 'comment') {
+    const commentEnd = htmlString.indexOf('-->', retainedTailScanState.closingSearchStart);
+    if (commentEnd === -1) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'comment',
+          closingSearchStart: findCommentClosingTagSearchStart(
+            htmlString,
+            retainedTailScanState.closingSearchStart,
+          ),
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, commentEnd + 3);
+  }
+
+  if (retainedTailScanState.kind === 'cdata') {
+    const cdataEnd = htmlString.indexOf(CDATA_CLOSE, retainedTailScanState.closingSearchStart);
+    if (cdataEnd === -1) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'cdata',
+          closingSearchStart: findCdataClosingTagSearchStart(
+            htmlString,
+            retainedTailScanState.closingSearchStart,
+          ),
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, cdataEnd + CDATA_CLOSE.length);
+  }
+
+  if (retainedTailScanState.kind === 'foreignContent') {
+    const foreignContentScan = scanForeignContentTail(
+      htmlString,
+      retainedTailScanState.closingSearchStart,
+      retainedTailScanState.tagName,
+      retainedTailScanState.depth,
+      retainedTailScanState.ignoredTailScanState,
+    );
+    if (foreignContentScan.closingTagEnd === undefined) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'foreignContent',
+          tagName: retainedTailScanState.tagName,
+          closingSearchStart: foreignContentScan.closingSearchStart,
+          depth: foreignContentScan.depth,
+          ignoredTailScanState: foreignContentScan.ignoredTailScanState,
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, foreignContentScan.closingTagEnd);
+  }
+
+  if (retainedTailScanState.kind === 'template') {
+    const templateScan = scanTemplateTail(
+      htmlString,
+      retainedTailScanState.closingSearchStart,
+      retainedTailScanState.depth,
+      retainedTailScanState.ignoredTailScanState,
+    );
+    if (templateScan.closingTagEnd === undefined) {
+      return {
+        completeHtml: '',
+        incompleteHtmlTagTail: htmlString,
+        incompleteHtmlTailScanState: {
+          kind: 'template',
+          closingSearchStart: templateScan.closingSearchStart,
+          depth: templateScan.depth,
+          ignoredTailScanState: templateScan.ignoredTailScanState,
+        },
+      };
+    }
+
+    return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, templateScan.closingTagEnd);
+  }
+
+  const closingTagScan = scanRawTextClosingTag(
+    htmlString,
+    retainedTailScanState.tagName,
+    retainedTailScanState.closingSearchStart,
+    retainedTailScanState.scriptDataState,
+  );
+  if (closingTagScan.closingTagEnd === undefined) {
+    return {
+      completeHtml: '',
+      incompleteHtmlTagTail: htmlString,
+      incompleteHtmlTailScanState: {
+        kind: 'rawText',
+        tagName: retainedTailScanState.tagName,
+        closingSearchStart: closingTagScan.closingSearchStart,
+        scriptDataState: closingTagScan.scriptDataState,
+      },
+    };
+  }
+
+  return splitAfterClosedRetainedRawTextOrCommentTail(htmlString, closingTagScan.closingTagEnd);
+}
+
+function splitUnclosedRawTextElementTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+): SplitIncompleteHtmlTailResult | undefined {
+  if (retainedTailScanState) {
+    const retainedTail = splitRetainedUnclosedRawTextOrCommentTail(htmlString, retainedTailScanState);
+    if (retainedTail) return retainedTail;
+  }
+
+  return splitNewUnclosedRawTextElementTail(htmlString);
+}
+
+function findTrailingIncompleteHtmlTagStart(htmlString: string) {
   // Streaming renderer output is expected to be well-formed HTML where bare "<"
   // characters are tag starts. Observability mode holds any trailing incomplete
   // tag so flush marks never split a tag boundary.
@@ -296,26 +1181,65 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   // incomplete tag; React SSR encodes text "<" as "&lt;", so renderer output is safe.
   // Application inline scripts that stream a bare "<" operator across chunks are
   // outside this guard's assumptions.
-  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastTagStart = htmlString.lastIndexOf('<');
-  const rawTextElementStart = findUnclosedRawTextElementStart(htmlString);
-  if (rawTextElementStart !== undefined) {
-    return {
-      completeHtml: htmlString.slice(0, rawTextElementStart),
-      incompleteHtmlTagTail: htmlString.slice(rawTextElementStart),
-    };
+  let searchIndex = 0;
+  while (searchIndex < htmlString.length) {
+    const tagStart = htmlString.indexOf('<', searchIndex);
+    if (tagStart === -1) return undefined;
+
+    if (htmlString.startsWith('<!--', tagStart)) {
+      const commentEnd = htmlString.indexOf('-->', tagStart + 4);
+      if (commentEnd === -1) return tagStart;
+
+      searchIndex = commentEnd + 3;
+    } else {
+      const tagEnd = findHtmlTagEnd(htmlString, tagStart);
+      if (tagEnd === undefined) return tagStart;
+
+      const parsedTag = parseHtmlTag(htmlString, tagStart, tagEnd);
+      if (parsedTag && !parsedTag.isClosingTag && RAW_TEXT_TAG_NAME_SET.has(parsedTag.tagName)) {
+        if (parsedTag.tagName === 'template') {
+          const templateScan = scanTemplateTail(htmlString, tagEnd);
+          if (templateScan.closingTagEnd === undefined) return tagStart;
+
+          searchIndex = templateScan.closingTagEnd;
+        } else {
+          const closingTagEnd = findRawTextClosingTagEnd(htmlString, parsedTag.tagName, tagEnd);
+          if (closingTagEnd === undefined) return tagStart;
+
+          searchIndex = closingTagEnd;
+        }
+      } else {
+        searchIndex = tagEnd;
+      }
+    }
   }
 
-  // The streamed payload is well-formed HTML, so a trailing "<" means a split tag rather than text content.
-  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
-    return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
-  }
+  return undefined;
+}
 
-  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
+function splitTrailingIncompleteHtmlTagTail(htmlString: string): SplitIncompleteHtmlTailResult {
+  const incompleteTagStart = findTrailingIncompleteHtmlTagStart(htmlString);
+  if (incompleteTagStart === undefined) return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
+
+  const incompleteHtmlTagTail = htmlString.slice(incompleteTagStart);
   return {
-    completeHtml: htmlString.slice(0, lastTagStart),
+    completeHtml: htmlString.slice(0, incompleteTagStart),
     incompleteHtmlTagTail,
   };
+}
+
+function splitIncompleteHtmlTagTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
+  const rawTextTail = splitUnclosedRawTextElementTail(htmlString, retainedTailScanState);
+  if (rawTextTail) {
+    if (rawTextTail.incompleteHtmlTagTail) return rawTextTail;
+
+    return splitTrailingIncompleteHtmlTagTail(rawTextTail.completeHtml);
+  }
+
+  return splitTrailingIncompleteHtmlTagTail(htmlString);
 }
 
 const LINK_TAG_PREFIX = '<link';
@@ -328,15 +1252,14 @@ function isLinkTagTail(normalizedTail: string) {
   return LINK_TAG_BOUNDARIES.has(normalizedTail.charAt(LINK_TAG_PREFIX.length));
 }
 
-function splitIncompleteLinkTagTail(htmlString: string) {
-  const lastCompleteTagEnd = htmlString.lastIndexOf('>');
-  const lastTagStart = htmlString.lastIndexOf('<');
+function splitIncompleteLinkTagTail(htmlString: string): SplitIncompleteHtmlTailResult {
+  const incompleteTagStart = findTrailingIncompleteHtmlTagStart(htmlString);
 
-  if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
+  if (incompleteTagStart === undefined) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
-  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
+  const incompleteHtmlTagTail = htmlString.slice(incompleteTagStart);
   const normalizedTail = incompleteHtmlTagTail.toLowerCase();
 
   if (!isLinkTagTail(normalizedTail)) {
@@ -344,9 +1267,23 @@ function splitIncompleteLinkTagTail(htmlString: string) {
   }
 
   return {
-    completeHtml: htmlString.slice(0, lastTagStart),
+    completeHtml: htmlString.slice(0, incompleteTagStart),
     incompleteHtmlTagTail,
   };
+}
+
+function splitIncompleteLinkOrRawTextTail(
+  htmlString: string,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
+  const rawTextTail = splitUnclosedRawTextElementTail(htmlString, retainedTailScanState);
+  if (rawTextTail) {
+    if (rawTextTail.incompleteHtmlTagTail) return rawTextTail;
+
+    return splitIncompleteLinkTagTail(rawTextTail.completeHtml);
+  }
+
+  return splitIncompleteLinkTagTail(htmlString);
 }
 
 type IncompleteHtmlTailMode = 'none' | 'link' | 'tag';
@@ -439,7 +1376,11 @@ function findIncompleteUTF8TailStartIndex(buffer: Buffer) {
   return tailStart;
 }
 
-function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMode: IncompleteHtmlTailMode) {
+function applyStreamedStylesheetPreloadGating(
+  html: Buffer,
+  incompleteHtmlTailMode: IncompleteHtmlTailMode,
+  retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
+) {
   let stringSafeHtmlBuffer = html;
   let incompleteUTF8TailBuffer: Buffer = Buffer.alloc(0);
   if (incompleteHtmlTailMode !== 'none') {
@@ -453,12 +1394,26 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMo
   const htmlString = stringSafeHtmlBuffer.toString();
   let completeHtml = htmlString;
   let nextIncompleteHtmlTagTail = '';
+  let nextIncompleteHtmlTailScanState: RetainedIncompleteHtmlTailScanState | undefined;
   if (incompleteHtmlTailMode === 'tag') {
-    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
-      splitIncompleteHtmlTagTail(htmlString));
+    ({
+      completeHtml,
+      incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+      incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+    } = splitIncompleteHtmlTagTail(htmlString, retainedTailScanState));
   } else if (incompleteHtmlTailMode === 'link') {
-    ({ completeHtml, incompleteHtmlTagTail: nextIncompleteHtmlTagTail } =
-      splitIncompleteLinkTagTail(htmlString));
+    ({
+      completeHtml,
+      incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+      incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+    } = splitIncompleteLinkOrRawTextTail(htmlString, retainedTailScanState));
+    if (!nextIncompleteHtmlTagTail && incompleteUTF8TailBuffer.length > 0) {
+      ({
+        completeHtml,
+        incompleteHtmlTagTail: nextIncompleteHtmlTagTail,
+        incompleteHtmlTailScanState: nextIncompleteHtmlTailScanState,
+      } = splitTrailingIncompleteHtmlTagTail(completeHtml));
+    }
   }
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
@@ -476,6 +1431,8 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMo
   return {
     gatedHtmlBuffer: gatedHtml === completeHtml ? completeHtmlBuffer : Buffer.from(gatedHtml),
     incompleteHtmlTailBuffer,
+    incompleteHtmlTailScanState:
+      incompleteHtmlTailBuffer.length > 0 ? nextIncompleteHtmlTailScanState : undefined,
   };
 }
 
@@ -548,9 +1505,12 @@ export default function injectRSCPayload(
    */
   const htmlBuffers: Buffer[] = [];
   // Observability mode holds any split tag so inline mark scripts never land in
-  // the middle of markup. Without observability, preserve the older link-only
-  // hold used by stylesheet preload promotion.
+  // the middle of markup. Without observability, hold link tails plus open
+  // raw-text elements so payload scripts never flush inside app script/style text.
+  // If the app leaves such a container open, streaming intentionally buffers the
+  // remaining HTML until final flush rather than injecting scripts into it.
   let incompleteHtmlTailMode: IncompleteHtmlTailMode = rscStreamObservability ? 'tag' : 'link';
+  let retainedHtmlTailScanState: RetainedIncompleteHtmlTailScanState | undefined;
 
   /**
    * Buffer for stylesheet links inferred from RSC client chunk references.
@@ -605,10 +1565,11 @@ export default function injectRSCPayload(
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const htmlBuffer = Buffer.concat(htmlBuffers);
-    const { gatedHtmlBuffer, incompleteHtmlTailBuffer } = applyStreamedStylesheetPreloadGating(
-      htmlBuffer,
-      incompleteHtmlTailMode,
-    );
+    const {
+      gatedHtmlBuffer,
+      incompleteHtmlTailBuffer,
+      incompleteHtmlTailScanState: nextRetainedHtmlTailScanState,
+    } = applyStreamedStylesheetPreloadGating(htmlBuffer, incompleteHtmlTailMode, retainedHtmlTailScanState);
     const shouldDeferRevealHtml =
       rscPromise &&
       shouldInferRSCClientStylesheets &&
@@ -635,6 +1596,7 @@ export default function injectRSCPayload(
         htmlBuffers.push(deferredRevealHtmlBuffer);
       }
       htmlBuffers.push(incompleteHtmlTailBuffer);
+      retainedHtmlTailScanState = deferredRevealHtmlBuffer ? undefined : nextRetainedHtmlTailScanState;
     };
 
     if (flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
@@ -729,11 +1691,13 @@ export default function injectRSCPayload(
     rscInitializationBuffers.length = 0;
     rscClientStylesheetBuffers.length = 0;
     htmlBuffers.length = 0;
+    retainedHtmlTailScanState = undefined;
     if (deferredRevealHtmlBuffer) {
       htmlBuffers.push(deferredRevealHtmlBuffer);
     }
     if (incompleteHtmlTailBuffer.length > 0) {
       htmlBuffers.push(incompleteHtmlTailBuffer);
+      retainedHtmlTailScanState = deferredRevealHtmlBuffer ? undefined : nextRetainedHtmlTailScanState;
     }
     rscPayloadBuffers.length = 0;
     rscPayloadMarkBuffers.length = 0;
@@ -741,6 +1705,7 @@ export default function injectRSCPayload(
 
   const endResultStream = () => {
     incompleteHtmlTailMode = 'none';
+    retainedHtmlTailScanState = undefined;
     // Cancel any pending fallback timer unconditionally.
     // flush() only clears the timer when it actually flushes data (past the
     // early-return guards). If we're closing with empty buffers, the timer
