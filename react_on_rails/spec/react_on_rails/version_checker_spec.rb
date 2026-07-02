@@ -380,6 +380,13 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: <2\.0\.0})
         end
 
+        it "rejects spaced upper-bound declared Rspack ranges" do
+          stub_failed_node_package_resolution
+
+          expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "< 2.0.0") }
+            .to raise_error(ReactOnRails::Error, %r{Detected @rspack/core: < 2\.0\.0})
+        end
+
         it "rejects exact declared Rspack versions below v1" do
           stub_failed_node_package_resolution
 

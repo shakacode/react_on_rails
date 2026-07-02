@@ -30,7 +30,7 @@ module ReactOnRails
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
 
         stub_const("ReactOnRailsPro", Module.new)
-        stub_const("ReactOnRailsPro::Configuration", Class.new)
+        stub_const("ReactOnRailsPro::Configuration", Class.new { attr_reader :enable_rsc_support })
         pro_config = instance_double(ReactOnRailsPro::Configuration, enable_rsc_support: true)
         ReactOnRailsPro.define_singleton_method(:configuration) { pro_config }
       end

@@ -338,11 +338,9 @@ module ReactOnRails
     def rsc_rspack_upper_bound_below_minimum?(rspack_version)
       return false if rspack_version.to_s.include?("||")
 
-      rspack_version.to_s.strip.split(/\s+/).any? do |candidate|
-        upper_bound = candidate.match(
-          /\A(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?\z/
-        )
-        next false unless upper_bound
+      upper_bound_pattern = /(?<operator><=?)\s*v?(?<major>\d+)(?:\.(?<minor>\d+))?(?:\.(?<patch>\d+))?/
+      rspack_version.to_s.strip.to_enum(:scan, upper_bound_pattern).any? do
+        upper_bound = Regexp.last_match
         next true if upper_bound[:major].to_i < MINIMUM_RSC_RSPACK_MAJOR
 
         upper_bound[:operator] == "<" &&
