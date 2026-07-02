@@ -604,9 +604,11 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
     );
+    expect(resultStr).toContain('before');
     expect(resultStr).not.toContain('rel="preload" as="style"');
+    expect(resultStr).not.toContain('client1-<script');
   });
 
   it('promotes streamed RSC stylesheet preloads split inside the link token', async () => {
@@ -621,9 +623,11 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">after',
     );
+    expect(resultStr).toContain('before');
     expect(resultStr).not.toContain('rel="preload" as="style"');
+    expect(resultStr).not.toContain('<li<script');
   });
 
   it('does not hold non-link partial tags for stylesheet gating when observability is disabled', async () => {
@@ -684,9 +688,130 @@ describe('injectRSCPayload', () => {
     });
     const resultStr = await collectStreamData(result);
 
-    expect(resultStr).toContain('before<script>after</script>');
+    expect(resultStr).toContain('before');
+    expect(resultStr).toContain('<script>after</script>');
     expect(resultStr).toContain('perf.mark("react-on-rails:rsc:flush"');
     expect(resultStr).not.toContain('before<scr<script');
+  });
+
+  it('keeps opt-in observability scripts out of split raw-text closing tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockHTML = createMockHTMLStream({
+      5: 'before<script>window.x = 1;</scr',
+      25: 'ipt>after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('window.x = 1');
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf('<script>window.x = 1;</script>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(appScriptIndex);
+    expect(resultStr).not.toContain('<script>window.x = 1;<script');
+  });
+
+  it('keeps opt-in observability scripts out of raw-text split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<script>window.msg = "caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('window.msg');
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf('<script>window.msg = "café";</script>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(appScriptIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<script>window.msg = "caf<script');
+  });
+
+  it('keeps opt-in observability scripts out of ambiguous raw-text closing tag prefixes', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockHTML = createMockHTMLStream({
+      5: 'before<style>body{color:red}</s',
+      25: 'tyle>after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('body{color:red}');
+
+    const resultStr = await allData;
+    const styleIndex = resultStr.indexOf('<style>body{color:red}</style>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(styleIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(styleIndex);
+    expect(resultStr).not.toContain('<style>body{color:red}<script');
+  });
+
+  it('flushes complete HTML and RSC scripts while holding an observability split tag tail', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockHTML = createMockHTMLStream({
+      5: 'before<div data-name="a',
+      25: 'pp">after</div>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<div data-name');
+    await expect(firstChunk).resolves.not.toContain('after</div>');
+
+    const resultStr = await allData;
+    expect(resultStr).toContain('<div data-name="app">after</div>');
+    expect(resultStr).not.toContain('<div data-name="a<script');
   });
 
   it('preserves split UTF-8 bytes when promoting streamed RSC stylesheet preloads', async () => {
@@ -707,9 +832,33 @@ describe('injectRSCPayload', () => {
     const resultStr = (await collectStreamBuffer(result)).toString('utf8');
 
     expect(resultStr).toContain(
-      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">café after',
+      'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">caf',
     );
+    expect(resultStr).toContain('é after');
     expect(resultStr).not.toContain('\uFFFD');
+  });
+
+  it('keeps adjacent incomplete UTF-8 lead bytes out of decoded flushes', async () => {
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([Buffer.from('before'), eAcuteBytes.subarray(0, 1)]);
+    const secondHtmlChunk = eAcuteBytes.subarray(0, 1);
+    const thirdHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from(' after')]);
+    const mockHTML = createMockHTMLByteStream({
+      0: firstHtmlChunk,
+      10: secondHtmlChunk,
+      20: thirdHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultBuffer = await collectStreamBuffer(result);
+
+    expect(resultBuffer.includes(Buffer.from([0xc3, 0xc3, 0xa9]))).toBe(true);
+    expect(resultBuffer.includes(Buffer.from('\uFFFD'))).toBe(false);
   });
 
   it('leaves app-authored style preloads as fetch hints', async () => {

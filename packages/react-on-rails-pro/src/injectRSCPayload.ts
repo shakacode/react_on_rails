@@ -265,6 +265,29 @@ function stylesheetTagsForRSCClientChunks(
   return stylesheetTags;
 }
 
+const RAW_TEXT_TAG_NAMES = ['script', 'style', 'textarea', 'title'];
+
+const RAW_TEXT_TAG_PATTERN = new RegExp(`<(\\/?)(${RAW_TEXT_TAG_NAMES.join('|')})\\b[^>]*>`, 'gi');
+
+function findUnclosedRawTextElementStart(htmlString: string) {
+  let openRawTextElement: { start: number; tagName: string } | undefined;
+  let match = RAW_TEXT_TAG_PATTERN.exec(htmlString);
+  while (match) {
+    const isClosingTag = match[1] === '/';
+    const tagName = match[2].toLowerCase();
+    if (isClosingTag) {
+      if (openRawTextElement?.tagName === tagName) {
+        openRawTextElement = undefined;
+      }
+    } else {
+      openRawTextElement = { start: match.index, tagName };
+    }
+    match = RAW_TEXT_TAG_PATTERN.exec(htmlString);
+  }
+
+  return openRawTextElement?.start;
+}
+
 function splitIncompleteHtmlTagTail(htmlString: string) {
   // Streaming renderer output is expected to be well-formed HTML where bare "<"
   // characters are tag starts. Observability mode holds any trailing incomplete
@@ -275,15 +298,23 @@ function splitIncompleteHtmlTagTail(htmlString: string) {
   // outside this guard's assumptions.
   const lastCompleteTagEnd = htmlString.lastIndexOf('>');
   const lastTagStart = htmlString.lastIndexOf('<');
+  const rawTextElementStart = findUnclosedRawTextElementStart(htmlString);
+  if (rawTextElementStart !== undefined) {
+    return {
+      completeHtml: htmlString.slice(0, rawTextElementStart),
+      incompleteHtmlTagTail: htmlString.slice(rawTextElementStart),
+    };
+  }
 
   // The streamed payload is well-formed HTML, so a trailing "<" means a split tag rather than text content.
   if (lastTagStart === -1 || lastTagStart < lastCompleteTagEnd) {
     return { completeHtml: htmlString, incompleteHtmlTagTail: '' };
   }
 
+  const incompleteHtmlTagTail = htmlString.slice(lastTagStart);
   return {
     completeHtml: htmlString.slice(0, lastTagStart),
-    incompleteHtmlTagTail: htmlString.slice(lastTagStart),
+    incompleteHtmlTagTail,
   };
 }
 
@@ -343,7 +374,41 @@ function promoteStylesheetPreloadTag(linkTag: string) {
   return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
 }
 
-function hasIncompleteUTF8Tail(buffer: Buffer) {
+function utf8ContinuationByteCount(leadByte: number) {
+  if (leadByte >= 0xc2 && leadByte <= 0xdf) return 1;
+  if (leadByte >= 0xe0 && leadByte <= 0xef) return 2;
+  if (leadByte >= 0xf0 && leadByte <= 0xf4) return 3;
+
+  return undefined;
+}
+
+function findPreviousIncompleteUTF8TailStartIndex(buffer: Buffer, tailStart: number) {
+  let previousLeadByteIndex = tailStart - 1;
+  let continuationBytes = 0;
+
+  while (
+    previousLeadByteIndex >= 0 &&
+    buffer[previousLeadByteIndex] >= 0x80 &&
+    buffer[previousLeadByteIndex] <= 0xbf
+  ) {
+    continuationBytes += 1;
+    previousLeadByteIndex -= 1;
+  }
+
+  if (previousLeadByteIndex < 0) {
+    return continuationBytes > 0 ? 0 : undefined;
+  }
+
+  const leadByte = buffer[previousLeadByteIndex];
+  if (leadByte <= 0x7f) return undefined;
+
+  const expectedContinuationBytes = utf8ContinuationByteCount(leadByte);
+  if (expectedContinuationBytes === undefined) return undefined;
+
+  return continuationBytes < expectedContinuationBytes ? previousLeadByteIndex : undefined;
+}
+
+function findIncompleteUTF8TailStartIndex(buffer: Buffer) {
   let continuationBytes = 0;
   let leadByteIndex = buffer.length - 1;
 
@@ -353,32 +418,39 @@ function hasIncompleteUTF8Tail(buffer: Buffer) {
   }
 
   if (leadByteIndex < 0) {
-    return continuationBytes > 0;
+    return continuationBytes > 0 ? 0 : undefined;
   }
 
   const leadByte = buffer[leadByteIndex];
-  if (leadByte <= 0x7f) return false;
+  if (leadByte <= 0x7f) return undefined;
 
-  let expectedContinuationBytes = 0;
-  if (leadByte >= 0xc2 && leadByte <= 0xdf) {
-    expectedContinuationBytes = 1;
-  } else if (leadByte >= 0xe0 && leadByte <= 0xef) {
-    expectedContinuationBytes = 2;
-  } else if (leadByte >= 0xf0 && leadByte <= 0xf4) {
-    expectedContinuationBytes = 3;
-  } else {
-    return false;
+  const expectedContinuationBytes = utf8ContinuationByteCount(leadByte);
+  if (expectedContinuationBytes === undefined) return undefined;
+
+  if (continuationBytes >= expectedContinuationBytes) return undefined;
+
+  let tailStart = leadByteIndex;
+  let previousTailStart = findPreviousIncompleteUTF8TailStartIndex(buffer, tailStart);
+  while (previousTailStart !== undefined) {
+    tailStart = previousTailStart;
+    previousTailStart = findPreviousIncompleteUTF8TailStartIndex(buffer, tailStart);
   }
 
-  return continuationBytes < expectedContinuationBytes;
+  return tailStart;
 }
 
 function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMode: IncompleteHtmlTailMode) {
-  if (incompleteHtmlTailMode !== 'none' && hasIncompleteUTF8Tail(html)) {
-    return { gatedHtmlBuffer: html, hasIncompleteHtmlTail: true };
+  let stringSafeHtmlBuffer = html;
+  let incompleteUTF8TailBuffer: Buffer = Buffer.alloc(0);
+  if (incompleteHtmlTailMode !== 'none') {
+    const incompleteUTF8TailStartIndex = findIncompleteUTF8TailStartIndex(html);
+    if (incompleteUTF8TailStartIndex !== undefined) {
+      stringSafeHtmlBuffer = html.subarray(0, incompleteUTF8TailStartIndex);
+      incompleteUTF8TailBuffer = html.subarray(incompleteUTF8TailStartIndex);
+    }
   }
 
-  const htmlString = html.toString();
+  const htmlString = stringSafeHtmlBuffer.toString();
   let completeHtml = htmlString;
   let nextIncompleteHtmlTagTail = '';
   if (incompleteHtmlTailMode === 'tag') {
@@ -393,10 +465,17 @@ function applyStreamedStylesheetPreloadGating(html: Buffer, incompleteHtmlTailMo
     (linkTag) =>
       shouldPromoteStylesheetPreloadTag(linkTag) ? promoteStylesheetPreloadTag(linkTag) : linkTag,
   );
+  const completeHtmlByteLength = Buffer.byteLength(completeHtml, 'utf8');
+  const completeHtmlBuffer =
+    completeHtmlByteLength === html.length ? html : stringSafeHtmlBuffer.subarray(0, completeHtmlByteLength);
+  const incompleteHtmlTailBuffer = Buffer.concat([
+    nextIncompleteHtmlTagTail ? stringSafeHtmlBuffer.subarray(completeHtmlByteLength) : Buffer.alloc(0),
+    incompleteUTF8TailBuffer,
+  ]);
 
   return {
-    gatedHtmlBuffer: gatedHtml === htmlString && !nextIncompleteHtmlTagTail ? html : Buffer.from(gatedHtml),
-    hasIncompleteHtmlTail: Boolean(nextIncompleteHtmlTagTail),
+    gatedHtmlBuffer: gatedHtml === completeHtml ? completeHtmlBuffer : Buffer.from(gatedHtml),
+    incompleteHtmlTailBuffer,
   };
 }
 
@@ -526,7 +605,7 @@ export default function injectRSCPayload(
     // Calculate total buffer size for efficient memory allocation
     const rscInitializationSize = rscInitializationBuffers.reduce((sum, buf) => sum + buf.length, 0);
     const htmlBuffer = Buffer.concat(htmlBuffers);
-    const { gatedHtmlBuffer, hasIncompleteHtmlTail } = applyStreamedStylesheetPreloadGating(
+    const { gatedHtmlBuffer, incompleteHtmlTailBuffer } = applyStreamedStylesheetPreloadGating(
       htmlBuffer,
       incompleteHtmlTailMode,
     );
@@ -548,16 +627,24 @@ export default function injectRSCPayload(
       rscPayloadSize +
       payloadMarkScriptBytes;
 
-    if (hasIncompleteHtmlTail) {
-      return;
-    }
+    const retainDeferredHtmlAndIncompleteTail = () => {
+      if (incompleteHtmlTailBuffer.length === 0) return;
 
-    if (deferredRevealHtmlBuffer && flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
+      htmlBuffers.length = 0;
+      if (deferredRevealHtmlBuffer) {
+        htmlBuffers.push(deferredRevealHtmlBuffer);
+      }
+      htmlBuffers.push(incompleteHtmlTailBuffer);
+    };
+
+    if (flushableHtmlBuffer.length === 0 && !hasFlushedOutputChunk) {
+      retainDeferredHtmlAndIncompleteTail();
       return;
     }
 
     // Skip flush if no data is buffered
     if (totalSizeWithoutFlushMark === 0) {
+      retainDeferredHtmlAndIncompleteTail();
       return;
     }
 
@@ -644,6 +731,9 @@ export default function injectRSCPayload(
     htmlBuffers.length = 0;
     if (deferredRevealHtmlBuffer) {
       htmlBuffers.push(deferredRevealHtmlBuffer);
+    }
+    if (incompleteHtmlTailBuffer.length > 0) {
+      htmlBuffers.push(incompleteHtmlTailBuffer);
     }
     rscPayloadBuffers.length = 0;
     rscPayloadMarkBuffers.length = 0;
