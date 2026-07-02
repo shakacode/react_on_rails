@@ -58,8 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Fetch enough history for change detection (50 commits is usually sufficient for PRs)
-          fetch-depth: 50
+          # Fetch full history so workflow_dispatch can diff against the exact PR base SHA.
+          fetch-depth: 0
           persist-credentials: false
       - name: Select hosted CI mode
         id: hosted-ci
