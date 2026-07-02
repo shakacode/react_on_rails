@@ -5,7 +5,9 @@ on:
     types: [created]
 
 concurrency:
-  group: ci-command-${{ github.event.issue.number }}
+  # GitHub keeps at most one pending run per concurrency group. Scope the group
+  # to the triggering comment so queued +ci-* comments are all handled.
+  group: ci-command-${{ github.event.issue.number }}-${{ github.event.comment.id }}
   cancel-in-progress: false
 
 jobs:
@@ -31,10 +33,12 @@ jobs:
             const repo = context.repo.repo;
             const issueNumber = context.issue.number;
             const commentId = context.payload.comment.id;
+            const commentCreatedAt = context.payload.comment.created_at;
             const actor = context.actor;
             const repoFullName = `${owner}/${repo}`;
             const hostedCiLabel = 'ready-for-hosted-ci';
             const forceFullHostedCiLabel = 'force-full-hosted-ci';
+            const newerCommandVisibilityDelayMs = 5000;
 
             const validCommands = [
               '+ci-run-hosted',
@@ -45,6 +49,8 @@ jobs:
               '+ci-status',
               '+ci-help'
             ];
+            const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            const permissionByLogin = new Map();
 
             function commandText(commentBody) {
               return commentBody
@@ -97,24 +103,39 @@ jobs:
               }
             }
 
-            async function hasWriteAccess() {
+            async function hasWriteAccessFor(username) {
+              if (!username) {
+                return false;
+              }
+
+              if (permissionByLogin.has(username)) {
+                return permissionByLogin.get(username);
+              }
+
               let permission;
               try {
                 ({ data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
                   owner,
                   repo,
-                  username: actor
+                  username
                 }));
               } catch (error) {
                 if ([403, 404].includes(error.status)) {
-                  console.log(`Unable to read permission for ${actor}: ${error.status}`);
+                  console.log(`Unable to read permission for ${username}: ${error.status}`);
+                  permissionByLogin.set(username, false);
                   return false;
                 }
 
                 throw error;
               }
 
-              return ['admin', 'write'].includes(permission.permission);
+              const hasWritePermission = ['admin', 'write'].includes(permission.permission);
+              permissionByLogin.set(username, hasWritePermission);
+              return hasWritePermission;
+            }
+
+            async function hasWriteAccess() {
+              return hasWriteAccessFor(actor);
             }
 
             async function getPullRequest() {
@@ -267,6 +288,76 @@ jobs:
               return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
+            function sleep(ms) {
+              return new Promise((resolve) => setTimeout(resolve, ms));
+            }
+
+            function newerCommandScanSince() {
+              const createdAt = Date.parse(commentCreatedAt);
+              if (Number.isNaN(createdAt)) {
+                return undefined;
+              }
+
+              return new Date(Math.max(0, createdAt - 60000)).toISOString();
+            }
+
+            async function newerCiCommands(commandNames, { waitForVisibility = true } = {}) {
+              const commandNameSet = new Set(commandNames);
+              const newerCommands = new Set();
+              const since = newerCommandScanSince();
+
+              // Give GitHub's comments API a short visibility window so a later
+              // stop/skip command wins over an older run-hosted command that is
+              // still dispatching workflows.
+              if (waitForVisibility) {
+                await sleep(newerCommandVisibilityDelayMs);
+              }
+
+              for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issueNumber,
+                per_page: 100,
+                sort: 'created',
+                direction: 'asc',
+                ...(since ? { since } : {})
+              })) {
+                for (const comment of page.data) {
+                  const commenterLogin = comment.user?.login;
+
+                  if (comment.id <= commentId ||
+                      comment.user?.type === 'Bot' ||
+                      !commenterLogin ||
+                      !trustedCommandAssociations.has(comment.author_association) ||
+                      !(await hasWriteAccessFor(commenterLogin))) {
+                    continue;
+                  }
+
+                  const parsed = parseCommand(comment.body || '');
+                  if (
+                    parsed &&
+                    validCommands.includes(parsed.command) &&
+                    commandNameSet.has(parsed.command)
+                  ) {
+                    newerCommands.add(parsed.command);
+                    if (newerCommands.size === commandNameSet.size) {
+                      return newerCommands;
+                    }
+                  }
+                }
+              }
+
+              return newerCommands;
+            }
+
+            async function hasNewerCiCommand(commandNames) {
+              return (await newerCiCommands(commandNames)).size > 0;
+            }
+
+            async function hasNewerCiCommandBeforeMutation(commandNames) {
+              return (await newerCiCommands(commandNames, { waitForVisibility: false })).size > 0;
+            }
+
             function helpBody() {
               return [
                 '## CI Commands',
@@ -313,7 +404,13 @@ jobs:
                 return;
               }
 
-              const inputs = forceFull ? { force_full_hosted: 'true' } : {};
+              const isDependabotPr = pr.user?.login === 'dependabot[bot]';
+              const inputs = {
+                pull_request_base_ref: pr.base.ref,
+                pull_request_base_sha: pr.base.sha,
+                ...(forceFull ? { force_full_hosted: 'true' } : {})
+              };
+              const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
               const workflows = [
                 ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
                 ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
@@ -322,19 +419,64 @@ jobs:
                 ['Assets Precompile Check', 'precompile-check.yml', inputs],
                 ['Generator tests', 'examples.yml', inputs],
                 ['Playwright E2E Tests', 'playwright.yml', inputs],
-                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
-                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+                ...(isDependabotPr ? [] : [
+                  ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                  ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+                ])
               ];
 
-              const dispatchResults = await Promise.allSettled(
-                workflows.map(([workflowName, workflowFile, inputs]) =>
-                  github.rest.actions.createWorkflowDispatch({
+              function legacyCompatibleInputs(workflowInputs) {
+                const legacyInputs = Object.fromEntries(
+                  Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
+                );
+                if (pr.base.ref !== 'main') {
+                  legacyInputs.force_full_hosted = 'true';
+                }
+
+                return legacyInputs;
+              }
+
+              function isUnexpectedInputError(error) {
+                const message = error?.message || '';
+                return error?.status === 422 &&
+                  /unexpected inputs?|provided inputs?/.test(message.toLowerCase()) &&
+                  [...baseContextInputNames].some((name) => message.includes(name));
+              }
+
+              async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
+                try {
+                  await github.rest.actions.createWorkflowDispatch({
                     owner,
                     repo,
                     workflow_id: workflowFile,
                     ref: pr.head.ref,
-                    inputs
-                  }).then(() => ({ file: workflowFile, name: workflowName }))
+                    inputs: workflowInputs
+                  });
+
+                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: false };
+                } catch (error) {
+                  if (!isUnexpectedInputError(error)) {
+                    throw error;
+                  }
+
+                  core.warning(
+                    `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
+                  );
+                  await github.rest.actions.createWorkflowDispatch({
+                    owner,
+                    repo,
+                    workflow_id: workflowFile,
+                    ref: pr.head.ref,
+                    inputs: legacyCompatibleInputs(workflowInputs)
+                  });
+
+                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: true };
+                }
+              }
+
+              const dispatchResults = await Promise.allSettled(
+                workflows.map(([workflowName, workflowFile, inputs]) =>
+                  createWorkflowDispatchWithFallback(workflowName, workflowFile, inputs)
                 )
               );
 
@@ -353,15 +495,43 @@ jobs:
               }
 
               let labelAdded = false;
+              let forceFullLabelAdded = false;
+              let labelMessageOverride = '';
               if (succeeded.length > 0) {
-                try {
-                  await addHostedCiLabels(forceFull);
-                  labelAdded = true;
-                } catch (error) {
-                  failed.push({
-                    workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
-                    error: error.message
-                  });
+                const labelControlCommands = [
+                  '+ci-stop-hosted',
+                  '+ci-skip-hosted',
+                  '+ci-stop-full'
+                ];
+                const newerCommands = await newerCiCommands(labelControlCommands);
+                if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
+                  labelMessageOverride =
+                    'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
+                } else {
+                  for (const command of await newerCiCommands(labelControlCommands, { waitForVisibility: false })) {
+                    newerCommands.add(command);
+                  }
+
+                  if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
+                    labelMessageOverride =
+                      'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
+                  } else {
+                    const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
+                    try {
+                      await addHostedCiLabels(shouldAddForceFullLabel);
+                      labelAdded = true;
+                      forceFullLabelAdded = shouldAddForceFullLabel;
+                      if (forceFull && !shouldAddForceFullLabel) {
+                        labelMessageOverride =
+                          'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                      }
+                    } catch (error) {
+                      failed.push({
+                        workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                        error: error.message
+                      });
+                    }
+                  }
                 }
               }
 
@@ -370,13 +540,17 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
-              const labelMessage = labelAdded && forceFull
+              const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
+              const fallbackMessage = fallbackCount > 0
+                ? `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
+                : '';
+              const labelMessage = labelMessageOverride || (labelAdded && forceFullLabelAdded
                 ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
                 : labelAdded
                   ? 'Added `ready-for-hosted-ci`, so future commits will keep running optimized hosted CI until `+ci-stop-hosted` is used.'
-                : succeeded.length > 0
-                  ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
-                  : 'Hosted CI labels were not added because no workflows were triggered.';
+                  : succeeded.length > 0
+                    ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
+                  : 'Hosted CI labels were not added because no workflows were triggered.');
 
               await postComment([
                 forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
@@ -385,6 +559,7 @@ jobs:
                 forceFull
                   ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
+                fallbackMessage,
                 labelMessage,
                 '',
                 'View progress in the Actions tab.',
@@ -397,6 +572,16 @@ jobs:
             }
 
             async function handleSkipHosted(pr, args) {
+              if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted-CI waiver because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
+              if (await hasNewerCiCommandBeforeMutation(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted-CI waiver because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removedHostedCi = await removeHostedCiLabels();
               const reason = oneLine(args) || 'not provided';
               const shortSha = pr.head.sha.slice(0, 12);
@@ -415,6 +600,16 @@ jobs:
             }
 
             async function handleStopHosted() {
+              if (await hasNewerCiCommand(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
+              if (await hasNewerCiCommandBeforeMutation(['+ci-run-hosted', '+ci-force-full'])) {
+                await postComment('Skipped hosted CI label removal because a newer hosted-CI request command was posted after this command.');
+                return;
+              }
+
               const removed = await removeHostedCiLabels();
               await postComment([
                 '## Hosted CI Mode Disabled',
@@ -428,6 +623,16 @@ jobs:
             }
 
             async function handleStopFull() {
+              if (await hasNewerCiCommand(['+ci-force-full'])) {
+                await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
+                return;
+              }
+
+              if (await hasNewerCiCommandBeforeMutation(['+ci-force-full'])) {
+                await postComment('Skipped force-full label removal because a newer `+ci-force-full` command was posted after this command.');
+                return;
+              }
+
               const removed = await removeForceFullHostedCiLabel();
               await postComment([
                 '## Force-Full Hosted CI Disabled',

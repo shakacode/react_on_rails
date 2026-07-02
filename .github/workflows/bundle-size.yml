@@ -55,10 +55,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          # fetch-depth: 0 is required so the merge commit's parents are real
-          # (a shallow checkout grafts the tip and hides its parents, which would
-          # break base-SHA derivation below).
-          fetch-depth: 0
+          # The merge commit and its two parents are enough for the base-SHA
+          # derivation below; no full-history checkout is needed.
+          fetch-depth: 2
 
       - name: Determine base SHA from the PR merge commit
         id: base-sha
@@ -83,11 +82,11 @@ jobs:
           read -ra parents <<< "$(git rev-list --parents -n 1 "$MERGE_SHA")"
           # parents[0] = merge commit, [1] = first parent (base), [2] = second parent (head)
           if [ "${#parents[@]}" -eq 0 ]; then
-            echo "::error::Could not read parents of github.sha ($MERGE_SHA); the commit is not reachable in this checkout. Ensure this job checks out with fetch-depth: 0."
+            echo "::error::Could not read parents of github.sha ($MERGE_SHA); the commit is not reachable in this checkout. Ensure this job checks out with fetch-depth: 2 or deeper."
             exit 1
           fi
           if [ "${#parents[@]}" -ne 3 ]; then
-            echo "::error::Expected github.sha ($MERGE_SHA) to be a 2-parent merge commit, found $(( ${#parents[@]} - 1 )) parent(s); cannot determine a matching base baseline. Ensure this job checks out with fetch-depth: 0."
+            echo "::error::Expected github.sha ($MERGE_SHA) to be a 2-parent merge commit, found $(( ${#parents[@]} - 1 )) parent(s); cannot determine a matching base baseline. Ensure this job checks out with fetch-depth: 2 or deeper."
             exit 1
           fi
           base_sha="${parents[1]}"

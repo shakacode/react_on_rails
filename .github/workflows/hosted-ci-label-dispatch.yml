@@ -1,0 +1,180 @@
+name: Hosted CI Label Dispatch
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  dispatch-hosted-ci:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Dispatch hosted CI for control labels
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const labelName = context.payload.label?.name;
+            const hostedCiLabel = 'ready-for-hosted-ci';
+            const forceFullHostedCiLabel = 'force-full-hosted-ci';
+            const controlLabels = new Set([hostedCiLabel, forceFullHostedCiLabel]);
+
+            if (!pr || !controlLabels.has(labelName)) {
+              core.info(`Ignoring label ${labelName || '(unknown)'}.`);
+              return;
+            }
+
+            if (context.actor === 'github-actions[bot]') {
+              core.info('Ignoring workflow-token label event; the command workflow dispatches hosted CI directly.');
+              return;
+            }
+
+            const headRepoFullName = pr.head.repo?.full_name;
+            const repoFullName = `${owner}/${repo}`;
+
+            if (!headRepoFullName || headRepoFullName !== repoFullName) {
+              core.setFailed(
+                'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+              );
+              return;
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: pr.number
+            });
+            const currentLabelNames = labels.map((label) => label.name);
+            if (!currentLabelNames.includes(labelName)) {
+              core.info(`Ignoring stale ${labelName} label event because the label is no longer present.`);
+              return;
+            }
+
+            const isDependabotPr = pr.user?.login === 'dependabot[bot]';
+            if (isDependabotPr) {
+              core.info('Ignoring Dependabot label event because its pull_request token cannot dispatch workflows.');
+              return;
+            }
+
+            const forceFull = currentLabelNames.includes(forceFullHostedCiLabel);
+            const inputs = {
+              pull_request_base_ref: pr.base.ref,
+              pull_request_base_sha: pr.base.sha,
+              ...(forceFull ? { force_full_hosted: 'true' } : {})
+            };
+            const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
+            const workflows = [
+              ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
+              ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
+              ['Rspec test for gem', 'gem-tests.yml', inputs],
+              ['Integration Tests', 'integration-tests.yml', inputs],
+              ['Assets Precompile Check', 'precompile-check.yml', inputs],
+              ['Generator tests', 'examples.yml', inputs],
+              ['Playwright E2E Tests', 'playwright.yml', inputs],
+              ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+              ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+            ];
+
+            function legacyCompatibleInputs(workflowInputs) {
+              const legacyInputs = Object.fromEntries(
+                Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
+              );
+              if (pr.base.ref !== 'main') {
+                legacyInputs.force_full_hosted = 'true';
+              }
+
+              return legacyInputs;
+            }
+
+            function isUnexpectedInputError(error) {
+              const message = error?.message || '';
+              return error?.status === 422 &&
+                /unexpected inputs?|provided inputs?/.test(message.toLowerCase()) &&
+                [...baseContextInputNames].some((name) => message.includes(name));
+            }
+
+            async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: pr.head.ref,
+                  inputs: workflowInputs
+                });
+
+                return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: false };
+              } catch (error) {
+                if (!isUnexpectedInputError(error)) {
+                  throw error;
+                }
+
+                core.warning(
+                  `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
+                );
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: pr.head.ref,
+                  inputs: legacyCompatibleInputs(workflowInputs)
+                });
+
+                return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: true };
+              }
+            }
+
+            const dispatchResults = await Promise.allSettled(
+              workflows.map(([workflowName, workflowFile, workflowInputs]) =>
+                createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs)
+              )
+            );
+
+            const succeeded = [];
+            const failed = [];
+            for (const [index, result] of dispatchResults.entries()) {
+              if (result.status === 'fulfilled') {
+                succeeded.push(result.value);
+              } else {
+                failed.push({
+                  workflow: workflows[index][0],
+                  error: result.reason?.message || String(result.reason)
+                });
+              }
+            }
+
+            if (failed.length > 0) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: [
+                  '## Hosted CI Label Dispatch Failed',
+                  '',
+                  `Label: \`${labelName}\``,
+                  `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
+                  '',
+                  'Failed:',
+                  ...failed.map((failure) => `- ${failure.workflow}: ${failure.error}`)
+                ].join('\n')
+              });
+              core.setFailed(`Failed to dispatch: ${failed.map((failure) => failure.workflow).join(', ')}`);
+            } else {
+              const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
+              if (fallbackCount > 0) {
+                core.info(
+                  `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
+                );
+              }
+              core.info(
+                `Dispatched ${workflows.length} hosted CI workflow(s) for ${pr.head.sha.slice(0, 12)}.`
+              );
+            }
