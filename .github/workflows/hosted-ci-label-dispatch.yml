@@ -54,7 +54,11 @@ jobs:
             });
             const currentLabelNames = labels.map((label) => label.name);
             const forceFull = currentLabelNames.includes(forceFullHostedCiLabel);
-            const inputs = forceFull ? { force_full_hosted: 'true' } : {};
+            const inputs = {
+              pull_request_base_ref: pr.base.ref,
+              pull_request_base_sha: pr.base.sha,
+              ...(forceFull ? { force_full_hosted: 'true' } : {})
+            };
             const workflows = [
               ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
               ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
