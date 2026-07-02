@@ -14420,7 +14420,7 @@ Then:
    you above it.
 4. Report a **Wilcoxon signed-rank p-value**; treat **p < 0.05** as strong directional evidence of a real shift when the paired samples consistently move in the same direction.
 
-We use [ShakaPerf](https://github.com/shakacode/shakaperf) for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
+We use ShakaPerf for this — it brings up the twin production-local servers and runs the paired comparison with `shaka-perf compare --categories perf`. The methodology is what matters, not the tool: any harness that runs two production builds side by side under identical mobile throttling with paired sampling and a significance test gives you the same signal.
 
 ### Reading the result
 
@@ -18380,18 +18380,7 @@ Location of `node_modules` directory. With Shakapacker, this should typically be
 config.node_modules_location = ""  # Shakapacker default
 ```
 
-#### server_render_method
-
-**Type:** String
-**Default:** `nil`
-
-Server rendering method. Only `"ExecJS"` is currently supported:
-
-```ruby
-config.server_render_method = nil  # Uses ExecJS
-```
-
-For alternative server rendering methods, contact [justin@shakacode.com](mailto:justin@shakacode.com).
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure`.
 
 For deprecated configuration options, see [configuration-deprecated.md](configuration-deprecated.md).
 
@@ -18886,6 +18875,8 @@ Because preload hints belong in `<head>`, pass component names that are known be
 This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and `javascript_pack_tag` calls in the layout so the browser still applies and executes the assets.
 
 When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
+
+With Shakapacker versions before 8.4 that do not expose `config.integrity`, preload links are still emitted without `integrity` attributes. React on Rails only adds preload SRI attributes when Shakapacker exposes integrity settings and marks them enabled.
 
 ---
 
@@ -21548,9 +21539,10 @@ For a comprehensive debugging guide covering SSR issues, hydration mismatches, a
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
   config.logging_on_server = true
-  config.server_render_method = 'NodeJS' # for better error messages
 end
 ```
+
+The open-source gem always renders on the server with ExecJS; there is no configuration option to select a different server render method. For a standalone Node rendering process, use [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)'s Node renderer, which is configured via `ReactOnRailsPro.configure` rather than through the open-source configuration.
 
 ### Debug webpack configuration
 
