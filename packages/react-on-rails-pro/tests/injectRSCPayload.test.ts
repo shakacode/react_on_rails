@@ -759,6 +759,321 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('<script>window.msg = "caf<script');
   });
 
+  it('keeps default RSC scripts out of raw-text split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<script>window.msg = "caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('window.msg');
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf('<script>window.msg = "café";</script>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(appScriptIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<script>window.msg = "caf<script');
+  });
+
+  it('keeps default RSC scripts out of script double-escaped split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<script><!--<script>const marker = "</script>"; caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<script><!--<script>');
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf(
+      '<script><!--<script>const marker = "</script>"; café";</script>after',
+    );
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(appScriptIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('const marker = "</script>"; caf<script');
+  });
+
+  it('does not keep scripts double-escaped after escaped script comments close', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<script><!--<script>-->window.msg = "caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('";</script>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('window.msg');
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf('<script><!--<script>-->window.msg = "café";</script>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(appScriptIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('window.msg = "caf<script');
+  });
+
+  it('keeps default RSC scripts out of iframe split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([Buffer.from('before<iframe>caf'), eAcuteBytes.subarray(0, 1)]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</iframe>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<iframe>');
+
+    const resultStr = await allData;
+    const iframeIndex = resultStr.indexOf('<iframe>café</iframe>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(iframeIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(iframeIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<iframe>caf<script');
+  });
+
+  it('keeps default RSC scripts out of noscript split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([Buffer.from('before<noscript>caf'), eAcuteBytes.subarray(0, 1)]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</noscript>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<noscript>');
+
+    const resultStr = await allData;
+    const noscriptIndex = resultStr.indexOf('<noscript>café</noscript>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(noscriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(noscriptIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<noscript>caf<script');
+  });
+
+  it('keeps default RSC scripts out of template split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([Buffer.from('before<template>caf'), eAcuteBytes.subarray(0, 1)]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</template>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<template>');
+
+    const resultStr = await allData;
+    const templateIndex = resultStr.indexOf('<template>café</template>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(templateIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(templateIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<template>caf<script');
+  });
+
+  it('keeps default RSC scripts out of template quoted-attribute split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<template><span title="</template>">caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</span></template>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<template>');
+
+    const resultStr = await allData;
+    const templateIndex = resultStr.indexOf(
+      '<template><span title="</template>">café</span></template>after',
+    );
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(templateIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(templateIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<span title="</template>">caf<script');
+  });
+
+  it('keeps default RSC scripts out of nested template split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<template><template></template>caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('</template>after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<template>');
+
+    const resultStr = await allData;
+    const templateIndex = resultStr.indexOf('<template><template></template>café</template>after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(templateIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(templateIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<template><template></template>caf<script');
+  });
+
+  it('keeps default RSC scripts out of template raw-text split UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<template><script>const marker = "</template>"; caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([
+      eAcuteBytes.subarray(1),
+      Buffer.from('";</script></template>after'),
+    ]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<template>');
+
+    const resultStr = await allData;
+    const templateIndex = resultStr.indexOf(
+      '<template><script>const marker = "</template>"; café";</script></template>after',
+    );
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(templateIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(templateIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('const marker = "</template>"; caf<script');
+  });
+
   it('keeps opt-in observability scripts out of ambiguous raw-text closing tag prefixes', async () => {
     const flightData = '{"test": "data"}';
     const mockRSC = createMockRSCStream({ 0: flightData });
@@ -786,6 +1101,317 @@ describe('injectRSCPayload', () => {
     expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
     expect(payloadScriptIndex).toBeLessThan(styleIndex);
     expect(resultStr).not.toContain('<style>body{color:red}<script');
+  });
+
+  it('flushes raw-text tails when the closing tag name completes across chunks', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appScript = '<script>window.msg = 1;</script>after';
+    const mockHTML = createMockHTMLStream({
+      5: 'before<script>window.msg = 1;</script',
+      25: '>after',
+      250: '<p>later</p>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, chunks, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(expectedInitializationScript);
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('window.msg');
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 80);
+    });
+    expect(chunks.join('')).toContain(appScript);
+    expect(chunks.join('')).not.toContain('<p>later</p>');
+
+    const resultStr = await allData;
+    expect(resultStr).toContain(appScript);
+    expect(resultStr).toContain('<p>later</p>');
+  });
+
+  it('does not treat raw-text contents as nested raw-text tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appScript = '<script>const msg = "Use <style> tags for CSS.";</script>after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appScript}`,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appScriptIndex = resultStr.indexOf(appScript);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appScriptIndex).toBeLessThan(payloadScriptIndex);
+    expect(resultStr).not.toContain('Use <style> tags for CSS."<script');
+  });
+
+  it('does not treat fake incomplete tags inside complete raw-text bodies as trailing tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appScript = '<script>const html = "<span "; window.msg = 1;</script>after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appScript}`,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appScriptIndex = resultStr.indexOf(appScript);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appScriptIndex).toBeLessThan(payloadScriptIndex);
+    expect(resultStr).not.toContain('const html = "<span <script');
+  });
+
+  it('keeps opt-in observability scripts out of split tag tails after retained raw-text closes', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const mockHTML = createMockHTMLStream({
+      5: 'before<script>window.msg = 1;',
+      25: '</script><div class="he',
+      50: 'llo">after</div>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appScriptIndex = resultStr.indexOf('<script>window.msg = 1;</script>');
+    const appDivIndex = resultStr.indexOf('<div class="hello">after</div>');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appDivIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(resultStr).not.toContain('<div class="he<script');
+  });
+
+  it('does not treat raw-text markers inside comments as raw-text tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appComment = '<!-- <script> --><!-- rendered by app -->after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appComment}`,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appCommentIndex = resultStr.indexOf(appComment);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appCommentIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appCommentIndex).toBeLessThan(payloadScriptIndex);
+    expect(resultStr).not.toContain('<!-- <script><script');
+  });
+
+  it('does not treat raw-text markers inside complete SVG CDATA as raw-text tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 25: flightData });
+    const appSvg = '<svg><![CDATA[<script>]]></svg>after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appSvg}`,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appSvgIndex = resultStr.indexOf(appSvg);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appSvgIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appSvgIndex).toBeLessThan(payloadScriptIndex);
+    expect(resultStr).not.toContain('<![CDATA[<script><script');
+  });
+
+  it('keeps default RSC scripts out of split SVG CDATA tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 10: flightData });
+    const mockHTML = createMockHTMLStream({
+      5: 'before<svg><![CDATA[<script>',
+      25: ']]></svg>after',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const resultStr = await collectStreamData(result);
+
+    const cdataIndex = resultStr.indexOf('<![CDATA[<script>]]>');
+    const cdataCloseIndex = cdataIndex + '<![CDATA[<script>]]>'.length;
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(cdataIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex < cdataIndex || payloadScriptIndex > cdataCloseIndex).toBe(true);
+    expect(resultStr).not.toContain('<![CDATA[<script><script');
+  });
+
+  it('does not treat raw-text markers inside quoted attributes as raw-text tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appHtml = '<div data-copy="<script>">after</div>';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appHtml}`,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const resultStr = await collectStreamData(result);
+
+    const appHtmlIndex = resultStr.indexOf(appHtml);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appHtmlIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appHtmlIndex).toBeLessThan(payloadScriptIndex);
+    expect(resultStr).not.toContain('data-copy="<script><script');
+  });
+
+  it('keeps default RSC scripts out of split comments after complete comments', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<!--done-->x<!--caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('-->after')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('before<!--done-->x');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<!--caf');
+
+    const resultStr = await allData;
+    const splitCommentIndex = resultStr.indexOf('<!--café-->after');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(splitCommentIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(splitCommentIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<!--caf<script');
+  });
+
+  it('keeps default RSC scripts out of non-link split tag UTF-8 tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([Buffer.from('before<span title="caf'), eAcuteBytes.subarray(0, 1)]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('">after</span>')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<span');
+
+    const resultStr = await allData;
+    const splitSpanIndex = resultStr.indexOf('<span title="café">after</span>');
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(splitSpanIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeLessThan(splitSpanIndex);
+    expect(resultStr).not.toContain('\uFFFD');
+    expect(resultStr).not.toContain('<span title="caf<script');
+  });
+
+  it('does not treat custom elements with raw-text tag prefixes as raw-text tags', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const customElement = '<script-loader>ready</script-loader>after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${customElement}`,
+      25: '<p>done</p>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(customElement);
+
+    const resultStr = await allData;
+    const customElementIndex = resultStr.indexOf(customElement);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(customElementIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(customElementIndex).toBeLessThan(payloadScriptIndex);
+  });
+
+  it('keeps raw-text closing tag indices stable when content lowercases to more code points', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const appScript = '<script>window.city = "İstanbul";</script>after';
+    const mockHTML = createMockHTMLStream({
+      5: `before${appScript}`,
+      25: '<p>done</p>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      rscStreamObservability: true,
+    });
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain(appScript);
+
+    const resultStr = await allData;
+    const appScriptIndex = resultStr.indexOf(appScript);
+    const payloadScriptIndex = resultStr.indexOf(expectedPayloadPushScript(flightData));
+    expect(appScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(payloadScriptIndex).toBeGreaterThanOrEqual(0);
+    expect(appScriptIndex).toBeLessThan(payloadScriptIndex);
   });
 
   it('flushes complete HTML and RSC scripts while holding an observability split tag tail', async () => {
@@ -835,6 +1461,34 @@ describe('injectRSCPayload', () => {
       'before<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css" data-precedence="rsc-css">caf',
     );
     expect(resultStr).toContain('é after');
+    expect(resultStr).not.toContain('\uFFFD');
+  });
+
+  it('keeps default RSC scripts out of quoted-attribute split UTF-8 tag tails', async () => {
+    const flightData = '{"test": "data"}';
+    const mockRSC = createMockRSCStream({ 0: flightData });
+    const eAcuteBytes = Buffer.from('é');
+    const firstHtmlChunk = Buffer.concat([
+      Buffer.from('before<span title=">caf'),
+      eAcuteBytes.subarray(0, 1),
+    ]);
+    const secondHtmlChunk = Buffer.concat([eAcuteBytes.subarray(1), Buffer.from('">after</span>')]);
+    const mockHTML = createMockHTMLByteStream({
+      5: firstHtmlChunk,
+      25: secondHtmlChunk,
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const { allData, firstChunk } = collectStreamDataByChunk(result);
+
+    await expect(firstChunk).resolves.toContain('before');
+    await expect(firstChunk).resolves.toContain(expectedPayloadPushScript(flightData));
+    await expect(firstChunk).resolves.not.toContain('<span title');
+
+    const resultStr = await allData;
+    expect(resultStr).toContain('<span title=">café">after</span>');
+    expect(resultStr).not.toContain('title=">caf<script');
     expect(resultStr).not.toContain('\uFFFD');
   });
 
