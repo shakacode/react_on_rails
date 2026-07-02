@@ -8,6 +8,9 @@ module ReactOnRails
       LEGACY_DEFAULT_IMPORT = /\A\s*import\s+\{\s*defineMessages\s*\}\s+from\s+["']react-intl["'];?/
       private_constant :LEGACY_DEFAULT_IMPORT
 
+      GENERATED_PREAMBLE_LINE = %r{\A\s*(?://|/\*|\*|\*/|["'][^"']*["'];?\s*\z)}
+      private_constant :GENERATED_PREAMBLE_LINE
+
       private
 
       def file_format
@@ -16,15 +19,14 @@ module ReactOnRails
 
       def generated_files_obsolete?
         # obsolete? only calls this after all output files exist; if the file disappears, regenerate.
-        first_significant_line = nil
         File.foreach(file("default")) do |line|
           next if line.match?(/\A\s*\z/)
 
-          first_significant_line = line
-          break
+          return true if line.match?(LEGACY_DEFAULT_IMPORT)
+          return false unless line.match?(GENERATED_PREAMBLE_LINE)
         end
 
-        !!first_significant_line&.match?(LEGACY_DEFAULT_IMPORT)
+        false
       rescue Errno::ENOENT
         true
       end
