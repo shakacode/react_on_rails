@@ -270,6 +270,8 @@ const sidebars: SidebarsConfig = {
                 'migrating/rsc-third-party-libs',
                 'migrating/rsc-troubleshooting',
                 'migrating/rsc-flight-payload',
+                'migrating/rsc-performance-validation',
+                'migrating/rsc-static-shell-sidecar',
               ],
             },
           ],
