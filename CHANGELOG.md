@@ -97,6 +97,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4352](https://github.com/shakacode/react_on_rails/pull/4352) by
   [justin808](https://github.com/justin808).
 
+- **Release CI detector runs release specs for heredoc fixture diffs**: Extensionless release
+  scripts and release Bash tests now treat heredoc body changes as executable release-tooling
+  changes, so fixture lines beginning with `#` no longer look comment-only and skip release
+  specs. Fixes [Issue 4332](https://github.com/shakacode/react_on_rails/issues/4332).
+  [PR 4351](https://github.com/shakacode/react_on_rails/pull/4351) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby
   source-encoding magic comments or a UTF-8 default, and validates content before override-gem
