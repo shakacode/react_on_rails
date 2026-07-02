@@ -11,8 +11,11 @@ const config: KnipConfig = {
         'benchmarks/k6.ts',
         '.github/workflows/shakaperf-release-gates.yml',
         'test/shakaperf/**/*.ts',
+        // Custom ESLint rule tests are run standalone via `pnpm run test:eslint-rules`
+        // (plain `node`, no importer), so knip needs them declared as entry points.
+        'eslint-rules/**/*.test.cjs',
       ],
-      project: ['*.{js,mjs,ts}', 'test/shakaperf/**/*.ts'],
+      project: ['*.{js,mjs,ts}', 'test/shakaperf/**/*.ts', 'eslint-rules/**/*.cjs'],
       ignoreBinaries: [
         // Pro package binaries used in Pro workflows
         'playwright',
