@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require_relative "spec_helper"
+require "timeout"
 require "fakefs/safe"
 
 describe ReactOnRailsPro::Request do
@@ -318,6 +319,46 @@ describe ReactOnRailsPro::Request do
     ensure
       leader&.kill if leader&.alive?
       follower&.kill if follower&.alive?
+    end
+
+    it "lets upload followers wait without blocking the fiber scheduler" do
+      require "async"
+
+      call_count = 0
+      results = []
+
+      Timeout.timeout(1) do
+        Async do |task|
+          upload_assets_mutex = described_class.singleton_class.const_get(:UPLOAD_ASSETS_MUTEX)
+
+          leader = task.async do
+            described_class.send(:with_asset_upload_single_flight, ["server-hash"]) do
+              call_count += 1
+              task.sleep(0.01)
+              :uploaded
+            end
+          end
+
+          loop do
+            upload_in_progress = upload_assets_mutex.synchronize do
+              described_class.send(:upload_assets_in_progress).any?
+            end
+            break if upload_in_progress
+
+            task.sleep(0.001)
+          end
+
+          follower = task.async do
+            described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
+          end
+
+          results << leader.wait
+          results << follower.wait
+        end
+      end
+
+      expect(call_count).to eq(1)
+      expect(results).to eq(%i[uploaded uploaded])
     end
 
     it "keeps upload single-flight keys distinct when copied asset contents change" do

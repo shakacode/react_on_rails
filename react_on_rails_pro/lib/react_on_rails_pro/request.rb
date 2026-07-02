@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "digest"
+require "io/wait"
 require "uri"
 require_relative "renderer_http_client"
 require_relative "stream_request"
@@ -21,6 +22,53 @@ require_relative "async_props_emitter"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
+    class UploadAssetsWaiter
+      def initialize
+        if Fiber.scheduler
+          @reader, @writer = IO.pipe
+        else
+          @queue = Queue.new
+        end
+      end
+
+      def wait
+        if @queue
+          @queue.pop
+        else
+          wait_for_signal
+        end
+      ensure
+        close_io(@reader)
+      end
+
+      def signal
+        if @queue
+          @queue << true
+        else
+          @writer.write_nonblock(".", exception: false)
+        end
+      rescue IOError, SystemCallError
+        nil
+      ensure
+        close_io(@writer)
+      end
+
+      private
+
+      def wait_for_signal
+        loop do
+          result = @reader.read_nonblock(1, exception: false)
+          break unless result == :wait_readable
+
+          @reader.wait_readable
+        end
+      end
+
+      def close_io(io)
+        io&.close unless io&.closed?
+      end
+    end
+
     class << self
       # Mutex for thread-safe connection management.
       # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
@@ -449,7 +497,7 @@ module ReactOnRailsPro
             upload_assets_in_progress.delete(key)
             state[:waiters]
           end
-          waiters.each { |waiter| waiter << true }
+          waiters.each(&:signal)
         end
 
         response
@@ -460,16 +508,17 @@ module ReactOnRailsPro
       end
 
       def wait_for_asset_upload_single_flight(state)
-        waiter = Queue.new
+        waiter = nil
         complete = UPLOAD_ASSETS_MUTEX.synchronize do
           if state[:complete]
             true
           else
+            waiter = UploadAssetsWaiter.new
             state[:waiters] << waiter
             false
           end
         end
-        waiter.pop unless complete
+        waiter.wait unless complete
 
         UPLOAD_ASSETS_MUTEX.synchronize do
           raise state[:error] if state[:error]

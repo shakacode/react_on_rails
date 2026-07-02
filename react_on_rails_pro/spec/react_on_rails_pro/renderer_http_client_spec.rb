@@ -435,6 +435,20 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(described_class::PersistentThreadClient).not_to have_received(:new)
     end
 
+    it "rejects lazy no-scheduler streaming responses after close without opening an ephemeral client" do
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      allow(Fiber).to receive(:scheduler).and_return(nil)
+      allow(Async::HTTP::Client).to receive(:open).and_raise("opened stale lazy stream")
+
+      response = client.post("/render", json: { renderingRequest: "lazy" }, stream: true)
+      client.close
+
+      expect { response.each.to_a }
+        .to raise_error(described_class::ConnectionError, "renderer HTTP client is closed")
+      expect(Async::HTTP::Client).not_to have_received(:open)
+    end
+
     it "uses the configured default stream limit for no-scheduler streaming requests when pool_size is nil" do
       stub_const("FakeAsyncOpenClient", Class.new)
       stub_const("FakeAsyncEndpoint", Class.new)
@@ -898,6 +912,41 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect { client.close }.to raise_error(close_error)
       expect(failing_client.closed).to be(true)
       expect(remaining_client.closed).to be(true)
+      expect(client.instance_variable_get(:@thread_clients)).to be_empty
+    end
+
+    it "closes persistent no-scheduler clients when scheduler client close fails" do
+      stub_const("FakeSchedulerCloseFailureClient", Class.new do
+        def initialize(error)
+          @error = error
+        end
+
+        def close
+          raise @error
+        end
+      end)
+      stub_const("FakeCleanupThreadClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+      close_error = StandardError.new("scheduler close failed")
+      scheduler_client = FakeSchedulerCloseFailureClient.new(close_error)
+      thread_client = FakeCleanupThreadClient.new
+      scheduler = Object.new
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+
+      scheduler.instance_variable_set(
+        :@__ror_pro_http_clients__,
+        { "http://localhost:3800" => { generation: described_class.client_generation, owner: client, client: scheduler_client } }
+      )
+      client.instance_variable_set(:@thread_clients, { Object.new => thread_client }.compare_by_identity)
+      allow(Fiber).to receive(:scheduler).and_return(scheduler)
+
+      expect { client.close }.to raise_error(close_error)
+      expect(thread_client.closed).to be(true)
       expect(client.instance_variable_get(:@thread_clients)).to be_empty
     end
 

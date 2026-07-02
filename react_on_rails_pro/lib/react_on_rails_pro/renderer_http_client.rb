@@ -537,9 +537,21 @@ module ReactOnRailsPro
     def close
       return unless mark_closed
 
+      close_error = nil
       scheduler = Fiber.scheduler
-      evict_client_from_scheduler(scheduler) if scheduler
-      close_thread_clients
+      begin
+        evict_client_from_scheduler(scheduler) if scheduler
+      rescue StandardError => e
+        close_error ||= e
+      end
+
+      begin
+        close_thread_clients
+      rescue StandardError => e
+        close_error ||= e
+      end
+
+      raise close_error if close_error
     end
 
     private
@@ -617,6 +629,7 @@ module ReactOnRailsPro
         # Ephemeral mode: no outer scheduler means either we're outside an Async context,
         # or Sync created an ephemeral scheduler. Streaming responses stay on the caller's
         # reactor so response chunks are not yielded across Ruby threads.
+        ensure_open!
         with_ephemeral_client(&)
       else
         yield(persistent_thread_client)
