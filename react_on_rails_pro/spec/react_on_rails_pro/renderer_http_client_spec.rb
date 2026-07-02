@@ -808,6 +808,34 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(open_calls).to eq(2)
     end
 
+    it "closes persistent no-scheduler clients whose owner thread exited" do
+      stub_const("FakeThreadClient", Class.new do
+        attr_reader :closed
+
+        def close
+          @closed = true
+        end
+      end)
+      stale_client = FakeThreadClient.new
+      current_client = FakeThreadClient.new
+      dead_thread = Thread.new { nil }
+      dead_thread.join
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      client.instance_variable_set(:@thread_clients, { dead_thread => stale_client }.compare_by_identity)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(described_class::PersistentThreadClient).to receive(:new).and_return(current_client)
+
+      yielded_client = client.__send__(:persistent_thread_client)
+
+      expect(yielded_client).to be(current_client)
+      expect(stale_client.closed).to be(true)
+      thread_clients = client.instance_variable_get(:@thread_clients)
+      expect(thread_clients.keys).to eq([Thread.current])
+      expect(thread_clients[Thread.current]).to be(current_client)
+    end
+
     it "stores clients per origin on the same scheduler" do
       stub_const("FakeOriginClient", Class.new { def get(_path); end })
       endpoint1 = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)

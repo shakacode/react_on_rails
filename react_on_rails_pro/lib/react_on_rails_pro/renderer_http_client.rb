@@ -601,12 +601,16 @@ module ReactOnRailsPro
     end
 
     def persistent_thread_client
-      @thread_clients_mutex.synchronize do
+      stale_clients = nil
+      client = @thread_clients_mutex.synchronize do
+        stale_clients = sweep_dead_thread_clients
         @thread_clients[Thread.current] ||= begin
           endpoint = endpoint_for(@origin)
           PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
         end
       end
+      stale_clients.each(&:close)
+      client
     end
 
     def evict_client_from_scheduler(scheduler)
@@ -645,6 +649,16 @@ module ReactOnRailsPro
       end
 
       clients.each(&:close)
+    end
+
+    def sweep_dead_thread_clients
+      stale_clients = []
+      @thread_clients.delete_if do |thread, thread_client|
+        stale = !thread.alive?
+        stale_clients << thread_client if stale
+        stale
+      end
+      stale_clients
     end
 
     def with_ephemeral_client(&)
