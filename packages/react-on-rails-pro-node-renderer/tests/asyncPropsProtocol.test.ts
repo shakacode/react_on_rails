@@ -188,6 +188,9 @@ describe('async props protocol constants', () => {
     expect(injectableStream).toBeDefined();
     expect(injectableStream?.destroyed).toBe(true);
     expect(sourceStream.destroyed).toBe(true);
+    expect(sharedExecutionContext.has(PULL_ENABLED_KEY)).toBe(false);
+    expect(sharedExecutionContext.has(PUSH_PROPS_KEY)).toBe(false);
+    expect(sharedExecutionContext.has(PROP_REQUEST_EMITTER_KEY)).toBe(false);
   });
 
   it('preserves the original setup error when cleanup release throws', async () => {

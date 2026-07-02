@@ -227,6 +227,7 @@ export async function handleIncrementalRenderRequest(
     }
 
     let finalResponse = response;
+    let pullModeSharedExecutionContext: Map<string, unknown> | undefined;
     let pullModeStream: PassThrough | undefined;
 
     try {
@@ -236,6 +237,7 @@ export async function handleIncrementalRenderRequest(
       if (pullEnabled && response.stream) {
         const sourceStream = response.stream;
         const { sharedExecutionContext } = executionContext;
+        pullModeSharedExecutionContext = sharedExecutionContext;
         sharedExecutionContext.set(PULL_ENABLED_KEY, true);
         sharedExecutionContext.set(PUSH_PROPS_KEY, new Set(pushProps || []));
 
@@ -353,6 +355,12 @@ export async function handleIncrementalRenderRequest(
         },
       };
     } catch (error) {
+      if (pullModeSharedExecutionContext) {
+        pullModeSharedExecutionContext.delete(PULL_ENABLED_KEY);
+        pullModeSharedExecutionContext.delete(PUSH_PROPS_KEY);
+        pullModeSharedExecutionContext.delete(PROP_REQUEST_EMITTER_KEY);
+      }
+
       try {
         if (pullModeStream && !pullModeStream.destroyed) {
           pullModeStream.destroy();
