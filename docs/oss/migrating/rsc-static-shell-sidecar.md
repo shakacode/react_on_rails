@@ -135,18 +135,20 @@ async function hydrateSearch(firstEvent) {
 function onIntent(event) {
   searchTarget.removeEventListener('click', onIntent);
   searchTarget.removeEventListener('focusin', onIntent);
-  searchTarget.removeEventListener('keydown', onIntent);
+  searchTarget.removeEventListener('keydown', onKeydown);
   hydrateSearch(event).catch((error) => {
     console.error('Failed to load search island', error);
   });
 }
 
+function onKeydown(event) {
+  if (event.key === 'Enter' || event.key === ' ') onIntent(event);
+}
+
 if (searchTarget) {
   searchTarget.addEventListener('click', onIntent);
   searchTarget.addEventListener('focusin', onIntent);
-  searchTarget.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') onIntent(event);
-  });
+  searchTarget.addEventListener('keydown', onKeydown);
 }
 ```
 
