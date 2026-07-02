@@ -76,9 +76,14 @@ jobs:
             ];
 
             function legacyCompatibleInputs(workflowInputs) {
-              return Object.fromEntries(
+              const legacyInputs = Object.fromEntries(
                 Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
               );
+              if (pr.base.ref !== 'main') {
+                legacyInputs.force_full_hosted = 'true';
+              }
+
+              return legacyInputs;
             }
 
             function isUnexpectedInputError(error) {
