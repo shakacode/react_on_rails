@@ -8,8 +8,8 @@ module ReactOnRails
       LEGACY_DEFAULT_IMPORT = /\A\s*import\s+\{\s*defineMessages\s*\}\s+from\s+["']react-intl["'];?/
       private_constant :LEGACY_DEFAULT_IMPORT
 
-      GENERATED_PREAMBLE_LINE = %r{\A\s*(?://|(?:"use (?:client|strict)";?|'use (?:client|strict)';?)\s*\z)}
-      private_constant :GENERATED_PREAMBLE_LINE
+      CURRENT_DEFAULT_LOCALE = /\A\s*const\s+defaultLocale\s*=/
+      private_constant :CURRENT_DEFAULT_LOCALE
 
       private
 
@@ -23,7 +23,7 @@ module ReactOnRails
           next if line.match?(/\A\s*\z/)
 
           return true if line.match?(LEGACY_DEFAULT_IMPORT)
-          return false unless line.match?(GENERATED_PREAMBLE_LINE)
+          return false if line.match?(CURRENT_DEFAULT_LOCALE)
         end
 
         false
