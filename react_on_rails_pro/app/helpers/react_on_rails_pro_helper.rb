@@ -424,11 +424,7 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
-    render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-      react_component_name: component_name,
-      options: { auto_load_bundle: }.merge(raw_options)
-    )
-    load_pack_for_generated_component(component_name, render_options)
+    load_pack_for_cached_react_component(component_name, { auto_load_bundle: }.merge(raw_options))
 
     initial_result, *rest_chunks = cached_chunks
 
@@ -519,11 +515,7 @@ module ReactOnRailsProHelper
     cached_result = Rails.cache.read(cache_key, cache_options)
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
-      render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-        react_component_name: component_name,
-        options: raw_options
-      )
-      load_pack_for_generated_component(component_name, render_options)
+      load_pack_for_cached_react_component(component_name, raw_options)
       return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
     end
 
