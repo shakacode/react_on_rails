@@ -282,8 +282,7 @@ jobs:
               return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
-            async function listNewerCiCommands() {
-              const newerCiCommands = [];
+            async function hasNewerCiCommand(commandNames) {
               for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
                 owner,
                 repo,
@@ -301,21 +300,17 @@ jobs:
                   }
 
                   const parsed = parseCommand(comment.body || '');
-                  if (parsed && validCommands.includes(parsed.command)) {
-                    newerCiCommands.push({
-                      command: parsed.command,
-                      id: comment.id
-                    });
+                  if (
+                    parsed &&
+                    validCommands.includes(parsed.command) &&
+                    commandNames.includes(parsed.command)
+                  ) {
+                    return true;
                   }
                 }
               }
 
-              return newerCiCommands;
-            }
-
-            async function hasNewerCiCommand(commandNames) {
-              const commands = await listNewerCiCommands();
-              return commands.some(({ command }) => commandNames.includes(command));
+              return false;
             }
 
             function helpBody() {
