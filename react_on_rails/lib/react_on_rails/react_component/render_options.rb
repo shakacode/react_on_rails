@@ -7,6 +7,8 @@ module ReactOnRails
     HYDRATE_ON_MODES = %i[immediate visible idle].freeze
 
     def self.normalize_hydrate_on(value)
+      return :immediate if value.nil?
+
       normalized_value = value.is_a?(String) ? value.to_sym : value
       unless HYDRATE_ON_MODES.include?(normalized_value)
         raise ArgumentError,

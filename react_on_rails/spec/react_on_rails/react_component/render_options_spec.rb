@@ -158,6 +158,12 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       expect(opts.hydrate_on).to eq(:immediate)
     end
 
+    it "treats nil as the default immediate mode" do
+      opts = described_class.new(**the_attrs(options: { hydrate_on: nil }))
+
+      expect(opts.hydrate_on).to eq(:immediate)
+    end
+
     context "without React on Rails Pro" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)

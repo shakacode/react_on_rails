@@ -702,6 +702,12 @@ describe ReactOnRailsHelper do
         expect(result).not_to match(/data-hydrate-on=/)
       end
 
+      it "does not add data-hydrate-on when hydrate_on is nil" do
+        result = react_component("App", hydrate_on: nil)
+
+        expect(result).not_to match(/data-hydrate-on=/)
+      end
+
       it "adds data-hydrate-on for explicit immediate mode" do
         result = react_component("App", hydrate_on: :immediate)
 
