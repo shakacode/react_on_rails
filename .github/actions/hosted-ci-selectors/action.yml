@@ -61,6 +61,8 @@ runs:
           const headRepoFullName = pullRequest?.head?.repo?.full_name;
           const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
           const isSameRepoPullRequest = !pullRequest || headRepoFullName === repoFullName;
+          const isDependabotPullRequest = pullRequest?.user?.login === 'dependabot[bot]';
+          const canDispatchHostedCiForPullRequest = isSameRepoPullRequest && !isDependabotPullRequest;
           const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
           const isReleasePullRequest = releaseBranchPrefixes.some((prefix) => baseRef.startsWith(prefix));
           const isReleaseBranchPush = eventName === 'push' &&
@@ -70,7 +72,7 @@ runs:
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
           const shouldRunHostedCi = eventName !== 'pull_request' ||
-            (isSameRepoPullRequest && (
+            (canDispatchHostedCiForPullRequest && (
               hostedCiRequested ||
               forceFullHostedCiRequested ||
               isReleaseTarget
