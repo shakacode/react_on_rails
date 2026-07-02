@@ -239,9 +239,10 @@ heredoc_body_line_numbers() {
   local candidate
   local matched
   local operator
+  local prefix
   local remaining
   local ruby_heredoc_regex="(<<[-~]?)([A-Za-z_][A-Za-z0-9_]*|'[^']+'|\"[^\"]+\")"
-  local bash_heredoc_regex="(^|[^<])(<<-?)[[:space:]]*((\\\\)?[A-Za-z_][A-Za-z0-9_]*|'[^']+'|\"[^\"]+\")"
+  local bash_heredoc_regex="(^|[^<])(<<-?)[[:space:]]*((\\\\)?[A-Za-z_][^[:space:]<>|&;()'\"\\\\]*|'[^']+'|\"[^\"]+\")"
 
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
@@ -294,6 +295,11 @@ heredoc_body_line_numbers() {
           operator="${BASH_REMATCH[2]}"
           delimiter="${BASH_REMATCH[3]}"
           matched="${BASH_REMATCH[0]}"
+          prefix="${remaining%%"$matched"*}"
+          if grep -Eq '\$\(\([^)]*$' <<< "$prefix"; then
+            remaining="${remaining#*"$matched"}"
+            continue
+          fi
           delimiter="${delimiter#\\}"
           case "$delimiter" in
             \"*\"|\'*\')

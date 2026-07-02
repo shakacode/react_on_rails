@@ -1245,6 +1245,55 @@ BASH
   assert_release_tooling_contract "$(detector_output)" "release-forward-port-test hyphenated bash heredoc output"
 }
 
+test_release_forward_port_test_unquoted_hyphenated_bash_heredoc_terminates_before_later_comment() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+cat <<release-fixture > release.md
+# Change Log
+release-fixture
+
+echo "done"
+BASH
+  commit_change "add release-forward-port-test unquoted hyphenated bash heredoc fixture"
+  perl -0pi -e 's/echo "done"/# Explain the release test.\necho "done"/' \
+    script/release-forward-port-test.bash
+  commit_change "release-forward-port-test comment after unquoted hyphenated bash heredoc"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_lint": true' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release-forward-port-test unquoted hyphenated comment output"
+  assert_contains "$out" '"run_generators": false' "release-forward-port-test unquoted hyphenated comment output"
+}
+
+test_release_forward_port_test_arithmetic_shift_comment_only_change_stays_non_runtime() {
+  setup_repo
+  mkdir -p script
+  cat > script/release-forward-port-test.bash <<'BASH'
+#!/usr/bin/env bash
+flags=1
+mask=2
+value=$((flags << mask))
+echo "$value"
+BASH
+  commit_change "add release-forward-port-test arithmetic shift fixture"
+  perl -0pi -e 's/echo "\$value"/# Explain the release test.\necho "\$value"/' \
+    script/release-forward-port-test.bash
+  commit_change "release-forward-port-test comment after arithmetic shift"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"docs_only": false' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"non_runtime_only": true' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_lint": true' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_ruby_tests": false' "release-forward-port-test arithmetic shift comment output"
+  assert_contains "$out" '"run_generators": false' "release-forward-port-test arithmetic shift comment output"
+}
+
 test_release_finish_test_compact_bash_heredoc_redirect_change_runs_release_specs() {
   setup_repo
   mkdir -p script
@@ -1420,6 +1469,8 @@ run_test test_release_forward_port_test_heredoc_fixture_change_runs_release_spec
 run_test test_release_finish_test_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_test_lowercase_bash_heredoc_fixture_change_runs_release_specs
 run_test test_release_forward_port_test_hyphenated_bash_heredoc_change_runs_release_specs
+run_test test_release_forward_port_test_unquoted_hyphenated_bash_heredoc_terminates_before_later_comment
+run_test test_release_forward_port_test_arithmetic_shift_comment_only_change_stays_non_runtime
 run_test test_release_finish_test_compact_bash_heredoc_redirect_change_runs_release_specs
 run_test test_release_finish_test_backslash_bash_heredoc_change_runs_release_specs
 run_test test_release_finish_test_multiple_bash_heredocs_on_one_line_track_later_body
