@@ -33,11 +33,6 @@ concurrency:
 jobs:
   required-pr-gate:
     name: required-pr-gate
-    if: |
-      github.event_name != 'pull_request' ||
-      (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-      github.event.label.name == 'ready-for-hosted-ci' ||
-      github.event.label.name == 'force-full-hosted-ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

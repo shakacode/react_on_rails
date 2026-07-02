@@ -37,6 +37,7 @@ jobs:
             const repoFullName = `${owner}/${repo}`;
             const hostedCiLabel = 'ready-for-hosted-ci';
             const forceFullHostedCiLabel = 'force-full-hosted-ci';
+            const newerCommandVisibilityDelayMs = 5000;
 
             const validCommands = [
               '+ci-run-hosted',
@@ -282,7 +283,19 @@ jobs:
               return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
-            async function hasNewerCiCommand(commandNames) {
+            function sleep(ms) {
+              return new Promise((resolve) => setTimeout(resolve, ms));
+            }
+
+            async function newerCiCommands(commandNames) {
+              const commandNameSet = new Set(commandNames);
+              const newerCommands = new Set();
+
+              // Give GitHub's comments API a short visibility window so a later
+              // stop/skip command wins over an older run-hosted command that is
+              // still dispatching workflows.
+              await sleep(newerCommandVisibilityDelayMs);
+
               for await (const page of github.paginate.iterator(github.rest.issues.listComments, {
                 owner,
                 repo,
@@ -303,14 +316,21 @@ jobs:
                   if (
                     parsed &&
                     validCommands.includes(parsed.command) &&
-                    commandNames.includes(parsed.command)
+                    commandNameSet.has(parsed.command)
                   ) {
-                    return true;
+                    newerCommands.add(parsed.command);
+                    if (newerCommands.size === commandNameSet.size) {
+                      return newerCommands;
+                    }
                   }
                 }
               }
 
-              return false;
+              return newerCommands;
+            }
+
+            async function hasNewerCiCommand(commandNames) {
+              return (await newerCiCommands(commandNames)).size > 0;
             }
 
             function helpBody() {
@@ -402,11 +422,16 @@ jobs:
               let forceFullLabelAdded = false;
               let labelMessageOverride = '';
               if (succeeded.length > 0) {
-                if (await hasNewerCiCommand(['+ci-stop-hosted', '+ci-skip-hosted'])) {
+                const newerCommands = await newerCiCommands([
+                  '+ci-stop-hosted',
+                  '+ci-skip-hosted',
+                  '+ci-stop-full'
+                ]);
+                if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
                   labelMessageOverride =
                     'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
                 } else {
-                  const shouldAddForceFullLabel = forceFull && !(await hasNewerCiCommand(['+ci-stop-full']));
+                  const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
                   try {
                     await addHostedCiLabels(shouldAddForceFullLabel);
                     labelAdded = true;
