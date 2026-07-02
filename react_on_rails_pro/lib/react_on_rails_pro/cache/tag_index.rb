@@ -291,16 +291,16 @@ module ReactOnRailsPro
           Rails.cache.delete(key)
           delete_entries(keys)
         rescue EntryDeletionError => e
-          restore_index_after_revalidation_failure(tag, key, keys, e.keys_to_restore, expires_at)
+          restore_index_after_revalidation_failure(tag, key, e.keys_to_restore, expires_at)
           raise e.original_error
         rescue StandardError
-          restore_index_after_revalidation_failure(tag, key, keys, keys, expires_at)
+          restore_index_after_revalidation_failure(tag, key, keys, expires_at)
           raise
         end
 
-        def restore_index_after_revalidation_failure(tag, key, original_keys, keys_to_restore, expires_at)
+        def restore_index_after_revalidation_failure(tag, key, keys_to_restore, expires_at)
           current_keys, current_expires_at = read_index(key)
-          restored_keys = (current_keys - original_keys) + keys_to_restore
+          restored_keys = merge_restored_keys(current_keys, keys_to_restore)
           enforce_max_keys(tag, restored_keys)
           restored_expires_at = [current_expires_at, expires_at].compact.max
           restore_result = write_index(key, restored_keys, restored_expires_at)
@@ -313,6 +313,10 @@ module ReactOnRailsPro
             "[ReactOnRailsPro] failed to restore cache tag index after revalidation failure: " \
               "#{e.class}: #{e.message}"
           end
+        end
+
+        def merge_restored_keys(current_keys, keys_to_restore)
+          (current_keys + keys_to_restore).reverse.uniq.reverse
         end
 
         # The recorded keys carry their full logical name (including any
@@ -330,7 +334,8 @@ module ReactOnRailsPro
         end
 
         def base_delete_multi?(store)
-          store.method(:delete_multi).owner == ActiveSupport::Cache::Store
+          !store.respond_to?(:delete_multi_entries, true) ||
+            store.method(:delete_multi_entries).owner == ActiveSupport::Cache::Store
         end
 
         def delete_entries_individually(keys)
