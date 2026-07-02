@@ -5,9 +5,20 @@ require "open3"
 require "pathname"
 
 MARKER = "MIRROR OF:"
+# Value-set mirror mode (language-agnostic). Unlike MIRROR OF:, which brace-matches a
+# JS `{...}` block and compares its text byte-for-byte, MIRROR VALUES OF: guards an
+# explicitly delimited region and compares only the *set* of quoted-string and integer
+# literals it contains. This lets Ruby (`%w[...].freeze`, `= 256`) and TS
+# (`[...] as const`, scattered `'literal'` args) definitions of the same wire-protocol
+# contract be pinned to each other without requiring identical syntax or a shared block.
+VALUES_MARKER = "MIRROR VALUES OF:"
+VALUES_END_MARKER = "MIRROR VALUES END"
 MIRROR_ROOTS = %w[
   packages/react-on-rails
   packages/react-on-rails-pro
+  packages/react-on-rails-pro-node-renderer/src
+  react_on_rails/lib
+  react_on_rails_pro/lib
 ].freeze
 WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 REGEX_LITERAL_PRECEDING_PUNCTUATION_BYTES = "([{}=,:;!&|?+-*~%^<>".bytes.freeze
@@ -34,6 +45,25 @@ TARGET_PATH_PATTERN = %r{
   ([A-Za-z0-9_@./+\-]+)
   `?
 }ix
+
+# Value-mode markers accept Ruby (`#`) as well as JS (`//`, `*`, `/*`) comment prefixes so
+# the same guard can pin a Ruby constant to a TS constant. The prefix is text-matched (not
+# lexer-classified) because value regions live in Ruby files the JS lexer does not model.
+COMMENT_PREFIX = %r{(?:(?://|\#|\*)\s*|/\*+\s*)}
+VALUES_MARKER_PATTERN = /\A\s*#{COMMENT_PREFIX}#{Regexp.escape(VALUES_MARKER)}/o
+VALUES_END_PATTERN = /\A\s*#{COMMENT_PREFIX}#{Regexp.escape(VALUES_END_MARKER)}\b/o
+VALUES_TARGET_PATH_PATTERN = %r{
+  #{Regexp.escape(VALUES_MARKER)}
+  \s+
+  `?
+  ([A-Za-z0-9_@./+\-]+)
+  `?
+}iox
+# String literals: '...' , "..." (single line, with escapes) plus Ruby %w[...]/%i[...] words.
+# Integer literals: standalone decimal numbers (e.g. MAX_PULL_PROP_NAME_LENGTH = 256).
+STRING_LITERAL_PATTERN = /'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/
+PERCENT_WORD_ARRAY_PATTERN = /%[wi]([\[({<])([^\])}>]*)[\])}>]/
+INTEGER_LITERAL_PATTERN = /(?<![\w.])\d+(?![\w.])/
 GUARD_HEADER_PATTERN = /
   \A
   (?:
@@ -50,6 +80,15 @@ MarkerRecord = Struct.new(
   :normalized_block,
   :block_start_line,
   :block_end_line,
+  keyword_init: true
+)
+ValuesRecord = Struct.new(
+  :path,
+  :line_number,
+  :target_path,
+  :literal_values,
+  :region_start_line,
+  :region_end_line,
   keyword_init: true
 )
 BlockStart = Struct.new(:line_index, :open_index, keyword_init: true)
@@ -647,6 +686,117 @@ def parse_markers(path, content)
   [records, errors]
 end
 
+def values_target_path_from(line)
+  match = line.match(VALUES_TARGET_PATH_PATTERN)
+  return nil unless match
+
+  clean_repo_path(match[1].sub(/[.,;:)\]]+\z/, ""))
+end
+
+QUOTE_CHARS = ["'", '"', "`"].freeze
+
+# True when index begins a Ruby (`#`), JS/TS line (`//`) or single-line block (`/* ... */`)
+# comment (outside any string — callers gate on that).
+def comment_start_at?(line, index)
+  char = line[index]
+  char == "#" || (char == "/" && ["/", "*"].include?(line[index + 1]))
+end
+
+# Return the code portion of a line with any trailing comment removed. Comment openers inside
+# a quoted string (e.g. a URL like 'http://x') are ignored. Only single-line comments are
+# handled — a value region spanning a multi-line /* ... */ is not supported and would leak its
+# tail; regions are single-line constant declarations, so this is sufficient.
+def strip_line_comment(line)
+  quote = nil
+  index = 0
+  while index < line.length
+    char = line[index]
+    if quote
+      quote = nil if char == quote
+    elsif QUOTE_CHARS.include?(char)
+      quote = char
+    elsif comment_start_at?(line, index)
+      return line[0...index]
+    end
+    index += 1
+  end
+  line
+end
+
+# Collect quoted-string and integer literals from one line of a value region.
+# %w[...]/%i[...] words are unquoted, so expand them to individual string values.
+# Trailing comments are stripped first so prose tokens never enter the contract.
+def literals_on_line(raw_line)
+  line = strip_line_comment(raw_line)
+  literals = []
+  line.scan(PERCENT_WORD_ARRAY_PATTERN) { |_open, body| literals.concat(body.split(/\s+/).reject(&:empty?)) }
+  # Remove the %w/%i bodies before scanning quoted strings so their contents are not double counted.
+  remainder = line.gsub(PERCENT_WORD_ARRAY_PATTERN, "")
+  remainder.scan(STRING_LITERAL_PATTERN) { |match| literals << match[1...-1] }
+  remainder.scan(INTEGER_LITERAL_PATTERN) { |match| literals << match }
+  literals
+end
+
+# Collect literals from a value region [start_index, end_index). Stacked MIRROR VALUES OF:
+# markers (a region can be pinned to several targets) and any nested END marker are skipped
+# so tokens inside those comment lines (e.g. a target path) never leak into the guarded set.
+def collect_region_literals(lines, start_index, end_index)
+  values = []
+  (start_index...end_index).each do |i|
+    next if lines[i].match?(VALUES_MARKER_PATTERN) || lines[i].match?(VALUES_END_PATTERN)
+
+    values.concat(literals_on_line(lines[i]))
+  end
+  values
+end
+
+def parse_values_marker(path, lines, marker_index, errors)
+  target_path = values_target_path_from(lines[marker_index])
+  unless target_path
+    errors << "#{path}:#{marker_index + 1}: unable to parse mirror target path; " \
+              "expected '#{VALUES_MARKER} <path>'"
+    return nil
+  end
+
+  end_index = (marker_index + 1...lines.length).find { |i| lines[i].match?(VALUES_END_PATTERN) }
+  unless end_index
+    errors << "#{path}:#{marker_index + 1}: missing closing '#{VALUES_END_MARKER}' comment for " \
+              "'#{VALUES_MARKER}' region"
+    return nil
+  end
+
+  values = collect_region_literals(lines, marker_index + 1, end_index)
+  if values.empty?
+    errors << "#{path}:#{marker_index + 1}: no string or integer literals found in " \
+              "'#{VALUES_MARKER}' region (lines #{marker_index + 2}-#{end_index})"
+    return nil
+  end
+
+  ValuesRecord.new(
+    path:,
+    line_number: marker_index + 1,
+    target_path:,
+    literal_values: values.uniq.sort,
+    region_start_line: marker_index + 2,
+    region_end_line: end_index
+  )
+end
+
+def parse_values_markers(path, content)
+  lines = content.lines
+  records = []
+  errors = []
+
+  lines.each_with_index do |line, index|
+    next unless line.match?(VALUES_MARKER_PATTERN)
+
+    record = parse_values_marker(path, lines, index, errors)
+    records << record if record
+  end
+
+  [records, errors]
+end
+
 def first_difference(left, right)
   left_lines = left.lines
   right_lines = right.lines
@@ -681,33 +831,103 @@ def drift_message(record, candidate)
     "block #{candidate.block_start_line}-#{candidate.block_end_line}#{detail}"
 end
 
+def values_drift_message(record, candidate)
+  only_here = record.literal_values - candidate.literal_values
+  only_there = candidate.literal_values - record.literal_values
+  detail = ""
+  detail += "\n  only in #{record.path}: #{only_here.join(', ')}" unless only_here.empty?
+  detail += "\n  only in #{candidate.path}: #{only_there.join(', ')}" unless only_there.empty?
+
+  "#{record.path}:#{record.line_number} values region " \
+    "#{record.region_start_line}-#{record.region_end_line} " \
+    "does not match #{candidate.path}:#{candidate.line_number} values region " \
+    "#{candidate.region_start_line}-#{candidate.region_end_line}#{detail}"
+end
+
+def values_target_error(record)
+  return "target #{record.target_path} is outside mirror marker scope" unless mirror_scope_path?(record.target_path)
+  return "target #{record.target_path} cannot be the same file" if record.target_path == record.path
+  return "target #{record.target_path} does not exist" unless File.file?(record.target_path)
+
+  nil
+end
+
+def values_pair_error(record, by_path, seen_pairs)
+  candidates = by_path.fetch(record.target_path, []).select { |candidate| candidate.target_path == record.path }
+  return "target #{record.target_path} has no reciprocal #{VALUES_MARKER} marker" if candidates.empty?
+  return nil if candidates.any? { |candidate| candidate.literal_values == record.literal_values }
+
+  candidate = candidates.first
+  pair_key = [[record.path, record.line_number], [candidate.path, candidate.line_number]].sort
+  return nil if seen_pairs[pair_key]
+
+  seen_pairs[pair_key] = true
+  values_drift_message(record, candidate)
+end
+
+def check_values_records(values_records, errors)
+  by_path = values_records.group_by(&:path)
+  seen_pairs = {}
+
+  values_records.each do |record|
+    target_error = values_target_error(record)
+    if target_error
+      errors << "#{record.path}:#{record.line_number}: #{target_error}"
+      next
+    end
+
+    pair_error = values_pair_error(record, by_path, seen_pairs)
+    errors << pair_error if pair_error
+  end
+end
+
+def collect_block_records(path, content, records, errors)
+  file_records, file_errors = parse_markers(path, content)
+  records.concat(file_records)
+  errors.concat(file_errors)
+rescue StandardError => e
+  errors << "#{path}: unexpected error during parsing (#{e.class}: #{e.message})"
+end
+
+def collect_values_records(path, content, values_records, errors)
+  file_values, file_values_errors = parse_values_markers(path, content)
+  values_records.concat(file_values)
+  errors.concat(file_values_errors)
+rescue StandardError => e
+  errors << "#{path}: unexpected error during values parsing (#{e.class}: #{e.message})"
+end
+
+def process_file(path, records, values_records, errors)
+  content = File.binread(path)
+  has_block_marker = content.include?(MARKER)
+  has_values_marker = content.include?(VALUES_MARKER)
+  return unless has_block_marker || has_values_marker
+
+  content.force_encoding(Encoding::UTF_8)
+  unless content.valid_encoding?
+    errors << "#{path}: contains a MIRROR marker but is not valid UTF-8"
+    return
+  end
+
+  collect_block_records(path, content, records, errors) if has_block_marker
+  collect_values_records(path, content, values_records, errors) if has_values_marker
+end
+
 ROOT = repo_root
 Dir.chdir(ROOT)
 
 records = []
+values_records = []
 errors = []
 
 git_files.sort.each do |path|
   next unless File.file?(path)
   next unless mirror_scope_path?(path)
 
-  content = File.binread(path)
-  next unless content.include?(MARKER)
-
-  content.force_encoding(Encoding::UTF_8)
-  unless content.valid_encoding?
-    errors << "#{path}: contains #{MARKER.inspect} but is not valid UTF-8"
-    next
-  end
-
-  begin
-    file_records, file_errors = parse_markers(path, content)
-    records.concat(file_records)
-    errors.concat(file_errors)
-  rescue StandardError => e
-    errors << "#{path}: unexpected error during parsing (#{e.class}: #{e.message})"
-  end
+  process_file(path, records, values_records, errors)
 end
+
+check_values_records(values_records, errors)
 
 records_by_path = records.group_by(&:path)
 drift_pair_keys = {}
@@ -750,4 +970,6 @@ if errors.any?
 end
 
 pair_count = records.map { |record| [record.path, record.target_path].sort }.uniq.length
+values_pair_count = values_records.map { |record| [record.path, record.target_path].sort }.uniq.length
 puts "Checked #{records.length} #{MARKER} markers across #{pair_count} mirrored pairs."
+puts "Checked #{values_records.length} #{VALUES_MARKER} markers across #{values_pair_count} value-mirrored pairs."

@@ -13,7 +13,10 @@ module ReactOnRails
   class LengthPrefixedParser
     # Keep aligned with ReactOnRailsPro::StreamRequest::CONTROL_MESSAGE_TYPES,
     # which routes these same control frames during bidirectional streaming.
+    # MIRROR VALUES OF: react_on_rails_pro/lib/react_on_rails_pro/stream_request.rb
+    # MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/streamingUtils.ts
     CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
+    # MIRROR VALUES END
     private_constant :CONTROL_MESSAGE_TYPES
 
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
