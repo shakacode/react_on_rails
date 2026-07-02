@@ -83,6 +83,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Response-start send failures are reported during abandoned incremental renders**:
+  The Pro node renderer now observes and reports rejected response-start/send promises when
+  incremental render request handling stops early or errors after a response starts, while still
+  propagating those failures on clean stream completion. Fixes
+  [Issue 4364](https://github.com/shakacode/react_on_rails/issues/4364).
+  [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
+  [justin808](https://github.com/justin808).
+
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
