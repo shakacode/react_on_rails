@@ -195,7 +195,7 @@ export const fetchRSC = ({
   replayConsoleScripts,
 }: FetchRSCOptions) => {
   if (!rscPayloadGenerationUrlPath) {
-    throw createMissingRSCPayloadPathError(componentName);
+    return Promise.reject(createMissingRSCPayloadPathError(componentName));
   }
 
   try {
@@ -230,7 +230,7 @@ export const fetchRSC = ({
       `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
     wrapper.cause = error;
-    throw wrapper;
+    return Promise.reject(wrapper);
   }
 };
 
@@ -357,7 +357,6 @@ const getReactServerComponent =
       }
     }
     if (!railsContext.rscPayloadGenerationUrlPath) {
-      // fetchRSC throws synchronously for a missing path; keep this API on the Promise rejection path.
       return Promise.reject(createMissingRSCPayloadPathError(componentName));
     }
 
