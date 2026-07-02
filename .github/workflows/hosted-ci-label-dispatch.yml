@@ -60,6 +60,7 @@ jobs:
               pull_request_base_sha: pr.base.sha,
               ...(forceFull ? { force_full_hosted: 'true' } : {})
             };
+            const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
             const workflows = [
               ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
               ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
@@ -74,21 +75,62 @@ jobs:
               ])
             ];
 
-            const dispatchResults = await Promise.allSettled(
-              workflows.map(([workflowName, workflowFile, workflowInputs]) =>
-                github.rest.actions.createWorkflowDispatch({
+            function legacyCompatibleInputs(workflowInputs) {
+              return Object.fromEntries(
+                Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
+              );
+            }
+
+            function isUnexpectedInputError(error) {
+              const message = error?.message || '';
+              return error?.status === 422 &&
+                /unexpected inputs?|provided inputs?/.test(message.toLowerCase()) &&
+                [...baseContextInputNames].some((name) => message.includes(name));
+            }
+
+            async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
                   owner,
                   repo,
                   workflow_id: workflowFile,
                   ref: pr.head.ref,
                   inputs: workflowInputs
-                }).then(() => ({ file: workflowFile, name: workflowName }))
+                });
+
+                return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: false };
+              } catch (error) {
+                if (!isUnexpectedInputError(error)) {
+                  throw error;
+                }
+
+                core.warning(
+                  `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
+                );
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: pr.head.ref,
+                  inputs: legacyCompatibleInputs(workflowInputs)
+                });
+
+                return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: true };
+              }
+            }
+
+            const dispatchResults = await Promise.allSettled(
+              workflows.map(([workflowName, workflowFile, workflowInputs]) =>
+                createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs)
               )
             );
 
+            const succeeded = [];
             const failed = [];
             for (const [index, result] of dispatchResults.entries()) {
-              if (result.status === 'rejected') {
+              if (result.status === 'fulfilled') {
+                succeeded.push(result.value);
+              } else {
                 failed.push({
                   workflow: workflows[index][0],
                   error: result.reason?.message || String(result.reason)
@@ -113,6 +155,12 @@ jobs:
               });
               core.setFailed(`Failed to dispatch: ${failed.map((failure) => failure.workflow).join(', ')}`);
             } else {
+              const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
+              if (fallbackCount > 0) {
+                core.info(
+                  `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
+                );
+              }
               core.info(
                 `Dispatched ${workflows.length} hosted CI workflow(s) for ${pr.head.sha.slice(0, 12)}.`
               );
