@@ -111,7 +111,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4354](https://github.com/shakacode/react_on_rails/pull/4354) by
   [justin808](https://github.com/justin808).
 
-- **RSC Rspack boot validation warns on undetermined versions**: Boot now warns and continues when
+- **[Pro]** **RSC Rspack boot validation warns on undetermined versions**: Boot now warns and continues when
   the active Rspack version cannot be determined, while strict doctor checks and provable Rspack v1
   failures still fail closed. Fixes [Issue 4340](https://github.com/shakacode/react_on_rails/issues/4340).
   [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
