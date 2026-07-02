@@ -663,11 +663,17 @@ module ReactOnRailsProHelper
       rsc_payload: {
         bootstrap_script_count: payload_diagnostics[:bootstrap_script_count],
         bootstrap_script_bytes: payload_diagnostics[:bootstrap_script_bytes],
-        stripped: payload_diagnostics[:bootstrap_script_count].to_i.positive?
+        stripped: static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
       },
       emitted_assets: static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostics_context[:packs]),
       client_references: static_rsc_client_reference_diagnostics
     }
+  end
+
+  def static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
+    return true if cache_diagnostics[:hit]
+
+    payload_diagnostics[:bootstrap_script_count].to_i.positive?
   end
 
   def static_rsc_cache_diagnostics_payload(cache_diagnostics)

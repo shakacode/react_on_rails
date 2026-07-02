@@ -1641,6 +1641,11 @@ describe ReactOnRailsProHelper do
           stripped: true
         )
         expect(diagnostics.first[:rsc_payload][:bootstrap_script_bytes]).to be_positive
+        expect(diagnostics.second[:rsc_payload]).to include(
+          bootstrap_script_count: nil,
+          bootstrap_script_bytes: nil,
+          stripped: true
+        )
         expect(diagnostics.second[:html]).to include(cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize)
         expect(notifications.first[:component]).to eq(component_name)
       ensure
