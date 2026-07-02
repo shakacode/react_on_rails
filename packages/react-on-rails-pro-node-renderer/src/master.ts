@@ -32,6 +32,7 @@ import { SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from './worker/shutdownHooks.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
+const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
 // How often to scan for orphaned upload directories.
 const ORPHAN_CLEANUP_INTERVAL_MS = 5 * MILLISECONDS_IN_MINUTE;
 // How old a directory must be before it is considered orphaned.
@@ -123,6 +124,7 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   let isAbortingForStartupFailure = false;
   let hasReportedStartupFailure = false;
   let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
+  const gracefulShutdownAcknowledgedWorkerIds = new Set<number>();
   // Set as soon as any shutdown path (external signal or startup-failure abort)
   // begins. Read by the `cluster.on('exit')` handler to suppress re-forking
   // workers that exit because we are intentionally tearing the cluster down.
@@ -141,12 +143,16 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   const currentWorkers = (): Worker[] =>
     Object.values(cluster.workers ?? {}).filter((worker): worker is Worker => Boolean(worker));
 
-  const forceKillSurvivingWorkers = (workers: Worker[]) => {
+  const forceKillSurvivingWorkers = (
+    workers: Worker[],
+    { skipAcknowledgedWorkers = false }: { skipAcknowledgedWorkers?: boolean } = {},
+  ) => {
     workers.forEach((worker) => {
       const workerProcess = worker.process;
       // isDead() only: ChildProcess.killed means a signal was sent, not that
       // the process died — e.g. a blocked worker surviving destroy()'s SIGTERM.
       if (worker.isDead()) return;
+      if (skipAcknowledgedWorkers && gracefulShutdownAcknowledgedWorkerIds.has(worker.id)) return;
 
       try {
         workerProcess.kill('SIGKILL');
@@ -210,7 +216,7 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     // Their SIGKILL-induced exits complete the disconnect, which lets the
     // normal waitForWorkerExits path below finish the shutdown promptly.
     const forceKillTimer = setTimeout(() => {
-      forceKillSurvivingWorkers(workersAtShutdown);
+      forceKillSurvivingWorkers(workersAtShutdown, { skipAcknowledgedWorkers: true });
     }, SHUTDOWN_WORKER_FORCE_KILL_TIMEOUT_MS);
     if (typeof forceKillTimer.unref === 'function') forceKillTimer.unref();
 
@@ -265,6 +271,11 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   };
 
   cluster.on('message', (worker, message) => {
+    if (message === SHUTDOWN_WORKER_ACK_MESSAGE) {
+      gracefulShutdownAcknowledgedWorkerIds.add(worker.id);
+      return;
+    }
+
     // Check the abort flag first to short-circuit the type-guard on every
     // ordinary IPC message once we are already aborting.
     if (isAbortingForStartupFailure || !isWorkerStartupFailureMessage(message)) return;
@@ -339,9 +350,13 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
     const allWorkersRestartIntervalMS = allWorkersRestartInterval * MILLISECONDS_IN_MINUTE;
     const scheduleWorkersRestart = () => {
-      void restartWorkers(delayBetweenIndividualWorkerRestarts, gracefulWorkerRestartTimeout).finally(() => {
-        setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
-      });
+      void restartWorkers(delayBetweenIndividualWorkerRestarts, gracefulWorkerRestartTimeout)
+        .catch((err: unknown) => {
+          log.error({ msg: 'Scheduled worker restart failed', err });
+        })
+        .finally(() => {
+          setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
+        });
     };
 
     setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
