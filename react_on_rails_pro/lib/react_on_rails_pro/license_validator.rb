@@ -29,7 +29,9 @@ module ReactOnRailsPro
     # - education: For educational institutions
     # - oss: For open source projects
     # - partner: Strategic partners
+    # MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
+    # MIRROR VALUES END
 
     # Plans that require attribution by default (complimentary licenses)
     #

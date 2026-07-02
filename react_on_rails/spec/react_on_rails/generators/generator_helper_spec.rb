@@ -221,18 +221,22 @@ RSpec.describe GeneratorHelper, type: :generator do
       YAML
     end
 
-    it "fails closed instead of parsing aliased configs without alias support" do
-      allow(self).to receive(:yaml_safe_load_supports_aliases?).and_return(true)
-      allow(YAML).to receive(:safe_load) do |_content, aliases: false, **_kwargs|
-        raise ArgumentError, "unknown keyword: :aliases" if aliases
+    it "parses aliased configs, resolving merge keys" do
+      expect(parse_shakapacker_yml_content(aliased_config)).to eq(
+        "default" => { "precompile_hook" => "bin/shakapacker-precompile-hook" },
+        "test" => { "precompile_hook" => "bin/shakapacker-precompile-hook" }
+      )
+    end
 
-        {
-          "default" => { "precompile_hook" => "bin/shakapacker-precompile-hook" },
-          "test" => { "precompile_hook" => "bin/shakapacker-precompile-hook" }
-        }
-      end
+    it "surfaces a clear error instead of silently discarding config when psych lacks alias support" do
+      # Simulates an unusually old, explicitly pinned psych (< 3.1) where the
+      # aliases: keyword is unknown. This must fail loudly, not swallow the whole
+      # shakapacker.yml into {} and fall back to defaults.
+      allow(YAML).to receive(:safe_load).and_raise(ArgumentError, "unknown keyword: :aliases")
 
-      expect(parse_shakapacker_yml_content(aliased_config)).to eq({})
+      expect do
+        parse_shakapacker_yml_content(aliased_config)
+      end.to raise_error(ArgumentError, /psych >= 3\.1 .* is required for YAML alias support/)
     end
 
     it "warns and raises when shakapacker.yml ERB cannot be evaluated" do

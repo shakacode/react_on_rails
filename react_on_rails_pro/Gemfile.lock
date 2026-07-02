@@ -21,14 +21,12 @@ PATH
   remote: .
   specs:
     react_on_rails_pro (17.0.0.rc.6)
-      addressable
       async (>= 2.29)
       async-http (~> 0.95)
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
       jwt (>= 2.5, < 4)
       nokogiri (>= 1.12)
-      rainbow
       react_on_rails (= 17.0.0.rc.6)
 
 GEM
