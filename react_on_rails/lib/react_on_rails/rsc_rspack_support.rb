@@ -154,6 +154,9 @@ module ReactOnRails
       return 0 if version_string.include?("/") && !version_string.start_with?("npm:")
       return 0 if version_string.start_with?("workspace:")
 
+      shorthand = version_string.match(/\A[~^]?\s*v?(\d+)(?:\.(?:x|\*|\d+))?(?:\.(?:x|\*|\d+))?\z/i)
+      return shorthand[1].to_i if shorthand
+
       # Accept installed semver versions and simple declared lower-bound specs. Other npm ranges or dist-tags
       # fail closed unless Node resolution already proved that the installed package is Rspack v2.
       major = version_string.match(/\Av?(\d+)\.\d+\.\d+(?:[-+].*)?\z/)&.[](1)

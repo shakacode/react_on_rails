@@ -498,11 +498,24 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           end
         end
 
+        it "allows compatible shorthand declared Rspack ranges without Node resolution" do
+          allow(Open3).to receive(:capture3)
+
+          aggregate_failures do
+            %w[^2 ~2 2 2.x].each do |rspack_core_version|
+              expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version:) }
+                .not_to raise_error
+            end
+          end
+
+          expect(Open3).not_to have_received(:capture3)
+        end
+
         it "warns and allows boot when the RSC Rspack version is undeterminable" do
           allow(Open3).to receive(:capture3).and_raise(Errno::ENOENT)
 
-          expect_rsc_rspack_boot_warning("^2") do
-            expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2") }
+          expect_rsc_rspack_boot_warning("latest") do
+            expect { validate_rsc_rspack_project(assets_bundler: "rspack", rspack_core_version: "latest") }
               .not_to raise_error
           end
         end

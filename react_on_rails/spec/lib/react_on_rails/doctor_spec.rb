@@ -5430,7 +5430,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     context "when the RSC Rspack version is undeterminable" do
-      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "^2") }
+      before { write_rspack_project(assets_bundler: "rspack", rspack_core_version: "latest") }
 
       it "keeps doctor fail-closed with Rspack v2 fix instructions" do
         doctor.send(:check_rsc_rspack_version)
@@ -5440,7 +5440,7 @@ RSpec.describe ReactOnRails::Doctor do
           a_hash_including(
             content: a_string_including(
               "RSC with Rspack requires Rspack v2 or newer",
-              "Detected @rspack/core: ^2",
+              "Detected @rspack/core: latest",
               "@rspack/core@^2"
             )
           )
