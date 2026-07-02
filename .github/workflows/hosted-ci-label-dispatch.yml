@@ -1,0 +1,112 @@
+name: Hosted CI Label Dispatch
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  dispatch-hosted-ci:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Dispatch hosted CI for control labels
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const labelName = context.payload.label?.name;
+            const hostedCiLabel = 'ready-for-hosted-ci';
+            const forceFullHostedCiLabel = 'force-full-hosted-ci';
+            const controlLabels = new Set([hostedCiLabel, forceFullHostedCiLabel]);
+
+            if (!pr || !controlLabels.has(labelName)) {
+              core.info(`Ignoring label ${labelName || '(unknown)'}.`);
+              return;
+            }
+
+            if (context.actor === 'github-actions[bot]') {
+              core.info('Ignoring workflow-token label event; the command workflow dispatches hosted CI directly.');
+              return;
+            }
+
+            const headRepoFullName = pr.head.repo?.full_name;
+            const repoFullName = `${owner}/${repo}`;
+
+            if (!headRepoFullName || headRepoFullName !== repoFullName) {
+              core.setFailed(
+                'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
+              );
+              return;
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: pr.number
+            });
+            const currentLabelNames = labels.map((label) => label.name);
+            const forceFull = currentLabelNames.includes(forceFullHostedCiLabel);
+            const inputs = forceFull ? { force_full_hosted: 'true' } : {};
+            const workflows = [
+              ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
+              ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
+              ['Rspec test for gem', 'gem-tests.yml', inputs],
+              ['Integration Tests', 'integration-tests.yml', inputs],
+              ['Assets Precompile Check', 'precompile-check.yml', inputs],
+              ['Generator tests', 'examples.yml', inputs],
+              ['Playwright E2E Tests', 'playwright.yml', inputs],
+              ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+              ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+            ];
+
+            const dispatchResults = await Promise.allSettled(
+              workflows.map(([workflowName, workflowFile, workflowInputs]) =>
+                github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: pr.head.ref,
+                  inputs: workflowInputs
+                }).then(() => ({ file: workflowFile, name: workflowName }))
+              )
+            );
+
+            const failed = [];
+            for (const [index, result] of dispatchResults.entries()) {
+              if (result.status === 'rejected') {
+                failed.push({
+                  workflow: workflows[index][0],
+                  error: result.reason?.message || String(result.reason)
+                });
+              }
+            }
+
+            if (failed.length > 0) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: [
+                  '## Hosted CI Label Dispatch Failed',
+                  '',
+                  `Label: \`${labelName}\``,
+                  `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
+                  '',
+                  'Failed:',
+                  ...failed.map((failure) => `- ${failure.workflow}: ${failure.error}`)
+                ].join('\n')
+              });
+              core.setFailed(`Failed to dispatch: ${failed.map((failure) => failure.workflow).join(', ')}`);
+            } else {
+              core.info(
+                `Dispatched ${workflows.length} hosted CI workflow(s) for ${pr.head.sha.slice(0, 12)}.`
+              );
+            }

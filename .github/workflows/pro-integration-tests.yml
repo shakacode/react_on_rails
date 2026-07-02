@@ -10,7 +10,7 @@ on:
       - 'release/**'
     # Always trigger on main/release branches; non-runtime detection handles skipping heavy jobs
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
     inputs:
@@ -31,11 +31,7 @@ jobs:
     # Branch deletion push events have no checkoutable release ref.
     if: |
       (github.event_name != 'push' || github.event.deleted != true) &&
-      (github.event_name != 'pull_request' || github.actor != 'dependabot[bot]') &&
-      (github.event_name != 'pull_request' ||
-       (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
-       github.event.label.name == 'ready-for-hosted-ci' ||
-       github.event.label.name == 'force-full-hosted-ci')
+      (github.event_name != 'pull_request' || github.actor != 'dependabot[bot]')
     permissions:
       contents: read
       actions: read
