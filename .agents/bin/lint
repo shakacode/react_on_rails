@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lint / format check. Fix with: (cd react_on_rails && bundle exec rake autofix)
 set -euo pipefail
-cd "$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)"
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 rc=0
 ( cd react_on_rails && bundle exec rake lint ) || rc=1
 if [ -d react_on_rails_pro ]; then

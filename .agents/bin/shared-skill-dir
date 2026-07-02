@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Print the directory for an installed/shared skill without requiring repo-local copies.
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: .agents/bin/shared-skill-dir <skill-name>" >&2
+  exit 2
+fi
+
+skill="$1"
+case "$skill" in
+  ""|*[!A-Za-z0-9_.-]*)
+    echo "shared-skill-dir: invalid skill name: $skill" >&2
+    exit 2
+    ;;
+esac
+
+root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+
+candidates=()
+candidates+=("${root}/.agents/skills/${skill}")
+if [ -n "${AGENT_WORKFLOWS_ROOT:-}" ]; then
+  candidates+=("${AGENT_WORKFLOWS_ROOT}/skills/${skill}")
+fi
+candidates+=("${CODEX_HOME:-${HOME}/.codex}/skills/${skill}")
+candidates+=("${CLAUDE_HOME:-${HOME}/.claude}/skills/${skill}")
+candidates+=("${HOME}/src/agent-workflows/skills/${skill}")
+
+for candidate in "${candidates[@]}"; do
+  if [ -f "${candidate}/SKILL.md" ]; then
+    printf '%s\n' "$candidate"
+    exit 0
+  fi
+done
+
+echo "shared-skill-dir: could not find skill '${skill}'" >&2
+echo "Set AGENT_WORKFLOWS_ROOT to a shakacode/agent-workflows checkout or install the shared skill pack." >&2
+exit 1

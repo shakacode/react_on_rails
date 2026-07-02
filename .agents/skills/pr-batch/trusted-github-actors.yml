@@ -1,8 +1,0 @@
-# Packaged default trust config -- intentionally empty and fail-closed.
-# Override with a repo-local .agents/trusted-github-actors.yml,
-# AGENT_WORKFLOWS_TRUST_CONFIG, ~/.agents/trusted-github-actors.yml, or
-# --trust-config.
-trusted_users: []
-trusted_bots: []
-trusted_metadata_bots: []
-trusted_teams: []

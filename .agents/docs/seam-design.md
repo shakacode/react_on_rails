@@ -28,7 +28,7 @@ consumer repo
   AGENTS.md                           canonical policy plus Agent Workflow Configuration seam
   .agents/bin/agent-workflow-seam-doctor
                                       optional local checker copy for the seam contract
-  .agents/skills/...                  repo-local overrides, compatibility copies, or domain skills
+  .agents/skills/...                  repo-specific skills or explicit overrides
   .agents/workflows/...               repo-local workflow files only when the repo needs them
 ```
 
@@ -38,10 +38,11 @@ installation mechanism. For example, an agent may install the shared
 Claude and use them in any repo. The skill then reads the target repo's
 `AGENTS.md` seam to resolve concrete commands and policy.
 
-Repository-pinned copies remain an optional escape hatch for environments that
-need exact workflow text in the checkout, such as cloud agents that cannot use a
-user skill install. They are not the default design and should be justified by a
-specific reproducibility or execution-environment need.
+Repository-pinned shared skill copies remain an optional escape hatch for
+environments that need exact workflow text in the checkout, such as cloud agents
+that cannot use a user skill install. They are not the default design; in this
+repo, keeping shared copies would duplicate installed Codex picker entries and
+should be justified by a specific reproducibility or execution-environment need.
 
 ## The Seam
 

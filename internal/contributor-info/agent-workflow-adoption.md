@@ -141,9 +141,11 @@ Shared portable skills include PR batching, review handling, post-merge audit,
 adversarial review, verification, CI routing, and changelog update workflows.
 They should avoid repo-specific commands, labels, paths, and domain examples.
 
-Repo-local skills are for domain-heavy or destructive workflows that do not make
-sense everywhere. React on Rails keeps `stress-test` local because it exercises
-RSC/SSR/demo-workspace behavior specific to this repo.
+Repo-local skills are for domain-heavy, destructive, or release-policy workflows
+that do not make sense everywhere. React on Rails keeps `stress-test`,
+`optimize-rsc-performance`, and `react-on-rails-update-changelog` local because
+they exercise RSC, SSR, demo-workspace, performance evidence, and release-train
+branch-targeting behavior specific to this repo.
 
 ## Optional Repo-Pinned Copies
 

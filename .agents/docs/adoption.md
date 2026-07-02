@@ -146,9 +146,10 @@ adversarial review, verification, CI routing, and changelog update workflows.
 They should avoid repo-specific commands, labels, paths, and domain examples.
 
 Repo-local skills are for domain-heavy or destructive workflows that do not make
-sense everywhere. For example, a framework repo may keep a destructive
-stress-test skill local because it depends on that framework's demo apps,
-runtime surfaces, and safety boundaries.
+sense everywhere. For example, a framework repo may keep destructive stress
+testing or framework-specific performance investigation skills local because
+they depend on that framework's demo apps, runtime surfaces, and safety
+boundaries.
 
 ## Optional Repo-Pinned Copies
 

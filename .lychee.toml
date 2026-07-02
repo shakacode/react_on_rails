@@ -180,7 +180,7 @@ exclude_path = [
 ]
 
 # Don't check fragments/anchors (can be flaky)
-include_fragments = false
+include_fragments = "none"
 
 # Keep CI cache entries short-lived so transient external failures do not
 # linger across otherwise valid PRs.
