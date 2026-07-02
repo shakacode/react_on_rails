@@ -285,14 +285,14 @@ module ReactOnRailsPro
 
         def restore_index_after_revalidation_failure(tag, key, keys, expires_at)
           current_keys, current_expires_at = read_index(key)
-          restored_keys = keys.dup
-          current_keys.each do |current_key|
-            restored_keys.delete(current_key)
-            restored_keys << current_key
-          end
+          restored_keys = (current_keys - keys) + keys
           enforce_max_keys(tag, restored_keys)
           restored_expires_at = [current_expires_at, expires_at].compact.max
-          write_index(key, restored_keys, restored_expires_at)
+          restore_result = write_index(key, restored_keys, restored_expires_at)
+          unless restore_result
+            raise ReactOnRailsPro::Error,
+                  "cache tag index restore write returned #{restore_result.inspect}"
+          end
         rescue StandardError => e
           Rails.logger.warn do
             "[ReactOnRailsPro] failed to restore cache tag index after revalidation failure: " \

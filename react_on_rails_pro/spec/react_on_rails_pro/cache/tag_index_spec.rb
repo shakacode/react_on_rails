@@ -383,7 +383,7 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")).to be_nil
     end
 
-    it "keeps restored failure indexes capped while preserving newer registrations" do
+    it "keeps restored failure indexes capped while prioritizing entries whose deletion failed" do
       allow(ReactOnRailsPro.configuration).to receive(:cache_tag_index_max_keys).and_return(2)
       Rails.cache.write("entry/old-one", "old-one")
       Rails.cache.write("entry/old-two", "old-two")
@@ -399,8 +399,28 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       end
 
       expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
-      expect(index_payload("t")["keys"]).to eq(%w[entry/new-one entry/new-two])
+      expect(index_payload("t")["keys"]).to eq(%w[entry/old-one entry/old-two])
       expect(logger_mock).to have_received(:warn).once
+    end
+
+    it "logs when the restored failure index write returns false instead of raising" do
+      Rails.cache.write("entry/one", "one")
+      described_class.register(["t"], "entry/one", { expires_in: 3600 })
+      index_key = described_class.index_key("t")
+      warning_messages = []
+
+      allow(logger_mock).to receive(:warn) do |message = nil, &block|
+        warning_messages << (message || block.call)
+      end
+      allow(Rails.cache).to receive(:delete_multi).and_raise(StandardError, "delete_multi failed")
+      allow(Rails.cache).to receive(:write).and_call_original
+      allow(Rails.cache)
+        .to receive(:write)
+        .with(index_key, kind_of(Hash), hash_including(:expires_in))
+        .and_return(false)
+
+      expect { described_class.revalidate("t") }.to raise_error(StandardError, "delete_multi failed")
+      expect(warning_messages.join("\n")).to include("cache tag index restore write returned false")
     end
 
     it "deletes the index before cached entries to avoid dropping same-key repopulations" do
