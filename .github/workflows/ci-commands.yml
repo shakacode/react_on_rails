@@ -404,6 +404,7 @@ jobs:
                 return;
               }
 
+              const isDependabotPr = pr.user?.login === 'dependabot[bot]';
               const inputs = {
                 pull_request_base_ref: pr.base.ref,
                 pull_request_base_sha: pr.base.sha,
@@ -417,8 +418,10 @@ jobs:
                 ['Assets Precompile Check', 'precompile-check.yml', inputs],
                 ['Generator tests', 'examples.yml', inputs],
                 ['Playwright E2E Tests', 'playwright.yml', inputs],
-                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
-                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+                ...(isDependabotPr ? [] : [
+                  ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                  ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+                ])
               ];
 
               const dispatchResults = await Promise.allSettled(
