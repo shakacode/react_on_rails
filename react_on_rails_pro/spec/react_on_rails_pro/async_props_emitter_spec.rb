@@ -156,17 +156,6 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
     end
   end
 
-  describe "#pull_enabled?" do
-    it "returns false by default" do
-      expect(emitter.pull_enabled?).to be false
-    end
-
-    it "returns true when initialized with pull_enabled: true" do
-      pull_emitter = described_class.new(bundle_timestamp, request_stream, pull_enabled: true)
-      expect(pull_emitter.pull_enabled?).to be true
-    end
-  end
-
   describe "#pull_requests" do
     it "is nil when pull mode is disabled" do
       expect(emitter.pull_requests).to be_nil

@@ -295,11 +295,11 @@ ReactOnRails.configure do |config|
   # - :defer: Defers script execution until after page load
   config.generated_component_packs_loading_strategy = :async
 
-  # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
-  # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-  # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
-  # config.defer_generated_component_packs = false
+  # 🚫 REMOVED in v17.0.0: `defer_generated_component_packs` now raises NoMethodError at boot.
+  # Use `generated_component_packs_loading_strategy` (above) instead:
+  #   `defer_generated_component_packs = true`  → `generated_component_packs_loading_strategy = :defer`
+  #   `defer_generated_component_packs = false` → `generated_component_packs_loading_strategy = :sync`
+  # See CHANGELOG.md and the [upgrade guide](../upgrading/upgrading-react-on-rails.md) for more details.
 
   ################################################################################
   # DEPRECATED CONFIGURATION

@@ -563,11 +563,10 @@ describe ReactOnRailsPro::Request do
       bidi_response = mock_response(status: 200, chunks: [to_length_prefixed("chunk")])
       allow(mock_connection).to receive(:post_bidi).and_return([mock_output, bidi_response])
 
-      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, _output, pull_enabled: false|
+      allow(ReactOnRailsPro::AsyncPropsEmitter).to receive(:new) do |bundle_timestamp, _output, **_kwargs|
         instance_double(
           ReactOnRailsPro::AsyncPropsEmitter,
           end_stream_chunk: { bundleTimestamp: bundle_timestamp, updateChunk: "mocked_js" },
-          pull_enabled?: pull_enabled,
           render_complete!: nil
         )
       end
