@@ -83,6 +83,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
+  skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
+  `NoMethodError` while still emitting preload hints. Fixes
+  [Issue 4369](https://github.com/shakacode/react_on_rails/issues/4369).
+  [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Tag revalidation keeps retry metadata after entry delete failures**:
   `ReactOnRailsPro.revalidate_tag` now restores the tag index before re-raising when tagged
   cache-entry deletion fails, so transient cache-store failures leave retry metadata instead

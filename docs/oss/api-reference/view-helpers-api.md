@@ -77,6 +77,8 @@ This helper only emits HTML link tags. Keep the normal `stylesheet_pack_tag` and
 
 When using a CDN asset host, keep Shakapacker's Subresource Integrity and `crossorigin` settings consistent between preload tags and the final script/style tags so the browser can reuse the preloaded response.
 
+With Shakapacker versions before 8.4 that do not expose `config.integrity`, preload links are still emitted without `integrity` attributes. React on Rails only adds preload SRI attributes when Shakapacker exposes integrity settings and marks them enabled.
+
 ---
 
 ### react_component_hash
