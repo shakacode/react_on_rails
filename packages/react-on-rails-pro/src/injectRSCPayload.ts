@@ -15,7 +15,9 @@
 
 import { PassThrough } from 'stream';
 import { readFileSync } from 'fs';
-import { resolve as resolvePath } from 'path';
+import { dirname, resolve as resolvePath } from 'path';
+import { performance as nodePerformance } from 'perf_hooks';
+import { fileURLToPath } from 'url';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createEmbeddedPayloadKey } from './utils.ts';
@@ -103,6 +105,8 @@ const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
 const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
 const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
 const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
+const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
+const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 
 type LoadableStats = {
@@ -111,8 +115,58 @@ type LoadableStats = {
 };
 
 type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+type RSCClientChunkStylesheetHrefsLoadState =
+  | {
+      status: 'success';
+      stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName;
+    }
+  | {
+      status: 'retry-after';
+      retryAfterMs: number;
+      retryDelayMs: number;
+    };
 
-let cachedRSCClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName | undefined;
+const EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME: RSCClientChunkStylesheetHrefsByChunkName =
+  new Map();
+
+let rscClientChunkStylesheetHrefsLoadState: RSCClientChunkStylesheetHrefsLoadState | undefined;
+
+function rscClientChunkStylesheetHrefsRetryClockMs() {
+  return globalThis.performance?.now?.() ?? nodePerformance.now();
+}
+
+function isFileNotFoundError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath: string) {
+  if (isFileNotFoundError(error)) return;
+
+  // Missing stats are an expected fallback. Existing but malformed or unreadable
+  // stats should stay visible while the retry window still allows recovery.
+  console.warn(
+    `React on Rails Pro could not load ${loadableStatsPath}; RSC stylesheet inference will retry while falling back to streamed preload tags.`,
+    error,
+  );
+}
+
+function currentModuleDirectoryFromStack() {
+  const { stack } = new Error();
+  const frameMatch = stack?.match(/\((file:\/\/[^)]+|\/[^):]+):\d+:\d+\)|at (file:\/\/\S+|\/\S+):\d+:\d+/);
+  const filenameOrUrl = frameMatch?.[1] ?? frameMatch?.[2];
+  if (!filenameOrUrl) return undefined;
+
+  return dirname(filenameOrUrl.startsWith('file://') ? fileURLToPath(filenameOrUrl) : filenameOrUrl);
+}
+
+function resolveLoadableStatsPath() {
+  const moduleDirectory = currentModuleDirectoryFromStack();
+  if (moduleDirectory) return resolvePath(moduleDirectory, LOADABLE_STATS_FILE_NAME);
+
+  if (typeof __dirname !== 'undefined') return resolvePath(__dirname, LOADABLE_STATS_FILE_NAME);
+
+  return resolvePath(LOADABLE_STATS_FILE_NAME);
+}
 
 function escapeRegExpLiteral(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -151,16 +205,25 @@ function assetHref(assetPath: string, publicPath?: string) {
 }
 
 function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStylesheetHrefsByChunkName {
-  if (cachedRSCClientChunkStylesheetHrefsByChunkName) {
-    return cachedRSCClientChunkStylesheetHrefsByChunkName;
+  const loadState = rscClientChunkStylesheetHrefsLoadState;
+
+  if (loadState?.status === 'success') {
+    return loadState.stylesheetHrefsByChunkName;
+  }
+
+  if (
+    loadState?.status === 'retry-after' &&
+    rscClientChunkStylesheetHrefsRetryClockMs() < loadState.retryAfterMs
+  ) {
+    return EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME;
   }
 
   const stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = new Map();
+  let loadableStatsPath = LOADABLE_STATS_FILE_NAME;
 
   try {
-    const loadableStats = JSON.parse(
-      readFileSync(resolvePath(__dirname, LOADABLE_STATS_FILE_NAME), 'utf8'),
-    ) as LoadableStats;
+    loadableStatsPath = resolveLoadableStatsPath();
+    const loadableStats = JSON.parse(readFileSync(loadableStatsPath, 'utf8')) as LoadableStats;
 
     Object.entries(loadableStats.assetsByChunkName ?? {}).forEach(([chunkName, assets]) => {
       if (!/^client\d+$/.test(chunkName)) return;
@@ -173,12 +236,29 @@ function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStyleshee
         stylesheetHrefsByChunkName.set(chunkName, stylesheetHrefs);
       }
     });
-  } catch {
+  } catch (error) {
     // RSC CSS gating is opportunistic for builds that copy loadable-stats.json to
     // the renderer bundle directory. Other setups fall back to streamed preload tags.
+    // Start with a short retry window for deploy races, then widen for builds
+    // that intentionally do not ship loadable-stats.json.
+    warnIfUnexpectedLoadableStatsFailure(error, loadableStatsPath);
+    const previousRetryDelayMs = loadState?.status === 'retry-after' ? loadState.retryDelayMs : 0;
+    const retryDelayMs =
+      previousRetryDelayMs === 0
+        ? LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS
+        : Math.min(previousRetryDelayMs * 2, LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS);
+    rscClientChunkStylesheetHrefsLoadState = {
+      status: 'retry-after',
+      retryAfterMs: rscClientChunkStylesheetHrefsRetryClockMs() + retryDelayMs,
+      retryDelayMs,
+    };
+    return stylesheetHrefsByChunkName;
   }
 
-  cachedRSCClientChunkStylesheetHrefsByChunkName = stylesheetHrefsByChunkName;
+  rscClientChunkStylesheetHrefsLoadState = {
+    status: 'success',
+    stylesheetHrefsByChunkName,
+  };
   return stylesheetHrefsByChunkName;
 }
 
