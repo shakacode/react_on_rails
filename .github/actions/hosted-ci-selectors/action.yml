@@ -97,6 +97,21 @@ runs:
             return Number(comment.id || 0) > Number(current.id || 0);
           }
 
+          function isNewerThan(comment, current) {
+            return current ? newerComment(comment, current) : true;
+          }
+
+          function isHostedDispatchSuccessForHead(comment) {
+            const shortSha = pullRequest?.head?.sha?.slice(0, 12);
+            if (!shortSha || comment.user?.login !== 'github-actions[bot]') {
+              return false;
+            }
+
+            const body = comment.body || '';
+            return /^## (?:Force-Full )?Hosted CI Requested/m.test(body) &&
+              new RegExp(`Triggered [1-9][0-9]* workflow\\(s\\) for \`${shortSha}\``).test(body);
+          }
+
           async function hasWriteAccessFor(username) {
             if (!username) {
               return false;
@@ -147,8 +162,14 @@ runs:
             }
             let latestStart = null;
             let latestStop = null;
+            let latestSuccess = null;
 
             for (const comment of comments) {
+              if (isHostedDispatchSuccessForHead(comment) && newerComment(comment, latestSuccess)) {
+                latestSuccess = comment;
+                continue;
+              }
+
               if (!trustedCommandAssociations.has(comment.author_association)) {
                 continue;
               }
@@ -165,7 +186,12 @@ runs:
               }
             }
 
-            return Boolean(latestStart && (!latestStop || newerComment(latestStart, latestStop)));
+            return Boolean(
+              latestStart &&
+                latestSuccess &&
+                isNewerThan(latestSuccess, latestStart) &&
+                (!latestStop || newerComment(latestStart, latestStop))
+            );
           }
 
           const trustedDependabotHostedRequest = isDependabotPullRequest ?
