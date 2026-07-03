@@ -102,6 +102,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Streaming dependency load errors stay visible**: Pro streaming cleanup now tolerates dependency
+  load failures that happen before stream observability state is captured, so the original `LoadError`
+  remains visible instead of being masked by cleanup. Fixes
+  [Issue 4324](https://github.com/shakacode/react_on_rails/issues/4324).
+  [PR 4388](https://github.com/shakacode/react_on_rails/pull/4388) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Tag revalidation keeps retry metadata after entry delete failures**:
   `ReactOnRailsPro.revalidate_tag` now restores the tag index before re-raising when tagged
   cache-entry deletion fails, so transient cache-store failures leave retry metadata instead

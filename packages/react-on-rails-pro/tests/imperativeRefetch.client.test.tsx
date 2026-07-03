@@ -242,6 +242,30 @@ class CapturingErrorBoundary extends React.Component<
     );
   };
 
+  const FireAndForgetRetryControls: React.FC = () => {
+    const { refetch, refetchError, retry } = useCurrentRSCRoute();
+
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="inline-refetch"
+          onClick={() => void refetch().catch(() => undefined)}
+        >
+          inline-refetch
+        </button>
+        {refetchError ? (
+          <div data-testid="recoverable-error">
+            {refetchError.message}
+            <button type="button" data-testid="inline-retry" onClick={() => void retry()}>
+              retry
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
   beforeEach(() => {
     // Start each test with a sensible default; tests that need different
     // payloads call setupSequencedFetcher again.
@@ -596,6 +620,71 @@ class CapturingErrorBoundary extends React.Component<
     await waitFor(() => expect(screen.getByTestId('card')).toHaveTextContent('Card v2'));
     expect(screen.queryByTestId('recoverable-error')).not.toBeInTheDocument();
     expect(ref.current!.refetchError).toBeNull();
+  });
+
+  it('1d4. production fire-and-forget retry failures are handled after refetchError records them', async () => {
+    process.env.NODE_ENV = 'production';
+    setupSequencedFetcher([
+      <div data-testid="card">
+        Card v1
+        <FireAndForgetRetryControls />
+      </div>,
+      rejectWith(new Error('initial recoverable refetch failed')),
+      rejectWith(new Error('fire-and-forget retry failed')),
+    ]);
+    const onRefetchError = jest.fn();
+    const unhandledRejections: unknown[] = [];
+    const captureUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    const ref = React.createRef<RSCRouteHandle>();
+
+    process.on('unhandledRejection', captureUnhandledRejection);
+    try {
+      await renderInAct(
+        <TestHarness>
+          <CapturingErrorBoundary fallback={(error) => <div data-testid="route-error">{error.message}</div>}>
+            <RSCRoute
+              ref={ref}
+              componentName="UserCard"
+              componentProps={{ id: 1 }}
+              onRefetchError={onRefetchError}
+            />
+          </CapturingErrorBoundary>
+        </TestHarness>,
+      );
+
+      expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('inline-refetch'));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId('recoverable-error')).toHaveTextContent(
+          'initial recoverable refetch failed',
+        ),
+      );
+      await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(1));
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('inline-retry'));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId('recoverable-error')).toHaveTextContent('fire-and-forget retry failed'),
+      );
+      await waitFor(() => expect(onRefetchError).toHaveBeenCalledTimes(2));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(unhandledRejections).toEqual([]);
+      expect(screen.getByTestId('card')).toHaveTextContent('Card v1');
+      expect(screen.queryByTestId('route-error')).not.toBeInTheDocument();
+    } finally {
+      process.off('unhandledRejection', captureUnhandledRejection);
+    }
   });
 
   it('1e. production ignores recoverable refetch errors from stale route props', async () => {

@@ -4787,6 +4787,12 @@ HTML stream rather than fetched as a separate `/rsc_payload/*` resource, so `Per
 JavaScript requests while the navigation response grows. Pair JavaScript byte counts with HTML transfer size, Flight
 payload bytes, FCP/LCP, TBT, and server/renderer timing before drawing conclusions.
 
+For PR evidence, use the [RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md). It covers
+same-machine control/experiment setup, visual regression gates, stable package-stack evidence, archived benchmark
+artifacts, and the metrics checklist reviewers need. For public pages that become mostly static RSC shells, pair the
+benchmark with [Mostly Static RSC Shell With a Tiny Sidecar](../migrating/rsc-static-shell-sidecar.md) so JavaScript
+byte reductions do not hide missing behavior.
+
 ## Real-World Results
 
 > [!NOTE]
@@ -24594,6 +24600,27 @@ How to optimize RSC Flight payload size for better performance. Covers:
 - Compression effectiveness and the LCP tradeoff
 - React on Rails double JSON.stringify overhead
 
+### 9. [RSC Performance Validation](rsc-performance-validation.md)
+
+How to prove that an RSC conversion improved the page users actually see. Covers:
+
+- Local control/experiment setup on the same machine
+- Warm cached SSR baselines for pages that already use React on Rails Pro caching
+- Visual regression checks paired with Lighthouse and resource metrics
+- Package-stack discipline for published, canary, RC, and diagnostic builds
+- Required PR metrics and the public-page case study
+
+### 10. [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)
+
+How to render public/static-ish pages as mostly static RSC HTML while preserving a few browser
+behaviors without loading the full global application pack. Covers:
+
+- Rails layout opt-out for selected global JavaScript packs
+- Inert JSON props/context handoff to a sidecar
+- Intent hydration with keyboard, accessibility, and no-JS fallback checks
+- CSS parity and behavior audit checklists
+- Bundler and `clientReferences` caveats
+
 ## How RSC Maps to React on Rails
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
@@ -24680,6 +24707,8 @@ These mistakes account for the majority of setup failures:
 - [Upgrading an Existing Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md) — generator-based runbook for adding RSC to an existing Pro app, including legacy webpack compatibility and verification checklist
 - [React 19 Native Metadata](../building-features/react-19-native-metadata.md) — replace react-helmet and `react_component_hash` with React 19's built-in `<title>`, `<meta>`, and `<link>` hoisting. Native metadata works with streaming and RSC out of the box.
 - [HTTP Response Ownership](rsc-http-response-patterns.md) — keep `404`, redirects, and cache policy in Rails while rendering route UI with RSC.
+- [RSC Performance Validation](rsc-performance-validation.md) — build the visual plus performance evidence package before claiming an RSC win.
+- [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md) — keep public RSC shells static while moving small browser behaviors into an explicit sidecar.
 
 ## References
 
@@ -28541,24 +28570,26 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                                                                        | Most Likely Cause                                                                            | Section                                                                                                   |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                       | [Serialization Boundary Issues](#serialization-boundary-issues)                                           |
-| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                       | [Error Message Catalog](#error-message-catalog)                                                           |
-| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                       | [Chunk Contamination](#chunk-contamination)                                                               |
-| Static RSC route is fast after emptying `clientReferences`, but client islands fail later                      | The RSC client-reference manifest no longer includes needed Client Components                | [Client Reference Scope and Empty `clientReferences`](#client-reference-scope-and-empty-clientreferences) |
-| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                        | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)             |
-| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                        | [Accidental Client Components](#accidental-client-components)                                             |
-| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                 | [Hydration Mismatches](#hydration-mismatches)                                                             |
-| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
-| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                               | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
-| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                         |
-| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                 | [MessageChannel Not Defined](#messagechannel-not-defined)                                                 |
-| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them  | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server)             |
-| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                             |
-| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                             |
-| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)                          |
-| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                      | [Performance Pitfalls](#performance-pitfalls)                                                             |
+| Symptom                                                                                                        | Most Likely Cause                                                                             | Section                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_                                                | Passing functions or class instances across the server-client boundary                        | [Serialization Boundary Issues](#serialization-boundary-issues)                                           |
+| Build error: _"needs useState/useEffect"_                                                                      | Using hooks in a Server Component file                                                        | [Error Message Catalog](#error-message-catalog)                                                           |
+| RSC page downloads unexpectedly large JS chunks                                                                | Chunk contamination from shared `'use client'` modules                                        | [Chunk Contamination](#chunk-contamination)                                                               |
+| Static RSC route is fast after emptying `clientReferences`, but client islands fail later                      | The RSC client-reference manifest no longer includes needed Client Components                 | [Client Reference Scope and Empty `clientReferences`](#client-reference-scope-and-empty-clientreferences) |
+| RSC conversion looks faster but visible UI changed or assets are missing                                       | Performance was measured without visual parity or equivalent assets                           | [RSC Performance Validation](rsc-performance-validation.md)                                               |
+| Mostly static RSC page still loads the full global browser pack                                                | Static shell needs a page-scoped global-JS opt-out and a small sidecar for remaining behavior | [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)                                |
+| Global CSS resets change only on RSC pages                                                                     | Bare element selectors in an RSC CSS Module winning source-order ties                         | [RSC Stylesheet Injection](#rsc-stylesheet-injection-render-blocking-links-and-cascade-order)             |
+| Component stays a Client Component after removing `'use client'`                                               | Imported by another `'use client'` file, or RSC bundle not rebuilding                         | [Accidental Client Components](#accidental-client-components)                                             |
+| Hydration mismatch warnings in console                                                                         | Server/client render output differs (timestamps, browser APIs, invalid HTML)                  | [Hydration Mismatches](#hydration-mismatches)                                                             |
+| `ReferenceError: performance is not defined`                                                                   | Node renderer VM context missing globals                                                      | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
+| `ReferenceError: fetch is not defined` (or `Headers`, `Request`, `Response`, `AbortController`, `AbortSignal`) | Node renderer VM context missing fetch globals                                                | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                  |
+| `ReferenceError: require is not defined`                                                                       | Server bundle or RSC bundle uses `externals` for Node builtins instead of `resolve.fallback`  | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                         |
+| `ReferenceError: MessageChannel is not defined`                                                                | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox                  | [MessageChannel Not Defined](#messagechannel-not-defined)                                                 |
+| RSC says a module is missing from the React Client Manifest and the manifest is empty in Rspack `bin/dev`      | Rspack lazy compilation deferred RSC client references before the server renderer read them   | [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server)             |
+| SSR hangs or times out on large pages                                                                          | Stream backpressure deadlock                                                                  | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                             |
+| Rails boot error about version mismatch                                                                        | Gem and npm package at different versions                                                     | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                             |
+| 422 Unprocessable Entity on form submission                                                                    | Missing CSRF token in fetch request                                                           | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)                          |
+| Page is blank until all data loads                                                                             | Missing `stream_react_component` or Suspense boundaries                                       | [Performance Pitfalls](#performance-pitfalls)                                                             |
 
 ## Serialization Boundary Issues
 
@@ -28928,7 +28959,8 @@ sidecar and scoped-loading design work is tracked in
   default scanning is the issue.
 - Isolate static-only builds only when the app can prove no client islands depend on that build.
 - Keep browser sidecars as plain browser JavaScript. The mostly-static sidecar pattern tracked in
-  [#4300](https://github.com/shakacode/react_on_rails/issues/4300) is separate from RSC
+  [#4300](https://github.com/shakacode/react_on_rails/issues/4300) and documented in
+  [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md) is separate from RSC
   client-reference discovery.
 - For broader chunk-contamination work, follow this guide's [Chunk Contamination](#chunk-contamination)
   section and the package-level context in
@@ -29847,7 +29879,9 @@ SOURCE: docs/oss/migrating/rsc-flight-payload.md
 
 This guide covers a critical and counterintuitive RSC performance nuance: not all non-interactive, stateless components should be Server Components. When presentational components produce element trees much larger than their data props, moving them to Client Components can dramatically reduce page weight.
 
-> **Part 8 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
+> **Part 8 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous:
+> [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) | Next:
+> [RSC Performance Validation Playbook](rsc-performance-validation.md)
 
 ## What's in the Flight Payload
 
@@ -30095,6 +30129,443 @@ The standard RSC advice -- "make everything a Server Component unless it needs i
 - [Component Tree Restructuring Patterns](rsc-component-patterns.md) -- the foundational patterns for splitting server and client components
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging payload duplication and other RSC issues
 - [Data Fetching Migration](rsc-data-fetching.md) -- migrating data-fetching patterns to Server Components
+
+================================================================================
+PAGE: https://reactonrails.com/docs/migrating/rsc-performance-validation
+SOURCE: docs/oss/migrating/rsc-performance-validation.md
+================================================================================
+
+# RSC Performance Validation Playbook
+
+Use this playbook when an RSC migration is intended to improve page performance. It defines the
+evidence package reviewers need before treating an RSC conversion as a performance win.
+
+> **Part 9 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous:
+> [Flight Payload Optimization](rsc-flight-payload.md) | Next:
+> [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)
+
+## Start With a Local Control and Experiment
+
+The cleanest merge signal is usually a local A/B comparison:
+
+- **Control:** current `origin/main`, or the explicit baseline branch the app already uses in
+  production.
+- **Experiment:** the PR branch or candidate branch.
+- **Machine:** same developer machine, same browser version, same CPU/network throttling, same sample
+  order.
+- **Builds:** comparable production-like builds. Do not compare a development server with compiled
+  production assets.
+- **Environment:** same data snapshot, Rails cache state, browser cache policy, image/CDN setup,
+  asset host, feature flags, secrets, and locale/device assumptions.
+- **Smoke test first:** open every control and experiment URL before measuring. Confirm the page
+  returns the expected status, real images and fonts load, and required user-visible content is
+  present.
+
+Review-app, staging, production PageSpeed, and production Lighthouse runs are useful context, but
+they are not automatically a clean A/B. CDN, hosting, cache warmth, data, image signatures, and deploy
+topology can differ enough to explain the result.
+
+## Compare Against the Real Incumbent Path
+
+RSC should be compared against the path users actually have today. If the existing page uses
+[`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching)
+with React on Rails Pro prerender caching, include a warm cached SSR baseline. A static page that is
+already served from a warm SSR fragment cache can be very hard to beat on TTFB, FCP, or LCP, even
+when RSC reduces hydration work and JavaScript bytes.
+
+Use the matrix in
+[Benchmarking RSC Against Warm SSR Caches](../core-concepts/performance-benchmarks.md#benchmarking-rsc-against-warm-ssr-caches)
+to label cold uncached SSR, warm cached SSR, RSC cold, and RSC warm runs. The public tracker for that
+tradeoff is [#4294](https://github.com/shakacode/react_on_rails/issues/4294).
+
+## Pair Visual Regression With Performance
+
+Performance evidence is incomplete without visual evidence. A page is not faster in a useful sense if
+it is missing visible UI, fonts, images, layout wrappers, search bars, or mobile navigation behavior.
+
+For every changed page and viewport:
+
+- Run visual checks in the same validation loop as performance checks.
+- Report diff pixels and diff percent, not only "looks fine".
+- Block unaccepted visual changes. Treat them as regressions unless the UI change was explicitly
+  reviewed and accepted.
+- Confirm screenshots include real page assets before using them as evidence.
+- Recheck keyboard, focus, and responsive states when the migration changes hydration or global
+  JavaScript loading.
+
+This also protects performance interpretation. A lower Total Blocking Time can be real while LCP gets
+worse because CSS, fonts, or the LCP image moved later in the critical path.
+
+## Keep the Package Stack Stable
+
+Final merge evidence should use installable packages:
+
+- Published packages, canary packages, or release-candidate packages are valid final evidence.
+- Framework `main` source checkouts and local package tarballs are diagnostic only unless the tested
+  package has been published and remeasured.
+- If a local tarball is useful during diagnosis, record its package name, version, source commit, and
+  shasum.
+- If a main-tip diagnostic improves performance, publish or use a canary/RC and rerun visual plus
+  performance before depending on it.
+- If a diagnostic stack improves performance but fails visual parity, it is not a ship candidate.
+
+Keep one variable per run. Do not combine an app conversion, package bump, framework SHA, bundler
+configuration change, and static-shell sidecar rewrite in one measurement if the result needs to
+guide implementation.
+
+## Archive and Parse Benchmark Output
+
+Each run should leave durable artifacts. Name archives so a future reader can identify the stack,
+baseline, candidate, date, pages, and viewport set without opening the report.
+
+Record:
+
+- Archive path or published artifact URL.
+- Tool version and configuration.
+- Control and experiment URLs.
+- Control and experiment SHAs.
+- Package versions and package SHAs or shasums where relevant.
+- Pages and viewports tested.
+- Environment caveats, especially local-vs-production differences.
+
+Parse JSON or equivalent machine-readable artifacts. Do not rely on terminal scrollback or a single
+summary screenshot.
+
+For ShakaPerf runs based on the HiChee lesson:
+
+- Run visual plus performance for every changed page and viewport.
+- Use Lighthouse `throttlingMethod: 'devtools'` for this workflow.
+- Prefer sequential sampling on one developer machine unless the benchmark setup was designed for
+  parallel execution.
+- Save both the full report and the self-contained report when available.
+
+The methodology matters more than the tool. ShakaPerf is the known ShakaCode workflow; equivalent
+tooling is fine when it produces the same control/experiment, visual, performance, and archived
+evidence.
+
+## Metrics Checklist
+
+Include this checklist in the PR description or benchmark comment:
+
+| Evidence         | Required detail                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| URLs             | Control URL and experiment URL                                                                                                  |
+| SHAs             | Control SHA and experiment SHA                                                                                                  |
+| Package stack    | React on Rails, React on Rails Pro, `react-on-rails`, `react-on-rails-pro`, `react-on-rails-rsc`, and tarball shasums when used |
+| Pages/viewports  | Every changed page and desktop/mobile viewport that matters                                                                     |
+| Visual diff      | Diff pixels and percent for each page/viewport                                                                                  |
+| Lighthouse score | Score for control and experiment, plus win/regression/no material change                                                        |
+| FCP              | Control, experiment, delta, verdict                                                                                             |
+| Speed Index      | Control, experiment, delta, verdict                                                                                             |
+| LCP              | Control, experiment, delta, verdict                                                                                             |
+| TBT              | Control, experiment, delta, verdict                                                                                             |
+| Total downloads  | Control, experiment, delta, verdict                                                                                             |
+| JavaScript bytes | Control, experiment, delta, verdict                                                                                             |
+| Caveats          | Local-vs-production, cache, CDN, image, data, throttling, sample-size, or visual caveats                                        |
+
+Use honest verdicts. It is valid for an RSC migration to be a win on TBT and JavaScript bytes, a
+regression on LCP, and still worth pursuing for maintainability or future optimization. Say that
+plainly.
+
+## HiChee Case Study
+
+A HiChee public-page conversion moved the home and FAQ pages to mostly static RSC output. Earlier
+attempts produced misleading signals because they mixed package stacks, incomplete visual evidence,
+missing asset setup, and hosted PageSpeed context that was not a clean local A/B.
+
+The final merge confidence came from a local master-vs-PR ShakaPerf run on the same machine. It tested
+home and FAQ in desktop and mobile viewports, paired visual regression with performance, used the
+published package stack, and treated review-app or production PageSpeed as context rather than the
+canonical merge signal. The published-stack run had clean visual diffs, materially lower JavaScript
+and download bytes, and large mobile Lighthouse gains on the changed pages. A separate diagnostic run
+against local framework main-tip packages was rejected because it failed visual parity, even though
+some performance numbers looked better.
+
+The key lesson is not "RSC always wins." The lesson is that RSC performance work needs a disciplined
+evidence package: same-machine control/experiment, stable package stack, one variable per run,
+archived parsed output, and visual parity as a merge gate.
+
+## Follow-Up Diagnostics and Related Work
+
+When the evidence points to unexpected RSC cost, use the existing troubleshooting guides before
+changing architecture:
+
+- [RSC render asset/cache diagnostics](https://github.com/shakacode/react_on_rails/issues/4296)
+  tracks framework support for showing cache hit/miss state, emitted assets, client references, and
+  payload size during benchmark runs.
+- [Chunk contamination](rsc-troubleshooting.md#chunk-contamination) explains large unexpected chunks
+  from shared `'use client'` modules.
+- [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences)
+  explains why globally emptying `clientReferences` is not a safe general optimization.
+- [#4111](https://github.com/shakacode/react_on_rails/issues/4111) tracks the RSC CSS and
+  cross-page chunk bloat warning work.
+- [react_on_rails_rsc#134](https://github.com/shakacode/react_on_rails_rsc/issues/134) tracks
+  route-scoped client-reference manifests.
+- [react_on_rails_rsc#145](https://github.com/shakacode/react_on_rails_rsc/issues/145) tracks tiny
+  sidecar entries for mostly static RSC pages.
+- [#4298](https://github.com/shakacode/react_on_rails/issues/4298) tracks the repo-local agent skill
+  that operationalizes this workflow.
+
+For mostly static pages that still need a few browser behaviors, continue with
+[Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md).
+
+================================================================================
+PAGE: https://reactonrails.com/docs/migrating/rsc-static-shell-sidecar
+SOURCE: docs/oss/migrating/rsc-static-shell-sidecar.md
+================================================================================
+
+# Mostly Static RSC Shell With a Tiny Sidecar
+
+Use this pattern when a public page can render almost all useful content as static RSC HTML but still
+needs a few browser behaviors. The goal is to keep the static shell and CSS on the critical path while
+loading only a small, explicit browser entry for progressive enhancement.
+
+> **Part 10 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous:
+> [RSC Performance Validation Playbook](rsc-performance-validation.md)
+
+## When to Use This Pattern
+
+Use a mostly static shell plus tiny sidecar when:
+
+- The page is public, SEO-sensitive, or mostly static.
+- The initial UI can render without browser state.
+- The normal global application pack is much larger than the required behavior.
+- The page needs a small amount of progressive enhancement, such as search, auth, currency, analytics,
+  newsletter signup, or URL-driven effects.
+- Visual parity with the old page is required.
+
+Do not use it when:
+
+- The page is mostly an authenticated application surface.
+- The page needs many eager client islands.
+- The global app pack is already tiny.
+- Route-level behavior depends on global JavaScript that the team has not audited.
+- The team is trying to hide a broad RSC client-reference problem by disabling discovery globally.
+
+## Architecture Sketch
+
+```text
+Rails view
+|-- renders static RSC component output
+|-- appends explicit static shell CSS
+|-- opts out of selected global JavaScript packs
+|-- emits inert JSON props/context for the sidecar
+`-- appends a tiny sidecar JavaScript entry
+
+StaticPublicPage
+`-- renders layout, chrome, and page content without browser-only hooks
+
+public-page-effects sidecar
+|-- parses JSON props/context
+|-- handles URL-driven effects immediately when needed
+|-- listens for user intent on static placeholders
+`-- lazy-imports React/client islands only on demand
+```
+
+The names above are placeholders. In an app, use page-specific names such as `StaticPublicPage`,
+`PublicPageEffects`, or `public-page-effects` rather than copying names from another product.
+
+## Rails Layout Pack Opt-Out
+
+Until a first-class helper exists, use an explicit Rails layout convention. Keep global CSS and layout
+markup intact; skip only the selected JavaScript pack on pages that opt in. The broader Pro layout
+pattern is documented in
+[Page-Level Global JavaScript Opt-Out for Static Shells](../../pro/react-server-components/static-shell-global-js-opt-out.md),
+and the public follow-up is [#4297](https://github.com/shakacode/react_on_rails/issues/4297).
+
+```erb
+<%# app/views/layouts/application.html.erb %>
+<% unless content_for?(:skip_global_javascript) %>
+  <% append_javascript_pack_tag "global" %>
+<% end %>
+<%= javascript_pack_tag defer: true %>
+```
+
+```erb
+<%# app/views/public/home.html.erb %>
+<% content_for :skip_global_javascript, "true" %>
+<% append_javascript_pack_tag "public-page-effects" %>
+```
+
+Keep the contract narrow:
+
+- Skip only the JavaScript pack you intend to replace.
+- Keep global CSS, layout CSS, fonts, and RSC/page-specific styles if the static HTML depends on
+  them.
+- Make the opt-out page-scoped and visible in the view.
+- List behavior normally initialized by the skipped pack and either replace it, move it to a smaller
+  sidecar, or consciously drop it.
+
+## Props and Context Handoff
+
+Avoid mounting a full React on Rails client component just to pass props to the sidecar. Emit inert
+JSON and let the sidecar parse it.
+
+```erb
+<script type="application/json" id="public-page-effects-props">
+  <%= raw json_escape(props.to_json) %>
+</script>
+```
+
+The sidecar can also read a small Rails context script when it needs CSRF, locale, currency, or
+feature flags. Keep the payload serializable and page-specific.
+
+```js
+function readJsonScript(id) {
+  const element = document.getElementById(id);
+  if (!element?.textContent) return {};
+  return JSON.parse(element.textContent);
+}
+
+const props = readJsonScript('public-page-effects-props');
+const context = readJsonScript('public-page-effects-context');
+```
+
+Sidecar rules:
+
+- Parse inert JSON scripts; do not depend on a hidden React mount for data transport.
+- Create a small root only when a real client island is needed.
+- Lazy import React and `react-dom/client` only when user intent or URL state requires it.
+- Fail safely when optional target elements are absent.
+- Keep sidecar behavior independent from RSC client-reference hydration.
+
+## Intent Hydration
+
+Render a static placeholder or fallback UI in the RSC HTML. Attach lightweight listeners to it from
+the sidecar. On first user intent, lazy import the real client island, mount it, and replay the
+intent.
+
+```js
+const searchTarget = document.querySelector('[data-public-search]');
+const props = readJsonScript('public-page-effects-props');
+let hydrating = false;
+
+async function hydrateSearch(firstEvent) {
+  const [{ default: SearchIsland }, { createRoot }, React] = await Promise.all([
+    import('./SearchIsland'),
+    import('react-dom/client'),
+    import('react'),
+  ]);
+
+  const root = createRoot(searchTarget);
+  root.render(React.createElement(SearchIsland, { props, firstEventType: firstEvent.type }));
+}
+
+async function onIntent(event) {
+  if (hydrating) return;
+
+  hydrating = true;
+  try {
+    await hydrateSearch(event);
+    searchTarget.removeEventListener('click', onIntent);
+    searchTarget.removeEventListener('focusin', onIntent);
+    searchTarget.removeEventListener('keydown', onKeydown);
+  } catch (error) {
+    console.error('Failed to load search island', error);
+  } finally {
+    hydrating = false;
+  }
+}
+
+function onKeydown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+
+  event.preventDefault();
+  onIntent(event);
+}
+
+if (searchTarget) {
+  searchTarget.addEventListener('click', onIntent);
+  searchTarget.addEventListener('focusin', onIntent);
+  searchTarget.addEventListener('keydown', onKeydown);
+}
+```
+
+Keep accessibility and fallback behavior explicit:
+
+- Support keyboard activation, not only pointer clicks.
+- Make intent targets keyboard-focusable before hydration: use a real `button`/`a`, or add
+  `tabindex="0"` and an appropriate `role` to a non-interactive placeholder.
+- Preserve focus order and visible focus styles before and after hydration.
+- Provide a no-JS or slow-JS fallback for required flows, such as a normal form action or link.
+- Replay the first intent so the user does not need to click or type twice.
+- Smoke-test URL-driven effects that must run without waiting for a click, such as auth or
+  query-param flows.
+
+## CSS Parity
+
+A static RSC shell cannot rely on a skipped JavaScript pack to incidentally import required styles.
+Make CSS delivery explicit:
+
+- Keep layout/global styles loaded when the static HTML depends on them.
+- Add a static shell stylesheet entry for page chrome that moved out of the old client graph.
+- Add page-specific CSS entries for page-only styles.
+- Keep existing preload or modulepreload behavior when it is part of the old page's critical path.
+- Compare before/after screenshots for fonts, icons, spacing, layout wrappers, hover/focus states,
+  mobile navigation, and responsive breakpoints.
+- Avoid hidden dependencies where a JavaScript pack imports SCSS needed by static HTML.
+
+If the RSC page downloads unexpected CSS or JS through client references, check
+[Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) and
+[RSC Stylesheet Injection](rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order).
+
+## Bundler and Client-Reference Caveats
+
+A tiny sidecar is ordinary browser JavaScript. It is not an RSC Client Component and it is not an RSC
+client reference. Sidecar success does not prove RSC client islands will hydrate.
+
+Do not use this pattern as a reason to globally disable RSC client-reference discovery:
+
+- Do not set `clientReferences = []` as a general app optimization.
+- Do not change normal RSC vendor or client-reference chunking unless the change is isolated and
+  tested.
+- If a sidecar is kept out of a monolithic vendor split, verify that RSC client-reference hydration
+  still works on a route that has a real Client Component.
+- Prefer app-source-scoped discovery until route-scoped client-reference manifests exist.
+
+See
+[Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences),
+[react_on_rails_rsc#134](https://github.com/shakacode/react_on_rails_rsc/issues/134), and
+[react_on_rails_rsc#145](https://github.com/shakacode/react_on_rails_rsc/issues/145).
+
+## Behavior Audit Before Skipping Global JavaScript
+
+Audit the selected global pack before opting a page out:
+
+- Auth, sign-in modal, sign-up modal, account menu, and session-expiration behavior.
+- Magic-link, campaign, referral, flash, or query-param flows.
+- CSRF/session-dependent fetches or forms.
+- Analytics, consent management, error tracking, and web-vitals reporting.
+- Currency, locale, theme, or user-preference state.
+- Navbar, menu, search, footer, and mobile layout interactions.
+- Third-party widgets and embeds.
+- Event handlers installed by the global pack on layout elements.
+- CSS imported only by the global pack.
+
+Move required behavior into the sidecar or a smaller layout-owned script. Do not assume skipped global
+JavaScript is harmless just because the page still renders.
+
+## Verification Checklist
+
+For each static shell page:
+
+- Smoke-test control and experiment URLs before measuring.
+- Confirm the global JavaScript pack is absent only on opted-out pages.
+- Confirm global CSS, static shell CSS, page CSS, fonts, and critical images still load.
+- Run visual regression for every changed page and viewport.
+- Compare total downloads and JavaScript bytes against the control.
+- Run the [RSC Performance Validation Playbook](rsc-performance-validation.md) when the PR claims a
+  performance win.
+- Exercise every sidecar-triggered flow, including URL-driven flows.
+- Check keyboard activation, focus management, and no-JS or slow-JS fallback behavior.
+- Add targeted system or E2E specs for behavior moved out of the global pack.
+- Test at least one RSC route with a real Client Component if `clientReferences` was narrowed.
+
+Related work: [#4295](https://github.com/shakacode/react_on_rails/issues/4295) tracks cached RSC
+output for static public pages, [#4297](https://github.com/shakacode/react_on_rails/issues/4297)
+tracks the page-level global JavaScript opt-out, and
+[#4299](https://github.com/shakacode/react_on_rails/issues/4299) tracks the performance validation
+playbook behind this guide.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/getting-started/comparison-with-alternatives
