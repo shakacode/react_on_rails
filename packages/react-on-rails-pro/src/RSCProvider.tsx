@@ -68,6 +68,9 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
   return next;
 };
 
+const rejectWithError = <T,>(error: unknown): Promise<T> =>
+  Promise.reject(error instanceof Error ? error : new Error(String(error)));
+
 /**
  * Creates a provider context for React Server Components.
  *
@@ -288,7 +291,12 @@ export const createRSCProvider = ({
 
     const getComponent = useCallback(
       (componentName: string, componentProps: unknown) => {
-        const key = createRSCPayloadKey(componentName, componentProps);
+        let key: string;
+        try {
+          key = createRSCPayloadKey(componentName, componentProps);
+        } catch (error) {
+          return rejectWithError<ReactNode>(error);
+        }
         const cached = fetchRSCPromises.get(key);
         if (cached !== undefined) {
           return cached;
@@ -377,12 +385,7 @@ export const createRSCProvider = ({
         try {
           serverComponentPromise = getServerComponent({ componentName, componentProps });
         } catch (error) {
-          // The in-flight latch is incremented only after `setPinned` succeeds
-          // below, so a synchronous producer throw only restores the marker.
-          if (notifyRoutesOnSuccess) {
-            evictedSuccessfulPayloadKeys.set(key, true);
-          }
-          throw error;
+          serverComponentPromise = rejectWithError(error);
         }
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {
@@ -419,7 +422,12 @@ export const createRSCProvider = ({
 
     const refetchComponent = useCallback(
       (componentName: string, componentProps: unknown, recoverOnError?: boolean) => {
-        const key = createRSCPayloadKey(componentName, componentProps);
+        let key: string;
+        try {
+          key = createRSCPayloadKey(componentName, componentProps);
+        } catch (error) {
+          return rejectWithError<ReactNode>(error);
+        }
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
