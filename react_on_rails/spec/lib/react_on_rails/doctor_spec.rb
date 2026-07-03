@@ -617,8 +617,7 @@ RSpec.describe ReactOnRails::Doctor do
         same_bundle_for_client_and_server: false,
         random_dom_id: nil,
         rendering_extension: nil,
-        rendering_props_extension: nil,
-        server_render_method: nil
+        rendering_props_extension: nil
       )
     end
 

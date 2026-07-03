@@ -62,20 +62,42 @@ module ReactOnRails
     end
 
     describe ".server_render_method" do
-      it "does not throw if the server render method is blank" do
+      it "is removed; setting it raises NoMethodError" do
         expect do
           ReactOnRails.configure do |config|
-            config.server_render_method = ""
+            config.server_render_method = "ExecJS"
           end
-        end.not_to raise_error
+        end.to raise_error(NoMethodError, /server_render_method=/)
       end
+    end
 
-      it "throws if the server render method is node" do
+    describe ".generated_assets_dirs" do
+      it "is removed; setting it raises NoMethodError" do
         expect do
           ReactOnRails.configure do |config|
-            config.server_render_method = "node"
+            config.generated_assets_dirs = "public/webpack"
           end
-        end.to raise_error(ReactOnRails::Error, /invalid value for `config.server_render_method`/)
+        end.to raise_error(NoMethodError, /generated_assets_dirs=/)
+      end
+    end
+
+    describe ".skip_display_none" do
+      it "is removed; setting it raises NoMethodError" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.skip_display_none = true
+          end
+        end.to raise_error(NoMethodError, /skip_display_none=/)
+      end
+    end
+
+    describe ".defer_generated_component_packs" do
+      it "is removed; setting it raises NoMethodError (use generated_component_packs_loading_strategy)" do
+        expect do
+          ReactOnRails.configure do |config|
+            config.defer_generated_component_packs = true
+          end
+        end.to raise_error(NoMethodError, /defer_generated_component_packs=/)
       end
     end
 

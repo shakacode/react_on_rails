@@ -46,6 +46,20 @@ module ReactOnRails
           @removed_immediate_hydration_warnings = {}
         end
       end
+
+      # Validates the **rest kwargs accepted by both redux_store implementations
+      # (controller concern and view helper). Raises ArgumentError for unknown
+      # keywords and warns once if the removed :immediate_hydration option is passed.
+      def validate_redux_store_options!(rest)
+        unknown_keys = rest.keys - [:immediate_hydration]
+        if unknown_keys.any?
+          plural = unknown_keys.one? ? "" : "s"
+          unknown_options = unknown_keys.map { |key| ":#{key}" }.join(", ")
+          raise ArgumentError, "unknown keyword#{plural}: #{unknown_options}"
+        end
+
+        warn_removed_immediate_hydration_option("redux_store") if rest.key?(:immediate_hydration)
+      end
     end
 
     # react_component_name: can be a React function or class component or a "Render-Function".
@@ -200,15 +214,7 @@ module ReactOnRails
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
     def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, **rest)
-      immediate_hydration_present = rest.key?(:immediate_hydration)
-      unknown_keys = rest.keys - [:immediate_hydration]
-      if unknown_keys.any?
-        plural = unknown_keys.one? ? "" : "s"
-        unknown_options = unknown_keys.map { |key| ":#{key}" }.join(", ")
-        raise ArgumentError, "unknown keyword#{plural}: #{unknown_options}"
-      end
-
-      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if immediate_hydration_present
+      ReactOnRails::Helper.validate_redux_store_options!(rest)
 
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
@@ -491,6 +497,7 @@ module ReactOnRails
     end
 
     def create_render_options(react_component_name, options)
+      options = options.dup
       # If no store dependencies are passed, default to all registered stores up till now
       unless options.key?(:store_dependencies)
         store_dependencies = registered_stores_including_deferred.map { |store| store[:store_name] }
@@ -1035,10 +1042,6 @@ module ReactOnRails
         JS
       end
       result
-    end
-
-    def replay_console_option(val)
-      val.nil? ? ReactOnRails.configuration.replay_console : val
     end
 
     def in_mailer?

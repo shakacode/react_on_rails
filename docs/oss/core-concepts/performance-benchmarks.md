@@ -174,6 +174,12 @@ HTML stream rather than fetched as a separate `/rsc_payload/*` resource, so `Per
 JavaScript requests while the navigation response grows. Pair JavaScript byte counts with HTML transfer size, Flight
 payload bytes, FCP/LCP, TBT, and server/renderer timing before drawing conclusions.
 
+For PR evidence, use the [RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md). It covers
+same-machine control/experiment setup, visual regression gates, stable package-stack evidence, archived benchmark
+artifacts, and the metrics checklist reviewers need. For public pages that become mostly static RSC shells, pair the
+benchmark with [Mostly Static RSC Shell With a Tiny Sidecar](../migrating/rsc-static-shell-sidecar.md) so JavaScript
+byte reductions do not hide missing behavior.
+
 ## Real-World Results
 
 > [!NOTE]

@@ -699,6 +699,107 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
   end
 
+  describe "#install_dependency_group" do
+    let(:packages) { %w[foo@^1.0.0 bar@^2.0.0] }
+
+    it "returns true and adds no warning when the packages install successfully" do
+      result = instance.send(:install_dependency_group, "Foo dependencies", "Foo dependencies", packages)
+
+      expect(result).to be(true)
+      expect(warnings.size).to eq(0)
+    end
+
+    it "passes the dev flag through to add_npm_dependencies" do
+      instance.send(:install_dependency_group, "Foo dependencies", "Foo dependencies", packages, dev: true)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(packages:, dev: true)
+      )
+    end
+
+    it "returns false and warns with manual instructions when the add fails" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
+
+      result = instance.send(:install_dependency_group, "Foo dependencies", "Foo dependencies", packages)
+
+      expect(result).to be(false)
+      expect(warnings.first.to_s).to include("Failed to add Foo dependencies")
+      expect(warnings.first.to_s).to include("You can install them manually by running:")
+    end
+
+    it "returns false and warns with the exception message when the add raises" do
+      allow(instance).to receive(:add_packages).and_raise(StandardError, "network error")
+
+      result = instance.send(:install_dependency_group, "Foo dependencies", "Foo dependencies", packages)
+
+      expect(result).to be(false)
+      expect(warnings.first.to_s).to include("Error adding Foo dependencies: network error")
+    end
+
+    it "uses singular wording when plural: false" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
+
+      instance.send(:install_dependency_group, "Foo dependency", "Foo dependency", packages, plural: false)
+
+      expect(warnings.first.to_s).to include("You can install it manually by running:")
+    end
+
+    it "emits the failure_note only in the non-exception failure path, above the manual instructions" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
+
+      instance.send(
+        :install_dependency_group, "Foo dependencies", "Foo dependencies", packages,
+        failure_note: "A helpful note."
+      )
+
+      expect(warnings.first.to_s).to include(
+        "Failed to add Foo dependencies.\n\nA helpful note.\nYou can install them manually by running:"
+      )
+    end
+
+    it "omits the failure_note from the exception path" do
+      allow(instance).to receive(:add_packages).and_raise(StandardError, "boom")
+
+      instance.send(
+        :install_dependency_group, "Foo dependencies", "Foo dependencies", packages,
+        failure_note: "A helpful note."
+      )
+
+      expect(warnings.first.to_s).not_to include("A helpful note.")
+    end
+  end
+
+  describe "#add_swc_dependencies" do
+    it "keeps the SWC failure note above the manual-install instructions when the add fails" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
+
+      instance.send(:add_swc_dependencies)
+
+      expect(warnings.first.to_s).to include(
+        "Failed to add SWC dependencies.\n\n" \
+        "SWC is the default JavaScript transpiler for Shakapacker 9.3.0+.\n" \
+        "You can install them manually by running:"
+      )
+    end
+
+    it "omits the SWC failure note when the add raises" do
+      allow(instance).to receive(:add_packages).and_raise(StandardError, "network error")
+
+      instance.send(:add_swc_dependencies)
+
+      expect(warnings.first.to_s).to include("Error adding SWC dependencies: network error")
+      expect(warnings.first.to_s).not_to include("SWC is the default JavaScript transpiler")
+    end
+  end
+
   describe "#rsc_packages_with_version" do
     it "defines an explicit RSC package version pin independent from the React semver range prefix" do
       expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.0.4")

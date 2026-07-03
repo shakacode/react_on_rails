@@ -24,6 +24,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **Removed the inert `config.server_render_method` option**: The open-source configuration no longer accepts `config.server_render_method`. The option never selected a server render method — the open-source gem always renders with ExecJS — and its validator raised `ReactOnRails::Error` at boot for any value other than blank or `"ExecJS"`. Setting it now raises `NoMethodError` at boot, so delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; `rake react_on_rails:doctor` also flags the stale line. For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`. Fixes [Issue 4415](https://github.com/shakacode/react_on_rails/issues/4415). [PR 4423](https://github.com/shakacode/react_on_rails/pull/4423) by [justin808](https://github.com/justin808).
+- **Removed three deprecated configuration options** (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`): These were deprecated in v16 and are gone in v17. Setting any of them now raises `NoMethodError` at boot; delete the stale lines from `config/initializers/react_on_rails.rb` (`rake react_on_rails:doctor` flags them). Migration: delete `config.generated_assets_dirs` — public asset paths come from `public_output_path` in `config/shakapacker.yml`; delete `config.skip_display_none` — it had no runtime effect; replace `config.defer_generated_component_packs = true` with `config.generated_component_packs_loading_strategy = :defer` and `config.defer_generated_component_packs = false` with `config.generated_component_packs_loading_strategy = :sync` (deleting the line without setting a strategy falls back to the default, which may differ from the previous deferred behavior). Fixes [Issue 4419](https://github.com/shakacode/react_on_rails/issues/4419). [PR 4432](https://github.com/shakacode/react_on_rails/pull/4432) by [justin808](https://github.com/justin808).
+
 #### Added
 
 - **Generated Rails response TypeScript contracts**: Rails apps can now register explicit JSON response
@@ -144,6 +149,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   failures still fail closed. Fixes [Issue 4340](https://github.com/shakacode/react_on_rails/issues/4340).
   [PR 4355](https://github.com/shakacode/react_on_rails/pull/4355) by
   [justin808](https://github.com/justin808).
+
+- **[Pro]** **Registry cleanup handles page-unload cancellations safely**: Pending component and store
+  registry waits are now rejected when a page unloads or store generators are cleared, stale registry
+  timeouts are cleared, and expected navigation cancellations are ignored during client rendering while
+  real registration failures still surface. [PR 4282](https://github.com/shakacode/react_on_rails/pull/4282)
+  by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Gemfile loader source encodings are honored under C/POSIX locales**:
   The Pro Gemfile now loads its shared dependency fragments in binary mode, applies Ruby

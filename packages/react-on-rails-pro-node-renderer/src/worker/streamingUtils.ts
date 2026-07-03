@@ -20,10 +20,18 @@ function formatControlMessageChunk(metadata: Record<string, string>): Buffer {
   return Buffer.from(header);
 }
 
+// Control-message type strings: the TS end of the streaming wire protocol. The guarded
+// region below wraps only this single-line declaration (mirroring the Ruby single-line
+// CONTROL_MESSAGE_TYPES arrays) so unrelated literals in the functions cannot leak in.
+// MIRROR VALUES OF: react_on_rails/lib/react_on_rails/length_prefixed_parser.rb
+// MIRROR VALUES OF: react_on_rails_pro/lib/react_on_rails_pro/stream_request.rb
+const CONTROL_MESSAGE_TYPES = { propRequest: 'propRequest', renderComplete: 'renderComplete' } as const;
+// MIRROR VALUES END
+
 export function formatPropRequestChunk(propName: string): Buffer {
-  return formatControlMessageChunk({ messageType: 'propRequest', propName });
+  return formatControlMessageChunk({ messageType: CONTROL_MESSAGE_TYPES.propRequest, propName });
 }
 
 export function formatRenderCompleteChunk(): Buffer {
-  return formatControlMessageChunk({ messageType: 'renderComplete' });
+  return formatControlMessageChunk({ messageType: CONTROL_MESSAGE_TYPES.renderComplete });
 }

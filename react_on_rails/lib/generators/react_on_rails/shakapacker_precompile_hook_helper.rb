@@ -383,16 +383,17 @@ module ReactOnRails
         require "yaml"
 
         rendered_content = render_shakapacker_yml_erb(content)
-        if yaml_safe_load_supports_aliases?
-          return YAML.safe_load(rendered_content, permitted_classes: [Symbol], aliases: true)
-        end
-        return {} if yaml_content_uses_aliases?(rendered_content)
-
-        YAML.safe_load(rendered_content, permitted_classes: [Symbol])
-      rescue ArgumentError => e
-        parse_shakapacker_yml_after_alias_keyword_error(e, rendered_content)
+        YAML.safe_load(rendered_content, permitted_classes: [Symbol], aliases: true)
       rescue ShakapackerYmlErbError
         raise
+      rescue ArgumentError => e
+        # The gemspec floor is Ruby >= 3.3.0, which bundles Psych >= 5.x, where the
+        # `aliases:` keyword is always supported. An ArgumentError here means an
+        # unusually old, explicitly pinned Psych (< 3.1) lacks that keyword. Surface
+        # this loudly rather than swallowing it into {}, which would silently discard
+        # the entire shakapacker.yml and fall back to defaults.
+        raise ArgumentError, "Could not parse #{SHAKAPACKER_YML_PATH}: #{e.message}. " \
+                             "psych >= 3.1 (bundled with Ruby >= 2.6) is required for YAML alias support."
       rescue ScriptError, StandardError
         {}
       end
@@ -419,42 +420,6 @@ module ReactOnRails
         say_status :warning,
                    "Skipping generated precompile_hook updates so custom Shakapacker config is not overwritten.",
                    :yellow
-      end
-
-      def parse_shakapacker_yml_after_alias_keyword_error(error, content)
-        return {} unless yaml_alias_keyword_error?(error)
-        return {} if yaml_content_uses_aliases?(content)
-
-        YAML.safe_load(content, permitted_classes: [Symbol])
-      end
-
-      def yaml_safe_load_supports_aliases?
-        YAML.method(:safe_load).parameters.any? do |type, name|
-          type == :keyrest || (type == :key && name == :aliases)
-        end
-      rescue StandardError
-        false
-      end
-
-      def yaml_alias_keyword_error?(error)
-        error.message.include?("aliases")
-      end
-
-      def yaml_content_uses_aliases?(content)
-        require "psych"
-
-        yaml_node_uses_aliases?(Psych.parse_stream(content))
-      rescue StandardError
-        true
-      end
-
-      def yaml_node_uses_aliases?(node)
-        return false unless node
-        return true if node.respond_to?(:anchor) && node.anchor
-        return true if defined?(Psych::Nodes::Alias) && node.is_a?(Psych::Nodes::Alias)
-        return false unless node.respond_to?(:children)
-
-        node.children.any? { |child| yaml_node_uses_aliases?(child) }
       end
 
       def shakapacker_supports_precompile_hook?

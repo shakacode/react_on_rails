@@ -57,8 +57,6 @@ module ReactOnRails
   def self.configuration
     @configuration ||= Configuration.new(
       node_modules_location: nil,
-      generated_assets_dirs: nil,
-      # generated_assets_dirs is deprecated
       generated_assets_dir: "",
       server_bundle_js_file: "",
       prerender: false,
@@ -70,12 +68,9 @@ module ReactOnRails
       development_mode: Rails.env.development?,
       server_renderer_pool_size: DEFAULT_SERVER_RENDERER_POOL_SIZE,
       server_renderer_timeout: DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS,
-      skip_display_none: nil,
-      # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
       rendering_extension: nil,
       rendering_props_extension: nil,
-      server_render_method: nil,
       build_test_command: "",
       build_production_command: "",
       random_dom_id: true,
@@ -84,7 +79,6 @@ module ReactOnRails
       components_subdirectory: nil,
       stores_subdirectory: nil,
       make_generated_server_bundle_the_entrypoint: false,
-      defer_generated_component_packs: false,
       # Maximum time in milliseconds to wait for client-side component registration after page load.
       # If exceeded, an error will be thrown for server-side rendered components not registered on the client.
       # Set to 0 to disable the timeout and wait indefinitely for component registration.
@@ -102,13 +96,13 @@ module ReactOnRails
   class Configuration
     attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
                   :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
-                  :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
-                  :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,
+                  :server_renderer_timeout, :raise_on_prerender_error,
+                  :generated_assets_dir, :components_subdirectory,
                   :stores_subdirectory,
                   :webpack_generated_files, :rendering_extension, :build_test_command,
                   :build_production_command, :i18n_dir, :i18n_yml_dir, :i18n_output_format,
-                  :i18n_yml_safe_load_options, :defer_generated_component_packs,
-                  :server_render_method, :random_dom_id, :auto_load_bundle,
+                  :i18n_yml_safe_load_options,
+                  :random_dom_id, :auto_load_bundle,
                   :same_bundle_for_client_and_server, :rendering_props_extension,
                   :make_generated_server_bundle_the_entrypoint,
                   :generated_component_packs_loading_strategy,
@@ -119,21 +113,19 @@ module ReactOnRails
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,
-                   trace: nil, development_mode: nil, defer_generated_component_packs: nil,
+                   trace: nil, development_mode: nil,
                    logging_on_server: nil, server_renderer_pool_size: nil,
                    server_renderer_timeout: nil, raise_on_prerender_error: true,
-                   skip_display_none: nil, generated_assets_dirs: nil,
                    generated_assets_dir: nil, webpack_generated_files: nil,
                    rendering_extension: nil, build_test_command: nil,
                    build_production_command: nil, generated_component_packs_loading_strategy: nil,
                    same_bundle_for_client_and_server: nil,
                    i18n_dir: nil, i18n_yml_dir: nil, i18n_output_format: nil, i18n_yml_safe_load_options: nil,
-                   random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
+                   random_dom_id: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, stores_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil,
                    check_database_on_dev_start: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
-      self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
       self.build_test_command = build_test_command
       self.build_production_command = build_production_command
@@ -153,7 +145,6 @@ module ReactOnRails
                               end
       self.trace = trace.nil? ? Rails.env.development? : trace
       self.raise_on_prerender_error = raise_on_prerender_error
-      self.skip_display_none = skip_display_none
       self.rendering_props_extension = rendering_props_extension
       self.component_registry_timeout = component_registry_timeout
 
@@ -166,12 +157,10 @@ module ReactOnRails
       self.webpack_generated_files = webpack_generated_files
       self.rendering_extension = rendering_extension
 
-      self.server_render_method = server_render_method
       self.components_subdirectory = components_subdirectory
       self.stores_subdirectory = stores_subdirectory
       self.auto_load_bundle = auto_load_bundle
       self.make_generated_server_bundle_the_entrypoint = make_generated_server_bundle_the_entrypoint
-      self.defer_generated_component_packs = defer_generated_component_packs
       self.generated_component_packs_loading_strategy = generated_component_packs_loading_strategy
       self.server_bundle_output_path = server_bundle_output_path
       self.enforce_private_server_bundles = enforce_private_server_bundles
@@ -183,9 +172,6 @@ module ReactOnRails
     def setup_config_values
       check_autobundling_requirements if auto_load_bundle
       ensure_webpack_generated_files_exists
-      configure_generated_assets_dirs_deprecation
-      configure_skip_display_none_deprecation
-      check_server_render_method_is_only_execjs
       error_if_using_packer_and_generated_assets_dir_not_match_public_output_path
       # check_deprecated_settings
       adjust_precompile_task
@@ -205,22 +191,7 @@ module ReactOnRails
       raise ReactOnRails::Error, "component_registry_timeout must be a positive integer"
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def validate_generated_component_packs_loading_strategy
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-
-      if defer_generated_component_packs
-        if %i[async sync].include?(generated_component_packs_loading_strategy)
-          Rails.logger.warn "**WARNING** ReactOnRails: config.defer_generated_component_packs is " \
-                            "superseded by config.generated_component_packs_loading_strategy"
-        else
-          Rails.logger.warn "[DEPRECATION] ReactOnRails: Use config." \
-                            "generated_component_packs_loading_strategy = :defer rather than " \
-                            "defer_generated_component_packs"
-          self.generated_component_packs_loading_strategy ||= :defer
-        end
-      end
-
       msg = <<~MSG
         ReactOnRails: Your current version of shakapacker \
         does not support async script loading. Please either:
@@ -389,35 +360,6 @@ module ReactOnRails
       end
     end
 
-    def check_server_render_method_is_only_execjs
-      return if server_render_method.blank? ||
-                server_render_method == "ExecJS"
-
-      msg = <<~MSG
-        Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
-        If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
-        for details.
-      MSG
-      raise ReactOnRails::Error, msg
-    end
-
-    def configure_generated_assets_dirs_deprecation
-      return if generated_assets_dirs.blank?
-
-      packer_public_output_path = ReactOnRails::PackerUtils.packer_public_output_path
-
-      msg = <<~MSG
-        ReactOnRails Configuration Warning: The 'generated_assets_dirs' configuration option is no longer supported.
-        Since Shakapacker is now required, public asset paths are automatically determined from your shakapacker.yml configuration.
-        Please remove 'config.generated_assets_dirs' from your config/initializers/react_on_rails.rb file.
-        Public assets will be loaded from: #{packer_public_output_path}
-        If you need to customize the public output path, configure it in config/shakapacker.yml under 'public_output_path'.
-        Note: Private server bundles are configured separately via server_bundle_output_path.
-      MSG
-
-      Rails.logger.warn msg
-    end
-
     def ensure_webpack_generated_files_exists
       all_required_files = ["manifest.json", server_bundle_js_file]
 
@@ -436,12 +378,6 @@ module ReactOnRails
         missing_files = all_required_files.reject { |file| webpack_generated_files.include?(file) }
         self.webpack_generated_files += missing_files if missing_files.any?
       end
-    end
-
-    def configure_skip_display_none_deprecation
-      return if skip_display_none.nil?
-
-      Rails.logger.warn "[DEPRECATION] ReactOnRails: remove skip_display_none from configuration."
     end
 
     def raise_missing_components_subdirectory
