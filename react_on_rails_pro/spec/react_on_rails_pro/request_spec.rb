@@ -294,10 +294,12 @@ describe ReactOnRailsPro::Request do
       end
 
       upload_started.pop
-      follower = Thread.new do
-        described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
-      rescue StandardError => e
-        follower_errors << e
+      followers = Array.new(2) do
+        Thread.new do
+          described_class.send(:with_asset_upload_single_flight, ["server-hash"]) { :unexpected_upload }
+        rescue StandardError => e
+          follower_errors << e
+        end
       end
 
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1
@@ -306,10 +308,10 @@ describe ReactOnRailsPro::Request do
         waiter_count = upload_assets_mutex.synchronize do
           described_class.send(:upload_assets_in_progress).values.first&.fetch(:waiters)&.length.to_i
         end
-        break if waiter_count == 1
+        break if waiter_count == followers.length
 
         if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-          raise "follower did not register for single-flight upload"
+          raise "followers did not register for single-flight upload"
         end
 
         sleep 0.001
@@ -318,12 +320,18 @@ describe ReactOnRailsPro::Request do
       allow_failure << true
 
       expect(leader.join(1)).to eq(leader)
-      expect(follower.join(1)).to eq(follower)
+      followers.each { |follower| expect(follower.join(1)).to eq(follower) }
       expect(leader_errors.pop).to be(upload_error)
-      expect(follower_errors.pop).to be(upload_error)
+      follower_error_instances = followers.map { follower_errors.pop }
+      follower_error_instances.each do |follower_error|
+        expect(follower_error).to be_a(StandardError)
+        expect(follower_error).not_to be(upload_error)
+        expect(follower_error.message).to eq(upload_error.message)
+      end
+      expect(follower_error_instances.uniq.length).to eq(follower_error_instances.length)
     ensure
       leader&.kill if leader&.alive?
-      follower&.kill if follower&.alive?
+      followers&.each { |follower| follower.kill if follower.alive? }
     end
 
     it "lets upload followers wait without blocking the fiber scheduler" do

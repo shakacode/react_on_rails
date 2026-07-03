@@ -535,11 +535,10 @@ module ReactOnRailsPro
         end
         waiter.wait unless complete
 
-        UPLOAD_ASSETS_MUTEX.synchronize do
-          raise state[:error] if state[:error]
+        error, response = UPLOAD_ASSETS_MUTEX.synchronize { [state[:error], state[:response]] }
+        raise error.class, error.message, error.backtrace if error
 
-          state[:response]
-        end
+        response
       end
 
       def create_connection
