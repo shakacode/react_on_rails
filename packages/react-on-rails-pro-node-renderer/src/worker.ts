@@ -625,7 +625,7 @@ export default function run(config: Partial<Config>) {
             dependencyBundleTimestamps,
             providedNewBundles,
             assetsToCopy,
-            rscStreamObservability: rscStreamObservability === true,
+            rscStreamObservability,
             tracingContext: context,
           });
           await setResponseAndReleaseExecutionContext(result.response, res, result.executionContext);

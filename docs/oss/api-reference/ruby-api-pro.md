@@ -113,6 +113,31 @@ Cache key, tag, and expiry options are the same as `cached_react_component`. Unl
 end %>
 ```
 
+### `cached_static_rsc_component(component_name, options = {}, &block)`
+
+Cached buffered RSC helper for static public pages that render server HTML but intentionally do not hydrate the generated page pack. It renders through `buffered_stream_react_component`, strips only embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS`, and caches that stripped HTML.
+
+Use this when the page appends a small explicit sidecar pack for client effects instead of loading the generated component pack. Props must be passed as a block, `cache_key` is required, and `on_complete` is not supported because cache hits cannot replay chunk callbacks. The cache key is namespaced separately from `cached_buffered_stream_react_component` while still including the same deploy bundle digests via the Pro cache key builder.
+
+Unlike older cached helpers, an explicit `auto_load_bundle: false` is respected even when global `config.auto_load_bundle` is true. If `auto_load_bundle` is omitted, the global default is used.
+
+Set `rsc_render_diagnostics: true` or pass a callback to collect the static RSC render summary. The summary is also emitted in development and when `ReactOnRailsPro.configuration.tracing` is enabled via the `render_static_rsc_component.react_on_rails_pro` notification. It reports cache hit/miss status, a SHA-256 digest of the expanded cache key, effective `auto_load_bundle`, HTML byte counts, stripped RSC payload/bootstrap script counts and bytes, manifest-derived JS/CSS assets, and RSC client-reference manifest entries when those files are available. Use `rsc_diagnostic_packs:` to include explicit sidecar packs that the view appends outside the helper.
+
+```ruby
+<%= cached_static_rsc_component("MarketingPage",
+      cache_key: ["marketing-page", I18n.locale],
+      cache_tags: ["marketing-page"],
+      cache_options: { expires_in: 30.minutes },
+      auto_load_bundle: false,
+      rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+      rsc_render_diagnostics: ->(summary) { Rails.logger.info(summary.to_json) },
+      id: "marketing-page") do
+  @marketing_page_props
+end %>
+
+<%= javascript_pack_tag("generated/PublicPageClientEffects") %>
+```
+
 ### `rsc_payload_react_component(component_name, options = {})`
 
 Renders the React Server Component payload as NDJSON. Each line contains:
