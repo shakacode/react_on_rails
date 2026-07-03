@@ -20,7 +20,9 @@ import { PUBLIC_KEY } from './licensePublicKey.js';
  * Valid license plan types.
  * Must match VALID_PLANS in react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
  */
+// MIRROR VALUES OF: react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
 const VALID_PLANS = ['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const;
+// MIRROR VALUES END
 export type ValidPlan = (typeof VALID_PLANS)[number];
 
 interface LicenseData {

@@ -978,7 +978,16 @@ module ReactOnRails
           [nil, escaped, index]
         end
 
-        def js_code_position?(content, target_index)
+        # Sentinel returned by scan_js_code_chars when a regex literal spans target_index,
+        # so callers can reproduce the original `return false` guard.
+        REGEX_SPANS_TARGET = :regex_spans_target
+
+        # Scans content up to target_index, skipping regex literals and threading JS
+        # string/comment state via advance_js_scan_state. Yields each code (non-string,
+        # non-comment) character so callers can fold over it (e.g. brace-depth tracking).
+        # Returns the final scan state (nil means the target is at a code position), or
+        # REGEX_SPANS_TARGET when a regex literal starts before but ends at/after target_index.
+        def scan_js_code_chars(content, target_index)
           state = nil
           escaped = false
           index = 0
@@ -988,46 +997,27 @@ module ReactOnRails
             next_char = content[index + 1]
             if state.nil? && js_regex_literal_start?(content, index)
               regex_end = js_regex_literal_end(content, index)
-              return false if regex_end >= target_index
+              return REGEX_SPANS_TARGET if regex_end >= target_index
 
               index = regex_end + 1
               next
             end
 
             state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+            yield char if state.nil? && block_given?
             index += 1
           end
 
-          state.nil?
+          state
+        end
+
+        def js_code_position?(content, target_index)
+          scan_js_code_chars(content, target_index).nil?
         end
 
         def js_top_level_position?(content, target_index)
-          state = nil
-          escaped = false
           depth = 0
-          index = 0
-
-          while index < target_index
-            char = content[index]
-            next_char = content[index + 1]
-            if state.nil? && js_regex_literal_start?(content, index)
-              regex_end = js_regex_literal_end(content, index)
-              return false if regex_end >= target_index
-
-              index = regex_end + 1
-              next
-            end
-
-            state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
-            if state
-              index += 1
-              next
-            end
-
-            depth += js_depth_delta(char, depth)
-            index += 1
-          end
-
+          state = scan_js_code_chars(content, target_index) { |char| depth += js_depth_delta(char, depth) }
           state.nil? && depth.zero?
         end
 
@@ -1765,9 +1755,15 @@ module ReactOnRails
           content_without_comments = rsc_plugin_options_without_comments(content)
           pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
 
+          any_top_level_destructuring_match?(content_without_comments, pattern, binding_name)
+        end
+
+        # Scans already-comment-stripped content for `pattern` (whose first capture group is the
+        # destructuring body) and returns true when any match sits at module scope and declares
+        # binding_name. The module-scope check guards against false positives when the same
+        # destructuring appears inside a function body (which does not produce a module-scope binding).
+        def any_top_level_destructuring_match?(content_without_comments, pattern, binding_name)
           content_without_comments.to_enum(:scan, pattern).any? do |captures|
-            # Module-scope check guards against false positives when the same destructuring
-            # appears inside a function body (which does not produce a module-scope binding).
             next false unless js_top_level_position?(content_without_comments, Regexp.last_match.begin(0))
 
             destructuring_declares_binding?(captures.first, binding_name)
@@ -1824,11 +1820,7 @@ module ReactOnRails
           content_without_comments = rsc_plugin_options_without_comments(content)
           pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}/
 
-          content_without_comments.to_enum(:scan, pattern).any? do |captures|
-            next false unless js_top_level_position?(content_without_comments, Regexp.last_match.begin(0))
-
-            destructuring_declares_binding?(captures.first, binding_name)
-          end
+          any_top_level_destructuring_match?(content_without_comments, pattern, binding_name)
         end
 
         def destructuring_declares_binding?(bindings, binding_name)

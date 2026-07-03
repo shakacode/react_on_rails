@@ -113,7 +113,10 @@ module ReactOnRailsPro
     MAX_PULL_PROP_NAME_LENGTH = 256
     # Keep aligned with ReactOnRails::LengthPrefixedParser::CONTROL_MESSAGE_TYPES,
     # which parses these same control frames from the shared wire format.
+    # MIRROR VALUES OF: react_on_rails/lib/react_on_rails/length_prefixed_parser.rb
+    # MIRROR VALUES OF: packages/react-on-rails-pro-node-renderer/src/worker/streamingUtils.ts
     CONTROL_MESSAGE_TYPES = %w[propRequest renderComplete].freeze
+    # MIRROR VALUES END
     private_constant :CONTROL_MESSAGE_TYPES
 
     def http_status = @status

@@ -441,8 +441,8 @@ module ReactOnRails
       end
 
       # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
-      # rubocop:disable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
-      def rewrite_non_comment_lines(content)
+      # rubocop:disable Metrics/PerceivedComplexity
+      def rewrite_non_comment_lines(content, &block)
         in_block_comment = false
         in_multiline_template_literal = false
         pending_multiline_module_call_depth = 0
@@ -464,8 +464,8 @@ module ReactOnRails
                 rewrite_line_after_template_literal_close(
                   line,
                   pending_multiline_module_call_depth,
-                  pending_multiline_static_import_specifier
-                ) { |line_fragment| yield line_fragment }
+                  pending_multiline_static_import_specifier, &block
+                )
               in_multiline_template_literal = updated_template_literal_state
               in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
@@ -475,8 +475,8 @@ module ReactOnRails
                   line,
                   pending_multiline_module_call_depth,
                   pending_multiline_static_import_specifier,
-                  in_block_comment:
-                ) { |line_fragment| yield line_fragment }
+                  in_block_comment:, &block
+                )
               in_multiline_template_literal = updated_template_literal_state
               in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
@@ -491,8 +491,8 @@ module ReactOnRails
                 rewrite_line_after_block_comment_close(
                   line,
                   pending_multiline_module_call_depth,
-                  pending_multiline_static_import_specifier
-                ) { |line_fragment| yield line_fragment }
+                  pending_multiline_static_import_specifier, &block
+                )
               in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             else
@@ -500,14 +500,12 @@ module ReactOnRails
             end
           elsif stripped.start_with?("/*")
             if stripped.include?("*/")
-              rewritten_line = yield line
-              rewritten_line, pending_multiline_static_import_specifier =
-                update_pending_multiline_static_import_tracking(
-                  rewritten_line,
-                  pending_multiline_static_import_specifier
+              rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
+                rewrite_and_track_line(
+                  line,
+                  pending_multiline_module_call_depth,
+                  pending_multiline_static_import_specifier, &block
                 )
-              rewritten_line, pending_multiline_module_call_depth =
-                update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
               in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             else
@@ -517,20 +515,18 @@ module ReactOnRails
           elsif stripped.start_with?("//") || stripped.match?(/\A\*\s/)
             line
           else
-            rewritten_line = yield line
-            rewritten_line, pending_multiline_static_import_specifier =
-              update_pending_multiline_static_import_tracking(
-                rewritten_line,
-                pending_multiline_static_import_specifier
+            rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
+              rewrite_and_track_line(
+                line,
+                pending_multiline_module_call_depth,
+                pending_multiline_static_import_specifier, &block
               )
-            rewritten_line, pending_multiline_module_call_depth =
-              update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
             in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
             rewritten_line
           end
         end.join
       end
-      # rubocop:enable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
+      # rubocop:enable Metrics/PerceivedComplexity
       # rubocop:enable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
       def unclosed_block_comment_starts?(line)
@@ -615,6 +611,19 @@ module ReactOnRails
         suffix_code = suffix[separator_match.end(0)..].to_s
         rewritten_suffix_code = rewrite_base_package_patterns(suffix_code)
         "#{line[0..closing_quote_index]}#{separator_match[:separator]}#{rewritten_suffix_code}"
+      end
+
+      # Rewrites one non-comment line (fragment) via the given block, then threads the
+      # multiline-static-import and multiline-module-call tracking state through it.
+      # Returns [rewritten_line, module_call_depth, static_import_specifier] so callers
+      # keep the loop-local state assignment explicit rather than mutating shared state.
+      def rewrite_and_track_line(line, pending_depth, pending_multiline_static_import_specifier)
+        rewritten_line = yield line
+        rewritten_line, pending_multiline_static_import_specifier =
+          update_pending_multiline_static_import_tracking(rewritten_line, pending_multiline_static_import_specifier)
+        rewritten_line, pending_depth =
+          update_pending_multiline_module_call_tracking(rewritten_line, pending_depth)
+        [rewritten_line, pending_depth, pending_multiline_static_import_specifier]
       end
 
       def update_pending_multiline_module_call_tracking(line, pending_depth)
@@ -754,33 +763,28 @@ module ReactOnRails
         backslash_count.odd?
       end
 
-      def rewrite_line_after_block_comment_close(line, pending_depth, pending_multiline_static_import_specifier)
+      def rewrite_line_after_block_comment_close(line, pending_depth, pending_multiline_static_import_specifier, &)
         closing_index = line.index("*/")
         return [line, pending_depth, pending_multiline_static_import_specifier] unless closing_index
         return [line, pending_depth, pending_multiline_static_import_specifier] if closing_index >= line.length - 2
 
         comment_prefix = line[0, closing_index + 2]
         line_fragment = line[(closing_index + 2)..]
-        rewritten_fragment = yield line_fragment
-        rewritten_fragment, pending_multiline_static_import_specifier =
-          update_pending_multiline_static_import_tracking(rewritten_fragment, pending_multiline_static_import_specifier)
-        rewritten_fragment, pending_depth =
-          update_pending_multiline_module_call_tracking(rewritten_fragment, pending_depth)
+        rewritten_fragment, pending_depth, pending_multiline_static_import_specifier =
+          rewrite_and_track_line(line_fragment, pending_depth, pending_multiline_static_import_specifier, &)
         ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      def rewrite_line_after_template_literal_close(line, pending_depth, pending_multiline_static_import_specifier)
+      def rewrite_line_after_template_literal_close(line, pending_depth, pending_multiline_static_import_specifier,
+                                                    &)
         closing_index = first_unescaped_backtick_index(line)
         return [line, pending_depth, pending_multiline_static_import_specifier] unless closing_index
         return [line, pending_depth, pending_multiline_static_import_specifier] if closing_index >= line.length - 1
 
         template_literal_prefix = line[0, closing_index + 1]
         line_fragment = line[(closing_index + 1)..]
-        rewritten_fragment = yield line_fragment
-        rewritten_fragment, pending_multiline_static_import_specifier =
-          update_pending_multiline_static_import_tracking(rewritten_fragment, pending_multiline_static_import_specifier)
-        rewritten_fragment, pending_depth =
-          update_pending_multiline_module_call_tracking(rewritten_fragment, pending_depth)
+        rewritten_fragment, pending_depth, pending_multiline_static_import_specifier =
+          rewrite_and_track_line(line_fragment, pending_depth, pending_multiline_static_import_specifier, &)
         ["#{template_literal_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
@@ -788,18 +792,16 @@ module ReactOnRails
         line,
         pending_depth,
         pending_multiline_static_import_specifier,
-        in_block_comment: false
+        in_block_comment: false,
+        &
       )
         opening_index = opening_backtick_index_for_multiline_start(line, in_block_comment:)
         return [line, pending_depth, pending_multiline_static_import_specifier] unless opening_index&.positive?
 
         line_prefix = line[0, opening_index]
         template_literal_suffix = line[opening_index..]
-        rewritten_prefix = yield line_prefix
-        rewritten_prefix, pending_multiline_static_import_specifier =
-          update_pending_multiline_static_import_tracking(rewritten_prefix, pending_multiline_static_import_specifier)
-        rewritten_prefix, pending_depth =
-          update_pending_multiline_module_call_tracking(rewritten_prefix, pending_depth)
+        rewritten_prefix, pending_depth, pending_multiline_static_import_specifier =
+          rewrite_and_track_line(line_prefix, pending_depth, pending_multiline_static_import_specifier, &)
         ["#{rewritten_prefix}#{template_literal_suffix}", pending_depth, pending_multiline_static_import_specifier]
       end
 

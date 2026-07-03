@@ -1,5 +1,5 @@
 {
-  "extends": "@tsconfig/node14",
+  "extends": "@tsconfig/node18",
   "compilerOptions": {
     "allowJs": true,
     "esModuleInterop": false,
@@ -7,6 +7,11 @@
     "declarationMap": true,
     // needed for Jest tests even though we don't use .tsx
     "jsx": "react-jsx",
+    // target/lib are pinned to es2020 (NOT the @tsconfig/node18 base's es2022/es2023) on purpose:
+    // this config is inherited by the browser-facing packages react-on-rails and react-on-rails-pro,
+    // whose `tsc` build emits the published lib/*.js consumed by END-USER BROWSERS. Keeping es2020
+    // here avoids raising their browser baseline. The node-renderer uses its own src/tsconfig.json
+    // (no target/lib override) so it genuinely inherits es2022/es2023 for Node >=18.19. See #4410.
     "lib": ["dom", "es2020"],
     "noImplicitAny": true,
     "allowImportingTsExtensions": true,
