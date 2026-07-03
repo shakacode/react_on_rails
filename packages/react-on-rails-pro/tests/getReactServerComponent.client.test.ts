@@ -156,6 +156,21 @@ describe('fetchRSC HTTP responses', () => {
       })}`,
     );
   });
+
+  it('returns a rejected promise for synchronous request preparation failures', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+
+    await expect(
+      fetchRSC({
+        componentName: 'BrokenPropsPanel',
+        componentProps: circularProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow('Failed to prepare RSC request for component "BrokenPropsPanel"');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('getReactServerComponent preloaded payload replay', () => {
