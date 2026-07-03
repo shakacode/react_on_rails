@@ -26,7 +26,12 @@ require "nokogiri"
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
-  STATIC_RSC_SCRIPT_TAG_PATTERN = %r{<script\b[^>]*>.*?</script\s*>}im
+  HTML_SPACE_CHARACTERS = [" ", "\t", "\n", "\f", "\r"].freeze
+  HTML_QUOTE_CHARACTERS = ['"', "'"].freeze
+  SCRIPT_OPEN_TAG = "<script"
+  SCRIPT_OPEN_TAG_LENGTH = 7
+  SCRIPT_CLOSE_TAG = "</script"
+  SCRIPT_CLOSE_TAG_LENGTH = 8
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
   @static_rsc_asset_diagnostic_cache = {}
 
@@ -506,7 +511,13 @@ module ReactOnRailsProHelper
   end
 
   def render_cached_static_rsc_component(component_name, cache_options, render_options, diagnostics_context, &block)
-    fetch_static_rsc_component(component_name, cache_options, render_options, diagnostics_context[:cache]) do
+    fetch_static_rsc_component(
+      component_name,
+      cache_options,
+      render_options,
+      diagnostics_context[:cache],
+      diagnostics_enabled: static_rsc_render_diagnostics_enabled?(diagnostics_context[:config])
+    ) do
       static_rsc_component_cache_miss_html(component_name, render_options, diagnostics_context, &block)
     end
   end
@@ -522,7 +533,14 @@ module ReactOnRailsProHelper
     )
   end
 
-  def fetch_static_rsc_component(component_name, cache_options, render_options, cache_diagnostics, &)
+  def fetch_static_rsc_component(
+    component_name,
+    cache_options,
+    render_options,
+    cache_diagnostics,
+    diagnostics_enabled:,
+    &
+  )
     cache_enabled = ReactOnRailsPro::Cache.use_cache?(cache_options)
     cache_diagnostics[:enabled] = cache_enabled
     cache_diagnostics[:hit] = false
@@ -531,11 +549,14 @@ module ReactOnRailsProHelper
 
     cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
     raw_cache_options = cache_options[:cache_options]
-    cache_diagnostics[:key_digest] = static_rsc_cache_key_digest(cache_key)
-    cache_diagnostics[:write_expired] = ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+    write_expired = ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+    if diagnostics_enabled
+      cache_diagnostics[:key_digest] = static_rsc_cache_key_digest(cache_key)
+      cache_diagnostics[:write_expired] = write_expired
+    end
     Rails.logger.debug { "React on Rails Pro static RSC cache_key is #{cache_key.inspect}" }
 
-    return yield if cache_diagnostics[:write_expired]
+    return yield if write_expired
 
     fetch_static_rsc_component_cache_entry(
       component_name,
@@ -584,15 +605,17 @@ module ReactOnRailsProHelper
     raw_html = html.to_s
     stripped_script_count = 0
     stripped_script_bytes = 0
+    stripped_html = +""
+    cursor = 0
 
-    stripped_html = raw_html.gsub(STATIC_RSC_SCRIPT_TAG_PATTERN) do |script_html|
-      script_node = Nokogiri::HTML5.fragment(script_html).at_css("script")
-      next script_html unless script_node && static_rsc_payload_script?(script_node)
-
+    each_static_rsc_payload_script_range(raw_html) do |script_range|
+      stripped_html << raw_html[cursor...script_range.begin]
+      script_html = raw_html[script_range]
       stripped_script_count += 1
       stripped_script_bytes += script_html.bytesize
-      ""
+      cursor = script_range.end + 1
     end
+    stripped_html << raw_html[cursor..] if cursor < raw_html.length
 
     diagnostics&.merge!(
       raw_bytes: raw_html.bytesize,
@@ -601,6 +624,69 @@ module ReactOnRailsProHelper
     )
 
     stripped_html.html_safe
+  end
+
+  def each_static_rsc_payload_script_range(raw_html)
+    normalized_html = raw_html.downcase
+    cursor = 0
+
+    while (script_start = normalized_html.index(SCRIPT_OPEN_TAG, cursor))
+      unless html_tag_name_boundary?(raw_html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+        cursor = script_start + SCRIPT_OPEN_TAG_LENGTH
+        next
+      end
+
+      opening_tag_end = html_tag_end_index(raw_html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+      break unless opening_tag_end
+
+      closing_tag_range = html_script_closing_tag_range(raw_html, normalized_html, opening_tag_end + 1)
+      break unless closing_tag_range
+
+      script_range = script_start..closing_tag_range.end
+      script_node = Nokogiri::HTML5.fragment(raw_html[script_range]).at_css("script")
+      yield script_range if script_node && static_rsc_payload_script?(script_node)
+
+      cursor = closing_tag_range.end + 1
+    end
+  end
+
+  def html_script_closing_tag_range(raw_html, normalized_html, cursor)
+    search_index = cursor
+
+    while (closing_tag_start = normalized_html.index(SCRIPT_CLOSE_TAG, search_index))
+      closing_name_end = closing_tag_start + SCRIPT_CLOSE_TAG_LENGTH
+      unless html_tag_name_boundary?(raw_html, closing_name_end)
+        search_index = closing_name_end
+        next
+      end
+
+      closing_tag_end = html_tag_end_index(raw_html, closing_name_end)
+      return closing_tag_start..closing_tag_end if closing_tag_end
+
+      return nil
+    end
+  end
+
+  def html_tag_end_index(raw_html, cursor)
+    quote = nil
+    index = cursor
+
+    while index < raw_html.length
+      character = raw_html[index]
+      if quote
+        quote = nil if character == quote
+      elsif HTML_QUOTE_CHARACTERS.include?(character)
+        quote = character
+      elsif character == ">"
+        return index
+      end
+      index += 1
+    end
+  end
+
+  def html_tag_name_boundary?(raw_html, index)
+    character = raw_html[index]
+    character.nil? || character == ">" || character == "/" || HTML_SPACE_CHARACTERS.include?(character)
   end
 
   def static_rsc_payload_script?(script_node)

@@ -1479,9 +1479,8 @@ describe ReactOnRailsProHelper do
             <svg viewBox="0 0 10 10"><foreignObject><p data-raw="1 &lt; 2">Keep&nbsp;entity</p></foreignObject></svg>
           </div>
         HTML
-        rsc_script = <<~HTML
-          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</script>
-        HTML
+        rsc_script = "<SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[\"#{component_name}\"]||=[])" \
+                     ".push(\"flight chunk\")</script\t\n data-ignored>\n"
         suffix_html = "<section data-tail='keep'>Tail</section>\n"
         raw_html = "#{preserved_html}#{rsc_script}#{suffix_html}"
         result = nil
@@ -1501,6 +1500,24 @@ describe ReactOnRailsProHelper do
         end
 
         expect(result).to eq("#{preserved_html}\n#{suffix_html}")
+      end
+
+      it "avoids cache-key digest work when static RSC diagnostics are disabled" do
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+          expect(self).not_to receive(:static_rsc_cache_key_digest)
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-diagnostics-disabled", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: false,
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
       end
 
       it "does not evaluate props and respects explicit auto_load_bundle false on cache hits" do
