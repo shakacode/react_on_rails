@@ -15114,7 +15114,7 @@ available default ENV values if you wire them into your own launch script.
    In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set. **Recommended for production** — rolling restarts are the primary safety net against memory leaks from application code. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set. Set this high enough so that not all workers are down simultaneously (e.g., if you have 4 workers and set this to 5 minutes, the full restart cycle takes 20 minutes).
-1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
+1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. For example, `30` means 30 seconds, not 30 milliseconds. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
 1. **maxDebugSnippetLength** (default: 1000) - If the rendering request is longer than this, it will be truncated in exception and logging messages.
 1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS global objects and functions that get added to the VM context:
    `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
@@ -19492,6 +19492,31 @@ Cache key, tag, and expiry options are the same as `cached_react_component`. Unl
       id: "marketing-page") do
   @marketing_page_props
 end %>
+```
+
+### `cached_static_rsc_component(component_name, options = {}, &block)`
+
+Cached buffered RSC helper for static public pages that render server HTML but intentionally do not hydrate the generated page pack. It renders through `buffered_stream_react_component`, strips only embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS`, and caches that stripped HTML.
+
+Use this when the page appends a small explicit sidecar pack for client effects instead of loading the generated component pack. Props must be passed as a block, `cache_key` is required, and `on_complete` is not supported because cache hits cannot replay chunk callbacks. The cache key is namespaced separately from `cached_buffered_stream_react_component` while still including the same deploy bundle digests via the Pro cache key builder.
+
+Unlike older cached helpers, an explicit `auto_load_bundle: false` is respected even when global `config.auto_load_bundle` is true. If `auto_load_bundle` is omitted, the global default is used.
+
+Set `rsc_render_diagnostics: true` or pass a callback to collect the static RSC render summary. The summary is also emitted in development and when `ReactOnRailsPro.configuration.tracing` is enabled via the `render_static_rsc_component.react_on_rails_pro` notification. It reports cache hit/miss status, a SHA-256 digest of the expanded cache key, effective `auto_load_bundle`, HTML byte counts, stripped RSC payload/bootstrap script counts and bytes, manifest-derived JS/CSS assets, and RSC client-reference manifest entries when those files are available. Use `rsc_diagnostic_packs:` to include explicit sidecar packs that the view appends outside the helper.
+
+```ruby
+<%= cached_static_rsc_component("MarketingPage",
+      cache_key: ["marketing-page", I18n.locale],
+      cache_tags: ["marketing-page"],
+      cache_options: { expires_in: 30.minutes },
+      auto_load_bundle: false,
+      rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+      rsc_render_diagnostics: ->(summary) { Rails.logger.info(summary.to_json) },
+      id: "marketing-page") do
+  @marketing_page_props
+end %>
+
+<%= javascript_pack_tag("generated/PublicPageClientEffects") %>
 ```
 
 ### `rsc_payload_react_component(component_name, options = {})`
