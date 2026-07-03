@@ -1,17 +1,17 @@
 /**
  * Regression tests for the color-enable decision in src/utils.ts.
  *
- * The `pc` color instance is built at module load from the environment, layering
- * two chalk@4-compatibility overrides on top of picocolors' own detection:
- * FORCE_COLOR=0/false disables, and a bare CI (non-TTY) does not force color.
- * Both behaviors have regressed in this package's history — FORCE_COLOR=0 wrongly
- * enabling color, empty NO_COLOR= mishandling, and CI-only output-incompatibility
- * — so this suite locks the decision across the env/TTY matrix.
+ * The `pc` color instance is built at module load by reproducing chalk@4's
+ * colorize/plain precedence (FORCE_COLOR wins, then NO_COLOR, then TTY) rather
+ * than deferring to picocolors' own detection, which uses a different precedence.
+ * This decision has regressed repeatedly in the package's history — FORCE_COLOR=0
+ * wrongly enabling color, empty NO_COLOR= mishandling, a bare CI forcing color in
+ * piped output, and NO_COLOR overriding an explicit FORCE_COLOR — so this suite
+ * locks the full matrix.
  *
- * `pc` is a module-load-time const and picocolors reads process.env + stdout.isTTY
- * when first required, so each case runs in an isolated module registry
- * (jest.isolateModules) after mutating the environment, then re-requires utils.
- * TTY state is stubbed explicitly so the result never depends on the test runner.
+ * `pc` is a module-load-time const, so each case runs in an isolated module
+ * registry (jest.isolateModules) after mutating the environment, then re-requires
+ * utils. TTY state is stubbed explicitly so the result never depends on the runner.
  */
 
 const ANSI_RED_OPEN = '[31m';
@@ -72,6 +72,19 @@ describe('pc color-enable decision', () => {
   it('disables color when NO_COLOR=1', () => {
     process.env.NO_COLOR = '1';
     expect(colorEnabled()).toBe(false);
+  });
+
+  it('lets an explicit FORCE_COLOR=1 override NO_COLOR (chalk precedence)', () => {
+    // chalk@4 treats a present, non-zero FORCE_COLOR as a hard override that wins
+    // over NO_COLOR; picocolors would let NO_COLOR disable, so this locks the order.
+    process.env.NO_COLOR = '1';
+    process.env.FORCE_COLOR = '1';
+    expect(colorEnabled()).toBe(true);
+  });
+
+  it('treats an empty FORCE_COLOR= as force-on (chalk precedence)', () => {
+    process.env.FORCE_COLOR = '';
+    expect(colorEnabled()).toBe(true);
   });
 
   it('enables color for an interactive TTY (no CI, no FORCE_COLOR)', () => {
