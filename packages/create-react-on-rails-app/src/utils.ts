@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'child_process';
-import chalk from 'chalk';
+import pc from 'picocolors';
 
 function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // Always inherit PATH, HOME, and the rest of process.env; callers only add/override keys.
@@ -82,21 +82,21 @@ export function detectPackageManager(): 'npm' | 'pnpm' | null {
 }
 
 export function logStep(current: number, total: number, message: string): void {
-  console.log(chalk.cyan(`\n[${current}/${total}] ${message}`));
+  console.log(pc.cyan(`\n[${current}/${total}] ${message}`));
 }
 
 export function logStepDone(message: string): void {
-  console.log(chalk.green(`  ✓ ${message}`));
+  console.log(pc.green(`  ✓ ${message}`));
 }
 
 export function logError(message: string): void {
-  console.error(chalk.red(`\nError: ${message}\n`));
+  console.error(pc.red(`\nError: ${message}\n`));
 }
 
 export function logSuccess(message: string): void {
-  console.log(chalk.green(message));
+  console.log(pc.green(message));
 }
 
 export function logInfo(message: string): void {
-  console.log(chalk.cyan(message));
+  console.log(pc.cyan(message));
 }
