@@ -1502,6 +1502,70 @@ describe ReactOnRailsProHelper do
         expect(result).to eq("#{preserved_html}\n#{suffix_html}")
       end
 
+      it "strips RSC scripts after Unicode characters whose case mapping changes length" do
+        raw_html = <<~HTML
+          <p>İstanbul launch page</p>
+          <SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</sCrIpT>
+          <section data-tail="keep">Tail</section>
+        HTML
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-unicode-before-script", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("İstanbul launch page")
+        expect(result).not_to include("REACT_ON_RAILS_RSC_PAYLOADS")
+        expect(result).to include('<section data-tail="keep">Tail</section>')
+      end
+
+      it "warns and diagnoses when malformed script markup aborts RSC script stripping" do
+        raw_html = <<~HTML
+          <div>Static RSC HTML</div>
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")
+          <section data-tail="keep">Tail</section>
+        HTML
+        diagnostics = []
+        result = nil
+
+        expect(Rails.logger).to receive(:warn).with(
+          /React on Rails Pro static RSC payload script stripping aborted: missing closing script tag at character \d+/
+        )
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-malformed-script", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq(raw_html)
+        expect(diagnostics.first[:rsc_payload]).to include(
+          bootstrap_script_count: 0,
+          bootstrap_script_bytes: 0,
+          bootstrap_script_strip_aborted: true,
+          stripped: false
+        )
+      end
+
       it "avoids cache-key digest work when static RSC diagnostics are disabled" do
         Sync do
           stub_pro_bundle_hashes

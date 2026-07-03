@@ -608,7 +608,7 @@ module ReactOnRailsProHelper
     stripped_html = +""
     cursor = 0
 
-    each_static_rsc_payload_script_range(raw_html) do |script_range|
+    strip_state = each_static_rsc_payload_script_range(raw_html) do |script_range|
       stripped_html << raw_html[cursor...script_range.begin]
       script_html = raw_html[script_range]
       stripped_script_count += 1
@@ -620,27 +620,33 @@ module ReactOnRailsProHelper
     diagnostics&.merge!(
       raw_bytes: raw_html.bytesize,
       bootstrap_script_count: stripped_script_count,
-      bootstrap_script_bytes: stripped_script_bytes
+      bootstrap_script_bytes: stripped_script_bytes,
+      bootstrap_script_strip_aborted: strip_state == :aborted
     )
 
     stripped_html.html_safe
   end
 
   def each_static_rsc_payload_script_range(raw_html)
-    normalized_html = raw_html.downcase
     cursor = 0
 
-    while (script_start = normalized_html.index(SCRIPT_OPEN_TAG, cursor))
+    while (script_start = html_ascii_case_insensitive_index(raw_html, SCRIPT_OPEN_TAG, cursor))
       unless html_tag_name_boundary?(raw_html, script_start + SCRIPT_OPEN_TAG_LENGTH)
         cursor = script_start + SCRIPT_OPEN_TAG_LENGTH
         next
       end
 
       opening_tag_end = html_tag_end_index(raw_html, script_start + SCRIPT_OPEN_TAG_LENGTH)
-      break unless opening_tag_end
+      unless opening_tag_end
+        warn_static_rsc_payload_script_strip_aborted("unterminated opening script tag", script_start)
+        return :aborted
+      end
 
-      closing_tag_range = html_script_closing_tag_range(raw_html, normalized_html, opening_tag_end + 1)
-      break unless closing_tag_range
+      closing_tag_range = html_script_closing_tag_range(raw_html, opening_tag_end + 1)
+      unless closing_tag_range
+        warn_static_rsc_payload_script_strip_aborted("missing closing script tag", script_start)
+        return :aborted
+      end
 
       script_range = script_start..closing_tag_range.end
       script_node = Nokogiri::HTML5.fragment(raw_html[script_range]).at_css("script")
@@ -648,12 +654,14 @@ module ReactOnRailsProHelper
 
       cursor = closing_tag_range.end + 1
     end
+
+    :completed
   end
 
-  def html_script_closing_tag_range(raw_html, normalized_html, cursor)
+  def html_script_closing_tag_range(raw_html, cursor)
     search_index = cursor
 
-    while (closing_tag_start = normalized_html.index(SCRIPT_CLOSE_TAG, search_index))
+    while (closing_tag_start = html_ascii_case_insensitive_index(raw_html, SCRIPT_CLOSE_TAG, search_index))
       closing_name_end = closing_tag_start + SCRIPT_CLOSE_TAG_LENGTH
       unless html_tag_name_boundary?(raw_html, closing_name_end)
         search_index = closing_name_end
@@ -665,6 +673,40 @@ module ReactOnRailsProHelper
 
       return nil
     end
+  end
+
+  def html_ascii_case_insensitive_index(raw_html, needle, cursor)
+    search_index = cursor
+
+    while (candidate_index = raw_html.index(needle[0], search_index))
+      return candidate_index if html_ascii_case_insensitive_match?(raw_html, needle, candidate_index)
+
+      search_index = candidate_index + 1
+    end
+  end
+
+  def html_ascii_case_insensitive_match?(raw_html, needle, index)
+    return false if index + needle.length > raw_html.length
+
+    needle.each_char.with_index.all? do |expected_character, offset|
+      html_ascii_character_matches?(raw_html[index + offset], expected_character)
+    end
+  end
+
+  def html_ascii_character_matches?(actual_character, expected_character)
+    return true if actual_character == expected_character
+    return false unless actual_character
+
+    expected_codepoint = expected_character.ord
+    return false unless expected_codepoint.between?(97, 122)
+
+    actual_character.ord == expected_codepoint - 32
+  end
+
+  def warn_static_rsc_payload_script_strip_aborted(reason, script_start)
+    Rails.logger.warn(
+      "React on Rails Pro static RSC payload script stripping aborted: #{reason} at character #{script_start}"
+    )
   end
 
   def html_tag_end_index(raw_html, cursor)
@@ -761,6 +803,7 @@ module ReactOnRailsProHelper
       rsc_payload: {
         bootstrap_script_count: payload_diagnostics[:bootstrap_script_count],
         bootstrap_script_bytes: payload_diagnostics[:bootstrap_script_bytes],
+        bootstrap_script_strip_aborted: payload_diagnostics[:bootstrap_script_strip_aborted],
         stripped: static_rsc_payload_stripped?(cache_diagnostics, payload_diagnostics)
       },
       emitted_assets: static_rsc_emitted_asset_diagnostics(component_name, render_options, diagnostics_context[:packs]),
