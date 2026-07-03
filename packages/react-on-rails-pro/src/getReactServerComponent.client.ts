@@ -166,6 +166,26 @@ const isAbortError = (error: unknown): boolean =>
   'name' in error &&
   (error as { name?: unknown }).name === 'AbortError';
 
+const RSC_PAYLOAD_FETCH_FAILURE_MESSAGE = 'request failed before receiving an RSC payload response.';
+
+const errorIncludesSerializedRSCProps = (
+  error: unknown,
+  {
+    encodedParams,
+    fetchUrl,
+    propsString,
+  }: {
+    encodedParams: string;
+    fetchUrl: string;
+    propsString: string;
+  },
+): boolean => {
+  const errorText = `${extractErrorMessage(error)}\n${error instanceof Error ? (error.stack ?? '') : ''}`;
+  return [fetchUrl, encodedParams, propsString, encodeURIComponent(propsString)].some(
+    (serializedValue) => serializedValue !== '' && errorText.includes(serializedValue),
+  );
+};
+
 /**
  * Fetches an RSC payload via HTTP request.
  *
@@ -220,10 +240,19 @@ export const fetchRSC = ({
       // (including .cause and the merged stack) instead of flattening to a plain Error.
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
       if (isAbortError(error)) throw error;
+      const errorMessage = extractErrorMessage(error);
+      const serializedPropsInError = errorIncludesSerializedRSCProps(error, {
+        encodedParams,
+        fetchUrl,
+        propsString,
+      });
+      const safeErrorMessage = serializedPropsInError ? RSC_PAYLOAD_FETCH_FAILURE_MESSAGE : errorMessage;
       const wrapper: Error & { cause?: unknown } = new Error(
-        `Failed to fetch RSC payload for component "${componentName}" from "${sourcePath}": ${extractErrorMessage(error)}`,
+        `Failed to fetch RSC payload for component "${componentName}" from "${sourcePath}": ${safeErrorMessage}`,
       );
-      wrapper.cause = error;
+      if (!serializedPropsInError) {
+        wrapper.cause = error;
+      }
       throw wrapper;
     });
   } catch (error: unknown) {
