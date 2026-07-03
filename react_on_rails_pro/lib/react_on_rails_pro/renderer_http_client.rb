@@ -181,6 +181,8 @@ module ReactOnRailsPro
       def initialize(endpoint:, protocol:, pool_limit:)
         @queue = Queue.new
         @ready = Queue.new
+        @pending_results = {}.compare_by_identity
+        @pending_results_mutex = Mutex.new
         @closed = false
         @closed_mutex = Mutex.new
         @thread = Thread.new { run_loop(endpoint:, protocol:, pool_limit:) }
@@ -223,13 +225,17 @@ module ReactOnRailsPro
         @closed_mutex.synchronize do
           raise ConnectionError, "renderer HTTP client is closed" if @closed
 
+          register_pending_result(result)
           @queue << [:request, method, path, headers, body, result]
         end
+        result << [:error, worker_thread_exited_error] unless @thread.alive?
 
         status, payload = wait_for_request_result(result)
         raise payload if status == :error
 
         payload
+      ensure
+        unregister_pending_result(result) if result
       end
 
       def run_loop(endpoint:, protocol:, pool_limit:)
@@ -258,6 +264,7 @@ module ReactOnRailsPro
         end
       rescue StandardError => e
         @ready << [:error, e] unless ready
+        notify_pending_results(worker_thread_exited_error) if ready
       end
 
       def handle_request(client, message)
@@ -285,18 +292,7 @@ module ReactOnRailsPro
       end
 
       def wait_for_request_result(result)
-        loop do
-          return result.pop(true)
-        rescue ThreadError
-          break unless @thread.alive?
-
-          @thread.join(0.01)
-        end
-
-        [
-          :error,
-          ConnectionError.new("renderer HTTP client worker thread exited before completing request")
-        ]
+        result.pop
       end
 
       def close_client(client, result)
@@ -313,6 +309,23 @@ module ReactOnRailsPro
         ResponseEnvelope.new(raw_response.status, BufferedResponseBody.new(chunks))
       ensure
         body&.close
+      end
+
+      def register_pending_result(result)
+        @pending_results_mutex.synchronize { @pending_results[result] = true }
+      end
+
+      def unregister_pending_result(result)
+        @pending_results_mutex.synchronize { @pending_results.delete(result) }
+      end
+
+      def notify_pending_results(error)
+        results = @pending_results_mutex.synchronize { @pending_results.keys }
+        results.each { |result| result << [:error, error] }
+      end
+
+      def worker_thread_exited_error
+        ConnectionError.new("renderer HTTP client worker thread exited before completing request")
       end
     end
 
@@ -685,32 +698,56 @@ module ReactOnRailsPro
     end
 
     def persistent_thread_client
-      stale_clients = nil
-      client_to_close = nil
-      client = begin
-        @thread_clients_mutex.synchronize do
+      stale_clients = []
+      clients_to_close = []
+      new_client = nil
+      begin
+        loop do
+          client, swept_clients = cached_thread_client
+          stale_clients.concat(swept_clients)
+          return client if client
+
+          new_client = build_persistent_thread_client
+          client, swept_clients, rejected_client = store_thread_client(new_client)
+          new_client = nil
+          stale_clients.concat(swept_clients)
+          clients_to_close << rejected_client if rejected_client
+          return client if client
+
           raise_if_closed_threadsafe
-
-          stale_clients = sweep_dead_thread_clients
-          @thread_clients[Thread.current] || begin
-            endpoint = endpoint_for(@origin)
-            new_client = PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
-
-            if closed?
-              client_to_close = new_client
-              nil
-            else
-              @thread_clients[Thread.current] = new_client
-            end
-          end
         end
       ensure
-        close_stale_clients(stale_clients, context: "dead no-scheduler client sweep") if stale_clients
+        close_stale_clients(stale_clients, context: "dead no-scheduler client sweep") if stale_clients.any?
+        close_stale_clients(clients_to_close, context: "late no-scheduler client close") if clients_to_close.any?
+        close_stale_clients([new_client], context: "abandoned no-scheduler client close") if new_client
       end
-      close_stale_clients([client_to_close], context: "late no-scheduler client close") if client_to_close
-      raise_if_closed_threadsafe unless client
+    end
 
-      client
+    def cached_thread_client
+      @thread_clients_mutex.synchronize do
+        raise_if_closed_threadsafe
+
+        stale_clients = sweep_dead_thread_clients
+        [@thread_clients[Thread.current], stale_clients]
+      end
+    end
+
+    def build_persistent_thread_client
+      endpoint = endpoint_for(@origin)
+      PersistentThreadClient.new(endpoint:, protocol: endpoint.protocol, pool_limit:)
+    end
+
+    def store_thread_client(new_client)
+      @thread_clients_mutex.synchronize do
+        return [nil, [], new_client] if closed?
+
+        stale_clients = sweep_dead_thread_clients
+        existing_client = @thread_clients[Thread.current]
+        return [existing_client, stale_clients, new_client] if existing_client
+
+        @thread_clients[Thread.current] = new_client
+        [new_client, stale_clients, nil]
+      end
     end
 
     def evict_client_from_scheduler(scheduler)

@@ -990,6 +990,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       dead_worker.join
 
       persistent_client.instance_variable_set(:@queue, Queue.new)
+      persistent_client.instance_variable_set(:@pending_results, {}.compare_by_identity)
+      persistent_client.instance_variable_set(:@pending_results_mutex, Mutex.new)
       persistent_client.instance_variable_set(:@closed, false)
       persistent_client.instance_variable_set(:@closed_mutex, Mutex.new)
       persistent_client.instance_variable_set(:@thread, dead_worker)
@@ -999,6 +1001,27 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
           persistent_client.__send__(:request, :get, "/render", headers: {}, body: nil)
         end
       end.to raise_error(ReactOnRailsPro::RendererHttpClient::ConnectionError, /worker thread exited/)
+    end
+
+    it "waits on the request result queue without polling the worker thread" do
+      persistent_client = described_class::PersistentThreadClient.allocate
+      result = Queue.new
+      producer = nil
+      worker_thread = instance_double(Thread)
+      allow(worker_thread).to receive(:alive?).and_return(true)
+      allow(worker_thread).to receive(:join).and_raise("polling join called")
+      persistent_client.instance_variable_set(:@thread, worker_thread)
+
+      producer = Thread.new do
+        sleep 0.02
+        result << %i[ok done]
+      end
+
+      response = Timeout.timeout(0.2) { persistent_client.__send__(:wait_for_request_result, result) }
+
+      expect(response).to eq(%i[ok done])
+    ensure
+      producer&.join
     end
 
     it "does not hold the close-state mutex while bootstrapping a persistent client" do
@@ -1025,6 +1048,39 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       finish_bootstrap << true
       expect(worker.value).to be(current_client)
+    end
+
+    it "does not hold the thread-client hash mutex while bootstrapping persistent clients" do
+      stub_const("ConcurrentBootstrapThreadClient", Class.new do
+        def alive?
+          true
+        end
+
+        def close; end
+      end)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      bootstrap_started = Queue.new
+      finish_bootstrap = Queue.new
+      workers = []
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(described_class::PersistentThreadClient).to receive(:new) do
+        bootstrap_started << Thread.current
+        finish_bootstrap.pop
+        ConcurrentBootstrapThreadClient.new
+      end
+
+      workers = Array.new(2) { Thread.new { client.__send__(:persistent_thread_client) } }
+      started_threads = Array.new(2) { Timeout.timeout(0.2) { bootstrap_started.pop } }
+      2.times { finish_bootstrap << true }
+
+      expect(started_threads.uniq.size).to eq(2)
+      expect(workers.map(&:value).size).to eq(2)
+      expect(described_class::PersistentThreadClient).to have_received(:new).twice
+    ensure
+      2.times { finish_bootstrap << true } if finish_bootstrap
+      workers.each(&:join)
     end
 
     it "attempts to close every persistent no-scheduler client before re-raising close errors" do
