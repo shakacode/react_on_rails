@@ -26,9 +26,11 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::Cache.fetch_react_component(
       component_name,
       options,
-      on_cache_hit: lambda do |cached_component_name, cached_options|
-        load_pack_for_cached_react_component(cached_component_name, cached_options)
-      end,
+      {
+        on_cache_hit: lambda do |cached_component_name, cached_options|
+          load_pack_for_cached_react_component(cached_component_name, cached_options)
+        end
+      },
       &
     )
   end
@@ -53,13 +55,12 @@ module ReactOnRailsProHelper
   def cached_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      cache_options = options_with_auto_load_bundle(raw_options)
 
-      fetch_react_component(component_name, raw_options) do
-        sanitized_options = raw_options
+      fetch_react_component(component_name, cache_options) do
+        sanitized_options = cache_options.dup
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
-        sanitized_options[:auto_load_bundle] =
-          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component(component_name, sanitized_options)
       end
     end
@@ -87,13 +88,12 @@ module ReactOnRailsProHelper
 
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      cache_options = options_with_auto_load_bundle(raw_options)
 
-      fetch_react_component(component_name, raw_options) do
-        sanitized_options = raw_options
+      fetch_react_component(component_name, cache_options) do
+        sanitized_options = cache_options.dup
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
-        sanitized_options[:auto_load_bundle] =
-          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component_hash(component_name, sanitized_options)
       end
     end
@@ -398,6 +398,12 @@ module ReactOnRailsProHelper
       options:
     )
     load_pack_for_generated_component(component_name, render_options)
+  end
+
+  def options_with_auto_load_bundle(raw_options)
+    raw_options.merge(
+      auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+    )
   end
 
   def fetch_stream_react_component(component_name, raw_options, &)
