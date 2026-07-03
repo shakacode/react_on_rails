@@ -1043,13 +1043,13 @@ describe ReactOnRailsProHelper do
           cache_key: "first-stream-cache-key",
           chunks: ["first chunk"],
           normalized_cache_tags: ["first-tag"],
-          cache_options: { expires_in: 60 }
+          raw_cache_options: { expires_in: 60 }
         }
         second_write = {
           cache_key: "second-stream-cache-key",
           chunks: ["second chunk"],
           normalized_cache_tags: ["second-tag"],
-          cache_options: { expires_in: 60 }
+          raw_cache_options: { expires_in: 60 }
         }
         write_options = { expires_in: 60 }
 
@@ -1079,7 +1079,7 @@ describe ReactOnRailsProHelper do
           cache_key: "completed-stream-cache-key",
           chunks: ["completed chunk"],
           normalized_cache_tags: ["completed-tag"],
-          cache_options: { expires_in: 60 }
+          raw_cache_options: { expires_in: 60 }
         }
         write_options = { expires_in: 60 }
 
@@ -1101,7 +1101,7 @@ describe ReactOnRailsProHelper do
           .with(["completed-tag"], "completed-stream-cache-key", write_options)
       end
 
-      it "defers stream cache writes and registers tags with the write options captured at completion time" do
+      it "defers stream cache writes and registers tags with the write options captured at flush time" do
         raw_cache_options = { expires_in: 60 }
         write_cache_options = { expires_in: 45 }
         captured_on_complete = nil
@@ -1130,7 +1130,7 @@ describe ReactOnRailsProHelper do
 
         captured_on_complete.call(["chunk"])
 
-        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+        expect(ReactOnRailsPro::Cache).not_to have_received(:cache_write_options)
         expect(Rails.cache).not_to have_received(:write)
         expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
 
@@ -1178,7 +1178,7 @@ describe ReactOnRailsProHelper do
 
       it "keeps stream cache expires_at absolute when deferred flush is delayed" do
         completion_time = Time.now
-        expires_at = completion_time + 5
+        expires_at = completion_time + 15
         raw_cache_options = { expires_at: }
         captured_on_complete = nil
 
@@ -1210,6 +1210,75 @@ describe ReactOnRailsProHelper do
           .with("stream-cache-key", ["chunk"], { expires_at: })
         expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
           .with(["stream-tag"], "stream-cache-key", { expires_at: })
+      end
+
+      it "converts stream cache expires_at at deferred flush time when the cache store lacks expires_at support" do
+        completion_time = Time.now
+        expires_at = completion_time + 15
+        raw_cache_options = { expires_at: }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        allow(Time).to receive(:now).and_return(completion_time + 10)
+        send(:flush_pending_stream_cache_writes)
+
+        expect(Rails.cache).to have_received(:write)
+          .with("stream-cache-key", ["chunk"], hash_including(expires_in: be_within(0.1).of(5)))
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", hash_including(expires_in: be_within(0.1).of(5)))
+      end
+
+      it "does not write stream cache entries whose expires_at passed before deferred flush" do
+        completion_time = Time.now
+        raw_cache_options = { expires_at: completion_time + 5 }
+        captured_on_complete = nil
+
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        allow(Time).to receive(:now).and_return(completion_time + 10)
+        send(:flush_pending_stream_cache_writes)
+
+        expect(@react_on_rails_pending_stream_cache_writes).to be_empty
+        expect(Rails.cache).not_to have_received(:write)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
       end
 
       it "does not queue stream cache entries whose expires_at passed before completion" do

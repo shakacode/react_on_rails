@@ -27,7 +27,7 @@ module ReactOnRailsPro
         cache_key:,
         chunks:,
         normalized_cache_tags:,
-        cache_options: ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+        raw_cache_options: raw_cache_options&.dup || {}
       }
     end
 
@@ -40,7 +40,10 @@ module ReactOnRailsPro
     end
 
     def write(cache_write)
-      cache_options = cache_write[:cache_options]
+      raw_cache_options = cache_write[:raw_cache_options]
+      return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+      cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
       Rails.cache.write(cache_write[:cache_key], cache_write[:chunks], cache_options)
       ReactOnRailsPro::Cache.register_normalized_tags(
         cache_write[:normalized_cache_tags],
