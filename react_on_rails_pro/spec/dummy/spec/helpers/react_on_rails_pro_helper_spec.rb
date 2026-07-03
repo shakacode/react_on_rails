@@ -219,6 +219,68 @@ describe ReactOnRailsProHelper do
             end.to raise_error("Pass 'props' as a block if using caching")
           end
         end
+
+        context "with configured auto_load_bundle" do
+          around do |example|
+            original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+            ReactOnRails.configuration.auto_load_bundle = true
+
+            example.run
+          ensure
+            ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+          end
+
+          it "respects explicit auto_load_bundle false on cache misses" do
+            captured_auto_load_bundle = nil
+
+            allow(self).to receive(:react_component) do |_component_name, options|
+              captured_auto_load_bundle = options[:auto_load_bundle]
+              "<div>rendered component</div>"
+            end
+
+            cached_react_component("App", cache_key: "auto-load-miss", auto_load_bundle: false) do
+              { a: 1, b: 2 }
+            end
+
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "respects explicit auto_load_bundle false on cache hits" do
+            cache_key = "auto-load-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, "<div>cached component</div>")
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "uses the configured auto_load_bundle default when the option is omitted on cache hits" do
+            cache_key = "auto-load-default-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, "<div>cached component</div>")
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component("App", cache_key:) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(true)
+          end
+        end
       end
 
       describe "ReactOnRailsProHelper.cached_react_component_hash" do
@@ -259,6 +321,56 @@ describe ReactOnRailsProHelper do
             end
 
             expect(cache_data.keys.count).to eq(1)
+          end
+        end
+
+        context "with configured auto_load_bundle" do
+          around do |example|
+            original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+            ReactOnRails.configuration.auto_load_bundle = true
+
+            example.run
+          ensure
+            ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+          end
+
+          it "respects explicit auto_load_bundle false on cache misses" do
+            captured_auto_load_bundle = nil
+
+            allow(self).to receive(:react_component_hash) do |_component_name, options|
+              captured_auto_load_bundle = options[:auto_load_bundle]
+              { component_html: "<div>rendered component</div>" }
+            end
+
+            cached_react_component_hash("ReactHelmetApp", cache_key: "hash-auto-load-miss",
+                                                          auto_load_bundle: false) do
+              { helloWorldData: { name: "Mr. Server Side Rendering" } }
+            end
+
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "respects explicit auto_load_bundle false on cache hits" do
+            cache_key = "hash-auto-load-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+              "ReactHelmetApp",
+              cache_key:,
+              prerender: true
+            )
+            cached_hash = { component_html: "<div>cached component</div>" }
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, cached_hash)
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component_hash("ReactHelmetApp", cache_key:, auto_load_bundle: false) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result[:component_html]).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(false)
           end
         end
       end
@@ -1000,6 +1112,25 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      it "respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+          captured_auto_load_bundle = render_options.auto_load_bundle
+        end
+
+        @async_barrier = Async::Barrier.new
+        result = send(:handle_stream_cache_hit, component_name, { auto_load_bundle: false }, false, ["cached chunk"])
+
+        expect(result).to eq("cached chunk")
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        @async_barrier = nil
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
       it "re-renders after revalidate_tag busts the tagged stream cache" do
         mock_request_and_response(count: 2)
         render_with_cached_stream(cache_tags: ["stream-tag"])
@@ -1441,7 +1572,7 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
-      it "uses the configured auto_load_bundle default before the per-call option on cache misses" do
+      it "respects explicit auto_load_bundle false on cache misses" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
         captured_auto_load_bundle = nil
@@ -1464,12 +1595,12 @@ describe ReactOnRailsProHelper do
           end
         end
 
-        expect(captured_auto_load_bundle).to be(true)
+        expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
-      it "uses the configured auto_load_bundle default before the per-call option on cache hits" do
+      it "respects explicit auto_load_bundle false on cache hits" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
         user_cache_key = ["buffered-stream-cache-auto-load-hit", component_name]
@@ -1501,7 +1632,7 @@ describe ReactOnRailsProHelper do
 
         expect(result).to eq("<div>cached buffered stream</div>")
         expect(result).to be_html_safe
-        expect(captured_auto_load_bundle).to be(true)
+        expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
@@ -2400,6 +2531,29 @@ describe ReactOnRailsProHelper do
         # Second call - cache hit
         second_result = cached_async_react_component("App", cache_key: "async-test-hit") { { a: 1 } }
         expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+      end
+
+      it "respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        cache_key = "async-auto-load-hit-#{SecureRandom.hex(4)}"
+        captured_auto_load_bundle = nil
+
+        first_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) { { a: 1 } }
+        first_result.value
+
+        allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+          captured_auto_load_bundle = render_options.auto_load_bundle
+        end
+
+        second_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) do
+          raise "props block should not run on cache hit"
+        end
+
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
       it "caches the rendered component" do

@@ -62,14 +62,16 @@ describe ReactOnRailsPro::Cache, :caching do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)
 
-      react_component_string1 = described_class.fetch_react_component("MyComponent",
-                                                                      if: true,
-                                                                      cache_key: "the_cache_key") do
+      react_component_string1 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: true, cache_key: "the_cache_key" }
+      ) do
         create_component_code.call
       end
-      react_component_string2 = described_class.fetch_react_component("MyComponent",
-                                                                      if: true,
-                                                                      cache_key: "the_cache_key") do
+      react_component_string2 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: true, cache_key: "the_cache_key" }
+      ) do
         create_component_code.call
       end
 
@@ -80,20 +82,40 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(Rails.cache.fetch(string_cache_key)).to eq(result)
     end
 
+    it "keeps keyword-style options compatible for direct callers" do
+      result = "<div>Something</div>"
+      create_component_code = instance_double(TestingCache, call: result)
+
+      react_component_string = described_class.fetch_react_component(
+        "MyComponent",
+        cache_key: "keyword_style_cache_key"
+      ) do
+        create_component_code.call
+      end
+
+      expect(react_component_string).to eq(result)
+      expect(create_component_code).to have_received(:call).once
+      string_cache_key =
+        "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/keyword_style_cache_key"
+      expect(Rails.cache.fetch(string_cache_key)).to eq(result)
+    end
+
     it "fetches the value from the cache if the value is a Hash" do
       html = "<div>Something</div>"
       ssr_result = { component_html: html }
       create_component_code = instance_double(TestingCache, call: ssr_result)
 
-      result1 = described_class.fetch_react_component("MyComponent",
-                                                      if: true,
-                                                      cache_key: "the_cache_key") do
+      result1 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: true, cache_key: "the_cache_key" }
+      ) do
         create_component_code.call
       end
 
-      result2 = described_class.fetch_react_component("MyComponent",
-                                                      if: true,
-                                                      cache_key: "the_cache_key") do
+      result2 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: true, cache_key: "the_cache_key" }
+      ) do
         create_component_code.call
       end
 
@@ -107,18 +129,46 @@ describe ReactOnRailsPro::Cache, :caching do
       expect(Rails.cache.fetch(string_cache_key)[:component_html]).to eq(html)
     end
 
+    it "runs the cache hit callback so callers can load generated packs for cached values" do
+      result = "<div>Something</div>"
+      options = { if: true, cache_key: "the_cache_key", auto_load_bundle: true }
+      create_component_code = instance_double(TestingCache, call: result)
+      cache_hits = []
+
+      fetch_component = lambda do
+        described_class.fetch_react_component(
+          "MyComponent",
+          options,
+          {
+            on_cache_hit: lambda do |hit_component_name, hit_options|
+              cache_hits << [hit_component_name, hit_options]
+            end
+          }
+        ) do
+          create_component_code.call
+        end
+      end
+
+      expect(fetch_component.call).to eq(result)
+      expect(fetch_component.call).to eq(result)
+      expect(create_component_code).to have_received(:call).once
+      expect(cache_hits).to eq([["MyComponent", options]])
+    end
+
     it "fetches the value from the cache if cache_key is a lambda" do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)
 
-      react_component_string1 = described_class.fetch_react_component("MyComponent",
-                                                                      unless: false,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string1 = described_class.fetch_react_component(
+        "MyComponent",
+        { unless: false, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
-      react_component_string2 = described_class.fetch_react_component("MyComponent",
-                                                                      unless: false,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string2 = described_class.fetch_react_component(
+        "MyComponent",
+        { unless: false, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
 
@@ -134,10 +184,14 @@ describe ReactOnRailsPro::Cache, :caching do
       create_component_code = instance_double(TestingCache, call: result)
 
       fetch = lambda do
-        described_class.fetch_react_component("MyComponent",
-                                              cache_key: "the_cache_key",
-                                              cache_tags: ["post:42"],
-                                              cache_options: { expires_in: 3600 }) do
+        described_class.fetch_react_component(
+          "MyComponent",
+          {
+            cache_key: "the_cache_key",
+            cache_tags: ["post:42"],
+            cache_options: { expires_in: 3600 }
+          }
+        ) do
           create_component_code.call
         end
       end
@@ -161,10 +215,14 @@ describe ReactOnRailsPro::Cache, :caching do
       expires_at = Time.now + 3600
       result = "<div>Something</div>"
 
-      described_class.fetch_react_component("MyComponent",
-                                            cache_key: "expires_at_key",
-                                            cache_tags: ["post:42"],
-                                            cache_options: { expires_at: }) do
+      described_class.fetch_react_component(
+        "MyComponent",
+        {
+          cache_key: "expires_at_key",
+          cache_tags: ["post:42"],
+          cache_options: { expires_at: }
+        }
+      ) do
         result
       end
 
@@ -181,10 +239,14 @@ describe ReactOnRailsPro::Cache, :caching do
       create_component_code = instance_double(TestingCache, call: result)
 
       fetch = lambda do
-        described_class.fetch_react_component("MyComponent",
-                                              cache_key: "expired_expires_at_key",
-                                              cache_tags: ["post:42"],
-                                              cache_options: { expires_at: Time.now - 60 }) do
+        described_class.fetch_react_component(
+          "MyComponent",
+          {
+            cache_key: "expired_expires_at_key",
+            cache_tags: ["post:42"],
+            cache_options: { expires_at: Time.now - 60 }
+          }
+        ) do
           create_component_code.call
         end
       end
@@ -204,10 +266,14 @@ describe ReactOnRailsPro::Cache, :caching do
         "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/invalid_tag_key"
 
       expect do
-        described_class.fetch_react_component("MyComponent",
-                                              cache_key: "invalid_tag_key",
-                                              cache_tags: [""],
-                                              cache_options: { expires_in: 3600 }) do
+        described_class.fetch_react_component(
+          "MyComponent",
+          {
+            cache_key: "invalid_tag_key",
+            cache_tags: [""],
+            cache_options: { expires_in: 3600 }
+          }
+        ) do
           "<div>Something</div>"
         end
       end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
@@ -220,10 +286,14 @@ describe ReactOnRailsPro::Cache, :caching do
         "ror_component/#{ReactOnRails::VERSION}/#{ReactOnRailsPro::VERSION}/MyComponent/bare_invalid_tag_key"
 
       expect do
-        described_class.fetch_react_component("MyComponent",
-                                              cache_key: "bare_invalid_tag_key",
-                                              cache_tags: " ",
-                                              cache_options: { expires_in: 3600 }) do
+        described_class.fetch_react_component(
+          "MyComponent",
+          {
+            cache_key: "bare_invalid_tag_key",
+            cache_tags: " ",
+            cache_options: { expires_in: 3600 }
+          }
+        ) do
           "<div>Something</div>"
         end
       end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
@@ -235,14 +305,16 @@ describe ReactOnRailsPro::Cache, :caching do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)
 
-      react_component_string1 = described_class.fetch_react_component("MyComponent",
-                                                                      if: false,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string1 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: false, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
-      react_component_string2 = described_class.fetch_react_component("MyComponent",
-                                                                      if: false,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string2 = described_class.fetch_react_component(
+        "MyComponent",
+        { if: false, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
 
@@ -255,14 +327,16 @@ describe ReactOnRailsPro::Cache, :caching do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)
 
-      react_component_string1 = described_class.fetch_react_component("MyComponent",
-                                                                      unless: true,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string1 = described_class.fetch_react_component(
+        "MyComponent",
+        { unless: true, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
-      react_component_string2 = described_class.fetch_react_component("MyComponent",
-                                                                      unless: true,
-                                                                      cache_key: -> { "the_cache_key" }) do
+      react_component_string2 = described_class.fetch_react_component(
+        "MyComponent",
+        { unless: true, cache_key: -> { "the_cache_key" } }
+      ) do
         create_component_code.call
       end
 

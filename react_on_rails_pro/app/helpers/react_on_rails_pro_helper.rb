@@ -46,38 +46,16 @@ module ReactOnRailsProHelper
   end
 
   def fetch_react_component(component_name, options, &)
-    if ReactOnRailsPro::Cache.use_cache?(options)
-      cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
-      Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-      cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
-      if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
-        return render_expired_cache_miss(cache_key, &)
-      end
-
-      cache_hit = true
-      normalized_cache_tags = []
-      result = Rails.cache.fetch(cache_key, cache_options) do
-        cache_hit = false
-        normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-        yield
-      end
-      ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
-      if cache_hit
-        render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-          react_component_name: component_name,
-          options:
-        )
-        load_pack_for_generated_component(component_name, render_options)
-      end
-      # Pass back the cache key in the results only if the result is a Hash
-      if result.is_a?(Hash)
-        result[:RORP_CACHE_KEY] = cache_key
-        result[:RORP_CACHE_HIT] = cache_hit
-      end
-      result
-    else
-      yield
-    end
+    ReactOnRailsPro::Cache.fetch_react_component(
+      component_name,
+      options,
+      {
+        on_cache_hit: lambda do |cached_component_name, cached_options|
+          load_pack_for_cached_react_component(cached_component_name, cached_options)
+        end
+      },
+      &
+    )
   end
 
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -100,13 +78,12 @@ module ReactOnRailsProHelper
   def cached_react_component(component_name, raw_options = {}, &block)
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      cache_options = options_with_auto_load_bundle(raw_options)
 
-      fetch_react_component(component_name, raw_options) do
-        sanitized_options = raw_options
+      fetch_react_component(component_name, cache_options) do
+        sanitized_options = cache_options.dup
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
-        sanitized_options[:auto_load_bundle] =
-          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component(component_name, sanitized_options)
       end
     end
@@ -134,13 +111,12 @@ module ReactOnRailsProHelper
 
     ReactOnRailsPro::Utils.with_trace(component_name) do
       check_caching_options!(raw_options, block)
+      cache_options = options_with_auto_load_bundle(raw_options)
 
-      fetch_react_component(component_name, raw_options) do
-        sanitized_options = raw_options
+      fetch_react_component(component_name, cache_options) do
+        sanitized_options = cache_options.dup
         sanitized_options[:props] = yield
         sanitized_options[:skip_prerender_cache] = true
-        sanitized_options[:auto_load_bundle] =
-          ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
         react_component_hash(component_name, sanitized_options)
       end
     end
@@ -344,8 +320,7 @@ module ReactOnRailsProHelper
               "use buffered_stream_react_component for chunk callbacks"
       end
 
-      normalized_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
-      render_options = raw_options.merge(auto_load_bundle: normalized_auto_load_bundle)
+      render_options = options_with_auto_load_bundle(raw_options)
       cache_options = render_options.merge(
         cache_key: lambda do
           raw_cache_key = raw_options[:cache_key]
@@ -378,7 +353,7 @@ module ReactOnRailsProHelper
       check_caching_options!(raw_options, block)
       check_cached_static_rsc_options!(raw_options)
 
-      render_options = raw_options.merge(auto_load_bundle: static_rsc_auto_load_bundle(raw_options))
+      render_options = options_with_auto_load_bundle(raw_options)
       cache_options = static_rsc_cache_options(raw_options, render_options)
 
       cached_result = render_cached_static_rsc_component(
@@ -470,18 +445,30 @@ module ReactOnRailsProHelper
 
   private
 
+  def load_pack_for_cached_react_component(component_name, options)
+    render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+      react_component_name: component_name,
+      options:
+    )
+    load_pack_for_generated_component(component_name, render_options)
+  end
+
+  def options_with_auto_load_bundle(raw_options)
+    raw_options.merge(auto_load_bundle: auto_load_bundle_option(raw_options))
+  end
+
+  def auto_load_bundle_option(raw_options)
+    return raw_options[:auto_load_bundle] if raw_options.key?(:auto_load_bundle)
+
+    ReactOnRails.configuration.auto_load_bundle
+  end
+
   def check_cached_static_rsc_options!(raw_options)
     return unless raw_options[:on_complete].respond_to?(:call)
 
     raise ReactOnRailsPro::Error,
           "cached_static_rsc_component does not support on_complete; " \
           "use buffered_stream_react_component for chunk callbacks"
-  end
-
-  def static_rsc_auto_load_bundle(raw_options)
-    return raw_options[:auto_load_bundle] if raw_options.key?(:auto_load_bundle)
-
-    ReactOnRails.configuration.auto_load_bundle
   end
 
   def static_rsc_cache_options(raw_options, render_options)
@@ -587,18 +574,10 @@ module ReactOnRailsProHelper
     unless cache_hit
       ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
     end
-    load_static_rsc_generated_pack_on_cache_hit(component_name, render_options) if cache_hit
+    load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
     result
-  end
-
-  def load_static_rsc_generated_pack_on_cache_hit(component_name, render_options)
-    render_options_object = ReactOnRails::ReactComponent::RenderOptions.new(
-      react_component_name: component_name,
-      options: render_options
-    )
-    load_pack_for_generated_component(component_name, render_options_object)
   end
 
   def strip_static_rsc_payload_scripts(html, diagnostics: nil)
@@ -995,7 +974,7 @@ module ReactOnRailsProHelper
   end
 
   def fetch_stream_react_component(component_name, raw_options, &)
-    auto_load_bundle = ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+    auto_load_bundle = auto_load_bundle_option(raw_options)
 
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
@@ -1018,11 +997,7 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
-    render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-      react_component_name: component_name,
-      options: { auto_load_bundle: }.merge(raw_options)
-    )
-    load_pack_for_generated_component(component_name, render_options)
+    load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
     initial_result, *rest_chunks = cached_chunks
 
@@ -1099,34 +1074,32 @@ module ReactOnRailsProHelper
             "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
     end
 
+    cache_options = options_with_auto_load_bundle(raw_options)
+
     # Check conditional caching (:if / :unless options)
-    unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+    unless ReactOnRailsPro::Cache.use_cache?(cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
-    raw_cache_options = raw_options[:cache_options] || {}
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    raw_cache_options = cache_options[:cache_options] || {}
     if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
 
     # Synchronous cache lookup
-    cached_result = Rails.cache.read(cache_key, cache_options)
+    cached_result = Rails.cache.read(cache_key, cache_write_options)
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
-      render_options = ReactOnRails::ReactComponent::RenderOptions.new(
-        react_component_name: component_name,
-        options: raw_options
-      )
-      load_pack_for_generated_component(component_name, render_options)
+      load_pack_for_cached_react_component(component_name, cache_options)
       return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, &)
+    render_async_react_component_with_cache(component_name, cache_options, cache_key, raw_cache_options, &)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
@@ -1164,20 +1137,11 @@ module ReactOnRailsProHelper
     ReactOnRailsPro::AsyncValue.new(task:)
   end
 
-  def render_expired_cache_miss(cache_key)
-    result = yield
-    if result.is_a?(Hash)
-      result[:RORP_CACHE_KEY] = cache_key
-      result[:RORP_CACHE_HIT] = false
-    end
-    result
-  end
-
   def prepare_async_render_options(raw_options)
     raw_options.merge(
       props: yield,
       skip_prerender_cache: true,
-      auto_load_bundle: ReactOnRails.configuration.auto_load_bundle || raw_options[:auto_load_bundle]
+      auto_load_bundle: auto_load_bundle_option(raw_options)
     )
   end
 
