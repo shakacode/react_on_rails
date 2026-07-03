@@ -242,6 +242,7 @@ test_promote_aborts_when_not_on_release_branch() {
 
   assert_status 1 "$RF_STATUS" "promote wrong-branch status"
   assert_contains "$RF_OUT" "not on release/1.0.0" "promote wrong-branch"
+  assert_not_contains "$RF_OUT" "+ git fetch -- origin" "promote wrong-branch should stop before fetch"
   assert_not_contains "$RF_OUT" "rake release[1.0.0]" "promote wrong-branch should stop before release"
 }
 
@@ -287,6 +288,7 @@ test_promote_aborts_on_dirty_worktree() {
 
   assert_status 1 "$RF_STATUS" "promote dirty status"
   assert_contains "$RF_OUT" "working tree is not clean" "promote dirty"
+  assert_not_contains "$RF_OUT" "+ git fetch -- origin" "promote dirty should stop before fetch"
 }
 
 # --- promote: guard — missing rc tag ---------------------------------------
@@ -528,6 +530,7 @@ test_close_out_aborts_when_not_on_main() {
 
   assert_status 1 "$RF_STATUS" "close-out wrong-branch status"
   assert_contains "$RF_OUT" "not on main" "close-out wrong-branch"
+  assert_not_contains "$RF_OUT" "+ git fetch -- origin" "close-out wrong-branch should stop before fetch"
 }
 
 # --- close-out: guard — dirty tree -----------------------------------------
@@ -540,6 +543,7 @@ test_close_out_aborts_on_dirty_worktree() {
 
   assert_status 1 "$RF_STATUS" "close-out dirty status"
   assert_contains "$RF_OUT" "working tree is not clean" "close-out dirty"
+  assert_not_contains "$RF_OUT" "+ git fetch -- origin" "close-out dirty should stop before fetch"
 }
 
 # --- shared: argument validation -------------------------------------------
@@ -574,6 +578,7 @@ test_help_exits_zero() {
 
   assert_status 0 "$RF_STATUS" "help status"
   assert_contains "$RF_OUT" "Orchestrates the release-train runbook steps 4" "help"
+  assert_contains "$RF_OUT" "still fetches remote refs needed for current-state checks" "help dry-run fetch disclosure"
 }
 
 run_test test_promote_dry_run_prints_commands_and_runs_nothing
