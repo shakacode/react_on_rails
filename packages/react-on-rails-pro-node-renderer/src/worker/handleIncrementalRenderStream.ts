@@ -255,9 +255,7 @@ export async function handleIncrementalRenderStream(
                 suppressUnhandledResponseStartError(onResponseStartPromise);
 
                 if (!continueFlag) {
-                  if (onResponseStartPromise !== null) {
-                    observeResponseStartError(onResponseStartPromise);
-                  }
+                  observeResponseStartError(onResponseStartPromise);
                   return;
                 }
               } catch (err) {
