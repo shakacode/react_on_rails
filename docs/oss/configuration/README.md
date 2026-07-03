@@ -298,7 +298,8 @@ ReactOnRails.configure do |config|
   # 🚫 REMOVED in v17.0.0: `defer_generated_component_packs` now raises NoMethodError at boot.
   # Use `generated_component_packs_loading_strategy` (above) instead:
   #   `defer_generated_component_packs = true`  → `generated_component_packs_loading_strategy = :defer`
-  #   `defer_generated_component_packs = false` → `generated_component_packs_loading_strategy = :sync`
+  #   `defer_generated_component_packs = false` → delete the line (the old `false` was a no-op that
+  #     fell through to the default strategy; set `:sync` only if you relied on synchronous loading).
   # See CHANGELOG.md and the [upgrade guide](../upgrading/upgrading-react-on-rails.md) for more details.
 
   ################################################################################
