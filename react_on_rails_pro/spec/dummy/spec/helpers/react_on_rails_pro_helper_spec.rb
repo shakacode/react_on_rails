@@ -1500,6 +1500,546 @@ describe ReactOnRailsProHelper do
       end
     end
 
+    describe "#cached_static_rsc_component", :caching do
+      around do |example|
+        clear_static_rsc_asset_diagnostic_cache
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+        clear_static_rsc_asset_diagnostic_cache
+      end
+
+      def static_rsc_cache_key
+        ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["static_rsc_component", ["static-rsc-cache-spec", component_name]],
+          prerender: true
+        )
+      end
+
+      def clear_static_rsc_asset_diagnostic_cache
+        ReactOnRailsProHelper.clear_static_rsc_asset_diagnostic_cache!
+      end
+
+      def static_rsc_html
+        <<~HTML
+          <div id="#{component_name}-react-component-0">Static RSC HTML</div>
+          <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"];(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]</script>
+          <script>(self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"]||={"hasErrors":true,"renderingError":{"message":"boom","stack":"stack trace"}}</script>
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</script>
+          <script>console.warn.apply(console, ["[SERVER] static cache warning"]);</script>
+          <script type="application/json" data-react-on-rails-component="StaticRSC">{"value":"component prop mentions REACT_ON_RAILS_RSC_PAYLOADS"}</script>
+          <script>window.ReactOnRailsReveal && window.ReactOnRailsReveal("#{component_name}")</script>
+          <script src="/packs/generated/PublicPageClientEffects.js"></script>
+        HTML
+      end
+
+      it "caches the stripped static HTML and preserves unrelated scripts" do
+        props_calls = 0
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props_calls += 1
+            props
+          end
+        end
+
+        expect(result).to include("Static RSC HTML")
+        expect(result).not_to include("delete (self.REACT_ON_RAILS_RSC_ERRORS")
+        expect(result).not_to include("renderingError")
+        expect(result).not_to include(".push(\"flight chunk\")")
+        expect(result).to include("static cache warning")
+        expect(result).to include("component prop mentions REACT_ON_RAILS_RSC_PAYLOADS")
+        expect(result).to include("ReactOnRailsReveal")
+        expect(result).to include("PublicPageClientEffects.js")
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(static_rsc_cache_key)).to eq(result)
+        expect(props_calls).to eq(1)
+      end
+
+      it "strips RSC scripts without reserializing unrelated markup" do
+        preserved_html = <<~HTML
+          <div data-json='{"angle":"&lt;tag&gt;","amp":"&amp;"}'>
+            <svg viewBox="0 0 10 10"><foreignObject><p data-raw="1 &lt; 2">Keep&nbsp;entity</p></foreignObject></svg>
+          </div>
+        HTML
+        rsc_script = "<SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[\"#{component_name}\"]||=[])" \
+                     ".push(\"flight chunk\")</script\t\n data-ignored>\n"
+        suffix_html = "<section data-tail='keep'>Tail</section>\n"
+        raw_html = "#{preserved_html}#{rsc_script}#{suffix_html}"
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-markup-fidelity", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq("#{preserved_html}\n#{suffix_html}")
+      end
+
+      it "strips RSC scripts after Unicode characters whose case mapping changes length" do
+        raw_html = <<~HTML
+          <p>İstanbul launch page</p>
+          <SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</sCrIpT>
+          <section data-tail="keep">Tail</section>
+        HTML
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-unicode-before-script", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("İstanbul launch page")
+        expect(result).not_to include("REACT_ON_RAILS_RSC_PAYLOADS")
+        expect(result).to include('<section data-tail="keep">Tail</section>')
+      end
+
+      it "warns and diagnoses when malformed script markup aborts RSC script stripping" do
+        raw_html = <<~HTML
+          <div>Static RSC HTML</div>
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")
+          <section data-tail="keep">Tail</section>
+        HTML
+        diagnostics = []
+        result = nil
+
+        expect(Rails.logger).to receive(:warn).with(
+          /React on Rails Pro static RSC payload script stripping aborted: missing closing script tag at character \d+/
+        )
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-malformed-script", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq(raw_html)
+        expect(diagnostics.first[:rsc_payload]).to include(
+          bootstrap_script_count: 0,
+          bootstrap_script_bytes: 0,
+          bootstrap_script_strip_aborted: true,
+          stripped: false
+        )
+      end
+
+      it "avoids cache-key digest work when static RSC diagnostics are disabled" do
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+          expect(self).not_to receive(:static_rsc_cache_key_digest)
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-diagnostics-disabled", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: false,
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+      end
+
+      it "does not evaluate props and respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          Rails.cache.write(static_rsc_cache_key, "<div>cached static rsc</div>", expires_in: 60)
+          allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+            captured_auto_load_bundle = render_options.auto_load_bundle
+          end
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to eq("<div>cached static rsc</div>")
+        expect(result).to be_html_safe
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "respects explicit auto_load_bundle false on cache misses" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>static rsc</div>".html_safe
+          end
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "uses the configured auto_load_bundle default when the option is omitted" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>static rsc</div>".html_safe
+          end
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(true)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "uses a cache namespace separate from cached_buffered_stream_react_component" do
+        buffered_cache_key = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          buffered_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", ["static-rsc-cache-spec", component_name]],
+            prerender: true
+          )
+          Rails.cache.write(buffered_cache_key, "<div>buffered entry</div>", expires_in: 60)
+          allow(self).to receive(:buffered_stream_react_component)
+            .and_return("<div>static rsc entry</div>".html_safe)
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(Rails.cache.read(buffered_cache_key)).to eq("<div>buffered entry</div>")
+        expect(Rails.cache.read(static_rsc_cache_key)).to eq("<div>static rsc entry</div>")
+      end
+
+      it "rejects on_complete because cache hits cannot replay callbacks consistently" do
+        expect do
+          Sync do
+            cached_static_rsc_component(
+              component_name,
+              cache_key: ["static-rsc-cache-on-complete", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: ->(_chunks) {},
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /cached_static_rsc_component does not support on_complete/
+        )
+      end
+
+      it "emits cache and payload diagnostics on misses and hits" do
+        diagnostics = []
+        notifications = []
+        subscriber = ActiveSupport::Notifications.subscribe(
+          "render_static_rsc_component.react_on_rails_pro"
+        ) do |_event_name, _started, _finished, _event_id, payload|
+          notifications << payload
+        end
+
+        render_cached = lambda do
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+        expect(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .once
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          render_cached.call
+          render_cached.call
+        end
+
+        expect(diagnostics.size).to eq(2)
+        expect(notifications.size).to eq(2)
+        expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
+        expect(diagnostics.second[:cache]).to include(enabled: true, hit: true)
+        expect(diagnostics.first[:cache][:key_digest]).to be_present
+        expect(diagnostics.first[:auto_load_bundle]).to be(false)
+        expect(diagnostics.first[:html]).to include(
+          raw_bytes: static_rsc_html.bytesize,
+          cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize
+        )
+        expect(diagnostics.first[:rsc_payload]).to include(
+          bootstrap_script_count: 3,
+          stripped: true
+        )
+        expect(diagnostics.first[:rsc_payload][:bootstrap_script_bytes]).to be_positive
+        expect(diagnostics.second[:rsc_payload]).to include(
+          bootstrap_script_count: nil,
+          bootstrap_script_bytes: nil,
+          stripped: true
+        )
+        expect(diagnostics.second[:client_references]).to include(
+          count: nil,
+          entries: [],
+          unavailable_reason: "cache_hit"
+        )
+        expect(diagnostics.second[:html]).to include(cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize)
+        expect(notifications.first[:component]).to eq(component_name)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "emits diagnostics when auto-load generated pack diagnostics cannot derive a pack name" do
+        diagnostics = []
+        notifications = []
+        invalid_component_name = "Blog/PostCard"
+        subscriber = ActiveSupport::Notifications.subscribe(
+          "render_static_rsc_component.react_on_rails_pro"
+        ) do |_event_name, _started, _finished, _event_id, payload|
+          notifications << payload
+        end
+
+        allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return("<div>static rsc</div>".html_safe)
+
+          cached_static_rsc_component(
+            invalid_component_name,
+            cache_key: ["static-rsc-cache-spec", invalid_component_name],
+            auto_load_bundle: true,
+            id: "blog-post-card-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(diagnostics.size).to eq(1)
+        expect(notifications.size).to eq(1)
+        expect(diagnostics.first[:component]).to eq(invalid_component_name)
+        expect(diagnostics.first[:auto_load_bundle]).to be(true)
+        expect(diagnostics.first[:emitted_assets]).to include(packs: [], js: [], css: [])
+        expect(diagnostics.first[:emitted_assets][:unavailable]).to include(
+          a_hash_including(
+            pack: invalid_component_name,
+            type: :generated_component_pack,
+            reason: /ArgumentError: react_on_rails_preload_links/
+          )
+        )
+        expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "drops manifest asset byte candidates that escape public roots" do
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        FileUtils.mkdir_p(custom_public_root.join("packs-test"))
+
+        shakapacker_config = instance_double(
+          Shakapacker::Configuration,
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
+        )
+        shakapacker_instance = instance_double(Shakapacker::Instance, config: shakapacker_config)
+        allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+
+        expect(send(:static_rsc_asset_path_candidates, "../static-rsc-secret.js")).to be_empty
+        expect(send(:static_rsc_asset_bytes, "../static-rsc-secret.js")).to be_nil
+      ensure
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
+      end
+
+      it "includes best-effort manifest asset and RSC client-reference diagnostics" do
+        diagnostics = []
+        client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        asset_paths = [
+          custom_public_root.join("packs-test/js/vendor-abc123.js"),
+          custom_public_root.join("packs-test/js/public-page-effects.js"),
+          custom_public_root.join("packs-test/css/public-page-effects.css")
+        ]
+
+        FileUtils.mkdir_p(client_manifest_path.dirname)
+        asset_paths.each { |asset_path| FileUtils.mkdir_p(asset_path.dirname) }
+        File.write(client_manifest_path, {
+          "filePathToModuleMetadata" => {
+            "./PublicPageClientEffects.client.jsx" => {
+              "id" => "./PublicPageClientEffects.client.jsx",
+              "chunks" => ["client0"]
+            }
+          },
+          "moduleLoading" => {
+            "prefix" => "/packs-test/js/"
+          }
+        }.to_json)
+        File.write(asset_paths[0], "vendor")
+        File.write(asset_paths[1], "sidecar")
+        File.write(asset_paths[2], "css")
+
+        manifest = instance_double(Shakapacker::Manifest)
+        shakapacker_config = instance_double(
+          Shakapacker::Configuration,
+          integrity: { enabled: false },
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
+        )
+        shakapacker_instance = instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config)
+        allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+        allow(manifest).to receive(:lookup_pack_with_chunks!)
+          .with("generated/PublicPageClientEffects", type: :javascript)
+          .and_return([
+                        { "src" => "/packs-test/js/vendor-abc123.js" },
+                        { "src" => "/packs-test/js/public-page-effects.js" }
+                      ])
+        allow(manifest).to receive(:lookup_pack_with_chunks)
+          .with("generated/PublicPageClientEffects", type: :stylesheet)
+          .and_return([{ "src" => "/packs-test/css/public-page-effects.css" }])
+        allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).and_return(client_manifest_path.to_s)
+        expect(self).to receive(:static_rsc_asset_bytes).exactly(3).times.and_call_original
+
+        render_cached = lambda do
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          render_cached.call
+          render_cached.call
+        end
+
+        expect(diagnostics.size).to eq(2)
+        summary = diagnostics.first
+        expect(diagnostics.second[:cache]).to include(hit: true)
+        expect(diagnostics.second[:emitted_assets]).to eq(summary[:emitted_assets])
+        expect(summary[:emitted_assets][:packs]).to eq(["generated/PublicPageClientEffects"])
+        expect(summary[:emitted_assets][:js]).to include(
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/js/vendor-abc123.js",
+                           bytes: 6),
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/js/public-page-effects.js",
+                           bytes: 7)
+        )
+        expect(summary[:emitted_assets][:css]).to include(
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/css/public-page-effects.css",
+                           bytes: 3)
+        )
+        expect(summary[:client_references]).to include(
+          count: 1,
+          entries: [
+            {
+              name: "./PublicPageClientEffects.client.jsx",
+              chunks: ["client0"],
+              id: "./PublicPageClientEffects.client.jsx"
+            }
+          ]
+        )
+      ensure
+        FileUtils.rm_f(Rails.root.join("tmp/static-rsc-client-manifest.json"))
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
+      end
+    end
+
     describe "cached_stream_react_component integration with RandomValue", :caching do # rubocop:disable RSpec/MultipleMemoizedHelpers
       let(:mocked_stream) { instance_double(ActionController::Live::Buffer) }
 

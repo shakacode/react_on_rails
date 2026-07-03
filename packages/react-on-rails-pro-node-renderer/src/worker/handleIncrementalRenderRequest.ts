@@ -219,7 +219,7 @@ export async function handleIncrementalRenderRequest(
       dependencyBundleTimestamps,
       providedNewBundles: undefined,
       assetsToCopy: undefined,
-      rscStreamObservability: rscStreamObservability === true,
+      rscStreamObservability,
     });
 
     // If we don't get an execution context, it means there was an early error
