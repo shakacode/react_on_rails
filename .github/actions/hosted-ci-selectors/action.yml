@@ -208,10 +208,10 @@ runs:
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
           const shouldRunHostedCi = eventName !== 'pull_request' ||
+            isReleaseTarget ||
             (canDispatchHostedCiForPullRequest && (
               hostedCiRequested ||
-              forceFullHostedCiRequested ||
-              isReleaseTarget
+              forceFullHostedCiRequested
             ));
           const shouldUseFullMatrix = shouldForceFullHostedCi ||
             isPushToMain ||

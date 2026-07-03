@@ -20,8 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Fetch full history so workflow diffs fail closed instead of hiding an unreachable base.
-          fetch-depth: 0
+          # Targeted fetch below handles unreachable bases; ordinary runs stay shallow.
+          fetch-depth: 1
           persist-credentials: false
       # We only download and run Actionlint if there is any difference in GitHub Action workflows
       # https://github.com/rhysd/actionlint/blob/main/docs/usage.md#on-github-actions
@@ -49,7 +49,7 @@ jobs:
             exit 1
           fi
 
-          if printf '%s\n' "$changed_files" | grep -q '^.github/workflows'; then
+          if printf '%s\n' "$changed_files" | grep -q '^\.github/workflows/'; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
             # Pinned fallback used when the GitHub API call fails (rate limit / outage)
             # so the cache key stays stable and the download step still has a version to pin to.

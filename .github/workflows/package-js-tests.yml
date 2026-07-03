@@ -51,8 +51,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Fetch full history so workflow_dispatch can diff against the exact PR base SHA.
-          fetch-depth: 0
+          # Full history is only needed for workflow_dispatch base-SHA reruns.
+          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && '0' || '50' }}
           persist-credentials: false
       - name: Select hosted CI mode
         id: hosted-ci

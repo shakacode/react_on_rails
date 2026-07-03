@@ -38,6 +38,35 @@ jobs:
 
             const headRepoFullName = pr.head.repo?.full_name;
             const repoFullName = `${owner}/${repo}`;
+            const permissionByLogin = new Map();
+
+            async function hasWriteAccessFor(username) {
+              if (!username) {
+                return false;
+              }
+
+              if (permissionByLogin.has(username)) {
+                return permissionByLogin.get(username);
+              }
+
+              let hasWriteAccess = false;
+              try {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username
+                });
+                hasWriteAccess = ['admin', 'write'].includes(permission.permission);
+              } catch (error) {
+                core.warning(
+                  `Unable to verify ${username} write permission for hosted CI label dispatch; ` +
+                    `treating the label event as untrusted: ${error.message || error}`
+                );
+              }
+
+              permissionByLogin.set(username, hasWriteAccess);
+              return hasWriteAccess;
+            }
 
             if (!headRepoFullName || headRepoFullName !== repoFullName) {
               core.setFailed(
@@ -58,12 +87,15 @@ jobs:
               return;
             }
 
-            const isDependabotPr = pr.user?.login === 'dependabot[bot]';
-            if (isDependabotPr) {
-              core.info('Ignoring Dependabot label event because its pull_request token cannot dispatch workflows.');
+            if (!(await hasWriteAccessFor(context.actor))) {
+              core.setFailed(
+                `Unable to dispatch hosted CI from this label event because ${context.actor} does not have write/admin repository permission. ` +
+                  'Use `+ci-run-hosted` or ask a write/admin maintainer to add the hosted CI label.'
+              );
               return;
             }
 
+            const isDependabotPr = pr.user?.login === 'dependabot[bot]';
             const forceFull = currentLabelNames.includes(forceFullHostedCiLabel);
             const inputs = {
               pull_request_base_ref: pr.base.ref,
@@ -79,8 +111,10 @@ jobs:
               ['Assets Precompile Check', 'precompile-check.yml', inputs],
               ['Generator tests', 'examples.yml', inputs],
               ['Playwright E2E Tests', 'playwright.yml', inputs],
-              ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
-              ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+              ...(isDependabotPr ? [] : [
+                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+              ])
             ];
 
             function legacyCompatibleInputs(workflowInputs) {
