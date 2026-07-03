@@ -26,6 +26,7 @@ require "nokogiri"
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
+  STATIC_RSC_SCRIPT_TAG_PATTERN = %r{<script\b[^>]*>.*?</script\s*>}im
 
   def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
@@ -571,17 +572,15 @@ module ReactOnRailsProHelper
     raw_html = html.to_s
     stripped_script_count = 0
     stripped_script_bytes = 0
-    fragment = Nokogiri::HTML5.fragment(raw_html)
 
-    fragment.css("script").each do |script_node|
-      next unless static_rsc_payload_script?(script_node)
+    stripped_html = raw_html.gsub(STATIC_RSC_SCRIPT_TAG_PATTERN) do |script_html|
+      script_node = Nokogiri::HTML5.fragment(script_html).at_css("script")
+      next script_html unless script_node && static_rsc_payload_script?(script_node)
 
       stripped_script_count += 1
-      stripped_script_bytes += script_node.to_html.bytesize
-      script_node.remove
+      stripped_script_bytes += script_html.bytesize
+      ""
     end
-
-    stripped_html = fragment.to_html
 
     diagnostics&.merge!(
       raw_bytes: raw_html.bytesize,

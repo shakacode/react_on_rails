@@ -1467,6 +1467,36 @@ describe ReactOnRailsProHelper do
         expect(props_calls).to eq(1)
       end
 
+      it "strips RSC scripts without reserializing unrelated markup" do
+        preserved_html = <<~HTML
+          <div data-json='{"angle":"&lt;tag&gt;","amp":"&amp;"}'>
+            <svg viewBox="0 0 10 10"><foreignObject><p data-raw="1 &lt; 2">Keep&nbsp;entity</p></foreignObject></svg>
+          </div>
+        HTML
+        rsc_script = <<~HTML
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</script>
+        HTML
+        suffix_html = "<section data-tail='keep'>Tail</section>\n"
+        raw_html = "#{preserved_html}#{rsc_script}#{suffix_html}"
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-markup-fidelity", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq("#{preserved_html}\n#{suffix_html}")
+      end
+
       it "does not evaluate props and respects explicit auto_load_bundle false on cache hits" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
