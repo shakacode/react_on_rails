@@ -49,7 +49,9 @@ module ReactOnRailsPro
           set_backtrace(original_error.backtrace)
         end
       end
-      private_constant :EntryDeletionError
+
+      DeletionResult = Struct.new(:deleted_count, :keys_to_restore, keyword_init: true)
+      private_constant :EntryDeletionError, :DeletionResult
 
       INDEX_KEY_PREFIX = "rorp:tag:v1:"
       # Keep the index entry alive slightly longer than the cache entries it
@@ -289,7 +291,11 @@ module ReactOnRailsPro
 
         def delete_entries_with_restorable_index(tag, key, keys, expires_at)
           Rails.cache.delete(key)
-          delete_entries(keys)
+          deletion_result = delete_entries(keys)
+          if deletion_result.keys_to_restore.any?
+            restore_index_after_revalidation_failure(tag, key, deletion_result.keys_to_restore, expires_at)
+          end
+          deletion_result.deleted_count
         rescue EntryDeletionError => e
           restore_index_after_revalidation_failure(tag, key, e.keys_to_restore, expires_at)
           raise e.original_error
@@ -324,12 +330,12 @@ module ReactOnRailsPro
         # default namespace to avoid prefixing them a second time.
         # delete_multi only exists on ActiveSupport >= 6.1; fall back to
         # per-key deletes on older stores.
-        # Returns an Integer count of deleted cache entries.
+        # Returns the deleted count plus any keys a batch store reports as not deleted.
         def delete_entries(keys)
           if Rails.cache.respond_to?(:delete_multi) && !base_delete_multi?(Rails.cache)
-            coerce_delete_multi_count(Rails.cache.delete_multi(keys, namespace: nil), keys)
+            coerce_delete_multi_result(Rails.cache.delete_multi(keys, namespace: nil), keys)
           else
-            delete_entries_individually(keys)
+            DeletionResult.new(deleted_count: delete_entries_individually(keys), keys_to_restore: [])
           end
         end
 
@@ -348,12 +354,21 @@ module ReactOnRailsPro
           deleted
         end
 
-        def coerce_delete_multi_count(result, keys)
-          return result if result.is_a?(Integer)
-          return [keys.size - result.size, 0].max if result.is_a?(Array)
-          return result.to_i if result.respond_to?(:to_i)
+        def coerce_delete_multi_result(result, keys)
+          return DeletionResult.new(deleted_count: result, keys_to_restore: []) if result.is_a?(Integer)
 
-          0
+          if result.is_a?(Array)
+            keys_to_restore = keys & result
+            return DeletionResult.new(deleted_count: keys.size - keys_to_restore.size, keys_to_restore:)
+          end
+
+          if result.respond_to?(:to_i)
+            deleted_count = result.to_i
+            keys_to_restore = deleted_count < keys.size ? keys : []
+            return DeletionResult.new(deleted_count:, keys_to_restore:)
+          end
+
+          DeletionResult.new(deleted_count: 0, keys_to_restore: keys)
         end
 
         def merged_cache_options(cache_options)

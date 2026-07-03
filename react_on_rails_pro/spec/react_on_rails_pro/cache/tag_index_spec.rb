@@ -353,26 +353,34 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(store.delete_multi_entries_calls).to eq([%w[entry/one entry/two]])
     end
 
-    it "coerces nil delete_multi results from custom stores to zero deletes" do
+    it "restores the index when custom stores return nil delete_multi results" do
       use_batch_delete_store
       Rails.cache.write("entry/one", "one")
       described_class.register(["t"], "entry/one", {})
       allow(Rails.cache).to receive(:delete_multi).with(["entry/one"], namespace: nil).and_return(nil)
 
       expect(described_class.revalidate("t")).to eq(0)
+      expect(index_payload("t")["keys"]).to eq(["entry/one"])
     end
 
-    it "counts deleted entries from custom stores that return undeleted keys" do
+    it "restores undeleted keys reported by custom stores" do
       use_batch_delete_store
       Rails.cache.write("entry/one", "one")
       Rails.cache.write("entry/two", "two")
       described_class.register(["t"], "entry/one", {})
       described_class.register(["t"], "entry/two", {})
-      allow(Rails.cache).to receive(:delete_multi)
-        .with(%w[entry/one entry/two], namespace: nil)
-        .and_return(["entry/two"])
+      original_delete = Rails.cache.method(:delete)
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        expect(keys).to eq(%w[entry/one entry/two])
+        original_delete.call("entry/one", namespace:)
+        ["entry/two"]
+      end
 
       expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to eq("two")
+      expect(index_payload("t")["keys"]).to eq(["entry/two"])
     end
 
     it "returns 0 and does not raise for tags that were never written" do
