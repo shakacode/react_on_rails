@@ -17,6 +17,25 @@ require "English"
 require "erb/util"
 
 module ReactOnRailsPro
+  module StreamCacheWrites
+    module_function
+
+    def flush(pending_writes)
+      Array(pending_writes).each do |cache_write|
+        raw_cache_options = cache_write[:raw_cache_options]
+        next if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+        Rails.cache.write(cache_write[:cache_key], cache_write[:chunks], cache_options)
+        ReactOnRailsPro::Cache.register_normalized_tags(
+          cache_write[:normalized_cache_tags],
+          cache_write[:cache_key],
+          cache_options
+        )
+      end
+    end
+  end
+
   module Stream
     extend ActiveSupport::Concern
 
@@ -64,6 +83,7 @@ module ReactOnRailsPro
         @async_barrier = Async::Barrier.new
         buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         @main_output_queue = Async::LimitedQueue.new(buffer_size)
+        @react_on_rails_pending_stream_cache_writes = []
 
         # Render template - components will start streaming immediately.
         # If a shell error occurs, consumer_stream_async raises PrerenderError here
@@ -85,6 +105,7 @@ module ReactOnRailsPro
 
         drain_streams_concurrently(parent_task)
         write_rsc_stream_observability_mark
+        flush_pending_stream_cache_writes
         # Do not close the response stream in an ensure block.
         # If an error occurs we may need the stream open to send diagnostic/error details
         # (for example, ApplicationController#rescue_from in the dummy app).
@@ -99,6 +120,7 @@ module ReactOnRailsPro
         raise
       end
     ensure
+      @react_on_rails_pending_stream_cache_writes = nil
       restore_rsc_stream_observability_state(previous_rsc_stream_observability_state)
     end
 
@@ -240,6 +262,12 @@ module ReactOnRailsPro
 
       nonce = content_security_policy_nonce
       nonce.present? ? %( nonce="#{ERB::Util.html_escape(nonce)}") : ""
+    end
+
+    def flush_pending_stream_cache_writes
+      ReactOnRailsPro::StreamCacheWrites.flush(@react_on_rails_pending_stream_cache_writes)
+    ensure
+      @react_on_rails_pending_stream_cache_writes&.clear
     end
 
     # Drains all streaming tasks concurrently using a producer-consumer pattern.

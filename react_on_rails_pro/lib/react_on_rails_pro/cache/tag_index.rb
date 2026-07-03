@@ -29,12 +29,13 @@ module ReactOnRailsPro
     #   limits. The payload holds the expanded entry keys written under that
     #   tag plus the index entry's own absolute expiry so concurrent writers can
     #   merge to the max TTL.
-    # - Appends are a plain read-modify-write. ActiveSupport::Cache has no
-    #   atomic set-append, so concurrent appends under the same tag can lose an
-    #   index entry (lossy-OK). A lost entry is lost only from the *index* —
-    #   the cached data is intact; it just survives revalidate_tag and expires
-    #   via its own :expires_in. Tag revalidation is therefore best-effort,
-    #   with correctness bounded by :expires_in.
+    # - Appends batch-read existing index entries, then write each updated
+    #   entry with its own TTL. ActiveSupport::Cache has no atomic set-append,
+    #   so concurrent appends under the same tag can lose an index entry
+    #   (lossy-OK). A lost entry is lost only from the *index* — the cached data
+    #   is intact; it just survives revalidate_tag and expires via its own
+    #   :expires_in. Tag revalidation is therefore best-effort, with
+    #   correctness bounded by :expires_in.
     # - A missing or evicted index entry means "nothing to revalidate" — never
     #   an error. This also covers :null_store and per-process :memory_store.
     # rubocop:disable Metrics/ClassLength
@@ -82,7 +83,7 @@ module ReactOnRailsPro
           entry_options = merged_cache_options(cache_options)
           entry_key = normalized_entry_key(cache_key, cache_options)
           warn_if_expires_in_missing(entry_options, entry_key)
-          normalized_tags.uniq.each { |tag| append_entry_key(tag, entry_key, entry_options) }
+          append_entry_keys(normalized_tags.uniq, entry_key, entry_options)
         end
 
         # Deletes every cache entry recorded under the given tags, then the
@@ -172,21 +173,37 @@ module ReactOnRailsPro
                 "Save the record before using it as a cache tag, or use an explicit String tag."
         end
 
-        def append_entry_key(tag, entry_key, cache_options)
-          key = index_key(tag)
-          keys, existing_expires_at = read_index(key)
-          # De-dup while keeping the entry key in last (most recent) position.
-          keys.delete(entry_key)
-          keys << entry_key
-          enforce_max_keys(tag, keys)
-
+        def append_entry_keys(tags, entry_key, cache_options)
+          keys_by_tag = tags.to_h { |tag| [tag, index_key(tag)] }
+          existing_indexes = read_indexes(keys_by_tag.values)
           now = Time.now.to_f
-          expires_at = [existing_expires_at, now + index_ttl(cache_options)].compact.max
-          write_index(key, keys, expires_at)
+          entry_expires_at = now + index_ttl(cache_options)
+
+          tags.each do |tag|
+            key = keys_by_tag[tag]
+            keys, existing_expires_at = existing_indexes.fetch(key)
+            # De-dup while keeping the entry key in last (most recent) position.
+            keys.delete(entry_key)
+            keys << entry_key
+            enforce_max_keys(tag, keys)
+
+            expires_at = [existing_expires_at, entry_expires_at].compact.max
+            write_index(key, keys, expires_at)
+          end
         end
 
         def read_index(key)
-          payload = Rails.cache.read(key)
+          parse_index_payload(Rails.cache.read(key))
+        end
+
+        def read_indexes(keys)
+          return keys.to_h { |key| [key, read_index(key)] } if keys.one? || !Rails.cache.respond_to?(:read_multi)
+
+          payloads = Rails.cache.read_multi(*keys)
+          keys.to_h { |key| [key, parse_index_payload(payloads[key])] }
+        end
+
+        def parse_index_payload(payload)
           case payload
           when Hash
             [Array(payload["keys"]), payload["expires_at"]&.to_f]

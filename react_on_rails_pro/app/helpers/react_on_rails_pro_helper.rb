@@ -1044,18 +1044,14 @@ module ReactOnRailsProHelper
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     raw_cache_options = raw_options[:cache_options] || {}
-    tag_index_cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        next if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-
-        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-        Rails.cache.write(view_cache_key, chunks, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(
-          normalized_cache_tags,
-          view_cache_key,
-          tag_index_cache_options
-        )
+        (@react_on_rails_pending_stream_cache_writes ||= []) << {
+          cache_key: view_cache_key,
+          chunks:,
+          normalized_cache_tags:,
+          raw_cache_options:
+        }
       }
     )
 
@@ -1122,7 +1118,7 @@ module ReactOnRailsProHelper
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, cache_options, &)
+    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, &)
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
@@ -1142,7 +1138,6 @@ module ReactOnRailsProHelper
     raw_options,
     cache_key,
     raw_cache_options,
-    cache_options_at_miss,
     &
   )
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
@@ -1153,7 +1148,7 @@ module ReactOnRailsProHelper
       unless ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
         cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
         Rails.cache.write(cache_key, result, cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options_at_miss)
+        ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options)
       end
       result
     end
