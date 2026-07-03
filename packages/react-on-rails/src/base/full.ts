@@ -3,20 +3,13 @@
  * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/full`.
  */
 
-import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
-import type { ReactOnRailsInternal, RenderParams, ErrorOptions, RenderingError } from '../types/index.ts';
-import handleError from '../handleError.ts';
-import serverRenderReactComponent from '../serverRenderReactComponent.ts';
-import { buildLengthPrefixedResult } from '../serverRenderUtils.ts';
+// This is a thin compatibility shim: the SSR implementations live in `capabilities/ssr.ts`
+// (`createSSRCapability`). This file composes them onto the base client object, preserving
+// the historical `createBaseFullObject` surface old Pro consumers rely on.
 
-// Warn about bundle size when included in browser bundles
-if (typeof window !== 'undefined') {
-  console.warn(
-    'Optimization opportunity: "react-on-rails" includes ~14KB of server-rendering code. ' +
-      'Browsers may not need it. See https://forum.shakacode.com/t/how-to-use-different-versions-of-a-file-for-client-and-server-rendering/1352 ' +
-      '(Requires creating a free account). Click this for the stack trace.',
-  );
-}
+import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
+import type { ReactOnRailsInternal } from '../types/index.ts';
+import { createSSRCapability } from '../capabilities/ssr.ts';
 
 /**
  * SSR-specific functions that extend the base client object to create a full object.
@@ -43,29 +36,9 @@ export function createBaseFullObject(
   // Get or create client object (with caching logic)
   const clientObject = createBaseClientObject(registries, currentObject);
 
-  // Define SSR-specific functions with proper types
-  // This object acts as a type-safe specification of what we're adding to the base object
-  const reactOnRailsFullSpecificFunctions: ReactOnRailsFullSpecificFunctions = {
-    handleError(options: ErrorOptions): string | undefined {
-      return handleError(options);
-    },
-
-    serverRenderReactComponent(options: RenderParams): null | string | Promise<string> {
-      return serverRenderReactComponent(options);
-    },
-
-    prepareRenderResult(
-      html: string,
-      consoleReplayScript: string,
-      hasErrors: boolean,
-      renderingError: RenderingError | null,
-    ): string {
-      return buildLengthPrefixedResult(html, consoleReplayScript, {
-        hasErrors,
-        error: renderingError ?? undefined,
-      });
-    },
-  };
+  // Delegate the SSR-specific functions to `createSSRCapability` (the canonical source).
+  // Typed to ReactOnRailsFullSpecificFunctions so we add exactly the SSR surface, nothing more.
+  const reactOnRailsFullSpecificFunctions: ReactOnRailsFullSpecificFunctions = createSSRCapability();
 
   // Type assertion is safe here because:
   // 1. We start with BaseClientObjectType (from createBaseClientObject)
