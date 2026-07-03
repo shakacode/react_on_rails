@@ -3,8 +3,13 @@
  * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/full`.
  */
 
+// This is a thin compatibility shim: the RSC SSR stubs live in `capabilities/ssr.rsc.ts`
+// (`createSSRCapability`). This file composes them onto the base client object, preserving
+// the historical `createBaseFullObject` surface old Pro consumers rely on.
+
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
 import type { BaseFullObjectType, ReactOnRailsFullSpecificFunctions } from './full.ts';
+import { createSSRCapability } from '../capabilities/ssr.rsc.ts';
 
 export type * from './full.ts';
 
@@ -15,21 +20,9 @@ export function createBaseFullObject(
   // Get or create client object (with caching logic)
   const clientObject = createBaseClientObject(registries, currentObject);
 
-  // Define SSR-specific functions with proper types
-  // This object acts as a type-safe specification of what we're adding to the base object
-  const reactOnRailsFullSpecificFunctions: ReactOnRailsFullSpecificFunctions = {
-    handleError() {
-      throw new Error('"handleError" function is not supported in RSC bundle');
-    },
-
-    serverRenderReactComponent() {
-      throw new Error('"serverRenderReactComponent" function is not supported in RSC bundle');
-    },
-
-    prepareRenderResult() {
-      throw new Error('"prepareRenderResult" function is not supported in RSC bundle');
-    },
-  };
+  // Delegate the RSC SSR stubs to `createSSRCapability` (the canonical source).
+  // Typed to ReactOnRailsFullSpecificFunctions so we add exactly the SSR surface, nothing more.
+  const reactOnRailsFullSpecificFunctions: ReactOnRailsFullSpecificFunctions = createSSRCapability();
 
   // Type assertion is safe here because:
   // 1. We start with BaseClientObjectType (from createBaseClientObject)

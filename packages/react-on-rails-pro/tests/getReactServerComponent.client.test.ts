@@ -163,6 +163,21 @@ describe('fetchRSC HTTP responses', () => {
     );
   });
 
+  it('returns a rejected promise for synchronous request preparation failures', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+
+    await expect(
+      fetchRSC({
+        componentName: 'BrokenPropsPanel',
+        componentProps: circularProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      }),
+    ).rejects.toThrow('Failed to prepare RSC request for component "BrokenPropsPanel"');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('warns when a fetched length-prefixed response ends mid-record', async () => {
     const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
     const { fetchRSC } = await loadClientModule(createFromReadableStream);

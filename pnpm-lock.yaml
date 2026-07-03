@@ -313,9 +313,6 @@ importers:
       '@babel/core':
         specifier: ^7.29.6
         version: 7.29.7
-      '@babel/eslint-parser':
-        specifier: ^7.27.0
-        version: 7.28.5(@babel/core@7.29.7)(eslint@9.39.1(jiti@2.6.1))
       '@babel/preset-env':
         specifier: ^7.20.2
         version: 7.28.5(@babel/core@7.29.7)
@@ -376,24 +373,15 @@ importers:
       babel-jest:
         specifier: ^29.7.0
         version: 29.7.0(@babel/core@7.29.7)
-      form-auto-content:
-        specifier: ^3.2.1
-        version: 3.2.1
       form-data:
         specifier: ^4.0.6
         version: 4.0.6
       jest-junit:
         specifier: ^16.0.0
         version: 16.0.0
-      jsdom:
-        specifier: ^16.5.0
-        version: 16.7.0
       node-html-parser:
         specifier: ^7.0.1
         version: 7.0.1
-      nps:
-        specifier: ^5.9.12
-        version: 5.10.0
       pino-pretty:
         specifier: ^13.0.0
         version: 13.1.2
@@ -5995,10 +5983,6 @@ packages:
   foreground-child@3.3.1:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==}
     engines: {node: '>=14'}
-
-  form-auto-content@3.2.1:
-    resolution: {integrity: sha512-e9dajOhS0QbfNUpwHUTd/2o64jqeWPft/JByATwxSJb0vpV2siT1k3FnnNyntm2ZBpH+bfA6JTpvjvTZtDhmEw==}
-    engines: {node: '>=14.0.0'}
 
   form-data@3.0.4:
     resolution: {integrity: sha512-f0cRzm6dkyVYV3nPoooP8XlccPQukegwhAnpoLcXy+X+A8KfpGOoXwDr9FLZd3wzgLaBGQBE3lY93Zm/i1JvIQ==}
@@ -16997,11 +16981,6 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
-
-  form-auto-content@3.2.1:
-    dependencies:
-      fast-querystring: 1.1.2
-      form-data: 4.0.6
 
   form-data@3.0.4:
     dependencies:
