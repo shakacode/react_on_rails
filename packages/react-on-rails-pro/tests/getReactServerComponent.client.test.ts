@@ -31,7 +31,13 @@ const loadClientModule = async (createFromReadableStream = jest.fn()) => {
 };
 
 const fetchMock = fetch as jest.MockedFunction<typeof fetch>;
+const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+const toLengthPrefixedRecord = (content: string, metadata: Record<string, unknown> = {}) => {
+  const contentBytes = encoder.encode(content);
+  return `${JSON.stringify(metadata)}\t${contentBytes.length.toString(16)}\n${content}`;
+};
 
 const readStreamText = async (stream: ReadableStream<Uint8Array>) => {
   const reader = stream.getReader();
@@ -170,6 +176,29 @@ describe('fetchRSC HTTP responses', () => {
       }),
     ).rejects.toThrow('Failed to prepare RSC request for component "BrokenPropsPanel"');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('warns when a fetched length-prefixed response ends mid-record', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { fetchRSC } = await loadClientModule(createFromReadableStream);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const completeRecord = toLengthPrefixedRecord('truncated Flight payload');
+    fetchMock.mockResolvedValue(createWebResponseFromText(completeRecord.slice(0, -1)));
+
+    try {
+      await expect(
+        fetchRSC({
+          componentName: 'TruncatedPanel',
+          componentProps: {},
+          rscPayloadGenerationUrlPath: '/rsc_payload',
+        }),
+      ).resolves.toBe('');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

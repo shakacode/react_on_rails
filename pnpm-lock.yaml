@@ -222,12 +222,12 @@ importers:
 
   packages/create-react-on-rails-app:
     dependencies:
-      chalk:
-        specifier: ^4.1.2
-        version: 4.1.2
       commander:
         specifier: ^12.1.0
         version: 12.1.0
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
     devDependencies:
       '@types/node':
         specifier: ^20.17.16

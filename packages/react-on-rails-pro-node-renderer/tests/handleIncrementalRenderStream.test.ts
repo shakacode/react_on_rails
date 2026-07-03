@@ -101,6 +101,12 @@ function createMockResponse(): ResponseResult {
 }
 
 describe('handleIncrementalRenderStream', () => {
+  async function waitForPromiseRejectionHandlers() {
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+  }
+
   describe('size limits', () => {
     it('rejects request exceeding total size limit (100MB)', async () => {
       // Create chunks that total > 100MB, with newlines to avoid hitting line limit
@@ -383,6 +389,32 @@ describe('handleIncrementalRenderStream', () => {
       // onRequestEnded is NOT called because the function returns early
       expect(onRequestEnded).not.toHaveBeenCalled();
     });
+
+    it('reports rejected response-start promises when shouldContinue is false', async () => {
+      const responseStartError = new Error('client closed while sending response');
+      const responseStartPromise = Promise.reject(responseStartError);
+      responseStartPromise.catch(() => {});
+
+      const mockRequest = createMockStream([Buffer.from(`${JSON.stringify({ id: 1, type: 'initial' })}\n`)]);
+      const onRenderRequestReceived = jest.fn().mockResolvedValue({
+        response: createMockResponse(),
+        shouldContinue: false,
+      });
+      const errorSpy = jest.spyOn(errorReporter, 'error').mockImplementation(() => {});
+
+      await handleIncrementalRenderStream({
+        request: mockRequest,
+        onRenderRequestReceived,
+        onResponseStart: jest.fn().mockReturnValue(responseStartPromise),
+        onUpdateReceived: jest.fn(),
+        onRequestEnded: jest.fn(),
+      });
+      await waitForPromiseRejectionHandlers();
+
+      expect(errorSpy).toHaveBeenCalledWith(responseStartError);
+
+      errorSpy.mockRestore();
+    });
   });
 
   describe('empty lines in NDJSON', () => {
@@ -631,6 +663,41 @@ describe('handleIncrementalRenderStream', () => {
       expect(onRequestEnded).not.toHaveBeenCalled();
     });
 
+    it('reports rejected response-start promises when the request stream errors after the response starts', async () => {
+      const responseStartError = new Error('client closed while streaming response');
+      const responseStartPromise = Promise.reject(responseStartError);
+      responseStartPromise.catch(() => {});
+      const streamError = new Error('ECONNRESET: connection reset by peer');
+      const mockRequest = {
+        raw: {
+          async *[Symbol.asyncIterator]() {
+            yield Buffer.from(`${JSON.stringify({ id: 1 })}\n`);
+            throw streamError;
+          },
+        },
+      };
+      const onRenderRequestReceived = jest.fn().mockResolvedValue({
+        response: createMockResponse(),
+        shouldContinue: true,
+      });
+      const errorSpy = jest.spyOn(errorReporter, 'error').mockImplementation(() => {});
+
+      await expect(
+        handleIncrementalRenderStream({
+          request: mockRequest,
+          onRenderRequestReceived,
+          onResponseStart: jest.fn().mockReturnValue(responseStartPromise),
+          onUpdateReceived: jest.fn(),
+          onRequestEnded: jest.fn(),
+        }),
+      ).rejects.toThrow(/ECONNRESET/);
+      await waitForPromiseRejectionHandlers();
+
+      expect(errorSpy).toHaveBeenCalledWith(responseStartError);
+
+      errorSpy.mockRestore();
+    });
+
     it('does not call onRequestEnded when stream errors before first object', async () => {
       const mockRequest = {
         raw: {
@@ -678,6 +745,60 @@ describe('handleIncrementalRenderStream', () => {
       });
 
       expect(onRequestEnded).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports response-start rejections when onRequestEnded fails', async () => {
+      const responseStartError = new Error('response send failed');
+      const requestEndedError = new Error('request cleanup failed');
+      const mockRequest = createMockStream([Buffer.from(`${JSON.stringify({ id: 1 })}\n`)]);
+      const onRenderRequestReceived = jest.fn().mockResolvedValue({
+        response: createMockResponse(),
+        shouldContinue: true,
+      });
+      const errorSpy = jest.spyOn(errorReporter, 'error').mockImplementation(() => {});
+
+      await expect(
+        handleIncrementalRenderStream({
+          request: mockRequest,
+          onRenderRequestReceived,
+          onResponseStart: jest.fn().mockRejectedValue(responseStartError),
+          onUpdateReceived: jest.fn(),
+          onRequestEnded: jest.fn().mockRejectedValue(requestEndedError),
+        }),
+      ).rejects.toThrow(requestEndedError);
+
+      await waitForPromiseRejectionHandlers();
+
+      expect(errorSpy).toHaveBeenCalledWith(responseStartError);
+
+      errorSpy.mockRestore();
+    });
+
+    it('reports and propagates clean-path response-start rejections once', async () => {
+      const responseStartError = new Error('response send failed');
+      const mockRequest = createMockStream([Buffer.from(`${JSON.stringify({ id: 1 })}\n`)]);
+      const onRenderRequestReceived = jest.fn().mockResolvedValue({
+        response: createMockResponse(),
+        shouldContinue: true,
+      });
+      const errorSpy = jest.spyOn(errorReporter, 'error').mockImplementation(() => {});
+
+      await expect(
+        handleIncrementalRenderStream({
+          request: mockRequest,
+          onRenderRequestReceived,
+          onResponseStart: jest.fn().mockRejectedValue(responseStartError),
+          onUpdateReceived: jest.fn(),
+          onRequestEnded: jest.fn(),
+        }),
+      ).rejects.toThrow(responseStartError);
+
+      await waitForPromiseRejectionHandlers();
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith(responseStartError);
+
+      errorSpy.mockRestore();
     });
   });
 });

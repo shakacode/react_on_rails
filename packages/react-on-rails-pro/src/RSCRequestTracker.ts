@@ -22,6 +22,46 @@ import {
 } from 'react-on-rails/types';
 import { extractErrorMessage } from './utils.ts';
 
+const expectedRSCStreamCleanup = Symbol('expectedRSCStreamCleanup');
+const rscStreamTruncationWarningState = Symbol('rscStreamTruncationWarningState');
+
+type ExpectedRSCStreamCleanupReadable = NodeJS.ReadableStream & {
+  [expectedRSCStreamCleanup]?: true;
+};
+
+type RSCStreamTruncationWarningState = {
+  reported: boolean;
+};
+
+type RSCStreamTruncationWarningReadable = NodeJS.ReadableStream & {
+  [rscStreamTruncationWarningState]?: RSCStreamTruncationWarningState;
+};
+
+const markExpectedRSCStreamCleanup = (stream: NodeJS.ReadableStream): void => {
+  const cleanupStream = stream as ExpectedRSCStreamCleanupReadable;
+  cleanupStream[expectedRSCStreamCleanup] = true;
+};
+
+export const hasExpectedRSCStreamCleanup = (stream: NodeJS.ReadableStream): boolean =>
+  (stream as ExpectedRSCStreamCleanupReadable)[expectedRSCStreamCleanup] === true;
+
+const shareRSCStreamTruncationWarningState = (...streams: NodeJS.ReadableStream[]): void => {
+  const state = { reported: false };
+  streams.forEach((stream) => {
+    const warningStream = stream as RSCStreamTruncationWarningReadable;
+    warningStream[rscStreamTruncationWarningState] = state;
+  });
+};
+
+export const shouldReportRSCStreamTruncation = (stream: NodeJS.ReadableStream): boolean => {
+  const state = (stream as RSCStreamTruncationWarningReadable)[rscStreamTruncationWarningState];
+  if (!state) return true;
+  if (state.reported) return false;
+
+  state.reported = true;
+  return true;
+};
+
 /**
  * A captured RSC bundle diagnostic for a single component, recorded during stream parse.
  *
@@ -86,10 +126,12 @@ class RSCRequestTracker {
     this.cleared = true;
     // Destroy the original source streams first: this stops the upstream Rails/API work driving each
     // RSC payload (issue #3885) and cascades to the tee'd destinations via the source's 'close'
-    // handler. Then destroy the tracked tee outputs defensively in case a source already ended.
+    // handler. Then end tracked tee outputs only while their source is still active; if the source
+    // already ended naturally, leave the parser to flush and report genuine truncated records.
     this.sourceStreams.forEach((source, index) => {
       try {
         if (!source.destroyed) {
+          markExpectedRSCStreamCleanup(source);
           source.destroy();
         }
       } catch (error) {
@@ -103,8 +145,10 @@ class RSCRequestTracker {
         // injectRSCPayload); destroying mid-iteration rejects the iterator with "Premature close",
         // which would surface an expected disconnect as a render error (issue #3885). Ending lets the
         // iterator finish cleanly — the source destroy above has already halted upstream production.
+        const sourceStream = this.sourceStreams[index];
         const teeStream = stream as PassThrough;
-        if (!teeStream.writableEnded && !teeStream.destroyed) {
+        if (sourceStream && !sourceStream.readableEnded && !teeStream.writableEnded && !teeStream.destroyed) {
+          markExpectedRSCStreamCleanup(teeStream);
           teeStream.end();
         }
       } catch (error) {
@@ -277,6 +321,8 @@ class RSCRequestTracker {
       // buffer is full.
       const stream1 = new PassThrough();
       const stream2 = new PassThrough();
+      shareRSCStreamTruncationWarningState(stream1, stream2);
+      const sourceStream = stream as Readable;
       stream.on('data', (chunk: Buffer) => {
         stream1.push(chunk);
         stream2.push(chunk);
@@ -295,13 +341,17 @@ class RSCRequestTracker {
       // On destroy without error (e.g., stream.destroy() with no argument), no 'error'
       // event fires so stream1/stream2 are untouched — we end them here to unblock
       // for-await consumers. Destroyed streams (from the error handler) are skipped.
-      (stream as Readable).on('close', () => {
+      sourceStream.on('close', () => {
+        if (!sourceStream.readableEnded && hasExpectedRSCStreamCleanup(sourceStream)) {
+          markExpectedRSCStreamCleanup(stream1);
+          markExpectedRSCStreamCleanup(stream2);
+        }
         if (!stream1.writableEnded && !stream1.destroyed) stream1.end();
         if (!stream2.writableEnded && !stream2.destroyed) stream2.end();
       });
 
       // Track the original source so an aborted request (issue #3885) can stop the upstream work.
-      this.sourceStreams.push(stream as Readable);
+      this.sourceStreams.push(sourceStream);
 
       const streamInfo: RSCPayloadStreamInfo = {
         componentName,

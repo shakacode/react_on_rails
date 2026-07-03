@@ -18,12 +18,15 @@
  */
 
 import { PassThrough, Transform } from 'stream';
+import { text } from 'stream/consumers';
 import type {
   GenerateRSCPayloadFunction,
   RailsContextWithServerComponentMetadata,
 } from 'react-on-rails/types';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
+import transformRSCStream from '../src/transformRSCNodeStream.ts';
+import { flushMacrotasks } from './testUtils.ts';
 
 const HIGHWATER_MARK = 16 * 1024; // Node.js default PassThrough highWaterMark: 16KB
 
@@ -162,6 +165,106 @@ describe('RSCRequestTracker', () => {
 
       expect(data1.length).toBe(totalBytes);
       expect(data2.length).toBe(totalBytes);
+    });
+
+    it('exposes only public tracked stream info fields', async () => {
+      setupSourceStream();
+      const tracker = createTracker();
+
+      await tracker.getRSCPayloadStream('TestComponent', {});
+      const streamInfo = tracker.getRSCPayloadStreams()[0];
+
+      expect(Object.keys(streamInfo).sort()).toEqual(['componentName', 'props', 'stream']);
+      expect(streamInfo).toMatchObject({ componentName: 'TestComponent', props: {} });
+      expect(streamInfo.stream).toBeInstanceOf(PassThrough);
+    });
+
+    it('does not warn when request cleanup ends a transformed RSC stream mid-record', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const source = setupSourceStream();
+      const tracker = createTracker();
+      const stream1 = await tracker.getRSCPayloadStream('TestComponent', {});
+      const transformedStream = transformRSCStream(stream1);
+      const transformedText = text(transformedStream);
+
+      try {
+        source.push(toLengthPrefixedPayload('partial Flight payload').subarray(0, -1));
+        await flushMacrotasks();
+        tracker.clear();
+
+        await expect(transformedText).resolves.toBe('');
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('warns when an upstream close ends a transformed RSC stream mid-record', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const source = setupSourceStream();
+      const tracker = createTracker();
+      const stream1 = await tracker.getRSCPayloadStream('TestComponent', {});
+      const transformedStream = transformRSCStream(stream1);
+      const transformedText = text(transformedStream);
+
+      try {
+        source.push(toLengthPrefixedPayload('partial Flight payload').subarray(0, -1));
+        await flushMacrotasks();
+        source.destroy();
+
+        await expect(transformedText).resolves.toBe('');
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('warns once when both tee consumers flush the same truncated source stream', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const source = setupSourceStream();
+      const tracker = createTracker();
+      const stream1 = await tracker.getRSCPayloadStream('TestComponent', {});
+      const htmlStream = new PassThrough();
+      const transformedText = text(transformRSCStream(stream1));
+      const injectedText = text(injectRSCPayload(htmlStream, tracker, 'test-node'));
+
+      try {
+        source.push(toLengthPrefixedPayload('partial Flight payload').subarray(0, -1));
+        source.push(null);
+        htmlStream.end('<html><body><div>Hello, world!</div></body></html>');
+
+        await Promise.all([transformedText, injectedText]);
+        const incompleteStreamWarnings = warnSpy.mock.calls.filter(([message]) =>
+          String(message).includes('[react_on_rails] Incomplete length-prefixed stream:'),
+        );
+        expect(incompleteStreamWarnings).toHaveLength(1);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('warns when request cleanup follows a naturally ended truncated tee stream', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const source = setupSourceStream();
+      const tracker = createTracker();
+      await tracker.getRSCPayloadStream('TestComponent', {});
+      const stream2 = tracker.getRSCPayloadStreams()[0].stream;
+
+      try {
+        source.push(toLengthPrefixedPayload('partial Flight payload').subarray(0, -1));
+        source.push(null);
+        await flushMacrotasks();
+        tracker.clear();
+
+        await expect(text(transformRSCStream(stream2))).resolves.toBe('');
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     // Tests that the tee handles payloads larger than the default highWaterMark (16KB)

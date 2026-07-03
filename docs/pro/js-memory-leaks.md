@@ -214,7 +214,7 @@ const config = {
   allWorkersRestartInterval: 45,
   // Stagger individual restarts by 6 minutes to avoid downtime
   delayBetweenIndividualWorkerRestarts: 6,
-  // Force-kill workers that don't restart within 30 seconds
+  // Force-kill workers that don't restart within 30 seconds (value is seconds)
   gracefulWorkerRestartTimeout: 30,
 };
 ```
