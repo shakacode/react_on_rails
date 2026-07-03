@@ -333,7 +333,8 @@ module ReactOnRailsPro
         # Returns the deleted count plus any keys a batch store reports as not deleted.
         def delete_entries(keys)
           if Rails.cache.respond_to?(:delete_multi) && !base_delete_multi?(Rails.cache)
-            coerce_delete_multi_result(Rails.cache.delete_multi(keys, namespace: nil), keys)
+            delete_keys = keys.dup
+            coerce_delete_multi_result(Rails.cache.delete_multi(delete_keys, namespace: nil), keys, delete_keys)
           else
             DeletionResult.new(deleted_count: delete_entries_individually(keys), keys_to_restore: [])
           end
@@ -354,11 +355,11 @@ module ReactOnRailsPro
           deleted
         end
 
-        def coerce_delete_multi_result(result, keys)
+        def coerce_delete_multi_result(result, keys, delete_keys = keys)
           return DeletionResult.new(deleted_count: result, keys_to_restore: []) if result.is_a?(Integer)
 
           if result.is_a?(Array)
-            keys_to_restore = keys & result
+            keys_to_restore = reported_keys_to_restore(result, keys, delete_keys)
             return DeletionResult.new(deleted_count: keys.size - keys_to_restore.size, keys_to_restore:)
           end
 
@@ -369,6 +370,13 @@ module ReactOnRailsPro
           end
 
           DeletionResult.new(deleted_count: 0, keys_to_restore: keys)
+        end
+
+        def reported_keys_to_restore(result, keys, delete_keys)
+          reported_keys = result.each_with_object({}) { |reported_key, lookup| lookup[reported_key] = true }
+          keys.each_with_index.filter_map do |key, index|
+            key if reported_keys[key] || reported_keys[delete_keys[index]]
+          end
         end
 
         def merged_cache_options(cache_options)

@@ -383,6 +383,26 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("t")["keys"]).to eq(["entry/two"])
     end
 
+    it "restores original keys when delete_multi reports mutated key names" do
+      use_batch_delete_store
+      Rails.cache.write("entry/one", "one")
+      Rails.cache.write("entry/two", "two")
+      described_class.register(["t"], "entry/one", {})
+      described_class.register(["t"], "entry/two", {})
+      original_delete = Rails.cache.method(:delete)
+
+      allow(Rails.cache).to receive(:delete_multi) do |keys, namespace:|
+        keys.map! { |key| "normalized:#{key}" }
+        original_delete.call("entry/one", namespace:)
+        ["normalized:entry/two"]
+      end
+
+      expect(described_class.revalidate("t")).to eq(1)
+      expect(Rails.cache.read("entry/one")).to be_nil
+      expect(Rails.cache.read("entry/two")).to eq("two")
+      expect(index_payload("t")["keys"]).to eq(["entry/two"])
+    end
+
     it "returns 0 and does not raise for tags that were never written" do
       expect(described_class.revalidate("never-written")).to eq(0)
     end
