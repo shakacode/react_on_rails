@@ -27,6 +27,18 @@ require "nokogiri"
 module ReactOnRailsProHelper
   STATIC_RSC_RENDER_DIAGNOSTIC_EVENT = "render_static_rsc_component.react_on_rails_pro"
   STATIC_RSC_SCRIPT_TAG_PATTERN = %r{<script\b[^>]*>.*?</script\s*>}im
+  STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
+  @static_rsc_asset_diagnostic_cache = {}
+
+  class << self
+    attr_reader :static_rsc_asset_diagnostic_cache
+
+    def clear_static_rsc_asset_diagnostic_cache!
+      STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX.synchronize do
+        @static_rsc_asset_diagnostic_cache = {}
+      end
+    end
+  end
 
   def fetch_react_component(component_name, options, &)
     if ReactOnRailsPro::Cache.use_cache?(options)
@@ -742,11 +754,20 @@ module ReactOnRailsProHelper
 
   def static_rsc_asset_diagnostic_entry(pack_name, source)
     source_path = preload_manifest_source(source)
+    cache_key = [pack_name.to_s, source_path.to_s]
+    cached_entry = STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX.synchronize do
+      ReactOnRailsProHelper.static_rsc_asset_diagnostic_cache[cache_key] ||= {
+        pack: pack_name,
+        name: static_rsc_asset_name(source_path),
+        bytes: static_rsc_asset_bytes(source_path)
+      }.freeze
+    end
+
     {
-      pack: pack_name,
-      name: static_rsc_asset_name(source_path),
+      pack: cached_entry[:pack],
+      name: cached_entry[:name],
       href: static_rsc_asset_href(source),
-      bytes: static_rsc_asset_bytes(source_path)
+      bytes: cached_entry[:bytes]
     }
   end
 

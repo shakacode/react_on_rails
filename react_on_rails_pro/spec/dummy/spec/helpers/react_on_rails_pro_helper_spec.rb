@@ -1408,10 +1408,12 @@ describe ReactOnRailsProHelper do
 
     describe "#cached_static_rsc_component", :caching do
       around do |example|
+        clear_static_rsc_asset_diagnostic_cache
         Rails.cache.clear
         example.run
       ensure
         Rails.cache.clear
+        clear_static_rsc_asset_diagnostic_cache
       end
 
       def static_rsc_cache_key
@@ -1420,6 +1422,10 @@ describe ReactOnRailsProHelper do
           cache_key: ["static_rsc_component", ["static-rsc-cache-spec", component_name]],
           prerender: true
         )
+      end
+
+      def clear_static_rsc_asset_diagnostic_cache
+        ReactOnRailsProHelper.clear_static_rsc_asset_diagnostic_cache!
       end
 
       def static_rsc_html
@@ -1786,11 +1792,9 @@ describe ReactOnRailsProHelper do
           .with("generated/PublicPageClientEffects", type: :stylesheet)
           .and_return([{ "src" => "/packs-test/css/public-page-effects.css" }])
         allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).and_return(client_manifest_path.to_s)
+        expect(self).to receive(:static_rsc_asset_bytes).exactly(3).times.and_call_original
 
-        Sync do
-          stub_pro_bundle_hashes
-          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
-
+        render_cached = lambda do
           cached_static_rsc_component(
             component_name,
             cache_key: ["static-rsc-cache-spec", component_name],
@@ -1804,7 +1808,18 @@ describe ReactOnRailsProHelper do
           end
         end
 
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          render_cached.call
+          render_cached.call
+        end
+
+        expect(diagnostics.size).to eq(2)
         summary = diagnostics.first
+        expect(diagnostics.second[:cache]).to include(hit: true)
+        expect(diagnostics.second[:emitted_assets]).to eq(summary[:emitted_assets])
         expect(summary[:emitted_assets][:packs]).to eq(["generated/PublicPageClientEffects"])
         expect(summary[:emitted_assets][:js]).to include(
           a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/js/vendor-abc123.js",
