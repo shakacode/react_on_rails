@@ -1176,11 +1176,13 @@ describe ReactOnRailsProHelper do
         expect(@react_on_rails_pending_stream_cache_writes).to be_nil
       end
 
-      it "writes stream cache entries with the expires_at TTL captured before deferred flush" do
+      it "keeps stream cache expires_at absolute when deferred flush is delayed" do
         completion_time = Time.now
-        raw_cache_options = { expires_at: completion_time + 5 }
+        expires_at = completion_time + 5
+        raw_cache_options = { expires_at: }
         captured_on_complete = nil
 
+        allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(true)
         allow(Time).to receive(:now).and_return(completion_time)
         allow(Rails.cache).to receive(:write)
         allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
@@ -1205,9 +1207,9 @@ describe ReactOnRailsProHelper do
         send(:flush_pending_stream_cache_writes)
 
         expect(Rails.cache).to have_received(:write)
-          .with("stream-cache-key", ["chunk"], hash_including(expires_in: be_within(0.1).of(5)))
+          .with("stream-cache-key", ["chunk"], { expires_at: })
         expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
-          .with(["stream-tag"], "stream-cache-key", hash_including(expires_in: be_within(0.1).of(5)))
+          .with(["stream-tag"], "stream-cache-key", { expires_at: })
       end
 
       it "does not queue stream cache entries whose expires_at passed before completion" do

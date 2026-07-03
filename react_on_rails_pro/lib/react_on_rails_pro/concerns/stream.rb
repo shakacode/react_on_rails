@@ -27,7 +27,7 @@ module ReactOnRailsPro
         cache_key:,
         chunks:,
         normalized_cache_tags:,
-        cache_options: cache_write_options(raw_cache_options)
+        cache_options: ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
       }
     end
 
@@ -56,21 +56,6 @@ module ReactOnRailsPro
       )
     rescue StandardError
       # Cache write failure logging must not keep a fully drained response open.
-    end
-
-    def cache_write_options(raw_cache_options)
-      unless snapshot_expires_at?(raw_cache_options)
-        return ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-      end
-
-      expires_in = raw_cache_options[:expires_at].to_time.to_f - Time.now.to_f
-      raw_cache_options.merge(
-        expires_in: [expires_in, ReactOnRailsPro::Cache::EXPIRED_CACHE_WRITE_TTL].max
-      ).except(:expires_at)
-    end
-
-    def snapshot_expires_at?(raw_cache_options)
-      raw_cache_options && raw_cache_options[:expires_at] && ReactOnRailsPro::Cache.cache_supports_expires_at?
     end
   end
 
