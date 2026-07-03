@@ -111,6 +111,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Response-start send failures are reported during abandoned incremental renders**:
+  The Pro node renderer now observes and reports rejected response-start/send promises when
+  incremental render request handling stops early or errors after a response starts, while still
+  propagating those failures on clean stream completion. Fixes
+  [Issue 4364](https://github.com/shakacode/react_on_rails/issues/4364).
+  [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
   bypasses renders that use async props, so per-request async stream output cannot be replayed from
   another request's cached stream. Fixes
