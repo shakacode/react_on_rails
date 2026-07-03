@@ -232,7 +232,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       // visible while the new promise streams in.
       const refetchPromise = refetchComponent(n, p, recoverOnError);
       const sharedRefetchVersion = getRefetchVersion(n, p);
-      return rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
           recoverOnError &&
@@ -245,6 +245,10 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
         }
         throw serverComponentFetchError;
       });
+      if (recoverOnError) {
+        void handledRefetchPromise.catch(() => undefined);
+      }
+      return handledRefetchPromise;
     }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
