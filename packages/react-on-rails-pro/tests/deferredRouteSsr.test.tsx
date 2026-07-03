@@ -390,7 +390,10 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(capturedError.serverComponentName).toBe('SyncRoute');
       expect(capturedError.serverComponentProps).toEqual({ id: 1 });
       expect(capturedError.originalError).toBe(syncError);
-      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      expect(getServerComponent).toHaveBeenCalledWith({
+        componentName: 'SyncRoute',
+        componentProps: { id: 1 },
+      });
     } finally {
       const mountedRoot = root;
       try {
