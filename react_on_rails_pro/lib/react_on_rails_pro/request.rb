@@ -13,6 +13,8 @@
 # For licensing terms:
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
+require "digest"
+require "io/wait"
 require "uri"
 require_relative "renderer_http_client"
 require_relative "stream_request"
@@ -20,15 +22,65 @@ require_relative "async_props_emitter"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
+    class UploadAssetsWaiter
+      def initialize
+        if Fiber.scheduler
+          @reader, @writer = IO.pipe
+        else
+          @queue = Queue.new
+        end
+      end
+
+      def wait
+        if @queue
+          @queue.pop
+        else
+          wait_for_signal
+        end
+      ensure
+        close_io(@reader)
+      end
+
+      def signal
+        if @queue
+          @queue << true
+        else
+          @writer.write_nonblock(".", exception: false)
+        end
+      rescue IOError, SystemCallError
+        nil
+      ensure
+        close_io(@writer)
+      end
+
+      private
+
+      def wait_for_signal
+        loop do
+          result = @reader.read_nonblock(1, exception: false)
+          break unless result == :wait_readable
+
+          @reader.wait_readable
+        end
+      end
+
+      def close_io(io)
+        io&.close unless io&.closed?
+      end
+    end
+
     class << self
       # Mutex for thread-safe connection management.
       # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
       CONNECTION_MUTEX = Mutex.new
+      UPLOAD_ASSETS_MUTEX = Mutex.new
+      UPLOAD_ASSET_FINGERPRINT_MUTEX = Mutex.new
 
       def reset_connection
         CONNECTION_MUTEX.synchronize do
           new_conn = create_connection
           old_conn = @connection
+          ReactOnRailsPro::RendererHttpClient.bump_client_generation
           @connection = new_conn
           old_conn&.close
         end
@@ -170,16 +222,20 @@ module ReactOnRailsPro
           target_bundles << pool.rsc_bundle_hash
         end
 
-        form = form_with_assets_and_bundle
-        # TODO: targetBundles is only kept for backward compatibility with older node renderers
-        # (protocol 2.0.0) that require it. The new node renderer derives target directories from
-        # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
-        # Note: it's not mandatory to keep this until then — users are expected to upgrade the
-        # node renderer and react_on_rails gem to the same version together — but it's an easy
-        # backward compatibility safeguard.
-        form["targetBundles"] = target_bundles
+        assets_to_copy = assets_to_copy_for_upload
 
-        perform_request("/upload-assets", form:)
+        with_asset_upload_single_flight(upload_assets_single_flight_key(target_bundles, assets_to_copy)) do
+          form = form_with_assets_and_bundle(assets_to_copy:)
+          # TODO: targetBundles is only kept for backward compatibility with older node renderers
+          # (protocol 2.0.0) that require it. The new node renderer derives target directories from
+          # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
+          # Note: it's not mandatory to keep this until then — users are expected to upgrade the
+          # node renderer and react_on_rails gem to the same version together — but it's an easy
+          # backward compatibility safeguard.
+          form["targetBundles"] = target_bundles
+
+          perform_request("/upload-assets", form:)
+        end
       end
 
       def asset_exists_on_vm_renderer?(filename)
@@ -283,7 +339,7 @@ module ReactOnRailsPro
         form
       end
 
-      def populate_form_with_bundle_and_assets(form, check_bundle:)
+      def populate_form_with_bundle_and_assets(form, check_bundle:, assets_to_copy: assets_to_copy_for_upload)
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
         add_bundle_to_form(
@@ -304,7 +360,7 @@ module ReactOnRailsPro
           )
         end
 
-        add_assets_to_form(form)
+        add_assets_to_form(form, assets_to_copy:)
       end
 
       def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:)
@@ -317,7 +373,7 @@ module ReactOnRailsPro
         }
       end
 
-      def add_assets_to_form(form)
+      def assets_to_copy_for_upload
         assets_to_copy = (ReactOnRailsPro.configuration.assets_to_copy || []).dup
         # react_client_manifest and react_server_manifest files are needed to generate react server components payload
         if ReactOnRailsPro.configuration.enable_rsc_support
@@ -325,6 +381,10 @@ module ReactOnRailsPro
           assets_to_copy << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
         end
 
+        assets_to_copy
+      end
+
+      def add_assets_to_form(form, assets_to_copy:)
         return form unless assets_to_copy.present?
 
         assets_to_copy.each_with_index do |asset_path, idx|
@@ -350,9 +410,9 @@ module ReactOnRailsPro
         form
       end
 
-      def form_with_assets_and_bundle
+      def form_with_assets_and_bundle(assets_to_copy: assets_to_copy_for_upload)
         form = common_form_data
-        populate_form_with_bundle_and_assets(form, check_bundle: true)
+        populate_form_with_bundle_and_assets(form, check_bundle: true, assets_to_copy:)
         form
       end
 
@@ -377,6 +437,108 @@ module ReactOnRailsPro
           data[:pushProps] = Array(push_props)
         end
         data
+      end
+
+      def upload_assets_single_flight_key(target_bundles, assets_to_copy)
+        [
+          "bundles",
+          Array(target_bundles).length.to_s,
+          *Array(target_bundles).map(&:to_s),
+          "assets",
+          assets_to_copy.length.to_s,
+          *assets_to_copy.map { |asset_path| upload_asset_fingerprint(asset_path) }
+        ].freeze
+      end
+
+      def upload_asset_fingerprint(asset_path)
+        path = asset_path.to_s
+        return "url:#{path}" if http_url?(path)
+        return "missing:#{path}" unless File.exist?(path)
+
+        stat = File.stat(path)
+        cache_key = [path, stat.size, stat.mtime.to_r, stat.ctime.to_r].freeze
+
+        UPLOAD_ASSET_FINGERPRINT_MUTEX.synchronize do
+          cached = upload_asset_fingerprints[path]
+          return cached[:fingerprint] if cached && cached[:cache_key] == cache_key
+
+          fingerprint = "file:#{path}:#{Digest::SHA256.file(path).hexdigest}"
+          upload_asset_fingerprints[path] = { cache_key:, fingerprint: }
+          fingerprint
+        end
+      end
+
+      def with_asset_upload_single_flight(key_parts, &)
+        key = Array(key_parts).map(&:to_s).freeze
+        leader = false
+
+        state = UPLOAD_ASSETS_MUTEX.synchronize do
+          upload_assets_in_progress[key] || begin
+            leader = true
+            upload_assets_in_progress[key] = {
+              complete: false,
+              error: nil,
+              response: nil,
+              waiters: []
+            }
+          end
+        end
+
+        if leader
+          perform_asset_upload_single_flight(key, state, &)
+        else
+          wait_for_asset_upload_single_flight(state)
+        end
+      end
+
+      def perform_asset_upload_single_flight(key, state)
+        error = nil
+        response = nil
+
+        begin
+          response = yield
+        rescue StandardError => e
+          error = e
+          raise
+        ensure
+          waiters = UPLOAD_ASSETS_MUTEX.synchronize do
+            state[:error] = error
+            state[:response] = response
+            state[:complete] = true
+            upload_assets_in_progress.delete(key)
+            state[:waiters]
+          end
+          waiters.each(&:signal)
+        end
+
+        response
+      end
+
+      def upload_assets_in_progress
+        @upload_assets_in_progress ||= {}
+      end
+
+      def upload_asset_fingerprints
+        @upload_asset_fingerprints ||= {}
+      end
+
+      def wait_for_asset_upload_single_flight(state)
+        waiter = nil
+        complete = UPLOAD_ASSETS_MUTEX.synchronize do
+          if state[:complete]
+            true
+          else
+            waiter = UploadAssetsWaiter.new
+            state[:waiters] << waiter
+            false
+          end
+        end
+        waiter.wait unless complete
+
+        error, response = UPLOAD_ASSETS_MUTEX.synchronize { [state[:error], state[:response]] }
+        raise error.class, error.message, error.backtrace if error
+
+        response
       end
 
       def create_connection

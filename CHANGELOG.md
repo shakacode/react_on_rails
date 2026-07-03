@@ -141,6 +141,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Renderer HTTP transport no longer buffers successful streams or duplicate bundle uploads**:
+  Pro renderer requests now pass successful streaming response chunks through without retaining them in Ruby
+  memory, reuse a persistent async-http client for plain Puma non-streaming requests, reset scheduler-scoped
+  clients when the shared renderer connection is reset, and stream/deduplicate same-bundle uploads. Plain Puma
+  reuse is per request-handling thread, so total renderer connection capacity can scale with Puma threads times
+  `renderer_http_pool_size`; tune the renderer and any intermediaries accordingly. Fixes
+  [Issue 4360](https://github.com/shakacode/react_on_rails/issues/4360),
+  [Issue 4361](https://github.com/shakacode/react_on_rails/issues/4361),
+  [Issue 4362](https://github.com/shakacode/react_on_rails/issues/4362), and
+  [Issue 4363](https://github.com/shakacode/react_on_rails/issues/4363).
+  [PR 4394](https://github.com/shakacode/react_on_rails/pull/4394) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Streaming dependency load errors stay visible**: Pro streaming cleanup now tolerates dependency
   load failures that happen before stream observability state is captured, so the original `LoadError`
   remains visible instead of being masked by cleanup. Fixes

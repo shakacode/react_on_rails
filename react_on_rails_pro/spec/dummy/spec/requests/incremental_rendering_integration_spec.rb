@@ -67,8 +67,11 @@ describe "Incremental Rendering Integration", :integration do
 
     # Mock populate_form_with_bundle_and_assets to use fixture bundles directly
     # rubocop:disable Lint/UnusedBlockArgument
-    allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
+    allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:,
+                                                                                       assets_to_copy: nil|
       # rubocop:enable Lint/UnusedBlockArgument
+      assets_to_copy ||= ReactOnRailsPro::Request.send(:assets_to_copy_for_upload)
+
       form["bundle_#{server_bundle_hash}"] = {
         body: Pathname.new(fixture_bundle_path),
         content_type: "text/javascript",
@@ -80,6 +83,8 @@ describe "Incremental Rendering Integration", :integration do
         content_type: "text/javascript",
         filename: "#{rsc_bundle_hash}.js"
       }
+
+      ReactOnRailsPro::Request.send(:add_assets_to_form, form, assets_to_copy:)
     end
 
     # Mock AsyncPropsEmitter chunk generation methods to work with fixture bundles.
@@ -361,8 +366,11 @@ describe "Incremental Rendering Integration", :integration do
         )
 
         # rubocop:disable Lint/UnusedBlockArgument
-        allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:|
+        allow(ReactOnRailsPro::Request).to receive(:populate_form_with_bundle_and_assets) do |form, check_bundle:,
+                                                                                         assets_to_copy: nil|
           # rubocop:enable Lint/UnusedBlockArgument
+          assets_to_copy ||= ReactOnRailsPro::Request.send(:assets_to_copy_for_upload)
+
           form["bundle_#{unique_hash}"] = {
             body: Pathname.new(fixture_bundle_path),
             content_type: "text/javascript",
@@ -373,6 +381,8 @@ describe "Incremental Rendering Integration", :integration do
             content_type: "text/javascript",
             filename: "#{rsc_bundle_hash}.js"
           }
+
+          ReactOnRailsPro::Request.send(:add_assets_to_form, form, assets_to_copy:)
         end
 
         # Do NOT call upload_assets — the bundle isn't on the renderer yet
