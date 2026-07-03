@@ -224,7 +224,8 @@ export const handleStreamError = (stream: Readable, onError: (error: Error) => v
 export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
   typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;
 
-export const majorVersion = (version: string) => Number.parseInt(version.split('.', 2)[0], 10);
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const majorVersion = (version: string) => Number.parseInt(version.split('.', 2)[0]!, 10);
 
 // Can be replaced by `import { setTimeout } from 'timers/promises'` when Node 16 is the minimum supported version
 export const delay = (milliseconds: number) =>
