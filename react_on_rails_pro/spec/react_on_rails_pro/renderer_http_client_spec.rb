@@ -1059,9 +1059,9 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         def close; end
       end)
       endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+      workers = []
       bootstrap_started = Queue.new
       finish_bootstrap = Queue.new
-      workers = []
 
       client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
       allow(client).to receive(:endpoint_for).and_return(endpoint)
