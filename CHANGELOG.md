@@ -90,6 +90,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   payload reuse, and retry lifecycle. The component-name URL-encoding fix and descriptive HTTP
   status errors from the helper work remain in the shared `RSCRoute` fetch path. Fixes
   [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439).
+  [PR 4440](https://github.com/shakacode/react_on_rails/pull/4440) by
+  [ihabadham](https://github.com/ihabadham).
 
 #### Changed
 
