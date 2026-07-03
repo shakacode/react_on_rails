@@ -2,28 +2,19 @@ import { execFileSync, spawnSync } from 'child_process';
 import picocolors from 'picocolors';
 
 /**
- * picocolors' default instance only presence-checks `FORCE_COLOR` (`"FORCE_COLOR" in env`),
- * so `FORCE_COLOR=0` / `FORCE_COLOR=false` incorrectly ENABLE color. chalk@4 parsed the
- * value and treated `0`/`false` as disabled. Restore that semantics here so callers/CI that
- * set `FORCE_COLOR=0` for plain-text logs keep getting plain text after the chalk→picocolors swap.
+ * Shared color instance, reused by other modules.
  *
- * Priority: NO_COLOR disables; FORCE_COLOR=0/false disables; FORCE_COLOR present & truthy enables;
- * otherwise defer to picocolors' own TTY/CI detection.
+ * We defer entirely to picocolors' own color detection (NO_COLOR, FORCE_COLOR, TTY, CI,
+ * platform) with exactly one override: picocolors enables color whenever `FORCE_COLOR` is
+ * merely present (`!!env.FORCE_COLOR`), so `FORCE_COLOR=0` / `FORCE_COLOR=false` would turn
+ * color ON. chalk@4 parsed that value and treated `0`/`false` as disabled, so we restore that
+ * one behavior here and let picocolors decide everything else. Keeping the override this narrow
+ * avoids re-implementing (and diverging from) picocolors' detection order.
  */
-function resolveColorEnabled(): boolean {
-  if (process.env.NO_COLOR) return false;
+const forceColorDisabled =
+  'FORCE_COLOR' in process.env && (process.env.FORCE_COLOR === '0' || process.env.FORCE_COLOR === 'false');
 
-  const forceColor = process.env.FORCE_COLOR;
-  if (forceColor !== undefined) {
-    if (forceColor === '0' || forceColor === 'false') return false;
-    return true;
-  }
-
-  return picocolors.isColorSupported;
-}
-
-/** Shared color instance with chalk-compatible FORCE_COLOR handling; reused by other modules. */
-export const pc = picocolors.createColors(resolveColorEnabled());
+export const pc = picocolors.createColors(forceColorDisabled ? false : picocolors.isColorSupported);
 
 function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // Always inherit PATH, HOME, and the rest of process.env; callers only add/override keys.
