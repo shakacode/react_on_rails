@@ -159,4 +159,29 @@ describe('restartWorkers', () => {
 
     await expect(restartPromise).resolves.toBeUndefined();
   });
+
+  it('continues scheduled restarts when a selected worker emits an error without a timeout', async () => {
+    jest.useFakeTimers();
+    const staleWorker = buildWorker(1);
+    const nextWorker = buildWorker(2);
+    const restartWorkers = loadRestartWorkers({ 1: staleWorker, 2: nextWorker });
+
+    const restartPromise = restartWorkers(0, undefined);
+    await Promise.resolve();
+
+    staleWorker.emit('error', new Error('worker IPC error'));
+    await Promise.resolve();
+    jest.runOnlyPendingTimers();
+    await Promise.resolve();
+
+    expect(staleWorker.isScheduledRestart).toBe(true);
+    expect(staleWorker.destroy).not.toHaveBeenCalled();
+    expect(nextWorker.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE, expect.any(Function));
+
+    nextWorker.emit('exit');
+    await Promise.resolve();
+    jest.runOnlyPendingTimers();
+
+    await expect(restartPromise).resolves.toBeUndefined();
+  });
 });
