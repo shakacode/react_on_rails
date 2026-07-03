@@ -320,6 +320,11 @@ export async function handleIncrementalRenderStream(
       throw err;
     }
 
-    await onResponseStartPromise;
+    try {
+      await onResponseStartPromise;
+    } catch (err) {
+      reportResponseStartError(err);
+      throw err;
+    }
   });
 }
