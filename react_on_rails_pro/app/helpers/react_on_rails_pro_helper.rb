@@ -599,8 +599,7 @@ module ReactOnRailsProHelper
 
     stripped_body.match?(/\Adelete\s*\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
       stripped_body.match?(/\A\(\(\s*self\.REACT_ON_RAILS_RSC_PAYLOADS\b/) ||
-      stripped_body.match?(/\A\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
-      stripped_body.match?(/\Aconsole\.(?:error|info|log|warn)\.apply\(\s*console\s*,\s*\[\s*["']\[SERVER\]/)
+      stripped_body.match?(/\A\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/)
   end
 
   def executable_script_type?(script_type)

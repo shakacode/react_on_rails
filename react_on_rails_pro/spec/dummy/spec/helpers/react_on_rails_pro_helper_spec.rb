@@ -1458,7 +1458,7 @@ describe ReactOnRailsProHelper do
         expect(result).not_to include("delete (self.REACT_ON_RAILS_RSC_ERRORS")
         expect(result).not_to include("renderingError")
         expect(result).not_to include(".push(\"flight chunk\")")
-        expect(result).not_to include("static cache warning")
+        expect(result).to include("static cache warning")
         expect(result).to include("component prop mentions REACT_ON_RAILS_RSC_PAYLOADS")
         expect(result).to include("ReactOnRailsReveal")
         expect(result).to include("PublicPageClientEffects.js")
@@ -1644,7 +1644,7 @@ describe ReactOnRailsProHelper do
           cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize
         )
         expect(diagnostics.first[:rsc_payload]).to include(
-          bootstrap_script_count: 4,
+          bootstrap_script_count: 3,
           stripped: true
         )
         expect(diagnostics.first[:rsc_payload][:bootstrap_script_bytes]).to be_positive
