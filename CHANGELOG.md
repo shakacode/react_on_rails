@@ -89,6 +89,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
+  each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
+  documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
+  shutdown deadline; and stale scheduled-restart workers no longer break the restart loop. Fixes
+  [Issue 4365](https://github.com/shakacode/react_on_rails/issues/4365),
+  [Issue 4366](https://github.com/shakacode/react_on_rails/issues/4366),
+  [Issue 4367](https://github.com/shakacode/react_on_rails/issues/4367), and
+  [Issue 4368](https://github.com/shakacode/react_on_rails/issues/4368).
+  [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Response-start send failures are reported during abandoned incremental renders**:
   The Pro node renderer now observes and reports rejected response-start/send promises when
   incremental render request handling stops early or errors after a response starts, while still
