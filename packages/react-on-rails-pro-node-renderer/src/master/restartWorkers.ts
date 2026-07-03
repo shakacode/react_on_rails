@@ -77,6 +77,7 @@ export default async function restartWorkers(
         const onError = (err: Error) => {
           log.warn({ msg: 'Error while waiting for scheduled worker restart', err });
           if (!gracefulWorkerRestartTimeout) {
+            workerToRestart.isScheduledRestart = false;
             finish();
           }
         };

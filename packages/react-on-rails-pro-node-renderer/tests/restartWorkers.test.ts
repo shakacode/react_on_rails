@@ -174,7 +174,7 @@ describe('restartWorkers', () => {
     jest.runOnlyPendingTimers();
     await Promise.resolve();
 
-    expect(staleWorker.isScheduledRestart).toBe(true);
+    expect(staleWorker.isScheduledRestart).toBe(false);
     expect(staleWorker.destroy).not.toHaveBeenCalled();
     expect(nextWorker.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE, expect.any(Function));
 
