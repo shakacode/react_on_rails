@@ -96,6 +96,25 @@ jobs:
             }
 
             const isDependabotPr = pr.user?.login === 'dependabot[bot]';
+            if (isDependabotPr) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: [
+                  '## Hosted CI Label Dispatch Skipped',
+                  '',
+                  `Label: \`${labelName}\``,
+                  `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
+                  '',
+                  'Dependabot PRs require the `+ci-run-hosted` command path so the required gate can verify trusted current-head dispatch proof before honoring hosted-CI labels.',
+                  'A write/admin maintainer should comment `+ci-run-hosted` or `+ci-force-full` instead.'
+                ].join('\n')
+              });
+              core.setFailed('Dependabot hosted CI label dispatch requires the +ci-run-hosted command path.');
+              return;
+            }
+
             const forceFull = currentLabelNames.includes(forceFullHostedCiLabel);
             const inputs = {
               pull_request_base_ref: pr.base.ref,
@@ -111,10 +130,8 @@ jobs:
               ['Assets Precompile Check', 'precompile-check.yml', inputs],
               ['Generator tests', 'examples.yml', inputs],
               ['Playwright E2E Tests', 'playwright.yml', inputs],
-              ...(isDependabotPr ? [] : [
-                ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
-                ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
-              ])
+              ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+              ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
             ];
 
             function legacyCompatibleInputs(workflowInputs) {

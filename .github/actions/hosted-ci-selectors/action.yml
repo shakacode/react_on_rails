@@ -109,6 +109,7 @@ runs:
 
             const body = comment.body || '';
             return /^## (?:Force-Full )?Hosted CI Requested/m.test(body) &&
+              !/\nFailed:\n/.test(body) &&
               new RegExp(`Triggered [1-9][0-9]* workflow\\(s\\) for \`${shortSha}\``).test(body);
           }
 
