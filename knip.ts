@@ -73,6 +73,12 @@ const config: KnipConfig = {
       // re-export, so utils.ts must be listed as a production entry for
       // `picocolors` to be counted as used (otherwise it is falsely flagged
       // as an unused dependency).
+      //
+      // Tradeoff: listing utils.ts as an entry marks ALL of its exports
+      // (execLiveArgs, getCommandVersion, logStep, ...) as always-used roots,
+      // so `knip --production` will not flag them if one later becomes dead.
+      // Accepted here because utils.ts is a small, fully-consumed helper module;
+      // revisit if it grows or accumulates unused exports.
       entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!', 'src/utils.ts!'],
       project: ['src/**/*.ts', 'tests/**/*.ts'],
       ignore: ['lib/**', 'node_modules/**'],
