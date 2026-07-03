@@ -210,10 +210,10 @@ describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
   });
 
   it('resolves the module-local directory from a stack frame when __dirname is unavailable', async () => {
-    const { internalLoadableStatsTesting } = await import('../src/injectRSCPayload.ts');
+    const { resolveLoadableStatsModuleDirectory } = await import('../src/injectRSCPayload.ts');
 
     expect(
-      internalLoadableStatsTesting.resolveLoadableStatsModuleDirectory(
+      resolveLoadableStatsModuleDirectory(
         undefined,
         [
           'Error',

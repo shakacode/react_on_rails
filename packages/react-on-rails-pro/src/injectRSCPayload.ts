@@ -171,7 +171,7 @@ function moduleDirectoryFromStack(stack: unknown) {
   return undefined;
 }
 
-function resolveLoadableStatsModuleDirectory(
+export function resolveLoadableStatsModuleDirectory(
   commonJsModuleDirectory: string | undefined,
   stack: unknown = new Error().stack,
 ) {
@@ -190,10 +190,6 @@ function resolveLoadableStatsPath() {
   );
   return resolvedLoadableStatsPath;
 }
-
-export const internalLoadableStatsTesting = {
-  resolveLoadableStatsModuleDirectory,
-};
 
 function escapeRegExpLiteral(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
