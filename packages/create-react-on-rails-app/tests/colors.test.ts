@@ -32,8 +32,12 @@ describe('pc color-enable decision', () => {
   const originalEnv = process.env;
   const originalIsTTY = process.stdout.isTTY;
 
-  function setTTY(isTTY: boolean): void {
-    Object.defineProperty(process.stdout, 'isTTY', { value: isTTY, configurable: true });
+  // Use plain assignment rather than Object.defineProperty: other suites (e.g.
+  // index-tty.test.ts) define process.stdout.isTTY as a non-configurable data
+  // property, and a later defineProperty would throw "Cannot redefine property".
+  // Assignment works whether isTTY is a writable data property or absent.
+  function setTTY(isTTY: boolean | undefined): void {
+    (process.stdout as { isTTY?: boolean }).isTTY = isTTY;
   }
 
   beforeEach(() => {
@@ -51,7 +55,7 @@ describe('pc color-enable decision', () => {
 
   afterEach(() => {
     process.env = originalEnv;
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+    setTTY(originalIsTTY);
   });
 
   it('enables color when FORCE_COLOR=1', () => {
