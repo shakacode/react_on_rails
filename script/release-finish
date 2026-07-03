@@ -116,7 +116,7 @@ class ReleaseFinish
       parser.on("--remote NAME", "Remote for fetch and branch deletion (default: origin)") do |remote|
         @options[:remote] = remote
       end
-      parser.on("--dry-run", "Print the exact commands without executing any of them") do
+      parser.on("--dry-run", "Preview the plan; still fetches remote refs needed for current-state checks") do
         @options[:dry_run] = true
       end
       parser.on("--yes", "Skip interactive confirmations (still honors --dry-run)") do
@@ -155,10 +155,10 @@ class ReleaseFinish
     release_branch = "release/#{version}"
 
     section "Promote #{version} (runbook step 4)"
-    fetch_remote!(@options.fetch(:remote))
     ensure_on_release_branch!(release_branch)
     ensure_clean_worktree!
 
+    fetch_remote!(@options.fetch(:remote))
     rc_tag = resolve_rc_tag!(version)
     ensure_tip_matches_rc_tag!(rc_tag)
 
@@ -269,10 +269,11 @@ class ReleaseFinish
     source = "#{remote}/#{release_branch}"
 
     section "Close out #{version} (runbook step 5)"
-    fetch_remote!(remote)
     ensure_on_main!
-    ensure_local_main_matches_remote!(remote)
     ensure_clean_worktree!
+
+    fetch_remote!(remote)
+    ensure_local_main_matches_remote!(remote)
 
     forward_port_to_main!(source)
     delete_release_branch!(release_branch, remote)
@@ -442,16 +443,16 @@ class ReleaseFinish
     answer.strip.casecmp?("y") || answer.strip.casecmp?("yes")
   end
 
-  # Run a command, or print it under --dry-run. Read-only setup (git fetch, the
-  # forward-port dry-run) flows through here so dry-run prints the full recipe.
-  def run_or_print(*command)
-    if @options[:dry_run]
+  # Run a command, or print it under --dry-run. Use force for read-only probes
+  # that must execute even while dry-run previews outward release actions.
+  def run_or_print(*command, env: {}, force: false)
+    if @options[:dry_run] && !force
       puts "DRY RUN: would run: #{command.join(' ')}"
       return
     end
 
     puts "+ #{command.join(' ')}"
-    return if system(*command)
+    return if system(env, *command)
 
     raise GitError, "command failed: #{command.join(' ')}"
   end
@@ -467,10 +468,7 @@ class ReleaseFinish
     # Fetch is read-only for the worktree and release branches, and the dry-run
     # plan must resolve tags and remote-tracking refs from the same state as a
     # real run.
-    puts "+ git fetch -- #{remote}"
-    return if system("git", "fetch", "--", remote)
-
-    raise GitError, "command failed: git fetch -- #{remote}"
+    run_or_print("git", "fetch", "--", remote, env: { "GIT_TERMINAL_PROMPT" => "0" }, force: true)
   end
 
   # ---------------------------------------------------------------------------
