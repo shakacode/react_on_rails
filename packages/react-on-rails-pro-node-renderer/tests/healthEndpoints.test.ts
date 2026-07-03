@@ -13,7 +13,7 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import formAutoContent from 'form-auto-content';
+import formAutoContent from './formAutoContent';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';

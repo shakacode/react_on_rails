@@ -13,7 +13,6 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import formAutoContent from 'form-auto-content';
 import fs from 'fs';
 import path from 'path';
 import querystring from 'querystring';
@@ -45,6 +44,7 @@ import {
   assetPath,
   assetPathOther,
 } from './helper';
+import formAutoContent from './formAutoContent';
 
 const testName = 'worker';
 const createVmBundleForTest = () => createVmBundle(testName);
