@@ -1,11 +1,10 @@
 import { Command } from 'commander';
-import pc from 'picocolors';
 import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import type { ResolvedSetupMode } from './mode.js';
 import { resolveSetupMode } from './mode.js';
-import { detectPackageManager, logError, logInfo } from './utils.js';
+import { detectPackageManager, logError, logInfo, pc } from './utils.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
