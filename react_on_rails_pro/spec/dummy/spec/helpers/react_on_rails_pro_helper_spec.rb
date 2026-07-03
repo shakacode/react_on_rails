@@ -1034,8 +1034,73 @@ describe ReactOnRailsProHelper do
 
         expect(mocked_stream).to have_received(:close)
         expect(Rails.logger).to have_received(:warn)
-          .with("[React on Rails Pro] Failed to write streamed cache entries after response drain: " \
+          .with("[React on Rails Pro] Failed to write streamed cache entry after response drain: " \
                 "StandardError: cache unavailable")
+      end
+
+      it "continues flushing pending stream cache writes after one entry fails" do
+        first_write = {
+          cache_key: "first-stream-cache-key",
+          chunks: ["first chunk"],
+          normalized_cache_tags: ["first-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        second_write = {
+          cache_key: "second-stream-cache-key",
+          chunks: ["second chunk"],
+          normalized_cache_tags: ["second-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        write_options = { expires_in: 45 }
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options).and_return(write_options)
+        allow(Rails.cache).to receive(:write) do |cache_key, *_args|
+          raise StandardError, "cache unavailable" if cache_key == "first-stream-cache-key"
+        end
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(Rails.logger).to receive(:warn)
+
+        ReactOnRailsPro::StreamCacheWrites.flush([first_write, second_write])
+
+        expect(Rails.cache).to have_received(:write)
+          .with("first-stream-cache-key", ["first chunk"], write_options)
+        expect(Rails.cache).to have_received(:write)
+          .with("second-stream-cache-key", ["second chunk"], write_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["second-tag"], "second-stream-cache-key", write_options)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+          .with(["first-tag"], "first-stream-cache-key", write_options)
+        expect(Rails.logger).to have_received(:warn)
+          .with("[React on Rails Pro] Failed to write streamed cache entry after response drain: " \
+                "StandardError: cache unavailable")
+      end
+
+      it "flushes completed pending stream cache writes before re-raising stream failures" do
+        pending_write = {
+          cache_key: "completed-stream-cache-key",
+          chunks: ["completed chunk"],
+          normalized_cache_tags: ["completed-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        write_options = { expires_in: 45 }
+
+        allow(self).to receive(:render_stream_template_chunk).and_return("initial chunk")
+        allow(self).to receive(:emit_rsc_stream_server_timing_header)
+        allow(self).to receive(:drain_streams_concurrently) do
+          @react_on_rails_pending_stream_cache_writes << pending_write
+          raise StandardError, "later stream failure"
+        end
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options).and_return(write_options)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+
+        expect { stream_view_containing_react_components(template: template_path) }
+          .to raise_error(StandardError, "later stream failure")
+
+        expect(Rails.cache).to have_received(:write)
+          .with("completed-stream-cache-key", ["completed chunk"], write_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["completed-tag"], "completed-stream-cache-key", write_options)
       end
 
       it "defers stream cache writes and registers tags with the write options from flush time" do
@@ -1052,6 +1117,7 @@ describe ReactOnRailsProHelper do
           captured_on_complete = options[:on_complete]
           "initial chunk"
         end
+        @react_on_rails_pending_stream_cache_writes = []
 
         result = send(
           :handle_stream_cache_miss,
@@ -1078,6 +1144,40 @@ describe ReactOnRailsProHelper do
           .with(["stream-tag"], "stream-cache-key", write_cache_options)
       end
 
+      it "writes stream cache immediately when no managed stream view flush is active" do
+        raw_cache_options = { expires_at: Time.now + 60 }
+        write_cache_options = { expires_in: 45 }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(write_cache_options)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+        expect(Rails.cache).to have_received(:write).with("stream-cache-key", ["chunk"], write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", write_cache_options)
+        expect(@react_on_rails_pending_stream_cache_writes).to be_nil
+      end
+
       it "does not flush stream cache entries whose expires_at passed before flush" do
         raw_cache_options = { expires_at: Time.now - 60 }
         captured_on_complete = nil
@@ -1089,6 +1189,7 @@ describe ReactOnRailsProHelper do
           captured_on_complete = options[:on_complete]
           "initial chunk"
         end
+        @react_on_rails_pending_stream_cache_writes = []
 
         result = send(
           :handle_stream_cache_miss,

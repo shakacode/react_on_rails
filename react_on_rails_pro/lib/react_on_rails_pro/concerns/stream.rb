@@ -22,24 +22,28 @@ module ReactOnRailsPro
 
     def flush(pending_writes)
       Array(pending_writes).each do |cache_write|
-        raw_cache_options = cache_write[:raw_cache_options]
-        next if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-
-        cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
-        Rails.cache.write(cache_write[:cache_key], cache_write[:chunks], cache_options)
-        ReactOnRailsPro::Cache.register_normalized_tags(
-          cache_write[:normalized_cache_tags],
-          cache_write[:cache_key],
-          cache_options
-        )
+        write(cache_write)
+      rescue StandardError => e
+        log_failure(e)
       end
-    rescue StandardError => e
-      log_failure(e)
+    end
+
+    def write(cache_write)
+      raw_cache_options = cache_write[:raw_cache_options]
+      return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+      cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+      Rails.cache.write(cache_write[:cache_key], cache_write[:chunks], cache_options)
+      ReactOnRailsPro::Cache.register_normalized_tags(
+        cache_write[:normalized_cache_tags],
+        cache_write[:cache_key],
+        cache_options
+      )
     end
 
     def log_failure(exception)
       Rails.logger.warn(
-        "[React on Rails Pro] Failed to write streamed cache entries after response drain: " \
+        "[React on Rails Pro] Failed to write streamed cache entry after response drain: " \
         "#{exception.class}: #{exception.message}"
       )
     rescue StandardError
@@ -127,7 +131,7 @@ module ReactOnRailsPro
         # the barrier may still have pending tasks that must be cancelled.
         # For post-commit errors (from drain_streams_concurrently), the barrier
         # is already stopped inside that method — stopping again is a no-op.
-        @async_barrier&.stop
+        stop_streaming_and_flush_cache_writes
         raise
       end
     ensure
@@ -280,6 +284,8 @@ module ReactOnRailsPro
     ensure
       @react_on_rails_pending_stream_cache_writes&.clear
     end
+
+    def stop_streaming_and_flush_cache_writes = @async_barrier&.stop.then { flush_pending_stream_cache_writes }
 
     # Drains all streaming tasks concurrently using a producer-consumer pattern.
     #
