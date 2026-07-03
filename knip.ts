@@ -67,7 +67,19 @@ const config: KnipConfig = {
 
     // Create React on Rails app package workspace
     'packages/create-react-on-rails-app': {
-      entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!'],
+      // src/utils.ts is a production module: index.ts imports its shared `pc`
+      // color instance, and utils.ts is where `picocolors` is imported. In
+      // --production mode knip does not trace a dependency through that value
+      // re-export, so utils.ts must be listed as a production entry for
+      // `picocolors` to be counted as used (otherwise it is falsely flagged
+      // as an unused dependency).
+      //
+      // Tradeoff: listing utils.ts as an entry marks ALL of its exports
+      // (execLiveArgs, getCommandVersion, logStep, ...) as always-used roots,
+      // so `knip --production` will not flag them if one later becomes dead.
+      // Accepted here because utils.ts is a small, fully-consumed helper module;
+      // revisit if it grows or accumulates unused exports.
+      entry: ['bin/create-react-on-rails-app.js!', 'src/index.ts!', 'src/utils.ts!'],
       project: ['src/**/*.ts', 'tests/**/*.ts'],
       ignore: ['lib/**', 'node_modules/**'],
     },
