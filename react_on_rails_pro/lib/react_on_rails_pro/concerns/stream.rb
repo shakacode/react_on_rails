@@ -33,6 +33,17 @@ module ReactOnRailsPro
           cache_options
         )
       end
+    rescue StandardError => e
+      log_failure(e)
+    end
+
+    def log_failure(exception)
+      Rails.logger.warn(
+        "[React on Rails Pro] Failed to write streamed cache entries after response drain: " \
+        "#{exception.class}: #{exception.message}"
+      )
+    rescue StandardError
+      # Cache write failure logging must not keep a fully drained response open.
     end
   end
 

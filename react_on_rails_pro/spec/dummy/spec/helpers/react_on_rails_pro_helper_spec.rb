@@ -1023,6 +1023,21 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
+      it "closes the stream when a deferred stream cache write fails after drain" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        allow(Rails.cache).to receive(:write).and_raise(StandardError, "cache unavailable")
+        allow(Rails.logger).to receive(:warn)
+
+        expect { run_stream }.not_to raise_error
+
+        expect(mocked_stream).to have_received(:close)
+        expect(Rails.logger).to have_received(:warn)
+          .with("[React on Rails Pro] Failed to write streamed cache entries after response drain: " \
+                "StandardError: cache unavailable")
+      end
+
       it "defers stream cache writes and registers tags with the write options from flush time" do
         raw_cache_options = { expires_at: Time.now + 60 }
         write_cache_options = { expires_in: 45 }
@@ -2252,7 +2267,7 @@ describe ReactOnRailsProHelper do
 
       it "registers async tags with the write options from completion time" do
         raw_cache_options = { expires_at: Time.now + 60 }
-        tag_index_cache_options = { expires_in: 60 }
+        read_cache_options = { expires_in: 60 }
         write_cache_options = { expires_in: 45 }
         raw_options = {
           cache_key: "async-expiry-recompute",
@@ -2263,8 +2278,8 @@ describe ReactOnRailsProHelper do
 
         allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
           .with(raw_cache_options)
-          .and_return(tag_index_cache_options, write_cache_options)
-        allow(Rails.cache).to receive(:read).with(component_cache_key, tag_index_cache_options).and_return(nil)
+          .and_return(read_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:read).with(component_cache_key, read_cache_options).and_return(nil)
         allow(Rails.cache).to receive(:write)
         allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
         allow(self).to receive(:react_component).and_return("<div>async</div>")
