@@ -163,7 +163,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   resolving stats.
   [PR 4447](https://github.com/shakacode/react_on_rails/pull/4447) by
   [justin808](https://github.com/justin808).
-- **[Pro]** **RSC client fetch failures no longer include serialized props in thrown error messages or causes**: Browser RSC requests still send the real `?props=...` payload to the Rails endpoint, but pre-response fetch failures now report the query-free component source path with a stable generic message so console logs, error boundaries, and error reporters do not capture accidental sensitive values from props. Fixes [Issue 4449](https://github.com/shakacode/react_on_rails/issues/4449). [PR 4450](https://github.com/shakacode/react_on_rails/pull/4450) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **RSC client fetch failures no longer include serialized props in thrown error messages or causes**: Browser RSC requests still send the real `?props=...` payload to the Rails endpoint, but pre-response fetch failures now report the query-free component source path with a stable generic message so console logs, error boundaries, and error reporters do not capture accidental sensitive values from props. Retry props remain directly readable for refetches but are no longer enumerable error fields. Fixes [Issue 4449](https://github.com/shakacode/react_on_rails/issues/4449). [PR 4450](https://github.com/shakacode/react_on_rails/pull/4450) by [ihabadham](https://github.com/ihabadham).
 
 
 - **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
