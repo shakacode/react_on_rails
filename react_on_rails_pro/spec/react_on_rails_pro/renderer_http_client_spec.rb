@@ -846,6 +846,10 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       stub_const("FakeThreadClient", Class.new do
         attr_reader :closed
 
+        def alive?
+          true
+        end
+
         def close
           @closed = true
         end
@@ -870,9 +874,48 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(thread_clients[Thread.current]).to be(current_client)
     end
 
+    it "closes and replaces persistent no-scheduler clients whose worker thread exited" do
+      stub_const("FakeWorkerThreadClient", Class.new do
+        attr_reader :closed
+
+        def initialize(alive)
+          @alive = alive
+          @closed = false
+        end
+
+        def alive?
+          @alive
+        end
+
+        def close
+          @closed = true
+        end
+      end)
+      stale_client = FakeWorkerThreadClient.new(false)
+      replacement_client = FakeWorkerThreadClient.new(true)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = described_class.new(origin: "http://localhost:3800", pool_size: 1, connect_timeout: 1, read_timeout: 1)
+      client.instance_variable_set(:@thread_clients, { Thread.current => stale_client }.compare_by_identity)
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(described_class::PersistentThreadClient).to receive(:new).and_return(replacement_client)
+
+      yielded_client = client.__send__(:persistent_thread_client)
+
+      expect(yielded_client).to be(replacement_client)
+      expect(stale_client.closed).to be(true)
+      thread_clients = client.instance_variable_get(:@thread_clients)
+      expect(thread_clients.keys).to eq([Thread.current])
+      expect(thread_clients[Thread.current]).to be(replacement_client)
+    end
+
     it "does not abort the current request when stale no-scheduler client cleanup fails" do
       stub_const("FakeThreadCleanupClient", Class.new do
         attr_reader :closed
+
+        def alive?
+          true
+        end
 
         def initialize(error = nil)
           @error = error

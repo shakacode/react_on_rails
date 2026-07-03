@@ -212,6 +212,10 @@ module ReactOnRailsPro
         raise payload if status == :error
       end
 
+      def alive?
+        @thread.alive?
+      end
+
       private
 
       def request(method, path, headers:, body:)
@@ -786,7 +790,7 @@ module ReactOnRailsPro
     def sweep_dead_thread_clients
       stale_clients = []
       @thread_clients.delete_if do |thread, thread_client|
-        stale = !thread.alive?
+        stale = !thread.alive? || !thread_client.alive?
         stale_clients << thread_client if stale
         stale
       end

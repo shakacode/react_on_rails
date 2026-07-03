@@ -72,6 +72,8 @@ module ReactOnRailsPro
       def get: (String path, headers: untyped) -> untyped
 
       def close: () -> nil
+
+      def alive?: () -> bool
     end
 
     class Response
