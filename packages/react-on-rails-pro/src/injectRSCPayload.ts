@@ -107,6 +107,7 @@ const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
 const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
+const LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS = LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS;
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
 const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
@@ -131,7 +132,12 @@ const EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME: RSCClientChunkStyle
   new Map();
 
 let rscClientChunkStylesheetHrefsLoadState: RSCClientChunkStylesheetHrefsLoadState | undefined;
-let lastUnexpectedLoadableStatsWarningKey: string | undefined;
+let lastUnexpectedLoadableStatsWarning:
+  | {
+      key: string;
+      warnedAtMs: number;
+    }
+  | undefined;
 let resolvedLoadableStatsPath: string | undefined;
 
 function rscClientChunkStylesheetHrefsRetryClockMs() {
@@ -146,8 +152,14 @@ function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath:
   if (isFileNotFoundError(error)) return;
 
   const warningKey = `${loadableStatsPath}\n${error instanceof Error ? `${error.name}:${error.message}` : String(error)}`;
-  if (warningKey === lastUnexpectedLoadableStatsWarningKey) return;
-  lastUnexpectedLoadableStatsWarningKey = warningKey;
+  const nowMs = rscClientChunkStylesheetHrefsRetryClockMs();
+  if (
+    warningKey === lastUnexpectedLoadableStatsWarning?.key &&
+    nowMs - lastUnexpectedLoadableStatsWarning.warnedAtMs < LOADABLE_STATS_UNEXPECTED_WARNING_INTERVAL_MS
+  ) {
+    return;
+  }
+  lastUnexpectedLoadableStatsWarning = { key: warningKey, warnedAtMs: nowMs };
 
   // Missing stats are an expected fallback. Existing but malformed or unreadable
   // stats should stay visible while the retry window still allows recovery.
@@ -157,6 +169,12 @@ function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath:
   );
 }
 
+function normalizeStackModuleDirectory(moduleDirectory: string) {
+  return /(?:^|[\\/])src$/.test(moduleDirectory)
+    ? resolvePath(moduleDirectory, '..', 'lib')
+    : moduleDirectory;
+}
+
 function moduleDirectoryFromStack(stack: unknown) {
   if (typeof stack !== 'string') return undefined;
 
@@ -164,7 +182,9 @@ function moduleDirectoryFromStack(stack: unknown) {
     const match = line.match(STACK_FILE_LOCATION);
     if (match) {
       const stackFilePath = match[1];
-      return dirname(stackFilePath.startsWith('file://') ? fileURLToPath(stackFilePath) : stackFilePath);
+      return normalizeStackModuleDirectory(
+        dirname(stackFilePath.startsWith('file://') ? fileURLToPath(stackFilePath) : stackFilePath),
+      );
     }
   }
 
@@ -283,7 +303,7 @@ function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStyleshee
     return EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME;
   }
 
-  lastUnexpectedLoadableStatsWarningKey = undefined;
+  lastUnexpectedLoadableStatsWarning = undefined;
   rscClientChunkStylesheetHrefsLoadState = {
     status: 'success',
     stylesheetHrefsByChunkName,

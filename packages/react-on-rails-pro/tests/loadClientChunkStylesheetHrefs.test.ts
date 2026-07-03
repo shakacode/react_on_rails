@@ -75,8 +75,6 @@ const missingLoadableStatsError = () =>
 describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
   afterEach(() => {
     jest.dontMock('fs');
-    jest.dontMock('path');
-    jest.dontMock('url');
     jest.resetModules();
     jest.restoreAllMocks();
   });
@@ -185,6 +183,33 @@ describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
     expect(consoleWarn).toHaveBeenCalledTimes(1);
   });
 
+  it('repeats identical unexpected loadable-stats warnings after the retry window stays failing', async () => {
+    let now = 1_000;
+    jest.spyOn(performance, 'now').mockImplementation(() => now);
+    const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const readFileSync = jest.fn().mockReturnValue('{');
+
+    jest.doMock('fs', () => ({
+      ...jest.requireActual<typeof import('fs')>('fs'),
+      readFileSync,
+    }));
+    const { default: injectRSCPayload } = await import('../src/injectRSCPayload.ts');
+    const flightData = '["client1","js/client1-12345678.chunk.js"]';
+
+    await expect(renderWithDefaultStylesheetInference(injectRSCPayload, flightData)).resolves.not.toContain(
+      '/webpack/test/css/client1-12345678.css',
+    );
+    expect(readFileSync).toHaveBeenCalledTimes(1);
+    expect(consoleWarn).toHaveBeenCalledTimes(1);
+
+    now += 30_000;
+    await expect(renderWithDefaultStylesheetInference(injectRSCPayload, flightData)).resolves.not.toContain(
+      '/webpack/test/css/client1-12345678.css',
+    );
+    expect(readFileSync).toHaveBeenCalledTimes(2);
+    expect(consoleWarn).toHaveBeenCalledTimes(2);
+  });
+
   it('resolves loadable-stats from a module-local path', async () => {
     const readFileSync = jest.fn().mockReturnValue(
       JSON.stringify({
@@ -235,6 +260,20 @@ describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
         ].join('\n'),
       ),
     ).toBe('/srv/app (blue)/node_modules/react-on-rails-pro/lib');
+  });
+
+  it('normalizes source-map-rewritten stack frames back to the compiled module directory', async () => {
+    const { resolveLoadableStatsModuleDirectory } = await import('../src/injectRSCPayload.ts');
+
+    expect(
+      resolveLoadableStatsModuleDirectory(
+        undefined,
+        [
+          'Error',
+          '    at resolveLoadableStatsModuleDirectory (file:///opt/react-on-rails-pro/src/injectRSCPayload.ts:42:11)',
+        ].join('\n'),
+      ),
+    ).toBe('/opt/react-on-rails-pro/lib');
   });
 
   it('uses a monotonic Node clock when global performance is unavailable', async () => {
