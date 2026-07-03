@@ -1046,12 +1046,13 @@ module ReactOnRailsProHelper
     raw_cache_options = raw_options[:cache_options] || {}
     cache_aware_options = raw_options.merge(
       on_complete: lambda { |chunks|
-        cache_write = {
+        cache_write = ReactOnRailsPro::StreamCacheWrites.build(
           cache_key: view_cache_key,
           chunks:,
           normalized_cache_tags:,
           raw_cache_options:
-        }
+        )
+        next unless cache_write
 
         pending_stream_cache_writes = @react_on_rails_pending_stream_cache_writes
         if pending_stream_cache_writes

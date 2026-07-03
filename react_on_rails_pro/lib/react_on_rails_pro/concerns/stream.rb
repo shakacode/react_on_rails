@@ -20,6 +20,17 @@ module ReactOnRailsPro
   module StreamCacheWrites
     module_function
 
+    def build(cache_key:, chunks:, normalized_cache_tags:, raw_cache_options:)
+      return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
+
+      {
+        cache_key:,
+        chunks:,
+        normalized_cache_tags:,
+        cache_options: cache_write_options(raw_cache_options)
+      }
+    end
+
     def flush(pending_writes)
       Array(pending_writes).each do |cache_write|
         write(cache_write)
@@ -29,10 +40,7 @@ module ReactOnRailsPro
     end
 
     def write(cache_write)
-      raw_cache_options = cache_write[:raw_cache_options]
-      return if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
-
-      cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+      cache_options = cache_write[:cache_options]
       Rails.cache.write(cache_write[:cache_key], cache_write[:chunks], cache_options)
       ReactOnRailsPro::Cache.register_normalized_tags(
         cache_write[:normalized_cache_tags],
@@ -49,9 +57,24 @@ module ReactOnRailsPro
     rescue StandardError
       # Cache write failure logging must not keep a fully drained response open.
     end
+
+    def cache_write_options(raw_cache_options)
+      unless snapshot_expires_at?(raw_cache_options)
+        return ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+      end
+
+      expires_in = raw_cache_options[:expires_at].to_time.to_f - Time.now.to_f
+      raw_cache_options.merge(
+        expires_in: [expires_in, ReactOnRailsPro::Cache::EXPIRED_CACHE_WRITE_TTL].max
+      ).except(:expires_at)
+    end
+
+    def snapshot_expires_at?(raw_cache_options)
+      raw_cache_options && raw_cache_options[:expires_at] && ReactOnRailsPro::Cache.cache_supports_expires_at?
+    end
   end
 
-  module Stream
+  module Stream # rubocop:disable Metrics/ModuleLength
     extend ActiveSupport::Concern
 
     included do
@@ -285,7 +308,10 @@ module ReactOnRailsPro
       @react_on_rails_pending_stream_cache_writes&.clear
     end
 
-    def stop_streaming_and_flush_cache_writes = @async_barrier&.stop.then { flush_pending_stream_cache_writes }
+    def stop_streaming_and_flush_cache_writes
+      @async_barrier&.stop
+      flush_pending_stream_cache_writes
+    end
 
     # Drains all streaming tasks concurrently using a producer-consumer pattern.
     #
