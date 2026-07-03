@@ -155,6 +155,14 @@ function reportResponseStartError(err: unknown) {
   errorReporter.error(err instanceof Error ? err : new Error(String(err)));
 }
 
+function observeResponseStartError(promise: Promise<void>) {
+  void promise.catch(reportResponseStartError);
+}
+
+function suppressUnhandledResponseStartError(promise: Promise<void>) {
+  void promise.catch(() => {});
+}
+
 /**
  * Handles incremental rendering requests with streaming JSON data.
  * The first object triggers rendering, subsequent objects provide incremental updates.
@@ -244,9 +252,12 @@ export async function handleIncrementalRenderStream(
                 const { response, shouldContinue: continueFlag } = result;
 
                 onResponseStartPromise = Promise.resolve(onResponseStart(response));
-                onResponseStartPromise.catch(reportResponseStartError);
+                suppressUnhandledResponseStartError(onResponseStartPromise);
 
                 if (!continueFlag) {
+                  if (onResponseStartPromise !== null) {
+                    observeResponseStartError(onResponseStartPromise);
+                  }
                   return;
                 }
               } catch (err) {
@@ -291,6 +302,10 @@ export async function handleIncrementalRenderStream(
         }
       }
     } catch (err) {
+      if (onResponseStartPromise !== null) {
+        observeResponseStartError(onResponseStartPromise);
+      }
+
       const error = err instanceof Error ? err : new Error(String(err));
       // Update the error message in place to retain the original stack trace, rather than creating a new error object
       error.message = `Error while handling the request stream: ${error.message}`;
@@ -298,7 +313,15 @@ export async function handleIncrementalRenderStream(
     }
 
     // Stream ended normally
-    await onRequestEnded();
+    try {
+      await onRequestEnded();
+    } catch (err) {
+      if (onResponseStartPromise !== null) {
+        observeResponseStartError(onResponseStartPromise);
+      }
+      throw err;
+    }
+
     await onResponseStartPromise;
   });
 }

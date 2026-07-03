@@ -747,7 +747,7 @@ describe('handleIncrementalRenderStream', () => {
       expect(onRequestEnded).toHaveBeenCalledTimes(1);
     });
 
-    it('propagates rejected response-start promises when the request stream ends cleanly', async () => {
+    it('propagates clean-path response-start rejections without reporting them twice', async () => {
       const responseStartError = new Error('response send failed');
       const mockRequest = createMockStream([Buffer.from(`${JSON.stringify({ id: 1 })}\n`)]);
       const onRenderRequestReceived = jest.fn().mockResolvedValue({
@@ -766,7 +766,9 @@ describe('handleIncrementalRenderStream', () => {
         }),
       ).rejects.toThrow(responseStartError);
 
-      expect(errorSpy).toHaveBeenCalledWith(responseStartError);
+      await waitForPromiseRejectionHandlers();
+
+      expect(errorSpy).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
     });
