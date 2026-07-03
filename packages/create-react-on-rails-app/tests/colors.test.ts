@@ -103,6 +103,19 @@ describe('pc color-enable decision', () => {
     expect(colorEnabled()).toBe(false);
   });
 
+  it('disables color on Windows with non-TTY stdout and no color vars', () => {
+    // picocolors enables color for `process.platform === 'win32'` regardless of
+    // TTY; chalk@4 required a TTY/FORCE_COLOR first. Guards ANSI escapes in
+    // redirected Windows output (e.g. `create-react-on-rails-app app > log.txt`).
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    try {
+      expect(colorEnabled()).toBe(false);
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    }
+  });
+
   it('still enables color in CI when FORCE_COLOR=1', () => {
     process.env.CI = 'true';
     process.env.FORCE_COLOR = '1';
