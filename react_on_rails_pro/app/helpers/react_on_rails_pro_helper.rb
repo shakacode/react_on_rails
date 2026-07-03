@@ -1008,7 +1008,7 @@ module ReactOnRailsProHelper
   end
 
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
-    load_pack_for_cached_react_component(component_name, { auto_load_bundle: }.merge(raw_options))
+    load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
     initial_result, *rest_chunks = cached_chunks
 
@@ -1081,30 +1081,39 @@ module ReactOnRailsProHelper
             "Include ReactOnRailsPro::AsyncRendering in your controller and call enable_async_react_rendering."
     end
 
+    cache_options = options_with_auto_load_bundle(raw_options)
+
     # Check conditional caching (:if / :unless options)
-    unless ReactOnRailsPro::Cache.use_cache?(raw_options)
+    unless ReactOnRailsPro::Cache.use_cache?(cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, raw_options)
-    raw_cache_options = raw_options[:cache_options] || {}
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, cache_options)
+    raw_cache_options = cache_options[:cache_options] || {}
     if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
       return render_async_react_component_uncached(component_name, raw_options, &)
     end
 
-    cache_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     Rails.logger.debug { "React on Rails Pro async cache_key is #{cache_key.inspect}" }
 
     # Synchronous cache lookup
-    cached_result = Rails.cache.read(cache_key, cache_options)
+    cached_result = Rails.cache.read(cache_key, cache_write_options)
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
-      load_pack_for_cached_react_component(component_name, raw_options)
+      load_pack_for_cached_react_component(component_name, cache_options)
       return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }
-    render_async_react_component_with_cache(component_name, raw_options, cache_key, raw_cache_options, cache_options, &)
+    render_async_react_component_with_cache(
+      component_name,
+      cache_options,
+      cache_key,
+      raw_cache_options,
+      cache_write_options,
+      &
+    )
   end
 
   # Renders async without caching (when :if/:unless conditions disable cache)
