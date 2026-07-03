@@ -26,28 +26,6 @@ module ReactOnRails
     configuration.setup_config_values
   end
 
-  # Rendering strategy configured at boot time by engine initializers.
-  # Replaces runtime react_on_rails_pro? checks (see issue #2905).
-  # Not yet wired into the main rendering path — currently additive only.
-  def self.rendering_strategy
-    @rendering_strategy ||= ReactOnRails::RenderingStrategy::ExecJsStrategy.new
-  end
-
-  def self.rendering_strategy=(strategy)
-    @rendering_strategy = strategy
-  end
-
-  # JS code builder configured at boot time by engine initializers.
-  # Used by RenderRequest#to_js to generate SSR JavaScript code.
-  # Not yet wired into the main rendering path — currently additive only.
-  def self.js_code_builder
-    @js_code_builder ||= ReactOnRails::JsCodeBuilder.new
-  end
-
-  def self.js_code_builder=(builder)
-    @js_code_builder = builder
-  end
-
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
   DEFAULT_SERVER_BUNDLE_OUTPUT_PATH = "ssr-generated"
