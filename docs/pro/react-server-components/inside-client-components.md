@@ -393,6 +393,7 @@ coordinator that returns plain route data, then render `RSCRoute` from the route
 Rails Pro then owns the RSC payload fetch, embedded SSR payload reuse, cache, and retry lifecycle.
 
 ```tsx
+import { Suspense } from 'react';
 import { createRoute } from '@tanstack/react-router';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import { rootRoute } from './rootRoute';
@@ -410,7 +411,11 @@ export const panelRoute = createRoute({
 function PanelRouteComponent() {
   const { componentName, componentProps } = panelRoute.useLoaderData();
 
-  return <RSCRoute componentName={componentName} componentProps={componentProps} />;
+  return (
+    <Suspense fallback={<div>Loading panel…</div>}>
+      <RSCRoute componentName={componentName} componentProps={componentProps} />
+    </Suspense>
+  );
 }
 ```
 
