@@ -223,6 +223,20 @@ describe('loadRSCClientChunkStylesheetHrefsByChunkName', () => {
     ).toBe('/opt/react-on-rails-pro/lib');
   });
 
+  it('resolves stack frame file URLs when the module path contains parentheses', async () => {
+    const { resolveLoadableStatsModuleDirectory } = await import('../src/injectRSCPayload.ts');
+
+    expect(
+      resolveLoadableStatsModuleDirectory(
+        undefined,
+        [
+          'Error',
+          '    at resolveLoadableStatsModuleDirectory (file:///srv/app%20(blue)/node_modules/react-on-rails-pro/lib/injectRSCPayload.js:42:11)',
+        ].join('\n'),
+      ),
+    ).toBe('/srv/app (blue)/node_modules/react-on-rails-pro/lib');
+  });
+
   it('uses a monotonic Node clock when global performance is unavailable', async () => {
     const originalPerformanceDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'performance');
     Object.defineProperty(globalThis, 'performance', { configurable: true, value: undefined });

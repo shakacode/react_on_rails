@@ -108,7 +108,7 @@ const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
 const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
 const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
-const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/[^):]+)|(?:\/[^():]+)|(?:[A-Za-z]:[\\/][^():]+)):\d+:\d+\)?/;
+const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
 type LoadableStats = {
   assetsByChunkName?: Record<string, string | string[]>;
@@ -177,6 +177,7 @@ export function resolveLoadableStatsModuleDirectory(
 ) {
   if (commonJsModuleDirectory) return commonJsModuleDirectory;
 
+  // Native ESM has no __dirname, while Jest still compiles this file in CJS.
   const stackModuleDirectory = moduleDirectoryFromStack(stack);
   if (stackModuleDirectory) return stackModuleDirectory;
 
