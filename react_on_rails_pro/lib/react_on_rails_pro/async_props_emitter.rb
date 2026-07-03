@@ -64,33 +64,14 @@ module ReactOnRailsPro
     # The prop value is JSON-serialized and sent as an NDJSON line.
     # On the Node side, this triggers asyncPropsManager.setProp(propName, value).
     def call(prop_name, prop_value)
-      update_chunk = generate_update_chunk(prop_name, prop_value)
-      @request_stream << "#{update_chunk.to_json}\n"
-      @pushed_props.add(prop_name)
-    rescue StandardError => e
-      # Continue streaming: one failed async prop write should not abort the
-      # entire render. The prop is not marked as pushed unless the write
-      # succeeds, so pull mode can request it again instead of silently hanging.
-      Rails.logger.error do
-        backtrace = e.backtrace&.first(5)&.join("\n")
-        "[ReactOnRailsPro::AsyncProps] Failed to send async prop '#{prop_name}': " \
-          "#{e.class} - #{e.message}\n#{backtrace}"
-      end
+      write_settled_chunk(prop_name, action: "send") { generate_update_chunk(prop_name, prop_value) }
     end
 
     # Rejects an async prop on the Node side so React can show an error boundary.
     def reject(prop_name, reason)
-      update_chunk = generate_reject_chunk(prop_name, reason)
-      @request_stream << "#{update_chunk.to_json}\n"
       # Once the reject chunk is written, Ruby treats the prop as settled too.
       # That keeps duplicate pull requests filtered even if the JS manager is recreated.
-      @pushed_props.add(prop_name)
-    rescue StandardError => e
-      Rails.logger.error do
-        backtrace = e.backtrace&.first(5)&.join("\n")
-        "[ReactOnRailsPro::AsyncProps] Failed to reject async prop '#{prop_name}': " \
-          "#{e.class} - #{e.message}\n#{backtrace}"
-      end
+      write_settled_chunk(prop_name, action: "reject") { generate_reject_chunk(prop_name, reason) }
     end
 
     # Generates the chunk that should be executed when the request stream closes.
@@ -109,6 +90,23 @@ module ReactOnRailsPro
     end
 
     private
+
+    def write_settled_chunk(prop_name, action:)
+      chunk = yield
+      @request_stream << "#{chunk.to_json}\n"
+      # Once the chunk is written, Ruby treats the prop as settled too.
+      # That keeps duplicate pull requests filtered even if the JS manager is recreated.
+      @pushed_props.add(prop_name)
+    rescue StandardError => e
+      # Continue streaming: one failed async prop write should not abort the
+      # entire render. The prop is not marked as pushed unless the write
+      # succeeds, so pull mode can request it again instead of silently hanging.
+      Rails.logger.error do
+        backtrace = e.backtrace&.first(5)&.join("\n")
+        "[ReactOnRailsPro::AsyncProps] Failed to #{action} async prop '#{prop_name}': " \
+          "#{e.class} - #{e.message}\n#{backtrace}"
+      end
+    end
 
     def generate_update_chunk(prop_name, value)
       {
