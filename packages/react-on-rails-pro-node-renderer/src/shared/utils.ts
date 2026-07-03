@@ -30,6 +30,7 @@ import { remapStackTrace } from '../worker/vmSourceMapSupport.js';
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
 
 export const SHUTDOWN_WORKER_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER';
+export const SHUTDOWN_WORKER_ACK_MESSAGE = 'NODE_RENDERER_SHUTDOWN_WORKER_ACK';
 
 export function workerIdLabel() {
   return cluster?.worker?.id || 'NO WORKER ID';

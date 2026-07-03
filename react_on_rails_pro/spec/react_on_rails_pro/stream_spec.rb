@@ -583,6 +583,17 @@ RSpec.describe ReactOnRailsPro::Stream do
     end
 
     describe "exception handling" do
+      it "preserves dependency load errors raised before stream observability state is captured" do
+        _queues, controller, _stream = setup_stream_test(component_count: 0)
+        allow(controller).to receive(:require_streaming_dependencies).and_raise(
+          LoadError, "cannot load such file -- async/limited_queue"
+        )
+
+        expect do
+          controller.stream_view_containing_react_components(template: "ignored")
+        end.to raise_error(LoadError, %r{async/limited_queue})
+      end
+
       it "does not commit the response when render_to_string raises" do
         _queues, controller, stream = setup_stream_test(component_count: 0)
 

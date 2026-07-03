@@ -60,6 +60,9 @@ class RSCRouteErrorBoundary extends Component<
     const { error } = this.state;
     const { componentName, componentProps, children } = this.props;
     if (error) {
+      if (isServerComponentFetchError(error)) {
+        throw error;
+      }
       throw new ServerComponentFetchError(error.message, componentName, componentProps, error);
     }
 
@@ -172,11 +175,13 @@ const toServerComponentFetchError = (
 };
 
 type RefetchErrorState = [string, ServerComponentFetchError];
+type RSCContextValue = ReturnType<typeof useRSC>;
+type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue };
 
-const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
-  ({ componentName, componentProps, onRefetchError }, ref) => {
+const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
+  ({ componentName, componentProps, onRefetchError, rscContext }, ref) => {
     const { getComponent, refetchComponent, getRefetchVersion, retainComponent, successfulVersions } =
-      useRSC();
+      rscContext;
     const currentRouteKey = useMemo(
       () => createRSCPayloadKey(componentName, componentProps),
       [componentName, componentProps],
@@ -232,7 +237,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
       // visible while the new promise streams in.
       const refetchPromise = refetchComponent(n, p, recoverOnError);
       const sharedRefetchVersion = getRefetchVersion(n, p);
-      return rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
           recoverOnError &&
@@ -245,6 +250,10 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
         }
         throw serverComponentFetchError;
       });
+      if (recoverOnError) {
+        void handledRefetchPromise.catch(() => undefined);
+      }
+      return handledRefetchPromise;
     }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {
@@ -267,15 +276,32 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
     const componentPromise = getComponent(componentName, componentProps);
     return (
       <CurrentRSCRouteContext.Provider value={handle}>
-        <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
-          <PromiseWrapper promise={componentPromise} />
-        </RSCRouteErrorBoundary>
+        <PromiseWrapper promise={componentPromise} />
       </CurrentRSCRouteContext.Provider>
     );
   },
 );
 
 RSCRouteContent.displayName = 'RSCRouteContent';
+
+const RSCRouteContentWithErrorBoundary = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
+  ({ componentName, componentProps, onRefetchError }, ref) => {
+    const rscContext = useRSC();
+    return (
+      <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
+        <RSCRouteContent
+          ref={ref}
+          componentName={componentName}
+          componentProps={componentProps}
+          onRefetchError={onRefetchError}
+          rscContext={rscContext}
+        />
+      </RSCRouteErrorBoundary>
+    );
+  },
+);
+
+RSCRouteContentWithErrorBoundary.displayName = 'RSCRouteContentWithErrorBoundary';
 
 /**
  * Renders a React Server Component inside a React Client Component.
@@ -310,7 +336,7 @@ const RSCRoute = forwardRef<RSCRouteHandle, RSCRouteProps>(
     }
 
     return (
-      <RSCRouteContent
+      <RSCRouteContentWithErrorBoundary
         ref={ref}
         componentName={componentName}
         componentProps={componentProps}
