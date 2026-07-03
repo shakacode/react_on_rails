@@ -1326,8 +1326,8 @@ describe('injectRSCPayload', () => {
     const appScript = '<script>window.msg = 1;</script>after';
     const mockHTML = createMockHTMLStream({
       5: 'before<script>window.msg = 1;</script',
-      25: '>after',
-      250: '<p>later</p>',
+      250: '>after',
+      500: '<p>later</p>',
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
@@ -1342,7 +1342,7 @@ describe('injectRSCPayload', () => {
     await expect(firstChunk).resolves.not.toContain('window.msg');
 
     await new Promise((resolve) => {
-      setTimeout(resolve, 80);
+      setTimeout(resolve, 300);
     });
     expect(chunks.join('')).toContain(appScript);
     expect(chunks.join('')).not.toContain('<p>later</p>');
