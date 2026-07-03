@@ -113,6 +113,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4394](https://github.com/shakacode/react_on_rails/pull/4394) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Streaming dependency load errors stay visible**: Pro streaming cleanup now tolerates dependency
+  load failures that happen before stream observability state is captured, so the original `LoadError`
+  remains visible instead of being masked by cleanup. Fixes
+  [Issue 4324](https://github.com/shakacode/react_on_rails/issues/4324).
+  [PR 4388](https://github.com/shakacode/react_on_rails/pull/4388) by
+  [justin808](https://github.com/justin808).
+
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
   like the default `:immediate` mode instead of raising, while invalid explicit values still fail
   fast. Fixes [Issue 4342](https://github.com/shakacode/react_on_rails/issues/4342).
