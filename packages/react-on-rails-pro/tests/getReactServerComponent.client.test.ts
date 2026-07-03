@@ -100,9 +100,47 @@ describe('fetchRSC HTTP responses', () => {
         rscPayloadGenerationUrlPath: '/rsc_payload',
       }),
     ).rejects.toThrow(
-      `Failed to fetch RSC payload for component "MissingPanel" from "${fetchUrl}": RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" failed with HTTP 404 Not Found.`,
+      'Failed to fetch RSC payload for component "MissingPanel" from "/rsc_payload/MissingPanel": RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" failed with HTTP 404 Not Found.',
     );
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     expect(createFromReadableStream).not.toHaveBeenCalled();
+  });
+
+  it('keeps serialized props out of non-ok HTTP error text while preserving the request URL', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const sentinel = 'SECRET_SENTINEL_RSC_PROPS_LEAK';
+    const componentProps = { token: sentinel };
+    const fetchUrl = `/rsc_payload/AccountPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    fetchMock.mockResolvedValue(
+      createWebResponseFromText('server failed', {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      }),
+    );
+
+    let thrownError: Error | undefined;
+    try {
+      await fetchRSC({
+        componentName: 'AccountPanel',
+        componentProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      });
+    } catch (error) {
+      thrownError = error as Error;
+    }
+
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    expect(thrownError).toBeInstanceOf(Error);
+    expect(thrownError?.message).toBe(
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 500 Internal Server Error.',
+    );
+
+    const reportedText = `${thrownError?.message ?? ''}\n${thrownError?.stack ?? ''}`;
+    expect(reportedText).not.toContain(sentinel);
+    expect(reportedText).not.toContain(encodeURIComponent(sentinel));
   });
 
   it('propagates non-ok HTTP responses through the getReactServerComponent fetch path', async () => {
@@ -126,7 +164,7 @@ describe('fetchRSC HTTP responses', () => {
         enforceRefetch: true,
       }),
     ).rejects.toThrow(
-      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel?props=%7B%7D": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
     );
     expect(createFromReadableStream).not.toHaveBeenCalled();
   });
@@ -152,7 +190,7 @@ describe('fetchRSC HTTP responses', () => {
     ).rejects.toThrow(
       `Failed to fetch RSC payload for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
         componentName,
-      )}?props=%7B%22id%22%3A1%7D": RSC payload request for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
+      )}": RSC payload request for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
         componentName,
       )}" failed with HTTP 401 Unauthorized.`,
     );

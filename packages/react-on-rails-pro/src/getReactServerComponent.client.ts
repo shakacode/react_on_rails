@@ -213,7 +213,7 @@ export const fetchRSC = ({
       cspNonce,
       replayConsoleScripts,
       // Keep `source` query-string free so serialized props aren't echoed into error messages
-      // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
+      // or attached error-monitoring events.
       source: sourcePath,
     }).catch((error: unknown) => {
       // RSC stream diagnostic errors already carry component/source context — preserve them
@@ -221,7 +221,7 @@ export const fetchRSC = ({
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
       if (isAbortError(error)) throw error;
       const wrapper: Error & { cause?: unknown } = new Error(
-        `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
+        `Failed to fetch RSC payload for component "${componentName}" from "${sourcePath}": ${extractErrorMessage(error)}`,
       );
       wrapper.cause = error;
       throw wrapper;
