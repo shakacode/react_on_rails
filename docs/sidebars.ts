@@ -248,7 +248,6 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/add-streaming-and-interactivity',
             'pro/react-server-components/create-without-ssr',
             'pro/react-server-components/inside-client-components',
-            'pro/react-server-components/rsc-payload-route-data',
             'pro/react-server-components/selective-hydration-in-streamed-components',
             'pro/react-server-components/flight-protocol-syntax',
             'pro/react-server-components/upgrading-existing-pro-app',

@@ -262,7 +262,7 @@ end
 # in hosted CI. (--check-staged stays tracked-only by design: it inspects the
 # index via `git show :path`, and an unstaged file is not part of the commit.)
 def working_tree_in_scope_files
-  (tracked_in_scope_files + untracked_in_scope_files).uniq.sort
+  (tracked_in_scope_files + untracked_in_scope_files).uniq.select { |path| File.file?(path) }.sort
 end
 
 def index_file_content(path)

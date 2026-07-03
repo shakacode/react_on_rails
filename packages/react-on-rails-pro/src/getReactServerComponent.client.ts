@@ -44,8 +44,6 @@ export type FetchRSCOptions = {
   componentProps: unknown;
   rscPayloadGenerationUrlPath: string;
   cspNonce?: string;
-  fetchOptions?: Pick<RequestInit, 'credentials' | 'headers' | 'signal'>;
-  replayConsoleScripts?: boolean;
 };
 
 const createMissingRSCPayloadPathError = (componentName: string) =>
@@ -84,12 +82,10 @@ const createFromFetch = async (
   {
     componentName,
     cspNonce,
-    replayConsoleScripts = true,
     source,
   }: {
     componentName: string;
     cspNonce?: string;
-    replayConsoleScripts?: boolean;
     source: string;
   },
 ) => {
@@ -132,7 +128,7 @@ const createFromFetch = async (
               reportDiagnosticError(metadata);
               controller.enqueue(content);
               const consoleScript = (metadata.consoleReplayScript as string) ?? '';
-              if (replayConsoleScripts && consoleScript) {
+              if (consoleScript) {
                 replayConsole(consoleScript, nonce);
               }
             });
@@ -158,14 +154,6 @@ const createFromFetch = async (
   });
 };
 
-// Duck type instead of `instanceof DOMException`: cross-realm AbortErrors
-// have the correct name but fail instanceof checks across realm boundaries.
-const isAbortError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'name' in error &&
-  (error as { name?: unknown }).name === 'AbortError';
-
 /**
  * Fetches an RSC payload via HTTP request.
  *
@@ -181,8 +169,6 @@ const isAbortError = (error: unknown): boolean =>
  * @param componentProps - Props for the server component
  * @param rscPayloadGenerationUrlPath - Base Rails path where RSC payloads are fetched
  * @param cspNonce - Optional nonce for legacy console replay script injection
- * @param fetchOptions - Narrow fetch controls for callers that need credentials, headers, or cancellation
- * @param replayConsoleScripts - Whether console replay metadata should be materialized as script tags
  * @returns A Promise resolving to the rendered React element
  * @throws Error if RSC payload generation URL path is not configured or network request fails
  * @internal Shared implementation for Pro client helpers; prefer exported package entry points.
@@ -192,8 +178,6 @@ export const fetchRSC = ({
   componentProps,
   rscPayloadGenerationUrlPath,
   cspNonce,
-  fetchOptions,
-  replayConsoleScripts,
 }: FetchRSCOptions) => {
   if (!rscPayloadGenerationUrlPath) {
     return Promise.reject(createMissingRSCPayloadPathError(componentName));
@@ -205,12 +189,11 @@ export const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
-    const fetchPromise = fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
+    const fetchPromise = fetch(fetchUrl);
 
     return createFromFetch(fetchPromise, {
       componentName,
       cspNonce,
-      replayConsoleScripts,
       // Keep `source` query-string free so serialized props aren't echoed into error messages
       // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
       source: sourcePath,
@@ -218,7 +201,6 @@ export const fetchRSC = ({
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
-      if (isAbortError(error)) throw error;
       const wrapper: Error & { cause?: unknown } = new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );

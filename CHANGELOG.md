@@ -81,6 +81,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4223](https://github.com/shakacode/react_on_rails/pull/4223) by
   [justin808](https://github.com/justin808).
 
+#### Removed
+
+- **[Pro]** **Removed the RC-only `react-on-rails-pro/rscPayloadNode` export**:
+  `createRscPayloadNode` was added in the 17.0.0 RC cycle but never shipped in a stable release.
+  `RSCRoute` is the canonical client-router integration: route loaders can return `componentName`
+  and `componentProps`, while React on Rails Pro owns the RSC payload fetch, cache, embedded SSR
+  payload reuse, and retry lifecycle. The component-name URL-encoding fix and descriptive HTTP
+  status errors from the helper work remain in the shared `RSCRoute` fetch path. Fixes
+  [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439).
+
 #### Changed
 
 - **[Pro]** **Reduced tag-index cache work for streamed cache writes**: Multi-tag cache registration now
