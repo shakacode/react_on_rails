@@ -2,23 +2,25 @@
  * Regression tests for the color-enable decision in src/utils.ts.
  *
  * The `pc` color instance is built at module load from the environment, layering
- * one chalk-compatibility override (FORCE_COLOR=0/false disables) on top of
- * picocolors' own detection. That override has already been wrong twice in this
- * package's history — FORCE_COLOR=0 wrongly enabling color, and empty NO_COLOR=
- * being mishandled — so this suite locks the decision across the env matrix.
+ * two chalk@4-compatibility overrides on top of picocolors' own detection:
+ * FORCE_COLOR=0/false disables, and a bare CI (non-TTY) does not force color.
+ * Both behaviors have regressed in this package's history — FORCE_COLOR=0 wrongly
+ * enabling color, empty NO_COLOR= mishandling, and CI-only output-incompatibility
+ * — so this suite locks the decision across the env/TTY matrix.
  *
- * `pc` is a module-load-time const and picocolors reads process.env when it is
- * first required, so each case runs in an isolated module registry
- * (jest.isolateModules) with process.env mutated first, then re-requires utils.
+ * `pc` is a module-load-time const and picocolors reads process.env + stdout.isTTY
+ * when first required, so each case runs in an isolated module registry
+ * (jest.isolateModules) after mutating the environment, then re-requires utils.
+ * TTY state is stubbed explicitly so the result never depends on the test runner.
  */
 
-const ANSI_RED_OPEN = '[31m';
+const ANSI_RED_OPEN = '[31m';
 
-function colorEnabledUnder(env: NodeJS.ProcessEnv): boolean {
+function colorEnabled(): boolean {
   let enabled = false;
   jest.isolateModules(() => {
     // Re-require inside the isolated registry so both picocolors and utils
-    // re-read the freshly mutated process.env.
+    // re-read the freshly mutated process.env and process.stdout.isTTY.
     // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
     const { pc } = require('../src/utils') as typeof import('../src/utils');
     enabled = pc.red('x').includes(ANSI_RED_OPEN);
@@ -28,45 +30,69 @@ function colorEnabledUnder(env: NodeJS.ProcessEnv): boolean {
 
 describe('pc color-enable decision', () => {
   const originalEnv = process.env;
+  const originalIsTTY = process.stdout.isTTY;
+
+  function setTTY(isTTY: boolean): void {
+    Object.defineProperty(process.stdout, 'isTTY', { value: isTTY, configurable: true });
+  }
 
   beforeEach(() => {
-    // Deterministic non-color baseline that does not depend on the test runner's
-    // TTY/CI: no TTY (jest's stdout isn't a TTY anyway), and explicitly clear the
-    // vars picocolors keys off so each case sets only what it is testing.
+    // Deterministic baseline independent of the runner: clear every signal the
+    // color decision keys off, and force a non-TTY stdout. Each test sets only
+    // what it is exercising.
     const base = { ...originalEnv };
     delete base.FORCE_COLOR;
     delete base.NO_COLOR;
     delete base.CI;
     delete base.TERM;
     process.env = base;
+    setTTY(false);
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
   });
 
   it('enables color when FORCE_COLOR=1', () => {
     process.env.FORCE_COLOR = '1';
-    expect(colorEnabledUnder(process.env)).toBe(true);
+    expect(colorEnabled()).toBe(true);
   });
 
   it('disables color when FORCE_COLOR=0 (chalk-compat override)', () => {
     process.env.FORCE_COLOR = '0';
-    expect(colorEnabledUnder(process.env)).toBe(false);
+    expect(colorEnabled()).toBe(false);
   });
 
   it('disables color when FORCE_COLOR=false (chalk-compat override)', () => {
     process.env.FORCE_COLOR = 'false';
-    expect(colorEnabledUnder(process.env)).toBe(false);
+    expect(colorEnabled()).toBe(false);
   });
 
   it('disables color when NO_COLOR=1', () => {
     process.env.NO_COLOR = '1';
-    expect(colorEnabledUnder(process.env)).toBe(false);
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('enables color for an interactive TTY (no CI, no FORCE_COLOR)', () => {
+    setTTY(true);
+    expect(colorEnabled()).toBe(true);
+  });
+
+  it('disables color for a bare CI with non-TTY stdout (chalk-compat override)', () => {
+    // picocolors enables color on `!!env.CI` alone; chalk@4 stayed plain unless
+    // FORCE_COLOR or a TTY was present. Guards ANSI leaking into captured CI logs.
+    process.env.CI = 'true';
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('still enables color in CI when FORCE_COLOR=1', () => {
+    process.env.CI = 'true';
+    process.env.FORCE_COLOR = '1';
+    expect(colorEnabled()).toBe(true);
   });
 
   it('disables color by default in a non-TTY, non-CI environment', () => {
-    // base already cleared FORCE_COLOR/NO_COLOR/CI; jest stdout is not a TTY.
-    expect(colorEnabledUnder(process.env)).toBe(false);
+    expect(colorEnabled()).toBe(false);
   });
 });

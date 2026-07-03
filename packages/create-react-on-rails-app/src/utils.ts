@@ -4,17 +4,33 @@ import picocolors from 'picocolors';
 /**
  * Shared color instance, reused by other modules.
  *
- * We defer entirely to picocolors' own color detection (NO_COLOR, FORCE_COLOR, TTY, CI,
- * platform) with exactly one override: picocolors enables color whenever `FORCE_COLOR` is
- * merely present (`!!env.FORCE_COLOR`), so `FORCE_COLOR=0` / `FORCE_COLOR=false` would turn
- * color ON. chalk@4 parsed that value and treated `0`/`false` as disabled, so we restore that
- * one behavior here and let picocolors decide everything else. Keeping the override this narrow
- * avoids re-implementing (and diverging from) picocolors' detection order.
+ * We start from picocolors' own color detection and layer two overrides so the
+ * output matches what `chalk@4` produced before the swap (the scaffolder is a
+ * user's first contact with the framework, and its logs are often captured):
+ *
+ *  1. picocolors enables color whenever `FORCE_COLOR` is merely present
+ *     (`!!env.FORCE_COLOR`), so `FORCE_COLOR=0` / `FORCE_COLOR=false` would turn
+ *     color ON. chalk@4 parsed that value and treated `0`/`false` as disabled.
+ *  2. picocolors enables color whenever `!!env.CI` is set, even for non-TTY
+ *     (piped) stdout. chalk@4 did not: in CI with piped output it stayed plain
+ *     unless FORCE_COLOR or a TTY was present, so a bare `CI` must not force
+ *     ANSI escapes into captured logs.
+ *
+ * Everything else (NO_COLOR incl. empty, FORCE_COLOR truthy, real TTY, --color)
+ * is left to picocolors, keeping the override surface small.
  */
-const forceColorDisabled =
-  'FORCE_COLOR' in process.env && (process.env.FORCE_COLOR === '0' || process.env.FORCE_COLOR === 'false');
+const forceColor = 'FORCE_COLOR' in process.env ? process.env.FORCE_COLOR : undefined;
+const forceColorEnabled = forceColor !== undefined && forceColor !== '0' && forceColor !== 'false';
+const forceColorDisabled = forceColor === '0' || forceColor === 'false';
+const enabledByTty = (process.stdout?.isTTY ?? false) && process.env.TERM !== 'dumb';
+// Color is enabled only when picocolors already wants it AND that is not solely
+// because of CI (an explicit FORCE_COLOR/TTY signal must also be present).
+const colorEnabled =
+  !forceColorDisabled &&
+  picocolors.isColorSupported &&
+  (forceColorEnabled || enabledByTty || !process.env.CI);
 
-export const pc = picocolors.createColors(forceColorDisabled ? false : picocolors.isColorSupported);
+export const pc = picocolors.createColors(colorEnabled);
 
 function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // Always inherit PATH, HOME, and the rest of process.env; callers only add/override keys.
