@@ -83,11 +83,25 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
+  bypasses renders that use async props, so per-request async stream output cannot be replayed from
+  another request's cached stream. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
+
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
   [Issue 4369](https://github.com/shakacode/react_on_rails/issues/4369).
   [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Streaming dependency load errors stay visible**: Pro streaming cleanup now tolerates dependency
+  load failures that happen before stream observability state is captured, so the original `LoadError`
+  remains visible instead of being masked by cleanup. Fixes
+  [Issue 4324](https://github.com/shakacode/react_on_rails/issues/4324).
+  [PR 4388](https://github.com/shakacode/react_on_rails/pull/4388) by
   [justin808](https://github.com/justin808).
 
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
@@ -96,12 +110,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4350](https://github.com/shakacode/react_on_rails/pull/4350) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **Cached component hits load generated packs consistently**:
-  Pro cached component helpers now share the `ReactOnRailsPro::Cache.fetch_react_component` path and
-  run the cache-hit pack-loading callback, so cached `cached_react_component` and
-  `cached_react_component_hash` output preserves generated pack behavior. Fixes
-  [Issue 4316](https://github.com/shakacode/react_on_rails/issues/4316).
-  [PR 4384](https://github.com/shakacode/react_on_rails/pull/4384) by
+- **[Pro]** **Incremental render setup failures release renderer context**:
+  The Pro node renderer now releases the execution context and destroys started streams when
+  pull-mode incremental render setup fails, preventing orphaned renderer work after response-start
+  errors. Fixes [Issue 4312](https://github.com/shakacode/react_on_rails/issues/4312).
+  [PR 4383](https://github.com/shakacode/react_on_rails/pull/4383) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Dropped pull-mode prop requests are logged**: Streaming SSR now warns when the Node
@@ -140,6 +153,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   fail under shells where Ruby's default external encoding is US-ASCII. Fixes
   [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
   [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Cached component hits load generated packs consistently**:
+  Pro cached component helpers now share the `ReactOnRailsPro::Cache.fetch_react_component` path and
+  run the cache-hit pack-loading callback, so cached `cached_react_component` and
+  `cached_react_component_hash` output preserves generated pack behavior. Fixes
+  [Issue 4316](https://github.com/shakacode/react_on_rails/issues/4316).
+  [PR 4384](https://github.com/shakacode/react_on_rails/pull/4384) by
   [justin808](https://github.com/justin808).
 
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
