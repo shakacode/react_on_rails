@@ -58,6 +58,18 @@ describe ReactOnRailsPro::Cache, :caching do
       allow(Rails).to receive(:logger).and_return(logger_mock)
     end
 
+    it "rejects duplicate keys across positional and keyword options" do
+      expect do
+        described_class.fetch_react_component(
+          "MyComponent",
+          { if: true, cache_key: "positional_key" },
+          cache_key: "keyword_key"
+        ) do
+          "<div>Something</div>"
+        end
+      end.to raise_error(ArgumentError, "Duplicate cache option keys: cache_key")
+    end
+
     it "fetches the value from the cache if the value is a string" do
       result = "<div>Something</div>"
       create_component_code = instance_double(TestingCache, call: result)

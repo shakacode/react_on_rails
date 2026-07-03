@@ -26,7 +26,7 @@ module ReactOnRailsPro
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
       def fetch_react_component(component_name, options = nil, on_cache_hit: nil, **keyword_options)
-        options = options ? options.merge(keyword_options) : keyword_options
+        options = merged_component_options(options, keyword_options)
 
         return yield unless use_cache?(options)
 
@@ -124,6 +124,15 @@ module ReactOnRailsPro
       end
 
       private
+
+      def merged_component_options(options, keyword_options)
+        return keyword_options unless options
+
+        duplicate_option_keys = options.keys & keyword_options.keys
+        return options.merge(keyword_options) if duplicate_option_keys.empty?
+
+        raise ArgumentError, "Duplicate cache option keys: #{duplicate_option_keys.join(', ')}"
+      end
 
       def add_component_cache_metadata(result, cache_key, cache_hit)
         return result unless result.is_a?(Hash)
