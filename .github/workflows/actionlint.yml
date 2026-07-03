@@ -41,7 +41,10 @@ jobs:
           fi
 
           if [ "$DIFF_BASE" != "origin/main" ] && ! git cat-file -e "$DIFF_BASE^{commit}"; then
-            git fetch origin "$DIFF_BASE"
+            if ! git fetch origin "$DIFF_BASE"; then
+              echo "::error::Unable to fetch workflow diff base $DIFF_BASE"
+              exit 1
+            fi
           fi
 
           if ! changed_files="$(git diff --name-only "$DIFF_BASE" ${{ github.sha }})"; then

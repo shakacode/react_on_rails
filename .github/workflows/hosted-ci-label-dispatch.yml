@@ -10,6 +10,10 @@ permissions:
   issues: write
   pull-requests: read
 
+concurrency:
+  group: hosted-ci-label-dispatch-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
 jobs:
   dispatch-hosted-ci:
     runs-on: ubuntu-22.04
@@ -84,6 +88,14 @@ jobs:
             const currentLabelNames = labels.map((label) => label.name);
             if (!currentLabelNames.includes(labelName)) {
               core.info(`Ignoring stale ${labelName} label event because the label is no longer present.`);
+              return;
+            }
+
+            if (labelName === hostedCiLabel && currentLabelNames.includes(forceFullHostedCiLabel)) {
+              core.info(
+                `Ignoring ${hostedCiLabel} label event because ${forceFullHostedCiLabel} is present; ` +
+                  'the force-full label event owns this dispatch.'
+              );
               return;
             }
 
