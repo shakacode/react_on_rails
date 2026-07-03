@@ -83,6 +83,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Reduced tag-index cache work for streamed cache writes**: Multi-tag cache registration now
+  batch-reads existing tag indexes when supported, and streamed cache misses defer cache writes and tag
+  registration until queued response chunks have drained. Streamed and async cache misses also register tags
+  with the same completion-time cache options used for the cache write, keeping TTL snapshots aligned. Fixes
+  [Issue 4319](https://github.com/shakacode/react_on_rails/issues/4319).
+  [PR 4443](https://github.com/shakacode/react_on_rails/pull/4443) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
   configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
   `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
