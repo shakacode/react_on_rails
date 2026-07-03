@@ -929,12 +929,27 @@ module ReactOnRailsProHelper
     public_output_prefix = public_output_path.relative_path_from(public_path).to_s
 
     [
-      public_output_path.join(relative_source_path.delete_prefix("#{public_output_prefix}/")),
-      public_path.join(relative_source_path),
-      Rails.root.join("public", relative_source_path)
-    ].uniq
+      static_rsc_contained_asset_path(
+        public_output_path,
+        relative_source_path.delete_prefix("#{public_output_prefix}/")
+      ),
+      static_rsc_contained_asset_path(public_path, relative_source_path),
+      static_rsc_contained_asset_path(Rails.root.join("public"), relative_source_path)
+    ].compact.uniq
   rescue StandardError
-    [Rails.root.join("public", clean_source_path.delete_prefix("/"))]
+    Array(static_rsc_contained_asset_path(Rails.root.join("public"), clean_source_path.delete_prefix("/")))
+  end
+
+  def static_rsc_contained_asset_path(root_path, relative_path)
+    clean_root_path = Pathname.new(root_path.to_s).cleanpath
+    candidate_path = clean_root_path.join(relative_path.to_s).cleanpath
+    return unless static_rsc_path_inside_root?(candidate_path, clean_root_path)
+
+    candidate_path
+  end
+
+  def static_rsc_path_inside_root?(candidate_path, root_path)
+    candidate_path == root_path || candidate_path.to_s.start_with?("#{root_path}#{File::SEPARATOR}")
   end
 
   def static_rsc_client_reference_diagnostics(cache_hit: false)

@@ -1827,6 +1827,24 @@ describe ReactOnRailsProHelper do
         ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
       end
 
+      it "drops manifest asset byte candidates that escape public roots" do
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        FileUtils.mkdir_p(custom_public_root.join("packs-test"))
+
+        shakapacker_config = instance_double(
+          Shakapacker::Configuration,
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
+        )
+        shakapacker_instance = instance_double(Shakapacker::Instance, config: shakapacker_config)
+        allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+
+        expect(send(:static_rsc_asset_path_candidates, "../static-rsc-secret.js")).to be_empty
+        expect(send(:static_rsc_asset_bytes, "../static-rsc-secret.js")).to be_nil
+      ensure
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
+      end
+
       it "includes best-effort manifest asset and RSC client-reference diagnostics" do
         diagnostics = []
         client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
