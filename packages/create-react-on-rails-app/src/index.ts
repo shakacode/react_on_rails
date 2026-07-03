@@ -1,11 +1,10 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
 import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import type { ResolvedSetupMode } from './mode.js';
 import { resolveSetupMode } from './mode.js';
-import { detectPackageManager, logError, logInfo } from './utils.js';
+import { detectPackageManager, logError, logInfo, pc } from './utils.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
@@ -52,7 +51,7 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
   }
 
   console.log('');
-  console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
+  console.log(`${pc.bold('create-react-on-rails-app')} v${packageJson.version}`);
   console.log('');
 
   const nameValidation = validateAppName(appName);
@@ -107,9 +106,9 @@ function run(appName: string, rawOpts: Record<string, unknown>, command?: Comman
 
   for (const { name, result } of results) {
     if (result.valid) {
-      console.log(chalk.green(`  ✓ ${name}: ${result.message}`));
+      console.log(pc.green(`  ✓ ${name}: ${result.message}`));
     } else {
-      console.log(chalk.red(`  ✗ ${name}`));
+      console.log(pc.red(`  ✗ ${name}`));
     }
   }
 

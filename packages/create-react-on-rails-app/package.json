@@ -20,8 +20,8 @@
     "lib/**/*.d.ts"
   ],
   "dependencies": {
-    "chalk": "^4.1.2",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.16",

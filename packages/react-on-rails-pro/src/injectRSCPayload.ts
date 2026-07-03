@@ -15,11 +15,16 @@
 
 import { PassThrough } from 'stream';
 import { readFileSync } from 'fs';
-import { resolve as resolvePath } from 'path';
+import { dirname, resolve as resolvePath } from 'path';
+import { performance as nodePerformance } from 'perf_hooks';
+import { fileURLToPath } from 'url';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createEmbeddedPayloadKey } from './utils.ts';
-import RSCRequestTracker from './RSCRequestTracker.ts';
+import RSCRequestTracker, {
+  hasExpectedRSCStreamCleanup,
+  shouldReportRSCStreamTruncation,
+} from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 import {
@@ -100,7 +105,10 @@ const RSC_CLIENT_CHUNK_STYLESHEET_PATH = /\/css\/client\d+-[^/]+\.css$/;
 const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client\d+-[^"]+\.chunk\.js"/g;
 const REACT_SUSPENSE_REVEAL_SCRIPT = /\$RC\(/;
 const LOADABLE_STATS_FILE_NAME = 'loadable-stats.json';
+const LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS = 100;
+const LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS = 30_000;
 const RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS = 100;
+const STACK_FILE_LOCATION = /\(?((?:file:\/\/\/.+)|(?:\/.+)|(?:[A-Za-z]:[\\/].+)):\d+:\d+\)?\s*$/;
 
 type LoadableStats = {
   assetsByChunkName?: Record<string, string | string[]>;
@@ -108,8 +116,81 @@ type LoadableStats = {
 };
 
 type RSCClientChunkStylesheetHrefsByChunkName = Map<string, string[]>;
+type RSCClientChunkStylesheetHrefsLoadState =
+  | {
+      status: 'success';
+      stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName;
+    }
+  | {
+      status: 'retry-after';
+      retryAfterMs: number;
+      retryDelayMs: number;
+    };
 
-let cachedRSCClientChunkStylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName | undefined;
+const EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME: RSCClientChunkStylesheetHrefsByChunkName =
+  new Map();
+
+let rscClientChunkStylesheetHrefsLoadState: RSCClientChunkStylesheetHrefsLoadState | undefined;
+let lastUnexpectedLoadableStatsWarningKey: string | undefined;
+let resolvedLoadableStatsPath: string | undefined;
+
+function rscClientChunkStylesheetHrefsRetryClockMs() {
+  return globalThis.performance?.now?.() ?? nodePerformance.now();
+}
+
+function isFileNotFoundError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+function warnIfUnexpectedLoadableStatsFailure(error: unknown, loadableStatsPath: string) {
+  if (isFileNotFoundError(error)) return;
+
+  const warningKey = `${loadableStatsPath}\n${error instanceof Error ? `${error.name}:${error.message}` : String(error)}`;
+  if (warningKey === lastUnexpectedLoadableStatsWarningKey) return;
+  lastUnexpectedLoadableStatsWarningKey = warningKey;
+
+  // Missing stats are an expected fallback. Existing but malformed or unreadable
+  // stats should stay visible while the retry window still allows recovery.
+  console.warn(
+    `React on Rails Pro could not load ${loadableStatsPath}; RSC stylesheet inference will retry while falling back to streamed preload tags.`,
+    error,
+  );
+}
+
+function moduleDirectoryFromStack(stack: unknown) {
+  if (typeof stack !== 'string') return undefined;
+
+  for (const line of stack.split('\n')) {
+    const match = line.match(STACK_FILE_LOCATION);
+    if (match) {
+      const stackFilePath = match[1];
+      return dirname(stackFilePath.startsWith('file://') ? fileURLToPath(stackFilePath) : stackFilePath);
+    }
+  }
+
+  return undefined;
+}
+
+export function resolveLoadableStatsModuleDirectory(
+  commonJsModuleDirectory: string | undefined,
+  stack: unknown = new Error().stack,
+) {
+  if (commonJsModuleDirectory) return commonJsModuleDirectory;
+
+  // Native ESM has no __dirname, while Jest still compiles this file in CJS.
+  const stackModuleDirectory = moduleDirectoryFromStack(stack);
+  if (stackModuleDirectory) return stackModuleDirectory;
+
+  throw new Error('Could not resolve the React on Rails Pro module directory for loadable-stats.json');
+}
+
+function resolveLoadableStatsPath() {
+  resolvedLoadableStatsPath ??= resolvePath(
+    resolveLoadableStatsModuleDirectory(typeof __dirname !== 'undefined' ? __dirname : undefined),
+    LOADABLE_STATS_FILE_NAME,
+  );
+  return resolvedLoadableStatsPath;
+}
 
 function escapeRegExpLiteral(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -148,16 +229,26 @@ function assetHref(assetPath: string, publicPath?: string) {
 }
 
 function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStylesheetHrefsByChunkName {
-  if (cachedRSCClientChunkStylesheetHrefsByChunkName) {
-    return cachedRSCClientChunkStylesheetHrefsByChunkName;
+  const loadState = rscClientChunkStylesheetHrefsLoadState;
+
+  if (loadState?.status === 'success') {
+    return loadState.stylesheetHrefsByChunkName;
   }
 
-  const stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName = new Map();
+  if (
+    loadState?.status === 'retry-after' &&
+    rscClientChunkStylesheetHrefsRetryClockMs() < loadState.retryAfterMs
+  ) {
+    return EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME;
+  }
+
+  let loadableStatsPath: string | undefined;
+  let stylesheetHrefsByChunkName: RSCClientChunkStylesheetHrefsByChunkName;
 
   try {
-    const loadableStats = JSON.parse(
-      readFileSync(resolvePath(__dirname, LOADABLE_STATS_FILE_NAME), 'utf8'),
-    ) as LoadableStats;
+    loadableStatsPath = resolveLoadableStatsPath();
+    const loadableStats = JSON.parse(readFileSync(loadableStatsPath, 'utf8')) as LoadableStats;
+    stylesheetHrefsByChunkName = new Map();
 
     Object.entries(loadableStats.assetsByChunkName ?? {}).forEach(([chunkName, assets]) => {
       if (!/^client\d+$/.test(chunkName)) return;
@@ -170,12 +261,33 @@ function loadRSCClientChunkStylesheetHrefsByChunkName(): RSCClientChunkStyleshee
         stylesheetHrefsByChunkName.set(chunkName, stylesheetHrefs);
       }
     });
-  } catch {
+  } catch (error) {
     // RSC CSS gating is opportunistic for builds that copy loadable-stats.json to
     // the renderer bundle directory. Other setups fall back to streamed preload tags.
+    // Start with a short retry window for deploy races, then widen for builds
+    // that intentionally do not ship loadable-stats.json.
+    warnIfUnexpectedLoadableStatsFailure(
+      error,
+      loadableStatsPath ?? `module-local ${LOADABLE_STATS_FILE_NAME}`,
+    );
+    const previousRetryDelayMs = loadState?.status === 'retry-after' ? loadState.retryDelayMs : 0;
+    const retryDelayMs =
+      previousRetryDelayMs === 0
+        ? LOADABLE_STATS_INITIAL_READ_RETRY_DELAY_MS
+        : Math.min(previousRetryDelayMs * 2, LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS);
+    rscClientChunkStylesheetHrefsLoadState = {
+      status: 'retry-after',
+      retryAfterMs: rscClientChunkStylesheetHrefsRetryClockMs() + retryDelayMs,
+      retryDelayMs,
+    };
+    return EMPTY_RSC_CLIENT_CHUNK_STYLESHEET_HREFS_BY_CHUNK_NAME;
   }
 
-  cachedRSCClientChunkStylesheetHrefsByChunkName = stylesheetHrefsByChunkName;
+  lastUnexpectedLoadableStatsWarningKey = undefined;
+  rscClientChunkStylesheetHrefsLoadState = {
+    status: 'success',
+    stylesheetHrefsByChunkName,
+  };
   return stylesheetHrefsByChunkName;
 }
 
@@ -1894,12 +2006,22 @@ export default function injectRSCPayload(
               // Schedule fallback in case flush() is never called.
               scheduleFlushFallback();
             };
+            let rscStreamEndedCleanly = false;
             try {
               for await (const chunk of stream ?? []) {
                 const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
                 parser.feed(chunkBuf, handleParsedChunk);
               }
+              rscStreamEndedCleanly = true;
             } finally {
+              if (
+                rscStreamEndedCleanly &&
+                stream &&
+                !hasExpectedRSCStreamCleanup(stream) &&
+                shouldReportRSCStreamTruncation(stream)
+              ) {
+                parser.flush();
+              }
               resolveRSCClientStylesheetInferenceForStream();
             }
           })(),

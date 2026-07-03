@@ -249,6 +249,16 @@ describe ReactOnRailsPro::Cache::TagIndex, :caching do
       expect(index_payload("tenant:7")["keys"]).to eq(["entry/one"])
     end
 
+    it "batch-reads existing index payloads when registering multiple tags" do
+      allow(Rails.cache).to receive(:read_multi).and_call_original
+
+      described_class.register(["post:42", "tenant:7"], "entry/one", { expires_in: 3600 })
+
+      expect(Rails.cache).to have_received(:read_multi)
+        .with(described_class.index_key("post:42"), described_class.index_key("tenant:7"))
+        .once
+    end
+
     it "revalidates entries under tags that would be invalid raw Memcached keys" do
       tag = "#{"tag with whitespace\nand controls " * 10}#{'x' * 300}"
       Rails.cache.write("entry/one", "one")
