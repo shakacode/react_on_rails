@@ -48,7 +48,7 @@ ReactOnRails.registerStore({
 When registering your component with React on Rails, you can get the store via `ReactOnRails.getStore`:
 
 ```js
-// getStore will initialize the store if not already initialized, so creates or retrieves store
+// getStore retrieves the store that React on Rails created and hydrated from the redux_store props
 const appStore = ReactOnRails.getStore('appStore');
 return (
   <Provider store={appStore}>

@@ -58,8 +58,8 @@ registerStoreGenerators(storesGenerators);
 
 /**
  * Allows retrieval of the store by name. This store will be hydrated by any Rails form props.
- * Pass optional param throwIfMissing = false if you want to use this call to get back null if the
- * store with name is not registered.
+ * Pass optional param throwIfMissing = false if you want to use this call to get back undefined if
+ * the store with name is not hydrated.
  * @param name
  * @param throwIfMissing Defaults to true. Set to false to have this call return undefined if
  *        there is no store with the given name.

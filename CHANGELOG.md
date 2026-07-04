@@ -108,6 +108,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **`ReactOnRails.getStore(name, false)` no longer throws when no stores are hydrated**: With
+  `throwIfMissing = false`, `getStore` now returns `undefined` when the hydrated-store registry is
+  empty — matching its documented contract and its existing behavior when other stores are hydrated —
+  in both the open-source and Pro JS packages. Default strict calls still throw the descriptive
+  "There are no stores hydrated" / "Could not find hydrated store" errors. By
+  [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
   each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
   documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
