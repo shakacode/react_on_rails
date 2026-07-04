@@ -2100,7 +2100,63 @@ Use `cached_buffered_stream_react_component` when the complete static response s
 %>
 ```
 
+For static public RSC pages that do not hydrate the generated page pack, use `cached_static_rsc_component`. It buffers through the same renderer, strips embedded `REACT_ON_RAILS_RSC_PAYLOADS` bootstrap scripts before caching, and respects an explicit `auto_load_bundle: false` so the view can append only a small sidecar pack:
+
+```erb
+<%=
+  cached_static_rsc_component(
+    "MarketingPage",
+    cache_key: ["marketing-page", I18n.locale],
+    cache_tags: ["marketing-page"],
+    cache_options: { expires_in: 30.minutes },
+    auto_load_bundle: false,
+    rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+    id: "marketing-page"
+  ) do
+    @marketing_page_props
+  end
+%>
+<%= javascript_pack_tag("generated/PublicPageClientEffects") %>
+```
+
 Buffered rendering is not progressive: the browser receives the page only after every RSC/SSR chunk is available. Prefer `stream_react_component` or `stream_react_component_with_async_props` when early shell flush, slow async props, or progressive Suspense boundaries matter.
+
+#### Static RSC Render Diagnostics
+
+`cached_static_rsc_component` emits a redacted render summary in development and when `ReactOnRailsPro.configuration.tracing` is enabled. You can also enable it per render with `rsc_render_diagnostics: true` or capture it directly with a callback:
+
+```erb
+<%=
+  cached_static_rsc_component(
+    "MarketingPage",
+    cache_key: ["marketing-page", I18n.locale],
+    auto_load_bundle: false,
+    rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+    rsc_render_diagnostics: ->(summary) { Rails.logger.info(summary.to_json) },
+    id: "marketing-page"
+  ) do
+    @marketing_page_props
+  end
+%>
+```
+
+The same payload is published as an `ActiveSupport::Notifications` event so benchmark harnesses can archive it with ShakaPerf or Lighthouse output:
+
+```ruby
+ActiveSupport::Notifications.subscribe("render_static_rsc_component.react_on_rails_pro") do |_name, _start, _finish, _id, summary|
+  Rails.logger.info(summary.to_json)
+end
+```
+
+The summary includes:
+
+- `cache.enabled`, `cache.hit`, and `cache.key_digest` so public-page runs can distinguish cold renders from warm cached output without logging raw cache keys.
+- `auto_load_bundle`, which shows whether the generated page pack was intentionally skipped.
+- `html.raw_bytes`, `html.cached_bytes`, `rsc_payload.bootstrap_script_count`, and `rsc_payload.bootstrap_script_bytes`, which show how much Flight/bootstrap script markup was removed before caching.
+- `emitted_assets.js` and `emitted_assets.css`, populated from the Shakapacker manifest for the generated component pack when `auto_load_bundle` is true and for any explicit `rsc_diagnostic_packs`.
+- `client_references.entries`, populated from the RSC client manifest when it is available on disk. An empty array is useful evidence for static public pages that should avoid eager RSC client references.
+
+Manifest-derived fields are best-effort. When a dev server, missing file, or custom deployment makes a manifest unavailable, the summary includes an `unavailable_reason` instead of failing the render. The summary never includes serialized props, Flight payload contents, or the raw expanded cache key.
 
 ### Browser-Observable RSC Stream Marks
 
@@ -2665,6 +2721,8 @@ Nonces are per-request values; caching renders per-request markup. Two distinct 
 ### Fragment caching helpers bake the nonce into the cached fragment
 
 `cached_react_component`, `cached_react_component_hash`, `cached_stream_react_component`, `cached_buffered_stream_react_component`, and `cached_async_react_component` cache the **final rendered HTML** (for streaming: the full chunk array) under a cache key built from your `cache_key` option plus bundle digests. The cached markup includes the executable inline scripts **with the nonce of the request that populated the cache**, and the cache key does **not** include the nonce.
+
+`cached_static_rsc_component` strips embedded RSC payload/bootstrap scripts that reference `REACT_ON_RAILS_RSC_PAYLOADS` before caching, so those payload scripts are not served with stale nonces. Any other executable inline scripts preserved in the cached HTML still follow this nonce caveat.
 
 A cache hit therefore serves a stale nonce to a different request, whose CSP header carries a different nonce — the browser blocks those inline scripts and immediate hydration/console replay silently degrade (components still hydrate via the client bundle's normal page-load path, but the strict-CSP guarantee of "zero violations" no longer holds).
 
@@ -4240,7 +4298,7 @@ const config = {
   allWorkersRestartInterval: 45,
   // Stagger individual restarts by 6 minutes to avoid downtime
   delayBetweenIndividualWorkerRestarts: 6,
-  // Force-kill workers that don't restart within 30 seconds
+  // Force-kill workers that don't restart within 30 seconds (value is seconds)
   gracefulWorkerRestartTimeout: 30,
 };
 ```
@@ -9836,26 +9894,27 @@ Rails, which you already have.
 > choice. React on Rails Pro's RSC feature set is actively expanding — check the
 > [release notes](../release-notes/index.md) for the current state.
 
-| Capability                                 | React on Rails Pro                                                                                                                                     | Next.js (App Router)                             |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| Server Components + Flight streaming       | Yes                                                                                                                                                    | Yes                                              |
-| SSR + hydration with **no** double-fetch   | Yes (inlined `REACT_ON_RAILS_RSC_PAYLOADS`)                                                                                                            | Yes (inlined `__next_f`)                         |
-| Refetch RSC on client navigation           | Yes (`/rsc_payload/:name` is the default endpoint)                                                                                                     | Yes (segment-level diff)                         |
-| Segment-level navigation diffing           | No route-segment diffing as of 2026 — RoR Pro refetches by component name; **Rails owns routing**                                                      | Yes — built into the framework router            |
-| Built-in link prefetching                  | Not built-in as of 2026 — use Rails/Turbo or a client router                                                                                           | Yes (viewport + hover)                           |
-| Server-side mutations                      | Rails controllers/endpoints own mutations; see [Rails data patterns](../../oss/migrating/rsc-data-fetching.md) (no server-action shorthand as of 2026) | "Server Actions" (RPC + re-render in one trip)   |
-| Static shell + streamed dynamic holes      | [Async props](../../oss/migrating/rsc-data-fetching.md) stream slow data (related goal, different mechanism)                                           | Partial Prerendering (PPR)                       |
-| Stream each slow prop independently        | Yes (async props)                                                                                                                                      | Related via Suspense/PPR (different granularity) |
-| Use your existing Rails app/routes/auth/DB | Yes — the entire point                                                                                                                                 | No — Next owns the server                        |
-| Bundler choice                             | webpack **or** Rspack (Shakapacker)                                                                                                                    | Turbopack default; webpack/Rspack also           |
-| Hosting model                              | Your Rails app + a Node renderer process                                                                                                               | One Node (or Edge) server process                |
+| Capability                                 | React on Rails Pro                                                                                                                                                                                                                      | Next.js (App Router)                             |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Server Components + Flight streaming       | Yes                                                                                                                                                                                                                                     | Yes                                              |
+| SSR + hydration with **no** double-fetch   | Yes (inlined `REACT_ON_RAILS_RSC_PAYLOADS`)                                                                                                                                                                                             | Yes (inlined `__next_f`)                         |
+| Refetch RSC on client navigation           | Yes (`/rsc_payload/:name` is the default endpoint)                                                                                                                                                                                      | Yes (segment-level diff)                         |
+| Segment-level navigation diffing           | No route-segment diffing as of 2026 — RoR Pro refetches by component name; **Rails owns routing**                                                                                                                                       | Yes — built into the framework router            |
+| Built-in link prefetching                  | Not built-in as of 2026 — use Rails/Turbo or a client router                                                                                                                                                                            | Yes (viewport + hover)                           |
+| Server-side mutations                      | Rails controllers/endpoints own mutations; see [Mutations without Server Actions](../../oss/building-features/mutations.md) and [Rails data patterns](../../oss/migrating/rsc-data-fetching.md) (no server-action shorthand as of 2026) | "Server Actions" (RPC + re-render in one trip)   |
+| Static shell + streamed dynamic holes      | [Async props](../../oss/migrating/rsc-data-fetching.md) stream slow data (related goal, different mechanism)                                                                                                                            | Partial Prerendering (PPR)                       |
+| Stream each slow prop independently        | Yes (async props)                                                                                                                                                                                                                       | Related via Suspense/PPR (different granularity) |
+| Use your existing Rails app/routes/auth/DB | Yes — the entire point                                                                                                                                                                                                                  | No — Next owns the server                        |
+| Bundler choice                             | webpack **or** Rspack (Shakapacker)                                                                                                                                                                                                     | Turbopack default; webpack/Rspack also           |
+| Hosting model                              | Your Rails app + a Node renderer process                                                                                                                                                                                                | One Node (or Edge) server process                |
 
 The pattern: **Next.js gives you more RSC-era features in the box** because it owns the whole stack.
 **React on Rails Pro gives you RSC inside a real Rails app** — keeping Rails' routing, data layer, and
 ecosystem — at the cost of running a couple more moving parts (the [node renderer](../node-renderer.md)
 and a third bundle). Where React on Rails Pro hands a responsibility back to Rails (mutations, routing,
 auth), that is usually a feature for a Rails team, not a gap: you already have those tools and do not
-want a second, parallel copy of them.
+want a second, parallel copy of them. For a practical mutation recipe, see
+[Mutations without Server Actions](../../oss/building-features/mutations.md).
 
 ## Developer experience: one process vs. several
 
@@ -9898,6 +9957,7 @@ chunk-loading primitives differ.
 - [RSC Rendering Flow](./rendering-flow.md) — the detailed rendering lifecycle and bundle types
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the RSC wire format
 - [Rspack Compatibility](./rspack-compatibility.md) — bundler support status and the native `RSCRspackPlugin`
+- [Mutations without Server Actions](../../oss/building-features/mutations.md) — Rails controller recipes side-by-side with Next.js Server Actions
 - [RSC Glossary](./glossary.md) — terminology reference
 - [RSC overview](./index.md) — the full React Server Components documentation set
 - [React on Rails Pro and TanStack Start](./tanstack-start-comparison.md) — the same kind of architecture comparison, for TanStack Start
@@ -9987,8 +10047,9 @@ database stay in Rails where they already live. (RSC is a Pro feature requiring 
 For the interactive pieces that **mutate**, both stacks still cross a network boundary: Start calls a
 typed server function; React on Rails posts to a Rails controller (often with TanStack Query driving the
 request). Start's server-function shorthand is genuinely less boilerplate for that path today; the trade
-is that the function — and the business logic inside it — lives in your UI's runtime rather than in
-Rails.
+is that the function — and the business logic inside it — lives in Start's server runtime rather than in
+Rails. For side-by-side mutation recipes, see
+[Mutations without Server Actions](../../oss/building-features/mutations.md).
 
 ## The backend you assemble vs. the backend you have
 
@@ -10090,6 +10151,7 @@ and would rather adopt the TanStack libraries on top of it than rebuild the back
 ## Related documentation
 
 - [TanStack Router on React on Rails](../../oss/building-features/tanstack-router.md) — using TanStack Router, with Pro SSR support
+- [Mutations without Server Actions](../../oss/building-features/mutations.md) — Rails controller recipes compared with Next.js Server Actions and TanStack server functions
 - [RoR Pro vs. Next.js RSC](./nextjs-comparison.md) — how the RSC contract works, compared across stacks
 - [React Server Components overview](./index.md) — the full RSC documentation set
 - [Decision Guide](../../oss/getting-started/comparing-react-on-rails-to-alternatives.md) — choosing between React on Rails, TanStack Start, Next.js, and other alternatives
