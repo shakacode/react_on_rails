@@ -9,8 +9,8 @@ CI should give fast feedback during review without weakening merge safety:
 1. Local machines catch routine failures before a push.
 2. Every PR update gets a stable required check: `ci-required / required-pr-gate`.
 3. Hosted GitHub Actions run only after local validation, on merge queue, on
-   `main`, on `release/*` pushes, on release-target PRs, or by explicit manual
-   dispatch.
+   `main`, on `release/*` pushes, on same-repository non-Dependabot
+   release-target PRs, or by explicit manual dispatch.
 4. Optimized hosted CI stays path-selected by `script/ci-changes-detector`.
 5. Force-full hosted CI is a separate maintainer decision that bypasses
    optimized suite selection.
@@ -38,8 +38,10 @@ Generator-sensitive changes are the standing exception: when
 `script/ci-changes-detector` sets `run_generators=true`, the required gate
 blocks ordinary pull requests until `+ci-run-hosted`, `bin/request-hosted-ci`,
 or a maintainer/user-token `ready-for-hosted-ci` label requests hosted CI.
-Merge queue, push-to-main, `release/*` pushes, and release-target PRs already
-satisfy hosted eligibility.
+Merge queue, push-to-main, `release/*` pushes, and same-repository
+non-Dependabot release-target PRs already satisfy hosted eligibility.
+Dependabot release-target PRs require trusted current-head `+ci-run-hosted` or
+`+ci-force-full` dispatch proof before hosted jobs are enabled.
 
 ## Hosted CI Modes
 
@@ -51,9 +53,15 @@ Optimized hosted CI runs when one of these is true:
 - the event is a push to `release/*`
 - the event is `merge_group`
 - the workflow is manually dispatched
-- the PR targets a release branch (`release/*`, `releases/*`, or `release-*`)
+- a same-repository non-Dependabot PR targets a release branch (`release/*`,
+  `releases/*`, or `release-*`)
 - the PR has `ready-for-hosted-ci`
 - the PR has `force-full-hosted-ci`
+
+Dependabot PRs are the exception: hosted CI labels and release-target base
+branches are honored only after a write/admin maintainer uses `+ci-run-hosted`
+or `+ci-force-full` and the selector sees the current-head dispatch success
+comment.
 
 Optimized hosted CI still uses `script/ci-changes-detector` to decide which
 suites are applicable. This is the normal remote confirmation path after local
@@ -131,7 +139,7 @@ To record a SHA-bound hosted-CI waiver:
 
 For fork PRs, comment-command hosted CI does not dispatch same-repository
 workflows or add persistent labels. A maintainer should push a trusted branch in
-the base repository when Pro or secret-backed CI is required.
+the base repository when release-target, Pro, or secret-backed CI is required.
 
 ## Local CI Contract
 

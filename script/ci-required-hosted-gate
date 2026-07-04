@@ -7,8 +7,9 @@ set -euo pipefail
 event_name="${GITHUB_EVENT_NAME:-}"
 run_generators="${RUN_GENERATORS:-false}"
 should_run_hosted_ci="${SHOULD_RUN_HOSTED_CI:-false}"
+force_required_hosted_ci_recheck="${FORCE_REQUIRED_HOSTED_CI_RECHECK:-false}"
 
-if [ "$event_name" = "pull_request" ] &&
+if { [ "$event_name" = "pull_request" ] || [ "$force_required_hosted_ci_recheck" = "true" ]; } &&
   [ "$run_generators" = "true" ] &&
   [ "$should_run_hosted_ci" != "true" ]; then
   cat >&2 <<'MSG'

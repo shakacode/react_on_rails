@@ -510,7 +510,7 @@ React on Rails uses a small required PR gate plus opt-in hosted validation. Cont
 ### CI Behavior
 
 - **Required PR gate**: Always starts for PRs and keeps the merge signal cheap.
-- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, release-target PRs, merge queue, `main`, `release/*` pushes, or manual dispatch.
+- **Optimized hosted CI**: Runs path-selected hosted suites after `+ci-run-hosted`, `ready-for-hosted-ci`, same-repository non-Dependabot release-target PRs, merge queue, `main`, `release/*` pushes, or manual dispatch. Dependabot PRs need trusted current-head `+ci-run-hosted` or `+ci-force-full` dispatch proof before hosted jobs are enabled.
 - **Force-full hosted CI**: Runs every hosted suite only after `+ci-force-full`, `force-full-hosted-ci`, or a manual `force_full_hosted: true` dispatch.
 - **Docs-only changes**: Expensive hosted suites skip when only documentation/metadata paths change (`*.md`, `*.mdx`, `*.markdown`, `*.rst`, `*.txt`, `docs/`, `internal/`, `.github/ISSUE_TEMPLATE/`, or `.lychee.toml`)
 
@@ -728,7 +728,7 @@ Legacy slash commands (`/run-skipped-ci`, `/run-skipped-tests`, and `/stop-run-s
 
 - **Force-pushes:** `+ci-run-hosted` and `+ci-force-full` dispatch workflows for the current head SHA before adding labels. If you force-push after commenting, the initial workflow run may test the old commit, but subsequent pushes follow the persistent labels.
 - **Workflow-token labels:** A label added by a workflow's `GITHUB_TOKEN` does not start new `pull_request` workflow runs by itself. That is why the comment commands dispatch workflows for the current head SHA before adding labels.
-- **Fork PRs:** Comment-command hosted CI does not dispatch same-repository workflows or add persistent labels for fork heads. A maintainer should push a trusted base-repository branch when Pro or secret-backed CI is required.
+- **Fork PRs:** Comment-command hosted CI does not dispatch same-repository workflows or add persistent labels for fork heads. A maintainer should push a trusted base-repository branch when release-target, Pro, or secret-backed CI is required.
 - **Waivers:** The `+ci-skip-hosted` command records the exact SHA in the PR conversation. If you push another commit, use `+ci-skip-hosted` again if you still intend to waive hosted CI.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 

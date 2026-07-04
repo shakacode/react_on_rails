@@ -65,8 +65,31 @@ on:
 # Cancel stale PR benchmark runs when new commits are pushed.
 # Main runs are never cancelled so every merge is measured.
 concurrency:
-  group: ${{ github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) || format('benchmark-{0}', github.sha) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: >-
+    ${{
+      github.event_name == 'pull_request' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name != 'benchmark' &&
+      github.event.label.name != 'benchmark-core' &&
+      github.event.label.name != 'benchmark-pro' &&
+      github.event.label.name != 'benchmark-pro-node-renderer' &&
+      github.event.label.name != 'hosted-ci-no-benchmarks' &&
+      format('benchmark-ignored-label-{0}', github.run_id) ||
+      github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) ||
+      format('benchmark-{0}', github.sha)
+    }}
+  cancel-in-progress: >-
+    ${{
+      github.event_name == 'pull_request' &&
+      (
+        github.event.action != 'labeled' ||
+        github.event.label.name == 'benchmark' ||
+        github.event.label.name == 'benchmark-core' ||
+        github.event.label.name == 'benchmark-pro' ||
+        github.event.label.name == 'benchmark-pro-node-renderer' ||
+        github.event.label.name == 'hosted-ci-no-benchmarks'
+      )
+    }}
 
 jobs:
   detect-changes:
