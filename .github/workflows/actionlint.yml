@@ -40,8 +40,14 @@ jobs:
             DIFF_BASE="origin/main"
           fi
 
-          if [ "$DIFF_BASE" != "origin/main" ] && ! git cat-file -e "$DIFF_BASE^{commit}"; then
-            if ! git fetch origin "$DIFF_BASE"; then
+          if ! git cat-file -e "$DIFF_BASE^{commit}"; then
+            if [ "$DIFF_BASE" = "origin/main" ]; then
+              fetch_ref="main:refs/remotes/origin/main"
+            else
+              fetch_ref="$DIFF_BASE"
+            fi
+
+            if ! git fetch origin "$fetch_ref"; then
               echo "::error::Unable to fetch workflow diff base $DIFF_BASE"
               exit 1
             fi

@@ -497,41 +497,50 @@ jobs:
               let labelAdded = false;
               let forceFullLabelAdded = false;
               let labelMessageOverride = '';
-              if (succeeded.length > 0) {
+              if (succeeded.length > 0 && failed.length === 0) {
                 const labelControlCommands = [
                   '+ci-stop-hosted',
                   '+ci-skip-hosted',
                   '+ci-stop-full'
                 ];
-                const newerCommands = await newerCiCommands(labelControlCommands);
-                if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
-                  labelMessageOverride =
-                    'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
-                } else {
-                  for (const command of await newerCiCommands(labelControlCommands, { waitForVisibility: false })) {
-                    newerCommands.add(command);
-                  }
-
+                try {
+                  const newerCommands = await newerCiCommands(labelControlCommands);
                   if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
                     labelMessageOverride =
                       'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
                   } else {
-                    const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
-                    try {
-                      await addHostedCiLabels(shouldAddForceFullLabel);
-                      labelAdded = true;
-                      forceFullLabelAdded = shouldAddForceFullLabel;
-                      if (forceFull && !shouldAddForceFullLabel) {
-                        labelMessageOverride =
-                          'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                    for (const command of await newerCiCommands(labelControlCommands, { waitForVisibility: false })) {
+                      newerCommands.add(command);
+                    }
+
+                    if (newerCommands.has('+ci-stop-hosted') || newerCommands.has('+ci-skip-hosted')) {
+                      labelMessageOverride =
+                        'Skipped hosted CI labels because a newer stop/skip command was posted after this command.';
+                    } else {
+                      const shouldAddForceFullLabel = forceFull && !newerCommands.has('+ci-stop-full');
+                      try {
+                        await addHostedCiLabels(shouldAddForceFullLabel);
+                        labelAdded = true;
+                        forceFullLabelAdded = shouldAddForceFullLabel;
+                        if (forceFull && !shouldAddForceFullLabel) {
+                          labelMessageOverride =
+                            'Added `ready-for-hosted-ci`, but skipped `force-full-hosted-ci` because a newer `+ci-stop-full` command was posted after this command.';
+                        }
+                      } catch (error) {
+                        failed.push({
+                          workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
+                          error: error.message
+                        });
                       }
-                    } catch (error) {
-                      failed.push({
-                        workflow: forceFull ? 'force-full hosted CI labels' : 'hosted CI label',
-                        error: error.message
-                      });
                     }
                   }
+                } catch (error) {
+                  failed.push({
+                    workflow: 'hosted CI newer-command check',
+                    error: error.message || String(error)
+                  });
+                  labelMessageOverride =
+                    'Skipped hosted CI labels because checking for newer stop/skip commands failed after workflows were triggered.';
                 }
               }
 

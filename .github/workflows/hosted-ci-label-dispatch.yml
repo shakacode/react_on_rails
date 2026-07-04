@@ -44,69 +44,6 @@ jobs:
             const repoFullName = `${owner}/${repo}`;
             const permissionByLogin = new Map();
 
-            async function hasWriteAccessFor(username) {
-              if (!username) {
-                return false;
-              }
-
-              if (permissionByLogin.has(username)) {
-                return permissionByLogin.get(username);
-              }
-
-              let hasWriteAccess = false;
-              try {
-                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
-                  owner,
-                  repo,
-                  username
-                });
-                hasWriteAccess = ['admin', 'write'].includes(permission.permission);
-              } catch (error) {
-                core.warning(
-                  `Unable to verify ${username} write permission for hosted CI label dispatch; ` +
-                    `treating the label event as untrusted: ${error.message || error}`
-                );
-              }
-
-              permissionByLogin.set(username, hasWriteAccess);
-              return hasWriteAccess;
-            }
-
-            if (!headRepoFullName || headRepoFullName !== repoFullName) {
-              core.setFailed(
-                'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
-                  'A maintainer should push the branch to this repository or trigger the required workflows manually.'
-              );
-              return;
-            }
-
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner,
-              repo,
-              issue_number: pr.number
-            });
-            const currentLabelNames = labels.map((label) => label.name);
-            if (!currentLabelNames.includes(labelName)) {
-              core.info(`Ignoring stale ${labelName} label event because the label is no longer present.`);
-              return;
-            }
-
-            if (labelName === hostedCiLabel && currentLabelNames.includes(forceFullHostedCiLabel)) {
-              core.info(
-                `Ignoring ${hostedCiLabel} label event because ${forceFullHostedCiLabel} is present; ` +
-                  'the force-full label event owns this dispatch.'
-              );
-              return;
-            }
-
-            if (!(await hasWriteAccessFor(context.actor))) {
-              core.setFailed(
-                `Unable to dispatch hosted CI from this label event because ${context.actor} does not have write/admin repository permission. ` +
-                  'Use `+ci-run-hosted` or ask a write/admin maintainer to add the hosted CI label.'
-              );
-              return;
-            }
-
             async function removeLabelIfPresent(name) {
               try {
                 await github.rest.issues.removeLabel({
@@ -138,8 +75,90 @@ jobs:
               return cleanupResults;
             }
 
+            async function removeTriggeredControlLabel() {
+              return [await removeLabelIfPresent(labelName)];
+            }
+
+            function cleanupSummary(cleanupResults) {
+              const removedControlLabels = cleanupResults
+                .filter((result) => result.removed)
+                .map((result) => result.name);
+
+              return removedControlLabels.length > 0
+                ? ` Removed hosted CI control label(s): ${removedControlLabels.join(', ')}.`
+                : '';
+            }
+
+            async function hasWriteAccessFor(username) {
+              if (!username) {
+                return false;
+              }
+
+              if (permissionByLogin.has(username)) {
+                return permissionByLogin.get(username);
+              }
+
+              let hasWriteAccess = false;
+              try {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username
+                });
+                hasWriteAccess = ['admin', 'write'].includes(permission.permission);
+              } catch (error) {
+                core.warning(
+                  `Unable to verify ${username} write permission for hosted CI label dispatch; ` +
+                    `treating the label event as untrusted: ${error.message || error}`
+                );
+              }
+
+              permissionByLogin.set(username, hasWriteAccess);
+              return hasWriteAccess;
+            }
+
+            if (!headRepoFullName || headRepoFullName !== repoFullName) {
+              const cleanupResults = await removeTriggeredControlLabel();
+              core.setFailed(
+                'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
+                  'A maintainer should push the branch to this repository or trigger the required workflows manually.' +
+                  cleanupSummary(cleanupResults)
+              );
+              return;
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: pr.number
+            });
+            const currentLabelNames = labels.map((label) => label.name);
+            if (!currentLabelNames.includes(labelName)) {
+              core.info(`Ignoring stale ${labelName} label event because the label is no longer present.`);
+              return;
+            }
+
+            if (labelName === hostedCiLabel && currentLabelNames.includes(forceFullHostedCiLabel)) {
+              core.info(
+                `Ignoring ${hostedCiLabel} label event because ${forceFullHostedCiLabel} is present; ` +
+                  'the force-full label event owns this dispatch.'
+              );
+              return;
+            }
+
+            if (!(await hasWriteAccessFor(context.actor))) {
+              const cleanupResults = await removeTriggeredControlLabel();
+              core.setFailed(
+                `Unable to dispatch hosted CI from this label event because ${context.actor} does not have write/admin repository permission. ` +
+                  'Use `+ci-run-hosted` or ask a write/admin maintainer to add the hosted CI label.' +
+                  cleanupSummary(cleanupResults)
+              );
+              return;
+            }
+
             const isDependabotPr = pr.user?.login === 'dependabot[bot]';
             if (isDependabotPr) {
+              const cleanupResults = await removeTriggeredControlLabel();
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -151,7 +170,8 @@ jobs:
                   `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
                   '',
                   'Dependabot PRs require the `+ci-run-hosted` command path so the required gate can verify trusted current-head dispatch proof before honoring hosted-CI labels.',
-                  'A write/admin maintainer should comment `+ci-run-hosted` or `+ci-force-full` instead.'
+                  'A write/admin maintainer should comment `+ci-run-hosted` or `+ci-force-full` instead.',
+                  cleanupSummary(cleanupResults).trim()
                 ].join('\n')
               });
               core.setFailed('Dependabot hosted CI label dispatch requires the +ci-run-hosted command path.');

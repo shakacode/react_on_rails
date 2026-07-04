@@ -113,6 +113,34 @@ runs:
               new RegExp(`Triggered [1-9][0-9]* workflow\\(s\\) for \`${shortSha}\``).test(body);
           }
 
+          async function dependabotCommentScanSince() {
+            const headSha = pullRequest?.head?.sha;
+            const headRepoFullName = pullRequest?.head?.repo?.full_name || `${context.repo.owner}/${context.repo.repo}`;
+            if (!headSha || !headRepoFullName) {
+              return null;
+            }
+
+            const [headOwner, headRepo] = headRepoFullName.split('/');
+            try {
+              const { data: commit } = await github.rest.repos.getCommit({
+                owner: headOwner,
+                repo: headRepo,
+                ref: headSha
+              });
+              const committedAt = Date.parse(commit.commit?.committer?.date || commit.commit?.author?.date || '');
+
+              return Number.isNaN(committedAt) ?
+                null :
+                new Date(Math.max(0, committedAt - 60 * 60 * 1000)).toISOString();
+            } catch (error) {
+              core.warning(
+                'Unable to read Dependabot PR head commit time for hosted-CI trust check; ' +
+                  `falling back to a full comment scan: ${error.message || error}`
+              );
+              return null;
+            }
+          }
+
           async function hasWriteAccessFor(username) {
             if (!username) {
               return false;
@@ -147,12 +175,16 @@ runs:
             }
 
             let comments;
+            const since = await dependabotCommentScanSince();
             try {
               comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pullRequest.number,
-                per_page: 100
+                per_page: 100,
+                sort: 'created',
+                direction: 'asc',
+                ...(since ? { since } : {})
               });
             } catch (error) {
               core.warning(
@@ -205,11 +237,13 @@ runs:
           const isReleaseBranchPush = eventName === 'push' &&
             context.ref.startsWith('refs/heads/release/');
           const isReleaseTarget = isReleasePullRequest || isReleaseBranchPush;
+          const isTrustedReleaseTarget = isReleaseTarget &&
+            (eventName !== 'pull_request' || isSameRepoPullRequest);
 
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
           const shouldRunHostedCi = eventName !== 'pull_request' ||
-            isReleaseTarget ||
+            isTrustedReleaseTarget ||
             (canDispatchHostedCiForPullRequest && (
               hostedCiRequested ||
               forceFullHostedCiRequested
@@ -217,7 +251,7 @@ runs:
           const shouldUseFullMatrix = shouldForceFullHostedCi ||
             isPushToMain ||
             isMergeGroup ||
-            isReleaseTarget;
+            isTrustedReleaseTarget;
 
           const outputs = {
             hosted_ci_requested: hostedCiRequested,
