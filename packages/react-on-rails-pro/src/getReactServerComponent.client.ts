@@ -169,9 +169,30 @@ const isAbortError = (error: unknown): boolean =>
 const RSC_PAYLOAD_FETCH_FAILURE_MESSAGE = 'request failed before receiving an RSC payload response.';
 const SERIALIZED_RSC_PROPS_SCAN_MAX_DEPTH = 8;
 const SERIALIZED_RSC_PROPS_SCAN_MAX_NODES = 64;
+const DISTINCTIVE_SERIALIZED_RSC_PROPS_MIN_LENGTH = 8;
+
+type SerializedRSCPropsValues = {
+  encodedParams: string;
+  fetchUrl: string;
+  propsString: string;
+  propsStringCameFromJSON: boolean;
+};
 
 const valueIncludesAnySerializedRSCProps = (value: string, serializedValues: string[]): boolean =>
   serializedValues.some((serializedValue) => serializedValue !== '' && value.includes(serializedValue));
+
+const buildSerializedRSCPropsValues = ({
+  encodedParams,
+  fetchUrl,
+  propsString,
+  propsStringCameFromJSON,
+}: SerializedRSCPropsValues): string[] => {
+  const serializedValues = [fetchUrl, encodedParams];
+  if (propsStringCameFromJSON && propsString.length >= DISTINCTIVE_SERIALIZED_RSC_PROPS_MIN_LENGTH) {
+    serializedValues.push(propsString, encodeURIComponent(propsString));
+  }
+  return serializedValues;
+};
 
 const defineErrorCause = (error: Error & { cause?: unknown }, cause: unknown) => {
   Object.defineProperty(error, 'cause', {
@@ -204,45 +225,60 @@ const valueGraphIncludesSerializedRSCProps = (
   }
   seen.add(value);
 
-  if (value instanceof Error) {
+  try {
     if (
-      valueIncludesAnySerializedRSCProps(value.message, serializedValues) ||
-      valueIncludesAnySerializedRSCProps(value.stack ?? '', serializedValues)
+      typeof URL !== 'undefined' &&
+      value instanceof URL &&
+      valueIncludesAnySerializedRSCProps(value.href, serializedValues)
     ) {
       return true;
     }
-  }
+    if (
+      typeof Request !== 'undefined' &&
+      value instanceof Request &&
+      valueIncludesAnySerializedRSCProps(value.url, serializedValues)
+    ) {
+      return true;
+    }
+    if (
+      typeof Response !== 'undefined' &&
+      value instanceof Response &&
+      valueIncludesAnySerializedRSCProps(value.url, serializedValues)
+    ) {
+      return true;
+    }
 
-  let descriptors: PropertyDescriptorMap;
-  try {
+    if (value instanceof Error) {
+      if (
+        valueIncludesAnySerializedRSCProps(value.message, serializedValues) ||
+        valueIncludesAnySerializedRSCProps(value.stack ?? '', serializedValues)
+      ) {
+        return true;
+      }
+    }
+
     // Inspect own data properties so non-enumerable Error.cause and fetch-library URL metadata are
-    // covered without invoking arbitrary getters on custom error objects.
-    descriptors = Object.getOwnPropertyDescriptors(value);
+    // covered without invoking arbitrary getters on custom error objects. Standard URL-bearing Web
+    // API objects expose URLs via prototype accessors and are handled explicitly above.
+    const descriptors = Object.getOwnPropertyDescriptors(value) as Record<PropertyKey, PropertyDescriptor>;
+    return Reflect.ownKeys(descriptors).some((key) => {
+      const descriptor = descriptors[key];
+      return (
+        'value' in descriptor &&
+        valueGraphIncludesSerializedRSCProps(descriptor.value, serializedValues, seen, depth + 1)
+      );
+    });
   } catch {
     return true;
   }
-
-  return Object.values(descriptors).some(
-    (descriptor) =>
-      'value' in descriptor &&
-      valueGraphIncludesSerializedRSCProps(descriptor.value, serializedValues, seen, depth + 1),
-  );
 };
 
 const errorIncludesSerializedRSCProps = (
   error: unknown,
-  {
-    encodedParams,
-    fetchUrl,
-    propsString,
-  }: {
-    encodedParams: string;
-    fetchUrl: string;
-    propsString: string;
-  },
+  serializedPropsValues: SerializedRSCPropsValues,
   errorMessage: string,
 ): boolean => {
-  const serializedValues = [fetchUrl, encodedParams, propsString, encodeURIComponent(propsString)];
+  const serializedValues = buildSerializedRSCPropsValues(serializedPropsValues);
   return (
     valueIncludesAnySerializedRSCProps(errorMessage, serializedValues) ||
     valueGraphIncludesSerializedRSCProps(error, serializedValues)
@@ -284,7 +320,8 @@ export const fetchRSC = ({
   }
 
   try {
-    const propsString = JSON.stringify(componentProps);
+    const stringifiedProps = JSON.stringify(componentProps);
+    const propsString = stringifiedProps ?? 'undefined';
     const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
@@ -310,6 +347,7 @@ export const fetchRSC = ({
           encodedParams,
           fetchUrl,
           propsString,
+          propsStringCameFromJSON: stringifiedProps !== undefined,
         },
         errorMessage,
       );
