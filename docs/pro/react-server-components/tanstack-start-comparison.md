@@ -83,7 +83,7 @@ database stay in Rails where they already live. (RSC is a Pro feature requiring 
 For the interactive pieces that **mutate**, both stacks still cross a network boundary: Start calls a
 typed server function; React on Rails posts to a Rails controller (often with TanStack Query driving the
 request). Start's server-function shorthand is genuinely less boilerplate for that path today; the trade
-is that the function — and the business logic inside it — lives in your UI's runtime rather than in
+is that the function — and the business logic inside it — lives in Start's server runtime rather than in
 Rails. For side-by-side mutation recipes, see
 [Mutations without Server Actions](../../oss/building-features/mutations.md).
 

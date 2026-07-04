@@ -33,6 +33,97 @@ The practical translation is:
 - **TanStack Start server function**: "call this typed same-origin server function from my app."
 - **React on Rails**: "call this Rails controller route from my React UI."
 
+## Same mutation in three stacks
+
+The same "create a project" mutation lands in a different server boundary in each stack. In Next.js,
+the form can call a Server Action; the database write, authorization, and cache refresh live in the
+Next.js server runtime:
+
+```tsx
+// app/projects/actions.ts
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { db } from '@/lib/db';
+
+export async function createProjectAction(formData: FormData) {
+  const name = String(formData.get('name') ?? '').trim();
+  const status = String(formData.get('status') ?? 'draft');
+
+  if (!name) {
+    return { errors: { name: ["can't be blank"] } };
+  }
+
+  const project = await db.project.create({ data: { name, status } });
+
+  revalidatePath('/projects');
+  redirect(`/projects/${project.id}`);
+}
+```
+
+```tsx
+// app/projects/form.tsx
+import { createProjectAction } from './actions';
+
+export function ProjectForm() {
+  return (
+    <form action={createProjectAction}>
+      <input name="name" />
+      <select name="status" defaultValue="draft">
+        <option value="draft">Draft</option>
+        <option value="active">Active</option>
+      </select>
+      <button type="submit">Create project</button>
+    </form>
+  );
+}
+```
+
+In TanStack Start, the component can call a server function. The handler still runs in Start's server
+runtime, not in Rails:
+
+```ts
+// src/projects/projects.functions.ts
+import { createServerFn } from '@tanstack/react-start';
+import { z } from 'zod';
+import { db } from '~/server/db';
+
+const projectSchema = z.object({
+  name: z.string().min(1),
+  status: z.enum(['draft', 'active']),
+});
+
+export const createProject = createServerFn({ method: 'POST' })
+  .validator(projectSchema)
+  .handler(async ({ data }) => {
+    const project = await db.project.create({ data });
+
+    return { project };
+  });
+```
+
+```tsx
+// src/projects/ProjectForm.tsx
+import { createProject } from './projects.functions';
+
+await createProject({ data: { name: 'Apollo', status: 'draft' } });
+```
+
+In React on Rails, the Client Component calls an ordinary Rails route. The Rails controller, shown in
+the recipe below, owns authentication, authorization, strong parameters, transactions, validation
+errors, redirects, jobs, and cache expiry:
+
+```ts
+import { createRailsAction } from 'react-on-rails/railsAction';
+
+const createProject = createRailsAction<{ project: ProjectFormData }, ProjectResponse>({
+  path: '/projects',
+});
+
+await createProject({ project: { name: 'Apollo', status: 'draft' } });
+```
+
 ## Choose the Rails entry point
 
 Use the narrowest path that matches the UI:
@@ -212,11 +303,17 @@ type ProjectResponse = {
   project: { id: number; name: string; status: string };
 };
 
+type ValidationErrors = Record<string, string[]>;
+
+type ErrorResponse = {
+  errors?: ValidationErrors;
+};
+
 const createProject = createRailsAction<{ project: ProjectFormData }, ProjectResponse>({
   path: '/projects',
 });
 
-export function useCreateProjectMutation() {
+export function useCreateProjectMutation(setValidationErrors: (errors: ValidationErrors) => void) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -227,7 +324,9 @@ export function useCreateProjectMutation() {
     },
     onError: (error) => {
       if (error instanceof RailsActionRequestError && error.response.status === 422) {
-        // Map your app's validation-error JSON into local form state.
+        const { errors = {} } = error.responseBody as ErrorResponse;
+
+        setValidationErrors(errors);
       }
     },
   });
