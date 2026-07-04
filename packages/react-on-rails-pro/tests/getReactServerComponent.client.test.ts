@@ -177,6 +177,78 @@ describe('fetchRSC HTTP responses', () => {
     expect(reportedText).not.toContain(encodeURIComponent(sentinel));
   });
 
+  it('redacts serialized props from nested fetch rejection causes', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const sentinel = 'SECRET_SENTINEL_RSC_PROPS_LEAK';
+    const componentProps = { token: sentinel };
+    const fetchUrl = `/rsc_payload/AccountPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    const innerError = new Error(`request to ${fetchUrl} failed`);
+    const fetchError = new TypeError('fetch failed') as TypeError & { cause?: unknown };
+    Object.defineProperty(fetchError, 'cause', {
+      configurable: true,
+      value: innerError,
+      writable: true,
+    });
+    fetchMock.mockRejectedValue(fetchError);
+
+    let thrownError: (Error & { cause?: unknown }) | undefined;
+    try {
+      await fetchRSC({
+        componentName: 'AccountPanel',
+        componentProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      });
+    } catch (error) {
+      thrownError = error as Error & { cause?: unknown };
+    }
+
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    expect(thrownError).toBeInstanceOf(Error);
+    expect(thrownError?.message).toBe(
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": request failed before receiving an RSC payload response.',
+    );
+    expect(thrownError?.cause).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(thrownError!, 'cause')).toBeUndefined();
+
+    const reportedText = [thrownError?.message, thrownError?.stack]
+      .filter((line): line is string => Boolean(line))
+      .join('\n');
+    expect(reportedText).not.toContain(sentinel);
+    expect(reportedText).not.toContain(encodeURIComponent(sentinel));
+  });
+
+  it('redacts serialized props from fetch rejection metadata fields', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const sentinel = 'SECRET_SENTINEL_RSC_PROPS_LEAK';
+    const componentProps = { token: sentinel };
+    const fetchUrl = `/rsc_payload/AccountPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    const fetchError = new TypeError('fetch failed') as TypeError & { request?: { url: string } };
+    fetchError.request = { url: fetchUrl };
+    fetchMock.mockRejectedValue(fetchError);
+
+    let thrownError: (Error & { cause?: unknown }) | undefined;
+    try {
+      await fetchRSC({
+        componentName: 'AccountPanel',
+        componentProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      });
+    } catch (error) {
+      thrownError = error as Error & { cause?: unknown };
+    }
+
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    expect(thrownError).toBeInstanceOf(Error);
+    expect(thrownError?.message).toBe(
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": request failed before receiving an RSC payload response.',
+    );
+    expect(thrownError?.cause).toBeUndefined();
+  });
+
   it('preserves safe fetch rejection messages and causes', async () => {
     const { fetchRSC } = await loadClientModule();
     const originalError = new Error('network offline');
@@ -197,6 +269,7 @@ describe('fetchRSC HTTP responses', () => {
       'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": network offline',
     );
     expect(thrownError?.cause).toBe(originalError);
+    expect(Object.getOwnPropertyDescriptor(thrownError!, 'cause')?.enumerable).toBe(false);
   });
 
   it('propagates non-ok HTTP responses through the getReactServerComponent fetch path', async () => {

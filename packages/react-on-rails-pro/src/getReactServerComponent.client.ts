@@ -167,6 +167,67 @@ const isAbortError = (error: unknown): boolean =>
   (error as { name?: unknown }).name === 'AbortError';
 
 const RSC_PAYLOAD_FETCH_FAILURE_MESSAGE = 'request failed before receiving an RSC payload response.';
+const SERIALIZED_RSC_PROPS_SCAN_MAX_DEPTH = 8;
+const SERIALIZED_RSC_PROPS_SCAN_MAX_NODES = 64;
+
+const valueIncludesAnySerializedRSCProps = (value: string, serializedValues: string[]): boolean =>
+  serializedValues.some((serializedValue) => serializedValue !== '' && value.includes(serializedValue));
+
+const defineErrorCause = (error: Error & { cause?: unknown }, cause: unknown) => {
+  Object.defineProperty(error, 'cause', {
+    configurable: true,
+    value: cause,
+    writable: true,
+  });
+};
+
+const valueGraphIncludesSerializedRSCProps = (
+  value: unknown,
+  serializedValues: string[],
+  seen = new Set<unknown>(),
+  depth = 0,
+): boolean => {
+  if (typeof value === 'string') {
+    return valueIncludesAnySerializedRSCProps(value, serializedValues);
+  }
+
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
+    return false;
+  }
+
+  if (seen.has(value)) {
+    return false;
+  }
+
+  if (depth > SERIALIZED_RSC_PROPS_SCAN_MAX_DEPTH || seen.size >= SERIALIZED_RSC_PROPS_SCAN_MAX_NODES) {
+    return true;
+  }
+  seen.add(value);
+
+  if (value instanceof Error) {
+    if (
+      valueIncludesAnySerializedRSCProps(value.message, serializedValues) ||
+      valueIncludesAnySerializedRSCProps(value.stack ?? '', serializedValues)
+    ) {
+      return true;
+    }
+  }
+
+  let descriptors: PropertyDescriptorMap;
+  try {
+    // Inspect own data properties so non-enumerable Error.cause and fetch-library URL metadata are
+    // covered without invoking arbitrary getters on custom error objects.
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    return true;
+  }
+
+  return Object.values(descriptors).some(
+    (descriptor) =>
+      'value' in descriptor &&
+      valueGraphIncludesSerializedRSCProps(descriptor.value, serializedValues, seen, depth + 1),
+  );
+};
 
 const errorIncludesSerializedRSCProps = (
   error: unknown,
@@ -179,10 +240,12 @@ const errorIncludesSerializedRSCProps = (
     fetchUrl: string;
     propsString: string;
   },
+  errorMessage: string,
 ): boolean => {
-  const errorText = `${extractErrorMessage(error)}\n${error instanceof Error ? (error.stack ?? '') : ''}`;
-  return [fetchUrl, encodedParams, propsString, encodeURIComponent(propsString)].some(
-    (serializedValue) => serializedValue !== '' && errorText.includes(serializedValue),
+  const serializedValues = [fetchUrl, encodedParams, propsString, encodeURIComponent(propsString)];
+  return (
+    valueIncludesAnySerializedRSCProps(errorMessage, serializedValues) ||
+    valueGraphIncludesSerializedRSCProps(error, serializedValues)
   );
 };
 
@@ -241,17 +304,21 @@ export const fetchRSC = ({
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
       if (isAbortError(error)) throw error;
       const errorMessage = extractErrorMessage(error);
-      const serializedPropsInError = errorIncludesSerializedRSCProps(error, {
-        encodedParams,
-        fetchUrl,
-        propsString,
-      });
+      const serializedPropsInError = errorIncludesSerializedRSCProps(
+        error,
+        {
+          encodedParams,
+          fetchUrl,
+          propsString,
+        },
+        errorMessage,
+      );
       const safeErrorMessage = serializedPropsInError ? RSC_PAYLOAD_FETCH_FAILURE_MESSAGE : errorMessage;
       const wrapper: Error & { cause?: unknown } = new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${sourcePath}": ${safeErrorMessage}`,
       );
       if (!serializedPropsInError) {
-        wrapper.cause = error;
+        defineErrorCause(wrapper, error);
       }
       throw wrapper;
     });
@@ -261,7 +328,7 @@ export const fetchRSC = ({
     const wrapper: Error & { cause?: unknown } = new Error(
       `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
-    wrapper.cause = error;
+    defineErrorCause(wrapper, error);
     return Promise.reject(wrapper);
   }
 };
