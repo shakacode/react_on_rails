@@ -25,37 +25,28 @@ module ReactOnRailsPro
     class << self
       # options[:cache_options] can include :compress, :expires_in, :race_condition_ttl and
       # other options
-      def fetch_react_component(component_name, options)
-        if use_cache?(options)
-          cache_key = react_component_cache_key(component_name, options)
-          Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-          cache_options = cache_write_options(options[:cache_options])
-          if cache_write_expired?(options[:cache_options])
-            result = yield
-            if result.is_a?(Hash)
-              result[:RORP_CACHE_KEY] = cache_key
-              result[:RORP_CACHE_HIT] = false
-            end
-            return result
-          end
+      def fetch_react_component(component_name, options = nil, callback_options = nil)
+        options ||= {}
+        on_cache_hit = cache_hit_callback(callback_options)
 
-          cache_hit = true
-          normalized_cache_tags = []
-          result = Rails.cache.fetch(cache_key, cache_options) do
-            cache_hit = false
-            normalized_cache_tags = normalize_tags(options[:cache_tags])
-            yield
-          end
-          register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
-          # Pass back the cache key in the results only if the result is a Hash
-          if result.is_a?(Hash)
-            result[:RORP_CACHE_KEY] = cache_key
-            result[:RORP_CACHE_HIT] = cache_hit
-          end
-          result
-        else
+        return yield unless use_cache?(options)
+
+        cache_key = react_component_cache_key(component_name, options)
+        Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
+        cache_options = cache_write_options(options[:cache_options])
+        return add_component_cache_metadata(yield, cache_key, false) if cache_write_expired?(options[:cache_options])
+
+        cache_hit = true
+        normalized_cache_tags = []
+        result = Rails.cache.fetch(cache_key, cache_options) do
+          cache_hit = false
+          normalized_cache_tags = normalize_tags(options[:cache_tags])
           yield
         end
+        register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
+        on_cache_hit&.call(component_name, options) if cache_hit
+
+        add_component_cache_metadata(result, cache_key, cache_hit)
       end
 
       # Registers cache tags for an already-written cache entry so a later
@@ -134,6 +125,20 @@ module ReactOnRailsPro
       end
 
       private
+
+      def cache_hit_callback(callback_options)
+        return nil unless callback_options
+
+        callback_options[:on_cache_hit]
+      end
+
+      def add_component_cache_metadata(result, cache_key, cache_hit)
+        return result unless result.is_a?(Hash)
+
+        result[:RORP_CACHE_KEY] = cache_key
+        result[:RORP_CACHE_HIT] = cache_hit
+        result
+      end
 
       def meaningful_revalidation_tags(tags)
         tags.flat_map do |tag|

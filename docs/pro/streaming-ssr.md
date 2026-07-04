@@ -239,7 +239,63 @@ Use `cached_buffered_stream_react_component` when the complete static response s
 %>
 ```
 
+For static public RSC pages that do not hydrate the generated page pack, use `cached_static_rsc_component`. It buffers through the same renderer, strips embedded `REACT_ON_RAILS_RSC_PAYLOADS` bootstrap scripts before caching, and respects an explicit `auto_load_bundle: false` so the view can append only a small sidecar pack:
+
+```erb
+<%=
+  cached_static_rsc_component(
+    "MarketingPage",
+    cache_key: ["marketing-page", I18n.locale],
+    cache_tags: ["marketing-page"],
+    cache_options: { expires_in: 30.minutes },
+    auto_load_bundle: false,
+    rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+    id: "marketing-page"
+  ) do
+    @marketing_page_props
+  end
+%>
+<%= javascript_pack_tag("generated/PublicPageClientEffects") %>
+```
+
 Buffered rendering is not progressive: the browser receives the page only after every RSC/SSR chunk is available. Prefer `stream_react_component` or `stream_react_component_with_async_props` when early shell flush, slow async props, or progressive Suspense boundaries matter.
+
+#### Static RSC Render Diagnostics
+
+`cached_static_rsc_component` emits a redacted render summary in development and when `ReactOnRailsPro.configuration.tracing` is enabled. You can also enable it per render with `rsc_render_diagnostics: true` or capture it directly with a callback:
+
+```erb
+<%=
+  cached_static_rsc_component(
+    "MarketingPage",
+    cache_key: ["marketing-page", I18n.locale],
+    auto_load_bundle: false,
+    rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+    rsc_render_diagnostics: ->(summary) { Rails.logger.info(summary.to_json) },
+    id: "marketing-page"
+  ) do
+    @marketing_page_props
+  end
+%>
+```
+
+The same payload is published as an `ActiveSupport::Notifications` event so benchmark harnesses can archive it with ShakaPerf or Lighthouse output:
+
+```ruby
+ActiveSupport::Notifications.subscribe("render_static_rsc_component.react_on_rails_pro") do |_name, _start, _finish, _id, summary|
+  Rails.logger.info(summary.to_json)
+end
+```
+
+The summary includes:
+
+- `cache.enabled`, `cache.hit`, and `cache.key_digest` so public-page runs can distinguish cold renders from warm cached output without logging raw cache keys.
+- `auto_load_bundle`, which shows whether the generated page pack was intentionally skipped.
+- `html.raw_bytes`, `html.cached_bytes`, `rsc_payload.bootstrap_script_count`, and `rsc_payload.bootstrap_script_bytes`, which show how much Flight/bootstrap script markup was removed before caching.
+- `emitted_assets.js` and `emitted_assets.css`, populated from the Shakapacker manifest for the generated component pack when `auto_load_bundle` is true and for any explicit `rsc_diagnostic_packs`.
+- `client_references.entries`, populated from the RSC client manifest when it is available on disk. An empty array is useful evidence for static public pages that should avoid eager RSC client references.
+
+Manifest-derived fields are best-effort. When a dev server, missing file, or custom deployment makes a manifest unavailable, the summary includes an `unavailable_reason` instead of failing the render. The summary never includes serialized props, Flight payload contents, or the raw expanded cache key.
 
 ### Browser-Observable RSC Stream Marks
 

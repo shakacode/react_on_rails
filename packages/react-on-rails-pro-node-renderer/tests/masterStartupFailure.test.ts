@@ -14,7 +14,7 @@
  */
 
 import { WORKER_STARTUP_FAILURE, type WorkerStartupFailureMessage } from '../src/shared/workerMessages';
-import { SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
+import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from '../src/shared/utils';
 import { WORKER_SHUTDOWN_HOOKS_TIMEOUT_MS } from '../src/worker/shutdownHooks';
 
 type MockWorker = {
@@ -24,6 +24,7 @@ type MockWorker = {
 };
 
 type MockClusterWorker = {
+  id: number;
   send: jest.Mock<boolean, [message: unknown]>;
   process: { killed: boolean; kill: jest.Mock<void, [signal: NodeJS.Signals]> };
   isDead: jest.Mock<boolean, []>;
@@ -61,7 +62,13 @@ function buildStartupFailureMessage(
   };
 }
 
-function setupMasterRunHarness() {
+function setupMasterRunHarness({
+  config = {},
+  restartWorkers = jest.fn(),
+}: {
+  config?: Record<string, unknown>;
+  restartWorkers?: jest.Mock;
+} = {}) {
   const operations: string[] = [];
   const clusterHandlers: Partial<ClusterHandlers> = {};
   // Capture process signal handlers instead of letting masterRun attach them to
@@ -88,10 +95,12 @@ function setupMasterRunHarness() {
   });
   const createMockClusterWorker = (
     label: 'first' | 'second',
+    id: number,
     send: jest.Mock<boolean, [unknown]>,
     workerProcess: (typeof mockWorkerProcesses)[typeof label],
   ): MockClusterWorker => {
     const worker = {} as MockClusterWorker;
+    worker.id = id;
     worker.exited = false;
     worker.process = workerProcess;
     worker.process.kill.mockImplementation((signal) => {
@@ -111,8 +120,8 @@ function setupMasterRunHarness() {
     return worker;
   };
   const mockClusterWorkers = {
-    first: createMockClusterWorker('first', mockWorkerSends.first, mockWorkerProcesses.first),
-    second: createMockClusterWorker('second', mockWorkerSends.second, mockWorkerProcesses.second),
+    first: createMockClusterWorker('first', 1, mockWorkerSends.first, mockWorkerProcesses.first),
+    second: createMockClusterWorker('second', 2, mockWorkerSends.second, mockWorkerProcesses.second),
   };
   const mockCluster = {} as MockCluster;
   mockCluster.workers = {
@@ -147,6 +156,7 @@ function setupMasterRunHarness() {
     delayBetweenIndividualWorkerRestarts: undefined,
     gracefulWorkerRestartTimeout: 0,
     serverBundleCachePath: '/tmp/react-on-rails-pro-node-renderer-bundles',
+    ...config,
   }));
   const mockLogSanitizedConfig = jest.fn();
   const mockGetLicenseStatus = jest.fn(() => 'valid');
@@ -202,7 +212,7 @@ function setupMasterRunHarness() {
   }));
   jest.doMock('../src/master/restartWorkers', () => ({
     __esModule: true,
-    default: jest.fn(),
+    default: restartWorkers,
   }));
 
   let masterRun: typeof import('../src/master').default | undefined;
@@ -232,7 +242,9 @@ function setupMasterRunHarness() {
     mockFork,
     mockCluster,
     mockErrorReporterMessage,
+    mockLog,
     mockRunRscPeerCompatibilityCheck,
+    mockRestartWorkers: restartWorkers,
     setIntervalSpy,
     setTimeoutSpy,
     processExitSpy,
@@ -617,5 +629,61 @@ describe('master graceful shutdown on external signals via masterRun wiring', ()
     expect(harness.mockWorkerProcesses.first.kill).toHaveBeenCalledWith('SIGKILL');
     expect(harness.mockWorkerProcesses.second.kill).toHaveBeenCalledWith('SIGKILL');
     expect(harness.processExitSpy).toHaveBeenCalledWith(143);
+  });
+
+  it('does not early SIGKILL workers that acknowledged graceful shutdown', () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    harness.clusterHandlers.message({ id: 1, process: { exitCode: null } }, SHUTDOWN_WORKER_ACK_MESSAGE);
+    findShutdownTimeout(harness, 2000).callback();
+
+    expect(harness.mockWorkerProcesses.first.kill).not.toHaveBeenCalled();
+    expect(harness.mockWorkerProcesses.second.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('forgets graceful-shutdown ACKs when workers exit', () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.signalHandlers.SIGTERM!();
+    harness.clusterHandlers.message({ id: 1, process: { exitCode: null } }, SHUTDOWN_WORKER_ACK_MESSAGE);
+    harness.clusterHandlers.exit({ id: 1, process: { exitCode: 0 } });
+    findShutdownTimeout(harness, 2000).callback();
+
+    expect(harness.mockWorkerProcesses.first.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(harness.mockWorkerProcesses.second.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs scheduled worker restart failures and still reschedules the next cycle', async () => {
+    const restartError = new Error('restart failed');
+    const restartWorkers = jest.fn(() => Promise.reject(restartError));
+    const harness = setupMasterRunHarness({
+      config: {
+        allWorkersRestartInterval: 1,
+        delayBetweenIndividualWorkerRestarts: 1,
+        gracefulWorkerRestartTimeout: 30,
+      },
+      restartWorkers,
+    });
+    const scheduledRestart = harness.shutdownTimeouts.find(({ delay }) => delay === 60_000);
+
+    if (!scheduledRestart) {
+      throw new Error('Could not find scheduled worker restart timeout');
+    }
+
+    scheduledRestart.callback();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(restartWorkers).toHaveBeenCalledWith(1, 30);
+    expect(harness.mockLog.error).toHaveBeenCalledWith({
+      msg: 'Scheduled worker restart failed',
+      err: restartError,
+    });
+    expect(harness.shutdownTimeouts.filter(({ delay }) => delay === 60_000)).toHaveLength(2);
   });
 });

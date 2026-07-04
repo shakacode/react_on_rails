@@ -17,6 +17,7 @@ import { Readable, Transform } from 'stream';
 import safePipe from './safePipe.ts';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 import { buildRSCStreamDiagnosticError, RSCStreamDiagnosticsOptions } from './rscDiagnostics.ts';
+import { hasExpectedRSCStreamCleanup, shouldReportRSCStreamTruncation } from './RSCRequestTracker.ts';
 
 /**
  * Transforms an RSC Node.js stream for server-side processing.
@@ -38,6 +39,7 @@ export default function transformRSCStream(
 ): NodeJS.ReadableStream {
   const parser = new LengthPrefixedStreamParser();
   let reportedDiagnosticError = false;
+  const readableStream = stream as Readable;
 
   const htmlExtractor = new Transform({
     transform(chunk: Buffer, _, callback) {
@@ -58,7 +60,17 @@ export default function transformRSCStream(
         callback(error as Error);
       }
     },
+    flush(callback) {
+      if (
+        !readableStream.errored &&
+        !hasExpectedRSCStreamCleanup(readableStream) &&
+        shouldReportRSCStreamTruncation(readableStream)
+      ) {
+        parser.flush();
+      }
+      callback();
+    },
   });
 
-  return safePipe(stream as Readable, htmlExtractor);
+  return safePipe(readableStream, htmlExtractor);
 }

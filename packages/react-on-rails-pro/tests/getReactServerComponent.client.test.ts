@@ -31,7 +31,13 @@ const loadClientModule = async (createFromReadableStream = jest.fn()) => {
 };
 
 const fetchMock = fetch as jest.MockedFunction<typeof fetch>;
+const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+const toLengthPrefixedRecord = (content: string, metadata: Record<string, unknown> = {}) => {
+  const contentBytes = encoder.encode(content);
+  return `${JSON.stringify(metadata)}\t${contentBytes.length.toString(16)}\n${content}`;
+};
 
 const readStreamText = async (stream: ReadableStream<Uint8Array>) => {
   const reader = stream.getReader();
@@ -155,6 +161,66 @@ describe('fetchRSC HTTP responses', () => {
         props: JSON.stringify(componentProps),
       })}`,
     );
+  });
+
+  it('returns a rejected promise instead of throwing when request preparation fails synchronously', async () => {
+    const { fetchRSC } = await loadClientModule();
+    const circularProps: Record<string, unknown> = {};
+    circularProps.self = circularProps;
+
+    let fetchResult!: ReturnType<typeof fetchRSC>;
+    expect(() => {
+      fetchResult = fetchRSC({
+        componentName: 'BrokenPropsPanel',
+        componentProps: circularProps,
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      });
+    }).not.toThrow();
+    await expect(fetchResult).rejects.toThrow(
+      'Failed to prepare RSC request for component "BrokenPropsPanel"',
+    );
+    await expect(fetchResult).rejects.toMatchObject({ cause: expect.any(TypeError) });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a rejected promise instead of throwing when rscPayloadGenerationUrlPath is missing', async () => {
+    const { fetchRSC } = await loadClientModule();
+
+    let fetchResult!: ReturnType<typeof fetchRSC>;
+    expect(() => {
+      fetchResult = fetchRSC({
+        componentName: 'MissingPathPanel',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '',
+      });
+    }).not.toThrow();
+    await expect(fetchResult).rejects.toThrow(
+      'Cannot fetch RSC payload for component "MissingPathPanel": rscPayloadGenerationUrlPath is not configured.',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('warns when a fetched length-prefixed response ends mid-record', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { fetchRSC } = await loadClientModule(createFromReadableStream);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const completeRecord = toLengthPrefixedRecord('truncated Flight payload');
+    fetchMock.mockResolvedValue(createWebResponseFromText(completeRecord.slice(0, -1)));
+
+    try {
+      await expect(
+        fetchRSC({
+          componentName: 'TruncatedPanel',
+          componentProps: {},
+          rscPayloadGenerationUrlPath: '/rsc_payload',
+        }),
+      ).resolves.toBe('');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[react_on_rails] Incomplete length-prefixed stream:'),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
 

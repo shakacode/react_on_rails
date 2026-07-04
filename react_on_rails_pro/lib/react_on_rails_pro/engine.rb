@@ -51,16 +51,6 @@ module ReactOnRailsPro
       config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
     end
 
-    # Override the default rendering strategy with Pro's NodeStrategy and JsCodeBuilder.
-    # Runs after core's initializer since Pro engine loads after core.
-    # Not yet wired into the main rendering path — currently additive only (see issue #2905).
-    initializer "react_on_rails_pro.set_rendering_strategy" do
-      config.after_initialize do
-        ReactOnRails.rendering_strategy = ReactOnRailsPro::RenderingStrategy::NodeStrategy.new
-        ReactOnRails.js_code_builder = ReactOnRailsPro::JsCodeBuilder.new
-      end
-    end
-
     # Install ScoutApm instrumentation after ScoutApm is configured via "scout_apm.start" initializer.
     # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm.rb#L221
     # If scout_apm is not in the Gemfile, Rails ignores the unknown `after:` target and still

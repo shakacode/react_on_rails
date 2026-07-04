@@ -27,7 +27,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Breaking Changes
 
 - **Removed the inert `config.server_render_method` option**: The open-source configuration no longer accepts `config.server_render_method`. The option never selected a server render method — the open-source gem always renders with ExecJS — and its validator raised `ReactOnRails::Error` at boot for any value other than blank or `"ExecJS"`. Setting it now raises `NoMethodError` at boot, so delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; `rake react_on_rails:doctor` also flags the stale line. For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`. Fixes [Issue 4415](https://github.com/shakacode/react_on_rails/issues/4415). [PR 4423](https://github.com/shakacode/react_on_rails/pull/4423) by [justin808](https://github.com/justin808).
-- **Removed three deprecated configuration options** (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`): These were deprecated in v16 and are gone in v17. Setting any of them now raises `NoMethodError` at boot; delete the stale lines from `config/initializers/react_on_rails.rb` (`rake react_on_rails:doctor` flags them). Migration: delete `config.generated_assets_dirs` — public asset paths come from `public_output_path` in `config/shakapacker.yml`; delete `config.skip_display_none` — it had no runtime effect; replace `config.defer_generated_component_packs = true` with `config.generated_component_packs_loading_strategy = :defer` and `config.defer_generated_component_packs = false` with `config.generated_component_packs_loading_strategy = :sync` (deleting the line without setting a strategy falls back to the default, which may differ from the previous deferred behavior). Fixes [Issue 4419](https://github.com/shakacode/react_on_rails/issues/4419). [PR 4432](https://github.com/shakacode/react_on_rails/pull/4432) by [justin808](https://github.com/justin808).
+- **Removed three deprecated configuration options** (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`): These were deprecated in v16 and are gone in v17. Setting any of them now raises `NoMethodError` at boot; delete the stale lines from `config/initializers/react_on_rails.rb` (`rake react_on_rails:doctor` flags them). Migration: delete `config.generated_assets_dirs` — public asset paths come from `public_output_path` in `config/shakapacker.yml`; delete `config.skip_display_none` — it had no runtime effect; replace `config.defer_generated_component_packs = true` with `config.generated_component_packs_loading_strategy = :defer`, and simply delete `config.defer_generated_component_packs = false` (the removed option was truthy-gated — only `= true` set `:defer`; `= false` was a no-op that fell through to the default strategy, so it did **not** mean `:sync`; set `:sync` explicitly only if you relied on synchronous loading). The default strategy is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker. Fixes [Issue 4419](https://github.com/shakacode/react_on_rails/issues/4419). [PR 4432](https://github.com/shakacode/react_on_rails/pull/4432) by [justin808](https://github.com/justin808).
+- **Removed the never-wired `RenderRequest` / `JsCodeBuilder` / `RenderingStrategy` rendering layer**: The internal strategy-pattern classes `ReactOnRails::RenderRequest`, `ReactOnRails::JsCodeBuilder`, `ReactOnRails::RenderingStrategy` (with `ExecJsStrategy`), and — in Pro — `ReactOnRailsPro::JsCodeBuilder` and `ReactOnRailsPro::RenderingStrategy::NodeStrategy`, plus the undocumented `ReactOnRails.rendering_strategy` and `ReactOnRails.js_code_builder` module accessors, are removed. This scaffolding was built for the strategy-pattern refactor in [Issue 2905](https://github.com/shakacode/react_on_rails/issues/2905) (closed without wiring it in) and was never invoked on any production server-rendering path — SSR runs through `ServerRenderingJsCode` and `ServerRenderingPool`, which never touched this layer. These constants and accessors were internal and undocumented; if you reference them in application code, remove the reference (the layer performed no work). Fixes [Issue 4414](https://github.com/shakacode/react_on_rails/issues/4414). [PR 4437](https://github.com/shakacode/react_on_rails/pull/4437) by [justin808](https://github.com/justin808).
 
 #### Added
 
@@ -57,6 +58,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 4263](https://github.com/shakacode/react_on_rails/issues/4263).
   [PR 4268](https://github.com/shakacode/react_on_rails/pull/4268) by
   [justin808](https://github.com/justin808).
+- **[Pro]** **Cached static RSC public-page helper and diagnostics**:
+  `cached_static_rsc_component` caches stripped static RSC HTML for public pages
+  that intentionally skip the generated page pack, while respecting
+  `auto_load_bundle: false` and preserving explicit sidecar assets. Static RSC
+  render diagnostics report cache hit/miss state, redacted cache-key digests,
+  HTML and stripped payload bytes, emitted asset bytes, and RSC client-reference
+  entries for performance investigations. Fixes
+  [Issue 4295](https://github.com/shakacode/react_on_rails/issues/4295) and
+  [Issue 4296](https://github.com/shakacode/react_on_rails/issues/4296).
+  [PR 4386](https://github.com/shakacode/react_on_rails/pull/4386) by
+  [justin808](https://github.com/justin808).
 - **[Pro]** **Opt-in browser performance marks for streamed RSC observability**: Pro streaming can now emit inline browser marks for RSC stream completion, embedded Flight payload chunks, Node-side flushes, hydration start, and first interactive client effects, with byte counts and timing details that avoid serialized props or payload contents. The documented path uses body-delivered marks and a fallback queue instead of HTTP trailers, so apps can measure streamed RSC responses across CDN paths that may strip or hide trailer timing. Fixes [Issue 4205](https://github.com/shakacode/react_on_rails/issues/4205), [Issue 4206](https://github.com/shakacode/react_on_rails/issues/4206), and [Issue 4207](https://github.com/shakacode/react_on_rails/issues/4207). [PR 4222](https://github.com/shakacode/react_on_rails/pull/4222) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **`Server-Timing` attribution for streamed RSC responses**: When `rsc_stream_observability: true`, the streamed RSC response now also carries a `Server-Timing` response header with a `ror_stream_shell` metric (Rails shell render, including the blocking wait for each component's first renderer chunk), set in the narrow window before `ActionController::Live` commits headers and appended to any existing `Server-Timing` entries. The Node renderer additionally emits a `ror_renderer_prepare` metric (execution-context build plus render start) on its HTTP response. This is the server/renderer-side complement to the browser performance marks above, letting a reviewer attribute the streamed `responseEnd` tail to a specific phase rather than guessing. Total/stream-complete time stays on the `react-on-rails:rsc:stream` mark because `ActionController::Live` does not support HTTP trailers. Closes [Issue 4239](https://github.com/shakacode/react_on_rails/issues/4239). [PR 4251](https://github.com/shakacode/react_on_rails/pull/4251) by [justin808](https://github.com/justin808).
@@ -71,6 +83,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **Reduced tag-index cache work for streamed cache writes**: Multi-tag cache registration now
+  batch-reads existing tag indexes when supported, and streamed cache misses defer cache writes and tag
+  registration until queued response chunks have drained. Streamed and async cache misses also register tags
+  with the same completion-time cache options used for the cache write, keeping TTL snapshots aligned. Fixes
+  [Issue 4319](https://github.com/shakacode/react_on_rails/issues/4319).
+  [PR 4443](https://github.com/shakacode/react_on_rails/pull/4443) by
+  [justin808](https://github.com/justin808).
+- **Lighter `npx create-react-on-rails-app` install**: The scaffolder now colorizes its terminal output with the zero-dependency [`picocolors`](https://github.com/alexeyraspopov/picocolors) instead of `chalk@4`, dropping `chalk` and its transitive tree (`ansi-styles`, `supports-color`, `color-convert`, `color-name`, `has-flag`) from the package's runtime dependencies. This trims the weight of every cold `npx create-react-on-rails-app` install with no change to the CLI's colored output. Fixes [Issue 4411](https://github.com/shakacode/react_on_rails/issues/4411). [PR 4444](https://github.com/shakacode/react_on_rails/pull/4444) by [justin808](https://github.com/justin808).
 - **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
   configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
   `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
@@ -88,6 +108,42 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Sync RSC route failures surface as `ServerComponentFetchError`**: Synchronous throws
+  in the RSC payload path (payload key creation on BigInt/circular props, sync
+  `getServerComponent` throws, `fetchRSC` request preparation) previously bypassed
+  `RSCRouteErrorBoundary`, so user error boundaries received raw `TypeError`s without component
+  metadata. All sync and async failure paths now funnel through the boundary, and a nested route's
+  already-wrapped error passes through without re-wrapping. Fixes
+  [Issue 4372](https://github.com/shakacode/react_on_rails/issues/4372).
+  [PR 4438](https://github.com/shakacode/react_on_rails/pull/4438) by
+  [justin808](https://github.com/justin808).
+
+- **`ReactOnRails.getStore(name, false)` no longer throws when no stores are hydrated**: With
+  `throwIfMissing = false`, `getStore` now returns `undefined` when the hydrated-store registry is
+  empty — matching its documented contract and its existing behavior when other stores are hydrated —
+  in both the open-source and Pro JS packages. Default strict calls still throw the descriptive
+  "There are no stores hydrated" / "Could not find hydrated store" errors.
+  [PR 4457](https://github.com/shakacode/react_on_rails/pull/4457) by
+  [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
+  each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
+  documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
+  shutdown deadline; and stale scheduled-restart workers no longer break the restart loop. Fixes
+  [Issue 4365](https://github.com/shakacode/react_on_rails/issues/4365),
+  [Issue 4366](https://github.com/shakacode/react_on_rails/issues/4366),
+  [Issue 4367](https://github.com/shakacode/react_on_rails/issues/4367), and
+  [Issue 4368](https://github.com/shakacode/react_on_rails/issues/4368).
+  [PR 4400](https://github.com/shakacode/react_on_rails/pull/4400) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Response-start send failures are reported during abandoned incremental renders**:
+  The Pro node renderer now observes and reports rejected response-start/send promises when
+  incremental render request handling stops early or errors after a response starts, while still
+  propagating those failures on clean stream completion. Fixes
+  [Issue 4364](https://github.com/shakacode/react_on_rails/issues/4364).
+  [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
   bypasses renders that use async props, so per-request async stream output cannot be replayed from
   another request's cached stream. Fixes
@@ -102,11 +158,32 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4377](https://github.com/shakacode/react_on_rails/pull/4377) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Renderer HTTP transport no longer buffers successful streams or duplicate bundle uploads**:
+  Pro renderer requests now pass successful streaming response chunks through without retaining them in Ruby
+  memory, reuse a persistent async-http client for plain Puma non-streaming requests, reset scheduler-scoped
+  clients when the shared renderer connection is reset, and stream/deduplicate same-bundle uploads. Plain Puma
+  reuse is per request-handling thread, so total renderer connection capacity can scale with Puma threads times
+  `renderer_http_pool_size`; tune the renderer and any intermediaries accordingly. Fixes
+  [Issue 4360](https://github.com/shakacode/react_on_rails/issues/4360),
+  [Issue 4361](https://github.com/shakacode/react_on_rails/issues/4361),
+  [Issue 4362](https://github.com/shakacode/react_on_rails/issues/4362), and
+  [Issue 4363](https://github.com/shakacode/react_on_rails/issues/4363).
+  [PR 4394](https://github.com/shakacode/react_on_rails/pull/4394) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Streaming dependency load errors stay visible**: Pro streaming cleanup now tolerates dependency
   load failures that happen before stream observability state is captured, so the original `LoadError`
   remains visible instead of being masked by cleanup. Fixes
   [Issue 4324](https://github.com/shakacode/react_on_rails/issues/4324).
   [PR 4388](https://github.com/shakacode/react_on_rails/pull/4388) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Tag revalidation keeps retry metadata after entry delete failures**:
+  `ReactOnRailsPro.revalidate_tag` now restores the tag index before re-raising when tagged
+  cache-entry deletion fails, so transient cache-store failures leave retry metadata instead
+  of orphaning stale entries until their TTL expires. Fixes
+  [Issue 4317](https://github.com/shakacode/react_on_rails/issues/4317).
+  [PR 4375](https://github.com/shakacode/react_on_rails/pull/4375) by
   [justin808](https://github.com/justin808).
 
 - **`hydrate_on: nil` falls back to immediate hydration**: Passing `hydrate_on: nil` now behaves
@@ -164,6 +241,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   fail under shells where Ruby's default external encoding is US-ASCII. Fixes
   [Issue 4276](https://github.com/shakacode/react_on_rails/issues/4276).
   [PR 4281](https://github.com/shakacode/react_on_rails/pull/4281) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Cached component hits load generated packs consistently**:
+  Pro cached component helpers now share the `ReactOnRailsPro::Cache.fetch_react_component` path and
+  run the cache-hit pack-loading callback, so cached `cached_react_component` and
+  `cached_react_component_hash` output preserves generated pack behavior. Fixes
+  [Issue 4316](https://github.com/shakacode/react_on_rails/issues/4316).
+  [PR 4384](https://github.com/shakacode/react_on_rails/pull/4384) by
   [justin808](https://github.com/justin808).
 
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:

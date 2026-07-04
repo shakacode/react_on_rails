@@ -58,6 +58,12 @@ describe('StoreRegistry', () => {
     expect(actual).toEqual(expected);
   });
 
+  it('StoreRegistry returns undefined when no stores are hydrated, passing throwIfMissing = false', () => {
+    const actual = StoreRegistry.getStore('foobar', false);
+    const expected = undefined;
+    expect(actual).toEqual(expected);
+  });
+
   it('StoreRegistry getStore, setStore', () => {
     const store = storeGenerator({});
     StoreRegistry.setStore('storeGenerator', store);

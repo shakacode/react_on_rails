@@ -138,6 +138,7 @@ const createFromFetch = async (
             });
           }
         }
+        parser.flush();
         controller.close();
       } catch (error) {
         console.error('[ReactOnRails] Error parsing RSC stream:', error);
@@ -182,8 +183,9 @@ const isAbortError = (error: unknown): boolean =>
  * @param cspNonce - Optional nonce for legacy console replay script injection
  * @param fetchOptions - Narrow fetch controls for callers that need credentials, headers, or cancellation
  * @param replayConsoleScripts - Whether console replay metadata should be materialized as script tags
- * @returns A Promise resolving to the rendered React element
- * @throws Error if RSC payload generation URL path is not configured or network request fails
+ * @returns A Promise resolving to the rendered React element; rejects (never throws synchronously)
+ * if the RSC payload generation URL path is not configured, request preparation fails, or the
+ * network request fails
  * @internal Shared implementation for Pro client helpers; prefer exported package entry points.
  */
 export const fetchRSC = ({
@@ -195,7 +197,7 @@ export const fetchRSC = ({
   replayConsoleScripts,
 }: FetchRSCOptions) => {
   if (!rscPayloadGenerationUrlPath) {
-    throw createMissingRSCPayloadPathError(componentName);
+    return Promise.reject(createMissingRSCPayloadPathError(componentName));
   }
 
   try {
@@ -225,12 +227,13 @@ export const fetchRSC = ({
       throw wrapper;
     });
   } catch (error: unknown) {
-    // Handle JSON.stringify errors or other synchronous errors
+    // JSON.stringify errors and other synchronous preparation failures become
+    // rejections so callers stay on the Promise error path (#4372).
     const wrapper: Error & { cause?: unknown } = new Error(
       `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
     wrapper.cause = error;
-    throw wrapper;
+    return Promise.reject(wrapper);
   }
 };
 
@@ -357,7 +360,6 @@ const getReactServerComponent =
       }
     }
     if (!railsContext.rscPayloadGenerationUrlPath) {
-      // fetchRSC throws synchronously for a missing path; keep this API on the Promise rejection path.
       return Promise.reject(createMissingRSCPayloadPathError(componentName));
     }
 
