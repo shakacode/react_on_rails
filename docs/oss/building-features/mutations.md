@@ -70,7 +70,7 @@ class ProjectsController < ApplicationController
 
     if project.save
       render json: {
-        project: { id: project.id, name: project.name },
+        project: { id: project.id, name: project.name, status: project.status },
         redirect_to: project_path(project)
       }, status: :created
     else
@@ -250,8 +250,9 @@ After a mutation, choose the refresh mechanism that matches the UI:
 - TanStack Query island: invalidate or update the affected query keys.
 - RSC route: navigate to a route that Rails renders again, or trigger the app's client router to load
   the next page state.
-- Fragment/component cache: expire or revalidate from Rails callbacks, jobs, or controller code, not
-  from a Node-renderer Server Action.
+- Fragment/component cache: expire Rails-owned cache keys from callbacks, jobs, or controller code,
+  then use the matching page, query, or route refresh path above to re-read the data. Do not rely
+  on a Node-renderer Server Action for cache invalidation.
 
 For the migration-specific warning, see
 [Mutations: Rails Controllers, Not Server Actions](../migrating/rsc-data-fetching.md#mutations-rails-controllers-not-server-actions).
