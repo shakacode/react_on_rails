@@ -110,6 +110,13 @@ jobs:
               'false' ||
               steps.hosted-ci.outputs.should_run_hosted_ci
             }}
+          FORCE_REQUIRED_HOSTED_CI_RECHECK: >-
+            ${{
+              github.event_name == 'workflow_dispatch' &&
+              github.event.inputs.force_required_hosted_ci_recheck == 'true' &&
+              'true' ||
+              'false'
+            }}
         run: |
           script/ci-required-hosted-gate
 
