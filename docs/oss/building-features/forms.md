@@ -26,6 +26,10 @@ The contract between them is one blessed error shape:
 The hook works against **any** endpoint returning that shape; the concern is a
 convenience, not a requirement.
 
+For the framework-level comparison with Next.js Server Actions and TanStack
+Start server functions, see
+[Mutations without Server Actions](./mutations.md).
+
 Compatibility: `react-on-rails/useRailsForm` requires React 16.8 or newer
 because it is a hook. Apps still on React 16.0-16.7 can continue using the
 package's other React 16 APIs, but this subpath throws a clear error until React
@@ -261,6 +265,8 @@ React on Rails intentionally keeps mutations in Rails controllers —
 [Server Functions RFC (Issue 3867)](https://github.com/shakacode/react_on_rails/issues/3867)
 explores the complementary RSC-side story. The two are designed to compose: if
 Server Functions land, this hook remains the plain-controller bridge.
+For side-by-side migration examples, see
+[Mutations without Server Actions](./mutations.md).
 
 ## Scope and roadmap
 
