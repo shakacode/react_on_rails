@@ -91,8 +91,13 @@ jobs:
 
       - name: Run changed-files detector
         id: changes
+        env:
+          PULL_REQUEST_BASE_SHA: ${{ github.event.inputs.pull_request_base_sha || '' }}
         run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.inputs.pull_request_base_sha || github.event.before || 'origin/main' }}"
+          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
+          if [ -n "${PULL_REQUEST_BASE_SHA}" ]; then
+            base_ref="${PULL_REQUEST_BASE_SHA}"
+          fi
           script/ci-changes-detector "$base_ref"
 
       - name: Enforce hosted CI for generator changes
