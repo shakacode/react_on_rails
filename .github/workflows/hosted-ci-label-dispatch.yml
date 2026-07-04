@@ -79,6 +79,33 @@ jobs:
               return [await removeLabelIfPresent(labelName)];
             }
 
+            async function dispatchRequiredGateRecheck() {
+              if (headRepoFullName !== repoFullName) {
+                core.info('Skipping forced ci-required recheck because fork PR heads cannot be workflow-dispatched.');
+                return { dispatched: false, skipped: true };
+              }
+
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: 'ci-required.yml',
+                  ref: pr.head.ref,
+                  inputs: {
+                    pull_request_base_ref: pr.base.ref,
+                    pull_request_base_sha: pr.base.sha,
+                    force_required_hosted_ci_recheck: 'true'
+                  }
+                });
+                return { dispatched: true };
+              } catch (error) {
+                core.warning(
+                  `Unable to dispatch ci-required after hosted CI label cleanup: ${error.message || error}`
+                );
+                return { dispatched: false, error };
+              }
+            }
+
             function cleanupSummary(cleanupResults) {
               const removedControlLabels = cleanupResults
                 .filter((result) => result.removed)
@@ -87,6 +114,18 @@ jobs:
               return removedControlLabels.length > 0
                 ? ` Removed hosted CI control label(s): ${removedControlLabels.join(', ')}.`
                 : '';
+            }
+
+            function requiredGateRecheckSummary(requiredGateRecheck) {
+              if (requiredGateRecheck.dispatched) {
+                return ' Dispatched ci-required to re-evaluate after label cleanup.';
+              }
+
+              if (requiredGateRecheck.skipped) {
+                return ' Skipped ci-required workflow_dispatch recheck because the PR head is outside this repository.';
+              }
+
+              return ' Failed to dispatch ci-required after label cleanup.';
             }
 
             async function hasWriteAccessFor(username) {
@@ -119,10 +158,12 @@ jobs:
 
             if (!headRepoFullName || headRepoFullName !== repoFullName) {
               const cleanupResults = await removeTriggeredControlLabel();
+              const requiredGateRecheck = await dispatchRequiredGateRecheck();
               core.setFailed(
                 'Unable to dispatch hosted CI from this label event because the PR branch is not in this repository. ' +
                   'A maintainer should push the branch to this repository or trigger the required workflows manually.' +
-                  cleanupSummary(cleanupResults)
+                  cleanupSummary(cleanupResults) +
+                  requiredGateRecheckSummary(requiredGateRecheck)
               );
               return;
             }
@@ -148,10 +189,12 @@ jobs:
 
             if (!(await hasWriteAccessFor(context.actor))) {
               const cleanupResults = await removeTriggeredControlLabel();
+              const requiredGateRecheck = await dispatchRequiredGateRecheck();
               core.setFailed(
                 `Unable to dispatch hosted CI from this label event because ${context.actor} does not have write/admin repository permission. ` +
                   'Use `+ci-run-hosted` or ask a write/admin maintainer to add the hosted CI label.' +
-                  cleanupSummary(cleanupResults)
+                  cleanupSummary(cleanupResults) +
+                  requiredGateRecheckSummary(requiredGateRecheck)
               );
               return;
             }
@@ -159,6 +202,7 @@ jobs:
             const isDependabotPr = pr.user?.login === 'dependabot[bot]';
             if (isDependabotPr) {
               const cleanupResults = await removeTriggeredControlLabel();
+              const requiredGateRecheck = await dispatchRequiredGateRecheck();
               await github.rest.issues.createComment({
                 owner,
                 repo,
@@ -171,7 +215,8 @@ jobs:
                   '',
                   'Dependabot PRs require the `+ci-run-hosted` command path so the required gate can verify trusted current-head dispatch proof before honoring hosted-CI labels.',
                   'A write/admin maintainer should comment `+ci-run-hosted` or `+ci-force-full` instead.',
-                  cleanupSummary(cleanupResults).trim()
+                  cleanupSummary(cleanupResults).trim(),
+                  requiredGateRecheckSummary(requiredGateRecheck).trim()
                 ].join('\n')
               });
               core.setFailed('Dependabot hosted CI label dispatch requires the +ci-run-hosted command path.');
@@ -267,6 +312,7 @@ jobs:
 
             if (failed.length > 0) {
               const cleanupResults = await removeHostedCiControlLabels();
+              const requiredGateRecheck = await dispatchRequiredGateRecheck();
               const removedControlLabels = cleanupResults
                 .filter((result) => result.removed)
                 .map((result) => result.name);
@@ -274,7 +320,9 @@ jobs:
               const cleanupMessage = removedControlLabels.length > 0
                 ? [
                     `Removed hosted CI control label(s): ${removedControlLabels.map((name) => `\`${name}\``).join(', ')}`,
-                    'The label removal triggers the required gate to re-evaluate without the failed hosted-CI request.'
+                    requiredGateRecheck.dispatched ?
+                      'Dispatched ci-required to re-evaluate without the failed hosted-CI request.' :
+                      'Unable to dispatch ci-required after removing the failed hosted-CI request.'
                   ]
                 : ['No hosted CI control labels were removed.'];
 
@@ -301,7 +349,8 @@ jobs:
               });
               core.setFailed(
                 `Failed to dispatch: ${failed.map((failure) => failure.workflow).join(', ')}` +
-                  (cleanupFailures.length > 0 ? '; hosted CI label cleanup also failed' : '')
+                  (cleanupFailures.length > 0 ? '; hosted CI label cleanup also failed' : '') +
+                  (requiredGateRecheck.error ? '; ci-required recheck dispatch also failed' : '')
               );
             } else {
               const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;

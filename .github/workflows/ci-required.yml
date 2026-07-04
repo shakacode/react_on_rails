@@ -5,6 +5,20 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
+    inputs:
+      pull_request_base_ref:
+        description: PR base branch for hosted-label cleanup rechecks.
+        required: false
+        type: string
+      pull_request_base_sha:
+        description: PR base SHA for hosted-label cleanup rechecks.
+        required: false
+        type: string
+      force_required_hosted_ci_recheck:
+        description: Re-run the required gate after hosted-label cleanup with hosted CI treated as not requested.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,26 +74,37 @@ jobs:
       - name: Run CI gate tests
         run: |
           bash script/ci-required-hosted-gate-test.bash
+          node .github/workflows/hosted-ci-safety.test.cjs
 
       - name: Fetch workflow dispatch base
         if: github.event_name == 'workflow_dispatch'
+        env:
+          BASE_REF: ${{ github.event.inputs.pull_request_base_ref || 'main' }}
         run: |
-          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main
+          git fetch --no-tags --depth=50 origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Select hosted CI mode
         id: hosted-ci
         uses: ./.github/actions/hosted-ci-selectors
+        with:
+          base-ref: ${{ github.event.inputs.pull_request_base_ref || '' }}
 
       - name: Run changed-files detector
         id: changes
         run: |
-          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
+          base_ref="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.inputs.pull_request_base_sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$base_ref"
 
       - name: Enforce hosted CI for generator changes
         env:
           RUN_GENERATORS: ${{ steps.changes.outputs.run_generators }}
-          SHOULD_RUN_HOSTED_CI: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
+          SHOULD_RUN_HOSTED_CI: >-
+            ${{
+              github.event_name == 'workflow_dispatch' &&
+              github.event.inputs.force_required_hosted_ci_recheck == 'true' &&
+              'false' ||
+              steps.hosted-ci.outputs.should_run_hosted_ci
+            }}
         run: |
           script/ci-required-hosted-gate
 
