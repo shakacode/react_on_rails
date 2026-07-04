@@ -9188,7 +9188,7 @@ import { createRailsAction, RailsActionRequestError } from 'react-on-rails/rails
 
 type ProjectFormData = {
   name: string;
-  status: string;
+  status: 'draft' | 'active';
 };
 
 type ProjectResponse = {
@@ -9207,6 +9207,7 @@ const isValidationErrors = (errors: unknown): errors is ValidationErrors =>
   Boolean(errors) &&
   typeof errors === 'object' &&
   !Array.isArray(errors) &&
+  Object.keys(errors).length > 0 &&
   Object.values(errors).every(
     (messages) => Array.isArray(messages) && messages.every((message) => typeof message === 'string'),
   );
