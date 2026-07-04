@@ -117,6 +117,15 @@ errors, redirects, jobs, and cache expiry:
 ```ts
 import { createRailsAction } from 'react-on-rails/railsAction';
 
+type ProjectFormData = {
+  name: string;
+  status: 'draft' | 'active';
+};
+
+type ProjectResponse = {
+  project: { id: number; name: string; status: string };
+};
+
 const createProject = createRailsAction<{ project: ProjectFormData }, ProjectResponse>({
   path: '/projects',
 });
