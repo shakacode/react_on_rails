@@ -315,8 +315,18 @@ type ProjectResponse = {
 type ValidationErrors = Record<string, string[]>;
 
 type ErrorResponse = {
-  errors?: ValidationErrors;
+  errors?: unknown;
 };
+
+const fallbackError: ValidationErrors = { base: ['Something went wrong. Please try again.'] };
+
+const isValidationErrors = (errors: unknown): errors is ValidationErrors =>
+  Boolean(errors) &&
+  typeof errors === 'object' &&
+  !Array.isArray(errors) &&
+  Object.values(errors).every(
+    (messages) => Array.isArray(messages) && messages.every((message) => typeof message === 'string'),
+  );
 
 const createProject = createRailsAction<{ project: ProjectFormData }, ProjectResponse>({
   path: '/projects',
@@ -339,8 +349,11 @@ export function useCreateProjectMutation(setValidationErrors: (errors: Validatio
             ? (responseBody as ErrorResponse).errors
             : undefined;
 
-        setValidationErrors(errors ?? { base: ['Something went wrong. Please try again.'] });
+        setValidationErrors(isValidationErrors(errors) ? errors : fallbackError);
+        return;
       }
+
+      setValidationErrors(fallbackError);
     },
   });
 }
