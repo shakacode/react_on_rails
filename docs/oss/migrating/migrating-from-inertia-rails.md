@@ -84,7 +84,7 @@ Examples:
 
 - **Small CRUD app:** 5 simple pages, 2 ordinary forms, no SSR, no heavy `usePage()` usage: roughly 3-6 engineer-days.
 - **Moderate Inertia app:** 20 pages, 5 forms, one shared user/flash surface, no deferred props: roughly 9-18 engineer-days with route-by-route coexistence.
-- **SEO/SSR migration:** 10 important pages plus SSR parity and performance validation: roughly 8-15 engineer-days, depending on whether ExecJS is enough or the Pro Node renderer is required.
+- **SEO/SSR migration:** 10 important pages plus SSR parity and performance validation: roughly 5-10 engineer-days before visual QA, depending on whether ExecJS is enough or the Pro Node renderer is required.
 
 These are planning ranges, not promises. Add separate time for visual QA, product copy changes, route redesign, or any
 cleanup you choose to do while touching the pages.

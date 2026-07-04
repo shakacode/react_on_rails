@@ -21,6 +21,8 @@ React on Rails is a better fit when you want one or more of these:
 
 If your app is already happy with a Vite-only client-rendered setup, this migration is optional.
 
+## Migration decision table
+
 | Stay on `vite_rails` when...                                                           | Move to React on Rails when...                                                                                         |
 | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | The app is a Vite-powered SPA and Rails only serves the shell.                         | Rails should own page rendering, route-level props, or several React islands inside existing ERB views.                |
