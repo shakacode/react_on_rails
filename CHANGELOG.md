@@ -112,7 +112,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `throwIfMissing = false`, `getStore` now returns `undefined` when the hydrated-store registry is
   empty — matching its documented contract and its existing behavior when other stores are hydrated —
   in both the open-source and Pro JS packages. Default strict calls still throw the descriptive
-  "There are no stores hydrated" / "Could not find hydrated store" errors. By
+  "There are no stores hydrated" / "Could not find hydrated store" errors.
+  [PR 4457](https://github.com/shakacode/react_on_rails/pull/4457) by
   [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
   each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
