@@ -326,7 +326,18 @@ export const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
-    const fetchPromise = fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
+    const fetchPromise = (() => {
+      try {
+        return fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
+      } catch (error) {
+        if (error instanceof Error) {
+          return Promise.reject(error);
+        }
+        const wrappedError: Error & { cause?: unknown } = new Error(String(error));
+        defineErrorCause(wrappedError, error);
+        return Promise.reject(wrappedError);
+      }
+    })();
 
     return createFromFetch(fetchPromise, {
       componentName,
