@@ -44,6 +44,10 @@ export default {
       return hydratedStores.get(name);
     }
 
+    if (!throwIfMissing) {
+      return undefined;
+    }
+
     const storeKeys = Array.from(hydratedStores.keys()).join(', ');
 
     if (storeKeys.length === 0) {
@@ -55,15 +59,10 @@ This can happen if you are server rendering and either:
       throw new Error(msg);
     }
 
-    if (throwIfMissing) {
-      console.log('storeKeys', storeKeys);
-      throw new Error(
-        `Could not find hydrated store with name '${name}'. ` +
-          `Hydrated store names include [${storeKeys}].`,
-      );
-    }
-
-    return undefined;
+    console.log('storeKeys', storeKeys);
+    throw new Error(
+      `Could not find hydrated store with name '${name}'. Hydrated store names include [${storeKeys}].`,
+    );
   },
 
   /**
