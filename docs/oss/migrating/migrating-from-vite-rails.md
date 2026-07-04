@@ -60,13 +60,13 @@ line items so the bundler/integration migration stays measurable.
 
 ## Migration decision table
 
-| Stay on `vite_rails` when...                                                           | Move to React on Rails when...                                                                                         |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| The app is a Vite-powered SPA and Rails only serves the shell.                         | Rails should own page rendering, route-level props, or several React islands inside existing ERB views.                |
-| Client-side rendering already meets SEO and performance needs.                         | You need SSR from Rails, a path to streaming SSR, or React Server Components.                                          |
-| Vite plugins, `import.meta.glob`, or Vite's dev server are central to your workflow.   | You want to consolidate on Shakapacker / webpack semantics or remove a separate Vite build path from Rails deployment. |
-| The current app has no bundler pain and no React on Rails Pro feature needs.           | You need React on Rails helpers, Rails request context, Pro Node rendering, streaming SSR, or RSC as app requirements. |
-| The migration would also require a product rewrite or router redesign you do not want. | You can keep the current product shape and migrate route-by-route or as one top-level SPA mount first.                 |
+| App signal              | Stay on `vite_rails` when...                                                           | Move to React on Rails when...                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| App shape               | The app is a Vite-powered SPA and Rails only serves the shell.                         | Rails should own page rendering, route-level props, or several React islands inside existing ERB views.                |
+| Rendering requirements  | Client-side rendering already meets SEO and performance needs.                         | You need SSR from Rails, a path to streaming SSR, or React Server Components.                                          |
+| Build workflow          | Vite plugins, `import.meta.glob`, or Vite's dev server are central to your workflow.   | You want to consolidate on Shakapacker / webpack semantics or remove a separate Vite build path from Rails deployment. |
+| Framework feature needs | The current app has no bundler pain and no React on Rails Pro feature needs.           | You need React on Rails helpers, Rails request context, Pro Node rendering, streaming SSR, or RSC as app requirements. |
+| Product scope           | The migration would also require a product rewrite or router redesign you do not want. | You can keep the current product shape and migrate route-by-route or as one top-level SPA mount first.                 |
 
 ## Preflight
 
