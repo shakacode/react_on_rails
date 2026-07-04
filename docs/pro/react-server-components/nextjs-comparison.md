@@ -190,26 +190,27 @@ Rails, which you already have.
 > choice. React on Rails Pro's RSC feature set is actively expanding — check the
 > [release notes](../release-notes/index.md) for the current state.
 
-| Capability                                 | React on Rails Pro                                                                                                                                     | Next.js (App Router)                             |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| Server Components + Flight streaming       | Yes                                                                                                                                                    | Yes                                              |
-| SSR + hydration with **no** double-fetch   | Yes (inlined `REACT_ON_RAILS_RSC_PAYLOADS`)                                                                                                            | Yes (inlined `__next_f`)                         |
-| Refetch RSC on client navigation           | Yes (`/rsc_payload/:name` is the default endpoint)                                                                                                     | Yes (segment-level diff)                         |
-| Segment-level navigation diffing           | No route-segment diffing as of 2026 — RoR Pro refetches by component name; **Rails owns routing**                                                      | Yes — built into the framework router            |
-| Built-in link prefetching                  | Not built-in as of 2026 — use Rails/Turbo or a client router                                                                                           | Yes (viewport + hover)                           |
-| Server-side mutations                      | Rails controllers/endpoints own mutations; see [Rails data patterns](../../oss/migrating/rsc-data-fetching.md) (no server-action shorthand as of 2026) | "Server Actions" (RPC + re-render in one trip)   |
-| Static shell + streamed dynamic holes      | [Async props](../../oss/migrating/rsc-data-fetching.md) stream slow data (related goal, different mechanism)                                           | Partial Prerendering (PPR)                       |
-| Stream each slow prop independently        | Yes (async props)                                                                                                                                      | Related via Suspense/PPR (different granularity) |
-| Use your existing Rails app/routes/auth/DB | Yes — the entire point                                                                                                                                 | No — Next owns the server                        |
-| Bundler choice                             | webpack **or** Rspack (Shakapacker)                                                                                                                    | Turbopack default; webpack/Rspack also           |
-| Hosting model                              | Your Rails app + a Node renderer process                                                                                                               | One Node (or Edge) server process                |
+| Capability                                 | React on Rails Pro                                                                                                                                                                                                                      | Next.js (App Router)                             |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Server Components + Flight streaming       | Yes                                                                                                                                                                                                                                     | Yes                                              |
+| SSR + hydration with **no** double-fetch   | Yes (inlined `REACT_ON_RAILS_RSC_PAYLOADS`)                                                                                                                                                                                             | Yes (inlined `__next_f`)                         |
+| Refetch RSC on client navigation           | Yes (`/rsc_payload/:name` is the default endpoint)                                                                                                                                                                                      | Yes (segment-level diff)                         |
+| Segment-level navigation diffing           | No route-segment diffing as of 2026 — RoR Pro refetches by component name; **Rails owns routing**                                                                                                                                       | Yes — built into the framework router            |
+| Built-in link prefetching                  | Not built-in as of 2026 — use Rails/Turbo or a client router                                                                                                                                                                            | Yes (viewport + hover)                           |
+| Server-side mutations                      | Rails controllers/endpoints own mutations; see [Mutations without Server Actions](../../oss/building-features/mutations.md) and [Rails data patterns](../../oss/migrating/rsc-data-fetching.md) (no server-action shorthand as of 2026) | "Server Actions" (RPC + re-render in one trip)   |
+| Static shell + streamed dynamic holes      | [Async props](../../oss/migrating/rsc-data-fetching.md) stream slow data (related goal, different mechanism)                                                                                                                            | Partial Prerendering (PPR)                       |
+| Stream each slow prop independently        | Yes (async props)                                                                                                                                                                                                                       | Related via Suspense/PPR (different granularity) |
+| Use your existing Rails app/routes/auth/DB | Yes — the entire point                                                                                                                                                                                                                  | No — Next owns the server                        |
+| Bundler choice                             | webpack **or** Rspack (Shakapacker)                                                                                                                                                                                                     | Turbopack default; webpack/Rspack also           |
+| Hosting model                              | Your Rails app + a Node renderer process                                                                                                                                                                                                | One Node (or Edge) server process                |
 
 The pattern: **Next.js gives you more RSC-era features in the box** because it owns the whole stack.
 **React on Rails Pro gives you RSC inside a real Rails app** — keeping Rails' routing, data layer, and
 ecosystem — at the cost of running a couple more moving parts (the [node renderer](../node-renderer.md)
 and a third bundle). Where React on Rails Pro hands a responsibility back to Rails (mutations, routing,
 auth), that is usually a feature for a Rails team, not a gap: you already have those tools and do not
-want a second, parallel copy of them.
+want a second, parallel copy of them. For a practical mutation recipe, see
+[Mutations without Server Actions](../../oss/building-features/mutations.md).
 
 ## Developer experience: one process vs. several
 
@@ -252,6 +253,7 @@ chunk-loading primitives differ.
 - [RSC Rendering Flow](./rendering-flow.md) — the detailed rendering lifecycle and bundle types
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the RSC wire format
 - [Rspack Compatibility](./rspack-compatibility.md) — bundler support status and the native `RSCRspackPlugin`
+- [Mutations without Server Actions](../../oss/building-features/mutations.md) — Rails controller recipes side-by-side with Next.js Server Actions
 - [RSC Glossary](./glossary.md) — terminology reference
 - [RSC overview](./index.md) — the full React Server Components documentation set
 - [React on Rails Pro and TanStack Start](./tanstack-start-comparison.md) — the same kind of architecture comparison, for TanStack Start
