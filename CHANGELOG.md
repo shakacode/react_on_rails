@@ -114,7 +114,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   the renderer (a bare read could even return a stale un-namespaced entry for the same logical key). Reads
   now pass the same normalized options as the deferred write, and the lower-level streaming prerender cache
   (`ReactOnRailsPro::StreamCache.fetch_stream`) likewise accepts and applies the `cache_options` its write
-  path uses. By [ihabadham](https://github.com/ihabadham).
+  path uses. [PR 4452](https://github.com/shakacode/react_on_rails/pull/4452) by
+  [ihabadham](https://github.com/ihabadham).
 
 - **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
   each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
