@@ -8,7 +8,7 @@ mechanics.
 
 A public worked example repo is planned as a separate follow-up in
 [reactonrails.com#140](https://github.com/shakacode/reactonrails.com/issues/140);
-use [Example Migrations](./example-migrations.md) until that repo exists.
+use the existing example-migration guide until that repo exists.
 
 ## When this migration makes sense
 
