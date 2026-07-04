@@ -118,6 +118,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4438](https://github.com/shakacode/react_on_rails/pull/4438) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Truncated RSC parser streams now warn at EOF**: The Pro RSC length-prefixed stream
+  parser flushes at stream end so incomplete trailing records emit the existing parser warning,
+  while expected request-abort cleanup remains quiet.
+  [PR 4392](https://github.com/shakacode/react_on_rails/pull/4392) by
+  [justin808](https://github.com/justin808).
+
 - **`ReactOnRails.getStore(name, false)` no longer throws when no stores are hydrated**: With
   `throwIfMissing = false`, `getStore` now returns `undefined` when the hydrated-store registry is
   empty — matching its documented contract and its existing behavior when other stores are hydrated —
@@ -125,6 +131,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   "There are no stores hydrated" / "Could not find hydrated store" errors.
   [PR 4457](https://github.com/shakacode/react_on_rails/pull/4457) by
   [ihabadham](https://github.com/ihabadham).
+
+- **[Pro]** **RSC stylesheet inference retries after transient stats read failures**: Pro now caches
+  client-chunk stylesheet metadata only after a successful `loadable-stats.json` read, so a
+  deploy-race or temporary parse/read failure does not disable inferred RSC client stylesheets for
+  the worker lifetime.
+  [PR 4401](https://github.com/shakacode/react_on_rails/pull/4401) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC loadable-stats retry diagnostics stay visible**: Malformed or unreadable
+  `loadable-stats.json` warnings are suppressed only for the retry window, and native ESM stack
+  paths rewritten through source maps are normalized back to the runtime `lib/` directory before
+  resolving stats.
+  [PR 4447](https://github.com/shakacode/react_on_rails/pull/4447) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Node renderer graceful shutdown and scheduled restarts**: Worker shutdown now counts
   each active request once across response, abort, and timeout hooks; scheduled restart timeouts use
   documented seconds; draining workers skip only the early master SIGKILL while keeping the hard
