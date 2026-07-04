@@ -59,7 +59,7 @@ product decision.
 
 Examples:
 
-- **Rails-owned island app:** 8 mounts, two layouts, no Vite-only plugins: roughly 3-5 engineer-days.
+- **Rails-owned island app:** 8 mounts, two layouts, no Vite-only plugins: roughly 4-7 engineer-days.
 - **SPA shell with light Vite usage:** one top-level app, `import.meta.env`, a few asset-path replacements: roughly 3-7 engineer-days.
 - **Vite-heavy app:** custom plugins plus `import.meta.glob` route discovery: run a 1-2 day spike first, then estimate from the plugin and module-discovery replacements.
 
