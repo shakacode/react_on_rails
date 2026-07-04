@@ -68,6 +68,9 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
   return next;
 };
 
+// Synchronous failures (payload key creation, sync producer throws) become
+// rejected promises so they funnel through RSCRoute's error boundary the same
+// way async fetch failures do (#4372).
 const rejectWithError = <T,>(error: unknown): Promise<T> =>
   Promise.reject(error instanceof Error ? error : new Error(String(error)));
 
@@ -385,6 +388,10 @@ export const createRSCProvider = ({
         try {
           serverComponentPromise = getServerComponent({ componentName, componentProps });
         } catch (error) {
+          // A synchronous producer throw behaves exactly like an immediately
+          // rejected fetch: the rejection flows through the standard
+          // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
+          // settles the evicted-success latch and evicts the cached rejection.
           serverComponentPromise = rejectWithError(error);
         }
 

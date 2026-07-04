@@ -108,6 +108,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Sync RSC route failures surface as `ServerComponentFetchError`**: Synchronous throws
+  in the RSC payload path (payload key creation on BigInt/circular props, sync
+  `getServerComponent` throws, `fetchRSC` request preparation) previously bypassed
+  `RSCRouteErrorBoundary`, so user error boundaries received raw `TypeError`s without component
+  metadata. All sync and async failure paths now funnel through the boundary, and a nested route's
+  already-wrapped error passes through without re-wrapping. Fixes
+  [Issue 4372](https://github.com/shakacode/react_on_rails/issues/4372).
+  [PR 4438](https://github.com/shakacode/react_on_rails/pull/4438) by
+  [justin808](https://github.com/justin808).
+
 - **`ReactOnRails.getStore(name, false)` no longer throws when no stores are hydrated**: With
   `throwIfMissing = false`, `getStore` now returns `undefined` when the hydrated-store registry is
   empty — matching its documented contract and its existing behavior when other stores are hydrated —
