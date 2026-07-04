@@ -3,7 +3,6 @@
 require "rake"
 
 require_relative "task_helpers"
-require_relative File.join(__dir__, "..", "lib", "react_on_rails", "utils")
 
 # Defines the ExampleType class, where each object represents a unique type of example
 # app that we can generate.
@@ -77,7 +76,7 @@ module ReactOnRails
       attr_writer :rails_options
 
       def rails_options
-        @rails_options ||= if ReactOnRails::Utils.rails_version_less_than("7.0")
+        @rails_options ||= if rails_version_less_than("7.0")
                              "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -J"
                            else
                              "--skip-bundle --skip-spring --skip-git --skip-test-unit --skip-active-record -j webpack"
@@ -108,6 +107,12 @@ module ReactOnRails
       end
 
       private
+
+      # Compares the running Rails version against the given version string.
+      # Rake-only helper for example generation (previously ReactOnRails::Utils.rails_version_less_than).
+      def rails_version_less_than(version)
+        Gem::Version.new(Rails.version) < Gem::Version.new(version)
+      end
 
       # Defines globs that scoop up all files (including dotfiles) in given directory
       def all_files_in_dir(p_dir)

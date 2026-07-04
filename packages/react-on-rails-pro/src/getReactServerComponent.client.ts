@@ -138,6 +138,7 @@ const createFromFetch = async (
             });
           }
         }
+        parser.flush();
         controller.close();
       } catch (error) {
         console.error('[ReactOnRails] Error parsing RSC stream:', error);

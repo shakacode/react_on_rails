@@ -117,6 +117,27 @@ How to optimize RSC Flight payload size for better performance. Covers:
 - Compression effectiveness and the LCP tradeoff
 - React on Rails double JSON.stringify overhead
 
+### 9. [RSC Performance Validation](rsc-performance-validation.md)
+
+How to prove that an RSC conversion improved the page users actually see. Covers:
+
+- Local control/experiment setup on the same machine
+- Warm cached SSR baselines for pages that already use React on Rails Pro caching
+- Visual regression checks paired with Lighthouse and resource metrics
+- Package-stack discipline for published, canary, RC, and diagnostic builds
+- Required PR metrics and the public-page case study
+
+### 10. [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md)
+
+How to render public/static-ish pages as mostly static RSC HTML while preserving a few browser
+behaviors without loading the full global application pack. Covers:
+
+- Rails layout opt-out for selected global JavaScript packs
+- Inert JSON props/context handoff to a sidecar
+- Intent hydration with keyboard, accessibility, and no-JS fallback checks
+- CSS parity and behavior audit checklists
+- Bundler and `clientReferences` caveats
+
 ## How RSC Maps to React on Rails
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
@@ -203,6 +224,8 @@ These mistakes account for the majority of setup failures:
 - [Upgrading an Existing Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md) — generator-based runbook for adding RSC to an existing Pro app, including legacy webpack compatibility and verification checklist
 - [React 19 Native Metadata](../building-features/react-19-native-metadata.md) — replace react-helmet and `react_component_hash` with React 19's built-in `<title>`, `<meta>`, and `<link>` hoisting. Native metadata works with streaming and RSC out of the box.
 - [HTTP Response Ownership](rsc-http-response-patterns.md) — keep `404`, redirects, and cache policy in Rails while rendering route UI with RSC.
+- [RSC Performance Validation](rsc-performance-validation.md) — build the visual plus performance evidence package before claiming an RSC win.
+- [Mostly Static RSC Shell With a Tiny Sidecar](rsc-static-shell-sidecar.md) — keep public RSC shells static while moving small browser behaviors into an explicit sidecar.
 
 ## References
 

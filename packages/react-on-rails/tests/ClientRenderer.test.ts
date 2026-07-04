@@ -1135,6 +1135,63 @@ describe('ClientRenderer', () => {
       );
       expect(mockHydrateOrRender).toHaveBeenCalledTimes(1);
     });
+
+    it('drops a scheduled visible root when the observed target is detached', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      const observerInstances: Array<{
+        callback: ObserverCallback;
+        disconnect: jest.Mock;
+        observe: jest.Mock;
+      }> = [];
+
+      class MockIntersectionObserver {
+        callback: ObserverCallback;
+
+        disconnect = jest.fn();
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          this.callback = callback;
+          observerInstances.push(this);
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      const targetNode = setupScheduledComponentDom('hydrate-visible-detached-drop', 'visible');
+      const mockHydrateOrRender = require('../src/reactHydrateOrRender.ts').default as jest.Mock;
+
+      renderComponent('hydrate-visible-detached-drop');
+      expect(observerInstances).toHaveLength(1);
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+
+      targetNode.remove();
+      observerInstances[0].callback(
+        [
+          { isIntersecting: false, intersectionRatio: 0, target: targetNode },
+        ] as unknown as IntersectionObserverEntry[],
+        observerInstances[0] as unknown as IntersectionObserver,
+      );
+
+      expect(observerInstances[0].disconnect).toHaveBeenCalledTimes(1);
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+
+      const replacementNode = document.createElement('div');
+      replacementNode.id = 'hydrate-visible-detached-drop';
+      replacementNode.innerHTML = '<div>Replacement server rendered</div>';
+      document.body.appendChild(replacementNode);
+
+      renderComponent('hydrate-visible-detached-drop');
+
+      expect(observerInstances).toHaveLength(2);
+      expect(observerInstances[0].disconnect).toHaveBeenCalledTimes(1);
+      expect(observerInstances[1].observe).toHaveBeenCalledWith(replacementNode);
+      expect(mockHydrateOrRender).not.toHaveBeenCalled();
+    });
   });
 
   describe('page unload cleanup (React-root cleanup)', () => {

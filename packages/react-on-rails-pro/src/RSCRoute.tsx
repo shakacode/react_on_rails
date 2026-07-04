@@ -178,7 +178,6 @@ const toServerComponentFetchError = (
 };
 
 type RefetchErrorState = [string, ServerComponentFetchError];
-
 type RSCContextValue = ReturnType<typeof useRSC>;
 type RSCRouteContentProps = Omit<RSCRouteProps, 'ssr'> & { rscContext: RSCContextValue };
 
@@ -241,7 +240,7 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
       // visible while the new promise streams in.
       const refetchPromise = refetchComponent(n, p, recoverOnError);
       const sharedRefetchVersion = getRefetchVersion(n, p);
-      return rejectErrorPayload(refetchPromise).catch((error: unknown) => {
+      const handledRefetchPromise = rejectErrorPayload(refetchPromise).catch((error: unknown) => {
         const serverComponentFetchError = toServerComponentFetchError(error, n, p);
         if (
           recoverOnError &&
@@ -254,6 +253,10 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
         }
         throw serverComponentFetchError;
       });
+      if (recoverOnError) {
+        void handledRefetchPromise.catch(() => undefined);
+      }
+      return handledRefetchPromise;
     }, [getRefetchVersion, refetchComponent]);
 
     const clearRefetchError = useCallback(() => {

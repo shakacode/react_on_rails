@@ -219,6 +219,68 @@ describe ReactOnRailsProHelper do
             end.to raise_error("Pass 'props' as a block if using caching")
           end
         end
+
+        context "with configured auto_load_bundle" do
+          around do |example|
+            original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+            ReactOnRails.configuration.auto_load_bundle = true
+
+            example.run
+          ensure
+            ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+          end
+
+          it "respects explicit auto_load_bundle false on cache misses" do
+            captured_auto_load_bundle = nil
+
+            allow(self).to receive(:react_component) do |_component_name, options|
+              captured_auto_load_bundle = options[:auto_load_bundle]
+              "<div>rendered component</div>"
+            end
+
+            cached_react_component("App", cache_key: "auto-load-miss", auto_load_bundle: false) do
+              { a: 1, b: 2 }
+            end
+
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "respects explicit auto_load_bundle false on cache hits" do
+            cache_key = "auto-load-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, "<div>cached component</div>")
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "uses the configured auto_load_bundle default when the option is omitted on cache hits" do
+            cache_key = "auto-load-default-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, "<div>cached component</div>")
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component("App", cache_key:) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(true)
+          end
+        end
       end
 
       describe "ReactOnRailsProHelper.cached_react_component_hash" do
@@ -259,6 +321,56 @@ describe ReactOnRailsProHelper do
             end
 
             expect(cache_data.keys.count).to eq(1)
+          end
+        end
+
+        context "with configured auto_load_bundle" do
+          around do |example|
+            original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+            ReactOnRails.configuration.auto_load_bundle = true
+
+            example.run
+          ensure
+            ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+          end
+
+          it "respects explicit auto_load_bundle false on cache misses" do
+            captured_auto_load_bundle = nil
+
+            allow(self).to receive(:react_component_hash) do |_component_name, options|
+              captured_auto_load_bundle = options[:auto_load_bundle]
+              { component_html: "<div>rendered component</div>" }
+            end
+
+            cached_react_component_hash("ReactHelmetApp", cache_key: "hash-auto-load-miss",
+                                                          auto_load_bundle: false) do
+              { helloWorldData: { name: "Mr. Server Side Rendering" } }
+            end
+
+            expect(captured_auto_load_bundle).to be(false)
+          end
+
+          it "respects explicit auto_load_bundle false on cache hits" do
+            cache_key = "hash-auto-load-hit"
+            expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+              "ReactHelmetApp",
+              cache_key:,
+              prerender: true
+            )
+            cached_hash = { component_html: "<div>cached component</div>" }
+            captured_auto_load_bundle = nil
+
+            Rails.cache.write(expected_cache_key, cached_hash)
+            allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+              captured_auto_load_bundle = render_options.auto_load_bundle
+            end
+
+            result = cached_react_component_hash("ReactHelmetApp", cache_key:, auto_load_bundle: false) do
+              raise "props block should not run on cache hit"
+            end
+
+            expect(result[:component_html]).to eq("<div>cached component</div>")
+            expect(captured_auto_load_bundle).to be(false)
           end
         end
       end
@@ -978,14 +1090,18 @@ describe ReactOnRailsProHelper do
       it "serves MISS then HIT with identical chunks and no second Node call" do
         mock_request_and_response
         render_with_cached_stream
+        cache_write_chunk_counts = []
 
-        expect(Rails.cache)
-          .to receive(:write).with(anything, kind_of(Array), hash_including(expires_in: 60)).and_call_original
+        allow(Rails.cache).to receive(:write).and_wrap_original do |original_method, *args, **kwargs|
+          cache_write_chunk_counts << written_chunks.length
+          original_method.call(*args, **kwargs)
+        end
 
         # First render (MISS → write-through)
         first_run_chunks = run_stream
         expect(chunks_read.count).to eq(chunks.count)
         expect(first_run_chunks.first).to include("<h1>Header Rendered In View</h1>")
+        expect(cache_write_chunk_counts).to eq([first_run_chunks.length])
 
         # Second render (HIT → served from cache, no Node call; no new HTTPX chunks)
         reset_stream_buffers
@@ -994,6 +1110,25 @@ describe ReactOnRailsProHelper do
         second_run_chunks = run_stream
         expect(chunks_read.count).to eq(0)
         expect(second_run_chunks).to eq(first_run_chunks)
+      end
+
+      it "respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+          captured_auto_load_bundle = render_options.auto_load_bundle
+        end
+
+        @async_barrier = Async::Barrier.new
+        result = send(:handle_stream_cache_hit, component_name, { auto_load_bundle: false }, false, ["cached chunk"])
+
+        expect(result).to eq("cached chunk")
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        @async_barrier = nil
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
       it "re-renders after revalidate_tag busts the tagged stream cache" do
@@ -1019,21 +1154,99 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
-      it "keeps stream tag-index options from shrinking while converting write options at completion" do
-        raw_cache_options = { expires_at: Time.now + 60 }
-        tag_index_cache_options = { expires_in: 60 }
+      it "closes the stream when a deferred stream cache write fails after drain" do
+        mock_request_and_response
+        render_with_cached_stream
+
+        allow(Rails.cache).to receive(:write).and_raise(StandardError, "cache unavailable")
+        allow(Rails.logger).to receive(:warn)
+
+        expect { run_stream }.not_to raise_error
+
+        expect(mocked_stream).to have_received(:close)
+        expect(Rails.logger).to have_received(:warn)
+          .with("[React on Rails Pro] Failed to write streamed cache entry after response drain: " \
+                "StandardError: cache unavailable")
+      end
+
+      it "continues flushing pending stream cache writes after one entry fails" do
+        first_write = {
+          cache_key: "first-stream-cache-key",
+          chunks: ["first chunk"],
+          normalized_cache_tags: ["first-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        second_write = {
+          cache_key: "second-stream-cache-key",
+          chunks: ["second chunk"],
+          normalized_cache_tags: ["second-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        write_options = { expires_in: 60 }
+
+        allow(Rails.cache).to receive(:write) do |cache_key, *_args|
+          raise StandardError, "cache unavailable" if cache_key == "first-stream-cache-key"
+        end
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(Rails.logger).to receive(:warn)
+
+        ReactOnRailsPro::StreamCacheWrites.flush([first_write, second_write])
+
+        expect(Rails.cache).to have_received(:write)
+          .with("first-stream-cache-key", ["first chunk"], write_options)
+        expect(Rails.cache).to have_received(:write)
+          .with("second-stream-cache-key", ["second chunk"], write_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["second-tag"], "second-stream-cache-key", write_options)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+          .with(["first-tag"], "first-stream-cache-key", write_options)
+        expect(Rails.logger).to have_received(:warn)
+          .with("[React on Rails Pro] Failed to write streamed cache entry after response drain: " \
+                "StandardError: cache unavailable")
+      end
+
+      it "flushes completed pending stream cache writes before re-raising stream failures" do
+        pending_write = {
+          cache_key: "completed-stream-cache-key",
+          chunks: ["completed chunk"],
+          normalized_cache_tags: ["completed-tag"],
+          raw_cache_options: { expires_in: 60 }
+        }
+        write_options = { expires_in: 60 }
+
+        allow(self).to receive(:render_stream_template_chunk).and_return("initial chunk")
+        allow(self).to receive(:emit_rsc_stream_server_timing_header)
+        allow(self).to receive(:drain_streams_concurrently) do
+          @react_on_rails_pending_stream_cache_writes << pending_write
+          raise StandardError, "later stream failure"
+        end
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+
+        expect { stream_view_containing_react_components(template: template_path) }
+          .to raise_error(StandardError, "later stream failure")
+
+        expect(Rails.cache).to have_received(:write)
+          .with("completed-stream-cache-key", ["completed chunk"], write_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["completed-tag"], "completed-stream-cache-key", write_options)
+      end
+
+      it "defers stream cache writes and registers tags with the write options captured at flush time" do
+        raw_cache_options = { expires_in: 60 }
         write_cache_options = { expires_in: 45 }
         captured_on_complete = nil
 
         allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
           .with(raw_cache_options)
-          .and_return(tag_index_cache_options, write_cache_options)
+          .and_return(write_cache_options)
         allow(Rails.cache).to receive(:write)
         allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
         allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
           captured_on_complete = options[:on_complete]
           "initial chunk"
         end
+        @react_on_rails_pending_stream_cache_writes = []
 
         result = send(
           :handle_stream_cache_miss,
@@ -1044,20 +1257,30 @@ describe ReactOnRailsProHelper do
         ) { props }
 
         expect(result).to eq("initial chunk")
-        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+        expect(ReactOnRailsPro::Cache).not_to have_received(:cache_write_options)
 
         captured_on_complete.call(["chunk"])
 
-        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
+        expect(ReactOnRailsPro::Cache).not_to have_received(:cache_write_options)
+        expect(Rails.cache).not_to have_received(:write)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+
+        send(:flush_pending_stream_cache_writes)
+
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
         expect(Rails.cache).to have_received(:write).with("stream-cache-key", ["chunk"], write_cache_options)
         expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
-          .with(["stream-tag"], "stream-cache-key", tag_index_cache_options)
+          .with(["stream-tag"], "stream-cache-key", write_cache_options)
       end
 
-      it "does not write or register stream cache entries whose expires_at passed before completion" do
-        raw_cache_options = { expires_at: Time.now - 60 }
+      it "writes stream cache immediately when no managed stream view flush is active" do
+        raw_cache_options = { expires_in: 60 }
+        write_cache_options = { expires_in: 45 }
         captured_on_complete = nil
 
+        allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
+          .with(raw_cache_options)
+          .and_return(write_cache_options)
         allow(Rails.cache).to receive(:write)
         allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
         allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
@@ -1077,6 +1300,146 @@ describe ReactOnRailsProHelper do
 
         captured_on_complete.call(["chunk"])
 
+        expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).once
+        expect(Rails.cache).to have_received(:write).with("stream-cache-key", ["chunk"], write_cache_options)
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", write_cache_options)
+        expect(@react_on_rails_pending_stream_cache_writes).to be_nil
+      end
+
+      it "keeps stream cache expires_at absolute when deferred flush is delayed" do
+        completion_time = Time.now
+        expires_at = completion_time + 15
+        raw_cache_options = { expires_at: }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(true)
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        allow(Time).to receive(:now).and_return(completion_time + 10)
+        send(:flush_pending_stream_cache_writes)
+
+        expect(Rails.cache).to have_received(:write)
+          .with("stream-cache-key", ["chunk"], { expires_at: })
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", { expires_at: })
+      end
+
+      it "converts stream cache expires_at at deferred flush time when the cache store lacks expires_at support" do
+        completion_time = Time.now
+        expires_at = completion_time + 15
+        raw_cache_options = { expires_at: }
+        captured_on_complete = nil
+
+        allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        allow(Time).to receive(:now).and_return(completion_time + 10)
+        send(:flush_pending_stream_cache_writes)
+
+        expect(Rails.cache).to have_received(:write)
+          .with("stream-cache-key", ["chunk"], hash_including(expires_in: be_within(0.1).of(5)))
+        expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
+          .with(["stream-tag"], "stream-cache-key", hash_including(expires_in: be_within(0.1).of(5)))
+      end
+
+      it "does not write stream cache entries whose expires_at passed before deferred flush" do
+        completion_time = Time.now
+        raw_cache_options = { expires_at: completion_time + 5 }
+        captured_on_complete = nil
+
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        allow(Time).to receive(:now).and_return(completion_time + 10)
+        send(:flush_pending_stream_cache_writes)
+
+        expect(@react_on_rails_pending_stream_cache_writes).to be_empty
+        expect(Rails.cache).not_to have_received(:write)
+        expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
+      end
+
+      it "does not queue stream cache entries whose expires_at passed before completion" do
+        completion_time = Time.now
+        raw_cache_options = { expires_at: completion_time - 60 }
+        captured_on_complete = nil
+
+        allow(Time).to receive(:now).and_return(completion_time)
+        allow(Rails.cache).to receive(:write)
+        allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
+        allow(self).to receive(:render_stream_component_with_props) do |_component_name, options, _auto_load_bundle, &|
+          captured_on_complete = options[:on_complete]
+          "initial chunk"
+        end
+        @react_on_rails_pending_stream_cache_writes = []
+
+        result = send(
+          :handle_stream_cache_miss,
+          component_name,
+          { cache_tags: ["stream-tag"], cache_options: raw_cache_options },
+          true,
+          "stream-cache-key"
+        ) { props }
+
+        expect(result).to eq("initial chunk")
+
+        captured_on_complete.call(["chunk"])
+        send(:flush_pending_stream_cache_writes)
+
+        expect(@react_on_rails_pending_stream_cache_writes).to be_empty
         expect(Rails.cache).not_to have_received(:write)
         expect(ReactOnRailsPro::Cache).not_to have_received(:register_normalized_tags)
       end
@@ -1209,7 +1572,7 @@ describe ReactOnRailsProHelper do
         expect(chunks_read.count).to eq(chunks.count)
       end
 
-      it "uses the configured auto_load_bundle default before the per-call option on cache misses" do
+      it "respects explicit auto_load_bundle false on cache misses" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
         captured_auto_load_bundle = nil
@@ -1232,12 +1595,12 @@ describe ReactOnRailsProHelper do
           end
         end
 
-        expect(captured_auto_load_bundle).to be(true)
+        expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
-      it "uses the configured auto_load_bundle default before the per-call option on cache hits" do
+      it "respects explicit auto_load_bundle false on cache hits" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
         user_cache_key = ["buffered-stream-cache-auto-load-hit", component_name]
@@ -1269,7 +1632,7 @@ describe ReactOnRailsProHelper do
 
         expect(result).to eq("<div>cached buffered stream</div>")
         expect(result).to be_html_safe
-        expect(captured_auto_load_bundle).to be(true)
+        expect(captured_auto_load_bundle).to be(false)
       ensure
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
@@ -1403,6 +1766,546 @@ describe ReactOnRailsProHelper do
             end
           end.not_to raise_error
         end
+      end
+    end
+
+    describe "#cached_static_rsc_component", :caching do
+      around do |example|
+        clear_static_rsc_asset_diagnostic_cache
+        Rails.cache.clear
+        example.run
+      ensure
+        Rails.cache.clear
+        clear_static_rsc_asset_diagnostic_cache
+      end
+
+      def static_rsc_cache_key
+        ReactOnRailsPro::Cache.react_component_cache_key(
+          component_name,
+          cache_key: ["static_rsc_component", ["static-rsc-cache-spec", component_name]],
+          prerender: true
+        )
+      end
+
+      def clear_static_rsc_asset_diagnostic_cache
+        ReactOnRailsProHelper.clear_static_rsc_asset_diagnostic_cache!
+      end
+
+      def static_rsc_html
+        <<~HTML
+          <div id="#{component_name}-react-component-0">Static RSC HTML</div>
+          <script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"];(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]</script>
+          <script>(self.REACT_ON_RAILS_RSC_ERRORS||={})["#{component_name}"]||={"hasErrors":true,"renderingError":{"message":"boom","stack":"stack trace"}}</script>
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</script>
+          <script>console.warn.apply(console, ["[SERVER] static cache warning"]);</script>
+          <script type="application/json" data-react-on-rails-component="StaticRSC">{"value":"component prop mentions REACT_ON_RAILS_RSC_PAYLOADS"}</script>
+          <script>window.ReactOnRailsReveal && window.ReactOnRailsReveal("#{component_name}")</script>
+          <script src="/packs/generated/PublicPageClientEffects.js"></script>
+        HTML
+      end
+
+      it "caches the stripped static HTML and preserves unrelated scripts" do
+        props_calls = 0
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props_calls += 1
+            props
+          end
+        end
+
+        expect(result).to include("Static RSC HTML")
+        expect(result).not_to include("delete (self.REACT_ON_RAILS_RSC_ERRORS")
+        expect(result).not_to include("renderingError")
+        expect(result).not_to include(".push(\"flight chunk\")")
+        expect(result).to include("static cache warning")
+        expect(result).to include("component prop mentions REACT_ON_RAILS_RSC_PAYLOADS")
+        expect(result).to include("ReactOnRailsReveal")
+        expect(result).to include("PublicPageClientEffects.js")
+        expect(result).to be_html_safe
+        expect(Rails.cache.read(static_rsc_cache_key)).to eq(result)
+        expect(props_calls).to eq(1)
+      end
+
+      it "strips RSC scripts without reserializing unrelated markup" do
+        preserved_html = <<~HTML
+          <div data-json='{"angle":"&lt;tag&gt;","amp":"&amp;"}'>
+            <svg viewBox="0 0 10 10"><foreignObject><p data-raw="1 &lt; 2">Keep&nbsp;entity</p></foreignObject></svg>
+          </div>
+        HTML
+        rsc_script = "<SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})[\"#{component_name}\"]||=[])" \
+                     ".push(\"flight chunk\")</script\t\n data-ignored>\n"
+        suffix_html = "<section data-tail='keep'>Tail</section>\n"
+        raw_html = "#{preserved_html}#{rsc_script}#{suffix_html}"
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-markup-fidelity", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq("#{preserved_html}\n#{suffix_html}")
+      end
+
+      it "strips RSC scripts after Unicode characters whose case mapping changes length" do
+        raw_html = <<~HTML
+          <p>İstanbul launch page</p>
+          <SCRIPT>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")</sCrIpT>
+          <section data-tail="keep">Tail</section>
+        HTML
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-unicode-before-script", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("İstanbul launch page")
+        expect(result).not_to include("REACT_ON_RAILS_RSC_PAYLOADS")
+        expect(result).to include('<section data-tail="keep">Tail</section>')
+      end
+
+      it "warns and diagnoses when malformed script markup aborts RSC script stripping" do
+        raw_html = <<~HTML
+          <div>Static RSC HTML</div>
+          <script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["#{component_name}"]||=[]).push("flight chunk")
+          <section data-tail="keep">Tail</section>
+        HTML
+        diagnostics = []
+        result = nil
+
+        expect(Rails.logger).to receive(:warn).with(
+          /React on Rails Pro static RSC payload script stripping aborted: missing closing script tag at character \d+/
+        )
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-malformed-script", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to eq(raw_html)
+        expect(diagnostics.first[:rsc_payload]).to include(
+          bootstrap_script_count: 0,
+          bootstrap_script_bytes: 0,
+          bootstrap_script_strip_aborted: true,
+          stripped: false
+        )
+      end
+
+      it "avoids cache-key digest work when static RSC diagnostics are disabled" do
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+          expect(self).not_to receive(:static_rsc_cache_key_digest)
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-diagnostics-disabled", component_name],
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: false,
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+      end
+
+      it "does not evaluate props and respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          Rails.cache.write(static_rsc_cache_key, "<div>cached static rsc</div>", expires_in: 60)
+          allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+            captured_auto_load_bundle = render_options.auto_load_bundle
+          end
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        expect(result).to eq("<div>cached static rsc</div>")
+        expect(result).to be_html_safe
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "respects explicit auto_load_bundle false on cache misses" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>static rsc</div>".html_safe
+          end
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "uses the configured auto_load_bundle default when the option is omitted" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        captured_auto_load_bundle = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component) do |_component_name, options|
+            captured_auto_load_bundle = options[:auto_load_bundle]
+            "<div>static rsc</div>".html_safe
+          end
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(captured_auto_load_bundle).to be(true)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "uses a cache namespace separate from cached_buffered_stream_react_component" do
+        buffered_cache_key = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          buffered_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            component_name,
+            cache_key: ["buffered_stream_react_component", ["static-rsc-cache-spec", component_name]],
+            prerender: true
+          )
+          Rails.cache.write(buffered_cache_key, "<div>buffered entry</div>", expires_in: 60)
+          allow(self).to receive(:buffered_stream_react_component)
+            .and_return("<div>static rsc entry</div>".html_safe)
+
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(Rails.cache.read(buffered_cache_key)).to eq("<div>buffered entry</div>")
+        expect(Rails.cache.read(static_rsc_cache_key)).to eq("<div>static rsc entry</div>")
+      end
+
+      it "rejects on_complete because cache hits cannot replay callbacks consistently" do
+        expect do
+          Sync do
+            cached_static_rsc_component(
+              component_name,
+              cache_key: ["static-rsc-cache-on-complete", component_name],
+              id: "#{component_name}-react-component-0",
+              on_complete: ->(_chunks) {},
+              cache_options: { expires_in: 60 }
+            ) do
+              props
+            end
+          end
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /cached_static_rsc_component does not support on_complete/
+        )
+      end
+
+      it "emits cache and payload diagnostics on misses and hits" do
+        diagnostics = []
+        notifications = []
+        subscriber = ActiveSupport::Notifications.subscribe(
+          "render_static_rsc_component.react_on_rails_pro"
+        ) do |_event_name, _started, _finished, _event_id, payload|
+          notifications << payload
+        end
+
+        render_cached = lambda do
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+        expect(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .once
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          render_cached.call
+          render_cached.call
+        end
+
+        expect(diagnostics.size).to eq(2)
+        expect(notifications.size).to eq(2)
+        expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
+        expect(diagnostics.second[:cache]).to include(enabled: true, hit: true)
+        expect(diagnostics.first[:cache][:key_digest]).to be_present
+        expect(diagnostics.first[:auto_load_bundle]).to be(false)
+        expect(diagnostics.first[:html]).to include(
+          raw_bytes: static_rsc_html.bytesize,
+          cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize
+        )
+        expect(diagnostics.first[:rsc_payload]).to include(
+          bootstrap_script_count: 3,
+          stripped: true
+        )
+        expect(diagnostics.first[:rsc_payload][:bootstrap_script_bytes]).to be_positive
+        expect(diagnostics.second[:rsc_payload]).to include(
+          bootstrap_script_count: nil,
+          bootstrap_script_bytes: nil,
+          stripped: true
+        )
+        expect(diagnostics.second[:client_references]).to include(
+          count: nil,
+          entries: [],
+          unavailable_reason: "cache_hit"
+        )
+        expect(diagnostics.second[:html]).to include(cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize)
+        expect(notifications.first[:component]).to eq(component_name)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "emits diagnostics when auto-load generated pack diagnostics cannot derive a pack name" do
+        diagnostics = []
+        notifications = []
+        invalid_component_name = "Blog/PostCard"
+        subscriber = ActiveSupport::Notifications.subscribe(
+          "render_static_rsc_component.react_on_rails_pro"
+        ) do |_event_name, _started, _finished, _event_id, payload|
+          notifications << payload
+        end
+
+        allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
+          .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return("<div>static rsc</div>".html_safe)
+
+          cached_static_rsc_component(
+            invalid_component_name,
+            cache_key: ["static-rsc-cache-spec", invalid_component_name],
+            auto_load_bundle: true,
+            id: "blog-post-card-react-component-0",
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(diagnostics.size).to eq(1)
+        expect(notifications.size).to eq(1)
+        expect(diagnostics.first[:component]).to eq(invalid_component_name)
+        expect(diagnostics.first[:auto_load_bundle]).to be(true)
+        expect(diagnostics.first[:emitted_assets]).to include(packs: [], js: [], css: [])
+        expect(diagnostics.first[:emitted_assets][:unavailable]).to include(
+          a_hash_including(
+            pack: invalid_component_name,
+            type: :generated_component_pack,
+            reason: /ArgumentError: react_on_rails_preload_links/
+          )
+        )
+        expect(diagnostics.first[:cache]).to include(enabled: true, hit: false)
+      ensure
+        ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      end
+
+      it "drops manifest asset byte candidates that escape public roots" do
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        FileUtils.mkdir_p(custom_public_root.join("packs-test"))
+
+        shakapacker_config = instance_double(
+          Shakapacker::Configuration,
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
+        )
+        shakapacker_instance = instance_double(Shakapacker::Instance, config: shakapacker_config)
+        allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+
+        expect(send(:static_rsc_asset_path_candidates, "../static-rsc-secret.js")).to be_empty
+        expect(send(:static_rsc_asset_bytes, "../static-rsc-secret.js")).to be_nil
+      ensure
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
+      end
+
+      it "includes best-effort manifest asset and RSC client-reference diagnostics" do
+        diagnostics = []
+        client_manifest_path = Rails.root.join("tmp/static-rsc-client-manifest.json")
+        custom_public_root = Rails.root.join("tmp/static-rsc-public")
+        asset_paths = [
+          custom_public_root.join("packs-test/js/vendor-abc123.js"),
+          custom_public_root.join("packs-test/js/public-page-effects.js"),
+          custom_public_root.join("packs-test/css/public-page-effects.css")
+        ]
+
+        FileUtils.mkdir_p(client_manifest_path.dirname)
+        asset_paths.each { |asset_path| FileUtils.mkdir_p(asset_path.dirname) }
+        File.write(client_manifest_path, {
+          "filePathToModuleMetadata" => {
+            "./PublicPageClientEffects.client.jsx" => {
+              "id" => "./PublicPageClientEffects.client.jsx",
+              "chunks" => ["client0"]
+            }
+          },
+          "moduleLoading" => {
+            "prefix" => "/packs-test/js/"
+          }
+        }.to_json)
+        File.write(asset_paths[0], "vendor")
+        File.write(asset_paths[1], "sidecar")
+        File.write(asset_paths[2], "css")
+
+        manifest = instance_double(Shakapacker::Manifest)
+        shakapacker_config = instance_double(
+          Shakapacker::Configuration,
+          integrity: { enabled: false },
+          public_path: custom_public_root,
+          public_output_path: custom_public_root.join("packs-test")
+        )
+        shakapacker_instance = instance_double(Shakapacker::Instance, manifest:, config: shakapacker_config)
+        allow(Shakapacker).to receive(:instance).and_return(shakapacker_instance)
+        allow(manifest).to receive(:lookup_pack_with_chunks!)
+          .with("generated/PublicPageClientEffects", type: :javascript)
+          .and_return([
+                        { "src" => "/packs-test/js/vendor-abc123.js" },
+                        { "src" => "/packs-test/js/public-page-effects.js" }
+                      ])
+        allow(manifest).to receive(:lookup_pack_with_chunks)
+          .with("generated/PublicPageClientEffects", type: :stylesheet)
+          .and_return([{ "src" => "/packs-test/css/public-page-effects.css" }])
+        allow(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).and_return(client_manifest_path.to_s)
+        expect(self).to receive(:static_rsc_asset_bytes).exactly(3).times.and_call_original
+
+        render_cached = lambda do
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            id: "#{component_name}-react-component-0",
+            rsc_diagnostic_packs: ["generated/PublicPageClientEffects"],
+            rsc_render_diagnostics: ->(summary) { diagnostics << summary },
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
+
+          render_cached.call
+          render_cached.call
+        end
+
+        expect(diagnostics.size).to eq(2)
+        summary = diagnostics.first
+        expect(diagnostics.second[:cache]).to include(hit: true)
+        expect(diagnostics.second[:emitted_assets]).to eq(summary[:emitted_assets])
+        expect(summary[:emitted_assets][:packs]).to eq(["generated/PublicPageClientEffects"])
+        expect(summary[:emitted_assets][:js]).to include(
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/js/vendor-abc123.js",
+                           bytes: 6),
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/js/public-page-effects.js",
+                           bytes: 7)
+        )
+        expect(summary[:emitted_assets][:css]).to include(
+          a_hash_including(pack: "generated/PublicPageClientEffects", name: "packs-test/css/public-page-effects.css",
+                           bytes: 3)
+        )
+        expect(summary[:client_references]).to include(
+          count: 1,
+          entries: [
+            {
+              name: "./PublicPageClientEffects.client.jsx",
+              chunks: ["client0"],
+              id: "./PublicPageClientEffects.client.jsx"
+            }
+          ]
+        )
+      ensure
+        FileUtils.rm_f(Rails.root.join("tmp/static-rsc-client-manifest.json"))
+        FileUtils.rm_rf(Rails.root.join("tmp/static-rsc-public"))
       end
     end
 
@@ -1630,6 +2533,29 @@ describe ReactOnRailsProHelper do
         expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
       end
 
+      it "respects explicit auto_load_bundle false on cache hits" do
+        original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
+        ReactOnRails.configuration.auto_load_bundle = true
+        cache_key = "async-auto-load-hit-#{SecureRandom.hex(4)}"
+        captured_auto_load_bundle = nil
+
+        first_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) { { a: 1 } }
+        first_result.value
+
+        allow(self).to receive(:load_pack_for_generated_component) do |_component_name, render_options|
+          captured_auto_load_bundle = render_options.auto_load_bundle
+        end
+
+        second_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) do
+          raise "props block should not run on cache hit"
+        end
+
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(captured_auto_load_bundle).to be(false)
+      ensure
+        ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
       it "caches the rendered component" do
         cache_key = "async-cache-test-#{SecureRandom.hex(4)}"
 
@@ -1698,9 +2624,9 @@ describe ReactOnRailsProHelper do
         expect(Rails.cache.read(component_cache_key)).to be_nil
       end
 
-      it "recomputes async write options at completion while keeping tag-index options from miss time" do
+      it "registers async tags with the write options from completion time" do
         raw_cache_options = { expires_at: Time.now + 60 }
-        tag_index_cache_options = { expires_in: 60 }
+        read_cache_options = { expires_in: 60 }
         write_cache_options = { expires_in: 45 }
         raw_options = {
           cache_key: "async-expiry-recompute",
@@ -1711,8 +2637,8 @@ describe ReactOnRailsProHelper do
 
         allow(ReactOnRailsPro::Cache).to receive(:cache_write_options)
           .with(raw_cache_options)
-          .and_return(tag_index_cache_options, write_cache_options)
-        allow(Rails.cache).to receive(:read).with(component_cache_key, tag_index_cache_options).and_return(nil)
+          .and_return(read_cache_options, write_cache_options)
+        allow(Rails.cache).to receive(:read).with(component_cache_key, read_cache_options).and_return(nil)
         allow(Rails.cache).to receive(:write)
         allow(ReactOnRailsPro::Cache).to receive(:register_normalized_tags)
         allow(self).to receive(:react_component).and_return("<div>async</div>")
@@ -1723,7 +2649,7 @@ describe ReactOnRailsProHelper do
         expect(ReactOnRailsPro::Cache).to have_received(:cache_write_options).twice
         expect(Rails.cache).to have_received(:write).with(component_cache_key, "<div>async</div>", write_cache_options)
         expect(ReactOnRailsPro::Cache).to have_received(:register_normalized_tags)
-          .with(["async-tag"], component_cache_key, tag_index_cache_options)
+          .with(["async-tag"], component_cache_key, write_cache_options)
       end
 
       it "respects :if option for conditional caching" do
