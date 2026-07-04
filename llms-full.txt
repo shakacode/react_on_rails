@@ -9216,9 +9216,13 @@ export function useCreateProjectMutation(setValidationErrors: (errors: Validatio
     },
     onError: (error) => {
       if (error instanceof RailsActionRequestError && error.response.status === 422) {
-        const { errors = {} } = error.responseBody as ErrorResponse;
+        const responseBody = error.responseBody;
+        const errors =
+          responseBody && typeof responseBody === 'object' && 'errors' in responseBody
+            ? (responseBody as ErrorResponse).errors
+            : undefined;
 
-        setValidationErrors(errors);
+        setValidationErrors(errors ?? { base: ['Something went wrong. Please try again.'] });
       }
     },
   });
