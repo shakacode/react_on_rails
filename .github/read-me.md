@@ -76,7 +76,7 @@ by a workflow's `GITHUB_TOKEN`:
 
 Fork PRs cannot use comment-command hosted CI to dispatch same-repository
 workflows or add persistent labels. A maintainer should push a trusted branch to
-this repository when Pro or secret-backed CI is required.
+this repository when release-target, Pro, or secret-backed CI is required.
 
 ## Dependency Profiles
 
@@ -185,8 +185,9 @@ Hosted workflows use the shared `.github/actions/hosted-ci-selectors` action and
 job-level conditions:
 
 - Ordinary PR updates run the required gate only unless `ready-for-hosted-ci`,
-  `force-full-hosted-ci`, a release-target base branch, or a release-branch push
-  allows hosted jobs.
+  `force-full-hosted-ci`, a same-repository non-Dependabot release-target base
+  branch, a trusted Dependabot `+ci-*` dispatch, or a release-branch push allows
+  hosted jobs.
 - Generator-sensitive PRs are stricter: if change detection sets
   `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary PRs
   until hosted CI is requested.
@@ -194,9 +195,12 @@ job-level conditions:
   selects applicable suites.
 - `force-full-hosted-ci` or `workflow_dispatch` with `force_full_hosted: true`
   bypasses optimized selection and marks every suite as applicable.
-- Pushes to `main`, pushes to release branches, merge queue, and release-target
-  PRs may use broad version/dependency matrices, but still respect detector
-  outputs unless force-full hosted CI is active.
+- Pushes to `main`, pushes to release branches, merge queue, and
+  same-repository non-Dependabot release-target PRs may use broad
+  version/dependency matrices, but still respect detector outputs unless
+  force-full hosted CI is active. Dependabot PRs need trusted current-head
+  `+ci-run-hosted` or `+ci-force-full` dispatch proof before hosted jobs are
+  enabled.
 
 Release-target names are centralized in the selector action: `release/*`,
 `releases/*`, and `release-*` for PR base branches. Release-train push events

@@ -568,7 +568,7 @@ jobs:
                 forceFull
                   ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
-                fallbackMessage,
+                ...(fallbackMessage ? [fallbackMessage] : []),
                 labelMessage,
                 '',
                 'View progress in the Actions tab.',

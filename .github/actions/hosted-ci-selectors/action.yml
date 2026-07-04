@@ -113,6 +113,10 @@ runs:
               new RegExp(`Triggered [1-9][0-9]* workflow\\(s\\) for \`${shortSha}\``).test(body);
           }
 
+          function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+          }
+
           async function dependabotCommentScanSince() {
             const headSha = pullRequest?.head?.sha;
             const headRepoFullName = pullRequest?.head?.repo?.full_name || `${context.repo.owner}/${context.repo.repo}`;
@@ -169,15 +173,9 @@ runs:
             return hasWriteAccess;
           }
 
-          async function hasTrustedDependabotHostedRequest() {
-            if (!pullRequest) {
-              return false;
-            }
-
-            let comments;
-            const since = await dependabotCommentScanSince();
+          async function listDependabotTrustComments(since) {
             try {
-              comments = await github.paginate(github.rest.issues.listComments, {
+              return await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pullRequest.number,
@@ -193,6 +191,9 @@ runs:
               );
               return false;
             }
+          }
+
+          async function dependabotHostedRequestState(comments) {
             let latestStart = null;
             let latestStop = null;
             let latestSuccess = null;
@@ -219,12 +220,44 @@ runs:
               }
             }
 
-            return Boolean(
-              latestStart &&
-                latestSuccess &&
-                isNewerThan(latestSuccess, latestStart) &&
-                (!latestStop || newerComment(latestStart, latestStop))
+            const hasActiveStart = Boolean(latestStart && (!latestStop || newerComment(latestStart, latestStop)));
+            const hasTrustedSuccess = Boolean(
+              hasActiveStart &&
+              latestSuccess &&
+              isNewerThan(latestSuccess, latestStart)
             );
+
+            return { hasActiveStart, hasTrustedSuccess };
+          }
+
+          async function hasTrustedDependabotHostedRequest() {
+            if (!pullRequest) {
+              return false;
+            }
+
+            const since = await dependabotCommentScanSince();
+            const maxAttempts = 4;
+            const retryDelayMs = 5000;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const comments = await listDependabotTrustComments(since);
+              if (!comments) {
+                return false;
+              }
+
+              const state = await dependabotHostedRequestState(comments);
+              if (state.hasTrustedSuccess || !state.hasActiveStart || attempt === maxAttempts) {
+                return state.hasTrustedSuccess;
+              }
+
+              core.info(
+                'Trusted Dependabot hosted-CI command found without the dispatch success comment yet; ' +
+                  `retrying comment scan (${attempt}/${maxAttempts}).`
+              );
+              await sleep(retryDelayMs);
+            }
+
+            return false;
           }
 
           const trustedDependabotHostedRequest = isDependabotPullRequest ?
@@ -237,8 +270,11 @@ runs:
           const isReleaseBranchPush = eventName === 'push' &&
             context.ref.startsWith('refs/heads/release/');
           const isReleaseTarget = isReleasePullRequest || isReleaseBranchPush;
+          // Same-repository release-target PRs run hosted CI by policy;
+          // Dependabot still needs trusted current-head dispatch proof.
           const isTrustedReleaseTarget = isReleaseTarget &&
-            (eventName !== 'pull_request' || isSameRepoPullRequest);
+            (eventName !== 'pull_request' ||
+              (isSameRepoPullRequest && (!isDependabotPullRequest || trustedDependabotHostedRequest)));
 
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
