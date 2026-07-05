@@ -85,12 +85,12 @@ const createFromFetch = async (
     componentName,
     cspNonce,
     replayConsoleScripts = true,
-    source,
+    sourceDescription,
   }: {
     componentName: string;
     cspNonce?: string;
     replayConsoleScripts?: boolean;
-    source: string;
+    sourceDescription: string;
   },
 ) => {
   const response = await fetchPromise;
@@ -99,7 +99,7 @@ const createFromFetch = async (
       ? `${response.status} ${response.statusText}`
       : `${response.status}`;
     throw new Error(
-      `RSC payload request for component "${componentName}" from "${source}" failed with HTTP ${statusDescription}.`,
+      `RSC payload request for component "${componentName}" from ${sourceDescription} failed with HTTP ${statusDescription}.`,
     );
   }
 
@@ -112,7 +112,10 @@ const createFromFetch = async (
   const parser = new LengthPrefixedStreamParser();
   let rscDiagnosticError: Error | undefined;
   const reportDiagnosticError = (metadata: Record<string, unknown>) => {
-    const diagnosticError = buildRSCStreamDiagnosticError(metadata, { componentName, source });
+    const diagnosticError = buildRSCStreamDiagnosticError(metadata, {
+      componentName,
+      source: sourceDescription,
+    });
     if (diagnosticError && !rscDiagnosticError) {
       rscDiagnosticError = diagnosticError;
     }
@@ -231,6 +234,9 @@ export const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
+    // Keep the displayed source query-string free so serialized props aren't echoed into
+    // error messages or attached error-monitoring events. The suffix makes that redaction explicit.
+    const sourceDescription = `"${sourcePath}" (props redacted)`;
     const fetchPromise = (() => {
       try {
         return Promise.resolve(fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl)).catch(
@@ -249,9 +255,7 @@ export const fetchRSC = ({
       componentName,
       cspNonce,
       replayConsoleScripts,
-      // Keep `source` query-string free so serialized props aren't echoed into error messages
-      // or attached error-monitoring events.
-      source: sourcePath,
+      sourceDescription,
     }).catch((error: unknown) => {
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.
@@ -262,7 +266,7 @@ export const fetchRSC = ({
           ? RSC_PAYLOAD_FETCH_FAILURE_MESSAGE
           : extractErrorMessage(error);
       const wrapper: Error & { cause?: unknown } = new Error(
-        `Failed to fetch RSC payload for component "${componentName}" from "${sourcePath}": ${safeErrorMessage}`,
+        `Failed to fetch RSC payload for component "${componentName}" from ${sourceDescription}: ${safeErrorMessage}`,
       );
       if (!(error instanceof RSCPreResponseFetchError)) {
         defineErrorCause(wrapper, error);

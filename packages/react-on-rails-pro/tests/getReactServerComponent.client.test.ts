@@ -100,7 +100,7 @@ describe('fetchRSC HTTP responses', () => {
         rscPayloadGenerationUrlPath: '/rsc_payload',
       }),
     ).rejects.toThrow(
-      'Failed to fetch RSC payload for component "MissingPanel" from "/rsc_payload/MissingPanel": RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" failed with HTTP 404 Not Found.',
+      'Failed to fetch RSC payload for component "MissingPanel" from "/rsc_payload/MissingPanel" (props redacted): RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" (props redacted) failed with HTTP 404 Not Found.',
     );
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     expect(createFromReadableStream).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe('fetchRSC HTTP responses', () => {
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     expect(thrownError).toBeInstanceOf(Error);
     expect(thrownError?.message).toBe(
-      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 500 Internal Server Error.',
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted): RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted) failed with HTTP 500 Internal Server Error.',
     );
 
     const reportedText = `${thrownError?.message ?? ''}\n${thrownError?.stack ?? ''}`;
@@ -226,7 +226,7 @@ describe('fetchRSC HTTP responses', () => {
       expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
       expect(thrownError).toBeInstanceOf(Error);
       expect(thrownError?.message).toBe(
-        'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": request failed before receiving an RSC payload response.',
+        'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted): request failed before receiving an RSC payload response.',
       );
       expect(thrownError?.cause).toBeUndefined();
       expect(Object.getOwnPropertyDescriptor(thrownError!, 'cause')).toBeUndefined();
@@ -265,7 +265,7 @@ describe('fetchRSC HTTP responses', () => {
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     expect(thrownError).toBeInstanceOf(Error);
     expect(thrownError?.message).toBe(
-      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": request failed before receiving an RSC payload response.',
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted): request failed before receiving an RSC payload response.',
     );
     expect(thrownError?.cause).toBeUndefined();
     expect(Object.getOwnPropertyDescriptor(thrownError!, 'cause')).toBeUndefined();
@@ -313,7 +313,7 @@ describe('fetchRSC HTTP responses', () => {
         enforceRefetch: true,
       }),
     ).rejects.toThrow(
-      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel": RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" failed with HTTP 401 Unauthorized.',
+      'Failed to fetch RSC payload for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted): RSC payload request for component "AccountPanel" from "/rsc_payload/AccountPanel" (props redacted) failed with HTTP 401 Unauthorized.',
     );
     expect(createFromReadableStream).not.toHaveBeenCalled();
   });
@@ -339,9 +339,9 @@ describe('fetchRSC HTTP responses', () => {
     ).rejects.toThrow(
       `Failed to fetch RSC payload for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
         componentName,
-      )}": RSC payload request for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
+      )}" (props redacted): RSC payload request for component "${componentName}" from "/rsc_payload/${encodeURIComponent(
         componentName,
-      )}" failed with HTTP 401 Unauthorized.`,
+      )}" (props redacted) failed with HTTP 401 Unauthorized.`,
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `/rsc_payload/${encodeURIComponent(componentName)}?${new URLSearchParams({
