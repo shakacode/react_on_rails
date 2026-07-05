@@ -21,6 +21,40 @@ RSpec.describe "bench-node-renderer" do
       expect { validate_node_renderer_benchmark_config! }
         .to raise_error(/LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS/)
     end
+
+    it "rejects fixed rates that would round to unlimited Vegeta rate with one shard" do
+      stub_const("LOAD_GENERATOR_SHARDS", 1)
+      stub_const("RATE", "0.0000004")
+
+      expect { validate_node_renderer_benchmark_config! }
+        .to raise_error(/RATE must be at least 0\.000001 when LOAD_GENERATOR_SHARDS=1/)
+    end
+
+    it "rejects fixed rates whose per-shard request period exceeds the benchmark duration" do
+      stub_const("LOAD_GENERATOR_SHARDS", 1)
+      stub_const("RATE", "0.000001")
+      stub_const("DURATION", "30s")
+
+      expect { validate_node_renderer_benchmark_config! }
+        .to raise_error(/RATE must be at least 0\.033334 when LOAD_GENERATOR_SHARDS=1 and DURATION=30s/)
+    end
+
+    it "rejects zero duration for fixed-rate Vegeta benchmarks" do
+      stub_const("LOAD_GENERATOR_SHARDS", 1)
+      stub_const("RATE", "1")
+      stub_const("DURATION", "0s")
+
+      expect { validate_node_renderer_benchmark_config! }
+        .to raise_error(/DURATION must be greater than 0 for fixed RATE/)
+    end
+
+    it "accepts fixed rates that schedule at least one request per shard within the benchmark duration" do
+      stub_const("LOAD_GENERATOR_SHARDS", 1)
+      stub_const("RATE", "0.033334")
+      stub_const("DURATION", "30s")
+
+      expect { validate_node_renderer_benchmark_config! }.not_to raise_error
+    end
   end
 
   describe "#vegeta_rates_for_shards" do
@@ -108,6 +142,11 @@ RSpec.describe "bench-node-renderer" do
 
   describe "#run_vegeta_benchmark" do
     it "runs all shards concurrently before merging their result streams into one Vegeta report" do
+      stub_const("CONNECTIONS", 10)
+      stub_const("MAX_CONNECTIONS", 10)
+      stub_const("RATE", "max")
+      stub_const("DURATION", "30s")
+
       events = []
       spawned_commands = []
 

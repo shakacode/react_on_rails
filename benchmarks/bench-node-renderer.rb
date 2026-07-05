@@ -60,6 +60,11 @@ SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
 BMF_PREFIX = "Pro Node Renderer: "
 VEGETA_RATE_PRECISION = 6
 VEGETA_RATE_SCALE = 10**VEGETA_RATE_PRECISION
+VEGETA_DURATION_UNITS_IN_SECONDS = {
+  "s" => 1,
+  "m" => 60,
+  "h" => 3600
+}.freeze
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -163,8 +168,6 @@ def validate_node_renderer_benchmark_config!
   validate_benchmark_config!
   validate_positive_integer(LOAD_GENERATOR_SHARDS, "LOAD_GENERATOR_SHARDS")
 
-  return if LOAD_GENERATOR_SHARDS == 1
-
   unless LOAD_GENERATOR_SHARDS <= CONNECTIONS && LOAD_GENERATOR_SHARDS <= MAX_CONNECTIONS
     raise "LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS " \
           "(got shards=#{LOAD_GENERATOR_SHARDS}, connections=#{CONNECTIONS}, max_connections=#{MAX_CONNECTIONS})"
@@ -178,6 +181,19 @@ def distribute_integer(total, shard_count)
   Array.new(shard_count) { |index| base + (index < remainder ? 1 : 0) }
 end
 
+def duration_seconds(duration)
+  duration.scan(/(\d+(?:\.\d+)?)([smh])/).sum(Rational(0)) do |number, unit|
+    Rational(number) * VEGETA_DURATION_UNITS_IN_SECONDS.fetch(unit)
+  end
+end
+
+def minimum_scaled_rate_for_duration(duration)
+  seconds = duration_seconds(duration)
+  raise "DURATION must be greater than 0 for fixed RATE" if seconds.zero?
+
+  (VEGETA_RATE_SCALE / seconds).ceil
+end
+
 def scaled_vegeta_rate
   whole, fractional = RATE.split(".", 2)
   fractional_digits = (fractional || "").ljust(VEGETA_RATE_PRECISION + 1, "0")
@@ -187,10 +203,20 @@ def scaled_vegeta_rate
 end
 
 def validate_fixed_rate_shards!(shard_count)
-  return if RATE == "max" || scaled_vegeta_rate >= shard_count
+  return if RATE == "max"
 
-  minimum_rate = format_scaled_vegeta_rate_for_message(shard_count)
-  raise "RATE must be at least #{minimum_rate} when LOAD_GENERATOR_SHARDS=#{shard_count}"
+  shard_rates = distribute_integer(scaled_vegeta_rate, shard_count)
+  minimum_rate_for_shards = shard_count
+  if shard_rates.min.zero?
+    minimum_rate = format_scaled_vegeta_rate_for_message(minimum_rate_for_shards)
+    raise "RATE must be at least #{minimum_rate} when LOAD_GENERATOR_SHARDS=#{shard_count}"
+  end
+
+  minimum_rate_per_shard = minimum_scaled_rate_for_duration(DURATION)
+  return if shard_rates.min >= minimum_rate_per_shard
+
+  minimum_rate = format_scaled_vegeta_rate_for_message(minimum_rate_per_shard * shard_count)
+  raise "RATE must be at least #{minimum_rate} when LOAD_GENERATOR_SHARDS=#{shard_count} and DURATION=#{DURATION}"
 end
 
 def format_scaled_vegeta_rate_for_message(scaled_rate)
