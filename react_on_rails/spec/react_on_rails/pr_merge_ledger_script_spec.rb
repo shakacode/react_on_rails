@@ -47,7 +47,7 @@ RSpec.describe "script/pr-merge-ledger" do
     SH
   end
 
-  def fake_gh_script_with_check_rows(required_json:, full_json:, pr_checks_exit_status: 0)
+  def fake_gh_script_with_check_rows(required_json:, full_json:, pr_checks_exit_status: 0, fail_first_pr_checks: nil)
     <<~SH
       #!/bin/sh
       if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
@@ -58,6 +58,11 @@ RSpec.describe "script/pr-merge-ledger" do
         fi
         count=$((count + 1))
         printf '%s\\n' "$count" > "$count_file"
+
+        if [ "$count" -eq 1 ] && [ -n #{fail_first_pr_checks.to_s.inspect} ]; then
+          printf '%s\\n' #{fail_first_pr_checks.to_s.inspect} >&2
+          exit 1
+        fi
 
         required=false
         for arg in "$@"; do
@@ -4707,6 +4712,41 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(ledger.fetch("ci_readiness").fetch("pending")).to be_empty
       expect(ledger.fetch("violations")).to be_empty
       expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
+    end
+  end
+
+  it "retries transient gh pr checks failures before deriving CI readiness" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      full_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      fail_first_pr_checks: "HTTP 429 Too Many Requests"
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      ledger = JSON.parse(stdout).fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "READY",
+        "required_used" => true
+      )
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("3")
     end
   end
 

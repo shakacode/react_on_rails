@@ -1588,10 +1588,7 @@ class PrMergeLedger
       args << "--required" if required
       args += ["--json", "name,state,bucket,link"]
 
-      stdout, stderr, status = capture_gh(
-        args,
-        timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
-      )
+      stdout, stderr, status = capture_pr_checks(args, required:)
       {
         stdout: stdout.to_s,
         stderr: stderr.to_s,
@@ -1599,6 +1596,34 @@ class PrMergeLedger
         success: status.success?,
         required:
       }
+    end
+
+    def capture_pr_checks(args, required:)
+      attempt = 0
+      loop do
+        attempt += 1
+        stdout, stderr, status = capture_gh(
+          args,
+          timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
+        )
+        return [stdout, stderr, status] if usable_pr_checks_result?(stdout, stderr, status, required:)
+        return [stdout, stderr, status] if attempt >= GITHUB_API_MAX_ATTEMPTS
+        return [stdout, stderr, status] if non_retryable_gh_error?(stderr)
+
+        sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
+      end
+    rescue Error
+      raise if attempt >= GITHUB_API_MAX_ATTEMPTS
+
+      sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
+      retry
+    end
+
+    def usable_pr_checks_result?(stdout, stderr, status, required:)
+      return true if status.success?
+      return true unless PrMergeLedger.parse_ci_check_rows(stdout).empty?
+
+      required && stderr.to_s.match?(/\bno required checks\b/i)
     end
 
     def pr_checks_error_message(*results)
