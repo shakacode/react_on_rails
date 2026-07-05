@@ -11,31 +11,38 @@ This runbook complements, and does not replace, the canonical gates:
   lifecycle, report template, waivers. Lane reports from this runbook are posted to the same RC
   tracking issue.
 - [`release-train-runbook.md`](release-train-runbook.md) — branch/tag mechanics. These lanes run
-  during phase 2 (stabilize) and must be green (or explicitly waived) before phase 4 (promote).
+  during step 2 (stabilize) and must satisfy this runbook's gating rules before step 4 (promote).
 
 Each lane below is a **self-contained agent prompt**: fill the parameters, paste the prompt into a
-fresh agent session (Claude or Codex) with repo access, and collect the report. Lanes are
-independent — run them in parallel. Origin: post–2026-06-12 review retro
+fresh agent session (Claude or Codex) with repo access, and collect the report. Run Lane 0 first.
+After its inventory is complete, Lanes 1–3 and 4b are independent and can run in parallel; run the
+final Lane 4a audit after issue-producing lanes and required fixes/waivers finish. Origin:
+post–2026-06-12 review retro
 ([#4346](https://github.com/shakacode/react_on_rails/issues/4346)), where diff review found the
 bugs it could find and these lanes cover what it could not.
 
 ## Parameters
 
-Fill once per RC; every prompt references these placeholders.
+Fill once per RC; every prompt references these placeholders. Lanes 2 and 4 add feature/version
+placeholders sourced from the Lane 0 report. Lane 3's leak-shaped issue list is sourced from current
+release review, audit, or tracking-issue findings; use `none` when there are no current leak-shaped
+findings.
 
-| Placeholder           | Meaning                                                        | Example (17.0.0)                                |
-| --------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
-| `{{PREV_STABLE}}`     | Last stable git tag (upgrade baseline)                         | `v16.6.0`                                       |
-| `{{RC_TAG}}`          | RC under verification                                          | `v17.0.0.rc.7`                                  |
-| `{{RELEASE_BRANCH}}`  | Ephemeral release branch                                       | `release/17.0.0`                                |
-| `{{TRACKING_ISSUE}}`  | RC tracking issue (per rc-testing-plan lifecycle)              | —                                               |
-| `{{UPGRADE_APP_OSS}}` | Fleet app on `{{PREV_STABLE}}` for the OSS upgrade dry-run     | `shakacode/react-webpack-rails-tutorial`        |
-| `{{UPGRADE_APP_PRO}}` | Fleet app with Pro + RSC/streaming for the Pro upgrade dry-run | `shakacode/react-on-rails-demo-hacker-news-rsc` |
-| `{{RSC_VERSION}}`     | react-on-rails-rsc version this release line pins              | `19.2.1`                                        |
+| Placeholder              | Meaning                                                                                                          | Example (17.0.0)                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `{{PREV_STABLE}}`        | Last stable git tag (upgrade baseline)                                                                           | `v16.6.0`                                |
+| `{{RC_TAG}}`             | RC under verification                                                                                            | `v17.0.0.rc.7`                           |
+| `{{RELEASE_BRANCH}}`     | Ephemeral release branch                                                                                         | `release/17.0.0`                         |
+| `{{TRACKING_ISSUE}}`     | RC tracking issue (per rc-testing-plan lifecycle)                                                                | —                                        |
+| `{{UPGRADE_APP_OSS}}`    | Fleet app on `{{PREV_STABLE}}` for the OSS upgrade dry-run                                                       | `shakacode/react-webpack-rails-tutorial` |
+| `{{UPGRADE_APP_PRO}}`    | Flagship fleet app with Pro + RSC/streaming for the Pro upgrade dry-run                                          | `shakacode/react-on-rails-demo-flagship` |
+| `{{RSC_VERSION}}`        | react-on-rails-rsc version this release line pins                                                                | `19.2.1`                                 |
+| `{{LEAK_SHAPED_ISSUES}}` | Current release review/audit findings that look like memory, handle, or resource leak risks; use `none` if empty | `#4312`, `#4313`                         |
 
-Re-run policy: a new RC with runtime changes re-runs Lanes 2–4 for the affected surfaces and Lane 1
-if upgrade-relevant files changed (generators, install templates, config, docs/upgrade). A
-version/changelog-metadata-only RC re-runs Lane 4a only.
+Re-run policy: a new RC with runtime changes refreshes Lane 0 first, then re-runs Lanes 2–4 for the
+affected surfaces and Lane 1 if upgrade-relevant files changed (generators, install templates,
+config, docs/upgrade). A version/changelog-metadata-only RC or final promotion re-runs Lane 4a plus
+the Lane 4b version/coherence subset for the newly published artifacts and tag.
 
 ## Lane 0 — Release inventory (feeds Lanes 2 and 4)
 
@@ -47,11 +54,16 @@ Cheap, run first. Produces the debut-feature list and breaking-change list the o
 You are preparing the verification inventory for react_on_rails {{RC_TAG}} (previous stable
 {{PREV_STABLE}}). Work in a clean checkout of shakacode/react_on_rails at {{RC_TAG}}. Read-only.
 
-1. Compute the release diff: `git log --oneline {{PREV_STABLE}}..{{RC_TAG}}` and
-   `git diff --stat {{PREV_STABLE}} {{RC_TAG}}` scoped to shipping surfaces only:
-   react_on_rails/lib, react_on_rails_pro/lib, react_on_rails_pro/app,
-   packages/react-on-rails/src, packages/react-on-rails-pro/src,
-   packages/react-on-rails-pro-node-renderer/src, and generator templates.
+1. Compute the release diff: `git log --oneline {{PREV_STABLE}}..{{RC_TAG}}`, then use
+   `git diff --stat {{PREV_STABLE}} {{RC_TAG}} -- <shipping paths>` to navigate and
+   `git diff {{PREV_STABLE}} {{RC_TAG}} -- <shipping paths>` or targeted file reads to inspect
+   actual hunks before deriving the inventory. Replace `<shipping paths>` with:
+   react_on_rails/lib, react_on_rails/app, react_on_rails/sig, react_on_rails_pro/lib,
+   react_on_rails_pro/app, react_on_rails_pro/sig, packages/react-on-rails/src,
+   packages/react-on-rails-pro/src,
+   packages/react-on-rails-pro-node-renderer/src, packages/create-react-on-rails-app/src,
+   packages/create-react-on-rails-app/bin, generator templates, package.json manifests, gemspecs,
+   and version files.
 2. Read the CHANGELOG.md sections covering {{PREV_STABLE}}..{{RC_TAG}}.
 3. Produce three lists, each entry with PRs, files, and doc links:
    a. DEBUT FEATURES — user-facing capabilities new in this release (new APIs, options,
@@ -85,9 +97,10 @@ config, or install templates.
 ```text
 You are performing a release-day upgrade rehearsal for react_on_rails {{RC_TAG}}.
 
-Setup: clone {{UPGRADE_APP}} at its current default branch into a scratch worktree; confirm it is
-on the {{PREV_STABLE}} line (Gemfile.lock + package.json). If it is not, check out the last commit
-that was. Do not push anything to the app repo.
+Setup: clone the app for this run (`{{UPGRADE_APP_OSS}}` or `{{UPGRADE_APP_PRO}}`, matching the
+invocation above) at its current default branch into a scratch worktree; confirm it is on the
+{{PREV_STABLE}} line (Gemfile.lock + package.json). If it is not, check out the last commit that was.
+Do not push anything to the app repo.
 
 Rules of the rehearsal:
 - Follow the published upgrade documentation VERBATIM (docs upgrade guide for this major, the
@@ -112,12 +125,14 @@ Verification ladder (record evidence at each rung):
 Output: a report with (a) verdict PASS / FAIL / PASS-WITH-GAPS, (b) the DOCS GAP list — this is
 the primary deliverable; each gap becomes a docs issue before final, (c) APP DEBT list, (d) the
 full diff of changes the upgrade required in the app, (e) evidence per ladder rung (commands +
-key output). File each DOCS GAP as a repo issue labeled release:<X.Y.Z>-must-have if it would
-strand a real upgrader, else P2/documentation.
+key output). File each DOCS GAP as a repo issue labeled `release:<X.Y.Z>-must-have` if it would
+strand a real upgrader, else with both `P2` and `documentation`.
 ```
 
 **Pass criteria:** ladder rungs 1–5 pass on both apps; every DOCS GAP filed. A FAIL on any rung
-that a real user would hit blocks promotion (treat as a hard gate for majors).
+that a real user would hit blocks promotion for majors, and for in-scope minors when the failure
+touches the changed generator/config/install-template surface; unrelated minor failures must be
+filed and waived under the rc-testing-plan process.
 
 ## Lane 2 — Debut-feature abuse pass
 
@@ -134,8 +149,11 @@ FEATURE: {{FEATURE_NAME}} — {{ONE_LINE_CONTRACT}}
 DOCS: {{DOC_LINKS}}   PRS: {{PR_LINKS}}   SURFACES: {{SURFACES}}
 
 Work in the react_on_rails monorepo at {{RC_TAG}}; use react_on_rails_pro/spec/dummy (or
-react_on_rails/spec/dummy for OSS-only features) as the running app. You may add throwaway test
-pages/specs in a scratch branch; do not merge anything from this session.
+react_on_rails/spec/dummy for OSS-only features) as the running app unless SURFACES includes CLI,
+generator, generated app, or install-template behavior. For those generator-owned surfaces, create a
+scratch app with the packed create-react-on-rails-app or the relevant generator output and test the
+generated defaults/files directly. Use a scratch worktree or throwaway branch for test pages/specs; do
+not push, open a PR, or merge anything from this session.
 
 Method:
 1. Enumerate the documented contract: inputs, outputs, defaults, error behavior, config gates.
@@ -161,8 +179,9 @@ File BROKEN findings as issues labeled release:<X.Y.Z>-must-have (contract viola
 feature ship as day-one bugs otherwise).
 ```
 
-**Pass criteria:** every debut feature SOLID, or its BROKEN findings fixed/waived per the
-rc-testing-plan waiver rules. Confirmed-defect repros land as permanent tests.
+**Pass criteria:** every debut feature SOLID, or its BROKEN findings fixed or explicitly waived
+under the rc-testing-plan waiver rules before promotion. Confirmed-defect repros land as permanent
+tests.
 
 ## Lane 3 — Stress and soak
 
@@ -174,9 +193,18 @@ inputs, fault injection) against repo-owned apps.
 **Prompt:**
 
 ```text
-Invoke the stress-test skill against a demo workspace running react_on_rails {{RC_TAG}}
-(react_on_rails_pro/spec/dummy in production mode, or a fleet Pro demo if the skill's manifest
-prefers it). This is an authorized destructive QA run on repo-owned apps only.
+Work in a clean shakacode/react_on_rails checkout at {{RC_TAG}}; the stress-test skill packs
+artifacts from the currently checked-out framework repo. Resolve the release tags to commit SHAs
+first: `PREV_SHA=$(git rev-parse {{PREV_STABLE}}^{commit})` and
+`RC_SHA=$(git rev-parse {{RC_TAG}}^{commit})`. Invoke the stress-test skill against the
+react_on_rails {{RC_TAG}} release diff with:
+`--from $PREV_SHA --to $RC_SHA --tier deep --max-hours 8`
+(or the narrower PR/commit range if this RC is a focused rerun). The skill builds
+packed gem/npm artifacts into its own `tmp/stress-test-<timestamp>/` workspace and creates demo
+apps there; do not point it at `react_on_rails_pro/spec/dummy` or edit tracked app/spec files. This
+is an authorized destructive QA run on repo-owned demo workspaces only. Stay attached through the
+skill's Phase 0 plan and type `go` only after the printed scope/cost plan is acceptable; it will not
+proceed unattended before that confirmation gate.
 
 Focus areas for this release, in priority order:
 1. Sustained streamed-RSC + incremental-render traffic (hours, not minutes): renderer worker RSS,
@@ -191,9 +219,9 @@ Focus areas for this release, in priority order:
    component counts) — server must reject cleanly, never hang or crash the worker pool.
 
 Output: the skill's gated findings report plus a resource-over-time table (RSS/heap/connections
-at t=0, t=30m, t=2h). Verdict: STABLE (flat resource curves, clean recovery) or findings with
-severity. File leaks/hangs as issues; anything that requires a process restart to recover is
-release:<X.Y.Z>-must-have.
+at t=0 and at 25%, 50%, 75%, and 100% of the actual run, including wall-clock timestamps). Verdict:
+STABLE (flat resource curves, clean recovery) or findings with severity. File leaks/hangs as
+issues; anything that requires a process restart to recover is release:<X.Y.Z>-must-have.
 ```
 
 **Pass criteria:** STABLE verdict, or every non-flat curve explained and its issue triaged. A
@@ -208,7 +236,8 @@ leak that accumulates under normal traffic blocks promotion.
 ```text
 Audit release-notes completeness for react_on_rails {{RC_TAG}} against the real release diff.
 Inputs: Lane 0's BREAKING CHANGES and DEBUT FEATURES lists; the repo at {{RC_TAG}}. Use the
-update-changelog and post-merge-audit skills where they fit; this prompt is the acceptance bar.
+repo-local react-on-rails-update-changelog skill for release-branch/RC changelog work, and
+post-merge-audit where it fits; this prompt is the acceptance bar.
 
 Check, with file/PR evidence for every claim:
 1. Every Lane 0 BREAKING CHANGE appears in the CHANGELOG release section AND in the upgrade
@@ -216,8 +245,10 @@ Check, with file/PR evidence for every claim:
 2. Every DEBUT FEATURE has a CHANGELOG entry and documentation reachable from the docs site nav.
 3. Every issue labeled release:<X.Y.Z>-must-have is closed, and its fix is in
    {{PREV_STABLE}}..{{RC_TAG}} (verify by commit, not by issue state).
-4. Version-stamp coherence: gem version.rb files, every published package.json, and the CHANGELOG
-   heading all agree with {{RC_TAG}}.
+4. Version-stamp coherence: derive the expected gem/CHANGELOG and npm package versions from
+   {{RC_TAG}} before comparing (for example, `v17.0.0.rc.7` -> gem/CHANGELOG `17.0.0.rc.7`,
+   npm `17.0.0-rc.7`); gem version.rb files, every published package.json, and the CHANGELOG
+   heading match those normalized targets.
 5. No CHANGELOG entry describes something the diff does not contain (stale/aspirational notes).
 
 Output: a checklist table (item / status / evidence), the list of missing or wrong entries as
@@ -233,23 +264,53 @@ Modeled on react_on_rails_rsc's `scripts/verify-release.sh` contract enforcement
 
 ```text
 Verify the publishable artifacts for react_on_rails {{RC_TAG}} before (or immediately after) npm/
-gem publication. Work in the monorepo at {{RC_TAG}} with a clean install.
+gem publication. Work in the monorepo at {{RC_TAG}} with a clean install. Write all generated
+tarballs, packed gems, and unpacked artifact trees under a scratch directory such as
+`tmp/release-artifact-check-{{RC_TAG}}/`; do not leave `npm pack`/`gem build` outputs in tracked
+package directories.
 
 For each published npm package (react-on-rails, react-on-rails-pro,
 react-on-rails-pro-node-renderer, create-react-on-rails-app):
-1. `npm pack --dry-run` (or pack + inspect the tarball): the file list matches the package.json
-   "files" globs; every entry-point/export map target exists in the tarball; no test/fixture/
-   source-map junk ships; Pro packages carry the commercial license header where required
-   (script/check-pro-license-headers).
-2. Peer/dependency contract: react-on-rails-rsc peer range includes {{RSC_VERSION}} and excludes
-   known-bad versions of that line; react/react-dom peers match the supported matrix; workspace:*
-   references are rewritten to real versions in the packed manifest.
+1. Inspect the package exactly as it will be published. Before publication, replay the release
+   publish preparation: run the package build/prepublish lifecycle that creates publishable files,
+   then wrap local `npm pack` inspection in a throwaway helper that loads `rakelib/release.rake` and
+   calls `with_publishable_package_json` so `workspace:*` dependencies are rewritten the same way
+   `pnpm publish` rewrites them. Do not run the real non-dry-run release task just to get rewritten
+   package.json files. After publication, inspect the actual npm metadata and packed tarball. The file
+   list matches the package.json "files" globs plus npm's automatic inclusions such as package.json,
+   README/LICENSE files, and main/bin targets; every entry-point/export map target exists in the
+   tarball; no test/fixture/source-map junk ships; Pro packages carry the commercial license header
+   where required (script/check-pro-license-headers).
+2. Peer/dependency contract: for packages or generated manifests that own the react-on-rails-rsc
+   dependency line, its peer/pin range includes {{RSC_VERSION}} and excludes known-bad versions of
+   that line; packages that do not own RSC do not need to declare that peer. For artifacts or
+   generated manifests that declare or generate react/react-dom dependencies, their peer/pin ranges
+   match the supported matrix; generated RSC app manifests pin react/react-dom versions compatible
+   with the {{RSC_VERSION}} support matrix rather than only matching the newest React line. Artifacts
+   that do not declare or generate React dependencies do not need to add them for this check.
+   For every npm package, compare the published runtime dependency contract against the release plan:
+   `dependencies`, `optionalDependencies`, `peerDependencies`, `engines`, `bin`, `main`, and `exports`
+   metadata are present and bounded as intended, including non-React contracts such as node-renderer
+   runtime dependencies and create-app `engines.node`. workspace:* references in install-time
+   dependency fields (`dependencies`, `optionalDependencies`, `peerDependencies`) are rewritten to
+   real versions in the release-task-rewritten or published manifest.
 3. Install the packed tarballs (not the workspace) into a scratch app skeleton and run
-   script/check-single-react-resolution.mjs — one React installation, matching versions.
-4. Gems: `gem build` both gemspecs from the tag; unpack and diff the file lists against the repo
-   expectations; version.rb values match the tag.
-5. Cross-artifact coherence: the npm versions, gem versions, and {{RC_TAG}} agree; the rsc pin in
-   packed manifests is {{RSC_VERSION}}.
+   `node script/check-single-react-resolution.mjs <scratch-app>` — one React installation,
+   matching versions. For create-react-on-rails-app, also invoke the command installed from the
+   packed tarball (for example `node_modules/.bin/create-react-on-rails-app --help` or the package's
+   documented smoke mode) so the published shebang, executable bit, and wrapper imports are tested.
+4. Gems: before publication, `gem build` both gemspecs from the tag; unpack and diff the file
+   lists against the repo expectations. After publication, fetch the actual RubyGems artifacts for
+   the normalized gem version, unpack those `.gem` files, and run the same file-list/version checks
+   on the published artifacts. Inspect the built/fetched gem specifications as well: runtime
+   dependencies, required Ruby version, and inter-gem version bounds match the release plan.
+   version.rb values match the normalized tag.
+5. Cross-artifact coherence: derive the expected gem version and npm version from {{RC_TAG}}
+   before comparing (for example, `v17.0.0.rc.7` -> gem/CHANGELOG `17.0.0.rc.7`, npm
+   `17.0.0-rc.7`). The normalized npm versions, gem versions, tag, and CHANGELOG heading agree;
+   the rsc pin in packed manifests is {{RSC_VERSION}}. Published npm dist-tags point at those same
+   normalized package versions: prereleases use the expected rc tag, final releases use latest, and
+   any package missing or carrying the wrong dist-tag is a defect.
 
 Output: per-artifact table (check / result / evidence), verdict CLEAN / DEFECTS. Artifact defects
 are always release blockers — a wrong tarball cannot be waived, only republished.
@@ -263,17 +324,18 @@ are always release blockers — a wrong tarball cannot be waived, only republish
   conventions (versions, evidence, tester, date). One comment per lane per RC.
 - Default blocking rules, subject to the rc-testing-plan waiver process:
 
-| Lane                     | Blocks promotion when                                               |
-| ------------------------ | ------------------------------------------------------------------- |
-| 1 Upgrade dry-run        | Any ladder-rung FAIL a real upgrader would hit (hard for majors)    |
-| 2 Feature abuse pass     | Unfixed, unwaived BROKEN finding in a debut feature                 |
-| 3 Stress/soak            | Leak under normal traffic, or non-recoverable degradation           |
-| 4a Changelog audit       | Missing breaking-change entry (fix is a cheap docs PR — just do it) |
-| 4b Artifact verification | Any defect (cannot be waived, only republished)                     |
-| 0 Inventory              | Never (input to the others)                                         |
+| Lane                     | Blocks promotion when                                            |
+| ------------------------ | ---------------------------------------------------------------- |
+| 1 Upgrade dry-run        | Any ladder-rung FAIL a real upgrader would hit (hard for majors) |
+| 2 Feature abuse pass     | Unfixed, unwaived BROKEN finding in a debut feature              |
+| 3 Stress/soak            | Leak under normal traffic, or non-recoverable degradation        |
+| 4a Changelog audit       | Any Lane 4a checklist item not COMPLETE                          |
+| 4b Artifact verification | Any defect (cannot be waived, only republished)                  |
+| 0 Inventory              | Never (input to the others)                                      |
 
-- Findings filed during lanes use the release must-have label for blockers
-  (`release:<X.Y.Z>-must-have`) and normal P-labels otherwise, matching the repo triage scheme.
+- Before first issue filing, confirm the repo has `release:<X.Y.Z>-must-have`, `P2`, and
+  `documentation` labels. Findings filed during lanes use the release must-have label for blockers
+  and normal P-labels otherwise, matching the repo triage scheme.
 
 ## Appendix — instantiation for 17.0.0
 
@@ -289,8 +351,8 @@ response-type generation (#3942/#4259/#4260), streamed-RSC observability marks a
 (#4222/#4251), Tailwind layout-owned packs (#4182), Pro-default create-app (#4217/#4232), FOUC
 stylesheet gating (#4047), RSC 19.2 line adoption (#4357).
 
-Lane 2/4a must-verify-fixed list (from the post–June-12 review, umbrella #4346): #4310, #4311,
-#4314, #4316, #4326, #4340, #4342, #4357, and rsc#148 (via the {{RSC_VERSION}} bump).
+Lane 2/4a must-verify-fixed list (from the post–June-12 review, umbrella #4346): `#4310`, `#4311`,
+`#4314`, `#4316`, `#4326`, `#4340`, `#4342`, `#4357`, and `rsc#148` (via the {{RSC_VERSION}} bump).
 
-Lane 3 `{{LEAK_SHAPED_ISSUES}}`: #4312 (executionContext leak), #4313 (source-map retention),
-#4328 (`hydrate_on: visible` detached nodes), #4329 (performance-marks queue).
+Lane 3 `{{LEAK_SHAPED_ISSUES}}`: `#4312` (executionContext leak), `#4313` (source-map retention),
+`#4328` (`hydrate_on: visible` detached nodes), `#4329` (performance-marks queue).

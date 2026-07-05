@@ -207,7 +207,8 @@ branch tip when maintainers want a new candidate to validate. Re-run the hard-ga
 [`rc-testing-plan.md`](rc-testing-plan.md) for each RC, and run the behavioral lanes in
 [`release-verification-runbook.md`](release-verification-runbook.md) (upgrade dry-run,
 debut-feature abuse pass, stress/soak, changelog and artifact audits) — they must be green or
-explicitly waived before step 4 promotes the RC.
+explicitly waived before step 4 promotes the RC, except Lane 4b artifact defects, which must be
+fixed by republishing.
 
 > Targeting confusion is the most common mistake here. A fix opened against `main` during the RC phase
 > does **not** reach the release unless it is forward-ported in step 3 (run in reverse: cherry-pick
