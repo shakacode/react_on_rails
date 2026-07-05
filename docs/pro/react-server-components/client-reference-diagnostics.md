@@ -19,6 +19,7 @@ function readJson(filename) {
 }
 
 const manifest = readJson('public/packs/react-client-manifest.json');
+const clientReferences = manifest.filePathToModuleMetadata ?? manifest;
 const loadableStats = readJson('public/packs/loadable-stats.json');
 const assets = new Map();
 
@@ -56,7 +57,7 @@ function addStylesheetsForChunk(chunkName, id) {
   }
 }
 
-for (const [id, metadata] of Object.entries(manifest)) {
+for (const [id, metadata] of Object.entries(clientReferences)) {
   const chunks = metadata.chunks ?? [];
   for (let index = 1; index < chunks.length; index += 2) {
     const chunkName = chunks[index - 1];
@@ -68,12 +69,13 @@ for (const [id, metadata] of Object.entries(manifest)) {
 console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metadata })));
 ```
 
-The report should be derived from the manifest entries that the RSC package emits. The manifest's
-`chunks` array stores alternating chunk ids and filenames; report only the filename half for JS
-assets, and use the chunk id half to look up extracted CSS files in `loadable-stats.json`. A shared JS
-or CSS file can list multiple client-reference owners. A richer local report can include the client
-references recorded in the manifest, the JS chunk files attached to each reference, CSS files, and
-byte sizes from the build stats when the bundler exposes them:
+The report should be derived from the manifest entries that the RSC package emits. Some manifest
+versions wrap those entries under `filePathToModuleMetadata`; normalize that wrapper before iterating.
+The manifest's `chunks` array stores alternating chunk ids and filenames; report only the filename
+half for JS assets, and use the chunk id half to look up extracted CSS files in `loadable-stats.json`.
+A shared JS or CSS file can list multiple client-reference owners. A richer local report can include
+the client references recorded in the manifest, the JS chunk files attached to each reference, CSS
+files, and byte sizes from the build stats when the bundler exposes them:
 
 ```json
 {
