@@ -1358,8 +1358,20 @@ class PrMergeLedger
     pending = ci_readiness.fetch("pending").map do |check|
       ci_check_violation(pull_request, check, "ci_check_pending", "CI check is still pending")
     end
+    details_missing = if ci_readiness.fetch("verdict") == "NOT_READY" && failed.empty? && pending.empty?
+                        [
+                          violation(
+                            pull_request,
+                            "ci_not_ready",
+                            "CI readiness is NOT_READY, but no failed or pending check details were returned",
+                            pull_request["url"]
+                          )
+                        ]
+                      else
+                        []
+                      end
 
-    failed + pending
+    failed + pending + details_missing
   end
 
   def ci_check_violation(pull_request, check, code, message)
@@ -1474,16 +1486,21 @@ class PrMergeLedger
     end
 
     def fetch_ci_readiness(pr_number)
-      required_raw = fetch_pr_checks(pr_number, required: true)
-      if PrMergeLedger.usable_ci_check_rows?(required_raw)
-        rows = PrMergeLedger.parse_ci_check_rows(required_raw)
+      required_result = fetch_pr_checks(pr_number, required: true)
+      if required_result.fetch(:success) && PrMergeLedger.usable_ci_check_rows?(required_result.fetch(:stdout))
+        rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
         required_used = true
+        message = nil
       else
-        rows = PrMergeLedger.parse_ci_check_rows(fetch_pr_checks(pr_number, required: false))
+        full_result = fetch_pr_checks(pr_number, required: false)
+        raise Error, pr_checks_error_message(required_result, full_result) unless full_result.fetch(:success)
+
+        rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
         required_used = false
+        message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
       end
 
-      PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used:, rows:)
+      PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message:)
     rescue Error => e
       PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used: false, rows: [], message: e.message)
     end
@@ -1493,8 +1510,25 @@ class PrMergeLedger
       args << "--required" if required
       args += ["--json", "name,state,bucket,link"]
 
-      stdout, = capture_gh(args)
-      stdout.to_s
+      stdout, stderr, status = capture_gh(args)
+      {
+        stdout: stdout.to_s,
+        stderr: stderr.to_s,
+        status:,
+        success: status.success?,
+        required:
+      }
+    end
+
+    def pr_checks_error_message(*results)
+      results.compact.filter_map do |result|
+        next if result.fetch(:success)
+
+        scope = result.fetch(:required) ? "required" : "full"
+        details = [result.fetch(:stderr), result.fetch(:stdout)].map(&:strip).reject(&:empty?).join(" | ")
+        details = "no command output" if details.empty?
+        "gh pr checks #{scope} failed with exit #{result.fetch(:status).exitstatus}: #{details}"
+      end.join("; ")
     end
 
     def fetch_paginated_connection(pr_number, query, connection_name)

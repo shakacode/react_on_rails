@@ -7,89 +7,7 @@ require "tmpdir"
 
 SCRIPT = File.expand_path("pr-merge-ledger", __dir__)
 
-class PrMergeLedgerTest < Minitest::Test
-  def test_ready_ci_allows_strict_closeout
-    output, status = run_fixture(
-      fixture(
-        ci_readiness: ci_readiness(
-          verdict: "READY",
-          checks: [
-            ci_check("Lint JS and Ruby / build", bucket: "pass", state: "SUCCESS")
-          ]
-        )
-      )
-    )
-
-    assert status.success?, output
-    data = JSON.parse(output)
-    assert data.fetch("complete_allowed")
-    assert_empty data.fetch("violations")
-    assert_equal "READY", ledger(data).fetch("ci_readiness").fetch("verdict")
-  end
-
-  def test_failed_ci_blocks_strict_closeout_with_check_name
-    output, status = run_fixture(
-      fixture(
-        number: 4444,
-        ci_readiness: ci_readiness(
-          verdict: "NOT_READY",
-          checks: [
-            ci_check(
-              "JS unit tests for Renderer package / build (22)",
-              bucket: "fail",
-              state: "FAILURE",
-              link: "https://github.com/shakacode/react_on_rails/actions/runs/28660148440/job/84998580503"
-            )
-          ]
-        )
-      )
-    )
-
-    refute status.success?, output
-    data = JSON.parse(output)
-    refute data.fetch("complete_allowed")
-    ci_readiness = ledger(data).fetch("ci_readiness")
-    assert_equal "NOT_READY", ci_readiness.fetch("verdict")
-    failing_check_names = ci_readiness.fetch("failing").map { |check| check.fetch("name") }
-    assert_equal ["JS unit tests for Renderer package / build (22)"], failing_check_names
-    assert_equal ["ci_check_failed"], violation_codes(data)
-  end
-
-  def test_pending_ci_blocks_strict_closeout
-    output, status = run_fixture(
-      fixture(
-        ci_readiness: ci_readiness(
-          verdict: "NOT_READY",
-          checks: [
-            ci_check("Integration Tests / build", bucket: "pending", state: "PENDING")
-          ]
-        )
-      )
-    )
-
-    refute status.success?, output
-    data = JSON.parse(output)
-    assert_equal ["ci_check_pending"], violation_codes(data)
-  end
-
-  def test_unknown_ci_blocks_strict_closeout
-    output, status = run_fixture(
-      fixture(
-        ci_readiness: ci_readiness(
-          status: "UNKNOWN",
-          verdict: "UNKNOWN",
-          checks: [],
-          message: "no active current-head check rows were returned"
-        )
-      )
-    )
-
-    refute status.success?, output
-    data = JSON.parse(output)
-    assert_equal ["ci_readiness.verdict"], unknown_field_names(data)
-    assert_equal ["unknown_ci_readiness"], violation_codes(data)
-  end
-
+module PrMergeLedgerFixtureHelpers
   private
 
   def ledger(data)
@@ -166,5 +84,108 @@ class PrMergeLedgerTest < Minitest::Test
       "bucket" => bucket,
       "link" => link
     }.compact
+  end
+end
+
+class PrMergeLedgerTest < Minitest::Test
+  include PrMergeLedgerFixtureHelpers
+
+  def test_ready_ci_allows_strict_closeout
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: ci_readiness(
+          verdict: "READY",
+          checks: [
+            ci_check("Lint JS and Ruby / build", bucket: "pass", state: "SUCCESS")
+          ]
+        )
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty data.fetch("violations")
+    assert_equal "READY", ledger(data).fetch("ci_readiness").fetch("verdict")
+  end
+
+  def test_failed_ci_blocks_strict_closeout_with_check_name
+    output, status = run_fixture(
+      fixture(
+        number: 4444,
+        ci_readiness: ci_readiness(
+          verdict: "NOT_READY",
+          checks: [
+            ci_check(
+              "JS unit tests for Renderer package / build (22)",
+              bucket: "fail",
+              state: "FAILURE",
+              link: "https://github.com/shakacode/react_on_rails/actions/runs/28660148440/job/84998580503"
+            )
+          ]
+        )
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    refute data.fetch("complete_allowed")
+    ci_readiness = ledger(data).fetch("ci_readiness")
+    assert_equal "NOT_READY", ci_readiness.fetch("verdict")
+    failing_check_names = ci_readiness.fetch("failing").map { |check| check.fetch("name") }
+    assert_equal ["JS unit tests for Renderer package / build (22)"], failing_check_names
+    assert_equal ["ci_check_failed"], violation_codes(data)
+  end
+
+  def test_pending_ci_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: ci_readiness(
+          verdict: "NOT_READY",
+          checks: [
+            ci_check("Integration Tests / build", bucket: "pending", state: "PENDING")
+          ]
+        )
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["ci_check_pending"], violation_codes(data)
+  end
+
+  def test_not_ready_ci_without_check_details_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: ci_readiness(
+          verdict: "NOT_READY",
+          checks: []
+        )
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["ci_not_ready"], violation_codes(data)
+    message = ledger(data).fetch("violations").fetch(0).fetch("message")
+    assert_match(/NOT_READY/, message)
+  end
+
+  def test_unknown_ci_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: ci_readiness(
+          status: "UNKNOWN",
+          verdict: "UNKNOWN",
+          checks: [],
+          message: "no active current-head check rows were returned"
+        )
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["ci_readiness.verdict"], unknown_field_names(data)
+    assert_equal ["unknown_ci_readiness"], violation_codes(data)
   end
 end
