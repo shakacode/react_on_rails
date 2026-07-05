@@ -158,6 +158,8 @@ def current_repo_info
   payload = run_gh_json("repo", "view", "--json", "nameWithOwner,url")
 
   repo_info_from_payload(payload)
+rescue StandardError => e
+  abort "Could not resolve current repository via gh repo view:\n#{e.message.strip}"
 end
 
 def repo_option_info(repo)

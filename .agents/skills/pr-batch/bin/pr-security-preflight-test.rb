@@ -595,6 +595,28 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
+  def test_current_repo_resolution_failure_exits_with_actionable_error
+    with_fake_gh("repo-view-failure") do |env, trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer-current-repo-fallback")
+      FileUtils.mkdir_p(consumer_root)
+      init_git_root(consumer_root)
+
+      out, status = run_script(
+        env,
+        "--trust-config",
+        trust_config_path,
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_includes out, "Could not resolve current repository via gh repo view:"
+      assert_includes out, "gh repo view --json nameWithOwner,url failed:"
+      assert_includes out, "simulated repo view failure"
+      refute_match(/pr-security-preflight:\d+:in /, out)
+    end
+  end
+
   def test_malformed_remote_port_does_not_crash_preflight
     with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
       consumer_root = File.join(dir, "consumer-bad-port")
