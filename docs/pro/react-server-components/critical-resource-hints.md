@@ -62,11 +62,11 @@ user input, query parameters, or other request-derived values directly to these 
 Use hints only for resources that are genuinely needed for the first viewport or early interaction:
 
 - Use `preinit` with `as: 'style'` for critical CSS that should participate in React's stylesheet precedence and
-  streamed boundary reveal behavior. By default it uses the `rsc-css` precedence bucket, the same
-  bucket React on Rails Pro uses for automatically discovered client-reference CSS. Pass an explicit
-  `precedence` when authored critical CSS must be ordered separately, but avoid overriding the
-  precedence for an `href` that automatic client-reference CSS discovery also emits because React
-  dedupes stylesheet preinit hints by URL.
+  streamed boundary reveal behavior. Pass `precedence: 'rsc-css'` when authored critical CSS should
+  join the same bucket React on Rails Pro uses for automatically discovered client-reference CSS. Use
+  a different explicit `precedence` only when authored critical CSS must be ordered separately, and
+  avoid doing that for an `href` that automatic client-reference CSS discovery also emits because
+  React dedupes stylesheet preinit hints by URL.
 - Use `preload` with `as: 'style'` when you only need to start downloading a stylesheet early.
 - Use `preload` with `as: 'font'` for fonts used by the LCP text. Include the real production font
   URL, `type`, and `crossOrigin` when the font request needs it.

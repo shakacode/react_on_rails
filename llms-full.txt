@@ -29530,8 +29530,8 @@ sidecar and scoped-loading design work is tracked in
   renders a tiny known Client Component from the same build.
 - Use
   [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
-  to inspect emitted client-reference chunks and asset byte totals when the build enables the
-  diagnostics file.
+  to derive a local report for emitted client-reference chunks and asset byte totals from the client
+  manifest.
 - Distinguish this from the Rspack dev-server lazy-compilation issue: if the manifest is empty only
   in normal `bin/dev` and generated bundles mention `lazy-compilation-proxy`, see
   [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server).
@@ -30882,7 +30882,8 @@ changing architecture:
   tracks framework support for showing cache hit/miss state, emitted assets, client references, and
   payload size during benchmark runs.
 - [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
-  shows how to emit a build-time diagnostics file for client-reference chunks and asset byte totals.
+  shows how to derive a local report for client-reference chunks and asset byte totals from the
+  emitted client manifest.
 - [Chunk contamination](rsc-troubleshooting.md#chunk-contamination) explains large unexpected chunks
   from shared `'use client'` modules.
 - [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences)

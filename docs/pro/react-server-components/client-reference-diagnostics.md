@@ -31,9 +31,11 @@ function addAsset(file, id, type) {
 }
 
 for (const [id, metadata] of Object.entries(manifest)) {
-  for (const file of metadata.chunks ?? []) {
-    addAsset(file, id, 'js');
+  const chunks = metadata.chunks ?? [];
+  for (let index = 1; index < chunks.length; index += 2) {
+    addAsset(chunks[index], id, 'js');
   }
+
   for (const file of metadata.css ?? []) {
     addAsset(file, id, 'css');
   }
@@ -42,8 +44,9 @@ for (const [id, metadata] of Object.entries(manifest)) {
 console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metadata })));
 ```
 
-The report should be derived from the manifest entries that the RSC package emits. A shared JS or CSS
-file can list multiple client-reference owners. A richer local report can include the client
+The report should be derived from the manifest entries that the RSC package emits. The manifest's
+`chunks` array stores alternating chunk ids and filenames; report only the filename half. A shared JS
+or CSS file can list multiple client-reference owners. A richer local report can include the client
 references recorded in the manifest, the JS chunk files attached to each reference, CSS files, and
 byte sizes from the build stats when the bundler exposes them:
 
