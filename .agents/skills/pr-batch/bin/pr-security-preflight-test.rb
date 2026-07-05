@@ -2110,6 +2110,7 @@ class PrSecurityPreflightTest < Minitest::Test
   end
 
   def with_env(values)
+    previous = {}
     previous = values.to_h { |key, _value| [key, ENV.fetch(key, nil)] }
     values.each do |key, value|
       value.nil? ? ENV.delete(key) : ENV[key] = value
