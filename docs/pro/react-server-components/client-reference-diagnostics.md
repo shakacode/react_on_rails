@@ -16,21 +16,36 @@ import { readFileSync } from 'node:fs';
 const manifest = JSON.parse(readFileSync('public/packs/react-client-manifest.json', 'utf8'));
 const assets = new Map();
 
+function addAsset(file, id, type) {
+  const entry = assets.get(file) ?? { ids: [], types: [] };
+
+  if (!entry.ids.includes(id)) {
+    entry.ids.push(id);
+  }
+
+  if (!entry.types.includes(type)) {
+    entry.types.push(type);
+  }
+
+  assets.set(file, entry);
+}
+
 for (const [id, metadata] of Object.entries(manifest)) {
   for (const file of metadata.chunks ?? []) {
-    assets.set(file, { id, type: 'js' });
+    addAsset(file, id, 'js');
   }
   for (const file of metadata.css ?? []) {
-    assets.set(file, { id, type: 'css' });
+    addAsset(file, id, 'css');
   }
 }
 
 console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metadata })));
 ```
 
-The report should be derived from the manifest entries that the RSC package emits. A richer local
-report can include the client references recorded in the manifest, the JS chunk files attached to
-each reference, CSS files, and byte sizes from the build stats when the bundler exposes them:
+The report should be derived from the manifest entries that the RSC package emits. A shared JS or CSS
+file can list multiple client-reference owners. A richer local report can include the client
+references recorded in the manifest, the JS chunk files attached to each reference, CSS files, and
+byte sizes from the build stats when the bundler exposes them:
 
 ```json
 {
