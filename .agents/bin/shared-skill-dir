@@ -9,7 +9,7 @@ fi
 
 skill="$1"
 case "$skill" in
-  ""|*[!A-Za-z0-9_.-]*)
+  ""|"."|".."|*[!A-Za-z0-9_.-]*)
     echo "shared-skill-dir: invalid skill name: $skill" >&2
     exit 2
     ;;

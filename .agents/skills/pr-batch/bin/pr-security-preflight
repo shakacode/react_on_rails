@@ -16,7 +16,7 @@ options = {
   repo: nil,
   fail_on_high_risk_files: false,
   include_reactions: false,
-  strict_trust: false,
+  strict_trust: true,
   trust_config: nil
 }
 
@@ -76,7 +76,7 @@ WARNING_SUSPICIOUS_PATTERN = /
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--trust-config PATH] " \
                 "[--acknowledge-risk NUMBER:RISK[,RISK]] [--include-reactions] " \
-                "[--strict-trust] [--fail-on-high-risk-files] NUMBER [...]"
+                "[--[no-]strict-trust] [--fail-on-high-risk-files] NUMBER [...]"
   opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
   opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
   acknowledge_help = "Maintainer-acknowledged exact-target risk. " \
@@ -88,12 +88,12 @@ parser = OptionParser.new do |opts|
   end
   include_reactions_help = "Fetch reaction users as visible actors (extra GitHub API calls). " \
                            "Without this flag, reaction-only users already present in GitHub participants " \
-                           "appear as hidden participants and block when --strict-trust is set."
+                           "appear as hidden participants and block unless --no-strict-trust is set."
   opts.on("--include-reactions", include_reactions_help) do
     options[:include_reactions] = true
   end
-  opts.on("--strict-trust", "Exit non-zero on non-allowlisted or hidden actor findings") do
-    options[:strict_trust] = true
+  opts.on("--[no-]strict-trust", "Exit non-zero on non-allowlisted or hidden actor findings (default: true)") do |value|
+    options[:strict_trust] = value
   end
   opts.on("--fail-on-high-risk-files", "Exit non-zero when high-risk surfaces changed") do
     options[:fail_on_high_risk_files] = true

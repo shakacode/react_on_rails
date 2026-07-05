@@ -55,6 +55,13 @@ def exit_code_for_status(status)
   status.exitstatus || 1
 end
 
+def flush_captured_output(stdout_file, stderr_file)
+  stdout_file.rewind
+  stderr_file.rewind
+  print stdout_file.read
+  $stderr.print(stderr_file.read)
+end
+
 options = {}
 
 parser = OptionParser.new do |opts|
@@ -114,6 +121,7 @@ begin
   loop do
     if interrupted_signal
       terminate_process_group(pid, signal: interrupted_signal)
+      flush_captured_output(stdout_file, stderr_file)
       exit(128 + Signal.list.fetch(interrupted_signal))
     end
 
@@ -133,21 +141,19 @@ begin
 
   if interrupted_signal
     terminate_process_group(pid, signal: interrupted_signal)
+    flush_captured_output(stdout_file, stderr_file)
     exit(128 + Signal.list.fetch(interrupted_signal))
   end
 
   terminate_process_group(pid) if timed_out
 
   if timed_out
+    flush_captured_output(stdout_file, stderr_file)
     warn "agent-coord-bounded: timed out after #{timeout}s: #{Shellwords.join(command)}"
     exit 124
   end
 
-  stdout_file.rewind
-  stderr_file.rewind
-  print stdout_file.read
-  $stderr.print(stderr_file.read)
-
+  flush_captured_output(stdout_file, stderr_file)
   exit(exit_code_for_status(status))
 ensure
   stdout_file&.close!

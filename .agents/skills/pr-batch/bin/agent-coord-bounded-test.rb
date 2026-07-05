@@ -30,11 +30,11 @@ class AgentCoordBoundedTest < Minitest::Test
       $stdout.flush
       sleep 5
     RUBY
-      stdout, stderr, status = run_script(env, "--timeout", "0.2", "doctor", "--json")
+      stdout, stderr, status = run_script(env, "--timeout", "1", "doctor", "--json")
 
       assert_equal 124, status.exitstatus
-      assert_empty stdout
-      assert_includes stderr, "agent-coord-bounded: timed out after 0.2s"
+      assert_equal "partial json output\n", stdout
+      assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
       assert_includes stderr, "agent-coord doctor --json"
     end
   end
@@ -116,15 +116,21 @@ class AgentCoordBoundedTest < Minitest::Test
   def test_terminates_agent_coord_process_group_when_interrupted
     Dir.mktmpdir("agent-coord-bounded-test") do |dir|
       child_pid_file = File.join(dir, "child.pid")
+      stdout_file = File.join(dir, "wrapper.stdout")
+      stderr_file = File.join(dir, "wrapper.stderr")
       wrapper_pid = nil
       child_pid = nil
 
       with_fake_agent_coord(<<~RUBY, "AGENT_COORD_CHILD_PID" => child_pid_file) do |env|
+        puts "interrupted stdout"
+        $stdout.flush
+        $stderr.puts "interrupted stderr"
+        $stderr.flush
         File.write(ENV.fetch("AGENT_COORD_CHILD_PID"), Process.pid.to_s)
         sleep 10
       RUBY
         wrapper_pid = Process.spawn(env, RbConfig.ruby, SCRIPT, "--timeout", "20", "status",
-                                    out: File::NULL, err: File::NULL)
+                                    out: stdout_file, err: stderr_file)
 
         assert wait_until(timeout: 5) { File.size?(child_pid_file) }, "fake agent-coord did not start"
 
@@ -133,6 +139,8 @@ class AgentCoordBoundedTest < Minitest::Test
         _, status = Process.waitpid2(wrapper_pid)
 
         assert_equal 143, status.exitstatus
+        assert_equal "interrupted stdout\n", File.read(stdout_file)
+        assert_includes File.read(stderr_file), "interrupted stderr\n"
         assert wait_until(timeout: 5) { !process_alive?(child_pid) }, "fake agent-coord survived wrapper termination"
       ensure
         Process.kill("KILL", wrapper_pid) if wrapper_pid && process_alive?(wrapper_pid)
@@ -155,11 +163,11 @@ class AgentCoordBoundedTest < Minitest::Test
         sleep 0.05 until File.size?(ENV.fetch("AGENT_COORD_HELPER_PID")) || Time.now >= deadline
         sleep 10
       RUBY
-        stdout, stderr, status = run_script(env, "--timeout", "1", "status")
+        stdout, stderr, status = run_script(env, "--timeout", "2", "status")
 
         assert_equal 124, status.exitstatus
         assert_empty stdout
-        assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
+        assert_includes stderr, "agent-coord-bounded: timed out after 2.0s"
         assert wait_until(timeout: 5) { File.size?(helper_pid_file) }, "fake helper did not start"
 
         helper_pid = File.read(helper_pid_file).to_i

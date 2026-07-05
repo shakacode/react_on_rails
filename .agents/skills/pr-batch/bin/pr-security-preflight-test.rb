@@ -475,7 +475,15 @@ class PrSecurityPreflightTest < Minitest::Test
 
   def test_participant_findings_header_includes_hidden_participants
     with_fake_gh("untrusted-participant") do |env, trust_config_path, _log_path|
-      out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--no-strict-trust",
+        "123"
+      )
 
       assert status.success?, out
       assert_includes out, "Untrusted or hidden participant findings:"
@@ -955,9 +963,30 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_default_mode_reports_untrusted_interactions_without_blocking
+  def test_default_mode_blocks_untrusted_interactions
     with_fake_gh("untrusted-comment") do |env, trust_config_path, _log_path|
       out, status = run_script(env, "--repo", "owner/repo", "--trust-config", trust_config_path, "123")
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "Untrusted comment/review queue:"
+      assert_includes out, "unknown-user issue comment"
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #123: untrusted comment/review author(s)"
+    end
+  end
+
+  def test_no_strict_trust_reports_untrusted_interactions_without_blocking
+    with_fake_gh("untrusted-comment") do |env, trust_config_path, _log_path|
+      out, status = run_script(
+        env,
+        "--repo",
+        "owner/repo",
+        "--trust-config",
+        trust_config_path,
+        "--no-strict-trust",
+        "123"
+      )
 
       assert status.success?, out
       assert_includes out, "Untrusted comment/review queue:"
