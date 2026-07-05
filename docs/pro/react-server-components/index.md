@@ -116,10 +116,16 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 
 - [How RSC Works](./how-react-server-components-work.md) — bundling process, RSC payload format, and client references
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
+- [Critical Resource Hints](./critical-resource-hints.md) — emit measured preload, preconnect, DNS,
+  font, script, image, and stylesheet hints from an RSC render
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
+- [RSC Client Reference Diagnostics](./client-reference-diagnostics.md) — inspect emitted client
+  reference chunks and static-page manifest scope
 - [Static Shell Global JavaScript Opt-Out](./static-shell-global-js-opt-out.md) — Rails layout pattern for keeping global CSS while skipping app-wide JavaScript on opted-in static shells
 - [React on Rails Pro vs. Next.js](./nextjs-comparison.md) — how both implement RSC, and the one architectural difference that explains the rest
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
+- [System Specs for Streamed RSC Payloads](./system-spec-streaming-rsc.md) — Capybara driver shape, Puffing Billy
+  boundaries, and browser assertions for streamed Flight payloads
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
 - [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 

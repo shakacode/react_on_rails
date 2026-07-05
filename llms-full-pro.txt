@@ -4766,10 +4766,16 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 
 - [How RSC Works](./how-react-server-components-work.md) — bundling process, RSC payload format, and client references
 - [RSC Rendering Flow](./rendering-flow.md) — detailed rendering lifecycle, bundle types, and architecture
+- [Critical Resource Hints](./critical-resource-hints.md) — emit measured preload, preconnect, DNS,
+  font, script, image, and stylesheet hints from an RSC render
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
+- [RSC Client Reference Diagnostics](./client-reference-diagnostics.md) — inspect emitted client
+  reference chunks and static-page manifest scope
 - [Static Shell Global JavaScript Opt-Out](./static-shell-global-js-opt-out.md) — Rails layout pattern for keeping global CSS while skipping app-wide JavaScript on opted-in static shells
 - [React on Rails Pro vs. Next.js](./nextjs-comparison.md) — how both implement RSC, and the one architectural difference that explains the rest
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
+- [System Specs for Streamed RSC Payloads](./system-spec-streaming-rsc.md) — Capybara driver shape, Puffing Billy
+  boundaries, and browser assertions for streamed Flight payloads
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
 - [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 
@@ -5493,6 +5499,111 @@ This approach offers significant advantages:
 ## Next Steps
 
 To learn more about how to render React Server Components inside client components, see [React Server Components Inside Client Components](./inside-client-components.md).
+
+================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/critical-resource-hints
+SOURCE: docs/pro/react-server-components/critical-resource-hints.md
+================================================================================
+
+# Critical Resource Hints for RSC Pages
+
+RSC pages can emit browser resource hints while the server component tree renders. Use this when an
+RSC page has a measured first-viewport bottleneck, such as late critical CSS, a late LCP image, or a
+font request that starts after the shell is already streaming.
+
+Use React DOM's resource hint APIs from the RSC render path. Do not import manual resource-hint
+helpers from `react-on-rails-rsc/server`: the published `react-on-rails-rsc` package does not export
+`preloadFont`, `preloadImage`, `preloadScript`, or `preloadStyle` helpers. That subpath is the Flight
+server entry point.
+
+Pass production URLs that your Rails, Shakapacker, webpack, or rspack manifests have already
+resolved.
+
+```tsx
+import { preconnect, prefetchDNS, preinit, preload } from 'react-dom';
+
+export default function WelcomePage() {
+  prefetchDNS('https://cdn.example.com');
+  preconnect('https://assets.example.com', { crossOrigin: 'anonymous' });
+
+  preinit('/packs/generated/WelcomePage.css', { as: 'style', precedence: 'rsc-css' });
+  preload('/assets/Poppins-600-abcd1234.woff2', {
+    as: 'font',
+    type: 'font/woff2',
+    crossOrigin: 'anonymous',
+  });
+  preload('/assets/listing-price-comparison-abcd1234.webp', {
+    as: 'image',
+    fetchPriority: 'high',
+    imageSrcSet:
+      '/assets/listing-price-comparison-abcd1234.webp 1x, /assets/listing-price-comparison@2x-abcd1234.webp 2x',
+    imageSizes: '100vw',
+  });
+
+  return <main>{/* page content */}</main>;
+}
+```
+
+The useful React DOM APIs for RSC resource hints are:
+
+- `prefetchDNS(href)`
+- `preconnect(href, options)`
+- `preinit(href, { as: 'style' | 'script', ...options })`
+- `preload(href, { as, ...options })`
+- `preinitModule(href, options)`
+- `preloadModule(href, options)`
+
+> [!NOTE]
+> The generator currently installs the tested React 19.0.x / `react-on-rails-rsc@19.0.5` stack by
+> default. Newer published `react-on-rails-rsc` releases may add automatic package-level hinting, but
+> app-authored resource hints should still use React DOM's public APIs rather than package-private
+> helpers.
+
+Use already-resolved URLs. These helpers do not look up logical pack names such as
+`generated/WelcomePage.css`; resolve those through the host app's asset manifest before calling the
+helper. Treat hint URLs and origins as trusted manifest or application configuration data. Do not pass
+user input, query parameters, or other request-derived values directly to these helpers.
+
+## Choosing Hints
+
+Use hints only for resources that are genuinely needed for the first viewport or early interaction:
+
+- Use `preinit` with `as: 'style'` for critical CSS that should participate in React's stylesheet precedence and
+  streamed boundary reveal behavior. Pass `precedence: 'rsc-css'` when authored critical CSS should
+  join the same bucket React on Rails Pro uses for automatically discovered client-reference CSS. Use
+  a different explicit `precedence` only when authored critical CSS must be ordered separately, and
+  avoid doing that for an `href` that automatic client-reference CSS discovery also emits because
+  React dedupes stylesheet preinit hints by URL.
+- Use `preload` with `as: 'style'` when you only need to start downloading a stylesheet early.
+- Use `preload` with `as: 'font'` for fonts used by the LCP text. Include the real production font
+  URL, `type`, and `crossOrigin` when the font request needs it.
+- Use `preload` with `as: 'image'` and `fetchPriority: 'high'` only for the actual LCP image, not
+  for below-the-fold gallery or avatar images.
+- Use `preconnect` for a CDN or asset origin that will certainly be used on the page. Use
+  `prefetchDNS` when you only need the cheaper DNS lookup.
+- Avoid preloading route chunks, below-the-fold images, optional third-party scripts, or assets that
+  are already guaranteed by the page shell unless a measurement shows they are late.
+
+Over-preloading can regress the same metrics this feature is intended to fix by competing with
+critical CSS, fonts, or the real LCP resource.
+
+## Verifying
+
+Use Lighthouse, ShakaPerf, or Chrome DevTools on production-like hashed assets:
+
+1. Confirm the LCP element. Check whether it is text, an image, or a client component boundary.
+2. In the Network panel, filter downloads before LCP. Verify only the intended CSS, font, image,
+   script, preconnect, or DNS hints moved earlier.
+3. For text LCP, inspect layout shifts and font swaps. If font loading causes CLS or delays the LCP
+   text, preload only the exact font weights used above the fold.
+4. For image LCP, confirm the real LCP image has high priority and below-the-fold images remain lazy
+   or low priority.
+5. Compare FCP, Speed Index, LCP, TBT, total JS bytes, total downloads, and request count against the
+   SSR or previous RSC baseline.
+6. Remove any hint that does not improve the measured bottleneck.
+
+For broader RSC performance work, pair this page with the
+[RSC Performance Validation Playbook](../../oss/migrating/rsc-performance-validation.md).
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/pro/react-server-components/css-and-styling
@@ -8085,6 +8196,296 @@ Selective hydration is a powerful feature that allows React to become interactiv
 ## Next Steps
 
 Now that you understand how to use selective hydration in React Server Components, you can proceed to the next article: [How React Server Components Work](how-react-server-components-work.md) to learn about the technical details and underlying mechanisms of React Server Components.
+
+================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/client-reference-diagnostics
+SOURCE: docs/pro/react-server-components/client-reference-diagnostics.md
+================================================================================
+
+# RSC Client Reference Diagnostics
+
+Use this guide when a public or mostly static RSC page should prove which client-reference chunks it
+can load before you introduce route-scoped manifest behavior. The current plugin model emits one
+client manifest per build. It does not automatically infer per-page or per-route manifests.
+
+## Emit Diagnostics
+
+The published `react-on-rails-rsc` webpack and rspack plugins do not currently emit a separate
+`clientReferenceDiagnosticsFilename` asset. Inspect the emitted client manifest instead, or generate a
+small local report from the client manifest plus `loadable-stats.json` after the client build
+completes.
+
+```js
+import { readFileSync } from 'node:fs';
+
+function readJson(filename) {
+  return JSON.parse(readFileSync(filename, 'utf8'));
+}
+
+const manifest = readJson('public/packs/react-client-manifest.json');
+const clientReferences = manifest.filePathToModuleMetadata ?? manifest;
+const loadableStats = readJson('public/packs/loadable-stats.json');
+const assets = new Map();
+
+function assetHref(asset) {
+  const publicPath = loadableStats.publicPath;
+  if (!publicPath || publicPath === 'auto') {
+    return asset;
+  }
+
+  return `${publicPath.replace(/\/?$/, '/')}${asset.replace(/^\/+/, '')}`;
+}
+
+function addAsset(file, id, type) {
+  const entry = assets.get(file) ?? { ids: [], types: [] };
+
+  if (!entry.ids.includes(id)) {
+    entry.ids.push(id);
+  }
+
+  if (!entry.types.includes(type)) {
+    entry.types.push(type);
+  }
+
+  assets.set(file, entry);
+}
+
+function addStylesheetsForChunk(chunkName, id) {
+  const chunkAssets = loadableStats.assetsByChunkName?.[chunkName] ?? [];
+  const assetsForChunk = Array.isArray(chunkAssets) ? chunkAssets : [chunkAssets];
+
+  for (const asset of assetsForChunk) {
+    if (typeof asset === 'string' && asset.endsWith('.css')) {
+      addAsset(assetHref(asset), id, 'css');
+    }
+  }
+}
+
+for (const [id, metadata] of Object.entries(clientReferences)) {
+  const chunks = metadata.chunks ?? [];
+  for (let index = 1; index < chunks.length; index += 2) {
+    const chunkName = chunks[index - 1];
+    addAsset(chunks[index], id, 'js');
+    addStylesheetsForChunk(chunkName, id);
+  }
+}
+
+console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metadata })));
+```
+
+The report should be derived from the manifest entries that the RSC package emits. Some manifest
+versions wrap those entries under `filePathToModuleMetadata`; normalize that wrapper before iterating.
+The manifest's `chunks` array stores alternating chunk ids and filenames; report only the filename
+half for JS assets, and use the chunk id half to look up extracted CSS files in `loadable-stats.json`.
+A shared JS or CSS file can list multiple client-reference owners. A richer local report can include
+the client references recorded in the manifest, the JS chunk files attached to each reference, CSS
+files, and byte sizes from the build stats when the bundler exposes them:
+
+```json
+{
+  "version": 1,
+  "manifestFilename": "react-client-manifest.json",
+  "isServer": false,
+  "clientReferenceCount": 1,
+  "totalChunkBytes": 1234,
+  "clientReferences": [
+    {
+      "file": "file:///absolute/path/to/TinyIsland.js",
+      "id": "./TinyIsland.js",
+      "name": "*",
+      "chunks": [
+        {
+          "id": "client-TinyIsland-js",
+          "file": "client-TinyIsland-js.chunk.js",
+          "bytes": 1234
+        }
+      ],
+      "totalBytes": 1234
+    }
+  ]
+}
+```
+
+`bytes` should be `null` when the bundler stats do not expose the asset source. `totalChunkBytes`
+should count each emitted JS or CSS asset file once even when multiple client references share that
+asset.
+
+On client and server builds, CSS entries are reported from the emitted CSS assets for the generated
+chunk group for the listed client reference. If one island imports another client reference, the
+imported child reference does not inherit a separate CSS asset that belongs only to the importing
+island.
+
+This diagnostics view is chunk-asset scoped, not selector scoped. If the bundler emits an owner
+island's CSS asset with selectors from a statically imported child in the same physical CSS file, the
+owner reference still reports that combined asset.
+
+## Static Page Patterns
+
+For a server-only static RSC entry, use an explicit empty client reference list for that build:
+
+```js
+new RSCWebpackPlugin({
+  isServer: false,
+  clientReferences: [],
+});
+```
+
+This produces an empty client manifest. Use it only for a build target that cannot render client
+components. Do not apply `clientReferences: []` to a mixed RSC app; any page that renders a client
+component will miss the client-reference metadata it needs at runtime.
+
+For a static page with one or two small islands, isolate the static build and declare only the island
+files that the public page may render:
+
+```js
+new RSCWebpackPlugin({
+  isServer: false,
+  clientReferences: [
+    {
+      directory: './app/public-rsc',
+      recursive: false,
+      include: /TinyIsland\.(js|jsx|ts|tsx)$/,
+    },
+  ],
+});
+```
+
+The same descriptor shape is supported by `RSCRspackPlugin`. Keep the static page entry separate from
+the normal authenticated app entry when the app entry imports large global vendors, analytics, or
+dashboard-only clients. The manifest gives a direct audit trail for whether the tiny island pulls only
+its own chunk or also pulls an unexpected vendor chunk through an import.
+
+If an island imports a heavy dependency, the manifest or derived report will show that dependency
+through the emitted chunk files and byte totals. Remove or defer the import in the island itself; the
+manifest only reports what the build emitted and does not rewrite the module graph.
+
+## Boundaries
+
+This diagnostics slice is intentionally narrow:
+
+- It does not create route-scoped or page-scoped manifests.
+- It does not discover the exact client references rendered by a specific RSC page.
+- It does not emit a separate diagnostics JSON file in the currently published package.
+- It does not eliminate vendor chunks automatically.
+- It does not solve broader dependency and manifest scoping work.
+
+Use the manifest output to decide whether an explicit static-page build is acceptable today, or
+whether the app needs broader manifest-scoping work before treating static RSC pages as
+performance-isolated.
+
+================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/system-spec-streaming-rsc
+SOURCE: docs/pro/react-server-components/system-spec-streaming-rsc.md
+================================================================================
+
+# System Specs for Streamed RSC Payloads
+
+Use this guide when a Rails system spec needs to verify that the browser consumes a streamed React Server
+Components payload from `rsc_payload_route`, `rsc_payload_react_component`, `stream_react_component`, or
+`stream_react_component_with_async_props`.
+
+Before writing these specs, wire the Rails test process, test bundles, and node renderer using the
+[RSC and Node Renderer System Tests](../../oss/building-features/testing-configuration.md#rsc-and-node-renderer-system-tests)
+recipe.
+
+## Transport Requirement
+
+The RSC payload request must reach the browser as the live response from the Rails app or node-renderer path.
+Do not stub, cache, replay, or buffer that request in a browser proxy. If the payload is buffered until
+completion, the browser-side RSC client may never observe the chunks that unblock hydration. The system spec can
+then hang even though the server generated a valid response.
+
+Common symptoms:
+
+- the page HTML renders, but the browser never reaches the hydrated state;
+- the RSC payload request stays `inflight` or completes only after the spec times out;
+- browser console logs show a pending Flight decode or missing client reference after the payload route returned
+  successfully on the server.
+
+## Recommended Capybara Shape
+
+Use a non-Billy browser driver for specs that assert streamed RSC behavior. If your suite's default JavaScript
+driver is already a plain Selenium driver, you can use it directly. Otherwise, register a dedicated driver for
+RSC streaming assertions and keep Puffing Billy for specs that need browser-side external request stubbing.
+
+```ruby
+# spec/support/capybara_rsc_streaming.rb
+Capybara.register_driver :selenium_chrome_rsc_streaming do |app|
+  options = Selenium::WebDriver::Chrome::Options.new
+  options.add_argument("--headless=new") if ENV["HEADLESS"] != "false"
+  options.add_argument("--disable-dev-shm-usage")
+  options.add_argument("--no-sandbox") if ENV["CI"]
+
+  Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
+end
+```
+
+```ruby
+RSpec.describe "public RSC pages", :rsc, :js, type: :system do
+  driven_by :selenium_chrome_rsc_streaming
+
+  it "hydrates the streamed RSC payload" do
+    visit "/"
+
+    expect(page).to have_css("[data-rsc-ready='true']")
+  end
+end
+```
+
+Use an app-specific ready marker or interaction. The important assertion is that the browser finished consuming
+the Flight payload, not merely that the initial static HTML was present.
+
+Good assertions include:
+
+- a client island becomes interactive and responds to a click;
+- an app-owned hydration marker appears after the client boundary finishes;
+- a Suspense fallback is replaced by streamed content and the related client control works.
+
+## Puffing Billy Compatibility
+
+Puffing Billy is an HTTP proxy for browser requests. Its
+[README](https://github.com/oesmith/puffing-billy) describes Capybara drivers with `_billy`
+suffixes, proxied unstubbed requests, cache configuration for requests routed through the proxy, and
+request log handlers such as `proxy`, `stubs`, `cache`, `error`, and `inflight`.
+
+That model is useful for external browser API calls, but it is a poor default for streamed RSC payload routes. For
+specs that must verify streaming:
+
+- do not run the spec with a `_billy` Capybara driver;
+- do not stub the RSC payload URL;
+- keep RSC payload paths out of `path_blacklist`, `cache_whitelist`, `merge_cached_responses_whitelist`, and any
+  persistent cache fixtures;
+- do not treat Billy `whitelist` entries as streaming proof. Whitelisting keeps local app URLs from being cached
+  by default, but the browser request can still be routed through the proxy layer;
+- if a spec needs both external browser stubs and streamed RSC payloads, prefer server-side stubs in the Rails
+  process, a local fake service, or a separate non-Billy spec for the RSC assertion.
+
+For remote Chrome, proxy bypass rules are host-oriented rather than route-aware. Bypassing the Capybara app host
+can keep `/rsc_payload` out of the Billy proxy, but it also means Billy will not observe other browser requests to
+that same app host. Prefer registering a dedicated non-Billy RSC driver unless the suite has a well-tested reason
+to share the Billy driver.
+
+When diagnosing an existing Billy-backed spec, temporarily enable request recording and inspect the Billy log. A
+streamed RSC payload handled by `cache`, `stubs`, `error`, or left `inflight` is not a passing transport setup. A
+`proxy` handler is better, but still needs an end-to-end hydration assertion because proxying alone does not prove
+chunk delivery to the browser.
+
+## Verification Checklist
+
+For app-specific system specs:
+
+1. Visit the RSC route with a non-Billy streaming driver.
+2. Wait for an app-owned hydrated marker, visible client-island behavior, or streamed content replacement.
+3. Confirm the RSC payload route was served by the app under test, not by a Billy stub or cache.
+4. Keep external API stubbing separate from the RSC payload transport check.
+
+Request specs for `/rsc_payload/:component_name` are still useful for status codes, content type, and payload
+shape, but they do not prove browser streaming. Pair request specs with at least one browser assertion when the
+behavior depends on hydration or progressive Flight chunk delivery.
+
+If the app can only reproduce a failure with Puffing Billy in front of the RSC payload route, keep that spec
+skipped or pending and link the skip to the app-specific proxy limitation. Do not treat a buffered proxy path as a
+supported RSC transport.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/pro/react-server-components/flight-protocol-syntax

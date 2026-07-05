@@ -156,6 +156,9 @@ changing architecture:
 - [RSC render asset/cache diagnostics](https://github.com/shakacode/react_on_rails/issues/4296)
   tracks framework support for showing cache hit/miss state, emitted assets, client references, and
   payload size during benchmark runs.
+- [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
+  shows how to derive a local report for client-reference chunks and asset byte totals from the
+  emitted client manifest.
 - [Chunk contamination](rsc-troubleshooting.md#chunk-contamination) explains large unexpected chunks
   from shared `'use client'` modules.
 - [Client Reference Scope and Empty `clientReferences`](rsc-troubleshooting.md#client-reference-scope-and-empty-clientreferences)

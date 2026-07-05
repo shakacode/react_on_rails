@@ -383,9 +383,10 @@ sidecar and scoped-loading design work is tracked in
   references. Look for large vendor/app chunks loaded before interaction.
 - If a page with no islands improved after `clientReferences = []`, test a second RSC route that
   renders a tiny known Client Component from the same build.
-- When available, use the diagnostics requested in
-  [#4296](https://github.com/shakacode/react_on_rails/issues/4296) to inspect client-reference
-  selection.
+- Use
+  [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
+  to derive a local report for emitted client-reference chunks and asset byte totals from the client
+  manifest.
 - Distinguish this from the Rspack dev-server lazy-compilation issue: if the manifest is empty only
   in normal `bin/dev` and generated bundles mention `lazy-compilation-proxy`, see
   [Empty Client Manifest with Rspack Dev Server](#empty-client-manifest-with-rspack-dev-server).

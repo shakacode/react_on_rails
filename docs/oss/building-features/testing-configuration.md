@@ -367,6 +367,11 @@ In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For loca
 
 Keep the first system test boring: visit a route that streams one Server Component and assert on visible HTML plus one hydrated Client Component interaction.
 
+For specs that must prove the browser receives streamed RSC payload chunks, use a non-proxy browser driver and keep
+Puffing Billy out of the RSC payload path. See
+[System Specs for Streamed RSC Payloads](../../pro/react-server-components/system-spec-streaming-rsc.md) for the
+driver shape, Billy compatibility boundary, and hydration assertions.
+
 ```ruby
 RSpec.describe "Story page", :rsc, :js, type: :system do
   it "renders the streamed RSC page and hydrates client controls" do

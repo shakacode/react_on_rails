@@ -192,6 +192,9 @@ Make CSS delivery explicit:
 If the RSC page downloads unexpected CSS or JS through client references, check
 [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) and
 [RSC Stylesheet Injection](rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order).
+Use
+[RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
+when you need a local asset report for the exact client-reference chunks emitted by the RSC plugin.
 
 ## Bundler and Client-Reference Caveats
 
@@ -240,6 +243,9 @@ For each static shell page:
 - Compare total downloads and JavaScript bytes against the control.
 - Run the [RSC Performance Validation Playbook](rsc-performance-validation.md) when the PR claims a
   performance win.
+- Inspect
+  [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
+  when client-reference chunks look larger than expected.
 - Exercise every sidecar-triggered flow, including URL-driven flows.
 - Check keyboard activation, focus management, and no-JS or slow-JS fallback behavior.
 - Add targeted system or E2E specs for behavior moved out of the global pack.
