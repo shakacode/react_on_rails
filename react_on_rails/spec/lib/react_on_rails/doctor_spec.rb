@@ -5794,7 +5794,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.0.7",
                   "react-dom" => "19.0.7",
-                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                  "react-on-rails-rsc" => "19.2.0"
                 }
               )
             )
@@ -5802,7 +5802,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.0.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.0-rc.4",
+              "version" => "19.2.0",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             example.run
@@ -5819,7 +5819,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(error_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7",
+            "react-on-rails-rsc 19.2.0 requires react ^19.2.7",
             "installed react is 19.0.7"
           )
         )
@@ -5829,7 +5829,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "does not report peer compatibility success when peer checks are unexpectedly empty" do
         rsc_package = {
-          "version" => "19.2.0-rc.4",
+          "version" => "19.2.0",
           "peerDependencies" => { "react" => "^19.0.4" }
         }
         allow(doctor).to receive(:rsc_peer_check_results).and_return([])
@@ -5849,7 +5849,7 @@ RSpec.describe ReactOnRails::Doctor do
               JSON.generate(
                 "dependencies" => {
                   "react" => "19.0.7",
-                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                  "react-on-rails-rsc" => "19.2.0"
                 }
               )
             )
@@ -5881,7 +5881,7 @@ RSpec.describe ReactOnRails::Doctor do
                   "react-dom" => "19.0.7"
                 },
                 "optionalDependencies" => {
-                  "react-on-rails-rsc" => "19.2.0-rc.4"
+                  "react-on-rails-rsc" => "19.2.0"
                 }
               )
             )
@@ -5960,7 +5960,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(Dir.pwd)
           .and_return(
             [
-              JSON.generate("latest" => "19.0.5", "next" => "19.2.0-rc.4"),
+              JSON.generate("latest" => "19.0.5", "next" => "19.2.1-rc.1"),
               instance_double(Process::Status, success?: true)
             ]
           )
@@ -5970,7 +5970,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.0-rc.4",
+            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.1-rc.1",
             "React Server Components track React minor versions"
           )
         )
@@ -6076,12 +6076,12 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "*")).to be false
         expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "x")).to be false
         expect(doctor.send(:npm_range_satisfied?, "1.0.0-rc.1", "~*")).to be false
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "^19.0.4")).to be false
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.0.4")).to be false
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.x")).to be false
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.0.4 - 20.0.0")).to be false
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", ">=19.2.0-rc.0 <20.0.0")).to be true
-        expect(doctor.send(:npm_range_satisfied?, "19.2.0-rc.4", "19.2.0-rc.0 - 20.0.0")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", "^19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", ">=19.0.4")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", "19.x")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", "19.0.4 - 20.0.0")).to be false
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", ">=19.2.1-rc.0 <20.0.0")).to be true
+        expect(doctor.send(:npm_range_satisfied?, "19.2.1-rc.4", "19.2.1-rc.0 - 20.0.0")).to be true
       end
     end
 
@@ -6258,7 +6258,7 @@ RSpec.describe ReactOnRails::Doctor do
               "dependencies" => {
                 "react" => "19.0.7",
                 "react-dom" => "19.0.7",
-                "react-on-rails-rsc" => "19.2.0-rc.4"
+                "react-on-rails-rsc" => "19.2.0"
               }
             )
           )
@@ -6266,7 +6266,7 @@ RSpec.describe ReactOnRails::Doctor do
           install_package("react-dom", "version" => "19.0.7")
           install_package(
             "react-on-rails-rsc",
-            "version" => "19.2.0-rc.4",
+            "version" => "19.2.0",
             "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
           )
           example.run
@@ -6301,7 +6301,7 @@ RSpec.describe ReactOnRails::Doctor do
       report = JSON.parse(output.join("\n"))
       rsc_check = report["checks"].find { |check| check["id"] == "react_server_components" }
       expect(rsc_check["status"]).to eq("fail")
-      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.0-rc.4 requires react ^19.2.7")
+      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.0 requires react ^19.2.7")
       expect(report["status"]).to eq("fail")
     end
   end
