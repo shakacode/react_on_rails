@@ -308,11 +308,30 @@ RSpec.describe ReactOnRailsPro::ServerRenderingPool::ProRendering do
         result = described_class.exec_server_render_js(js_code, render_options)
 
         expect(result).to eq(wrapped_stream)
+        expect(ReactOnRailsPro::StreamCache).to have_received(:fetch_stream)
+          .with(["ror_pro_rendered_html", "test", render_options.request_digest],
+                cache_options:)
         expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache)
           .with(["ror_pro_rendered_html", "test", render_options.request_digest],
                 upstream_stream,
                 cache_options:)
         expect(pool).to have_received(:exec_server_render_js).with(js_code, render_options).once
+      end
+
+      it "serves the second streaming render from cache when cache options include a namespace" do
+        cache_options = { namespace: "prerender-ns", expires_in: 60.seconds }
+        memory_store = ActiveSupport::Cache::MemoryStore.new
+        allow(Rails).to receive(:cache).and_return(memory_store)
+        allow(pool).to receive(:exec_server_render_js).and_return(fake_stream_class.new(%w[chunk-1 chunk-2]))
+
+        first_options = build_render_options(streaming: true, internal_options: { cache_options: })
+        first = described_class.exec_server_render_js(js_code, first_options)
+        expect(first.each_chunk.to_a).to eq(%w[chunk-1 chunk-2])
+
+        second_options = build_render_options(streaming: true, internal_options: { cache_options: })
+        second = described_class.exec_server_render_js(js_code, second_options)
+        expect(second.each_chunk.to_a).to eq(%w[chunk-1 chunk-2])
+        expect(pool).to have_received(:exec_server_render_js).once
       end
 
       it "does not replay a cached stream when async props can emit per-request data" do

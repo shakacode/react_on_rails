@@ -108,6 +108,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Streaming component caches honor `cache_options` on reads**: `cached_stream_react_component`
+  wrote cached chunks with the user-supplied `cache_options` but read them back without any options, so
+  key-altering options such as `namespace:` meant the cache never hit and every request re-streamed from
+  the renderer (a bare read could even return a stale un-namespaced entry for the same logical key). Reads
+  now pass the same normalized options as the deferred write, and the lower-level streaming prerender cache
+  (`ReactOnRailsPro::StreamCache.fetch_stream`) likewise accepts and applies the `cache_options` its write
+  path uses. [PR 4452](https://github.com/shakacode/react_on_rails/pull/4452) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **Sync RSC route failures surface as `ServerComponentFetchError`**: Synchronous throws
   in the RSC payload path (payload key creation on BigInt/circular props, sync
   `getServerComponent` throws, `fetchRSC` request preparation) previously bypassed

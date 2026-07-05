@@ -1112,6 +1112,25 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      it "serves a HIT on the second render when cache_options includes a namespace" do
+        # The second mocked response only feeds a regression (second Node call),
+        # letting the chunks_read assertion below fail legibly instead of erroring.
+        mock_request_and_response(count: 2)
+        render_with_cached_stream(cache_options: { namespace: "stream-ns", expires_in: 60 })
+
+        # First render (MISS → write-through under the namespaced key)
+        first_run_chunks = run_stream
+        expect(chunks_read.count).to eq(chunks.count)
+        expect(cache_data.keys).to all(start_with("stream-ns:"))
+
+        # Second render (HIT → read applies the same namespace, no Node call)
+        reset_stream_buffers
+        @rendered_rails_context = nil
+        second_run_chunks = run_stream
+        expect(chunks_read.count).to eq(0)
+        expect(second_run_chunks).to eq(first_run_chunks)
+      end
+
       it "respects explicit auto_load_bundle false on cache hits" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true

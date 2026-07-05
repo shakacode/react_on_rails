@@ -96,14 +96,15 @@ module ReactOnRailsPro
 
         def render_streaming_with_cache(prerender_cache_key, js_code, render_options)
           # Streaming path: try to serve from cache; otherwise wrap upstream stream
-          cached_stream = ReactOnRailsPro::StreamCache.fetch_stream(prerender_cache_key)
+          cache_options = render_options.internal_option(:cache_options)
+          cached_stream = ReactOnRailsPro::StreamCache.fetch_stream(prerender_cache_key, cache_options:)
           return cached_stream if cached_stream
 
           upstream = render_on_pool(js_code, render_options)
           ReactOnRailsPro::StreamCache.wrap_and_cache(
             prerender_cache_key,
             upstream,
-            cache_options: render_options.internal_option(:cache_options)
+            cache_options:
           )
         end
 
