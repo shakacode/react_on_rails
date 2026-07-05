@@ -72,6 +72,7 @@
         "unresolved_current_head_review_threads",
         "review_objects",
         "issue_comments",
+        "ci_readiness",
         "priority_finding_dispositions",
         "changelog_classification",
         "lockfile_diff",
@@ -191,6 +192,46 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/issue_comment"
+          }
+        },
+        "ci_readiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pr", "status", "verdict", "required_used", "failing", "pending", "checks"],
+          "properties": {
+            "pr": {
+              "type": "integer"
+            },
+            "status": {
+              "enum": ["known", "UNKNOWN"]
+            },
+            "verdict": {
+              "enum": ["READY", "NOT_READY", "UNKNOWN"]
+            },
+            "required_used": {
+              "type": "boolean"
+            },
+            "failing": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ci_check"
+              }
+            },
+            "pending": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ci_check"
+              }
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ci_check"
+              }
+            },
+            "message": {
+              "type": ["string", "null"]
+            }
           }
         },
         "priority_finding_dispositions": {
@@ -437,6 +478,25 @@
         }
       }
     },
+    "ci_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": ["string", "null"]
+        },
+        "bucket": {
+          "type": ["string", "null"]
+        },
+        "link": {
+          "type": ["string", "null"]
+        }
+      }
+    },
     "priority_finding": {
       "type": "object",
       "additionalProperties": false,
@@ -531,6 +591,15 @@
         },
         "current_head": {
           "type": "boolean"
+        },
+        "check_name": {
+          "type": ["string", "null"]
+        },
+        "state": {
+          "type": ["string", "null"]
+        },
+        "bucket": {
+          "type": ["string", "null"]
         }
       },
       "additionalProperties": false

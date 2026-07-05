@@ -12,6 +12,7 @@ function assertMatches(name, text, pattern) {
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
+const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -39,6 +40,12 @@ assertMatches(
   'required gate cleanup recheck',
   labelDispatchWorkflow,
   /createWorkflowDispatch\({[\s\S]*workflow_id: 'ci-required\.yml'[\s\S]*force_required_hosted_ci_recheck: 'true'/,
+);
+assertMatches('closed PR hosted-CI guard', ciCommandsWorkflow, /pr\.state !== 'open'/);
+assertMatches(
+  'closed PR degraded evidence comment',
+  ciCommandsWorkflow,
+  /branch-ref hosted-CI evidence is degraded\/invalid/,
 );
 
 assertMatches(
