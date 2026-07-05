@@ -30,7 +30,7 @@ import {
   RSCRouteSSRFalseBailoutError,
 } from '../src/RSCRouteSSRFalseBailoutError.ts';
 import RSCRoute from '../src/RSCRoute.tsx';
-import { isServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
+import { isServerComponentFetchError, ServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
 import { flushMacrotasks } from './testUtils.ts';
 
 class TestErrorBoundary extends React.Component<
@@ -112,6 +112,26 @@ const runWithoutWindow = <T,>(callback: () => T): T => {
 };
 
 describe('RSCRoute deferred SSR behavior', () => {
+  it('keeps retry props directly readable without making them enumerable', () => {
+    const sentinel = 'SECRET_SENTINEL_RSC_RETRY_PROPS_ENUMERATION';
+    const componentProps = { token: sentinel };
+    const error = new ServerComponentFetchError(
+      'Failed to fetch server component',
+      'AccountPanel',
+      componentProps,
+      new Error('HTTP 500'),
+    );
+
+    expect(error.serverComponentProps).toBe(componentProps);
+    expect(Object.getOwnPropertyDescriptor(error, 'serverComponentProps')).toMatchObject({
+      enumerable: false,
+      value: componentProps,
+    });
+    expect(Object.keys(error)).not.toContain('serverComponentProps');
+    expect({ ...error }).not.toHaveProperty('serverComponentProps');
+    expect(JSON.stringify(error)).not.toContain(sentinel);
+  });
+
   it('throws a classified server bailout when ssr is false on the server', () => {
     expect(() => runWithoutWindow(() => renderRouteToString({ ssr: false }))).toThrow(
       RSCRouteSSRFalseBailoutError,

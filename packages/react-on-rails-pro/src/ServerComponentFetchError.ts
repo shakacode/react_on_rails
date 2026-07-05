@@ -28,7 +28,12 @@ export class ServerComponentFetchError extends Error {
     super(message);
     this.name = 'ServerComponentFetchError';
     this.serverComponentName = componentName;
-    this.serverComponentProps = componentProps;
+    Object.defineProperty(this, 'serverComponentProps', {
+      configurable: true,
+      enumerable: false,
+      value: componentProps,
+      writable: true,
+    });
     this.originalError = originalError;
   }
 }

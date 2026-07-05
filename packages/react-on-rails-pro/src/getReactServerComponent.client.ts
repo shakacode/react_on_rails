@@ -85,12 +85,12 @@ const createFromFetch = async (
     componentName,
     cspNonce,
     replayConsoleScripts = true,
-    source,
+    sourceDescription,
   }: {
     componentName: string;
     cspNonce?: string;
     replayConsoleScripts?: boolean;
-    source: string;
+    sourceDescription: string;
   },
 ) => {
   const response = await fetchPromise;
@@ -99,7 +99,7 @@ const createFromFetch = async (
       ? `${response.status} ${response.statusText}`
       : `${response.status}`;
     throw new Error(
-      `RSC payload request for component "${componentName}" from "${source}" failed with HTTP ${statusDescription}.`,
+      `RSC payload request for component "${componentName}" from ${sourceDescription} failed with HTTP ${statusDescription}.`,
     );
   }
 
@@ -112,7 +112,10 @@ const createFromFetch = async (
   const parser = new LengthPrefixedStreamParser();
   let rscDiagnosticError: Error | undefined;
   const reportDiagnosticError = (metadata: Record<string, unknown>) => {
-    const diagnosticError = buildRSCStreamDiagnosticError(metadata, { componentName, source });
+    const diagnosticError = buildRSCStreamDiagnosticError(metadata, {
+      componentName,
+      source: sourceDescription,
+    });
     if (diagnosticError && !rscDiagnosticError) {
       rscDiagnosticError = diagnosticError;
     }
@@ -160,11 +163,36 @@ const createFromFetch = async (
 
 // Duck type instead of `instanceof DOMException`: cross-realm AbortErrors
 // have the correct name but fail instanceof checks across realm boundaries.
-const isAbortError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'name' in error &&
-  (error as { name?: unknown }).name === 'AbortError';
+const isAbortError = (error: unknown): boolean => {
+  try {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name?: unknown }).name === 'AbortError'
+    );
+  } catch {
+    return false;
+  }
+};
+
+const RSC_PAYLOAD_FETCH_FAILURE_MESSAGE = 'request failed before receiving an RSC payload response.';
+
+class RSCPreResponseFetchError extends Error {
+  constructor() {
+    super(RSC_PAYLOAD_FETCH_FAILURE_MESSAGE);
+    this.name = 'RSCPreResponseFetchError';
+  }
+}
+
+const defineErrorCause = (error: Error & { cause?: unknown }, cause: unknown) => {
+  Object.defineProperty(error, 'cause', {
+    configurable: true,
+    enumerable: false,
+    value: cause,
+    writable: true,
+  });
+};
 
 /**
  * Fetches an RSC payload via HTTP request.
@@ -201,29 +229,48 @@ export const fetchRSC = ({
   }
 
   try {
-    const propsString = JSON.stringify(componentProps);
+    const propsString = JSON.stringify(componentProps) ?? 'undefined';
     const strippedUrlPath = rscPayloadGenerationUrlPath.replace(/^\/|\/$/g, '');
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const sourcePath = `/${strippedUrlPath}/${encodeURIComponent(componentName)}`;
     const fetchUrl = `${sourcePath}?${encodedParams}`;
-    const fetchPromise = fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl);
+    // Keep the displayed source query-string free so serialized props aren't echoed into
+    // error messages or attached error-monitoring events. The suffix makes that redaction explicit.
+    const sourceDescription = `"${sourcePath}" (props redacted)`;
+    const fetchPromise = (() => {
+      try {
+        return Promise.resolve(fetchOptions ? fetch(fetchUrl, fetchOptions) : fetch(fetchUrl)).catch(
+          (error: unknown) => {
+            if (isAbortError(error)) throw error as Error;
+            throw new RSCPreResponseFetchError();
+          },
+        );
+      } catch (error) {
+        if (isAbortError(error)) return Promise.reject(error as Error);
+        return Promise.reject(new RSCPreResponseFetchError());
+      }
+    })();
 
     return createFromFetch(fetchPromise, {
       componentName,
       cspNonce,
       replayConsoleScripts,
-      // Keep `source` query-string free so serialized props aren't echoed into error messages
-      // or attached error-monitoring events. The outer wrapper below retains `fetchUrl` for reproducibility.
-      source: sourcePath,
+      sourceDescription,
     }).catch((error: unknown) => {
       // RSC stream diagnostic errors already carry component/source context — preserve them
       // (including .cause and the merged stack) instead of flattening to a plain Error.
       if (error instanceof Error && error.name === RSC_STREAM_DIAGNOSTIC_ERROR_NAME) throw error;
       if (isAbortError(error)) throw error;
+      const safeErrorMessage =
+        error instanceof RSCPreResponseFetchError
+          ? RSC_PAYLOAD_FETCH_FAILURE_MESSAGE
+          : extractErrorMessage(error);
       const wrapper: Error & { cause?: unknown } = new Error(
-        `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
+        `Failed to fetch RSC payload for component "${componentName}" from ${sourceDescription}: ${safeErrorMessage}`,
       );
-      wrapper.cause = error;
+      if (!(error instanceof RSCPreResponseFetchError)) {
+        defineErrorCause(wrapper, error);
+      }
       throw wrapper;
     });
   } catch (error: unknown) {
@@ -232,7 +279,7 @@ export const fetchRSC = ({
     const wrapper: Error & { cause?: unknown } = new Error(
       `Failed to prepare RSC request for component "${componentName}": ${extractErrorMessage(error)}`,
     );
-    wrapper.cause = error;
+    defineErrorCause(wrapper, error);
     return Promise.reject(wrapper);
   }
 };
