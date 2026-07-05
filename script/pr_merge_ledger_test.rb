@@ -139,6 +139,23 @@ class PrMergeLedgerTest < Minitest::Test
     assert_equal ["ci_check_failed"], violation_codes(data)
   end
 
+  def test_check_rows_override_inconsistent_ready_ci_payload
+    checks = [ci_check("lint", bucket: "fail", state: "FAILURE")]
+    readiness = ci_readiness(verdict: "READY", checks:)
+    readiness["failing"] = []
+    readiness["pending"] = []
+
+    output, status = run_fixture(fixture(ci_readiness: readiness))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    ci_readiness = ledger(data).fetch("ci_readiness")
+    assert_equal "NOT_READY", ci_readiness.fetch("verdict")
+    failing_check_names = ci_readiness.fetch("failing").map { |check| check.fetch("name") }
+    assert_equal ["lint"], failing_check_names
+    assert_equal ["ci_check_failed"], violation_codes(data)
+  end
+
   def test_pending_ci_blocks_strict_closeout
     output, status = run_fixture(
       fixture(

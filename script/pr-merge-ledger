@@ -707,21 +707,41 @@ class PrMergeLedger
       message: raw_readiness["message"]
     )
     checks = computed.fetch("checks")
-    failing = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "failing", "fail")
-    pending = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "pending", "pending")
-    verdict = normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
-    status = normalize_ci_readiness_status(raw_readiness, computed, verdict)
+    components = normalize_ci_readiness_components(raw_readiness, computed, checks)
 
     {
       "pr" => (raw_readiness["pr"] || pull_request.fetch("number")).to_i,
-      "status" => status,
-      "verdict" => verdict,
+      "status" => components.fetch("status"),
+      "verdict" => components.fetch("verdict"),
       "required_used" => raw_readiness["required_used"] == true,
-      "failing" => failing,
-      "pending" => pending,
+      "failing" => components.fetch("failing"),
+      "pending" => components.fetch("pending"),
       "checks" => checks,
       "message" => raw_readiness["message"] || computed["message"]
     }.compact
+  end
+
+  def normalize_ci_readiness_components(raw_readiness, computed, checks)
+    return computed_ci_readiness_components(computed) unless checks.empty?
+
+    failing = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "failing", "fail")
+    pending = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "pending", "pending")
+    verdict = normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
+    {
+      "status" => normalize_ci_readiness_status(raw_readiness, computed, verdict),
+      "verdict" => verdict,
+      "failing" => failing,
+      "pending" => pending
+    }
+  end
+
+  def computed_ci_readiness_components(computed)
+    {
+      "status" => computed.fetch("status"),
+      "verdict" => computed.fetch("verdict"),
+      "failing" => computed.fetch("failing"),
+      "pending" => computed.fetch("pending")
+    }
   end
 
   def normalize_ci_readiness_check_list(raw_readiness, computed, checks, key, bucket)
