@@ -105,6 +105,55 @@ alternative: after `pnpm run build`, run `yalc publish` from each
 > managers skip for Git dependencies — so you would end up without the built
 > output. The pnpm `path:` selector and the tarball both avoid this.
 
+## React Server Components package
+
+React Server Components also depend on the separate `react-on-rails-rsc` npm
+package. Prefer a released package version when possible. For temporary testing
+of an unreleased `react-on-rails-rsc` fix, choose the workflow based on how
+widely the build must be shared:
+
+| Workflow                                | Use when                                                                   | Tradeoff                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| yalc                                    | You are iterating locally in one downstream app.                           | Fastest loop, but not useful for CI or sharing.                         |
+| Canary npm publish                      | Teammates or CI need the same temporary build.                             | Requires maintainer npm publish rights and a unique prerelease version. |
+| Packed tarball or throwaway dist branch | A package manager needs built files and npm publishing is not appropriate. | Must never be treated as the official release path.                     |
+
+Avoid plain source-branch dependencies for `react-on-rails-rsc`, especially with
+Yarn Classic:
+
+```shell
+yarn add react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main
+```
+
+The package does not commit `dist/`; published npm tarballs include it.
+Depending on install flags, cache state, and the package manager environment, a
+Git dependency can install without the built files that package exports point
+at, or spend the app install trying to build the package from source.
+
+For a local yalc loop:
+
+```shell
+# In the react_on_rails_rsc checkout
+yarn
+yarn build
+yalc publish
+
+# In the downstream app
+yalc add react-on-rails-rsc
+yarn install
+```
+
+After each package change, rebuild and refresh the downstream app copy:
+
+```shell
+yarn build
+yalc push
+```
+
+Do not commit yalc artifacts such as `.yalc/`, `yalc.lock`, or temporary
+`package.json` dependency rewrites unless the downstream project deliberately
+tracks them for its own testing workflow.
+
 ## Version pairing
 
 When you consume an unreleased build, bump the related packages **together** so
