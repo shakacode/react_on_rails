@@ -10253,6 +10253,19 @@ A JSON file mapping component paths to their corresponding JavaScript chunks. Us
 The endpoint path where RSC requests are handled, defaulting to "rsc_payload/" in the React on Rails Pro configuration.
 
 ================================================================================
+PAGE: https://reactonrails.com/docs/pro/react-server-components/rsc-payload-route-data
+SOURCE: docs/pro/react-server-components/rsc-payload-route-data.md
+================================================================================
+
+# RSC Payloads as Route Data
+
+This route is kept for compatibility with older docs links.
+
+The standalone `createRscPayloadNode` route-data helper has been removed. Use `RSCRoute` as the canonical way to render Server Components inside client-router routes.
+
+For loader-based router examples, see [Client router loaders](./inside-client-components.md#client-router-loaders). For the full setup, see [Embedding Server Components in Client Components](./inside-client-components.md).
+
+================================================================================
 PAGE: https://reactonrails.com/docs/pro/release-notes/4.0
 SOURCE: docs/pro/release-notes/4.0.md
 ================================================================================
