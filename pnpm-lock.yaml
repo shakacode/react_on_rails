@@ -547,13 +547,13 @@ importers:
         version: 2.2.5
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(f05d7b0c662e2e291d0d3b1e8e661531)
+        version: 10.2.0(a69e24363a158ac434a179477ec4adc8)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(f05d7b0c662e2e291d0d3b1e8e661531)
+        version: 10.2.0(a69e24363a158ac434a179477ec4adc8)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(35eba163a73d8092d9851ba9d4ba44de)
+        version: 10.2.0(3cdf654e036b48e65a824d3d21997832)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.105.2)
@@ -787,13 +787,13 @@ importers:
         version: 2.2.5
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+        version: 10.2.0(1aaad03cd60c78dd6508e64840fc46b5)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+        version: 10.2.0(1aaad03cd60c78dd6508e64840fc46b5)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(17ae710aa137b970d47390ef8ba49a1b)
+        version: 10.2.0(0b43219045ba8dfe124b96dac68f07d9)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.104.1)
@@ -932,13 +932,13 @@ importers:
         version: 5.2.2(@rspack/core@2.0.5)
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+        version: 10.2.0(de5150bce082cf23b093dd4c4b68fe2a)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+        version: 10.2.0(de5150bce082cf23b093dd4c4b68fe2a)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(827f899b2aeea6284e28d98d62793270)
+        version: 10.2.0(4e782252f91b7f79edb7e613791139fb)
       style-loader:
         specifier: ^4.0.0
         version: 4.0.0(webpack@5.104.1)
@@ -961,6 +961,9 @@ importers:
       '@pmmmwh/react-refresh-webpack-plugin':
         specifier: ^0.5.15
         version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.4)(webpack@5.104.1)
+      '@rspack/plugin-react-refresh':
+        specifier: ^2.0.0
+        version: 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
       react-refresh:
         specifier: ^0.14.2
         version: 0.14.2
@@ -3281,6 +3284,15 @@ packages:
 
   '@rspack/lite-tapable@1.1.1':
     resolution: {integrity: sha512-d1p93zyCSvI8ASw6pJWzDOx+RNh3Utu3DSQRPBibmDJEg57Q6kEcYBY0xJUD0m4tJ7JNu8KKKRB1EKhLM7RLrw==}
+
+  '@rspack/plugin-react-refresh@2.0.2':
+    resolution: {integrity: sha512-dGNZiCxQxgAUI9sah7gd8u+O7OJZRCmqtEJNDOd8xW5RqcieC86F7p5qcShyw6onH5pKf57evpr2VjGbaFGkZg==}
+    peerDependencies:
+      '@rspack/core': ^2.0.0
+      react-refresh: '>=0.10.0 <1.0.0'
+    peerDependenciesMeta:
+      '@rspack/core':
+        optional: true
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -13710,6 +13722,19 @@ snapshots:
 
   '@rspack/lite-tapable@1.1.1': {}
 
+  '@rspack/plugin-react-refresh@2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)':
+    dependencies:
+      react-refresh: 0.11.0
+    optionalDependencies:
+      '@rspack/core': 2.0.5
+    optional: true
+
+  '@rspack/plugin-react-refresh@2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)':
+    dependencies:
+      react-refresh: 0.14.2
+    optionalDependencies:
+      '@rspack/core': 2.0.5
+
   '@rtsao/scc@1.1.0': {}
 
   '@sentry-internal/tracing@7.120.4':
@@ -20483,14 +20508,15 @@ snapshots:
       chalk: 4.1.2
       playwright-core: 1.58.2
 
-  shakapacker-rspack@10.2.0(2be65ea18853c1d3af1f72afddf4d654):
+  shakapacker-rspack@10.2.0(1aaad03cd60c78dd6508e64840fc46b5):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+      shakapacker: 10.2.0(1aaad03cd60c78dd6508e64840fc46b5)
     optionalDependencies:
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
       sass: 1.97.3
       sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.104.1)
@@ -20516,14 +20542,15 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-rspack@10.2.0(f05d7b0c662e2e291d0d3b1e8e661531):
+  shakapacker-rspack@10.2.0(a69e24363a158ac434a179477ec4adc8):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(f05d7b0c662e2e291d0d3b1e8e661531)
+      shakapacker: 10.2.0(a69e24363a158ac434a179477ec4adc8)
     optionalDependencies:
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.105.2)
       sass: 1.97.3
       sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.105.2)
@@ -20549,9 +20576,43 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-webpack@10.2.0(17ae710aa137b970d47390ef8ba49a1b):
+  shakapacker-rspack@10.2.0(de5150bce082cf23b093dd4c4b68fe2a):
     dependencies:
-      shakapacker: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+      '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
+      '@rspack/core': 2.0.5
+      '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
+      rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
+      shakapacker: 10.2.0(de5150bce082cf23b093dd4c4b68fe2a)
+    optionalDependencies:
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
+      css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
+      sass: 1.97.3
+      sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.104.1)
+    transitivePeerDependencies:
+      - '@babel/core'
+      - '@babel/plugin-transform-runtime'
+      - '@babel/preset-env'
+      - '@babel/runtime'
+      - '@swc/core'
+      - '@types/babel__core'
+      - '@types/webpack'
+      - babel-loader
+      - compression-webpack-plugin
+      - esbuild
+      - esbuild-loader
+      - mini-css-extract-plugin
+      - swc-loader
+      - terser-webpack-plugin
+      - ts-node
+      - webpack
+      - webpack-assets-manifest
+      - webpack-cli
+      - webpack-dev-server
+      - webpack-subresource-integrity
+
+  shakapacker-webpack@10.2.0(0b43219045ba8dfe124b96dac68f07d9):
+    dependencies:
+      shakapacker: 10.2.0(1aaad03cd60c78dd6508e64840fc46b5)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
@@ -20583,9 +20644,9 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(35eba163a73d8092d9851ba9d4ba44de):
+  shakapacker-webpack@10.2.0(3cdf654e036b48e65a824d3d21997832):
     dependencies:
-      shakapacker: 10.2.0(f05d7b0c662e2e291d0d3b1e8e661531)
+      shakapacker: 10.2.0(a69e24363a158ac434a179477ec4adc8)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2)
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.105.2)
@@ -20617,9 +20678,9 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(827f899b2aeea6284e28d98d62793270):
+  shakapacker-webpack@10.2.0(4e782252f91b7f79edb7e613791139fb):
     dependencies:
-      shakapacker: 10.2.0(2be65ea18853c1d3af1f72afddf4d654)
+      shakapacker: 10.2.0(de5150bce082cf23b093dd4c4b68fe2a)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
@@ -20651,7 +20712,7 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker@10.2.0(2be65ea18853c1d3af1f72afddf4d654):
+  shakapacker@10.2.0(1aaad03cd60c78dd6508e64840fc46b5):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20666,6 +20727,7 @@ snapshots:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       '@swc/core': 1.15.3
       '@types/babel__core': 7.20.5
       '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
@@ -20686,7 +20748,7 @@ snapshots:
     transitivePeerDependencies:
       - ts-node
 
-  shakapacker@10.2.0(f05d7b0c662e2e291d0d3b1e8e661531):
+  shakapacker@10.2.0(a69e24363a158ac434a179477ec4adc8):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20701,6 +20763,7 @@ snapshots:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       '@swc/core': 1.15.3
       '@types/babel__core': 7.20.5
       '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
@@ -20718,6 +20781,42 @@ snapshots:
       webpack-assets-manifest: 6.5.2(webpack@5.105.2)
       webpack-cli: 7.0.3(webpack-dev-server@5.2.4)(webpack@5.105.2)
       webpack-dev-server: 5.2.4(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+    transitivePeerDependencies:
+      - ts-node
+
+  shakapacker@10.2.0(de5150bce082cf23b093dd4c4b68fe2a):
+    dependencies:
+      js-yaml: 4.1.1
+      pack-config-diff: 0.1.0
+      path-complete-extname: 1.0.0
+      webpack-merge: 5.10.0
+      yargs: 17.7.2
+    optionalDependencies:
+      '@babel/core': 7.28.5
+      '@babel/plugin-transform-runtime': 7.17.0(@babel/core@7.28.5)
+      '@babel/preset-env': 7.28.5(@babel/core@7.28.5)
+      '@babel/runtime': 7.28.4
+      '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
+      '@rspack/core': 2.0.5
+      '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
+      '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
+      '@swc/core': 1.15.3
+      '@types/babel__core': 7.20.5
+      '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
+      babel-loader: 8.2.4(@babel/core@7.28.5)(webpack@5.104.1)
+      compression-webpack-plugin: 9.2.0(webpack@5.104.1)
+      css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
+      esbuild: 0.28.0
+      mini-css-extract-plugin: 2.10.0(webpack@5.104.1)
+      rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
+      sass: 1.97.3
+      sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.104.1)
+      swc-loader: 0.2.6(@swc/core@1.15.3)(webpack@5.104.1)
+      terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
+      webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
+      webpack-assets-manifest: 6.5.2(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.4)(webpack@5.104.1)
+      webpack-dev-server: 5.2.4(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     transitivePeerDependencies:
       - ts-node
 

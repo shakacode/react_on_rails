@@ -16,10 +16,10 @@
     "@babel/preset-env": "7",
     "@babel/preset-react": "^7.24.7",
     "@babel/runtime": "7",
-    "@types/babel__core": "7",
-    "@types/webpack": "5",
     "@rspack/cli": "^2.0.0",
     "@rspack/core": "^2.0.0",
+    "@types/babel__core": "7",
+    "@types/webpack": "5",
     "babel-loader": "8",
     "babel-plugin-macros": "^3.1.0",
     "babel-plugin-transform-react-remove-prop-types": "^0.4.24",
@@ -45,6 +45,7 @@
   "scripts": {},
   "devDependencies": {
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
+    "@rspack/plugin-react-refresh": "^2.0.0",
     "react-refresh": "^0.14.2",
     "webpack-dev-server": "^5.2.4"
   }
