@@ -1622,21 +1622,24 @@ class PrMergeLedger
       attempt = 0
       loop do
         attempt += 1
-        stdout, stderr, status = capture_gh(
-          args,
-          timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
-        )
+        stdout, stderr, status = capture_pr_checks_once(args, attempt)
         return [stdout, stderr, status] if usable_pr_checks_result?(stdout, stderr, status, required:)
         return [stdout, stderr, status] if attempt >= GITHUB_API_MAX_ATTEMPTS
         return [stdout, stderr, status] if non_retryable_gh_error?(stderr)
 
         sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
       end
-    rescue Error
+    end
+
+    def capture_pr_checks_once(args, attempt)
+      capture_gh(
+        args,
+        timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
+      )
+    rescue Error => e
       raise if attempt >= GITHUB_API_MAX_ATTEMPTS
 
-      sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
-      retry
+      ["", e.message, failed_status]
     end
 
     def usable_pr_checks_result?(stdout, stderr, status, required:)
@@ -1644,6 +1647,14 @@ class PrMergeLedger
       return true unless PrMergeLedger.parse_ci_check_rows(stdout).empty?
 
       required && stderr.to_s.match?(/\bno required checks\b/i)
+    end
+
+    def failed_status
+      @failed_status ||= Class.new do
+        def success?
+          false
+        end
+      end.new
     end
 
     def pr_checks_error_message(*results)
