@@ -68,6 +68,7 @@ defaults:
         - react-on-rails-pro-node-renderer
         - react-on-rails-rsc
         - shakapacker
+        - shakapacker-rspack
       gem:
         - react_on_rails
         - react_on_rails_pro
