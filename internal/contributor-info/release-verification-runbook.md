@@ -124,9 +124,11 @@ Verification ladder (record evidence at each rung):
 
 Output: a report with (a) verdict PASS / FAIL / PASS-WITH-GAPS, (b) the DOCS GAP list — this is
 the primary deliverable; each gap becomes a docs issue before final, (c) APP DEBT list, (d) the
-full diff of changes the upgrade required in the app, (e) evidence per ladder rung (commands +
-key output). File each DOCS GAP as a repo issue labeled `release:<X.Y.Z>-must-have` if it would
-strand a real upgrader, else with both `P2` and `documentation`.
+upgrade diff evidence (full diff for public apps; redacted diff summary for Pro/private apps, with
+private logs, URLs, screenshots, app details, and proprietary hunks omitted), (e) evidence per
+ladder rung (commands + key output). File each DOCS GAP in `shakacode/react_on_rails`, for example
+with `gh issue create --repo shakacode/react_on_rails`, labeled `release:<X.Y.Z>-must-have` if it
+would strand a real upgrader, else with both `P2` and `documentation`.
 ```
 
 **Pass criteria:** ladder rungs 1–5 pass on both apps; every DOCS GAP filed. A FAIL on any rung
