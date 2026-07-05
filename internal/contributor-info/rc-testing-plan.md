@@ -22,6 +22,7 @@ and no untriaged suspected RC regression.
 | ----------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `react_on_rails` generator/install smoke        | Replaces the archived manual RSC generator demo with direct generator validation. | Generator specs pass, package build passes, and install smoke from local gems completes or has a filed blocker.                                        |
 | `shakacode/hichee`                              | Private production-like app signal.                                               | High-level public tracker note that install/build/smoke/CI passed, with tester and date. Do not paste private logs, URLs, screenshots, or app details. |
+| `shakacode/react-on-rails-demo-flagship`        | Flagship Pro + RSC/streaming happy path.                                          | RC bump PR, dependency install, app build/smoke, and CI status. Do not paste private Pro source, install logs, URLs, screenshots, or app details.      |
 | `shakacode/react-on-rails-demo-marketplace-rsc` | Public Marketplace RSC example.                                                   | RC bump PR, dependency install, app build/smoke, and CI status.                                                                                        |
 | `shakacode/react-on-rails-demo-hacker-news-rsc` | Public Hacker News RSC example.                                                   | RC bump PR, dependency install, app build/smoke, and CI status.                                                                                        |
 | `shakacode/react-on-rails-demo-gumroad-rsc`     | Public Gumroad RSC example.                                                       | RC bump PR, dependency install, app build/smoke, and CI status.                                                                                        |
@@ -133,10 +134,11 @@ The tracker comment must include:
 Do not self-certify ambiguous RSC, build, or generator failures. If the failure could plausibly be
 caused by the RC, treat it as a release blocker until another maintainer agrees it is unrelated.
 
-## HiChee Privacy Rule
+## Private Evidence Privacy Rule
 
-`shakacode/hichee` is a private hard gate, but the tracker is public. The public tracker may name
-the repo and record high-level status, but it must not expose private app details.
+`shakacode/hichee` is a private hard gate, and some hard gates consume private Pro source. The
+tracker is public. The public tracker may name the repo and record high-level status, but it must
+not expose private app or private Pro source details.
 
 Allowed public evidence:
 
