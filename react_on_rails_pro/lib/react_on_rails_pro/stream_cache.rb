@@ -17,9 +17,10 @@ module ReactOnRailsPro
   class StreamCache
     class << self
       # Returns a stream-like object that responds to `each_chunk` and yields cached chunks
-      # or nil if not present in cache.
-      def fetch_stream(cache_key)
-        cached_chunks = Rails.cache.read(cache_key)
+      # or nil if not present in cache. Pass the same cache_options given to wrap_and_cache
+      # so key-altering options such as :namespace resolve to the written entry.
+      def fetch_stream(cache_key, cache_options: nil)
+        cached_chunks = Rails.cache.read(cache_key, cache_options)
         return nil unless cached_chunks.is_a?(Array)
 
         build_stream_from_chunks(cached_chunks)

@@ -979,7 +979,9 @@ module ReactOnRailsProHelper
     unless ReactOnRailsPro::Cache.use_cache?(raw_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
-    if ReactOnRailsPro::Cache.cache_write_expired?(raw_options[:cache_options])
+
+    raw_cache_options = raw_options[:cache_options] || {}
+    if ReactOnRailsPro::Cache.cache_write_expired?(raw_cache_options)
       return render_stream_component_with_props(component_name, raw_options, auto_load_bundle, &)
     end
 
@@ -987,8 +989,9 @@ module ReactOnRailsProHelper
     key_options = raw_options.merge(prerender: true)
     view_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, key_options)
 
+    cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
     # Attempt HIT without evaluating props block
-    if (cached_chunks = Rails.cache.read(view_cache_key)).is_a?(Array)
+    if (cached_chunks = Rails.cache.read(view_cache_key, cache_write_options)).is_a?(Array)
       return handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     end
 
