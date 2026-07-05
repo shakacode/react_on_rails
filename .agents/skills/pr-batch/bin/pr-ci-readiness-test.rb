@@ -99,6 +99,18 @@ class PrCiReadinessTest < Minitest::Test
     refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
   end
 
+  def test_required_rows_incomplete_when_matching_full_required_check_is_pending
+    required_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" }
+    ]
+    full_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" },
+      { "name" => "required-pr-gate", "bucket" => "pending" }
+    ]
+
+    refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+  end
+
   def test_required_rows_complete_when_extra_full_checks_are_done
     required_rows = [
       { "name" => "required-pr-gate", "bucket" => "pass" }
@@ -216,7 +228,7 @@ class PrCiReadinessCliTest < Minitest::Test
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
       assert_equal "UNKNOWN", data["verdict"]
-      assert_equal true, data["required_used"]
+      assert_equal false, data["required_used"]
     end
   end
 

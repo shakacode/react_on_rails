@@ -220,8 +220,7 @@ class PrMergeLedger
     full_keys = Array(full_rows).map { |row| ci_check_row_key(row) }
     return false unless (required_keys - full_keys).empty?
 
-    extra_full_rows = Array(full_rows).reject { |row| required_keys.include?(ci_check_row_key(row)) }
-    extra_full_rows.none? { |row| non_ready_ci_check_row?(row) }
+    Array(full_rows).none? { |row| non_ready_ci_check_row?(row) }
   end
 
   def self.normalize_ci_check_row(row)

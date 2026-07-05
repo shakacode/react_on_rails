@@ -12,7 +12,7 @@
 #   3. Treat cancelled rows as non-ready unless the list contains no active rows,
 #      in which case the verdict is UNKNOWN.
 #   4. When required rows exist, cross-check them against the full list and use
-#      the full list if any extra full-check row is fail/pending/cancel.
+#      the full list if any full-check row is fail/pending/cancel.
 #   5. Otherwise READY only when no failing (bucket "fail") and no pending
 #      (bucket "pending" or "cancel") rows remain. Passing and skipping rows are fine.
 #
@@ -77,8 +77,7 @@ module PrCiReadiness
     full_keys = full_rows.map { |row| row_key(row) }
     return false unless (required_keys - full_keys).empty?
 
-    extra_full_rows = full_rows.reject { |row| required_keys.include?(row_key(row)) }
-    extra_full_rows.none? { |row| non_ready_row?(row) }
+    full_rows.none? { |row| non_ready_row?(row) }
   end
 
   def failing_names(rows)
