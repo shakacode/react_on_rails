@@ -2,8 +2,9 @@
  * Regression tests for the color-enable decision in src/utils.ts.
  *
  * The `pc` color instance is built at module load by reproducing chalk@4's
- * colorize/plain precedence (FORCE_COLOR wins, then NO_COLOR, then TTY) rather
- * than deferring to picocolors' own detection, which uses a different precedence.
+ * colorize/plain precedence (FORCE_COLOR wins, then NO_COLOR, then TTY plus a
+ * chalk-compatible positive color signal) rather than deferring to picocolors'
+ * own detection, which uses a different precedence.
  * This decision has regressed repeatedly in the package's history — FORCE_COLOR=0
  * wrongly enabling color, empty NO_COLOR= mishandling, a bare CI forcing color in
  * piped output, and NO_COLOR overriding an explicit FORCE_COLOR — so this suite
@@ -15,6 +16,22 @@
  */
 
 const ANSI_RED_OPEN = '[31m';
+const COLOR_SIGNAL_ENV_KEYS = [
+  'APPVEYOR',
+  'BUILDKITE',
+  'CI',
+  'CIRCLECI',
+  'CI_NAME',
+  'COLORTERM',
+  'DRONE',
+  'GITHUB_ACTIONS',
+  'GITLAB_CI',
+  'TEAMCITY_VERSION',
+  'TERM',
+  'TERM_PROGRAM',
+  'TERM_PROGRAM_VERSION',
+  'TRAVIS',
+];
 
 function colorEnabled(): boolean {
   let enabled = false;
@@ -31,6 +48,7 @@ function colorEnabled(): boolean {
 describe('pc color-enable decision', () => {
   const originalEnv = process.env;
   const originalIsTTY = process.stdout.isTTY;
+  const originalPlatform = process.platform;
 
   // Use plain assignment rather than Object.defineProperty: other suites (e.g.
   // index-tty.test.ts) define process.stdout.isTTY as a non-configurable data
@@ -40,6 +58,10 @@ describe('pc color-enable decision', () => {
     (process.stdout as { isTTY?: boolean }).isTTY = isTTY;
   }
 
+  function setPlatform(platform: NodeJS.Platform): void {
+    Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  }
+
   beforeEach(() => {
     // Deterministic baseline independent of the runner: clear every signal the
     // color decision keys off, and force a non-TTY stdout. Each test sets only
@@ -47,14 +69,17 @@ describe('pc color-enable decision', () => {
     const base = { ...originalEnv };
     delete base.FORCE_COLOR;
     delete base.NO_COLOR;
-    delete base.CI;
-    delete base.TERM;
+    for (const key of COLOR_SIGNAL_ENV_KEYS) {
+      delete base[key];
+    }
     process.env = base;
+    setPlatform('linux');
     setTTY(false);
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    setPlatform(originalPlatform);
     setTTY(originalIsTTY);
   });
 
@@ -91,9 +116,34 @@ describe('pc color-enable decision', () => {
     expect(colorEnabled()).toBe(true);
   });
 
-  it('enables color for an interactive TTY (no CI, no FORCE_COLOR)', () => {
+  it('enables color for an interactive TTY with a recognized TERM', () => {
     setTTY(true);
+    process.env.TERM = 'xterm-256color';
     expect(colorEnabled()).toBe(true);
+  });
+
+  it('disables color for an interactive TTY with unset TERM and no other chalk signal', () => {
+    setTTY(true);
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('disables color for an interactive TTY with unrecognized TERM and no other chalk signal', () => {
+    setTTY(true);
+    process.env.TERM = 'acme-terminal';
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('enables color for an interactive TTY with COLORTERM despite unrecognized TERM', () => {
+    setTTY(true);
+    process.env.TERM = 'acme-terminal';
+    process.env.COLORTERM = '1';
+    expect(colorEnabled()).toBe(true);
+  });
+
+  it('disables color for an interactive TTY with TERM=dumb', () => {
+    setTTY(true);
+    process.env.TERM = 'dumb';
+    expect(colorEnabled()).toBe(false);
   });
 
   it('disables color for a bare CI with non-TTY stdout (chalk-compat override)', () => {
@@ -103,17 +153,39 @@ describe('pc color-enable decision', () => {
     expect(colorEnabled()).toBe(false);
   });
 
+  it('disables color for a generic CI even when stdout is a TTY', () => {
+    setTTY(true);
+    process.env.CI = 'true';
+    process.env.TERM = 'xterm-256color';
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('enables color for a recognized CI vendor when stdout is a TTY', () => {
+    setTTY(true);
+    process.env.CI = 'true';
+    process.env.GITHUB_ACTIONS = 'true';
+    expect(colorEnabled()).toBe(true);
+  });
+
+  it('disables color for Drone CI with no chalk-recognized CI signal', () => {
+    setTTY(true);
+    process.env.CI = 'true';
+    process.env.DRONE = 'true';
+    expect(colorEnabled()).toBe(false);
+  });
+
   it('disables color on Windows with non-TTY stdout and no color vars', () => {
     // picocolors enables color for `process.platform === 'win32'` regardless of
     // TTY; chalk@4 required a TTY/FORCE_COLOR first. Guards ANSI escapes in
     // redirected Windows output (e.g. `create-react-on-rails-app app > log.txt`).
-    const originalPlatform = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    try {
-      expect(colorEnabled()).toBe(false);
-    } finally {
-      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
-    }
+    setPlatform('win32');
+    expect(colorEnabled()).toBe(false);
+  });
+
+  it('enables color on Windows when stdout is a TTY', () => {
+    setPlatform('win32');
+    setTTY(true);
+    expect(colorEnabled()).toBe(true);
   });
 
   it('still enables color in CI when FORCE_COLOR=1', () => {

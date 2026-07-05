@@ -386,6 +386,44 @@ export default function AppRouter() {
 }
 ```
 
+### Client router loaders
+
+Client router loaders can still choose which server component a route renders. Keep the loader as a
+coordinator that returns plain route data, then render `RSCRoute` from the route component. React on
+Rails Pro then owns the RSC payload fetch, embedded SSR payload reuse, cache, and retry lifecycle.
+
+If your app enforces a strict Content Security Policy without `'unsafe-inline'`, configure the Rails
+script nonce described in [Strict Content Security Policy](../strict-csp.md). `RSCRoute` uses the
+standard React on Rails Pro RSC path, so streamed payload scripts, console replay scripts, and
+hydration scripts need the same `railsContext.cspNonce` setup as other streamed RSC pages.
+
+```tsx
+import { Suspense } from 'react';
+import { createRoute } from '@tanstack/react-router';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+import { rootRoute } from './rootRoute';
+
+export const panelRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/panel',
+  loader: () => ({
+    componentName: 'Panel',
+    componentProps: { requestedBy: 'TanStack Router loader' },
+  }),
+  component: PanelRouteComponent,
+});
+
+function PanelRouteComponent() {
+  const { componentName, componentProps } = panelRoute.useLoaderData();
+
+  return (
+    <Suspense fallback={<div>Loading panel…</div>}>
+      <RSCRoute componentName={componentName} componentProps={componentProps} />
+    </Suspense>
+  );
+}
+```
+
 ### Using `Outlet` in server components
 
 React Router's `Outlet` is a client component (it uses context). To use it inside a server component, re-export it as a client component:

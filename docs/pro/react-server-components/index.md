@@ -120,7 +120,6 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [Static Shell Global JavaScript Opt-Out](./static-shell-global-js-opt-out.md) — Rails layout pattern for keeping global CSS while skipping app-wide JavaScript on opted-in static shells
 - [React on Rails Pro vs. Next.js](./nextjs-comparison.md) — how both implement RSC, and the one architectural difference that explains the rest
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
-- [RSC Payloads as Route Data](./rsc-payload-route-data.md) — browser helper for client router loaders
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
 - [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 
