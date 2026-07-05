@@ -234,6 +234,6 @@ class PrMergeLedgerTest < Minitest::Test
     assert_equal "NOT_READY", ci_readiness.fetch("verdict")
     pending_check_names = ci_readiness.fetch("pending").map { |check| check.fetch("name") }
     assert_equal ["rspec-package-tests"], pending_check_names
-    assert_equal ["ci_check_pending"], violation_codes(data)
+    assert_equal ["ci_check_cancelled"], violation_codes(data)
   end
 end

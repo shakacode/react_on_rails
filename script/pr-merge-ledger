@@ -189,10 +189,6 @@ class PrMergeLedger
     []
   end
 
-  def self.usable_ci_check_rows?(raw)
-    !parse_ci_check_rows(raw).empty?
-  end
-
   def self.active_ci_check_rows(rows)
     Array(rows).reject { |row| row.is_a?(Hash) && row["bucket"].to_s == "cancel" }
   end
@@ -219,7 +215,8 @@ class PrMergeLedger
 
     return false unless missing_required_ci_check_keys(required_rows, full_rows).empty?
 
-    Array(full_rows).none? { |row| non_ready_ci_check_row?(row) }
+    matching_full_rows = Array(full_rows).select { |row| required_keys.include?(ci_check_row_key(row)) }
+    matching_full_rows.none? { |row| non_ready_ci_check_row?(row) }
   end
 
   def self.missing_required_ci_check_keys(required_rows, full_rows)
@@ -1415,7 +1412,11 @@ class PrMergeLedger
       ci_check_violation(pull_request, check, "ci_check_failed", "CI check failed")
     end
     pending = ci_readiness.fetch("pending").map do |check|
-      ci_check_violation(pull_request, check, "ci_check_pending", "CI check is still pending")
+      if check["bucket"].to_s == "cancel"
+        ci_check_violation(pull_request, check, "ci_check_cancelled", "CI check was cancelled or superseded")
+      else
+        ci_check_violation(pull_request, check, "ci_check_pending", "CI check is still pending")
+      end
     end
     details_missing = if ci_readiness.fetch("verdict") == "NOT_READY" && failed.empty? && pending.empty?
                         [

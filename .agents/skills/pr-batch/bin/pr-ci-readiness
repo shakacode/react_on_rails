@@ -11,8 +11,9 @@
 #   2. An empty check list => UNKNOWN / not ready.
 #   3. Treat cancelled rows as non-ready unless the list contains no active rows,
 #      in which case the verdict is UNKNOWN.
-#   4. When required rows exist, cross-check them against the full list and use
-#      the full list if any full-check row is fail/pending/cancel.
+#   4. When required rows exist, cross-check them against the full list. A
+#      missing or non-ready matching required check blocks readiness; advisory
+#      rows outside the required set do not block required readiness.
 #   5. Otherwise READY only when no failing (bucket "fail") and no pending
 #      (bucket "pending" or "cancel") rows remain. Passing and skipping rows are fine.
 #
@@ -76,7 +77,8 @@ module PrCiReadiness
 
     return false unless missing_required_keys(required_rows, full_rows).empty?
 
-    full_rows.none? { |row| non_ready_row?(row) }
+    matching_full_rows = full_rows.select { |row| required_keys.include?(row_key(row)) }
+    matching_full_rows.none? { |row| non_ready_row?(row) }
   end
 
   def missing_required_keys(required_rows, full_rows)
@@ -140,9 +142,9 @@ module PrCiReadiness
     Decide whether a PR's CI is ready to merge. Runs `gh pr checks <PR> --required`
     first; when no required checks exist, falls back to the full `gh pr checks <PR>`
     list. An empty or cancel-only list is UNKNOWN/not-ready. When required rows
-    exist, the helper cross-checks the full list and uses it if extra full-check rows
-    are fail/pending/cancel. The PR is READY only when no failing or pending checks
-    remain.
+    exist, the helper cross-checks the full list for the same required check
+    identities. The PR is READY when no required check is missing, failing, or
+    pending; advisory full-list rows do not block required readiness.
 
     Arguments:
       <pr-number>        PR number to inspect (integer).
@@ -240,7 +242,8 @@ module PrCiReadiness
     end
 
     # Fetch the required-check list first; fall back to the full list when the
-    # required form yields no rows or when the full list has extra non-ready rows.
+    # required form yields no rows or when the full list has matching required
+    # rows that are missing or non-ready. Advisory full-list rows do not block.
     # required_used flips to false on fallback.
     def assess(repo, pr_number)
       required_raw = fetch_checks(repo, pr_number, required: true)

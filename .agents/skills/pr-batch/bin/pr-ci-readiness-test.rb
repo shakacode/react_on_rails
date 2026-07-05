@@ -87,7 +87,7 @@ class PrCiReadinessTest < Minitest::Test
     assert PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
   end
 
-  def test_required_rows_incomplete_when_full_has_extra_pending_check
+  def test_required_rows_complete_when_full_has_extra_advisory_pending_check
     required_rows = [
       { "name" => "required-pr-gate", "bucket" => "pass" }
     ]
@@ -96,7 +96,7 @@ class PrCiReadinessTest < Minitest::Test
       { "name" => "rspec-package-tests", "bucket" => "pending" }
     ]
 
-    refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+    assert PrCiReadiness.required_rows_complete?(required_rows, full_rows)
   end
 
   def test_required_rows_incomplete_when_matching_full_required_check_is_pending
@@ -244,7 +244,7 @@ class PrCiReadinessCliTest < Minitest::Test
     end
   end
 
-  def test_required_subset_with_extra_pending_full_check_is_not_ready_via_cli
+  def test_required_subset_with_extra_advisory_pending_full_check_is_ready_via_cli
     with_fake_gh(
       required_json: '[{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"x"}]',
       full_json: '[{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"x"},' \
@@ -252,9 +252,9 @@ class PrCiReadinessCliTest < Minitest::Test
     ) do |env|
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
-      assert_equal "NOT_READY", data["verdict"]
-      assert_equal false, data["required_used"]
-      assert_equal ["rspec-package-tests"], data["pending"]
+      assert_equal "READY", data["verdict"]
+      assert_equal true, data["required_used"]
+      assert_empty data["pending"]
     end
   end
 

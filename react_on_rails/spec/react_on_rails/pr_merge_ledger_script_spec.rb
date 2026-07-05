@@ -23,6 +23,16 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  def with_raw_fake_gh(script_body)
+    Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
+      gh_path = File.join(bin_dir, "gh")
+      File.write(gh_path, script_body)
+      File.chmod(0o755, gh_path)
+
+      yield({ "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" }, bin_dir)
+    end
+  end
+
   def fake_gh_script_with_ready_checks(script_body)
     <<~SH
       #!/bin/sh
@@ -34,6 +44,70 @@ RSpec.describe "script/pr-merge-ledger" do
       fi
 
       #{script_body}
+    SH
+  end
+
+  def fake_gh_script_with_check_rows(required_json:, full_json:, pr_checks_exit_status: 0)
+    <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        count_file="$(dirname "$0")/pr-check-calls"
+        count=0
+        if [ -f "$count_file" ]; then
+          count=$(cat "$count_file")
+        fi
+        count=$((count + 1))
+        printf '%s\\n' "$count" > "$count_file"
+
+        required=false
+        for arg in "$@"; do
+          if [ "$arg" = "--required" ]; then
+            required=true
+          fi
+        done
+
+        if [ "$required" = "true" ]; then
+          cat <<'JSON'
+      #{required_json}
+      JSON
+        else
+          cat <<'JSON'
+      #{full_json}
+      JSON
+        fi
+        exit #{pr_checks_exit_status}
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
     SH
   end
 
@@ -4595,6 +4669,43 @@ RSpec.describe "script/pr-merge-ledger" do
         ["required-pr-gate"]
       )
       expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include("ci_check_pending")
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
+    end
+  end
+
+  it "allows strict live closeout when full checks include an advisory pending row" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      full_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"},{"name":"rspec-package-tests","state":"PENDING","bucket":"pending","link":"https://example.com/advisory"}]
+      JSON
+      pr_checks_exit_status: 8
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      ledger = JSON.parse(stdout).fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "READY",
+        "required_used" => true
+      )
+      expect(ledger.fetch("ci_readiness").fetch("pending")).to be_empty
+      expect(ledger.fetch("violations")).to be_empty
       expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
     end
   end
