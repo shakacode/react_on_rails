@@ -1,8 +1,11 @@
-# Packaged default trust config -- intentionally empty and fail-closed.
-# Override with a repo-local .agents/trusted-github-actors.yml,
-# AGENT_WORKFLOWS_TRUST_CONFIG, ~/.agents/trusted-github-actors.yml, or
-# --trust-config.
+# Packaged fallback allowlist for the pr-batch security preflight. Keep this
+# fail-closed: human maintainers and trusted automation are repo- or
+# user-specific and belong in a repo-local or user-global trust config, not in
+# this public fallback.
 trusted_users: []
+
 trusted_bots: []
+
 trusted_metadata_bots: []
+
 trusted_teams: []

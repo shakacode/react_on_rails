@@ -5,6 +5,10 @@ inputs:
     description: 'Whether this manual dispatch should bypass optimized hosted-CI selection.'
     required: false
     default: 'false'
+  base-ref:
+    description: 'Pull request base branch for workflow_dispatch-triggered hosted CI.'
+    required: false
+    default: ''
 outputs:
   hosted_ci_requested:
     description: 'Whether the PR has the ready-for-hosted-ci label.'
@@ -30,9 +34,13 @@ runs:
     - name: Select hosted CI mode
       id: select
       uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+      env:
+        FORCE_FULL_HOSTED: ${{ inputs.force-full-hosted }}
+        DISPATCH_BASE_REF: ${{ inputs.base-ref }}
       with:
         script: |
-          const forceFullInput = '${{ inputs.force-full-hosted }}'.toLowerCase() === 'true';
+          const forceFullInput = (process.env.FORCE_FULL_HOSTED || '').toLowerCase() === 'true';
+          const dispatchBaseRef = process.env.DISPATCH_BASE_REF || '';
           const pullRequest = context.payload.pull_request;
           const labels = [];
 
@@ -49,23 +57,237 @@ runs:
           const forceFullHostedCiRequested = labels.includes('force-full-hosted-ci');
           const shouldForceFullHostedCi = forceFullInput || forceFullHostedCiRequested;
           const eventName = context.eventName;
-          const baseRef = pullRequest?.base?.ref || '';
+          const baseRef = pullRequest?.base?.ref || dispatchBaseRef;
+          const headRepoFullName = pullRequest?.head?.repo?.full_name;
+          const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
+          const isSameRepoPullRequest = !pullRequest || headRepoFullName === repoFullName;
+          const isDependabotPullRequest = pullRequest?.user?.login === 'dependabot[bot]';
+          const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+          const hostedStartCommands = new Set(['+ci-run-hosted', '+ci-force-full']);
+          const hostedStopCommands = new Set(['+ci-stop-hosted', '+ci-skip-hosted']);
+          const permissionByLogin = new Map();
+
+          function commandText(commentBody) {
+            return (commentBody || '')
+              .replace(/```[\s\S]*?```/g, '')
+              .replace(/~~~[\s\S]*?~~~/g, '')
+              .split('\n')
+              .filter((line) => !/^\s*>/.test(line))
+              .join('\n');
+          }
+
+          function parseCommand(commentBody) {
+            const match = commandText(commentBody)
+              .match(/(?:^|\n)\s*(\+ci-[a-z0-9][a-z0-9-]*)(?:[ \t]+([^\n]*))?/i);
+
+            return match?.[1]?.toLowerCase() || null;
+          }
+
+          function newerComment(comment, current) {
+            if (!current) {
+              return true;
+            }
+
+            const commentTime = Date.parse(comment.created_at || '');
+            const currentTime = Date.parse(current.created_at || '');
+            if (commentTime !== currentTime) {
+              return commentTime > currentTime;
+            }
+
+            return Number(comment.id || 0) > Number(current.id || 0);
+          }
+
+          function isNewerThan(comment, current) {
+            return current ? newerComment(comment, current) : true;
+          }
+
+          function isHostedDispatchSuccessForHead(comment) {
+            const shortSha = pullRequest?.head?.sha?.slice(0, 12);
+            if (!shortSha || comment.user?.login !== 'github-actions[bot]') {
+              return false;
+            }
+
+            const body = comment.body || '';
+            return /^## (?:Force-Full )?Hosted CI Requested/m.test(body) &&
+              !/\nFailed:\n/.test(body) &&
+              new RegExp(`Triggered [1-9][0-9]* workflow\\(s\\) for \`${shortSha}\``).test(body);
+          }
+
+          function sleep(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+          }
+
+          async function dependabotCommentScanSince() {
+            const headSha = pullRequest?.head?.sha;
+            const headRepoFullName = pullRequest?.head?.repo?.full_name || `${context.repo.owner}/${context.repo.repo}`;
+            if (!headSha || !headRepoFullName) {
+              return null;
+            }
+
+            const [headOwner, headRepo] = headRepoFullName.split('/');
+            try {
+              const { data: commit } = await github.rest.repos.getCommit({
+                owner: headOwner,
+                repo: headRepo,
+                ref: headSha
+              });
+              const committedAt = Date.parse(commit.commit?.committer?.date || commit.commit?.author?.date || '');
+
+              return Number.isNaN(committedAt) ?
+                null :
+                new Date(Math.max(0, committedAt - 60 * 60 * 1000)).toISOString();
+            } catch (error) {
+              core.warning(
+                'Unable to read Dependabot PR head commit time for hosted-CI trust check; ' +
+                  `falling back to a full comment scan: ${error.message || error}`
+              );
+              return null;
+            }
+          }
+
+          async function hasWriteAccessFor(username) {
+            if (!username) {
+              return false;
+            }
+
+            if (permissionByLogin.has(username)) {
+              return permissionByLogin.get(username);
+            }
+
+            let hasWriteAccess = false;
+            try {
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username
+              });
+              hasWriteAccess = ['admin', 'write'].includes(permission.permission);
+            } catch (error) {
+              core.warning(
+                `Unable to verify ${username} write permission for Dependabot hosted-CI trust check; ` +
+                  `treating the command as untrusted: ${error.message || error}`
+              );
+            }
+
+            permissionByLogin.set(username, hasWriteAccess);
+            return hasWriteAccess;
+          }
+
+          async function listDependabotTrustComments(since) {
+            try {
+              return await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                per_page: 100,
+                sort: 'created',
+                direction: 'asc',
+                ...(since ? { since } : {})
+              });
+            } catch (error) {
+              core.warning(
+                'Unable to read PR comments for Dependabot hosted-CI trust check; ' +
+                  `treating hosted CI as not trusted: ${error.message || error}`
+              );
+              return false;
+            }
+          }
+
+          async function dependabotHostedRequestState(comments) {
+            let latestStart = null;
+            let latestStop = null;
+            let latestSuccess = null;
+
+            for (const comment of comments) {
+              if (isHostedDispatchSuccessForHead(comment) && newerComment(comment, latestSuccess)) {
+                latestSuccess = comment;
+                continue;
+              }
+
+              if (!trustedCommandAssociations.has(comment.author_association)) {
+                continue;
+              }
+
+              if (!(await hasWriteAccessFor(comment.user?.login))) {
+                continue;
+              }
+
+              const command = parseCommand(comment.body);
+              if (hostedStartCommands.has(command) && newerComment(comment, latestStart)) {
+                latestStart = comment;
+              } else if (hostedStopCommands.has(command) && newerComment(comment, latestStop)) {
+                latestStop = comment;
+              }
+            }
+
+            const hasActiveStart = Boolean(latestStart && (!latestStop || newerComment(latestStart, latestStop)));
+            const hasTrustedSuccess = Boolean(
+              hasActiveStart &&
+              latestSuccess &&
+              isNewerThan(latestSuccess, latestStart)
+            );
+
+            return { hasActiveStart, hasTrustedSuccess };
+          }
+
+          async function hasTrustedDependabotHostedRequest() {
+            if (!pullRequest) {
+              return false;
+            }
+
+            const since = await dependabotCommentScanSince();
+            const maxAttempts = 4;
+            const retryDelayMs = 5000;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const comments = await listDependabotTrustComments(since);
+              if (!comments) {
+                return false;
+              }
+
+              const state = await dependabotHostedRequestState(comments);
+              if (state.hasTrustedSuccess || !state.hasActiveStart || attempt === maxAttempts) {
+                return state.hasTrustedSuccess;
+              }
+
+              core.info(
+                'Trusted Dependabot hosted-CI command found without the dispatch success comment yet; ' +
+                  `retrying comment scan (${attempt}/${maxAttempts}).`
+              );
+              await sleep(retryDelayMs);
+            }
+
+            return false;
+          }
+
+          const trustedDependabotHostedRequest = isDependabotPullRequest ?
+            await hasTrustedDependabotHostedRequest() :
+            false;
+          const canDispatchHostedCiForPullRequest = isSameRepoPullRequest &&
+            (!isDependabotPullRequest || trustedDependabotHostedRequest);
           const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
           const isReleasePullRequest = releaseBranchPrefixes.some((prefix) => baseRef.startsWith(prefix));
           const isReleaseBranchPush = eventName === 'push' &&
             context.ref.startsWith('refs/heads/release/');
           const isReleaseTarget = isReleasePullRequest || isReleaseBranchPush;
+          // Same-repository release-target PRs run hosted CI by policy;
+          // Dependabot still needs trusted current-head dispatch proof.
+          const isTrustedReleaseTarget = isReleaseTarget &&
+            (eventName !== 'pull_request' ||
+              (isSameRepoPullRequest && (!isDependabotPullRequest || trustedDependabotHostedRequest)));
 
           const isPushToMain = eventName === 'push' && context.ref === 'refs/heads/main';
           const isMergeGroup = eventName === 'merge_group';
           const shouldRunHostedCi = eventName !== 'pull_request' ||
-            hostedCiRequested ||
-            forceFullHostedCiRequested ||
-            isReleaseTarget;
+            isTrustedReleaseTarget ||
+            (canDispatchHostedCiForPullRequest && (
+              hostedCiRequested ||
+              forceFullHostedCiRequested
+            ));
           const shouldUseFullMatrix = shouldForceFullHostedCi ||
             isPushToMain ||
             isMergeGroup ||
-            isReleaseTarget;
+            isTrustedReleaseTarget;
 
           const outputs = {
             hosted_ci_requested: hostedCiRequested,

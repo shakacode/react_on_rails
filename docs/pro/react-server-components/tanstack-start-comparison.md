@@ -83,8 +83,9 @@ database stay in Rails where they already live. (RSC is a Pro feature requiring 
 For the interactive pieces that **mutate**, both stacks still cross a network boundary: Start calls a
 typed server function; React on Rails posts to a Rails controller (often with TanStack Query driving the
 request). Start's server-function shorthand is genuinely less boilerplate for that path today; the trade
-is that the function — and the business logic inside it — lives in your UI's runtime rather than in
-Rails.
+is that the function — and the business logic inside it — lives in Start's server runtime rather than in
+Rails. For side-by-side mutation recipes, see
+[Mutations without Server Actions](../../oss/building-features/mutations.md).
 
 ## The backend you assemble vs. the backend you have
 
@@ -186,6 +187,7 @@ and would rather adopt the TanStack libraries on top of it than rebuild the back
 ## Related documentation
 
 - [TanStack Router on React on Rails](../../oss/building-features/tanstack-router.md) — using TanStack Router, with Pro SSR support
+- [Mutations without Server Actions](../../oss/building-features/mutations.md) — Rails controller recipes compared with Next.js Server Actions and TanStack server functions
 - [RoR Pro vs. Next.js RSC](./nextjs-comparison.md) — how the RSC contract works, compared across stacks
 - [React Server Components overview](./index.md) — the full RSC documentation set
 - [Decision Guide](../../oss/getting-started/comparing-react-on-rails-to-alternatives.md) — choosing between React on Rails, TanStack Start, Next.js, and other alternatives

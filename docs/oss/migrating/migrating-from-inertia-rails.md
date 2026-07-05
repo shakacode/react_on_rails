@@ -8,7 +8,7 @@ This guide is for Rails apps that currently use [Inertia Rails](https://inertia-
 
 For the "why" comparison (architecture, SSR, streaming, RSC tradeoffs), see [Comparing React on Rails to Alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md#react-on-rails-vs-inertia-rails). This page is the "how."
 
-> **Scope note:** This is the v1 of the migration guide. A full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) and a worked example app are planned as follow-ups, tracked in [#3899](https://github.com/shakacode/react_on_rails/issues/3899). One mapping-table parity feature, the first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)), **has shipped** as [`useRailsForm`](../building-features/forms.md). The opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) is **not shipped yet** — check that issue for current status. The table gives you the current answer for each.
+> **Scope note:** This is the v1 of the migration guide. A full step-by-step playbook (forms, shared state, SSR cutover, removing Inertia) is tracked in [#3899](https://github.com/shakacode/react_on_rails/issues/3899). Publishing a standalone worked-example repo for that playbook is tracked in [reactonrails.com#140](https://github.com/shakacode/reactonrails.com/issues/140). One mapping-table parity feature, the first-class `useForm`-style helper ([#3872](https://github.com/shakacode/react_on_rails/issues/3872)), **has shipped** as [`useRailsForm`](../building-features/forms.md). The opinionated routing/prefetch starter ([#3873](https://github.com/shakacode/react_on_rails/issues/3873)) is **not shipped yet** — check that issue for current status. The table gives you the current answer for each.
 
 ## Concept mapping
 
@@ -63,6 +63,41 @@ The migration-enabling claim is that `inertia_rails` and `react_on_rails` can li
 - The scratch app used webpack-bundled Inertia via Shakapacker. If your Inertia app uses Vite, you can run Vite and Shakapacker side by side during the migration, but that combination was **not** part of this verification.
 
 **The resulting migration strategy** is route-by-route: keep `render inertia:` actions as they are, and convert one low-risk route at a time to a conventional Rails view + `react_component`. Page components are plain React in both stacks, so most component code moves unchanged — what changes is how props arrive (view helper instead of the Inertia page object) and how navigation/forms talk to Rails (see the mapping table).
+
+## Estimate the migration before coding
+
+Use the coexistence setup above as the default sizing model. A big-bang rewrite is usually harder to estimate because
+it mixes framework migration with product and routing changes. First count the routes and app surfaces that must move,
+then apply the rubric below.
+
+| App surface to count                       | Typical effort after dependencies install cleanly     | What changes the estimate                                                                                                                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initial React on Rails + Shakapacker setup | 0.5-1 engineer-day                                    | Older Ruby/Node locks, a custom package root, or a non-standard asset pipeline can push this higher.                                                                                                                 |
+| Simple display page                        | 0.25-0.5 day per route                                | Mostly moving `render inertia:` props into an ERB view that calls `react_component`.                                                                                                                                 |
+| Form page with validation                  | 0.5-1 day per basic form; more for Inertia helpers    | Basic forms map to [`useRailsForm`](../building-features/forms.md). Budget separate replacement work for uploads, progress bars, transforms, `recentlySuccessful`, or other Inertia-specific `useForm` conveniences. |
+| Shared data / `usePage()` surface          | 0.5-1.5 days per shared surface                       | App-wide user, flash, locale, or permissions data needs a render-function boundary, props, React Context, or Redux instead of an implicit page object.                                                               |
+| Inertia navigation polish                  | 1-3 days per app area                                 | `<Link>`, prefetch, scroll restoration, redirect flash conventions, and visit lifecycle hooks need explicit routing or full-page navigation decisions.                                                               |
+| Deferred, lazy, merged, or partial props   | 0.5-2 days per data surface                           | Simple cases become component-local fetches. Complex cases may justify Pro streaming SSR or RSC instead of rebuilding Inertia's protocol behavior one-for-one.                                                       |
+| SSR cutover                                | 1-3 days for the first representative page, then less | ExecJS may be fine for small pages; performance-sensitive SSR should be measured and may require the Pro Node renderer, streaming SSR, or a targeted RSC design.                                                     |
+
+Examples:
+
+- **Small CRUD app:** 5 simple pages, 2 ordinary forms, no SSR, no heavy `usePage()` usage: roughly 3-6 engineer-days.
+- **Moderate Inertia app:** 20 pages, 5 forms, one shared user/flash surface, no deferred props: roughly 9-18 engineer-days with route-by-route coexistence.
+- **SEO/SSR migration:** 10 important pages plus SSR parity and performance validation: roughly 5-10 engineer-days before visual QA, depending on whether ExecJS is enough or the Pro Node renderer is required.
+
+These are planning ranges, not promises. Add separate time for visual QA, product copy changes, route redesign, or any
+cleanup you choose to do while touching the pages.
+
+## Migration decision table
+
+| Current app signal                        | Prefer staying on Inertia when...                                                                     | Prefer moving to React on Rails when...                                                                                                                                                                                                       |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mostly CRUD pages, no SEO or SSR pressure | Client-rendered pages are already acceptable and the migration would only change integration style.   | You need Rails-owned views or incremental React islands inside existing ERB pages.                                                                                                                                                            |
+| Forms are the main interaction surface    | Your app depends on Inertia form niceties not yet covered by `useRailsForm`, such as upload progress. | Basic model validation, `422` handling, and CSRF-aware `fetch` semantics cover most flows.                                                                                                                                                    |
+| Navigation depends on Inertia visits      | `<Link>`, prefetch, scroll restoration, and visit lifecycle behavior are central to the product.      | Full-page route boundaries are acceptable, or you want to choose React Router / TanStack Router explicitly for client-routed sections.                                                                                                        |
+| Shared data relies heavily on `usePage()` | Replacing implicit page context would touch too many nested components for the expected benefit.      | You already want explicit props, React Context, Redux, or request-aware `railsContext` boundaries.                                                                                                                                            |
+| SEO or basic SSR performance              | These are not priorities for the app.                                                                 | OSS SSR/SEO needs justify a React on Rails migration. If streaming SSR, RSC, fragment caching, or the Pro Node renderer are the drivers, confirm the required Pro feature set and size that slice separately before committing the whole app. |
 
 ## When to stay on Inertia
 

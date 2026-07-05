@@ -41,14 +41,14 @@ Codex/Claude notes.
    This is the only place portable skills resolve repo-specific values.
 
 4. **Keep repo-local skills local, but keep workflow references reachable.** Add
-   only repo-specific skills, tiny compatibility launchers, or local validation
-   helpers to the repo. Do not copy shared workflow text into the repo unless
-   the execution environment cannot load user-installed skills. Do not run an
-   installed-skill-only setup with only `skills/`: install `workflows/` too, or
-   keep repo-local workflow copies/launchers for skills that still reference
-   `.agents/workflows/...`. If an agent surface can load installed skill
-   Markdown but cannot execute the installed skill's `bin/` helpers, keep a
-   local helper copy or compatibility launcher for that skill.
+   only repo-specific skills, repo-pinned helper `bin/` copies, or local
+   validation helpers to the repo. Do not copy shared workflow `SKILL.md` text
+   into the repo unless the execution environment cannot load user-installed
+   skills. Do not run an installed-skill-only setup with only `skills/`: install
+   `workflows/` too, or keep repo-local workflow copies for skills that still
+   reference `.agents/workflows/...`. If an agent surface can load installed
+   skill Markdown but cannot execute the installed skill's `bin` helpers, keep
+   a local helper copy for that skill without adding a duplicate `SKILL.md`.
 
 5. **Validate the seam.** Run `agent-workflow-seam-doctor` from the shared
    `shakacode/agent-workflows` pack with `--shared` pointing at the cloned or
@@ -141,9 +141,11 @@ Shared portable skills include PR batching, review handling, post-merge audit,
 adversarial review, verification, CI routing, and changelog update workflows.
 They should avoid repo-specific commands, labels, paths, and domain examples.
 
-Repo-local skills are for domain-heavy or destructive workflows that do not make
-sense everywhere. React on Rails keeps `stress-test` local because it exercises
-RSC/SSR/demo-workspace behavior specific to this repo.
+Repo-local skills are for domain-heavy, destructive, or release-policy workflows
+that do not make sense everywhere. React on Rails keeps `stress-test`,
+`optimize-rsc-performance`, and `react-on-rails-update-changelog` local because
+they exercise RSC, SSR, demo-workspace, performance evidence, and release-train
+branch-targeting behavior specific to this repo.
 
 ## Optional Repo-Pinned Copies
 

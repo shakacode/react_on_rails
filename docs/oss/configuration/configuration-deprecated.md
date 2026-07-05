@@ -27,13 +27,15 @@ Deprecated in v16 and removed in v17. Setting `config.defer_generated_component_
 ```ruby
 # Old (removed):
 config.defer_generated_component_packs = true   # → :defer
-config.defer_generated_component_packs = false  # → :sync
+config.defer_generated_component_packs = false  # → delete the line (was a no-op)
 
 # New:
 config.generated_component_packs_loading_strategy = :defer  # or :sync
 ```
 
-If you delete the line without setting `generated_component_packs_loading_strategy`, the default strategy applies (`:async` for Pro when Shakapacker supports async loading, otherwise `:defer`), which may differ from the previous deferred behavior.
+The old option was truthy-gated: only `= true` had any effect (it set `:defer`). `= false` was a no-op that fell through to the default strategy — it did **not** mean `:sync`. So migrate `= true` to `:defer`, and simply delete `= false`. Set `:sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
+
+If you delete the line without setting `generated_component_packs_loading_strategy`, the default strategy applies: `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
 
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for more details.
 

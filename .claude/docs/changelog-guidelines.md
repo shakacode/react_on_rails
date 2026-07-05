@@ -15,10 +15,10 @@ All entries live in a single chronological flow within each release. Pro entries
 - **Update CHANGELOG.md for user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements)
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
-- **Use `/update-changelog` skill** for guided changelog updates with automatic formatting
-- **Before a release**: Run `/update-changelog release` (or `rc`/`beta`) to stamp a version header; then `rake release` reads it automatically and creates the GitHub release
+- **Use the installed/shared `$update-changelog` skill** for guided mainline changelog updates with automatic formatting
+- **Before a release**: Run `$update-changelog release` for ordinary mainline releases, or `$react-on-rails-update-changelog release`/`rc`/`beta` when the PR must target `release/X.Y.Z`; then `rake release` reads it automatically and creates the GitHub release
 - **Version management**: `bundle exec rake "update_changelog[release]"` (or `rc`/`beta`/explicit version) for header-only updates
 - **Security support window**: For minor and major releases, update `SECURITY.md` "Current support window" rows and cutoff dates to match the new release line
 - **After releasing without changelog**: Run `bundle exec rake "sync_github_release[VERSION]"` to create the GitHub release from CHANGELOG.md
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
-- **Prerelease curation**: See `.agents/skills/update-changelog/SKILL.md` for prerelease-to-stable consolidation process
+- **Prerelease curation**: See `$react-on-rails-update-changelog` for release-branch targeting and the installed/shared `$update-changelog` skill for the portable prerelease-to-stable consolidation process

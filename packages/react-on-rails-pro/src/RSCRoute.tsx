@@ -60,6 +60,9 @@ class RSCRouteErrorBoundary extends Component<
     const { error } = this.state;
     const { componentName, componentProps, children } = this.props;
     if (error) {
+      // A nested RSCRoute's boundary may have already wrapped the failure with
+      // its own (more specific) component context; pass it through instead of
+      // re-wrapping.
       if (isServerComponentFetchError(error)) {
         throw error;
       }
@@ -284,6 +287,14 @@ const RSCRouteContent = forwardRef<RSCRouteHandle, RSCRouteContentProps>(
 
 RSCRouteContent.displayName = 'RSCRouteContent';
 
+/**
+ * Reads the RSC context above the error boundary (so a missing provider still
+ * fails loudly with the raw `useRSC` error) and renders the boundary around
+ * all of RSCRouteContent's render work. Synchronous render-phase failures —
+ * payload key creation, a sync throw out of `getComponent` — funnel through
+ * the boundary and surface as `ServerComponentFetchError`, matching async
+ * fetch failures (#4372).
+ */
 const RSCRouteContentWithErrorBoundary = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ssr'>>(
   ({ componentName, componentProps, onRefetchError }, ref) => {
     const rscContext = useRSC();

@@ -121,4 +121,24 @@ describe('StoreRegistry', () => {
 
     await expect(pendingStoreGenerator).resolves.toBe(storeGenerator);
   });
+
+  it('returns undefined from getStore when no stores are hydrated and throwIfMissing is false', () => {
+    expect(StoreRegistry.getStore('Missing', false)).toBeUndefined();
+  });
+
+  it('returns undefined from getStore when other stores are hydrated and throwIfMissing is false', () => {
+    StoreRegistry.setStore('Other', createStore());
+    expect(StoreRegistry.getStore('Missing', false)).toBeUndefined();
+  });
+
+  it('throws from getStore when no stores are hydrated and throwIfMissing is default', () => {
+    expect(() => StoreRegistry.getStore('Missing')).toThrow(/There are no stores hydrated/);
+  });
+
+  it('throws from getStore when the store is missing and others are hydrated', () => {
+    StoreRegistry.setStore('Other', createStore());
+    expect(() => StoreRegistry.getStore('Missing')).toThrow(
+      /Could not find hydrated store registered with name Missing/,
+    );
+  });
 });
