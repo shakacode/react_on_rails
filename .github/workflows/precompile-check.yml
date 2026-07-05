@@ -10,7 +10,7 @@ on:
       - 'release/**'
     # Always trigger on main/release branches; non-runtime detection handles skipping heavy jobs
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
     inputs:
@@ -19,6 +19,14 @@ on:
         required: false
         type: boolean
         default: false
+      pull_request_base_ref:
+        description: 'Pull request base branch for label/command dispatches'
+        required: false
+        type: string
+      pull_request_base_sha:
+        description: 'Pull request base SHA for label/command dispatches'
+        required: false
+        type: string
 
 jobs:
   detect-changes:
@@ -38,15 +46,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 50
+          # Full history is only needed for workflow_dispatch base-SHA reruns.
+          fetch-depth: ${{ github.event_name == 'workflow_dispatch' && '0' || '50' }}
           persist-credentials: false
       - name: Select hosted CI mode
         id: hosted-ci
         uses: ./.github/actions/hosted-ci-selectors
         with:
           force-full-hosted: ${{ inputs.force_full_hosted || false }}
+          base-ref: ${{ inputs.pull_request_base_ref || '' }}
       - name: Detect relevant changes
         id: detect
+        env:
+          DISPATCH_BASE_REF: ${{ inputs.pull_request_base_ref || '' }}
+          DISPATCH_BASE_SHA: ${{ inputs.pull_request_base_sha || '' }}
         run: |
           # Force-full hosted CI is the explicit escape hatch that bypasses
           # optimized change selection. Hosted readiness alone stays path-based.
@@ -59,7 +72,12 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
+          if [ -n "$DISPATCH_BASE_SHA" ]; then
+            export GITHUB_BASE_REF="$DISPATCH_BASE_REF"
+            BASE_REF="$DISPATCH_BASE_SHA"
+          else
+            BASE_REF="${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}"
+          fi
           script/ci-changes-detector "$BASE_REF"
         shell: bash
       - name: Guard docs-only main pushes

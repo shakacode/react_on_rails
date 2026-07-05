@@ -38,6 +38,44 @@ module ReactOnRailsPro
       def connect: (untyped remote_address, **untyped options) ?{ (untyped) -> untyped } -> untyped
     end
 
+    class BufferedResponseBody
+      def initialize: (Array[String] chunks) -> void
+
+      def each: () { (String) -> untyped } -> untyped
+
+      def close: () -> nil
+    end
+
+    class MultipartFileBody
+      CHUNK_SIZE: Integer
+
+      def initialize: (untyped body) -> void
+
+      def read: () -> String?
+
+      def close: () -> nil
+    end
+
+    class MultipartBody
+      def <<: (untyped chunk) -> untyped
+
+      def read: () -> String?
+
+      def close: (?StandardError? error) -> untyped
+    end
+
+    class PersistentThreadClient
+      def initialize: (endpoint: untyped, protocol: untyped, pool_limit: Integer?) -> void
+
+      def post: (String path, headers: untyped, body: untyped) -> untyped
+
+      def get: (String path, headers: untyped) -> untyped
+
+      def close: () -> nil
+
+      def alive?: () -> bool
+    end
+
     class Response
       attr_reader status: Integer?
 
@@ -58,12 +96,16 @@ module ReactOnRailsPro
 
     def self.split_url: (String url) -> [String, String]
 
+    def self.client_generation: () -> Integer
+
+    def self.bump_client_generation: () -> Integer
+
     def self.build_multipart_body: (
       Hash[untyped, untyped] form,
       ?boundary: String
-    ) -> [Array[[String, String]], String]
+    ) -> [Array[[String, String]], MultipartBody]
 
-    def self.build_form_body: (Hash[untyped, untyped] form) -> [Array[[String, String]], String]
+    def self.build_form_body: (Hash[untyped, untyped] form) -> [Array[[String, String]], MultipartBody | String]
 
     def initialize: (
       origin: String,

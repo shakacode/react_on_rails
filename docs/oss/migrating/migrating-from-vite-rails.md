@@ -6,6 +6,10 @@ If you want repo-shaped references before touching your own app, start with
 [Example Migrations](./example-migrations.md) and then come back here for the
 mechanics.
 
+A public worked example repo is planned as a separate follow-up in
+[reactonrails.com#140](https://github.com/shakacode/reactonrails.com/issues/140);
+use the existing example-migration guide until that repo exists.
+
 ## When this migration makes sense
 
 React on Rails is a better fit when you want one or more of these:
@@ -27,6 +31,42 @@ Not all `vite_rails` + React apps are the same shape, and the migration effort d
   2. **Break the SPA into island mounts** by moving Rails back to being the view-owner. This is a real product decision and should not be bundled with the bundler/integration change.
 
 For most teams, the **Keep the SPA shape** path is the fastest first step: you're swapping Vite's build integration for Shakapacker, not re-architecting the app. The main friction is usually not the Rails-side `react_component` call — it's the Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue) that the client code may depend on. See [Replace Vite-specific asset and env usage](#5-replace-vite-specific-asset-and-env-usage) for the concrete replacements.
+
+## Estimate the migration before coding
+
+Use the smallest shape that proves parity. For Rails-owned island apps, that usually means one page or mount at a time.
+For SPA-shell apps, it often means one top-level `react_component` call first, with any island split treated as a later
+product decision.
+
+| App surface to count                        | Typical effort after dependencies install cleanly | What changes the estimate                                                                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Initial React on Rails + Shakapacker setup  | 0.5-1 engineer-day                                | Older lockfiles, custom `client/` package roots, or existing webpack config can add setup time.                                                                                                        |
+| Rails-owned island mount                    | 0.25-0.5 day per mount                            | Most work is moving the mount call from a Vite entrypoint into an ERB `react_component` call and checking props/hydration.                                                                             |
+| Top-level client-routed SPA shell           | 1-3 days                                          | Keep the SPA shape first. Add time if the shell depends on Vite-only env handling, asset paths, or plugin behavior during boot.                                                                        |
+| Vite layout/helper cleanup                  | 0.5-1 day per layout family                       | More layouts, engines, or custom helper wrappers increase search-and-replace plus QA time.                                                                                                             |
+| `import.meta.env` / `vite_asset_path` usage | 0.25-1 day per usage pattern                      | Rails-passed props are usually simple. Treat client env injection as a security review: only publish values that are safe in browser bundles, and keep server-only secrets out of webpack definitions. |
+| `import.meta.glob` or route auto-discovery  | 0.5-2 days per pattern                            | `require.context` differs in key shape and sync/lazy behavior, so route/module registries need focused tests.                                                                                          |
+| Vite plugins with no Shakapacker equivalent | 1-3 days per plugin                               | Spike these before committing the full migration; a plugin replacement can be the real schedule driver.                                                                                                |
+| SSR or Pro feature adoption                 | 2-5 days for the first representative page        | Add renderer setup, asset/CSS parity checks, and performance validation for ExecJS vs the Pro Node renderer; size streaming SSR/RSC separately from the bundler migration.                             |
+
+Examples:
+
+- **Rails-owned island app:** 8 mounts, two layouts, no Vite-only plugins: roughly 4-7 engineer-days.
+- **SPA shell with light Vite usage:** one top-level app, `import.meta.env`, a few asset-path replacements: roughly 3-7 engineer-days.
+- **Vite-heavy app:** custom plugins plus `import.meta.glob` route discovery: run a 1-2 day spike first, then estimate from the plugin and module-discovery replacements.
+
+These ranges exclude visual QA, product redesign, and optional work to split a SPA into islands. Keep those as separate
+line items so the bundler/integration migration stays measurable.
+
+## Migration decision table
+
+| App signal              | Stay on `vite_rails` when...                                                           | Move to React on Rails when...                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| App shape               | The app is a Vite-powered SPA and Rails only serves the shell.                         | Rails should own page rendering, route-level props, or several React islands inside existing ERB views.                |
+| Rendering requirements  | Client-side rendering already meets SEO and performance needs.                         | You need SSR from Rails, a path to streaming SSR, or React Server Components.                                          |
+| Build workflow          | Vite plugins, `import.meta.glob`, or Vite's dev server are central to your workflow.   | You want to consolidate on Shakapacker / webpack semantics or remove a separate Vite build path from Rails deployment. |
+| Framework feature needs | The current app has no bundler pain and no React on Rails Pro feature needs.           | You need React on Rails helpers, Rails request context, Pro Node rendering, streaming SSR, or RSC as app requirements. |
+| Product scope           | The migration would also require a product rewrite or router redesign you do not want. | You can keep the current product shape and migrate route-by-route or as one top-level SPA mount first.                 |
 
 ## Preflight
 

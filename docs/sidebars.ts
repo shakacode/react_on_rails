@@ -94,6 +94,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'building-features/accessibility',
             'building-features/forms',
+            'building-features/mutations',
             'building-features/react-and-redux',
             'building-features/tanstack-query',
             'building-features/generated-rails-response-types',

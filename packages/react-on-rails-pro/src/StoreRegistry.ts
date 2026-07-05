@@ -60,6 +60,10 @@ export function getStore(name: string, throwIfMissing = true): Store | undefined
   try {
     return hydratedStoreRegistry.get(name);
   } catch (error) {
+    if (!throwIfMissing) {
+      return undefined;
+    }
+
     if (hydratedStoreRegistry.getAll().size === 0) {
       const msg = `There are no stores hydrated and you are requesting the store ${name}.
 This can happen if you are server rendering and either:
@@ -69,10 +73,7 @@ This can happen if you are server rendering and either:
       throw new Error(msg);
     }
 
-    if (throwIfMissing) {
-      throw error;
-    }
-    return undefined;
+    throw error;
   }
 }
 

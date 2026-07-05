@@ -112,18 +112,25 @@ function isUnexpectedGithubApiResponse(error) {
 
 async function listWorkflowRunsForEvent({ github, context, sha, createdAfter, event }) {
   const workflowRuns = [];
+  const listOptions = {
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    event,
+    head_sha: sha,
+    per_page: 30,
+    sort: 'created',
+    direction: 'desc',
+  };
+
+  if (createdAfter) {
+    listOptions.created = `>${createdAfter}`;
+  }
 
   try {
-    for await (const response of github.paginate.iterator(github.rest.actions.listWorkflowRunsForRepo, {
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      event,
-      head_sha: sha,
-      per_page: 30,
-      created: `>${createdAfter}`,
-      sort: 'created',
-      direction: 'desc',
-    })) {
+    for await (const response of github.paginate.iterator(
+      github.rest.actions.listWorkflowRunsForRepo,
+      listOptions,
+    )) {
       const pageRuns = response.data;
       const relevantInPage = pageRuns.filter((run) => run.head_sha === sha);
 
@@ -332,7 +339,7 @@ async function checkPreviousMainCommitStatus({
   excludeWorkflowsInput,
   maxGuardOnlyHops = MAX_GUARD_ONLY_HOPS,
   maxNoRunsHops = MAX_NO_RUNS_HOPS,
-  createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+  createdAfter = null,
 }) {
   const excludeWorkflows = parseExcludeWorkflows(excludeWorkflowsInput);
 
@@ -348,7 +355,7 @@ async function checkPreviousMainCommitStatus({
       const exhaustedLimit =
         remainingGuardOnlyHops <= 0
           ? `${maxGuardOnlyHops} docs-only guard-only commits`
-          : `${maxNoRunsHops} no-run merge queue candidate commits`;
+          : `${maxNoRunsHops} no-run candidate commits`;
       const noRunsTrailForFailure =
         remainingNoRunsHops <= 0 && !noRunsTrail.includes(shaToCheck)
           ? [...noRunsTrail, shaToCheck]
@@ -377,19 +384,31 @@ async function checkPreviousMainCommitStatus({
     });
 
     if (result.status === 'no-runs') {
+      const noRunsSummary = createdAfter
+        ? `No trusted workflow runs found for ${shaToCheck} since ${createdAfter}.`
+        : `No trusted workflow runs found for ${shaToCheck}.`;
       const shouldTraceNoRunsParent =
-        context.eventName === 'merge_group' &&
-        !(await isCommitReachableFromDefaultBranch({ github, context, sha: shaToCheck }));
+        context.eventName === 'push' ||
+        (context.eventName === 'merge_group' &&
+          !(await isCommitReachableFromDefaultBranch({ github, context, sha: shaToCheck })));
       const parentSha = shouldTraceNoRunsParent
         ? await firstParentSha({ github, context, sha: shaToCheck })
         : null;
 
       if (parentSha) {
+        const traceReason =
+          context.eventName === 'merge_group'
+            ? [
+                'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
+                'that was never pushed to main.',
+              ].join(' ')
+            : 'For main pushes, a docs-only commit may follow earlier docs-only commits whose real CI state is on an ancestor.';
+
         core.info(
           [
-            `No trusted workflow runs found for ${shaToCheck} in the last 7 days.`,
-            'For batched merge queues, github.event.merge_group.base_sha can be a synthetic queue commit',
-            `that was never pushed to main. Checking first parent ${parentSha} for the underlying CI state.`,
+            noRunsSummary,
+            traceReason,
+            `Checking first parent ${parentSha} for the underlying CI state.`,
           ].join(' '),
         );
         noRunsTrail.push(shaToCheck);
@@ -398,9 +417,14 @@ async function checkPreviousMainCommitStatus({
       }
 
       if (shouldTraceNoRunsParent) {
+        const noParentSubject =
+          context.eventName === 'merge_group'
+            ? `merge queue SHA ${shaToCheck} is not in the default branch and`
+            : `main push SHA ${shaToCheck}`;
+
         core.setFailed(
           [
-            `Cannot determine prior real CI status because merge queue SHA ${shaToCheck} is not in the default branch and has no parent commits to inspect.`,
+            `Cannot determine prior real CI status because ${noParentSubject} has no parent commits to inspect.`,
             formatNoRunsTrailDetails(noRunsTrail),
             'Push a non-docs change to trigger hosted CI.',
           ]
@@ -413,14 +437,12 @@ async function checkPreviousMainCommitStatus({
       if (context.eventName === 'merge_group') {
         core.info(
           [
-            `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
+            `${noRunsSummary} Allowing docs-only skip.`,
             'This SHA is already in the default branch history; no parent tracing needed.',
           ].join('\n'),
         );
       } else {
-        core.info(
-          `No trusted workflow runs found for ${shaToCheck} in the last 7 days. Allowing docs-only skip.`,
-        );
+        core.info(`${noRunsSummary} Allowing docs-only skip.`);
       }
       return;
     }
