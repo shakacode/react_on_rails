@@ -27,13 +27,16 @@ class AgentCoordBoundedTest < Minitest::Test
   def test_times_out_and_reports_unknown_friendly_status
     with_fake_agent_coord(<<~RUBY) do |env|
       puts "partial json output"
+      $stderr.puts "partial stderr output"
       $stdout.flush
+      $stderr.flush
       sleep 5
     RUBY
       stdout, stderr, status = run_script(env, "--timeout", "1", "doctor", "--json")
 
       assert_equal 124, status.exitstatus
       assert_equal "partial json output\n", stdout
+      assert_includes stderr, "partial stderr output"
       assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
       assert_includes stderr, "agent-coord doctor --json"
     end
@@ -116,21 +119,21 @@ class AgentCoordBoundedTest < Minitest::Test
   def test_terminates_agent_coord_process_group_when_interrupted
     Dir.mktmpdir("agent-coord-bounded-test") do |dir|
       child_pid_file = File.join(dir, "child.pid")
-      stdout_file = File.join(dir, "wrapper.stdout")
-      stderr_file = File.join(dir, "wrapper.stderr")
+      wrapper_stdout_file = File.join(dir, "wrapper.stdout")
+      wrapper_stderr_file = File.join(dir, "wrapper.stderr")
       wrapper_pid = nil
       child_pid = nil
 
       with_fake_agent_coord(<<~RUBY, "AGENT_COORD_CHILD_PID" => child_pid_file) do |env|
-        puts "interrupted stdout"
+        puts "interrupted stdout output"
+        $stderr.puts "interrupted stderr output"
         $stdout.flush
-        $stderr.puts "interrupted stderr"
         $stderr.flush
         File.write(ENV.fetch("AGENT_COORD_CHILD_PID"), Process.pid.to_s)
         sleep 10
       RUBY
         wrapper_pid = Process.spawn(env, RbConfig.ruby, SCRIPT, "--timeout", "20", "status",
-                                    out: stdout_file, err: stderr_file)
+                                    out: wrapper_stdout_file, err: wrapper_stderr_file)
 
         assert wait_until(timeout: 5) { File.size?(child_pid_file) }, "fake agent-coord did not start"
 
@@ -139,8 +142,8 @@ class AgentCoordBoundedTest < Minitest::Test
         _, status = Process.waitpid2(wrapper_pid)
 
         assert_equal 143, status.exitstatus
-        assert_equal "interrupted stdout\n", File.read(stdout_file)
-        assert_includes File.read(stderr_file), "interrupted stderr\n"
+        assert_equal "interrupted stdout output\n", File.read(wrapper_stdout_file)
+        assert_includes File.read(wrapper_stderr_file), "interrupted stderr output"
         assert wait_until(timeout: 5) { !process_alive?(child_pid) }, "fake agent-coord survived wrapper termination"
       ensure
         Process.kill("KILL", wrapper_pid) if wrapper_pid && process_alive?(wrapper_pid)
@@ -163,11 +166,52 @@ class AgentCoordBoundedTest < Minitest::Test
         sleep 0.05 until File.size?(ENV.fetch("AGENT_COORD_HELPER_PID")) || Time.now >= deadline
         sleep 10
       RUBY
-        stdout, stderr, status = run_script(env, "--timeout", "2", "status")
+        stdout, stderr, status = run_script(env, "--timeout", "1", "status")
 
         assert_equal 124, status.exitstatus
         assert_empty stdout
-        assert_includes stderr, "agent-coord-bounded: timed out after 2.0s"
+        assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
+        assert wait_until(timeout: 5) { File.size?(helper_pid_file) }, "fake helper did not start"
+
+        helper_pid = File.read(helper_pid_file).to_i
+        assert wait_until(timeout: 5) { !process_alive?(helper_pid) }, "helper survived process-group cleanup"
+      ensure
+        Process.kill("KILL", helper_pid) if helper_pid && process_alive?(helper_pid)
+      end
+    end
+  end
+
+  def test_timeout_replays_helper_output_before_killing_process_group
+    Dir.mktmpdir("agent-coord-bounded-test") do |dir|
+      helper_pid_file = File.join(dir, "helper.pid")
+      helper_pid = nil
+
+      with_fake_agent_coord(<<~RUBY, "AGENT_COORD_HELPER_PID" => helper_pid_file) do |env|
+        helper_code = <<~'HELPER'
+          trap("TERM") do
+            sleep 0.2
+            puts "helper stdout after TERM"
+            $stderr.puts "helper stderr after TERM"
+            $stdout.flush
+            $stderr.flush
+            exit! 0
+          end
+          File.write(ENV.fetch("AGENT_COORD_HELPER_PID"), Process.pid.to_s)
+          sleep 10
+        HELPER
+        helper_pid = Process.spawn({ "AGENT_COORD_HELPER_PID" => ENV.fetch("AGENT_COORD_HELPER_PID") },
+                                   #{RbConfig.ruby.dump}, "-e", helper_code)
+        Process.detach(helper_pid)
+        deadline = Time.now + 5
+        sleep 0.05 until File.size?(ENV.fetch("AGENT_COORD_HELPER_PID")) || Time.now >= deadline
+        sleep 10
+      RUBY
+        stdout, stderr, status = run_script(env, "--timeout", "1", "status")
+
+        assert_equal 124, status.exitstatus
+        assert_includes stdout, "helper stdout after TERM"
+        assert_includes stderr, "helper stderr after TERM"
+        assert_includes stderr, "agent-coord-bounded: timed out after 1.0s"
         assert wait_until(timeout: 5) { File.size?(helper_pid_file) }, "fake helper did not start"
 
         helper_pid = File.read(helper_pid_file).to_i
@@ -180,6 +224,8 @@ class AgentCoordBoundedTest < Minitest::Test
 
   def test_process_alive_treats_eperm_as_alive
     original_kill = Process.method(:kill)
+    # This patches Process globally for the duration of the assertion; the
+    # ensure block restores it so later tests do not inherit the EPERM stub.
     Process.define_singleton_method(:kill) { |*| raise Errno::EPERM }
 
     assert process_alive?(1234)
@@ -220,10 +266,19 @@ class AgentCoordBoundedTest < Minitest::Test
 
   def process_alive?(pid)
     Process.kill(0, pid)
-    true
+    !zombie_process?(pid)
   rescue Errno::ESRCH
     false
   rescue Errno::EPERM
     true
+  end
+
+  def zombie_process?(pid)
+    stdout, status = Open3.capture2("ps", "-o", "stat=", "-p", pid.to_s)
+    return false unless status.success?
+
+    stdout.split.any? { |state| state.start_with?("Z") }
+  rescue StandardError
+    false
   end
 end

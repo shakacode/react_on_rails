@@ -9,18 +9,22 @@ require "optparse"
 require "set"
 # rubocop:enable Lint/RedundantRequireStatement
 require "timeout"
+require "uri"
 require "yaml"
+
+require_relative "../lib/git_probe_env"
 
 options = {
   acknowledged_risks: Hash.new { |hash, key| hash[key] = Set.new },
   repo: nil,
   fail_on_high_risk_files: false,
   include_reactions: false,
-  strict_trust: true,
+  strict_trust: false,
   trust_config: nil
 }
 
 GH_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_SECURITY_PREFLIGHT_GH_TIMEOUT_SECONDS", "60"))
+GIT_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_SECURITY_PREFLIGHT_GIT_TIMEOUT_SECONDS", "10"))
 ACKNOWLEDGEABLE_RISKS = Set.new(
   %w[
     github-api-coverage
@@ -76,7 +80,7 @@ WARNING_SUSPICIOUS_PATTERN = /
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: pr-security-preflight [--repo OWNER/REPO] [--trust-config PATH] " \
                 "[--acknowledge-risk NUMBER:RISK[,RISK]] [--include-reactions] " \
-                "[--[no-]strict-trust] [--fail-on-high-risk-files] NUMBER [...]"
+                "[--strict-trust] [--fail-on-high-risk-files] NUMBER [...]"
   opts.on("--repo OWNER/REPO", "GitHub repository, defaulting to gh repo view") { |repo| options[:repo] = repo }
   opts.on("--trust-config PATH", "Trusted GitHub actor allowlist") { |path| options[:trust_config] = path }
   acknowledge_help = "Maintainer-acknowledged exact-target risk. " \
@@ -88,12 +92,12 @@ parser = OptionParser.new do |opts|
   end
   include_reactions_help = "Fetch reaction users as visible actors (extra GitHub API calls). " \
                            "Without this flag, reaction-only users already present in GitHub participants " \
-                           "appear as hidden participants and block unless --no-strict-trust is set."
+                           "appear as hidden participants and block when --strict-trust is set."
   opts.on("--include-reactions", include_reactions_help) do
     options[:include_reactions] = true
   end
-  opts.on("--[no-]strict-trust", "Exit non-zero on non-allowlisted or hidden actor findings (default: true)") do |value|
-    options[:strict_trust] = value
+  opts.on("--strict-trust", "Exit non-zero on non-allowlisted or hidden actor findings") do
+    options[:strict_trust] = true
   end
   opts.on("--fail-on-high-risk-files", "Exit non-zero when high-risk surfaces changed") do
     options[:fail_on_high_risk_files] = true
@@ -127,7 +131,7 @@ def run_gh(*args)
   status = nil
 
   Timeout.timeout(GH_TIMEOUT_SECONDS) do
-    stdout, stderr, status = Open3.capture3("gh", *args)
+    stdout, stderr, status = Open3.capture3(git_probe_env, "gh", *args)
   end
 
   # Force UTF-8 so non-ASCII gh output (issue bodies, author names) survives LANG=C.
@@ -150,8 +154,30 @@ def run_gh_paginated_json_array(*)
   run_gh_json(*, "--paginate", "--slurp").flatten
 end
 
-def current_repo
-  JSON.parse(run_gh("repo", "view", "--json", "nameWithOwner")).fetch("nameWithOwner")
+def current_repo_info
+  payload = run_gh_json("repo", "view", "--json", "nameWithOwner,url")
+
+  repo_info_from_payload(payload)
+end
+
+def repo_option_info(repo)
+  return { repo:, github_host: expected_github_host } unless ENV["GH_HOST"].to_s.empty?
+
+  payload = run_gh_json("repo", "view", repo, "--json", "nameWithOwner,url")
+  repo_info_from_payload(payload).merge(repo:)
+rescue StandardError => e
+  warn "WARN: could not resolve GitHub host via gh repo view for #{repo.inspect}: #{e.message.lines.first&.strip}"
+  { repo:, github_host: inferred_github_host_from_local_git(repo) || expected_github_host }
+end
+
+def repo_info_from_payload(payload)
+  remote = github_remote_from_remote_url(payload["url"])
+  repo = payload.fetch("nameWithOwner")
+
+  {
+    repo:,
+    github_host: remote&.fetch(:host) || expected_github_host
+  }
 end
 
 def issue_payload(repo, number)
@@ -189,19 +215,37 @@ HOME_TRUST_CONFIG = "~/.agents/trusted-github-actors.yml"
 PACKAGED_TRUST_CONFIG = File.expand_path("../trusted-github-actors.yml", __dir__)
 USER_TRUST_CONFIG_ENV = "AGENT_WORKFLOWS_TRUST_CONFIG"
 
-def resolved_trust_config(explicit_path)
+def git_probe_env
+  PrBatchGitProbeEnv.probe_env
+end
+
+def capture_git_probe(*args)
+  Timeout.timeout(GIT_TIMEOUT_SECONDS) do
+    Open3.capture3(git_probe_env, *args)
+  end
+rescue Timeout::Error
+  warn "WARN: git #{args.join(' ')} timed out after #{GIT_TIMEOUT_SECONDS}s"
+  ["", "", nil]
+end
+
+def resolved_trust_config(explicit_path, repo:, github_host:)
   if explicit_path
     expanded = File.expand_path(explicit_path)
     abort "Trust config not found: #{expanded}" unless File.exist?(expanded)
 
-    return { path: expanded, global: false }
+    return { path: expanded, global: trust_config_global?(expanded, repo, github_host:) }
   end
 
   repo_path = repo_trust_config_path
-  return { path: repo_path, global: false } if File.exist?(repo_path)
+  return { path: repo_path, global: trust_config_global?(repo_path, repo, github_host:) } if File.exist?(repo_path)
 
   env_path = ENV[USER_TRUST_CONFIG_ENV].to_s
-  return { path: env_path, global: true } if !env_path.empty? && File.exist?(File.expand_path(env_path))
+  unless env_path.empty?
+    expanded_env_path = File.expand_path(env_path)
+    abort "#{USER_TRUST_CONFIG_ENV} points to a missing trust config: #{expanded_env_path}" unless File.exist?(expanded_env_path)
+
+    return { path: expanded_env_path, global: true }
+  end
 
   home_path = File.expand_path(HOME_TRUST_CONFIG)
   return { path: home_path, global: true } if File.exist?(home_path)
@@ -214,12 +258,176 @@ def repo_trust_config_path
   File.join(root, DEFAULT_TRUST_CONFIG)
 end
 
-def git_toplevel
-  stdout, = Open3.capture3("git", "rev-parse", "--show-toplevel")
+def git_toplevel(chdir: nil)
+  args = ["git"]
+  args.push("-C", chdir) if chdir
+  args.concat(["rev-parse", "--show-toplevel"])
+  stdout, _stderr, status = capture_git_probe(*args)
+  return unless status&.success?
+
+  stdout = stdout.force_encoding("UTF-8").scrub
   root = stdout.strip
   root unless root.empty?
 rescue StandardError
   nil
+end
+
+def trust_config_repo_local?(path, repo, github_host:)
+  root = git_toplevel(chdir: File.dirname(path))
+  return false unless root
+  return false unless path_inside_git_root?(path, root:)
+
+  git_root_matches_repo?(root, repo, github_host:)
+end
+
+def trust_config_global?(path, repo, github_host:)
+  !trust_config_repo_local?(path, repo, github_host:)
+end
+
+def path_inside_git_root?(path, root:)
+  expanded_root = canonical_path(root)
+  expanded_path = canonical_path(path)
+  expanded_path == expanded_root ||
+    expanded_path.start_with?("#{expanded_root}#{File::SEPARATOR}")
+end
+
+def git_remote_urls(root)
+  # Intentionally reads stored remote URLs without applying url.*.insteadOf
+  # rewrites; consumers using mirror rewrites should keep a canonical remote too.
+  %w[--local --worktree].flat_map do |scope|
+    stdout, _stderr, status = capture_git_probe(
+      "git",
+      "-C",
+      root,
+      "config",
+      scope,
+      "--null",
+      "--get-regexp",
+      "^remote\\..*\\.url$"
+    )
+    next [] unless status&.success?
+
+    stdout = stdout.force_encoding("UTF-8").scrub
+    stdout.split("\0").filter_map do |entry|
+      key, url = entry.split("\n", 2)
+      next unless key&.match?(/\Aremote\..*\.url\z/)
+
+      url&.strip
+    end
+  end.uniq
+rescue StandardError
+  []
+end
+
+def inferred_github_host_from_local_git(repo)
+  root = git_toplevel
+  return unless root
+
+  matching_hosts = git_remote_urls(root).filter_map do |url|
+    remote = github_remote_from_remote_url(url)
+    remote[:host] if remote && remote[:repo].casecmp(repo).zero?
+  end.uniq
+  matching_hosts.first if matching_hosts.one?
+end
+
+def normalized_github_host(host)
+  host.to_s.downcase
+end
+
+def expected_github_host
+  normalized_github_host(ENV.fetch("GH_HOST", "github.com"))
+end
+
+def normalized_remote_host(host)
+  # GitHub documents ssh.github.com:443 for SSH-over-HTTPS clones; trust checks
+  # should still compare those remotes against github.com API scans.
+  %w[ssh.github.com ssh.github.com:443].include?(host) ? "github.com" : host
+end
+
+def remote_url_host(host, port, scheme:)
+  normalized = normalized_github_host(host)
+  return if normalized.empty?
+
+  default_port_match = case scheme
+                       when "http"
+                         port == 80
+                       when "https"
+                         port == 443
+                       when "ssh"
+                         port == 22
+                       else
+                         false
+                       end
+  normalized_remote_host(port && !default_port_match ? "#{normalized}:#{port}" : normalized)
+end
+
+def uri_remote_from_remote_url(normalized)
+  uri = URI.parse(normalized)
+  return unless %w[http https ssh].include?(uri.scheme)
+
+  repo = uri.path.to_s.delete_prefix("/")
+  return unless repo.match?(%r{\A[^/\s]+/[^/\s]+\z})
+
+  port = uri.port || (22 if uri.scheme == "ssh")
+  host = remote_url_host(uri.host, port, scheme: uri.scheme)
+  return unless host
+
+  { host:, port:, repo:, scheme: uri.scheme }
+rescue URI::Error
+  nil
+end
+
+def github_remote_from_remote_url(url)
+  normalized = url.to_s.strip.sub(%r{/+\z}, "").sub(/\.git\z/i, "")
+  return uri_remote_from_remote_url(normalized) if normalized.match?(%r{\A(?:https?|ssh)://}i)
+
+  match = normalized.match(%r{\A[^@/:\s]+@([^:\s]+):([^/\s]+/[^/\s]+)\z}i)
+  return unless match
+
+  { host: normalized_remote_host(normalized_github_host(match[1])), port: 22, repo: match[2], scheme: "ssh" }
+end
+
+def host_port(host)
+  host.to_s.match(/\A(.+):(\d+)\z/)&.then { |match| [match[1], match[2].to_i] }
+end
+
+def remote_matches_github_host?(remote, github_host)
+  github_host_port = host_port(github_host)
+  return remote[:host] == github_host unless github_host_port
+
+  github_base_host, github_port = github_host_port
+  return true if remote[:host] == github_host
+  return false unless remote[:host] == github_base_host
+
+  case remote[:scheme]
+  when "http"
+    github_port == 80 && remote[:port] == 80
+  when "https"
+    github_port == 443 && remote[:port] == 443
+  when "ssh"
+    remote[:port] == 22 || (github_port == 443 && remote[:port] == 443)
+  else
+    false
+  end
+end
+
+def git_root_matches_repo?(root, repo, github_host:)
+  remote_repos = git_remote_urls(root).filter_map do |url|
+    remote = github_remote_from_remote_url(url)
+    remote[:repo] if remote && remote_matches_github_host?(remote, github_host)
+  end
+  if remote_repos.empty?
+    warn "WARN: could not determine repo from remotes for trust config working tree #{root.inspect}; treating trust config as global"
+    return false
+  end
+
+  remote_repos.any? { |remote_repo| remote_repo.casecmp(repo).zero? }
+end
+
+def canonical_path(path)
+  File.realpath(path)
+rescue SystemCallError
+  File.expand_path(path)
 end
 
 def normalized_team_entry(value, require_owner:)
@@ -231,6 +439,8 @@ def normalized_team_entry(value, require_owner:)
 
     { owner: normalized_login(owner_or_slug), slug: }
   elsif require_owner
+    warn "WARN: global trust config ignores unqualified team slug #{owner_or_slug.inspect}: " \
+         "use OWNER/team-slug format"
     nil
   else
     { owner: nil, slug: owner_or_slug }
@@ -314,6 +524,10 @@ def allowed_metadata_actor?(repo, login, trust_config, team_cache)
   trusted_actor?(repo, login, trust_config, team_cache) || trusted_metadata_bot?(login, trust_config)
 end
 
+def trusted_metadata_text?(repo, author, text, trust_config:, team_cache:, pattern:)
+  allowed_metadata_actor?(repo, author, trust_config, team_cache) && text.to_s.match?(pattern)
+end
+
 RESOLVED_REVIEW_THREADS_QUERY = <<~GRAPHQL
   query($owner:String!, $name:String!, $number:Int!, $after:String) {
     repository(owner:$owner, name:$name) {
@@ -355,7 +569,7 @@ end
 def add_resolved_review_comment_ids(ids, threads, repo:, trust_config:, team_cache:)
   Array(threads["nodes"]).each do |thread|
     next unless thread["isResolved"]
-    next unless trusted_actor?(repo, thread.dig("resolvedBy", "login"), trust_config, team_cache)
+    next unless allowed_metadata_actor?(repo, thread.dig("resolvedBy", "login"), trust_config, team_cache)
 
     Array(thread.dig("comments", "nodes")).each do |comment|
       database_id = comment["databaseId"]
@@ -495,7 +709,7 @@ def target_source_actor_logins(target)
 end
 
 def trusted_pr_source?(repo, target, trust_config:, team_cache:)
-  return false unless commit_author_coverage_findings(target).empty?
+  return false unless source_actor_coverage_findings(target).empty?
 
   logins = pr_source_actor_logins(target)
   return false if logins.empty?
@@ -508,14 +722,13 @@ def suspicious_issue_text(rest_context, repo, trust_config:, team_cache:, patter
   issue = rest_context.fetch(:issue)
 
   issue_author = issue.dig("user", "login")
-  if trusted_actor?(repo, issue_author, trust_config, team_cache) && (issue["body"] || "").match?(pattern)
+  if trusted_metadata_text?(repo, issue_author, issue["body"], trust_config:, team_cache:, pattern:)
     findings << { location: "issue body", author: issue_author, url: issue.fetch("html_url") }
   end
 
   rest_context.fetch(:issue_comments).each do |comment|
     author = comment.dig("user", "login")
-    next unless trusted_actor?(repo, author, trust_config, team_cache)
-    next unless (comment["body"] || "").match?(pattern)
+    next unless trusted_metadata_text?(repo, author, comment["body"], trust_config:, team_cache:, pattern:)
 
     findings << {
       location: "issue comment #{comment.fetch('id')}",
@@ -533,12 +746,15 @@ def suspicious_pr_review_comments(rest_context, repo, trust_config:, team_cache:
 
   rest_context.fetch(:review_comments).each do |comment|
     author = comment.dig("user", "login")
-    next unless trusted_actor?(repo, author, trust_config, team_cache)
+
     # Resolved trusted-bot review comments are historical review metadata. Keep
-    # unresolved/current bot findings blocking, and fail closed if resolution
-    # state could not be fetched.
-    next if trusted_bot?(author, trust_config) && resolved_review_comment_ids.include?(comment["id"])
-    next unless (comment["body"] || "").match?(pattern)
+    # unresolved/current bot findings visible, preserve blocking-pattern warnings,
+    # and fail closed if resolution state could not be fetched.
+    resolved_comment_from_known_bot =
+      (trusted_bot?(author, trust_config) || trusted_metadata_bot?(author, trust_config)) &&
+      resolved_review_comment_ids.include?(comment["id"])
+    next if resolved_comment_from_known_bot && pattern != BLOCKING_SUSPICIOUS_PATTERN
+    next unless trusted_metadata_text?(repo, author, comment["body"], trust_config:, team_cache:, pattern:)
 
     findings << {
       location: "review comment #{comment.fetch('id')}",
@@ -555,8 +771,7 @@ def suspicious_pr_reviews(rest_context, repo, trust_config:, team_cache:, patter
 
   rest_context.fetch(:reviews).each do |review|
     author = review.dig("user", "login")
-    next unless trusted_actor?(repo, author, trust_config, team_cache)
-    next unless (review["body"] || "").match?(pattern)
+    next unless trusted_metadata_text?(repo, author, review["body"], trust_config:, team_cache:, pattern:)
 
     findings << {
       location: "pull request review #{review.fetch('id')}",
@@ -628,7 +843,6 @@ end
 
 def untrusted_issue_comment_findings(rest_context, repo, trust_config:, team_cache:)
   rest_context.fetch(:issue_comments).filter_map do |comment|
-
     untrusted_interaction_finding(
       repo,
       comment.dig("user", "login"),
@@ -953,9 +1167,22 @@ def connection_coverage_finding(target, connection_name)
   { connection: connection_name, fetched_count: nodes.size, reason: "truncated", total_count: }
 end
 
-def graph_coverage_findings(target)
-  PAGINATED_CONNECTIONS.filter_map { |connection_name| connection_coverage_finding(target, connection_name) } +
-    commit_author_coverage_findings(target)
+def graph_coverage_findings(target, include_target_author:, connections: PAGINATED_CONNECTIONS)
+  [
+    (target_author_coverage_finding(target) if include_target_author),
+    *connections.filter_map { |connection_name| connection_coverage_finding(target, connection_name) },
+    *commit_author_coverage_findings(target)
+  ].compact
+end
+
+def target_author_coverage_finding(target)
+  return unless target.dig("author", "login").to_s.empty?
+
+  { connection: "target author", fetched_count: 0, reason: "nodes unavailable", total_count: 1 }
+end
+
+def source_actor_coverage_findings(target)
+  graph_coverage_findings(target, include_target_author: true, connections: ["timelineItems"])
 end
 
 def commit_author_coverage_findings(target)
@@ -976,12 +1203,12 @@ def commit_author_coverage_findings(target)
 
     total_count = authors["totalCount"].to_i
     if nodes.any? { |author| author.dig("user", "login").to_s.empty? }
-      next({ connection: "commit authors", fetched_count: nodes.size, reason: "nodes unavailable", total_count: total_count })
+      next({ connection: "commit authors", fetched_count: nodes.size, reason: "nodes unavailable", total_count: })
     end
 
     next unless authors.dig("pageInfo", "hasNextPage") || total_count > nodes.size
 
-    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: total_count }
+    { connection: "commit authors", fetched_count: nodes.size, reason: "truncated", total_count: }
   end
 end
 
@@ -1105,7 +1332,7 @@ def scan_target(repo:, owner:, name:, number:, pr_query:, issue_query:, include_
   {
     files:,
     number:,
-    graph_coverage_findings: graph_coverage_findings(target),
+    graph_coverage_findings: graph_coverage_findings(target, include_target_author: target_is_pr),
     participant_findings: participant_findings(repo:, target:, visible:, permission_cache:, trust_config:, team_cache:),
     risky_files: high_risk_files(files),
     suspicious: suspicious_findings.fetch(:suspicious),
@@ -1302,7 +1529,10 @@ def print_scan_result(result, overall_blockers, acknowledged_findings:, acknowle
   puts
 end
 
-repo = options[:repo] || current_repo
+repo_info = options[:repo] ? repo_option_info(options[:repo]) : current_repo_info
+repo = repo_info.fetch(:repo)
+github_host = repo_info.fetch(:github_host)
+ENV["GH_HOST"] = github_host
 owner, name = repo.split("/", 2)
 abort "Repository must be OWNER/REPO, got #{repo.inspect}" unless owner && name && !owner.empty? && !name.empty?
 
@@ -1365,7 +1595,7 @@ overall_blockers = []
 acknowledged_findings = []
 permission_cache = {}
 team_cache = {}
-trust_config = load_trust_config(**resolved_trust_config(options.fetch(:trust_config)))
+trust_config = load_trust_config(**resolved_trust_config(options.fetch(:trust_config), repo:, github_host:))
 
 ARGV.each do |arg|
   number = Integer(arg, exception: false)
