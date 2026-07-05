@@ -16,11 +16,145 @@ RSpec.describe "script/pr-merge-ledger" do
   def with_fake_gh(script_body)
     Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
       gh_path = File.join(bin_dir, "gh")
-      File.write(gh_path, script_body)
+      File.write(gh_path, fake_gh_script_with_ready_checks(script_body))
       File.chmod(0o755, gh_path)
 
       yield({ "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" })
     end
+  end
+
+  def with_raw_fake_gh(script_body)
+    Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
+      gh_path = File.join(bin_dir, "gh")
+      File.write(gh_path, script_body)
+      File.chmod(0o755, gh_path)
+
+      yield({ "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" }, bin_dir)
+    end
+  end
+
+  def fake_gh_script_with_ready_checks(script_body)
+    <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        cat <<'JSON'
+      [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+        exit 0
+      fi
+
+      #{script_body}
+    SH
+  end
+
+  def fake_gh_script_with_check_rows(
+    required_json:,
+    full_json:,
+    pr_checks_exit_status: 0,
+    fail_first_pr_checks: nil,
+    pr_checks_stderr: nil,
+    pr_checks_sleep_seconds: nil
+  )
+    <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        count_file="$(dirname "$0")/pr-check-calls"
+        count=0
+        if [ -f "$count_file" ]; then
+          count=$(cat "$count_file")
+        fi
+        count=$((count + 1))
+        printf '%s\\n' "$count" > "$count_file"
+
+        if [ "$count" -eq 1 ] && [ -n #{fail_first_pr_checks.to_s.inspect} ]; then
+          printf '%s\\n' #{fail_first_pr_checks.to_s.inspect} >&2
+          exit 1
+        fi
+
+        if [ -n #{pr_checks_sleep_seconds.to_s.inspect} ]; then
+          sleep #{pr_checks_sleep_seconds.to_s.inspect}
+          exit 1
+        fi
+
+        required=false
+        for arg in "$@"; do
+          if [ "$arg" = "--required" ]; then
+            required=true
+          fi
+        done
+
+        if [ "$required" = "true" ]; then
+          cat <<'JSON'
+      #{required_json}
+      JSON
+        else
+          cat <<'JSON'
+      #{full_json}
+      JSON
+        fi
+        if [ -n #{pr_checks_stderr.to_s.inspect} ]; then
+          printf '%s\\n' #{pr_checks_stderr.to_s.inspect} >&2
+        fi
+        exit #{pr_checks_exit_status}
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+  end
+
+  def write_fixture(file, fixture, binary: false)
+    fixture = fixture.merge(default_ci_readiness) if fixture_needs_default_ci_readiness?(fixture)
+    json = JSON.generate(fixture)
+    file.write(binary ? json.b : json)
+  end
+
+  def fixture_needs_default_ci_readiness?(fixture)
+    fixture.is_a?(Hash) &&
+      fixture["pull_request"].is_a?(Hash) &&
+      !fixture.key?("ci_readiness") &&
+      !fixture.key?("checks")
+  end
+
+  def default_ci_readiness
+    {
+      "ci_readiness" => {
+        "status" => "known",
+        "verdict" => "READY",
+        "required_used" => true,
+        "failing" => [],
+        "pending" => [],
+        "checks" => []
+      }
+    }
   end
 
   it "reports the known #3613 CHANGES_REQUESTED merge-ledger violation" do
@@ -87,7 +221,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-unknown", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -137,7 +271,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-unknown-review-decision-change-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -175,7 +309,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-null-review-decision", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -211,7 +345,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-missing-files", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -256,7 +390,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-blank-review-decision", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -302,7 +436,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-null-review-decision-change-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -349,7 +483,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-blank-review-decision-change-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -386,7 +520,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-review-required", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -423,7 +557,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-unsupported-review-decision", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -466,7 +600,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-non-strict-violations", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -502,7 +636,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-missing-changelog", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -540,7 +674,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     %w[changelog_present deferred_to_update_changelog].each do |classification|
       Tempfile.create(["pr-merge-ledger-#{classification}", ".json"]) do |file|
-        file.write(JSON.generate(fixture))
+        write_fixture(file, fixture)
         file.flush
 
         stdout, stderr, status = Open3.capture3(
@@ -578,7 +712,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-unknown-changelog", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -611,7 +745,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-clean", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -649,7 +783,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-draft", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -687,7 +821,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-closed-unmerged", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -723,7 +857,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-missing-head-sha", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -754,7 +888,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-missing-pull-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
@@ -787,7 +921,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-malformed-pull-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
@@ -806,7 +940,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-programming-error", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(script_path, "--fixture", file.path, chdir: repo_root)
@@ -851,7 +985,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-superseded", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -910,7 +1044,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-current-change-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -974,7 +1108,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-current-approval", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1039,7 +1173,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-current-approval-tie", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1090,7 +1224,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-stale-change-request", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1152,7 +1286,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-parsed-timestamp", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1203,7 +1337,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-negative-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1259,7 +1393,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-all-current-reviews", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, _stderr, status = Open3.capture3(
@@ -1321,7 +1455,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-non-gating-review-findings", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1376,7 +1510,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-gating-review-findings", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1425,7 +1559,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-p0", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1480,7 +1614,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-badge-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1530,7 +1664,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-numbered-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1580,7 +1714,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-heading-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1630,7 +1764,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-task-list-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1680,7 +1814,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-slash-combined-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1734,7 +1868,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-or-separated-finding", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-or-separated-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -1786,7 +1920,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-two-findings", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1836,7 +1970,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-duplicate-severity", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1885,7 +2019,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-priority-looking-title", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1934,7 +2068,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-cross-priority-title", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -1984,7 +2118,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-indented-marker", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2039,7 +2173,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-outdated-thread-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2093,7 +2227,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-old-head-thread", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2152,7 +2286,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-url-comment-id", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2195,7 +2329,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-commentless-thread", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2257,7 +2391,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-stale-thread-comment", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2313,7 +2447,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-resolved-thread-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2376,7 +2510,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-superseded-review-finding", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2422,7 +2556,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-waived-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2474,7 +2608,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-resolved-multi-severity-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2524,7 +2658,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-no-issues-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2570,7 +2704,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-unresolved-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2620,7 +2754,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-not-fully-resolved-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2670,7 +2804,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-none-of-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2720,7 +2854,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-none-the-less-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2770,7 +2904,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-none-remaining-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2814,7 +2948,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-none-resolved-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2863,7 +2997,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2913,7 +3047,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-comma-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -2963,7 +3097,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-however-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3012,7 +3146,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-with-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3061,7 +3195,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-period-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3113,7 +3247,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-space-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3162,7 +3296,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-conjunction-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3220,7 +3354,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-colon-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3274,7 +3408,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-parenthetical-mixed-summary", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3324,7 +3458,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-previous-review-still-applies", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3374,7 +3508,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-resolved-first-clause", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3418,7 +3552,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-top-level-comment", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3475,7 +3609,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-issue-comment-body", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3521,7 +3655,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-large-comment-body", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3587,7 +3721,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-truncated-comments", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3645,7 +3779,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-incomplete-unresolved-thread", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -3694,7 +3828,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -3753,7 +3887,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-line-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-line-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -3810,7 +3944,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-multi-line-broad-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-multi-line-broad-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -3867,7 +4001,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-same-line-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-same-line-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -3925,7 +4059,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-same-line-broad-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-same-line-broad-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -3981,7 +4115,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -4033,7 +4167,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(["fixed"]))
         dispositions_file.flush
@@ -4080,7 +4214,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -4131,7 +4265,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -4178,7 +4312,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -4316,7 +4450,7 @@ RSpec.describe "script/pr-merge-ledger" do
     }
 
     Tempfile.create(["pr-merge-ledger-bad-submitted-at", ".json"]) do |file|
-      file.write(JSON.generate(fixture))
+      write_fixture(file, fixture)
       file.flush
 
       stdout, stderr, status = Open3.capture3(
@@ -4459,6 +4593,327 @@ RSpec.describe "script/pr-merge-ledger" do
       report = JSON.parse(stdout)
       expect(report.dig("source", "repo")).to eq("shakacode/react_on_rails")
       expect(report.fetch("repository")).to eq("shakacode/react_on_rails")
+    end
+  end
+
+  it "blocks strict live closeout when full checks include a newer pending required row" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        count_file="$(dirname "$0")/pr-check-calls"
+        count=0
+        if [ -f "$count_file" ]; then
+          count=$(cat "$count_file")
+        fi
+        count=$((count + 1))
+        printf '%s\\n' "$count" > "$count_file"
+
+        required=false
+        for arg in "$@"; do
+          if [ "$arg" = "--required" ]; then
+            required=true
+          fi
+        done
+
+        if [ "$required" = "true" ]; then
+          cat <<'JSON'
+      [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+        else
+          cat <<'JSON'
+      [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"},{"name":"required-pr-gate","state":"PENDING","bucket":"pending","link":"https://example.com/check-rerun"}]
+      JSON
+        fi
+        exit 8
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
+      gh_path = File.join(bin_dir, "gh")
+      File.write(gh_path, fake_gh)
+      File.chmod(0o755, gh_path)
+
+      stdout, stderr, status = Open3.capture3(
+        { "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" },
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+      expect(stderr).to include("ledger violations:")
+
+      report = JSON.parse(stdout)
+      ledger = report.fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "NOT_READY",
+        "required_used" => false
+      )
+      expect(ledger.fetch("ci_readiness").fetch("pending").map { |check| check.fetch("name") }).to eq(
+        ["required-pr-gate"]
+      )
+      expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include("ci_check_pending")
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
+    end
+  end
+
+  it "allows strict live closeout when full checks include an advisory pending row" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      full_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"},{"name":"rspec-package-tests","state":"PENDING","bucket":"pending","link":"https://example.com/advisory"}]
+      JSON
+      pr_checks_exit_status: 8
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      ledger = JSON.parse(stdout).fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "READY",
+        "required_used" => true
+      )
+      expect(ledger.fetch("ci_readiness").fetch("pending")).to be_empty
+      expect(ledger.fetch("violations")).to be_empty
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
+    end
+  end
+
+  it "retries transient gh pr checks failures before deriving CI readiness" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      full_json: <<~JSON,
+        [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+      fail_first_pr_checks: "HTTP 429 Too Many Requests"
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      ledger = JSON.parse(stdout).fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "READY",
+        "required_used" => true
+      )
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("3")
+    end
+  end
+
+  it "bounds repeated gh pr checks timeouts before reporting unknown CI readiness" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: "[]",
+      full_json: "[]",
+      pr_checks_sleep_seconds: "2"
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env.merge("PR_MERGE_LEDGER_GITHUB_API_TIMEOUT_SECONDS" => "1"),
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("unknown_fields").map { |field| field.fetch("field") }).to include(
+        "ci_readiness.verdict"
+      )
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("3")
+    end
+  end
+
+  it "retries timeout-like gh pr checks stderr before reporting unknown CI readiness" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: "[]",
+      full_json: "[]",
+      pr_checks_exit_status: 1,
+      pr_checks_stderr: "gh pr checks timed out after 404 seconds"
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("unknown_fields").map { |field| field.fetch("field") }).to include(
+        "ci_readiness.verdict"
+      )
+      expect(report.fetch("pull_requests").fetch(0).fetch("ci_readiness").fetch("message")).to include(
+        "gh pr checks required failed with exit 1: gh pr checks timed out after 404 seconds"
+      )
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("6")
+    end
+  end
+
+  it "blocks strict live closeout when full checks omit required rows" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        required=false
+        for arg in "$@"; do
+          if [ "$arg" = "--required" ]; then
+            required=true
+          fi
+        done
+
+        if [ "$required" = "true" ]; then
+          cat <<'JSON'
+      [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+        else
+          cat <<'JSON'
+      [{"name":"docs-format-check","state":"SUCCESS","bucket":"pass","link":"https://example.com/docs"}]
+      JSON
+        fi
+        exit 0
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
+      gh_path = File.join(bin_dir, "gh")
+      File.write(gh_path, fake_gh)
+      File.chmod(0o755, gh_path)
+
+      stdout, stderr, status = Open3.capture3(
+        { "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" },
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+      expect(stderr).to include("ledger violations:")
+
+      report = JSON.parse(stdout)
+      ledger = report.fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "UNKNOWN",
+        "required_used" => false,
+        "message" => "full current-head check list omitted required checks: required-pr-gate"
+      )
+      expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_ci_readiness"
+      )
     end
   end
 
@@ -5095,7 +5550,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-disposition-fixture", ".json"]) do |fixture_file|
       Tempfile.create(["pr-merge-ledger-dispositions", ".json"]) do |dispositions_file|
-        fixture_file.write(JSON.generate(fixture))
+        write_fixture(fixture_file, fixture)
         fixture_file.flush
         dispositions_file.write(JSON.generate(dispositions))
         dispositions_file.flush
@@ -5263,7 +5718,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
     Tempfile.create(["pr-merge-ledger-non-ascii", ".json"]) do |file|
       file.binmode
-      file.write(JSON.generate(fixture).b)
+      write_fixture(file, fixture, binary: true)
       file.flush
 
       stdout, stderr, status = with_unbundled_env do

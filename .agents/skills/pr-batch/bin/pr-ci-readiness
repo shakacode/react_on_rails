@@ -6,13 +6,16 @@
 # Encapsulates the repeated "is this PR's CI ready?" rule that is otherwise
 # restated in prose across pr-batch, adversarial-pr-review, and pr-processing:
 #
-#   1. Run `gh pr checks <PR> --required`. If it reports no usable required
-#      checks -- either no JSON at all, or only cancelled/superseded rows --
+#   1. Run `gh pr checks <PR> --required`. If it reports no required checks,
 #      fall back to the full `gh pr checks <PR>` list.
 #   2. An empty check list => UNKNOWN / not ready.
-#   3. Ignore superseded/cancelled rows (bucket "cancel").
-#   4. Otherwise READY only when no failing (bucket "fail") and no pending
-#      (bucket "pending") rows remain. Passing and skipping rows are fine.
+#   3. Treat cancelled rows as non-ready unless the list contains no active rows,
+#      in which case the verdict is UNKNOWN.
+#   4. When required rows exist, cross-check them against the full list. A
+#      missing or non-ready matching required check blocks readiness; advisory
+#      rows outside the required set do not block required readiness.
+#   5. Otherwise READY only when no failing (bucket "fail") and no pending
+#      (bucket "pending" or "cancel") rows remain. Passing and skipping rows are fine.
 #
 # `gh pr checks` exits non-zero when checks are failing or pending, so this
 # captures stdout and inspects the rows rather than trusting the exit status.
@@ -41,18 +44,47 @@ module PrCiReadiness
     []
   end
 
-  # True when the raw payload holds a JSON array with at least one row that
-  # counts toward the gate. A required-check list made up entirely of cancelled
-  # rows would otherwise short-circuit the full-list fallback and then drop to
-  # zero active rows, producing a spurious UNKNOWN; treating it as "no usable
-  # checks" lets the caller fall back to the full list instead.
+  # True when the raw payload holds a JSON array with at least one row.
   def usable_checks?(raw)
-    !active_rows(parse_rows(raw)).empty?
+    !parse_rows(raw).empty?
   end
 
-  # Rows that count toward the gate: cancelled/superseded rows are dropped.
+  # Rows that count toward READY/NOT_READY. Cancel-only is UNKNOWN, but a cancel
+  # row alongside active rows keeps the PR out of READY.
   def active_rows(rows)
     rows.reject { |row| row["bucket"].to_s == "cancel" }
+  end
+
+  def cancelled_rows(rows)
+    rows.select { |row| row["bucket"].to_s == "cancel" }
+  end
+
+  def non_ready_row?(row)
+    %w[cancel fail pending].include?(row["bucket"].to_s)
+  end
+
+  def row_key(row)
+    name = row["name"].to_s
+    return name unless name.empty?
+
+    link = row["link"].to_s
+    link.empty? ? row.to_s : link
+  end
+
+  def required_rows_complete?(required_rows, full_rows)
+    required_keys = required_rows.map { |row| row_key(row) }
+    return false if required_keys.empty?
+
+    return false unless missing_required_keys(required_rows, full_rows).empty?
+
+    matching_full_rows = full_rows.select { |row| required_keys.include?(row_key(row)) }
+    matching_full_rows.none? { |row| non_ready_row?(row) }
+  end
+
+  def missing_required_keys(required_rows, full_rows)
+    required_keys = required_rows.map { |row| row_key(row) }
+    full_keys = full_rows.map { |row| row_key(row) }
+    required_keys - full_keys
   end
 
   def failing_names(rows)
@@ -63,8 +95,12 @@ module PrCiReadiness
     rows.select { |row| row["bucket"].to_s == "pending" }.map { |row| row["name"].to_s }
   end
 
-  def verdict_for(rows, failing, pending)
-    if rows.empty?
+  def cancelled_names(rows)
+    cancelled_rows(rows).map { |row| row["name"].to_s }
+  end
+
+  def verdict_for(active, failing, pending)
+    if active.empty?
       "UNKNOWN"
     elsif failing.empty? && pending.empty?
       "READY"
@@ -75,13 +111,14 @@ module PrCiReadiness
 
   # Build the normalized result hash from the captured check rows.
   def assess(pr_number:, required_used:, rows:)
-    rows = active_rows(rows)
-    failing = failing_names(rows)
-    pending = pending_names(rows)
+    active = active_rows(rows)
+    failing = failing_names(active)
+    pending = pending_names(active)
+    pending += cancelled_names(rows) unless active.empty?
 
     {
       "pr" => pr_number.to_i,
-      "verdict" => verdict_for(rows, failing, pending),
+      "verdict" => verdict_for(active, failing, pending),
       "required_used" => required_used,
       "failing" => failing,
       "pending" => pending
@@ -103,10 +140,11 @@ module PrCiReadiness
     Usage: pr-ci-readiness <pr-number> [options]
 
     Decide whether a PR's CI is ready to merge. Runs `gh pr checks <PR> --required`
-    first; when no usable required checks exist (no rows, or only cancelled rows),
-    falls back to the full `gh pr checks <PR>` list. An empty list is
-    UNKNOWN/not-ready. Cancelled/superseded rows are ignored.
-    The PR is READY only when no failing or pending checks remain.
+    first; when no required checks exist, falls back to the full `gh pr checks <PR>`
+    list. An empty or cancel-only list is UNKNOWN/not-ready. When required rows
+    exist, the helper cross-checks the full list for the same required check
+    identities. The PR is READY when no required check is missing, failing, or
+    pending; advisory full-list rows do not block required readiness.
 
     Arguments:
       <pr-number>        PR number to inspect (integer).
@@ -128,8 +166,8 @@ module PrCiReadiness
       }
 
     verdict is UNKNOWN when neither the required nor the full check list reports any
-    checks (cancelled rows do not count). required_used is true when the required
-    check list was non-empty and was used as the readiness gate.
+    active non-cancelled checks. required_used is true when the required check list
+    was complete and used as the readiness gate.
 
     Requires: gh (GitHub CLI)
   USAGE
@@ -204,15 +242,27 @@ module PrCiReadiness
     end
 
     # Fetch the required-check list first; fall back to the full list when the
-    # required form yields no rows. required_used flips to false on fallback.
+    # required form yields no rows or when the full list has matching required
+    # rows that are missing or non-ready. Advisory full-list rows do not block.
+    # required_used flips to false on fallback.
     def assess(repo, pr_number)
       required_raw = fetch_checks(repo, pr_number, required: true)
-      if PrCiReadiness.usable_checks?(required_raw)
-        rows = PrCiReadiness.parse_rows(required_raw)
-        required_used = true
-      else
+      required_rows = PrCiReadiness.parse_rows(required_raw)
+      if required_rows.empty?
         rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
         required_used = false
+      else
+        full_rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
+        if !PrCiReadiness.missing_required_keys(required_rows, full_rows).empty?
+          rows = []
+          required_used = false
+        elsif PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+          rows = required_rows
+          required_used = true
+        else
+          rows = full_rows
+          required_used = false
+        end
       end
       PrCiReadiness.assess(pr_number:, required_used:, rows:)
     end
@@ -286,7 +336,7 @@ module PrCiReadiness
                                    { "name" => "lint", "bucket" => "fail" },
                                    { "name" => "stale", "bucket" => "cancel" }
                                  ])
-      ok = out["verdict"] == "NOT_READY" && out["failing"] == ["lint"] && out["pending"].empty?
+      ok = out["verdict"] == "NOT_READY" && out["failing"] == ["lint"] && out["pending"] == ["stale"]
       ok ? [] : ["failing did not yield NOT_READY (lint)"]
     end
 
@@ -308,9 +358,6 @@ module PrCiReadiness
       errors << "usable_checks? treated [] as usable" if PrCiReadiness.usable_checks?("[]")
       errors << "usable_checks? treated blank as usable" if PrCiReadiness.usable_checks?("")
       errors << "usable_checks? treated non-JSON as usable" if PrCiReadiness.usable_checks?("no required checks")
-      if PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
-        errors << "usable_checks? treated cancel-only as usable"
-      end
       errors
     end
 

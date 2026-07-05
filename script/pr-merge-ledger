@@ -25,6 +25,7 @@ class PrMergeLedger
     deferred_to_update_changelog
     not_user_visible
   ].freeze
+  CI_VERDICTS = %w[READY NOT_READY UNKNOWN].freeze
   DISPOSITIONS = %w[fixed explicitly_waived follow_up_issue not_applicable].freeze
   REVIEW_OBJECT_DECISION_STATES = %w[APPROVED CHANGES_REQUESTED].freeze
   NON_BLOCKING_REVIEW_DECISION_STATES = %w[APPROVED NOT_REQUIRED].freeze
@@ -32,6 +33,18 @@ class PrMergeLedger
     "CHANGES_REQUESTED" => ["review_decision_changes_requested", "GitHub reviewDecision is CHANGES_REQUESTED"],
     "REVIEW_REQUIRED" => ["review_decision_review_required", "GitHub reviewDecision is REVIEW_REQUIRED"]
   }.freeze
+  UNKNOWN_VIOLATION_CODES = [
+    [/\Aci_readiness/, "unknown_ci_readiness"],
+    [/\Apriority_finding_dispositions\.body_scan/, "unknown_priority_finding_body_scan"],
+    [/\Apriority_finding_dispositions/, "unknown_priority_finding_disposition"],
+    [/\Achangelog_classification/, "unknown_changelog_classification"],
+    [/\Alockfile_diff/, "unknown_lockfile_diff"],
+    [/\Areview_threads\.comments/, "unknown_review_thread_comments"],
+    [/\Apr\.head_sha/, "unknown_head_sha"],
+    # Missing and unsupported reviewDecision values share this gate code;
+    # unknown_fields[].message carries the precise diagnostic.
+    [/\Apr\.review_decision/, "unknown_review_decision"]
+  ].freeze
   BLOCKING_REVIEW_DECISION_STATES = BLOCKING_REVIEW_DECISION_VIOLATIONS.keys.freeze
   KNOWN_REVIEW_DECISION_STATES = (NON_BLOCKING_REVIEW_DECISION_STATES + BLOCKING_REVIEW_DECISION_STATES).freeze
   INTERNAL_REVIEW_DECISION_RAW_KEY = "review_decision_raw"
@@ -167,6 +180,101 @@ class PrMergeLedger
     io.read
   rescue IOError
     ""
+  end
+
+  def self.parse_ci_check_rows(raw)
+    rows = JSON.parse(raw.to_s)
+    rows.is_a?(Array) ? rows : []
+  rescue JSON::ParserError
+    []
+  end
+
+  def self.active_ci_check_rows(rows)
+    Array(rows).reject { |row| row.is_a?(Hash) && row["bucket"].to_s == "cancel" }
+  end
+
+  def self.cancelled_ci_check_rows(rows)
+    Array(rows).select { |row| row.is_a?(Hash) && row["bucket"].to_s == "cancel" }
+  end
+
+  def self.non_ready_ci_check_row?(row)
+    %w[cancel fail pending].include?(row["bucket"].to_s)
+  end
+
+  def self.ci_check_row_key(row)
+    name = row["name"].to_s
+    return name unless name.empty?
+
+    link = row["link"].to_s
+    link.empty? ? row.to_s : link
+  end
+
+  def self.required_ci_check_rows_complete?(required_rows, full_rows)
+    required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
+    return false if required_keys.empty?
+
+    return false unless missing_required_ci_check_keys(required_rows, full_rows).empty?
+
+    matching_full_rows = Array(full_rows).select { |row| required_keys.include?(ci_check_row_key(row)) }
+    matching_full_rows.none? { |row| non_ready_ci_check_row?(row) }
+  end
+
+  def self.missing_required_ci_check_keys(required_rows, full_rows)
+    required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
+    full_keys = Array(full_rows).map { |row| ci_check_row_key(row) }
+    required_keys - full_keys
+  end
+
+  def self.normalize_ci_check_row(row)
+    case row
+    when Hash
+      {
+        "name" => row["name"].to_s,
+        "state" => row["state"],
+        "bucket" => row["bucket"],
+        "link" => row["link"]
+      }.compact
+    else
+      { "name" => row.to_s }
+    end
+  end
+
+  def self.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message: nil)
+    checks = Array(rows).map { |row| normalize_ci_check_row(row) }
+    active_checks = active_ci_check_rows(checks)
+    cancelled_checks = cancelled_ci_check_rows(checks)
+    failing = active_checks.select { |row| row["bucket"].to_s == "fail" }
+    pending = active_checks.select { |row| row["bucket"].to_s == "pending" }
+    pending += cancelled_checks unless active_checks.empty?
+    verdict = ci_verdict_for(checks, failing, pending)
+    status = ci_status_for(verdict)
+
+    {
+      "pr" => pr_number.to_i,
+      "status" => status,
+      "verdict" => verdict,
+      "required_used" => required_used == true,
+      "failing" => failing,
+      "pending" => pending,
+      "checks" => checks,
+      "message" => message || ci_unknown_message(status)
+    }.compact
+  end
+
+  def self.ci_verdict_for(checks, failing, pending)
+    active_checks = active_ci_check_rows(checks)
+    return UNKNOWN if active_checks.empty?
+    return "READY" if failing.empty? && pending.empty?
+
+    "NOT_READY"
+  end
+
+  def self.ci_status_for(verdict)
+    verdict == UNKNOWN ? UNKNOWN : "known"
+  end
+
+  def self.ci_unknown_message(status)
+    status == UNKNOWN ? "no active current-head non-cancelled check rows were returned" : nil
   end
 
   def self.run(argv)
@@ -363,13 +471,14 @@ class PrMergeLedger
     File.basename(path)
   end
 
-  # rubocop:disable Metrics/AbcSize
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def ledger_for(dataset, dispositions, enforce_unused_dispositions: true)
     pull_request = normalize_pull_request(dataset.fetch("pull_request"))
     files = file_paths(dataset)
     review_threads = normalized_review_threads(dataset, pull_request)
     reviews = normalized_reviews(dataset, pull_request)
     issue_comments = normalized_issue_comments(dataset)
+    ci_readiness = normalized_ci_readiness(dataset, pull_request)
 
     unresolved_threads = review_threads.select { |thread| unresolved_current_head_thread?(thread) }
     output_reviews = reviews.map { |review| review.except("body_text") }
@@ -397,20 +506,32 @@ class PrMergeLedger
         "all_changes_requested" => all_changes_requested
       },
       "issue_comments" => output_issue_comments,
+      "ci_readiness" => ci_readiness,
       "priority_finding_dispositions" => finding_report,
       "changelog_classification" => changelog,
       "lockfile_diff" => lockfile
     }
 
-    unknown_fields = unknown_fields_for(pull_request, review_threads, finding_report, changelog, lockfile)
-    violations = violations_for(pull_request, unresolved_threads, changes_requested, changelog, unknown_fields)
+    gate_context = {
+      review_threads:,
+      finding_report:,
+      ci_readiness:,
+      changelog:,
+      lockfile:,
+      unresolved_threads:,
+      changes_requested:,
+      unknown_fields: nil
+    }
+    unknown_fields = unknown_fields_for(pull_request, gate_context)
+    gate_context[:unknown_fields] = unknown_fields
+    violations = violations_for(pull_request, gate_context)
     ledger.merge(
       "violations" => violations,
       "unknown_fields" => unknown_fields,
       "complete_allowed" => violations.empty?
     )
   end
-  # rubocop:enable Metrics/AbcSize
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   def file_paths(dataset)
     return nil unless dataset.key?("files") && !dataset["files"].nil?
@@ -428,6 +549,25 @@ class PrMergeLedger
 
   def normalized_issue_comments(dataset)
     Array(dataset["comments"]).map { |comment| normalize_issue_comment(comment) }
+  end
+
+  def normalized_ci_readiness(dataset, pull_request)
+    return normalize_ci_readiness(dataset.fetch("ci_readiness"), pull_request) if dataset.key?("ci_readiness")
+
+    if dataset.key?("checks")
+      return self.class.ci_readiness_from_check_rows(
+        pull_request.fetch("number"),
+        required_used: dataset["required_checks_used"],
+        rows: dataset.fetch("checks")
+      )
+    end
+
+    self.class.ci_readiness_from_check_rows(
+      pull_request.fetch("number"),
+      required_used: false,
+      rows: [],
+      message: "fixture is missing ci_readiness"
+    )
   end
 
   def normalize_pull_request(raw_pr)
@@ -555,6 +695,106 @@ class PrMergeLedger
       "body_excerpt" => excerpt(comment["body"]),
       "body" => comment["body"].to_s
     }
+  end
+
+  def normalize_ci_readiness(raw_readiness, pull_request)
+    return unknown_ci_readiness(pull_request, "ci_readiness must be a JSON object") unless raw_readiness.is_a?(Hash)
+
+    computed = self.class.ci_readiness_from_check_rows(
+      pull_request.fetch("number"),
+      required_used: raw_readiness["required_used"],
+      rows: Array(raw_readiness["checks"]),
+      message: raw_readiness["message"]
+    )
+    checks = computed.fetch("checks")
+    components = normalize_ci_readiness_components(raw_readiness, computed, checks)
+
+    {
+      "pr" => (raw_readiness["pr"] || pull_request.fetch("number")).to_i,
+      "status" => components.fetch("status"),
+      "verdict" => components.fetch("verdict"),
+      "required_used" => raw_readiness["required_used"] == true,
+      "failing" => components.fetch("failing"),
+      "pending" => components.fetch("pending"),
+      "checks" => checks,
+      "message" => raw_readiness["message"] || computed["message"]
+    }.compact
+  end
+
+  def normalize_ci_readiness_components(raw_readiness, computed, checks)
+    return computed_ci_readiness_components(computed) unless checks.empty?
+
+    failing = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "failing", "fail")
+    pending = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "pending", "pending")
+    verdict = normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
+    {
+      "status" => normalize_ci_readiness_status(raw_readiness, computed, verdict),
+      "verdict" => verdict,
+      "failing" => failing,
+      "pending" => pending
+    }
+  end
+
+  def computed_ci_readiness_components(computed)
+    {
+      "status" => computed.fetch("status"),
+      "verdict" => computed.fetch("verdict"),
+      "failing" => computed.fetch("failing"),
+      "pending" => computed.fetch("pending")
+    }
+  end
+
+  def normalize_ci_readiness_check_list(raw_readiness, computed, checks, key, bucket)
+    return computed.fetch(key) unless raw_readiness.key?(key)
+
+    normalize_ci_check_list(raw_readiness[key], checks, bucket)
+  end
+
+  def normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
+    return computed.fetch("verdict") unless raw_readiness.key?("verdict")
+
+    normalize_ci_verdict(raw_readiness["verdict"], checks, failing, pending)
+  end
+
+  def normalize_ci_readiness_status(raw_readiness, computed, verdict)
+    return computed.fetch("status") unless raw_readiness.key?("status")
+
+    normalize_ci_status(raw_readiness["status"], verdict)
+  end
+
+  def normalize_ci_check_list(raw_rows, checks, bucket)
+    rows = if raw_rows.nil?
+             checks.select { |row| row["bucket"].to_s == bucket }
+           else
+             Array(raw_rows)
+           end
+
+    rows.map { |row| self.class.normalize_ci_check_row(row) }
+  end
+
+  def normalize_ci_verdict(raw_verdict, checks, failing, pending)
+    return raw_verdict if CI_VERDICTS.include?(raw_verdict)
+
+    return UNKNOWN if self.class.active_ci_check_rows(checks).empty?
+    return "READY" if failing.empty? && pending.empty?
+
+    "NOT_READY"
+  end
+
+  def normalize_ci_status(raw_status, verdict)
+    return "known" if raw_status == "known" && verdict != UNKNOWN
+    return UNKNOWN if raw_status == UNKNOWN || verdict == UNKNOWN
+
+    "known"
+  end
+
+  def unknown_ci_readiness(pull_request, message)
+    self.class.ci_readiness_from_check_rows(
+      pull_request.fetch("number"),
+      required_used: false,
+      rows: [],
+      message:
+    )
   end
 
   def latest_reviews_by_reviewer(reviews)
@@ -1000,7 +1240,12 @@ class PrMergeLedger
     LOCKFILE_BASENAMES.include?(basename) || basename.end_with?(".lock")
   end
 
-  def unknown_fields_for(pull_request, review_threads, finding_dispositions, changelog, lockfile)
+  def unknown_fields_for(pull_request, gate_context)
+    review_threads = gate_context.fetch(:review_threads)
+    finding_dispositions = gate_context.fetch(:finding_report)
+    ci_readiness = gate_context.fetch(:ci_readiness)
+    changelog = gate_context.fetch(:changelog)
+    lockfile = gate_context.fetch(:lockfile)
     # pull_request must be the pre-output object so INTERNAL_REVIEW_DECISION_RAW_KEY
     # remains available for specific unsupported reviewDecision diagnostics.
     unknowns = pull_request_unknown_fields(pull_request)
@@ -1017,6 +1262,14 @@ class PrMergeLedger
     end
 
     unknowns.concat(priority_finding_unknown_fields(pull_request, finding_dispositions))
+
+    if ci_readiness.fetch("status") == UNKNOWN || ci_readiness.fetch("verdict") == UNKNOWN
+      unknowns << unknown_field(
+        pull_request,
+        "ci_readiness.verdict",
+        ci_readiness["message"] || "CI readiness is UNKNOWN"
+      )
+    end
 
     if changelog.fetch("classification") == UNKNOWN
       unknowns << unknown_field(
@@ -1094,15 +1347,16 @@ class PrMergeLedger
     }.compact
   end
 
-  def violations_for(pull_request, unresolved_threads, changes_requested, changelog, unknown_fields)
+  def violations_for(pull_request, gate_context)
     [
       review_decision_violation(pull_request),
       draft_pr_violation(pull_request),
       closed_unmerged_pr_violation(pull_request),
-      changelog_violation(pull_request, changelog),
-      *changes_requested_violations(pull_request, changes_requested),
-      *unresolved_thread_violations(pull_request, unresolved_threads),
-      *unknown_field_violations(pull_request, unknown_fields)
+      changelog_violation(pull_request, gate_context.fetch(:changelog)),
+      *changes_requested_violations(pull_request, gate_context.fetch(:changes_requested)),
+      *unresolved_thread_violations(pull_request, gate_context.fetch(:unresolved_threads)),
+      *ci_readiness_violations(pull_request, gate_context.fetch(:ci_readiness)),
+      *unknown_field_violations(pull_request, gate_context.fetch(:unknown_fields))
     ].compact
   end
 
@@ -1173,6 +1427,46 @@ class PrMergeLedger
     end
   end
 
+  def ci_readiness_violations(pull_request, ci_readiness)
+    failed = ci_readiness.fetch("failing").map do |check|
+      ci_check_violation(pull_request, check, "ci_check_failed", "CI check failed")
+    end
+    pending = ci_readiness.fetch("pending").map do |check|
+      if check["bucket"].to_s == "cancel"
+        ci_check_violation(pull_request, check, "ci_check_cancelled", "CI check was cancelled or superseded")
+      else
+        ci_check_violation(pull_request, check, "ci_check_pending", "CI check is still pending")
+      end
+    end
+    details_missing = if ci_readiness.fetch("verdict") == "NOT_READY" && failed.empty? && pending.empty?
+                        [
+                          violation(
+                            pull_request,
+                            "ci_not_ready",
+                            "CI readiness is NOT_READY, but no failed or pending check details were returned",
+                            pull_request["url"]
+                          )
+                        ]
+                      else
+                        []
+                      end
+
+    failed + pending + details_missing
+  end
+
+  def ci_check_violation(pull_request, check, code, message)
+    check_name = check["name"].to_s.empty? ? UNKNOWN : check["name"].to_s
+    violation(
+      pull_request,
+      code,
+      "#{message}: #{check_name}",
+      check["link"],
+      "check_name" => check_name,
+      "state" => check["state"],
+      "bucket" => check["bucket"]
+    )
+  end
+
   def unknown_field_violations(pull_request, unknown_fields)
     unknown_fields.map do |unknown|
       violation(
@@ -1185,26 +1479,7 @@ class PrMergeLedger
   end
 
   def unknown_violation_code(field)
-    case field
-    when /\Apriority_finding_dispositions\.body_scan/
-      "unknown_priority_finding_body_scan"
-    when /\Apriority_finding_dispositions/
-      "unknown_priority_finding_disposition"
-    when /\Achangelog_classification/
-      "unknown_changelog_classification"
-    when /\Alockfile_diff/
-      "unknown_lockfile_diff"
-    when /\Areview_threads\.comments/
-      "unknown_review_thread_comments"
-    when /\Apr\.head_sha/
-      "unknown_head_sha"
-    when /\Apr\.review_decision/
-      # Missing and unsupported reviewDecision values share this gate code;
-      # unknown_fields[].message carries the precise diagnostic.
-      "unknown_review_decision"
-    else
-      "unknown_ledger_field"
-    end
+    UNKNOWN_VIOLATION_CODES.find { |pattern, _code| field.match?(pattern) }&.last || "unknown_ledger_field"
   end
 
   def violation(pull_request, code, message, url, extra = {})
@@ -1243,7 +1518,8 @@ class PrMergeLedger
         "files" => files,
         "review_threads" => fetch_review_threads(pr_number),
         "reviews" => fetch_reviews(pr_number),
-        "comments" => fetch_comments(pr_number)
+        "comments" => fetch_comments(pr_number),
+        "ci_readiness" => fetch_ci_readiness(pr_number)
       }
     end
 
@@ -1287,6 +1563,119 @@ class PrMergeLedger
 
     def fetch_comments(pr_number)
       fetch_paginated_connection(pr_number, comments_query, "comments")
+    end
+
+    def fetch_ci_readiness(pr_number)
+      required_result = fetch_pr_checks(pr_number, required: true)
+      required_rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
+      rows, required_used, message = select_ci_readiness_rows(pr_number, required_result, required_rows)
+
+      PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message:)
+    rescue Error => e
+      PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used: false, rows: [], message: e.message)
+    end
+
+    def select_ci_readiness_rows(pr_number, required_result, required_rows)
+      full_rows = fetch_full_pr_check_rows(pr_number, required_result)
+
+      if required_rows.empty?
+        required_message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
+        return [full_rows, false, required_message]
+      end
+
+      missing_required_keys = PrMergeLedger.missing_required_ci_check_keys(required_rows, full_rows)
+      unless missing_required_keys.empty?
+        message = "full current-head check list omitted required checks: #{missing_required_keys.join(', ')}"
+        return [[], false, message]
+      end
+      return [required_rows, true, nil] if PrMergeLedger.required_ci_check_rows_complete?(required_rows, full_rows)
+
+      [full_rows, false, "required check subset was incomplete; using full current-head check list"]
+    end
+
+    def fetch_full_pr_check_rows(pr_number, required_result)
+      full_result = fetch_pr_checks(pr_number, required: false)
+      full_rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
+      unless full_result.fetch(:success) || !full_rows.empty?
+        raise Error, pr_checks_error_message(required_result, full_result)
+      end
+
+      full_rows
+    end
+
+    def fetch_pr_checks(pr_number, required:)
+      args = ["pr", "checks", pr_number.to_s, "--repo", "#{@owner}/#{@name}"]
+      args << "--required" if required
+      args += ["--json", "name,state,bucket,link"]
+
+      stdout, stderr, status = capture_pr_checks(args, required:)
+      {
+        stdout: stdout.to_s,
+        stderr: stderr.to_s,
+        status:,
+        success: status.success?,
+        required:
+      }
+    end
+
+    def capture_pr_checks(args, required:)
+      attempt = 0
+      loop do
+        attempt += 1
+        stdout, stderr, status = capture_pr_checks_once(args, attempt)
+        return [stdout, stderr, status] if usable_pr_checks_result?(stdout, stderr, status, required:)
+        return [stdout, stderr, status] if attempt >= GITHUB_API_MAX_ATTEMPTS
+        return [stdout, stderr, status] if non_retryable_gh_error?(stderr)
+
+        sleep(GITHUB_API_RETRY_BASE_DELAY_SECONDS * (2**(attempt - 1)))
+      end
+    end
+
+    def capture_pr_checks_once(args, attempt)
+      capture_gh(
+        args,
+        timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
+      )
+    rescue Error => e
+      raise if attempt >= GITHUB_API_MAX_ATTEMPTS
+
+      ["", e.message, failed_status]
+    end
+
+    def usable_pr_checks_result?(stdout, stderr, status, required:)
+      return true if status.success?
+      return true unless PrMergeLedger.parse_ci_check_rows(stdout).empty?
+
+      required && stderr.to_s.match?(/\bno required checks\b/i)
+    end
+
+    def failed_status
+      @failed_status ||= Class.new do
+        def success?
+          false
+        end
+
+        def exitstatus
+          nil
+        end
+      end.new
+    end
+
+    def pr_checks_error_message(*results)
+      results.compact.filter_map do |result|
+        next if result.fetch(:success)
+
+        scope = result.fetch(:required) ? "required" : "full"
+        details = [result.fetch(:stderr), result.fetch(:stdout)].map(&:strip).reject(&:empty?).join(" | ")
+        details = "no command output" if details.empty?
+        "gh pr checks #{scope} failed with exit #{status_exitstatus(result.fetch(:status))}: #{details}"
+      end.join("; ")
+    end
+
+    def status_exitstatus(status)
+      return status.exitstatus if status.respond_to?(:exitstatus) && status.exitstatus
+
+      "unknown"
     end
 
     def fetch_paginated_connection(pr_number, query, connection_name)
@@ -1410,6 +1799,8 @@ class PrMergeLedger
 
     def non_retryable_gh_error?(stderr)
       error_text = stderr.to_s
+      return false if error_text.match?(/\bgh (?:api graphql|pr checks|repo view) timed out after \d+ seconds\b/i)
+
       if error_text.match?(/\b(?:abuse detection|rate limit|rate-limit|secondary rate|too many requests)\b/i)
         return false
       end
@@ -1417,12 +1808,12 @@ class PrMergeLedger
       error_text.match?(/\b4(?:0\d|1\d|2[0-8]|[3-9]\d)\b|\b(?:Not Found|Unauthorized|Forbidden)\b/i)
     end
 
-    def capture_gh(args)
+    def capture_gh(args, timeout_message: nil)
       timeout = PrMergeLedger.github_api_timeout_seconds
       PrMergeLedger.capture_command_with_timeout(
         ["gh", *args],
         timeout:,
-        timeout_message: "gh api graphql timed out after #{timeout} seconds"
+        timeout_message: timeout_message || "gh api graphql timed out after #{timeout} seconds"
       )
     end
 

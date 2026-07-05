@@ -382,6 +382,17 @@ jobs:
             }
 
             async function triggerHostedCi(pr, { forceFull }) {
+              if (pr.state !== 'open') {
+                await addReaction('confused');
+                await postComment([
+                  'Unable to run hosted CI from this command because the PR is not open.',
+                  '',
+                  `Current PR state: \`${pr.state || 'unknown'}\`; merged: \`${pr.merged ? 'yes' : 'no'}\`.`,
+                  'Hosted CI dispatch requires the live PR head ref before merge or close. After that point, branch-ref hosted-CI evidence is degraded/invalid; use the existing current-head checks, the merge commit, or a verification PR if more hosted evidence is required.'
+                ].join('\n'));
+                return;
+              }
+
               const headRepoFullName = pr.head.repo?.full_name;
 
               if (!headRepoFullName) {
