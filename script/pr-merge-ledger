@@ -190,11 +190,38 @@ class PrMergeLedger
   end
 
   def self.usable_ci_check_rows?(raw)
-    !active_ci_check_rows(parse_ci_check_rows(raw)).empty?
+    !parse_ci_check_rows(raw).empty?
   end
 
   def self.active_ci_check_rows(rows)
     Array(rows).reject { |row| row.is_a?(Hash) && row["bucket"].to_s == "cancel" }
+  end
+
+  def self.cancelled_ci_check_rows(rows)
+    Array(rows).select { |row| row.is_a?(Hash) && row["bucket"].to_s == "cancel" }
+  end
+
+  def self.non_ready_ci_check_row?(row)
+    %w[cancel fail pending].include?(row["bucket"].to_s)
+  end
+
+  def self.ci_check_row_key(row)
+    name = row["name"].to_s
+    return name unless name.empty?
+
+    link = row["link"].to_s
+    link.empty? ? row.to_s : link
+  end
+
+  def self.required_ci_check_rows_complete?(required_rows, full_rows)
+    required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
+    return false if required_keys.empty?
+
+    full_keys = Array(full_rows).map { |row| ci_check_row_key(row) }
+    return false unless (required_keys - full_keys).empty?
+
+    extra_full_rows = Array(full_rows).reject { |row| required_keys.include?(ci_check_row_key(row)) }
+    extra_full_rows.none? { |row| non_ready_ci_check_row?(row) }
   end
 
   def self.normalize_ci_check_row(row)
@@ -212,9 +239,12 @@ class PrMergeLedger
   end
 
   def self.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message: nil)
-    checks = active_ci_check_rows(rows).map { |row| normalize_ci_check_row(row) }
-    failing = checks.select { |row| row["bucket"].to_s == "fail" }
-    pending = checks.select { |row| row["bucket"].to_s == "pending" }
+    checks = Array(rows).map { |row| normalize_ci_check_row(row) }
+    active_checks = active_ci_check_rows(checks)
+    cancelled_checks = cancelled_ci_check_rows(checks)
+    failing = active_checks.select { |row| row["bucket"].to_s == "fail" }
+    pending = active_checks.select { |row| row["bucket"].to_s == "pending" }
+    pending += cancelled_checks unless active_checks.empty?
     verdict = ci_verdict_for(checks, failing, pending)
     status = ci_status_for(verdict)
 
@@ -231,7 +261,8 @@ class PrMergeLedger
   end
 
   def self.ci_verdict_for(checks, failing, pending)
-    return UNKNOWN if checks.empty?
+    active_checks = active_ci_check_rows(checks)
+    return UNKNOWN if active_checks.empty?
     return "READY" if failing.empty? && pending.empty?
 
     "NOT_READY"
@@ -242,7 +273,7 @@ class PrMergeLedger
   end
 
   def self.ci_unknown_message(status)
-    status == UNKNOWN ? "no active current-head check rows were returned" : nil
+    status == UNKNOWN ? "no active current-head non-cancelled check rows were returned" : nil
   end
 
   def self.run(argv)
@@ -668,11 +699,17 @@ class PrMergeLedger
   def normalize_ci_readiness(raw_readiness, pull_request)
     return unknown_ci_readiness(pull_request, "ci_readiness must be a JSON object") unless raw_readiness.is_a?(Hash)
 
-    checks = Array(raw_readiness["checks"]).map { |row| self.class.normalize_ci_check_row(row) }
-    failing = normalize_ci_check_list(raw_readiness["failing"], checks, "fail")
-    pending = normalize_ci_check_list(raw_readiness["pending"], checks, "pending")
-    verdict = normalize_ci_verdict(raw_readiness["verdict"], checks, failing, pending)
-    status = normalize_ci_status(raw_readiness["status"], verdict)
+    computed = self.class.ci_readiness_from_check_rows(
+      pull_request.fetch("number"),
+      required_used: raw_readiness["required_used"],
+      rows: Array(raw_readiness["checks"]),
+      message: raw_readiness["message"]
+    )
+    checks = computed.fetch("checks")
+    failing = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "failing", "fail")
+    pending = normalize_ci_readiness_check_list(raw_readiness, computed, checks, "pending", "pending")
+    verdict = normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
+    status = normalize_ci_readiness_status(raw_readiness, computed, verdict)
 
     {
       "pr" => (raw_readiness["pr"] || pull_request.fetch("number")).to_i,
@@ -682,8 +719,26 @@ class PrMergeLedger
       "failing" => failing,
       "pending" => pending,
       "checks" => checks,
-      "message" => raw_readiness["message"]
+      "message" => raw_readiness["message"] || computed["message"]
     }.compact
+  end
+
+  def normalize_ci_readiness_check_list(raw_readiness, computed, checks, key, bucket)
+    return computed.fetch(key) unless raw_readiness.key?(key)
+
+    normalize_ci_check_list(raw_readiness[key], checks, bucket)
+  end
+
+  def normalize_ci_readiness_verdict(raw_readiness, computed, checks, failing, pending)
+    return computed.fetch("verdict") unless raw_readiness.key?("verdict")
+
+    normalize_ci_verdict(raw_readiness["verdict"], checks, failing, pending)
+  end
+
+  def normalize_ci_readiness_status(raw_readiness, computed, verdict)
+    return computed.fetch("status") unless raw_readiness.key?("status")
+
+    normalize_ci_status(raw_readiness["status"], verdict)
   end
 
   def normalize_ci_check_list(raw_rows, checks, bucket)
@@ -699,7 +754,7 @@ class PrMergeLedger
   def normalize_ci_verdict(raw_verdict, checks, failing, pending)
     return raw_verdict if CI_VERDICTS.include?(raw_verdict)
 
-    return UNKNOWN if checks.empty?
+    return UNKNOWN if self.class.active_ci_check_rows(checks).empty?
     return "READY" if failing.empty? && pending.empty?
 
     "NOT_READY"
@@ -1488,25 +1543,33 @@ class PrMergeLedger
     def fetch_ci_readiness(pr_number)
       required_result = fetch_pr_checks(pr_number, required: true)
       required_rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
-      if PrMergeLedger.usable_ci_check_rows?(required_result.fetch(:stdout))
-        rows = required_rows
-        required_used = true
-        message = nil
-      else
-        full_result = fetch_pr_checks(pr_number, required: false)
-        full_rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
-        if !full_result.fetch(:success) && !PrMergeLedger.usable_ci_check_rows?(full_result.fetch(:stdout))
-          raise Error, pr_checks_error_message(required_result, full_result)
-        end
-
-        rows = full_rows
-        required_used = false
-        message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
-      end
+      rows, required_used, message = select_ci_readiness_rows(pr_number, required_result, required_rows)
 
       PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message:)
     rescue Error => e
       PrMergeLedger.ci_readiness_from_check_rows(pr_number, required_used: false, rows: [], message: e.message)
+    end
+
+    def select_ci_readiness_rows(pr_number, required_result, required_rows)
+      full_rows = fetch_full_pr_check_rows(pr_number, required_result)
+
+      if required_rows.empty?
+        required_message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
+        return [full_rows, false, required_message]
+      end
+      return [required_rows, true, nil] if PrMergeLedger.required_ci_check_rows_complete?(required_rows, full_rows)
+
+      [full_rows, false, "required check subset was incomplete; using full current-head check list"]
+    end
+
+    def fetch_full_pr_check_rows(pr_number, required_result)
+      full_result = fetch_pr_checks(pr_number, required: false)
+      full_rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
+      unless full_result.fetch(:success) || !full_rows.empty?
+        raise Error, pr_checks_error_message(required_result, full_result)
+      end
+
+      full_rows
     end
 
     def fetch_pr_checks(pr_number, required:)
@@ -1514,7 +1577,7 @@ class PrMergeLedger
       args << "--required" if required
       args += ["--json", "name,state,bucket,link"]
 
-      stdout, stderr, status = capture_gh(args)
+      stdout, stderr, status = capture_gh_with_retries(args)
       {
         stdout: stdout.to_s,
         stderr: stderr.to_s,

@@ -62,8 +62,9 @@ class PrCiReadinessTest < Minitest::Test
                                  { "name" => "rspec", "bucket" => "pass" },
                                  { "name" => "stale", "bucket" => "cancel" }
                                ])
-    assert_equal "READY", out["verdict"]
+    assert_equal "NOT_READY", out["verdict"]
     assert_empty out["failing"]
+    assert_equal ["stale"], out["pending"]
   end
 
   def test_cancel_row_dropped_from_failing_and_pending
@@ -83,8 +84,31 @@ class PrCiReadinessTest < Minitest::Test
     refute PrCiReadiness.usable_checks?("")
     refute PrCiReadiness.usable_checks?(nil)
     refute PrCiReadiness.usable_checks?("no required checks") # non-JSON message
-    # Cancel-only rows are not usable: they must not short-circuit the fallback.
-    refute PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
+    assert PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
+  end
+
+  def test_required_rows_incomplete_when_full_has_extra_pending_check
+    required_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" }
+    ]
+    full_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" },
+      { "name" => "rspec-package-tests", "bucket" => "pending" }
+    ]
+
+    refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+  end
+
+  def test_required_rows_complete_when_extra_full_checks_are_done
+    required_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" }
+    ]
+    full_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" },
+      { "name" => "docs-format-check", "bucket" => "skipping" }
+    ]
+
+    assert PrCiReadiness.required_rows_complete?(required_rows, full_rows)
   end
 
   def test_parse_rows_handles_non_array_json
@@ -148,7 +172,7 @@ class PrCiReadinessCliTest < Minitest::Test
   def test_required_checks_used_when_present
     with_fake_gh(
       required_json: '[{"name":"rspec","state":"SUCCESS","bucket":"pass","link":"x"}]',
-      full_json: '[{"name":"rspec","bucket":"pass"},{"name":"extra","bucket":"fail"}]'
+      full_json: '[{"name":"rspec","bucket":"pass"},{"name":"extra","bucket":"pass"}]'
     ) do |env|
       out, status = run_script(env, "123", "--repo", "owner/repo")
       assert status.success?, out
@@ -184,51 +208,48 @@ class PrCiReadinessCliTest < Minitest::Test
     end
   end
 
-  def test_cancel_only_required_falls_back_to_full_list
-    # A required list of only cancelled rows is not usable: it must fall back to
-    # the full check list (which here surfaces a real failure) instead of
-    # silently collapsing to UNKNOWN.
+  def test_cancel_only_required_is_unknown
     with_fake_gh(
       required_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]',
-      full_json: '[{"name":"lint","state":"FAILURE","bucket":"fail","link":"x"}]'
-    ) do |env|
-      out, = run_script(env, "123", "--repo", "owner/repo")
-      data = JSON.parse(out)
-      assert_equal "NOT_READY", data["verdict"]
-      # required form had no usable rows, so the full list was used.
-      assert_equal false, data["required_used"]
-      assert_equal ["lint"], data["failing"]
-    end
-  end
-
-  def test_cancel_only_required_and_empty_full_is_unknown_via_cli
-    # Cancel-only required falls back; if the full list is also empty, UNKNOWN.
-    with_fake_gh(
-      required_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]',
-      full_json: "[]"
+      full_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]'
     ) do |env|
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
       assert_equal "UNKNOWN", data["verdict"]
+      assert_equal true, data["required_used"]
+    end
+  end
+
+  def test_required_subset_with_extra_pending_full_check_is_not_ready_via_cli
+    with_fake_gh(
+      required_json: '[{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"x"}]',
+      full_json: '[{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"x"},' \
+                 '{"name":"rspec-package-tests","state":"PENDING","bucket":"pending","link":"y"}]'
+    ) do |env|
+      out, = run_script(env, "123", "--repo", "owner/repo")
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
       assert_equal false, data["required_used"]
+      assert_equal ["rspec-package-tests"], data["pending"]
     end
   end
 
   def test_cancel_row_does_not_mask_passing_via_cli
     with_fake_gh(
       required_json: '[{"name":"rspec","bucket":"pass"},{"name":"stale","bucket":"cancel"}]',
-      full_json: "[]"
+      full_json: '[{"name":"rspec","bucket":"pass"},{"name":"stale","bucket":"cancel"}]'
     ) do |env|
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
-      assert_equal "READY", data["verdict"]
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal ["stale"], data["pending"]
     end
   end
 
   def test_text_mode_via_cli
     with_fake_gh(
       required_json: '[{"name":"lint","bucket":"fail"}]',
-      full_json: "[]"
+      full_json: '[{"name":"lint","bucket":"fail"}]'
     ) do |env|
       out, status = run_script(env, "123", "--repo", "owner/repo", "--text")
       assert status.success?, out
@@ -240,7 +261,7 @@ class PrCiReadinessCliTest < Minitest::Test
   def test_repo_defaults_to_gh_repo_view
     with_fake_gh(
       required_json: '[{"name":"rspec","bucket":"pass"}]',
-      full_json: "[]"
+      full_json: '[{"name":"rspec","bucket":"pass"}]'
     ) do |env|
       out, status = run_script(env, "123")
       assert status.success?, out

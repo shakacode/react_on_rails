@@ -64,9 +64,9 @@ module PrMergeLedgerFixtureHelpers
     }
   end
 
-  def ci_readiness(verdict:, checks:, status: "known", required_used: true, message: nil)
+  def ci_readiness(verdict:, checks:, number: 123, status: "known", required_used: true, message: nil)
     {
-      "pr" => 123,
+      "pr" => number,
       "status" => status,
       "verdict" => verdict,
       "required_used" => required_used,
@@ -114,6 +114,7 @@ class PrMergeLedgerTest < Minitest::Test
       fixture(
         number: 4444,
         ci_readiness: ci_readiness(
+          number: 4444,
           verdict: "NOT_READY",
           checks: [
             ci_check(
@@ -131,6 +132,7 @@ class PrMergeLedgerTest < Minitest::Test
     data = JSON.parse(output)
     refute data.fetch("complete_allowed")
     ci_readiness = ledger(data).fetch("ci_readiness")
+    assert_equal 4444, ci_readiness.fetch("pr")
     assert_equal "NOT_READY", ci_readiness.fetch("verdict")
     failing_check_names = ci_readiness.fetch("failing").map { |check| check.fetch("name") }
     assert_equal ["JS unit tests for Renderer package / build (22)"], failing_check_names
@@ -187,5 +189,51 @@ class PrMergeLedgerTest < Minitest::Test
     data = JSON.parse(output)
     assert_equal ["ci_readiness.verdict"], unknown_field_names(data)
     assert_equal ["unknown_ci_readiness"], violation_codes(data)
+  end
+
+  def test_cancel_only_ci_without_explicit_verdict_is_unknown
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: {
+          "pr" => 123,
+          "status" => "known",
+          "required_used" => true,
+          "checks" => [
+            ci_check("required-pr-gate", bucket: "cancel", state: "CANCELLED")
+          ]
+        }
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    ci_readiness = ledger(data).fetch("ci_readiness")
+    assert_equal "UNKNOWN", ci_readiness.fetch("verdict")
+    assert_equal ["ci_readiness.verdict"], unknown_field_names(data)
+    assert_equal ["unknown_ci_readiness"], violation_codes(data)
+  end
+
+  def test_cancelled_row_with_passing_check_is_not_ready
+    output, status = run_fixture(
+      fixture(
+        ci_readiness: {
+          "pr" => 123,
+          "status" => "known",
+          "required_used" => true,
+          "checks" => [
+            ci_check("required-pr-gate", bucket: "pass", state: "SUCCESS"),
+            ci_check("rspec-package-tests", bucket: "cancel", state: "CANCELLED")
+          ]
+        }
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    ci_readiness = ledger(data).fetch("ci_readiness")
+    assert_equal "NOT_READY", ci_readiness.fetch("verdict")
+    pending_check_names = ci_readiness.fetch("pending").map { |check| check.fetch("name") }
+    assert_equal ["rspec-package-tests"], pending_check_names
+    assert_equal ["ci_check_pending"], violation_codes(data)
   end
 end
