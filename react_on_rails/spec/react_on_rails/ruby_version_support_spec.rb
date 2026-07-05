@@ -253,7 +253,7 @@ RSpec.describe "Ruby version support" do
 
   it "documents and switches to Ruby 4.0 for the latest local CI configuration" do
     expect(read_repo_file("README.md")).to include("Ruby >= 3.3 (CI tested: 3.3 - 4.0)")
-    expect(read_repo_file("README.md")).to include("CI tested: 8.2.0 - 10.1.0")
+    expect(read_repo_file("README.md")).to include("CI tested: 8.2.0 - 10.2.0")
     expect(read_repo_file(".github/read-me.md")).to include("Only latest dependency versions (Ruby 4.0, Node 22)")
 
     ci_switch_config = read_repo_file("bin/ci-switch-config")
@@ -318,7 +318,7 @@ RSpec.describe "Ruby version support" do
     dependency_versions = tool_versions(".ci-dependency-versions")
     expect(dependency_versions.fetch("minimum-shakapacker")).to eq("8.2.0")
     expect(dependency_versions.fetch("minimum-react")).to eq("18.0.0")
-    expect(dependency_versions.fetch("latest-shakapacker")).to eq("10.1.0")
+    expect(dependency_versions.fetch("latest-shakapacker")).to eq("10.2.0")
     expect(dependency_versions.fetch("latest-react")).to eq("19.0.0")
     expect(ci_switch_config).to match(/set_ruby_version "\$LATEST_RUBY_VERSION"/)
     expect(ci_switch_config).to match(/set_node_version "\$LATEST_NODE_VERSION"/)
@@ -335,7 +335,7 @@ RSpec.describe "Ruby version support" do
     ci_rerun_failures = read_repo_file("bin/ci-rerun-failures")
     latest_job_description = [
       'JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]=',
-      '"Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"'
+      '"Ruby 4.0, Node 22, Shakapacker 10.2.0, React 19"'
     ].join
     expect(ci_rerun_failures).to include(latest_job_description)
 
@@ -344,7 +344,7 @@ RSpec.describe "Ruby version support" do
     expect(switching_guide).to include("Restore `.tool-versions` from `.maximum.tool-versions`")
 
     expect(read_repo_file(".claude/docs/replicating-ci-failures.md")).to include(
-      "Ruby 4.0, Node 22, Shakapacker 10.1.0, React 19"
+      "Ruby 4.0, Node 22, Shakapacker 10.2.0, React 19"
     )
     # Exact table spacing is intentional: keeps the Markdown column padding in sync.
     expect(read_repo_file("internal/contributor-info/ci-optimization.md")).to include(
