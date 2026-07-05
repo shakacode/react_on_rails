@@ -712,8 +712,8 @@ module ReactOnRailsProHelper
   end
 
   def static_rsc_payload_script?(script_node)
-    return true if static_rsc_payload_script_marker?(script_node)
     return false unless executable_script_type?(script_node["type"])
+    return true if static_rsc_payload_script_marker?(script_node)
 
     stripped_body = script_node.content.to_s.strip
 

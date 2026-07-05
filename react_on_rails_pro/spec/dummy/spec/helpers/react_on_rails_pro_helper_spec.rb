@@ -1887,6 +1887,7 @@ describe ReactOnRailsProHelper do
       it "strips explicitly marked RSC payload scripts even when generated body shape changes" do
         raw_html = <<~HTML
           <div>Static RSC HTML</div>
+          <script type="application/json" data-react-on-rails-rsc-payload="true">{"keep":"structured data"}</script>
           <script data-react-on-rails-rsc-payload="true">window.__nextRSCChunk("flight chunk")</script>
           <script>window.__nextRSCChunk("not an RSC payload script")</script>
         HTML
@@ -1907,6 +1908,7 @@ describe ReactOnRailsProHelper do
         end
 
         expect(result).to include("Static RSC HTML")
+        expect(result).to include('{"keep":"structured data"}')
         expect(result).not_to include("flight chunk")
         expect(result).to include('window.__nextRSCChunk("not an RSC payload script")')
       end
