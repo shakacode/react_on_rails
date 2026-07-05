@@ -4506,6 +4506,14 @@ RSpec.describe "script/pr-merge-ledger" do
     fake_gh = <<~SH
       #!/bin/sh
       if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        count_file="$(dirname "$0")/pr-check-calls"
+        count=0
+        if [ -f "$count_file" ]; then
+          count=$(cat "$count_file")
+        fi
+        count=$((count + 1))
+        printf '%s\\n' "$count" > "$count_file"
+
         required=false
         for arg in "$@"; do
           if [ "$arg" = "--required" ]; then
@@ -4522,7 +4530,7 @@ RSpec.describe "script/pr-merge-ledger" do
       [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"},{"name":"required-pr-gate","state":"PENDING","bucket":"pending","link":"https://example.com/check-rerun"}]
       JSON
         fi
-        exit 0
+        exit 8
       fi
 
       query=""
@@ -4587,6 +4595,7 @@ RSpec.describe "script/pr-merge-ledger" do
         ["required-pr-gate"]
       )
       expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include("ci_check_pending")
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("2")
     end
   end
 

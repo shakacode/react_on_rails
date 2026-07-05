@@ -1576,7 +1576,10 @@ class PrMergeLedger
       args << "--required" if required
       args += ["--json", "name,state,bucket,link"]
 
-      stdout, stderr, status = capture_gh_with_retries(args)
+      stdout, stderr, status = capture_gh(
+        args,
+        timeout_message: "gh pr checks timed out after #{PrMergeLedger.github_api_timeout_seconds} seconds"
+      )
       {
         stdout: stdout.to_s,
         stderr: stderr.to_s,
@@ -1725,12 +1728,12 @@ class PrMergeLedger
       error_text.match?(/\b4(?:0\d|1\d|2[0-8]|[3-9]\d)\b|\b(?:Not Found|Unauthorized|Forbidden)\b/i)
     end
 
-    def capture_gh(args)
+    def capture_gh(args, timeout_message: nil)
       timeout = PrMergeLedger.github_api_timeout_seconds
       PrMergeLedger.capture_command_with_timeout(
         ["gh", *args],
         timeout:,
-        timeout_message: "gh api graphql timed out after #{timeout} seconds"
+        timeout_message: timeout_message || "gh api graphql timed out after #{timeout} seconds"
       )
     end
 
