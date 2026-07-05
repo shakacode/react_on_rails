@@ -52,6 +52,7 @@ RSpec.describe "script/pr-merge-ledger" do
     full_json:,
     pr_checks_exit_status: 0,
     fail_first_pr_checks: nil,
+    pr_checks_stderr: nil,
     pr_checks_sleep_seconds: nil
   )
     <<~SH
@@ -90,6 +91,9 @@ RSpec.describe "script/pr-merge-ledger" do
           cat <<'JSON'
       #{full_json}
       JSON
+        fi
+        if [ -n #{pr_checks_stderr.to_s.inspect} ]; then
+          printf '%s\\n' #{pr_checks_stderr.to_s.inspect} >&2
         fi
         exit #{pr_checks_exit_status}
       fi
@@ -4788,6 +4792,40 @@ RSpec.describe "script/pr-merge-ledger" do
         "ci_readiness.verdict"
       )
       expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("3")
+    end
+  end
+
+  it "retries timeout-like gh pr checks stderr before reporting unknown CI readiness" do
+    fake_gh = fake_gh_script_with_check_rows(
+      required_json: "[]",
+      full_json: "[]",
+      pr_checks_exit_status: 1,
+      pr_checks_stderr: "gh pr checks timed out after 404 seconds"
+    )
+
+    with_raw_fake_gh(fake_gh) do |env, bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+
+      report = JSON.parse(stdout)
+      expect(report.fetch("unknown_fields").map { |field| field.fetch("field") }).to include(
+        "ci_readiness.verdict"
+      )
+      expect(report.fetch("pull_requests").fetch(0).fetch("ci_readiness").fetch("message")).to include(
+        "gh pr checks required failed with exit 1: gh pr checks timed out after 404 seconds"
+      )
+      expect(File.read(File.join(bin_dir, "pr-check-calls")).strip).to eq("6")
     end
   end
 

@@ -1654,6 +1654,10 @@ class PrMergeLedger
         def success?
           false
         end
+
+        def exitstatus
+          nil
+        end
       end.new
     end
 
@@ -1664,8 +1668,14 @@ class PrMergeLedger
         scope = result.fetch(:required) ? "required" : "full"
         details = [result.fetch(:stderr), result.fetch(:stdout)].map(&:strip).reject(&:empty?).join(" | ")
         details = "no command output" if details.empty?
-        "gh pr checks #{scope} failed with exit #{result.fetch(:status).exitstatus}: #{details}"
+        "gh pr checks #{scope} failed with exit #{status_exitstatus(result.fetch(:status))}: #{details}"
       end.join("; ")
+    end
+
+    def status_exitstatus(status)
+      return status.exitstatus if status.respond_to?(:exitstatus) && status.exitstatus
+
+      "unknown"
     end
 
     def fetch_paginated_connection(pr_number, query, connection_name)
@@ -1789,6 +1799,8 @@ class PrMergeLedger
 
     def non_retryable_gh_error?(stderr)
       error_text = stderr.to_s
+      return false if error_text.match?(/\bgh (?:api graphql|pr checks|repo view) timed out after \d+ seconds\b/i)
+
       if error_text.match?(/\b(?:abuse detection|rate limit|rate-limit|secondary rate|too many requests)\b/i)
         return false
       end
