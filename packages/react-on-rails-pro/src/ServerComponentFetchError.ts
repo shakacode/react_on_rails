@@ -30,6 +30,7 @@ export class ServerComponentFetchError extends Error {
     this.serverComponentName = componentName;
     Object.defineProperty(this, 'serverComponentProps', {
       configurable: true,
+      enumerable: false,
       value: componentProps,
       writable: true,
     });
