@@ -74,10 +74,15 @@ module PrCiReadiness
     required_keys = required_rows.map { |row| row_key(row) }
     return false if required_keys.empty?
 
-    full_keys = full_rows.map { |row| row_key(row) }
-    return false unless (required_keys - full_keys).empty?
+    return false unless missing_required_keys(required_rows, full_rows).empty?
 
     full_rows.none? { |row| non_ready_row?(row) }
+  end
+
+  def missing_required_keys(required_rows, full_rows)
+    required_keys = required_rows.map { |row| row_key(row) }
+    full_keys = full_rows.map { |row| row_key(row) }
+    required_keys - full_keys
   end
 
   def failing_names(rows)
@@ -245,7 +250,10 @@ module PrCiReadiness
         required_used = false
       else
         full_rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
-        if PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+        if !PrCiReadiness.missing_required_keys(required_rows, full_rows).empty?
+          rows = []
+          required_used = false
+        elsif PrCiReadiness.required_rows_complete?(required_rows, full_rows)
           rows = required_rows
           required_used = true
         else

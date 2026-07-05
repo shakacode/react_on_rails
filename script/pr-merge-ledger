@@ -217,10 +217,15 @@ class PrMergeLedger
     required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
     return false if required_keys.empty?
 
-    full_keys = Array(full_rows).map { |row| ci_check_row_key(row) }
-    return false unless (required_keys - full_keys).empty?
+    return false unless missing_required_ci_check_keys(required_rows, full_rows).empty?
 
     Array(full_rows).none? { |row| non_ready_ci_check_row?(row) }
+  end
+
+  def self.missing_required_ci_check_keys(required_rows, full_rows)
+    required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
+    full_keys = Array(full_rows).map { |row| ci_check_row_key(row) }
+    required_keys - full_keys
   end
 
   def self.normalize_ci_check_row(row)
@@ -1555,6 +1560,12 @@ class PrMergeLedger
       if required_rows.empty?
         required_message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
         return [full_rows, false, required_message]
+      end
+
+      missing_required_keys = PrMergeLedger.missing_required_ci_check_keys(required_rows, full_rows)
+      unless missing_required_keys.empty?
+        message = "full current-head check list omitted required checks: #{missing_required_keys.join(', ')}"
+        return [[], false, message]
       end
       return [required_rows, true, nil] if PrMergeLedger.required_ci_check_rows_complete?(required_rows, full_rows)
 

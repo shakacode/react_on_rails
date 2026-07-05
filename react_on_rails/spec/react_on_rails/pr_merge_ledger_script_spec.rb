@@ -4599,6 +4599,94 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "blocks strict live closeout when full checks omit required rows" do
+    fake_gh = <<~SH
+      #!/bin/sh
+      if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+        required=false
+        for arg in "$@"; do
+          if [ "$arg" = "--required" ]; then
+            required=true
+          fi
+        done
+
+        if [ "$required" = "true" ]; then
+          cat <<'JSON'
+      [{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"https://example.com/check"}]
+      JSON
+        else
+          cat <<'JSON'
+      [{"name":"docs-format-check","state":"SUCCESS","bucket":"pass","link":"https://example.com/docs"}]
+      JSON
+        fi
+        exit 0
+      fi
+
+      query=""
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          -f|-F)
+            shift
+            case "$1" in
+              query=*) query=${1#query=} ;;
+            esac
+            ;;
+        esac
+        shift
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"number":1,"title":"PR 1","url":"https://example.com/pr/1","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-1","headRefOid":"head-1","mergedAt":null,"reviewDecision":"APPROVED","files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviews":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+
+    Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
+      gh_path = File.join(bin_dir, "gh")
+      File.write(gh_path, fake_gh)
+      File.chmod(0o755, gh_path)
+
+      stdout, stderr, status = Open3.capture3(
+        { "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" },
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success, stderr
+      expect(stderr).to include("ledger violations:")
+
+      report = JSON.parse(stdout)
+      ledger = report.fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "verdict" => "UNKNOWN",
+        "required_used" => false,
+        "message" => "full current-head check list omitted required checks: required-pr-gate"
+      )
+      expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_ci_readiness"
+      )
+    end
+  end
+
   it "aggregates multiple live PR ledgers in one invocation" do
     fake_gh = <<~SH
       #!/bin/sh

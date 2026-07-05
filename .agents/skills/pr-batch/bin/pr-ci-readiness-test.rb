@@ -111,6 +111,18 @@ class PrCiReadinessTest < Minitest::Test
     refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
   end
 
+  def test_required_rows_incomplete_when_full_is_missing_required_check
+    required_rows = [
+      { "name" => "required-pr-gate", "bucket" => "pass" }
+    ]
+    full_rows = [
+      { "name" => "docs-format-check", "bucket" => "pass" }
+    ]
+
+    assert_equal ["required-pr-gate"], PrCiReadiness.missing_required_keys(required_rows, full_rows)
+    refute PrCiReadiness.required_rows_complete?(required_rows, full_rows)
+  end
+
   def test_required_rows_complete_when_extra_full_checks_are_done
     required_rows = [
       { "name" => "required-pr-gate", "bucket" => "pass" }
@@ -243,6 +255,20 @@ class PrCiReadinessCliTest < Minitest::Test
       assert_equal "NOT_READY", data["verdict"]
       assert_equal false, data["required_used"]
       assert_equal ["rspec-package-tests"], data["pending"]
+    end
+  end
+
+  def test_required_subset_missing_from_full_snapshot_is_unknown_via_cli
+    with_fake_gh(
+      required_json: '[{"name":"required-pr-gate","state":"SUCCESS","bucket":"pass","link":"x"}]',
+      full_json: '[{"name":"docs-format-check","state":"SUCCESS","bucket":"pass","link":"y"}]'
+    ) do |env|
+      out, = run_script(env, "123", "--repo", "owner/repo")
+      data = JSON.parse(out)
+      assert_equal "UNKNOWN", data["verdict"]
+      assert_equal false, data["required_used"]
+      assert_equal [], data["failing"]
+      assert_equal [], data["pending"]
     end
   end
 
