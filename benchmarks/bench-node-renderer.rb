@@ -5,8 +5,8 @@
 #
 # Uses Vegeta with HTTP/2 Cleartext (h2c) support. Set
 # LOAD_GENERATOR_SHARDS=N to split each test across N Vegeta attack processes;
-# the script concatenates the binary result streams and runs one merged Vegeta
-# report so percentiles are recomputed over the combined sample distribution.
+# the script passes every shard result file to one merged Vegeta report so
+# percentiles are recomputed over the combined sample distribution.
 
 require "English"
 require "open3"
@@ -58,6 +58,8 @@ TEST_CASES = [
 # Script-specific configuration (common params from benchmark_config.rb)
 SUMMARY_TXT = "#{OUTDIR}/node_renderer_summary.txt".freeze
 BMF_PREFIX = "Pro Node Renderer: "
+VEGETA_RATE_PRECISION = 6
+VEGETA_RATE_SCALE = 10**VEGETA_RATE_PRECISION
 
 # Local wrapper for add_summary_line to use local constant
 def add_to_summary(*parts)
@@ -162,10 +164,13 @@ def validate_node_renderer_benchmark_config!
   validate_positive_integer(LOAD_GENERATOR_SHARDS, "LOAD_GENERATOR_SHARDS")
 
   return if LOAD_GENERATOR_SHARDS == 1
-  return if LOAD_GENERATOR_SHARDS <= CONNECTIONS && LOAD_GENERATOR_SHARDS <= MAX_CONNECTIONS
 
-  raise "LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS " \
-        "(got shards=#{LOAD_GENERATOR_SHARDS}, connections=#{CONNECTIONS}, max_connections=#{MAX_CONNECTIONS})"
+  unless LOAD_GENERATOR_SHARDS <= CONNECTIONS && LOAD_GENERATOR_SHARDS <= MAX_CONNECTIONS
+    raise "LOAD_GENERATOR_SHARDS must be no greater than CONNECTIONS and MAX_CONNECTIONS " \
+          "(got shards=#{LOAD_GENERATOR_SHARDS}, connections=#{CONNECTIONS}, max_connections=#{MAX_CONNECTIONS})"
+  end
+
+  validate_fixed_rate_shards!(LOAD_GENERATOR_SHARDS)
 end
 
 def distribute_integer(total, shard_count)
@@ -173,15 +178,41 @@ def distribute_integer(total, shard_count)
   Array.new(shard_count) { |index| base + (index < remainder ? 1 : 0) }
 end
 
-def format_vegeta_rate(rate)
-  formatted = format("%.6f", rate)
-  formatted.sub(/\.?0+\z/, "")
+def scaled_vegeta_rate
+  whole, fractional = RATE.split(".", 2)
+  fractional_digits = (fractional || "").ljust(VEGETA_RATE_PRECISION + 1, "0")
+  scaled = (whole.to_i * VEGETA_RATE_SCALE) + fractional_digits[0, VEGETA_RATE_PRECISION].to_i
+  scaled += 1 if fractional_digits[VEGETA_RATE_PRECISION].to_i >= 5
+  scaled
+end
+
+def validate_fixed_rate_shards!(shard_count)
+  return if RATE == "max" || scaled_vegeta_rate >= shard_count
+
+  minimum_rate = format_scaled_vegeta_rate_for_message(shard_count)
+  raise "RATE must be at least #{minimum_rate} when LOAD_GENERATOR_SHARDS=#{shard_count}"
+end
+
+def format_scaled_vegeta_rate_for_message(scaled_rate)
+  whole, fractional = scaled_rate.divmod(VEGETA_RATE_SCALE)
+  return whole.to_s if fractional.zero?
+
+  "#{whole}.#{fractional.to_s.rjust(VEGETA_RATE_PRECISION, '0').sub(/0+\z/, '')}"
+end
+
+def format_vegeta_attack_rate(scaled_rate)
+  whole, fractional = scaled_rate.divmod(VEGETA_RATE_SCALE)
+  return whole.to_s if fractional.zero?
+
+  # Vegeta accepts integer rates or integer-frequency duration syntax, but not
+  # bare decimals like "0.333333".
+  "#{scaled_rate}/#{VEGETA_RATE_SCALE}s"
 end
 
 def vegeta_rates_for_shards(shard_count)
   return Array.new(shard_count, "0") if RATE == "max"
 
-  Array.new(shard_count, format_vegeta_rate(RATE.to_f / shard_count))
+  distribute_integer(scaled_vegeta_rate, shard_count).map { |rate| format_vegeta_attack_rate(rate) }
 end
 
 def vegeta_result_file(name, shard_number, shard_count)
@@ -190,14 +221,18 @@ def vegeta_result_file(name, shard_number, shard_count)
   "#{OUTDIR}/#{name}_vegeta_shard_#{shard_number}_of_#{shard_count}.bin"
 end
 
-def run_vegeta_attack_shards(name, targets_file, shard_count)
+def vegeta_result_files(name, shard_count)
+  Array.new(shard_count) { |index| vegeta_result_file(name, index + 1, shard_count) }
+end
+
+def vegeta_attack_shard_specs(targets_file, result_files)
+  shard_count = result_files.length
   worker_counts = distribute_integer(CONNECTIONS, shard_count)
   max_worker_counts = distribute_integer(MAX_CONNECTIONS, shard_count)
   rates = vegeta_rates_for_shards(shard_count)
 
-  Array.new(shard_count) do |index|
+  result_files.map.with_index do |result_file, index|
     shard_number = index + 1
-    result_file = vegeta_result_file(name, shard_number, shard_count)
     vegeta_args = [
       "-rate=#{rates.fetch(index)}",
       "-workers=#{worker_counts.fetch(index)}",
@@ -217,28 +252,80 @@ def run_vegeta_attack_shards(name, targets_file, shard_count)
       "> #{Shellwords.escape(result_file)}"
     ].join(" ")
 
-    raise "Vegeta attack failed for #{name} shard #{shard_number}/#{shard_count}" unless system(vegeta_cmd)
-
-    result_file
+    { command: vegeta_cmd, result_file:, shard_count:, shard_number: }
   end
 end
 
+def vegeta_shard_label(shard_spec)
+  "shard #{shard_spec.fetch(:shard_number)}/#{shard_spec.fetch(:shard_count)}"
+end
+
+def process_status_description(status)
+  return "exited with status #{status.exitstatus}" if status.exitstatus
+  return "terminated by signal #{status.termsig}" if status.termsig
+
+  "finished unsuccessfully"
+end
+
+def wait_for_vegeta_attack_shards(running_shards)
+  running_shards.filter_map do |shard_spec|
+    _pid, status = Process.wait2(shard_spec.fetch(:pid))
+    next if status.success?
+
+    "#{vegeta_shard_label(shard_spec)} #{process_status_description(status)}"
+  rescue Errno::ECHILD
+    "#{vegeta_shard_label(shard_spec)} could not be waited on"
+  end
+end
+
+def stop_vegeta_attack_shards(running_shards)
+  running_shards.each do |shard_spec|
+    Process.kill("TERM", shard_spec.fetch(:pid))
+  rescue Errno::ESRCH
+    nil
+  end
+end
+
+def run_vegeta_attack_shards(name, targets_file, result_files)
+  running_shards = []
+  current_spec = nil
+
+  vegeta_attack_shard_specs(targets_file, result_files).each do |shard_spec|
+    current_spec = shard_spec
+    running_shards << shard_spec.merge(pid: Process.spawn(shard_spec.fetch(:command)))
+  end
+
+  failures = wait_for_vegeta_attack_shards(running_shards)
+  raise "Vegeta attack failed for #{name}: #{failures.join(', ')}" if failures.any?
+
+  result_files
+rescue SystemCallError => e
+  stop_vegeta_attack_shards(running_shards)
+  wait_for_vegeta_attack_shards(running_shards)
+  raise "Vegeta attack failed for #{name} #{vegeta_shard_label(current_spec)}: #{e.message}"
+end
+
+def vegeta_report_command(result_files, *args)
+  ["vegeta", "report", *args, *result_files].map { |part| Shellwords.escape(part) }.join(" ")
+end
+
+def run_vegeta_report_command!(command, failure_message)
+  return if system("bash", "-c", "set -o pipefail; #{command}")
+
+  raise failure_message
+end
+
 def run_vegeta_reports(result_files, vegeta_txt, vegeta_json)
-  escaped_results = result_files.map { |path| Shellwords.escape(path) }.join(" ")
-
-  # Vegeta's binary result stream is concatenable, so feeding all shard files to
-  # one report recomputes percentiles over the merged sample distribution.
-  unless system("bash", "-c",
-                "set -o pipefail; cat #{escaped_results} | vegeta report | " \
-                "tee #{Shellwords.escape(vegeta_txt)}")
-    raise "Vegeta text report failed"
-  end
-
-  unless system("bash", "-c",
-                "set -o pipefail; cat #{escaped_results} | vegeta report -type=json > " \
-                "#{Shellwords.escape(vegeta_json)}")
-    raise "Vegeta JSON report failed"
-  end
+  # Pass multiple gob files to one report; naive `cat` concatenation fails with
+  # duplicate gob type declarations on Vegeta 12.13.
+  run_vegeta_report_command!(
+    "#{vegeta_report_command(result_files)} | tee #{Shellwords.escape(vegeta_txt)}",
+    "Vegeta text report failed"
+  )
+  run_vegeta_report_command!(
+    "#{vegeta_report_command(result_files, '-type=json')} > #{Shellwords.escape(vegeta_json)}",
+    "Vegeta JSON report failed"
+  )
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -271,20 +358,23 @@ def run_vegeta_benchmark(test_case, bundle_timestamp, shard_count: LOAD_GENERATO
     @#{body_file}
   TARGETS
 
-  result_files = run_vegeta_attack_shards(name, targets_file, shard_count)
-  run_vegeta_reports(result_files, vegeta_txt, vegeta_json)
+  result_files = vegeta_result_files(name, shard_count)
+  begin
+    run_vegeta_attack_shards(name, targets_file, result_files)
+    run_vegeta_reports(result_files, vegeta_txt, vegeta_json)
 
-  # Delete the large binary file to save disk space
-  FileUtils.rm_f(*result_files)
+    # Parse results
+    vegeta_data = parse_json_file(vegeta_json, "Vegeta")
+    vegeta_rps = vegeta_data["throughput"]&.round(2) || "MISSING"
+    vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "MISSING"
+    vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "MISSING"
+    vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "MISSING"
 
-  # Parse results
-  vegeta_data = parse_json_file(vegeta_json, "Vegeta")
-  vegeta_rps = vegeta_data["throughput"]&.round(2) || "MISSING"
-  vegeta_p50 = vegeta_data.dig("latencies", "50th")&./(1_000_000.0)&.round(2) || "MISSING"
-  vegeta_p90 = vegeta_data.dig("latencies", "90th")&./(1_000_000.0)&.round(2) || "MISSING"
-  vegeta_status = vegeta_data["status_codes"]&.map { |k, v| "#{k}=#{v}" }&.join(",") || "MISSING"
-
-  [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_status]
+    [vegeta_rps, vegeta_p50, vegeta_p90, vegeta_status]
+  ensure
+    # Delete the large binary files to save disk space, including failed partial runs.
+    FileUtils.rm_f(result_files)
+  end
 end
 
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -333,7 +423,7 @@ if __FILE__ == $PROGRAM_NAME
   validate_node_renderer_benchmark_config!
 
   # Check required tools
-  check_required_tools(%w[vegeta curl column tee bash cat])
+  check_required_tools(%w[vegeta curl column tee bash])
 
   # Wait for node renderer to be ready
   # Note: Node renderer only speaks HTTP/2, but we can still check with a simple GET
