@@ -68,6 +68,7 @@ defaults:
         - react-on-rails-pro-node-renderer
         - react-on-rails-rsc
         - shakapacker
+        - shakapacker-rspack
       gem:
         - react_on_rails
         - react_on_rails_pro
@@ -175,13 +176,18 @@ repos:
 
   - name: shakacode/react-on-rails-starter-tanstack
     tier: hard_gate
-    headline: TanStack starter example
+    headline: TanStack Pro + RSC starter example
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-    needs_pro: false
+      - { ecosystem: npm, name: shakapacker-rspack }
+    needs_pro: true
     smoke: [/]
     verify: true
 

@@ -27,7 +27,7 @@ and no untriaged suspected RC regression.
 | `shakacode/react-on-rails-demo-hacker-news-rsc` | Public Hacker News RSC example.                                                   | RC bump PR, dependency install, app build/smoke, and CI status.                                                                                        |
 | `shakacode/react-on-rails-demo-gumroad-rsc`     | Public Gumroad RSC example.                                                       | RC bump PR, dependency install, app build/smoke, and CI status.                                                                                        |
 | `shakacode/react-webpack-rails-tutorial`        | Public legacy tutorial reference.                                                 | RC bump PR, dependency install, primary tutorial route smoke, and CI status.                                                                           |
-| `shakacode/react-on-rails-starter-tanstack`     | Public TanStack starter example.                                                  | RC bump PR, dependency install, starter build/smoke, and CI status.                                                                                    |
+| `shakacode/react-on-rails-starter-tanstack`     | Public TanStack Pro + RSC starter example.                                        | RC bump PR, dependency install, starter build/smoke, and CI status.                                                                                    |
 
 ### Shelved Or Non-Gating Repos
 
