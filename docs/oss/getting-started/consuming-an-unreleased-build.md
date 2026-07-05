@@ -118,11 +118,18 @@ widely the build must be shared:
 | Canary npm publish                      | Teammates or CI need the same temporary build.                             | Requires maintainer npm publish rights and a unique prerelease version. |
 | Packed tarball or throwaway dist branch | A package manager needs built files and npm publishing is not appropriate. | Must never be treated as the official release path.                     |
 
-Avoid plain source-branch dependencies for `react-on-rails-rsc`, especially with
-Yarn Classic:
+Avoid plain source-branch dependencies for `react-on-rails-rsc`, especially when using Yarn Classic.
+The same built-output risk applies to npm and pnpm Git dependencies:
 
 ```shell
+# Yarn
 yarn add react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main
+
+# npm
+npm install react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main
+
+# pnpm
+pnpm add react-on-rails-rsc@git+https://github.com/shakacode/react_on_rails_rsc.git#main
 ```
 
 The package does not commit `dist/`; published npm tarballs include it.
@@ -141,6 +148,19 @@ yalc publish
 # In the downstream app
 yalc add react-on-rails-rsc
 yarn install
+```
+
+If the downstream app uses a different package manager, keep the RSC checkout build command aligned
+with that checkout, then use the app's package manager after `yalc add`:
+
+```shell
+# npm app
+npx yalc add react-on-rails-rsc
+npm install
+
+# pnpm app
+pnpm dlx yalc add react-on-rails-rsc
+pnpm install
 ```
 
 After each package change, rebuild and refresh the downstream app copy:

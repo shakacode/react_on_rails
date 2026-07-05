@@ -4,29 +4,29 @@ RSC pages can emit browser resource hints while the server component tree render
 RSC page has a measured first-viewport bottleneck, such as late critical CSS, a late LCP image, or a
 font request that starts after the shell is already streaming.
 
-Import the helpers from the `react-on-rails-rsc/server` export that your RSC bundle already uses, and
-pass production URLs that your Rails, Shakapacker, webpack, or rspack manifests have already resolved.
+Use React DOM's resource hint APIs from the RSC render path. Do not import manual resource-hint
+helpers from `react-on-rails-rsc/server`: the published `react-on-rails-rsc` package does not export
+`preloadFont`, `preloadImage`, `preloadScript`, or `preloadStyle` helpers. That subpath is the Flight
+server entry point.
+
+Pass production URLs that your Rails, Shakapacker, webpack, or rspack manifests have already
+resolved.
 
 ```tsx
-import {
-  preconnect,
-  prefetchDNS,
-  preinitStyle,
-  preloadFont,
-  preloadImage,
-  preloadScript,
-  preloadStyle,
-} from 'react-on-rails-rsc/server';
+import { preconnect, prefetchDNS, preinit, preload } from 'react-dom';
 
 export default function WelcomePage() {
   prefetchDNS('https://cdn.example.com');
   preconnect('https://assets.example.com', { crossOrigin: 'anonymous' });
 
-  preinitStyle('/packs/generated/WelcomePage.css');
-  preloadStyle('/packs/generated/WelcomePage-abcd1234.css', { fetchPriority: 'high' });
-  preloadScript('/packs/generated/WelcomePage-abcd1234.js');
-  preloadFont('/assets/Poppins-600-abcd1234.woff2', { type: 'font/woff2' });
-  preloadImage('/assets/listing-price-comparison-abcd1234.webp', {
+  preinit('/packs/generated/WelcomePage.css', { as: 'style', precedence: 'rsc-css' });
+  preload('/assets/Poppins-600-abcd1234.woff2', {
+    as: 'font',
+    type: 'font/woff2',
+    crossOrigin: 'anonymous',
+  });
+  preload('/assets/listing-price-comparison-abcd1234.webp', {
+    as: 'image',
     fetchPriority: 'high',
     imageSrcSet:
       '/assets/listing-price-comparison-abcd1234.webp 1x, /assets/listing-price-comparison@2x-abcd1234.webp 2x',
@@ -37,17 +37,20 @@ export default function WelcomePage() {
 }
 ```
 
-These helpers are thin wrappers around React DOM's RSC-aware resource hint APIs:
+The useful React DOM APIs for RSC resource hints are:
 
 - `prefetchDNS(href)`
 - `preconnect(href, options)`
-- `preloadAsset(href, { as, ...options })`
-- `preloadStyle(href, options)`
-- `preinitStyle(href, options)`
-- `preloadScript(href, options)`
-- `preinitScript(href, options)`
-- `preloadFont(href, options)`
-- `preloadImage(href, options)`
+- `preinit(href, { as: 'style' | 'script', ...options })`
+- `preload(href, { as, ...options })`
+- `preinitModule(href, options)`
+- `preloadModule(href, options)`
+
+> [!NOTE]
+> The generator currently installs the tested React 19.0.x / `react-on-rails-rsc@19.0.5` stack by
+> default. Newer published `react-on-rails-rsc` releases may add automatic package-level hinting, but
+> app-authored resource hints should still use React DOM's public APIs rather than package-private
+> helpers.
 
 Use already-resolved URLs. These helpers do not look up logical pack names such as
 `generated/WelcomePage.css`; resolve those through the host app's asset manifest before calling the
@@ -58,17 +61,17 @@ user input, query parameters, or other request-derived values directly to these 
 
 Use hints only for resources that are genuinely needed for the first viewport or early interaction:
 
-- Use `preinitStyle` for critical CSS that should participate in React's stylesheet precedence and
+- Use `preinit` with `as: 'style'` for critical CSS that should participate in React's stylesheet precedence and
   streamed boundary reveal behavior. By default it uses the `rsc-css` precedence bucket, the same
   bucket React on Rails Pro uses for automatically discovered client-reference CSS. Pass an explicit
-  `precedence` when author-critical CSS must be ordered separately, but avoid overriding the
+  `precedence` when authored critical CSS must be ordered separately, but avoid overriding the
   precedence for an `href` that automatic client-reference CSS discovery also emits because React
   dedupes stylesheet preinit hints by URL.
-- Use `preloadStyle` when you only need to start downloading a stylesheet early.
-- Use `preloadFont` for fonts used by the LCP text. Include the real production font URL and `type`,
-  for example `font/woff2`.
-- Use `preloadImage` with `fetchPriority: 'high'` only for the actual LCP image, not for
-  below-the-fold gallery or avatar images.
+- Use `preload` with `as: 'style'` when you only need to start downloading a stylesheet early.
+- Use `preload` with `as: 'font'` for fonts used by the LCP text. Include the real production font
+  URL, `type`, and `crossOrigin` when the font request needs it.
+- Use `preload` with `as: 'image'` and `fetchPriority: 'high'` only for the actual LCP image, not
+  for below-the-fold gallery or avatar images.
 - Use `preconnect` for a CDN or asset origin that will certainly be used on the page. Use
   `prefetchDNS` when you only need the cheaper DNS lookup.
 - Avoid preloading route chunks, below-the-fold images, optional third-party scripts, or assets that

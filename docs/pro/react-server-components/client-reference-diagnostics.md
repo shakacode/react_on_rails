@@ -6,26 +6,31 @@ client manifest per build. It does not automatically infer per-page or per-route
 
 ## Emit Diagnostics
 
-Enable the optional diagnostics asset on the client build:
+The published `react-on-rails-rsc` webpack and rspack plugins do not currently emit a separate
+`clientReferenceDiagnosticsFilename` asset. Inspect the emitted client manifest instead, or generate a
+small local report from it after the client build completes.
 
 ```js
-new RSCWebpackPlugin({
-  isServer: false,
-  clientReferenceDiagnosticsFilename: 'rsc-client-reference-diagnostics.json',
-});
+import { readFileSync } from 'node:fs';
+
+const manifest = JSON.parse(readFileSync('public/packs/react-client-manifest.json', 'utf8'));
+const assets = new Map();
+
+for (const [id, metadata] of Object.entries(manifest)) {
+  for (const file of metadata.chunks ?? []) {
+    assets.set(file, { id, type: 'js' });
+  }
+  for (const file of metadata.css ?? []) {
+    assets.set(file, { id, type: 'css' });
+  }
+}
+
+console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metadata })));
 ```
 
-Rspack uses the same option:
-
-```js
-new RSCRspackPlugin({
-  isServer: false,
-  clientReferenceDiagnosticsFilename: 'rsc-client-reference-diagnostics.json',
-});
-```
-
-The emitted JSON reports the client references recorded in the manifest, the JS chunk files attached
-to each reference, and byte sizes for emitted assets when the bundler exposes them:
+The report should be derived from the manifest entries that the RSC package emits. A richer local
+report can include the client references recorded in the manifest, the JS chunk files attached to
+each reference, CSS files, and byte sizes from the build stats when the bundler exposes them:
 
 ```json
 {
@@ -52,9 +57,9 @@ to each reference, and byte sizes for emitted assets when the bundler exposes th
 }
 ```
 
-`bytes` is `null` only when the bundler does not expose the asset source during manifest emission.
-`totalChunkBytes` counts each emitted JS or CSS asset file once even when multiple client references
-share that asset.
+`bytes` should be `null` when the bundler stats do not expose the asset source. `totalChunkBytes`
+should count each emitted JS or CSS asset file once even when multiple client references share that
+asset.
 
 On client and server builds, CSS entries are reported from the emitted CSS assets for the generated
 chunk group for the listed client reference. If one island imports another client reference, the
@@ -73,13 +78,12 @@ For a server-only static RSC entry, use an explicit empty client reference list 
 new RSCWebpackPlugin({
   isServer: false,
   clientReferences: [],
-  clientReferenceDiagnosticsFilename: 'rsc-client-reference-diagnostics.json',
 });
 ```
 
-This produces an empty client manifest and an empty diagnostics file. Use it only for a build target
-that cannot render client components. Do not apply `clientReferences: []` to a mixed RSC app; any page
-that renders a client component will miss the client-reference metadata it needs at runtime.
+This produces an empty client manifest. Use it only for a build target that cannot render client
+components. Do not apply `clientReferences: []` to a mixed RSC app; any page that renders a client
+component will miss the client-reference metadata it needs at runtime.
 
 For a static page with one or two small islands, isolate the static build and declare only the island
 files that the public page may render:
@@ -94,18 +98,17 @@ new RSCWebpackPlugin({
       include: /TinyIsland\.(js|jsx|ts|tsx)$/,
     },
   ],
-  clientReferenceDiagnosticsFilename: 'rsc-client-reference-diagnostics.json',
 });
 ```
 
 The same descriptor shape is supported by `RSCRspackPlugin`. Keep the static page entry separate from
 the normal authenticated app entry when the app entry imports large global vendors, analytics, or
-dashboard-only clients. The diagnostics file gives a direct audit trail for whether the tiny island
-pulls only its own chunk or also pulls an unexpected vendor chunk through an import.
+dashboard-only clients. The manifest gives a direct audit trail for whether the tiny island pulls only
+its own chunk or also pulls an unexpected vendor chunk through an import.
 
-If an island imports a heavy dependency, the diagnostics file will show that dependency through the
-emitted chunk files and byte totals. Remove or defer the import in the island itself; the diagnostics
-option only reports what the build emitted and does not rewrite the module graph.
+If an island imports a heavy dependency, the manifest or derived report will show that dependency
+through the emitted chunk files and byte totals. Remove or defer the import in the island itself; the
+manifest only reports what the build emitted and does not rewrite the module graph.
 
 ## Boundaries
 
@@ -113,9 +116,10 @@ This diagnostics slice is intentionally narrow:
 
 - It does not create route-scoped or page-scoped manifests.
 - It does not discover the exact client references rendered by a specific RSC page.
+- It does not emit a separate diagnostics JSON file in the currently published package.
 - It does not eliminate vendor chunks automatically.
 - It does not solve broader dependency and manifest scoping work.
 
-Use the diagnostics output to decide whether an explicit static-page build is acceptable today, or
+Use the manifest output to decide whether an explicit static-page build is acceptable today, or
 whether the app needs broader manifest-scoping work before treating static RSC pages as
 performance-isolated.
