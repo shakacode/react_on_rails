@@ -191,7 +191,7 @@ test_promote_dry_run_prints_commands_and_runs_nothing() {
   assert_contains "$RF_OUT" "Promote 1.0.0 (runbook step 4)" "promote dry-run"
   assert_contains "$RF_OUT" "Resolved accepted RC tag: v1.0.0.rc.0" "promote dry-run"
   assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote dry-run"
-  assert_contains "$RF_OUT" "update-changelog release" "promote dry-run"
+  assert_contains "$RF_OUT" "react-on-rails-update-changelog release" "promote dry-run"
   assert_contains "$RF_OUT" "no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed" "promote dry-run"
 }
 

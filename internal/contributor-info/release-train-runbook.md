@@ -156,7 +156,8 @@ git push -u origin release/17.0.0
 ```
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
-ensure the rc changelog header is present (`/update-changelog rc` on the branch), then cut rc.0 with a
+ensure the rc changelog header is present (`$react-on-rails-update-changelog rc`
+targeting the branch), then cut rc.0 with a
 bare release — the version is read from CHANGELOG.md, so you do **not** pass `17.0.0.rc.0`:
 
 ```bash
@@ -295,7 +296,7 @@ Collapse the RC CHANGELOG sections into the final section and bump to the final 
 this is the only code change between the good RC and the final:
 
 ```bash
-# /update-changelog release   (collapses rc sections into ### [17.0.0])
+# $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
 bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
 ```
 

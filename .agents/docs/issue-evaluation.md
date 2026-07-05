@@ -77,7 +77,7 @@ Live issue state checked on 2026-06-15:
 - `P3`: parked priority.
 - `discussion`: RFCs, unclear product direction, or design conversations.
 - `needs-customer-feedback`: do not implement until customer evidence or maintainer approval exists.
-  See [skills/evaluate-issue/SKILL.md](../skills/evaluate-issue/SKILL.md) for the canonical creation description, color, and authorization rule.
+  See the installed/shared `$evaluate-issue` skill for the canonical creation description, color, and authorization rule.
 - `runtime-fix`: user-facing behavior fix that should actually be implemented.
 
 Label changes are authorized only when the current user prompt, worker goal, or task instructions explicitly allow label changes, or the user granted issue-triage/write permission for the current task. If unsure, report the label recommendation without changing GitHub.
@@ -86,12 +86,11 @@ Do not label AI/code-analysis-only findings as high priority without verified us
 
 ## Batch Planning
 
-For broad issue audits or all-open-issues review, use
-[skills/plan-issue-triage/SKILL.md](../skills/plan-issue-triage/SKILL.md)
-first to generate a review-only prompt. In that context, GitHub issue comments
-may be allowed while code, branch, issue, PR, label, milestone, assignee,
-title/body, and issue-state changes remain disallowed unless explicitly
-approved.
+For broad issue audits or all-open-issues review, use the installed/shared
+`$plan-issue-triage` skill first to generate a review-only prompt. In that
+context, GitHub issue comments may be allowed while code, branch, issue, PR,
+label, milestone, assignee, title/body, and issue-state changes remain
+disallowed unless explicitly approved.
 
 Before adding issues to a PR batch, classify each target as:
 
@@ -103,7 +102,6 @@ Before adding issues to a PR batch, classify each target as:
 
 Only implementation PRs and explicitly selected documentation updates should go to worker implementation batches. Parked, close-candidate, and product-decision items belong in audit/comment-only batches or should be excluded.
 
-Use [skills/evaluate-issue/SKILL.md](../skills/evaluate-issue/SKILL.md) when
-skills are available. Use
+Use the installed/shared `$evaluate-issue` skill when skills are available. Use
 [workflows/evaluate-issue.md](../workflows/evaluate-issue.md) for assistants
 that prefer workflow-file entry points over skill invocation syntax.

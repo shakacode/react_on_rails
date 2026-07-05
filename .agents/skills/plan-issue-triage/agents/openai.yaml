@@ -1,5 +1,0 @@
-# Codex UI metadata for skill picker display text and default prompt.
-interface:
-  display_name: "Plan Issue Triage"
-  short_description: "Generate issue audit prompts"
-  default_prompt: "Use $plan-issue-triage to draft a review-only issue audit prompt for the current repository."

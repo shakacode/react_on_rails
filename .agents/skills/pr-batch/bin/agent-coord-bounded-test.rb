@@ -266,10 +266,19 @@ class AgentCoordBoundedTest < Minitest::Test
 
   def process_alive?(pid)
     Process.kill(0, pid)
-    true
+    !zombie_process?(pid)
   rescue Errno::ESRCH
     false
   rescue Errno::EPERM
     true
+  end
+
+  def zombie_process?(pid)
+    stdout, status = Open3.capture2("ps", "-o", "stat=", "-p", pid.to_s)
+    return false unless status.success?
+
+    stdout.split.any? { |state| state.start_with?("Z") }
+  rescue StandardError
+    false
   end
 end

@@ -1,13 +1,13 @@
 # Post-Merge Audit Prompts
 
-Use these prompts with `.agents/skills/post-merge-audit/SKILL.md` when auditing merged agent batch work, comparing Codex and Claude findings, or turning audit findings into GitHub issues.
+Use these prompts with the installed/shared `$post-merge-audit` skill when auditing merged agent batch work, comparing Codex and Claude findings, or turning audit findings into GitHub issues.
 
 ## Coordination Rules
 
 These prompts intentionally repeat the worked-issue scope state machine from
-`.agents/skills/post-merge-audit/SKILL.md` so copy-paste audits stay
-self-contained. Keep state-machine changes mirrored across this workflow,
-`SKILL.md`, and `.agents/workflows/pr-processing.md`.
+the installed/shared `$post-merge-audit` skill so copy-paste audits stay
+self-contained. Keep state-machine changes mirrored across this workflow, the
+shared `$post-merge-audit` skill source, and `.agents/workflows/pr-processing.md`.
 
 - Use one exact audit id, base, and head for every agent, for example `audit: <YYYY-MM-DD>-post-rc`.
 - Format `<AUDIT_ID>` as `<YYYY-MM-DD>-<short-purpose>`, for example `<YYYY-MM-DD>-post-rc` or `<YYYY-MM-DD>-agent-batch-audit`.
@@ -121,7 +121,7 @@ First, produce the exact worked-issue scope and merged-PR range:
   `worked_issue_scope: not applicable`
 - when batch work is in scope but the batch id is `UNKNOWN`:
   - using the bounded helper from the resolved `PR_BATCH_SKILL_DIR`
-    (`PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"`),
+    (`PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"`),
     run bounded `agent-coord doctor --json`, then run bounded
     `agent-coord status --json` as a broad audit/discovery read to list
     candidate batch/run ids and lanes; do not use this broad read for worker
@@ -255,11 +255,11 @@ Also audit each included merged PR for:
 - risky behavior change
 - missing or weak validation
 - missing lockfile content-diff evidence when committed lockfiles changed, using
-  the Handoff Contract in `.agents/skills/pr-batch/SKILL.md`
+  the Handoff Contract in the installed/shared `$pr-batch` skill
 - weak closing evidence in any PR whose body or linked issue uses analysis,
   benchmark, or investigation evidence to support a `close` or
   `document/work around` disposition: apply the full gate from the "Evaluate the
-  fix plan separately" step in `.agents/skills/evaluate-issue/SKILL.md`,
+  fix plan separately" step in the installed/shared `$evaluate-issue` skill,
   including reproducible artifact or justified missing-artifact caveat, internal
   consistency, production-environment caveats, and refutable-conclusion handling
 - cross-PR interactions
@@ -408,7 +408,7 @@ Rules:
 - For non-release audits with no release-gate ledger, include
   `Audit ledger: not applicable (non-release audit)` in every parent and child
   issue body.
-- For missing changelog findings, prefer one bundled changelog issue or recommend `/update-changelog`; do not create one issue per missing entry unless explicitly approved.
+- For missing changelog findings, prefer one bundled changelog issue or recommend `$update-changelog`; use `$react-on-rails-update-changelog` when the changelog PR must target `release/X.Y.Z`. Do not create one issue per missing entry unless explicitly approved.
 - For process findings, preserve the approved Process Gap Disposition fields:
   `Mechanism target`, `Motivating miss`, `Replay evidence or park reason`, and
   `Non-goal`.

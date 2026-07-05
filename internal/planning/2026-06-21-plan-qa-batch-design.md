@@ -7,7 +7,7 @@ Branch: `jg-conductor/3952-qa-automation-plan`
 
 Behavioral QA — proving that a merged change actually does what it claims — has a
 worker but no planner. The `verify-pr-fix` skill
-(`.agents/skills/verify-pr-fix/SKILL.md`) verifies **one** PR: reproduce the bug
+(the installed/shared `$verify-pr-fix` skill) verifies **one** PR: reproduce the bug
 before the fix, confirm it gone after, post evidence to the PR. But nothing
 decides **which** merged PRs get that treatment, **when**, or **in what order**.
 
@@ -150,7 +150,7 @@ per-page/streaming processing if a target repo's merged PR count makes that
 memory trade-off unsafe.
 
 The read-only resolver
-`.agents/skills/post-merge-audit/bin/post-merge-audit-scope --json` is then used
+`POST_MERGE_AUDIT_SKILL_DIR="$(.agents/bin/shared-skill-dir post-merge-audit)"; "${POST_MERGE_AUDIT_SKILL_DIR}/bin/post-merge-audit-scope" --json` is then used
 **only as an optimization** to order/prioritize the common since-RC window, never
 to filter the backlog. Two real constraints when calling it (verified against the
 script): it **hard-fails (`return 1`)** when no `*.rc.*` tag is in head history
@@ -476,16 +476,16 @@ readiness) differ enough that overloading `pr-batch` would muddy both.
 
 **Create:**
 
-- `.agents/skills/plan-qa-batch/SKILL.md`
-- `.agents/skills/qa-batch/SKILL.md`
+- the planned shared `$plan-qa-batch` skill
+- the planned shared `$qa-batch` skill
 - Optionally `.agents/workflows/qa-processing.md` (the QA operating model the
   goal prompt references, analogous to `pr-processing.md`) if the runner needs
   more than the SKILL.md carries.
 
 **Edit:**
 
-- `.agents/skills/verify-pr-fix/SKILL.md` — add the `qa-verified` label step.
-- `.agents/skills/post-merge-audit/SKILL.md` — add `agent-coord` coordination.
+- the installed/shared `$verify-pr-fix` skill — add the `qa-verified` label step.
+- the installed/shared `$post-merge-audit` skill — add `agent-coord` coordination.
 
 **Labels** (created on demand by the writers — no manual pre-step, see §5):
 

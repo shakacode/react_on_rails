@@ -38,7 +38,7 @@ commands.
 gh pr view <PR> --json number,title,body,state,isDraft,headRefOid,headRefName,baseRefName,mergeStateStatus,reviewDecision,labels,url,reviews,comments,mergedAt
 gh pr diff <PR> --name-only
 gh pr diff <PR>
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"
+PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
 "${PR_BATCH_SKILL_DIR}/bin/pr-ci-readiness" <PR> --repo <OWNER/REPO>
 gh pr checks <PR>   # advisory review-agent completion beyond the readiness gate
 ```
