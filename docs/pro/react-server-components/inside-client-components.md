@@ -392,6 +392,11 @@ Client router loaders can still choose which server component a route renders. K
 coordinator that returns plain route data, then render `RSCRoute` from the route component. React on
 Rails Pro then owns the RSC payload fetch, embedded SSR payload reuse, cache, and retry lifecycle.
 
+If your app enforces a strict Content Security Policy without `'unsafe-inline'`, configure the Rails
+script nonce described in [Strict Content Security Policy](../strict-csp.md). `RSCRoute` uses the
+standard React on Rails Pro RSC path, so streamed payload scripts, console replay scripts, and
+hydration scripts need the same `railsContext.cspNonce` setup as other streamed RSC pages.
+
 ```tsx
 import { Suspense } from 'react';
 import { createRoute } from '@tanstack/react-router';
