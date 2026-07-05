@@ -127,7 +127,7 @@ This will:
    with `.maximum.tool-versions.head`
    - This `.tool-versions` update happens for every supported version manager because CI reads the file directly.
 2. Run `script/convert` to downgrade dependencies:
-   - Shakapacker 10.1.0 → 8.2.0
+   - Shakapacker 10.2.0 → 8.2.0
    - React 19.0.0 → 18.0.0
    - Remove ESLint and other packages incompatible with Node 20
 3. Clean `node_modules` and `pnpm-lock.yaml`
