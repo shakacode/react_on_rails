@@ -56,23 +56,34 @@ function resetCacheKeyDiagnosticObject(cacheKey: string) {
   return `delete (self.REACT_ON_RAILS_RSC_ERRORS||={})[${JSON.stringify(cacheKey)}]`;
 }
 
+const RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = 'data-react-on-rails-rsc-payload="true"';
+
 function nonceAttribute(sanitizedNonce?: string) {
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
 
-function createScriptTag(script: string, sanitizedNonce?: string) {
-  return `<script${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;
+function rscPayloadScriptMarkerAttribute(markAsRSCPayload?: boolean) {
+  return markAsRSCPayload ? ` ${RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE}` : '';
+}
+
+function createScriptTag(script: string, sanitizedNonce?: string, markAsRSCPayload?: boolean) {
+  return `<script${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;
 }
 
 function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?: string) {
   return createScriptTag(
     `${resetCacheKeyDiagnosticObject(cacheKey)};${cacheKeyJSArray(cacheKey)}`,
     sanitizedNonce,
+    true,
   );
 }
 
 function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
-  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
+  return createScriptTag(
+    `(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`,
+    sanitizedNonce,
+    true,
+  );
 }
 
 function nonEmptyMetadataString(value: unknown) {
@@ -98,6 +109,7 @@ function createRSCDiagnosticScript(
   return createScriptTag(
     `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
     sanitizedNonce,
+    true,
   );
 }
 

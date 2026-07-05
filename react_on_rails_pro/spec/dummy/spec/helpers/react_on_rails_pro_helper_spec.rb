@@ -1884,6 +1884,35 @@ describe ReactOnRailsProHelper do
         expect(result).to eq("#{preserved_html}\n#{suffix_html}")
       end
 
+      it "strips explicitly marked RSC payload scripts even when generated body shape changes" do
+        raw_html = <<~HTML
+          <div>Static RSC HTML</div>
+          <script type="application/json" data-react-on-rails-rsc-payload="true">{"keep":"structured data"}</script>
+          <script data-react-on-rails-rsc-payload="true">window.__nextRSCChunk("flight chunk")</script>
+          <script>window.__nextRSCChunk("not an RSC payload script")</script>
+        HTML
+        result = nil
+
+        Sync do
+          stub_pro_bundle_hashes
+          allow(self).to receive(:buffered_stream_react_component).and_return(raw_html.html_safe)
+
+          result = cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-marked-payload-script", component_name],
+            id: "#{component_name}-react-component-0",
+            cache_options: { expires_in: 60 }
+          ) do
+            props
+          end
+        end
+
+        expect(result).to include("Static RSC HTML")
+        expect(result).to include('{"keep":"structured data"}')
+        expect(result).not_to include("flight chunk")
+        expect(result).to include('window.__nextRSCChunk("not an RSC payload script")')
+      end
+
       it "strips RSC scripts after Unicode characters whose case mapping changes length" do
         raw_html = <<~HTML
           <p>İstanbul launch page</p>

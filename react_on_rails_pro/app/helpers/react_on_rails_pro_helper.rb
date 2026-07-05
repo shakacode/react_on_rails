@@ -32,6 +32,7 @@ module ReactOnRailsProHelper
   SCRIPT_OPEN_TAG_LENGTH = 7
   SCRIPT_CLOSE_TAG = "</script"
   SCRIPT_CLOSE_TAG_LENGTH = 8
+  STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = "data-react-on-rails-rsc-payload"
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
   @static_rsc_asset_diagnostic_cache = {}
 
@@ -712,12 +713,17 @@ module ReactOnRailsProHelper
 
   def static_rsc_payload_script?(script_node)
     return false unless executable_script_type?(script_node["type"])
+    return true if static_rsc_payload_script_marker?(script_node)
 
     stripped_body = script_node.content.to_s.strip
 
     stripped_body.match?(/\Adelete\s*\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/) ||
       stripped_body.match?(/\A\(\(\s*self\.REACT_ON_RAILS_RSC_PAYLOADS\b/) ||
       stripped_body.match?(/\A\(\s*self\.REACT_ON_RAILS_RSC_ERRORS\b/)
+  end
+
+  def static_rsc_payload_script_marker?(script_node)
+    script_node[STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE].to_s.casecmp?("true")
   end
 
   def executable_script_type?(script_type)
