@@ -194,8 +194,7 @@ If the RSC page downloads unexpected CSS or JS through client references, check
 [RSC Stylesheet Injection](rsc-troubleshooting.md#rsc-stylesheet-injection-render-blocking-links-and-cascade-order).
 Use
 [RSC Client Reference Diagnostics](../../pro/react-server-components/client-reference-diagnostics.md)
-when you need a build-time asset report for the exact client-reference chunks emitted by the RSC
-plugin.
+when you need a local asset report for the exact client-reference chunks emitted by the RSC plugin.
 
 ## Bundler and Client-Reference Caveats
 

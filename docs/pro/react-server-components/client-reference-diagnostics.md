@@ -8,13 +8,28 @@ client manifest per build. It does not automatically infer per-page or per-route
 
 The published `react-on-rails-rsc` webpack and rspack plugins do not currently emit a separate
 `clientReferenceDiagnosticsFilename` asset. Inspect the emitted client manifest instead, or generate a
-small local report from it after the client build completes.
+small local report from the client manifest plus `loadable-stats.json` after the client build
+completes.
 
 ```js
 import { readFileSync } from 'node:fs';
 
-const manifest = JSON.parse(readFileSync('public/packs/react-client-manifest.json', 'utf8'));
+function readJson(filename) {
+  return JSON.parse(readFileSync(filename, 'utf8'));
+}
+
+const manifest = readJson('public/packs/react-client-manifest.json');
+const loadableStats = readJson('public/packs/loadable-stats.json');
 const assets = new Map();
+
+function assetHref(asset) {
+  const publicPath = loadableStats.publicPath;
+  if (!publicPath || publicPath === 'auto') {
+    return asset;
+  }
+
+  return `${publicPath.replace(/\/?$/, '/')}${asset.replace(/^\/+/, '')}`;
+}
 
 function addAsset(file, id, type) {
   const entry = assets.get(file) ?? { ids: [], types: [] };
@@ -30,14 +45,23 @@ function addAsset(file, id, type) {
   assets.set(file, entry);
 }
 
+function addStylesheetsForChunk(chunkName, id) {
+  const chunkAssets = loadableStats.assetsByChunkName?.[chunkName] ?? [];
+  const assetsForChunk = Array.isArray(chunkAssets) ? chunkAssets : [chunkAssets];
+
+  for (const asset of assetsForChunk) {
+    if (typeof asset === 'string' && asset.endsWith('.css')) {
+      addAsset(assetHref(asset), id, 'css');
+    }
+  }
+}
+
 for (const [id, metadata] of Object.entries(manifest)) {
   const chunks = metadata.chunks ?? [];
   for (let index = 1; index < chunks.length; index += 2) {
+    const chunkName = chunks[index - 1];
     addAsset(chunks[index], id, 'js');
-  }
-
-  for (const file of metadata.css ?? []) {
-    addAsset(file, id, 'css');
+    addStylesheetsForChunk(chunkName, id);
   }
 }
 
@@ -45,7 +69,8 @@ console.table([...assets.entries()].map(([file, metadata]) => ({ file, ...metada
 ```
 
 The report should be derived from the manifest entries that the RSC package emits. The manifest's
-`chunks` array stores alternating chunk ids and filenames; report only the filename half. A shared JS
+`chunks` array stores alternating chunk ids and filenames; report only the filename half for JS
+assets, and use the chunk id half to look up extracted CSS files in `loadable-stats.json`. A shared JS
 or CSS file can list multiple client-reference owners. A richer local report can include the client
 references recorded in the manifest, the JS chunk files attached to each reference, CSS files, and
 byte sizes from the build stats when the bundler exposes them:
