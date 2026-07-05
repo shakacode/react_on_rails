@@ -77,6 +77,12 @@ body:
           - Tester/date:
           - Issue/waiver:
 
+        - [ ] `shakacode/react-on-rails-demo-flagship`
+          - PR:
+          - Public-safe evidence:
+          - Required CI:
+          - Issue/waiver:
+
         - [ ] `shakacode/react-on-rails-demo-marketplace-rsc`
           - PR:
           - Install/build/smoke evidence:
@@ -188,6 +194,10 @@ body:
       description: Fill this after the final release ships. The tracker stays open until final bumps are merged or explicitly followed up.
       value: |
         - [ ] `shakacode/hichee`
+          - Final PR:
+          - Result:
+
+        - [ ] `shakacode/react-on-rails-demo-flagship`
           - Final PR:
           - Result:
 
