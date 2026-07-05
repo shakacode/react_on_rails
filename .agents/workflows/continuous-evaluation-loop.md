@@ -26,7 +26,7 @@ role, not a maker role.
 Gather live evidence from git, GitHub, and agent-coord, not chat memory:
 
 1. Run bounded coordination reads through the resolved `pr-batch` helper:
-   `PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-.agents/skills/pr-batch}"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json`,
+   `PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"; "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json`,
    then `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id <batch-id> --json`
    when a batch id is known, or
    `"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo <owner/repo> --target <issue-or-pr> --json`
@@ -129,7 +129,7 @@ Return a report with these sections:
    - owner, target, branch, last heartbeat, liveness, blocker, and recommended
      resume/reassign/drop decision
 4. **Post-Merge Audit Intake**
-   - merged non-OK findings that should feed `.agents/skills/post-merge-audit/SKILL.md`
+   - merged non-OK findings that should feed the installed/shared `$post-merge-audit` skill
    - draft issue entries only when useful, with fingerprints and no GitHub
      writes
    - use the hidden HTML comment fingerprint format from
@@ -175,11 +175,11 @@ sources used.
 
 ## Integration Notes
 
-- This loop complements, but does not replace, `.agents/skills/plan-pr-batch/SKILL.md` and any
+- This loop complements, but does not replace, the installed/shared `$plan-pr-batch` skill and any
   capacity-aware triage workflow present in the active branch: planning builds
   the worklist and queue; this loop checks whether assigned work was actually
   realized and whether stalled work needs a decision.
-- This loop complements, but does not replace, `.agents/skills/post-merge-audit/SKILL.md`: use the
+- This loop complements, but does not replace, the installed/shared `$post-merge-audit` skill: use the
   loop for continuous detection and use post-merge audit for approved deep audit
   and issue-plan creation over merged ranges.
 - The merge ledger is mechanical evidence about review-thread, review-object,
