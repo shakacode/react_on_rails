@@ -1487,15 +1487,19 @@ class PrMergeLedger
 
     def fetch_ci_readiness(pr_number)
       required_result = fetch_pr_checks(pr_number, required: true)
-      if required_result.fetch(:success) && PrMergeLedger.usable_ci_check_rows?(required_result.fetch(:stdout))
-        rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
+      required_rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
+      if PrMergeLedger.usable_ci_check_rows?(required_result.fetch(:stdout))
+        rows = required_rows
         required_used = true
         message = nil
       else
         full_result = fetch_pr_checks(pr_number, required: false)
-        raise Error, pr_checks_error_message(required_result, full_result) unless full_result.fetch(:success)
+        full_rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
+        if !full_result.fetch(:success) && !PrMergeLedger.usable_ci_check_rows?(full_result.fetch(:stdout))
+          raise Error, pr_checks_error_message(required_result, full_result)
+        end
 
-        rows = PrMergeLedger.parse_ci_check_rows(full_result.fetch(:stdout))
+        rows = full_rows
         required_used = false
         message = pr_checks_error_message(required_result) unless required_result.fetch(:success)
       end
