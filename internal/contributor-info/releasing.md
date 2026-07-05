@@ -13,7 +13,9 @@ See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIB
 **Always update CHANGELOG.md before running the release task.** The release task reads the version from CHANGELOG.md and automatically creates a GitHub release from the changelog section.
 
 1. Ensure all desired changes are merged to `main` branch
-2. Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to:
+2. Run the installed/shared `$update-changelog release` for ordinary mainline
+   releases, or `$react-on-rails-update-changelog release`/`rc`/`beta` when the
+   PR must target `release/X.Y.Z`, to:
    - Find merged PRs missing from the changelog
    - Add changelog entries under the appropriate category headings
    - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
@@ -228,7 +230,11 @@ The task automatically converts Ruby gem format to npm semver format:
 
    **Option A - Use Claude Code (recommended):**
 
-   Run `/update-changelog 16.5.0` (using the already-released version) to analyze commits, write entries, and automatically open a PR. After the PR merges, pull the updated changelog and sync the GitHub release:
+   Run `$update-changelog 16.5.0` (using the already-released version) to analyze
+   commits, write entries, and automatically open a PR. Use
+   `$react-on-rails-update-changelog` instead when the catch-up PR must target
+   `release/X.Y.Z`. After the PR merges, pull the updated changelog and sync the
+   GitHub release:
 
    ```bash
    git pull --rebase
