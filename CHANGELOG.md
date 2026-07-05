@@ -127,6 +127,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4438](https://github.com/shakacode/react_on_rails/pull/4438) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **RSC payload streaming flushes complete HTML before incomplete tails**: The Pro RSC
+  payload injector now streams the complete prefix of each chunk immediately while retaining only
+  incomplete UTF-8 sequences, HTML tags, comments, template content, raw-text elements, or
+  foreign-content tails for the next chunk. This preserves progressive streaming when a chunk ends
+  in partial markup instead of holding the entire flush until the tail completes. Fixes
+  [Issue 4327](https://github.com/shakacode/react_on_rails/issues/4327).
+  [PR 4379](https://github.com/shakacode/react_on_rails/pull/4379) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Truncated RSC parser streams now warn at EOF**: The Pro RSC length-prefixed stream
   parser flushes at stream end so incomplete trailing records emit the existing parser warning,
   while expected request-abort cleanup remains quiet.
