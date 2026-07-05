@@ -33,9 +33,10 @@ const toLengthPrefixedWithMetadata = (content: string, metadata: Record<string, 
 
 const rscPayloadKey = 'test-fun4a7ngv9-test-node';
 const rscPayloadKeyReference = `[${JSON.stringify(rscPayloadKey)}]`;
-const expectedInitializationScript = `<script>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference};(self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]</script>`;
+const rscPayloadScriptMarker = 'data-react-on-rails-rsc-payload="true"';
+const expectedInitializationScript = `<script ${rscPayloadScriptMarker}>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference};(self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]</script>`;
 const expectedPayloadPushScript = (chunk: string) =>
-  `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
+  `<script ${rscPayloadScriptMarker}>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
     chunk,
   )})</script>`;
 
@@ -400,6 +401,9 @@ describe('injectRSCPayload', () => {
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
     const resultStr = await collectStreamData(result);
 
+    expect(resultStr).toContain(
+      `<script ${rscPayloadScriptMarker}>(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`,
+    );
     expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
     expect(resultStr).toContain('["test-fun4a7ngv9-test-node"]||=');
     expect(resultStr).toContain('useState is not a function');
