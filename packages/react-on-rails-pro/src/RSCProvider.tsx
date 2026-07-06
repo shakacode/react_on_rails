@@ -32,6 +32,7 @@ import {
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
+import { getPrefetchedServerComponent } from './RSCPrefetchStore.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
@@ -385,14 +386,19 @@ export const createRSCProvider = ({
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
-        try {
-          serverComponentPromise = getServerComponent({ componentName, componentProps });
-        } catch (error) {
-          // A synchronous producer throw behaves exactly like an immediately
-          // rejected fetch: the rejection flows through the standard
-          // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
-          // settles the evicted-success latch and evicts the cached rejection.
-          serverComponentPromise = rejectWithError(error);
+        const prefetchedServerComponentPromise = getPrefetchedServerComponent(key);
+        if (prefetchedServerComponentPromise) {
+          serverComponentPromise = prefetchedServerComponentPromise;
+        } else {
+          try {
+            serverComponentPromise = getServerComponent({ componentName, componentProps });
+          } catch (error) {
+            // A synchronous producer throw behaves exactly like an immediately
+            // rejected fetch: the rejection flows through the standard
+            // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
+            // settles the evicted-success latch and evicts the cached rejection.
+            serverComponentPromise = rejectWithError(error);
+          }
         }
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {

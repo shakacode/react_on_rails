@@ -84,7 +84,7 @@ const createFromFetch = async (
   {
     componentName,
     cspNonce,
-    replayConsoleScripts = true,
+    replayConsoleScripts = false,
     sourceDescription,
   }: {
     componentName: string;

@@ -24,6 +24,7 @@ import {
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from '../src/RSCProviderCache.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
+import { resetRSCPrefetchStoreForTesting, setPrefetchedServerComponent } from '../src/RSCPrefetchStore.ts';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
 import { createRSCPayloadKey } from '../src/utils.ts';
@@ -425,12 +426,14 @@ describe('RSCRoute successful-version error reset', () => {
 
   beforeEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    resetRSCPrefetchStoreForTesting();
     setupCountingFetcher();
   });
 
   afterEach(() => {
     jest.useRealTimers();
     process.env.NODE_ENV = originalNodeEnv;
+    resetRSCPrefetchStoreForTesting();
   });
 
   it('a. evicts least-recently-used keys once distinct keys exceed the cap', async () => {
@@ -1560,5 +1563,29 @@ describe('RSCRoute successful-version error reset', () => {
     await resolveLoad(retryReplacement, <span>replacement after rejection</span>);
 
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('q. loader-time prefetched payload is adopted into the provider cache', async () => {
+    const key = createRSCPayloadKey('Card', { id: 123 });
+    setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
+
+    const result = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+
+    await rerenderInAct(
+      result,
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 # React on Rails Pro — RSC
 
-React Server Components support for Rails apps: server-side Flight payload generation, embedding into SSR HTML, client-side caching, and (planned, #4460) loader-time prefetch for client routers.
+React Server Components support for Rails apps: server-side Flight payload generation, embedding into SSR HTML, client-side caching, and loader-time prefetch for client routers.
 
 ## Language
 
@@ -16,13 +16,13 @@ _Avoid_: RSC cache (ambiguous with the other stores)
 The `window.REACT_ON_RAILS_RSC_PAYLOADS` global written during SSR streaming and consulted by the client before any HTTP fetch.
 _Avoid_: preloaded payloads store
 
-**Prefetch Store** (planned, #4460):
+**Prefetch Store**:
 A module-level registry of decoded payload promises created by `prefetchServerComponent(...)` from outside React context (router loaders/preloads), awaiting adoption by a Provider Cache.
 
-**Self-eviction** (planned, #4460):
+**Self-eviction**:
 A failed prefetch removes its own Prefetch Store entry, so the subsequent render fetches normally — a failed prefetch behaves as if it never happened.
 
-**Adoption** (planned, #4460):
+**Adoption**:
 The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider Cache on the first `getComponent` call for that key.
 
 ## Relationships
@@ -34,7 +34,7 @@ The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider 
 - The Embedded Payload Registry outranks a network fetch; a prefetch for a key already embedded in the SSR HTML must be a no-op.
 - `prefetchServerComponent` returns `Promise<void>` (warm-cache only, never a `ReactNode`): resolves once decoded into the Prefetch Store, or once a failure/abort has self-evicted from the store. Fetch/decode failures do not reject the public promise, so fire-and-forget usage produces no unhandled-rejection noise. Rendering payloads is exclusively `<RSCRoute />`'s job.
 - Signature: `prefetchServerComponent(componentName, componentProps, { signal? })`. `headers`/`credentials` are intentionally absent: fetch options are not part of the cache key, so anything that could change payload content must be identical across all fetch paths (per-app needs belong in a global fetch config, not a per-prefetch parameter). An aborted prefetch self-evicts, same as a failed one.
-- Prefetch must have **no extra CSP/console-replay surface**: it calls the shared client-fetch path and inherits its policy. Because Adoption makes prefetched and render-fetched payloads interchangeable, a per-path CSP fork would make inline-script emission timing-dependent. Today the shared client-fetch path used for client-navigation fetches still defaults `replayConsoleScripts` on, and the main/same-request RSC rendering path may materialize an inline script (nonce-capable via `cspNonce`). The planned #4460 implementation must make the shared prefetch/client-navigation policy CSP-safe, so #4439 sign-off condition 1 is still only partially met.
+- Prefetch has **no extra CSP/console-replay surface**: it calls the shared client-fetch path and inherits its policy. Because Adoption makes prefetched and render-fetched payloads interchangeable, a per-path CSP fork would make inline-script emission timing-dependent. The shared client-fetch path used for client-navigation fetches defaults `replayConsoleScripts` off; same-request SSR payload injection remains nonce-capable via `cspNonce`.
 - During SSR, `prefetchServerComponent` is a **resolving no-op** (server conditional export): SSR guarantees the payload is embedded via `injectRSCPayload`, so this is the degenerate case of the "embedded payload ⇒ prefetch no-ops" rule. It must never reject — loaders legitimately run on the server.
 - The Prefetch Store is **bounded** (mirror the Provider Cache's `BoundedLRU`): entries that are never adopted must not accumulate.
 
