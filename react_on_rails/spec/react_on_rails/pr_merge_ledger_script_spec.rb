@@ -2807,6 +2807,12 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Addressed by current head `current`. Covered by the regression suite. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. This avoids regressions in the color parsing. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No functional regressions observed. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Regression-free per the full suite run. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It doesn't fail on Windows anymore. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It won\u2019t fail on Windows anymore. " \
@@ -2952,74 +2958,79 @@ RSpec.describe "script/pr-merge-ledger" do
   end
 
   it "does not infer fixed dispositions from ambiguous direct replies" do
-    fixture = {
-      "repository" => "shakacode/react_on_rails",
-      "pull_request" => {
-        "number" => 8,
-        "headRefOid" => "current",
-        "reviewDecision" => "APPROVED"
-      },
-      "files" => [],
-      "review_threads" => [
-        {
-          "id" => "resolved-current-thread",
-          "isResolved" => true,
-          "isOutdated" => false,
-          "comments" => [
-            {
-              "id" => "finding-comment",
-              "url" => "https://example.com/finding-comment",
-              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
-              "author" => { "login" => "reviewer" },
-              "createdAt" => "2026-06-01T00:00:00Z",
-              "outdated" => false,
-              "commit" => { "oid" => "current" }
-            },
-            {
-              "id" => "reply-comment",
-              "url" => "https://example.com/reply-comment",
-              "body" => "\nFixed in current head `current`. Does this look right?",
-              "author" => { "login" => "reviewer" },
-              "createdAt" => "2026-06-01T00:05:00Z",
-              "outdated" => false,
-              "replyTo" => { "id" => "finding-comment" },
-              "commit" => { "oid" => "current" }
-            }
-          ]
-        }
-      ],
-      "reviews" => [],
-      "comments" => []
-    }
+    [
+      "\nFixed in current head `current`. Does this look right?",
+      "Fixed in colors.test.ts. Is that correct?"
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "reply-comment",
+                "url" => "https://example.com/reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
 
-    Tempfile.create(["pr-merge-ledger-ambiguous-fixed-reply", ".json"]) do |file|
-      write_fixture(file, fixture)
-      file.flush
+      Tempfile.create(["pr-merge-ledger-ambiguous-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
 
-      stdout, _stderr, status = Open3.capture3(
-        script_path,
-        "--fixture",
-        file.path,
-        "--changelog-classification",
-        "not_user_visible",
-        "--strict",
-        chdir: repo_root
-      )
+        stdout, _stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
 
-      expect(status).not_to be_success
+        expect(status).not_to be_success
 
-      report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
 
-      expect(report.fetch("complete_allowed")).to be(false)
-      expect(finding).to include(
-        "id" => "finding-comment",
-        "severity" => "P2",
-        "disposition" => "UNKNOWN"
-      )
-      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_priority_finding_disposition"
-      )
+        expect(report.fetch("complete_allowed")).to be(false)
+        expect(finding).to include(
+          "id" => "finding-comment",
+          "severity" => "P2",
+          "disposition" => "UNKNOWN"
+        )
+        expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+          "unknown_priority_finding_disposition"
+        )
+      end
     end
   end
 

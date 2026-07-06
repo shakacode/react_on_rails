@@ -131,6 +131,11 @@ class PrMergeLedger
   }ix
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
   TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
+  BENIGN_REGRESSION_REPLY_PATTERN = /
+    \b(?:no|without)\s+(?:\S+\s+){0,4}regressions?\b|
+    \bavoid(?:s|ed|ing)?\s+(?:\S+\s+){0,4}regressions?\b|
+    \bregression[- ]free\b
+  /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
       \b(?:
@@ -1165,7 +1170,7 @@ class PrMergeLedger
   end
 
   def contradicted_disposition_reply?(normalized_body)
-    body = normalized_body.gsub(/\bno\s+(?:(?:new|known|more|other|additional)\s+){0,3}regressions?\b/i, "")
+    body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
     body = body.gsub(
       /
         \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
@@ -1189,15 +1194,15 @@ class PrMergeLedger
     return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
-    sentence_boundary = body_without_urls.match(/[!\r\n.]/)
+    sentence_boundary = body_without_urls.match(/[!\r\n]|\.(?=\s|$)/)
     first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
     return true if first_sentence.include?("?")
 
     follow_up = sentence_boundary ? body_without_urls[sentence_boundary.end(0)..].to_s : ""
     follow_up.match?(
       /\b(?:can|could)\s+you\s+(?:confirm|verify|check)\b|
-       \b(?:does|do|did|would)\s+this\s+(?:look|cover|address|fix|work)\b|
-       \b(?:is|are)\s+this\s+(?:right|okay|ok)\b/ix
+       \b(?:does|do|did|would)\s+(?:this|that|it)\s+(?:look|cover|address|fix|work)\b|
+       \b(?:is|are)\s+(?:this|that|it|these|those)\s+(?:correct|right|okay|ok)\b/ix
     )
   end
 
