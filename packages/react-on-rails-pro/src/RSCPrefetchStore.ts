@@ -60,7 +60,7 @@ if (typeof document !== 'undefined') {
 
 export const getReusablePrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined => {
   const entry = prefetchedRSCPromises.get(key, false);
-  if (!entry || (entry.hasBeenAdopted && entry.isSettled)) {
+  if (!entry) {
     return undefined;
   }
   prefetchedRSCPromises.get(key);

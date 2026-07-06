@@ -442,6 +442,10 @@ other same-key callers or a later render. It never resolves to a `ReactNode`, an
 failures do not reject the public promise, so fire-and-forget loader use does not create unhandled
 promise rejections. It does not accept per-call `headers` or `credentials`; anything that can change
 payload content must stay identical across the normal `RSCRoute` fetch path and the prefetch path.
+Adopted prefetched payloads do not replay server console scripts in the browser console; non-prefetched
+client navigations keep the legacy console replay behavior.
+Build `componentProps` from the same object or shared helper for the loader and `RSCRoute`; the cache
+key uses JSON serialization, so equivalent objects with different key insertion order will not match.
 
 ### Using `Outlet` in server components
 

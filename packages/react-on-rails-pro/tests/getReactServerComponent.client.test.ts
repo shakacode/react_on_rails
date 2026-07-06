@@ -559,6 +559,24 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('reuses an adopted settled prefetch for repeated loader calls', async () => {
+    const {
+      consumePrefetchedServerComponent,
+      createRSCPayloadKey,
+      prefetchServerComponent,
+      setPrefetchedServerComponent,
+    } = await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    const key = createRSCPayloadKey('PrefetchedPanel', componentProps);
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setPrefetchedServerComponent(key, Promise.resolve('decoded payload'));
+
+    await expect(consumePrefetchedServerComponent(key, {})).resolves.toBe('decoded payload');
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('honors the current caller abort signal when reusing an in-flight prefetch', async () => {
     const { prefetchServerComponent } = await loadPrefetchModule();
     const abortController = new AbortController();

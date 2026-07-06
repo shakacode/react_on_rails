@@ -33,12 +33,7 @@ import {
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent, deletePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 import { createEmbeddedPayloadKey, createRSCPayloadKey } from './utils.ts';
-
-type WindowWithRSCPreloadedPayloads = Window & {
-  REACT_ON_RAILS_RSC_PAYLOADS?: RSCPreloadedPayloadGlobals['REACT_ON_RAILS_RSC_PAYLOADS'];
-};
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
@@ -85,7 +80,7 @@ const hasEmbeddedPayload = (componentName: string, componentProps: unknown) => {
     return false;
   }
 
-  const payloads = (window as WindowWithRSCPreloadedPayloads).REACT_ON_RAILS_RSC_PAYLOADS;
+  const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS;
   if (!payloads) {
     return false;
   }
