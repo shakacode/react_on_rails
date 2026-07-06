@@ -3326,7 +3326,9 @@ RSpec.describe "script/pr-merge-ledger" do
     [
       "This doesn't work on Windows.",
       "This no longer works on Windows.",
-      "CI is no longer passing on Windows."
+      "CI is no longer passing on Windows.",
+      "This doesn't pass on Windows.",
+      "CI does not pass on Windows."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",

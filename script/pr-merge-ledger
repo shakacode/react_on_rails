@@ -134,7 +134,7 @@ class PrMergeLedger
     (?:
       \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
       (?:\s+\S+){0,3}\s+
-      \b(?:fixed|addressed|resolved|work(?:s|ed|ing)?|passing)\b
+      \b(?:fixed|addressed|resolved|work(?:s|ed|ing)?|pass(?:es|ed|ing)?)\b
     )|
     (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
@@ -710,7 +710,7 @@ class PrMergeLedger
       "author" => comment.dig("author", "login"),
       "body" => comment["body"].to_s,
       "outdated" => comment["outdated"] == true,
-      "reply_to_id" => comment.dig("replyTo", "id") || comment["reply_to_id"],
+      "reply_to_id" => comment.dig("replyTo", "id"),
       "review_state" => review["state"],
       "review_head_sha" => review.dig("commit", "oid"),
       "comment_head_sha" => comment.dig("commit", "oid"),
@@ -1105,18 +1105,19 @@ class PrMergeLedger
   end
 
   def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id)
-    disposition = inferred_disposition_from_reply(reply)
+    clear_disposition_reply = clear_inferred_disposition_reply?(reply)
+    disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:)
     if disposition
       inferred[reply_to_id] = disposition
-    elsif clear_inferred_disposition_reply?(reply)
+    elsif clear_disposition_reply
       inferred.delete(reply_to_id)
     end
   end
 
-  def inferred_disposition_from_reply(reply)
+  def inferred_disposition_from_reply(reply, clear_disposition_reply: clear_inferred_disposition_reply?(reply))
     body = reply.fetch("body").to_s
     normalized_body = body.lstrip
-    return nil if clear_inferred_disposition_reply?(reply)
+    return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     {
