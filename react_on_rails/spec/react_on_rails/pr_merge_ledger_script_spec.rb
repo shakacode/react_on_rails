@@ -2574,6 +2574,81 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not infer fixed dispositions from truncated direct replies" do
+    truncated_tail = "#{'padding line\n' * 1_100}This still fails on Windows."
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.\n" \
+                        "#{truncated_tail}",
+              "author" => { "login" => "justin808" },
+              "authorAssociation" => "MEMBER",
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-truncated-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
   it "does not infer fixed dispositions from untrusted direct replies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2822,6 +2897,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. CI is not failing anymore on Windows. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI isn't failing anymore on Windows. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No CI regressions. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No workflow regressions. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`: nested fixed-style replies no longer apply a fixed disposition. " \
       "Validation: bundle exec rspec pr_merge_ledger_script_spec.rb.",
@@ -3282,7 +3361,9 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`, but this doesn't address Windows.",
       "Fixed in current head `current`, but this doesn\u2019t fix Windows.",
       "Fixed in current head `current`. Tests fail on Windows.",
-      "Fixed in current head `current`. The specs are failing."
+      "Fixed in current head `current`. The specs are failing.",
+      "Fixed in current head `current`. No this doesn't fix the regression on Windows. " \
+      "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
@@ -3435,6 +3516,88 @@ RSpec.describe "script/pr-merge-ledger" do
     finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
     expect(status).to be_success
     expect(finding).to include("disposition" => "fixed")
+  end
+
+  it "preserves inferred fixed dispositions after later untrusted contradictory direct replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "fixed-reply-comment",
+              "url" => "https://example.com/fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "untrusted-regressed-reply-comment",
+              "url" => "https://example.com/untrusted-regressed-reply-comment",
+              "body" => "Actually this regressed on Windows.",
+              "author" => { "login" => "external-contributor" },
+              "authorAssociation" => "CONTRIBUTOR",
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-later-untrusted-contradictory-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+      expect(finding.fetch("evidence")).to include("https://example.com/fixed-reply-comment")
+      expect(finding.fetch("evidence")).not_to include("https://example.com/untrusted-regressed-reply-comment")
+    end
   end
 
   it "clears inferred fixed dispositions after later contradictory direct replies" do
@@ -4123,6 +4286,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Addressed by current head `current`. Probably fixed now.",
       "Fixed in current head `current`. I haven't tested it yet.",
       "Fixed in current head `current`. I haven't had a chance to test it yet.",
+      "Fixed in current head `current`. Need to test on Windows.",
+      "Addressed by current head `current`. Needs to verify this manually.",
       "Fixed in a bit, will verify shortly.",
       "Fixed in current head `current`. Will verify shortly."
     ].each do |reply_body|

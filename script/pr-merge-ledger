@@ -63,6 +63,7 @@ class PrMergeLedger
   MAX_GRAPHQL_PAGES = 500
   GITHUB_REPO_NAME_PATTERN = /\A[A-Za-z0-9._-]+\z/
   MAX_BODY_LINES = 1_000
+  MAX_DISPOSITION_REPLY_BODY_LENGTH = 16_384
   MAX_EXCERPT_LENGTH = 180
   LIST_MARKER_PATTERN = /(?:[-*]\s*(?:\[[ xX]\]\s*)?|\d+[.)]\s*)/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
@@ -131,9 +132,13 @@ class PrMergeLedger
   }ix
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
   TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
+  BENIGN_REGRESSION_MODIFIER_PATTERN = /
+    any|more|other|functional|new|known|additional|observable|observed|reported|detected|found|introduced|
+    remaining|runtime|behavioral|user[- ]visible|ci|build|job|workflow|checks?
+  /ix
   BENIGN_REGRESSION_REPLY_PATTERN = /
-    \b(?:no|without)\s+(?:\S+\s+){0,4}regressions?\b|
-    \bavoid(?:s|ed|ing)?\s+(?:\S+\s+){0,4}regressions?\b|
+    \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bavoid(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bregression[- ]free\b|
     \b(?:test|tests|spec|specs|case|coverage)(?:\s+\S+){0,6}\s+fail(?:s|ed|ing)?\s+
       before\s+(?:the\s+)?fix\b
@@ -152,6 +157,7 @@ class PrMergeLedger
   FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN = /
     this|that|it|fix|change|patch|issue|tests?|specs?|suites?|cases?
   /ix
+  FAILURE_STATUS_SUBJECT_PATTERN = /ci|build|job|workflow|checks?/ix
   FAILURE_DISPOSITION_REPLY_VERB_PATTERN = /
     fail(?:s|ed|ing)?|
     break(?:s|ing)?|broke|broken|
@@ -179,7 +185,7 @@ class PrMergeLedger
       \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
     (?:
-      \b(?:ci|build|job|workflow|checks?)\b
+      \b(?:#{FAILURE_STATUS_SUBJECT_PATTERN.source})\b
       [\s\S]{0,80}
       \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
@@ -214,6 +220,7 @@ class PrMergeLedger
     \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
     \b(?:i\s+(?:think|believe)|probably|should\s+be|not\s+(?:100%\s+)?sure|untested|unverified)\b|
     \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
+    \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
     \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
     \b(?:shortly|soon|in\s+a\s+bit|in\s+a\s+moment)\b|
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
@@ -1166,7 +1173,8 @@ class PrMergeLedger
   end
 
   def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_reply_to_id:, target_comment:)
-    clear_disposition_reply = clear_inferred_disposition_reply?(reply)
+    trusted_reply = trusted_disposition_reply_author_association?(reply)
+    clear_disposition_reply = trusted_reply && clear_inferred_disposition_reply?(reply)
     disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:, target_comment:)
     if disposition
       inferred[reply_to_id] = disposition
@@ -1181,8 +1189,9 @@ class PrMergeLedger
     clear_disposition_reply: clear_inferred_disposition_reply?(reply),
     target_comment: nil
   )
-    body = reply.fetch("body").to_s
+    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
     normalized_body = normalized_disposition_reply_body(body)
+    return nil if truncated
     return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
     return nil unless trusted_disposition_reply_author?(reply, target_comment:)
@@ -1195,7 +1204,9 @@ class PrMergeLedger
   end
 
   def clear_inferred_disposition_reply?(reply)
-    normalized_body = normalized_disposition_reply_body(reply.fetch("body"))
+    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
+    normalized_body = normalized_disposition_reply_body(body)
+    return true if truncated
     return true if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
     return true if hedged_fixed_disposition_reply?(normalized_body)
     return true if ambiguous_fixed_disposition_reply?(normalized_body)
@@ -1215,34 +1226,26 @@ class PrMergeLedger
       /ix,
       ""
     )
-    body = body.gsub(
-      /
-        \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
-        (?:\s+\S+){0,6}\s+
-        \b(?:
-          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
-          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
-        )\b
-        (?:\s+\S+){0,3}\s+
-        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
-      /ix,
-      ""
-    )
-    body = body.gsub(
-      /
-        \b(?:ci|build|job|workflow|checks?)\b
-        (?:\s+\S+){0,6}\s+
-        \b(?:
-          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
-          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
-        )\b
-        (?:\s+\S+){0,3}\s+
-        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
-      /ix,
-      ""
-    )
+    body = strip_negated_failure_reply_clauses(body, FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN)
+    body = strip_negated_failure_reply_clauses(body, FAILURE_STATUS_SUBJECT_PATTERN)
 
     body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
+  end
+
+  def strip_negated_failure_reply_clauses(body, subject_pattern)
+    body.gsub(
+      /
+        \b(?:#{subject_pattern.source})\b
+        (?:\s+\S+){0,6}\s+
+        \b(?:
+          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+        )\b
+        (?:\s+\S+){0,3}\s+
+        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+      /ix,
+      ""
+    )
   end
 
   def hedged_fixed_disposition_reply?(normalized_body)
@@ -1269,6 +1272,10 @@ class PrMergeLedger
   def trusted_disposition_reply_author?(reply, target_comment: nil)
     return false if same_author_disposition_reply?(reply, target_comment)
 
+    trusted_disposition_reply_author_association?(reply)
+  end
+
+  def trusted_disposition_reply_author_association?(reply)
     association = reply["author_association"]
 
     TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS.include?(association)
@@ -1284,6 +1291,20 @@ class PrMergeLedger
 
   def normalized_disposition_reply_body(body)
     body.to_s.lstrip.gsub(/[\u2018\u2019]/, "'")
+  end
+
+  def bounded_disposition_reply_body(body)
+    bounded_lines = +""
+    body.to_s.each_line.with_index(1) do |line, line_number|
+      return [bounded_lines, true] if line_number > MAX_BODY_LINES
+
+      bounded_lines << line
+      if bounded_lines.length > MAX_DISPOSITION_REPLY_BODY_LENGTH
+        return [bounded_lines[0, MAX_DISPOSITION_REPLY_BODY_LENGTH], true]
+      end
+    end
+
+    [bounded_lines, false]
   end
 
   def inferred_disposition_for(finding, context, disposition)
