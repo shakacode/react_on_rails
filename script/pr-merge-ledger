@@ -146,7 +146,7 @@ class PrMergeLedger
     \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bavoid(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bregression[- ]free\b|
-    \b(?:has|have|had|is|are|was|were)\s+not\s+regressed\b|
+    \b(?:has|have|had|is|are|was|were)(?:\s+not|n't)\s+regressed\b|
     \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
     \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
       fail(?:s|ed|ing)?\s+
@@ -1242,7 +1242,7 @@ class PrMergeLedger
     )
     if disposition
       inferred[reply_to_id] = disposition
-    elsif clear_disposition_reply
+    elsif clear_disposition_reply && !priority_finding_reply?(normalized_body)
       inferred.delete(
         clear_disposition_target_id(
           inferred,
@@ -1251,6 +1251,12 @@ class PrMergeLedger
           target_comment:
         )
       )
+    end
+  end
+
+  def priority_finding_reply?(normalized_body)
+    normalized_body.to_s.each_line.any? do |line|
+      !non_actionable_finding_summary?(line) && finding_occurrences(line).any?
     end
   end
 
@@ -1343,7 +1349,7 @@ class PrMergeLedger
     return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
-    sentence_boundary = body_without_urls.match(/[!\r\n]|\.(?=\s|$)/)
+    sentence_boundary = body_without_urls.match(/[!\r\n]|[.,;](?=\s|$)/)
     first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
     return true if first_sentence.include?("?")
 

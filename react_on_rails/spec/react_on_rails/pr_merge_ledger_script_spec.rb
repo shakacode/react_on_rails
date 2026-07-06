@@ -2975,6 +2975,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Verified it has not regressed. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Verified it hasn't regressed. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It did not regress under the full suite. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Added a test that fails before the fix and passes after. " \
@@ -3019,6 +3021,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "**Fixed in** `current`. Validation: pnpm test -- colors.test.ts.",
       "__Addressed by__ current. Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`; does it also apply to nested routes? " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This fixes the failing test on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
@@ -4114,7 +4118,7 @@ RSpec.describe "script/pr-merge-ledger" do
             {
               "id" => "nested-finding-comment",
               "url" => "https://example.com/nested-finding-comment",
-              "body" => "[P2] Preserve nested disposition handling.",
+              "body" => "[P2] Windows tests still fail for nested disposition handling.",
               "author" => { "login" => "reviewer" },
               "createdAt" => "2026-06-01T00:10:00Z",
               "outdated" => false,
