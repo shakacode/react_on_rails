@@ -405,6 +405,9 @@
         "author": {
           "type": ["string", "null"]
         },
+        "author_association": {
+          "type": ["string", "null"]
+        },
         "body": {
           "type": "string"
         },

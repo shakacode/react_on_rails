@@ -7273,6 +7273,9 @@ RSpec.describe "script/pr-merge-ledger" do
     expect(schema.dig("$defs", "pull_request_ledger", "properties", "issue_comments", "items", "$ref")).to eq(
       "#/$defs/issue_comment"
     )
+    expect(schema.dig("$defs", "review_thread_comment", "properties", "author_association", "type")).to eq(
+      %w[string null]
+    )
     expect(
       schema.dig("$defs", "pull_request_ledger", "properties", "priority_finding_dispositions", "properties",
                  "findings", "items", "$ref")
