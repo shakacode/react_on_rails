@@ -25,7 +25,7 @@ import { rm } from 'fs/promises';
 import { Transform } from 'stream';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
-import fastifyMultipart from '@fastify/multipart';
+import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
 import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
@@ -58,6 +58,7 @@ import {
   ResponseResult,
   saveMultipartFile,
   Asset,
+  validateAssetFilename,
   getAssetPath,
 } from './shared/utils.js';
 import { startSsrRequestOptions, subSpan, trace, type TracingContext } from './shared/tracing.js';
@@ -93,6 +94,7 @@ declare module '@fastify/multipart' {
 declare module 'fastify' {
   interface FastifyRequest {
     uploadDir: string;
+    uploadAssetValidationError: string | null;
   }
 }
 
@@ -457,6 +459,16 @@ const extractBodyArrayField = <Key extends string>(
   return undefined;
 };
 
+function discardMultipartFile(part: MultipartFile) {
+  part.file.resume();
+  // eslint-disable-next-line no-param-reassign
+  part.value = {
+    filename: part.filename,
+    savedFilePath: '',
+    type: 'asset',
+  };
+}
+
 export default function run(config: Partial<Config>) {
   runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
@@ -508,6 +520,7 @@ export default function run(config: Partial<Config>) {
   // from overwriting each other's files (GitHub issue #2449).
   // The directory path is lazily assigned in onFile (only for requests with file uploads).
   app.decorateRequest('uploadDir', '');
+  app.decorateRequest('uploadAssetValidationError', null);
   // Clean up the per-request upload directory after the response is sent.
   // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
   // this is an internal service not exposed to the internet, the path is
@@ -526,6 +539,7 @@ export default function run(config: Partial<Config>) {
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
+    preservePath: true,
     limits: {
       fieldSize: FIELD_SIZE_LIMIT,
       // For bundles and assets
@@ -539,18 +553,26 @@ export default function run(config: Partial<Config>) {
       if (typeof this?.uploadDir !== 'string') {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
       }
-      // Lazily assign a per-request upload directory on first file upload
+
+      if (this.uploadAssetValidationError) {
+        discardMultipartFile(part);
+        return;
+      }
+
+      let safeFilename: string;
+      try {
+        safeFilename = validateAssetFilename(part.filename);
+      } catch (err) {
+        this.uploadAssetValidationError = (err as Error).message;
+        discardMultipartFile(part);
+        return;
+      }
+
+      // Lazily assign a per-request upload directory on first valid file upload.
       if (this.uploadDir === '') {
         this.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
       }
-      // Use path.basename to strip any directory components from the filename,
-      // preventing path traversal attacks (e.g. filename "../../etc/shadow").
-      const safeFilename = path.basename(part.filename);
-      if (!safeFilename) {
-        throw new Error(
-          `onFile: received file with empty or invalid filename: ${JSON.stringify(part.filename)}`,
-        );
-      }
+
       const destinationPath = path.join(this.uploadDir, safeFilename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
@@ -609,6 +631,11 @@ export default function run(config: Partial<Config>) {
         badRequestResponseResult('Invalid "rscStreamObservability" field in render request.'),
         res,
       );
+      return;
+    }
+
+    if (req.uploadAssetValidationError) {
+      await setResponse(badRequestResponseResult(req.uploadAssetValidationError), res);
       return;
     }
 
@@ -1085,6 +1112,11 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
+    if (req.uploadAssetValidationError) {
+      await setResponse(badRequestResponseResult(req.uploadAssetValidationError), res);
+      return;
+    }
+
     const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body);
 
     if (providedNewBundles.length === 0) {
@@ -1165,6 +1197,16 @@ export default function run(config: Partial<Config>) {
       return;
     }
 
+    let assetFilename: string;
+    try {
+      assetFilename = validateAssetFilename(filename);
+    } catch (err) {
+      const { message } = err as Error;
+      log.info(message);
+      await setResponse(badRequestResponseResult(message), res);
+      return;
+    }
+
     // Handle targetBundles as either a string or an array
     const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
     if (!targetBundles || targetBundles.length === 0) {
@@ -1177,7 +1219,7 @@ export default function run(config: Partial<Config>) {
     // Check if the asset exists in each of the target bundles
     const results = await Promise.all(
       targetBundles.map(async (bundleHash) => {
-        const assetPath = getAssetPath(bundleHash, filename);
+        const assetPath = getAssetPath(bundleHash, assetFilename);
         const exists = await fileExistsAsync(assetPath);
 
         if (exists) {

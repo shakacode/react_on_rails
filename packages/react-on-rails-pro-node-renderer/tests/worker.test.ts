@@ -14,6 +14,7 @@
  */
 
 import fs from 'fs';
+import FormData from 'form-data';
 import path from 'path';
 import querystring from 'querystring';
 import { PassThrough, Readable } from 'stream';
@@ -129,6 +130,41 @@ describe('worker', () => {
     expect(fs.existsSync(vmBundlePath(testName))).toBe(true);
     expect(fs.existsSync(assetPath(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest rejects unsafe uploaded asset filenames', async () => {
+    const app = createWorker();
+    const httpErrorLogSpy = jest.spyOn(app.log, 'error');
+
+    try {
+      const form = new FormData();
+      form.append('gemVersion', gemVersion);
+      form.append('protocolVersion', protocolVersion);
+      form.append('railsEnv', railsEnv);
+      form.append('renderingRequest', 'ReactOnRails.dummy');
+      form.append('bundle', fs.readFileSync(getFixtureBundle()), {
+        contentType: 'text/javascript',
+        filename: 'bundle.js',
+      });
+      form.append('asset1', Buffer.from('{}'), {
+        contentType: 'application/json',
+        filepath: '../../loadable-stats.json',
+      });
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(form.getBuffer())
+        .headers(form.getHeaders())
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('Invalid asset filename');
+      expect(httpErrorLogSpy).not.toHaveBeenCalled();
+      expect(fs.existsSync(vmBundlePath(testName))).toBe(false);
+    } finally {
+      httpErrorLogSpy.mockRestore();
+    }
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest', async () => {
@@ -524,6 +560,66 @@ describe('worker', () => {
     });
   });
 
+  test('post /asset-exists rejects unsafe filenames without reporting them', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+    const sentinelPath = path.resolve(serverBundleCachePathForTest(), '..', 'asset-exists-sentinel.txt');
+    fs.writeFileSync(sentinelPath, 'outside renderer cache');
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    try {
+      for (const filename of ['../../asset-exists-sentinel.txt', 'foo\0bar', 'foo\nbar']) {
+        const query = querystring.stringify({ filename });
+
+        const res = await app
+          .inject()
+          .post(`/asset-exists?${query}`)
+          .payload({
+            password: 'my_password',
+            targetBundles: [bundleHash],
+          })
+          .end();
+        expect(res.statusCode).toBe(400);
+        expect(res.payload).toContain('Invalid asset filename');
+      }
+      expect(reportMessageSpy).not.toHaveBeenCalled();
+    } finally {
+      reportMessageSpy.mockRestore();
+      fs.rmSync(sentinelPath, { force: true });
+    }
+  });
+
+  test('post /asset-exists rejects repeated filename query keys without reporting them', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    try {
+      const res = await app
+        .inject()
+        .post('/asset-exists?filename=loadable-stats.json&filename=other.json')
+        .payload({
+          password: 'my_password',
+          targetBundles: [bundleHash],
+        })
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('Invalid asset filename');
+      expect(reportMessageSpy).not.toHaveBeenCalled();
+    } finally {
+      reportMessageSpy.mockRestore();
+    }
+  });
+
   test('post /asset-exists requires targetBundles (protocol version 2.0.0)', async () => {
     await createAsset(testName, String(BUNDLE_TIMESTAMP));
     const app = createWorker({
@@ -564,6 +660,45 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets rejects unsafe uploaded filenames before copying assets', async () => {
+    const bundleHash = 'unsafe-upload-filename-hash';
+
+    const app = createWorker({
+      password: 'my_password',
+    });
+    const httpErrorLogSpy = jest.spyOn(app.log, 'error');
+
+    try {
+      const form = new FormData();
+      form.append('gemVersion', gemVersion);
+      form.append('protocolVersion', protocolVersion);
+      form.append('railsEnv', railsEnv);
+      form.append('password', 'my_password');
+      form.append(`bundle_${bundleHash}`, Buffer.from('bundle'), {
+        contentType: 'text/javascript',
+        filename: `${bundleHash}.js`,
+      });
+      form.append('asset1', Buffer.from('{}'), {
+        contentType: 'application/json',
+        filepath: '../../loadable-stats.json',
+      });
+
+      const res = await app
+        .inject()
+        .post(`/upload-assets`)
+        .payload(form.getBuffer())
+        .headers(form.getHeaders())
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.payload).toContain('Invalid asset filename');
+      expect(httpErrorLogSpy).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(serverBundleCachePathForTest(), bundleHash))).toBe(false);
+    } finally {
+      httpErrorLogSpy.mockRestore();
+    }
   });
 
   test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
