@@ -522,6 +522,7 @@ describe('prefetchServerComponent client API', () => {
     delete window.REACT_ON_RAILS_RSC_PAYLOADS;
     fetchMock.mockReset();
     jest.dontMock('react-on-rails-rsc/client.browser');
+    jest.dontMock('react-on-rails/pageLifecycle');
     const { resetRailsContext } = await import('react-on-rails/context');
     resetRailsContext();
     document.body.innerHTML = '';
@@ -578,6 +579,38 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not let one caller abort cancel the shared in-flight prefetch', async () => {
+    const { prefetchServerComponent } = await loadPrefetchModule();
+    const abortController = new AbortController();
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    let resolveFetch!: (response: Response) => void;
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const abortedCaller = prefetchServerComponent('PrefetchedPanel', componentProps, {
+      signal: abortController.signal,
+    });
+    const joinedCaller = prefetchServerComponent('PrefetchedPanel', componentProps);
+
+    abortController.abort();
+
+    await expect(abortedCaller).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(joinedCaller).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fetch when an embedded SSR payload already exists', async () => {
     const {
       prefetchServerComponent,
@@ -599,22 +632,20 @@ describe('prefetchServerComponent client API', () => {
     ).toBeUndefined();
   });
 
-  it('resolves and self-evicts when the prefetch fetch is aborted', async () => {
+  it('resolves and self-evicts when the shared prefetch fetch rejects', async () => {
     const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
       await loadPrefetchModule();
     const componentProps = { id: 1 };
-    const abortController = new AbortController();
     const abortError = new DOMException('The operation was aborted.', 'AbortError');
     setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
     fetchMock.mockRejectedValueOnce(abortError);
 
-    await expect(
-      prefetchServerComponent('PrefetchedPanel', componentProps, { signal: abortController.signal }),
-    ).resolves.toBeUndefined();
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ signal: abortController.signal }),
+      `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+        props: JSON.stringify(componentProps),
+      })}`,
     );
     expect(
       getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
@@ -623,6 +654,29 @@ describe('prefetchServerComponent client API', () => {
     fetchMock.mockResolvedValueOnce(createWebResponseFromText(toLengthPrefixedRecord('payload')));
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the prefetch store on soft page unload', async () => {
+    let unloadCallback: (() => void) | undefined;
+    jest.resetModules();
+    jest.doMock('react-on-rails/pageLifecycle', () => ({
+      onPageUnloaded: jest.fn((callback: () => void) => {
+        unloadCallback = callback;
+      }),
+    }));
+
+    const { getReusablePrefetchedServerComponent, setPrefetchedServerComponent } = await import(
+      '../src/RSCPrefetchStore.ts'
+    );
+    const { createRSCPayloadKey } = await import('../src/utils.ts');
+    const key = createRSCPayloadKey('PrefetchedPanel', { id: 1 });
+
+    setPrefetchedServerComponent(key, Promise.resolve('decoded payload'));
+    expect(getReusablePrefetchedServerComponent(key)).toBeDefined();
+
+    unloadCallback?.();
+
+    expect(getReusablePrefetchedServerComponent(key)).toBeUndefined();
   });
 
   it('resolves and self-evicts when decoded payload creation fails', async () => {

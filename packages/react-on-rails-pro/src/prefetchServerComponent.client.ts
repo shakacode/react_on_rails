@@ -96,7 +96,6 @@ export const prefetchServerComponent = (
     componentProps,
     rscPayloadGenerationUrlPath,
     cspNonce: railsContext.cspNonce,
-    ...(signal ? { fetchOptions: { signal } } : {}),
   });
   setPrefetchedServerComponent(key, prefetchPromise);
 

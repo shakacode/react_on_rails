@@ -14,6 +14,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from './RSCProviderCache.ts';
 
 export type RSCProviderCacheIdentity = object;
@@ -47,6 +48,12 @@ const createPrefetchStore = () =>
   new BoundedLRU<PrefetchedServerComponentEntry>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
 
 let prefetchedRSCPromises = createPrefetchStore();
+
+const resetRSCPrefetchStore = (): void => {
+  prefetchedRSCPromises = createPrefetchStore();
+};
+
+onPageUnloaded(resetRSCPrefetchStore);
 
 export const getReusablePrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined => {
   const entry = prefetchedRSCPromises.get(key, false);
@@ -85,5 +92,5 @@ export const deletePrefetchedServerComponent = (key: string, promise?: Promise<R
 
 /** @internal Test-only reset for module-level prefetch state. */
 export const resetRSCPrefetchStoreForTesting = (): void => {
-  prefetchedRSCPromises = createPrefetchStore();
+  resetRSCPrefetchStore();
 };

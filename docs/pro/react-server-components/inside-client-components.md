@@ -436,11 +436,12 @@ function PanelRouteComponent() {
 ```
 
 `prefetchServerComponent(componentName, componentProps, { signal })` is warm-cache-only: it resolves
-after a successful decode, or after a failed/aborted prefetch has removed itself from the prefetch
-store. It never resolves to a `ReactNode`, and fetch/decode failures do not reject the public
-promise, so fire-and-forget loader use does not create unhandled promise rejections. It does not
-accept per-call `headers` or `credentials`; anything that can change payload content must stay
-identical across the normal `RSCRoute` fetch path and the prefetch path.
+after a successful decode, after the caller's `AbortSignal` aborts its wait, or after a failed
+prefetch has removed itself from the prefetch store. The signal does not cancel the shared fetch for
+other same-key callers or a later render. It never resolves to a `ReactNode`, and fetch/decode
+failures do not reject the public promise, so fire-and-forget loader use does not create unhandled
+promise rejections. It does not accept per-call `headers` or `credentials`; anything that can change
+payload content must stay identical across the normal `RSCRoute` fetch path and the prefetch path.
 
 ### Using `Outlet` in server components
 
