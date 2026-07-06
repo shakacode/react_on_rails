@@ -148,12 +148,12 @@ class PrMergeLedger
     (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
       [\s\S]{0,80}
-      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      \b(?:fail(?:s|ed|ing)?|broken|red|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\b
     )|
     (?:
       \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
       (?:\s+\S+){0,6}\s+
-      \b(?:fails?|failed)\b
+      \b(?:fails?|failed|breaks?|broke|broken|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\b
     )|
     (?:
       \b(?:ci|build|job|workflow|checks?)\b

@@ -3603,7 +3603,13 @@ RSpec.describe "script/pr-merge-ledger" do
       "This doesn't address Windows.",
       "This doesn\u2019t fix Windows.",
       "This fails on Windows.",
-      "The fix failed on Windows."
+      "The fix failed on Windows.",
+      "This is broken on Windows.",
+      "This breaks Windows.",
+      "Actually, I just retested and this repros on Windows.",
+      "I can still reproduce this issue.",
+      "This issue still occurs on Windows.",
+      "This still happens on Windows."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
