@@ -179,7 +179,11 @@ class PrMergeLedger
     )
     (?:\s+\S+){0,4}\s+
     \b(?:fix(?:es|ed|ing)|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|cover(?:s|ed|ing)?)\b
-    (?:\s+\S+){0,6}\s+
+    (?:
+      \s+
+      (?!\b(?:but|however|though|although|still|continues?|keeps?|remains?|regress(?:ed|ion)?|fails?)\b)
+      [^\s,.;:!?()]+
+    ){0,6}\s+
     \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
   /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /

@@ -3382,6 +3382,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. This has not been fixed on Windows.",
       "Fixed in current head `current`. This hasn't fixed the Windows case.",
       "Fixed in current head `current`. This doesn't fix the failing test on Windows.",
+      "Fixed in current head `current`. This resolves the crash, but the test still fails intermittently.",
       "Fixed in current head `current`. No this doesn't fix the regression on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
