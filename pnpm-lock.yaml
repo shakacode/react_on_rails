@@ -478,7 +478,7 @@ importers:
         version: 1.58.2
       '@pmmmwh/react-refresh-webpack-plugin':
         specifier: ^0.5.1
-        version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.105.2)
+        version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.105.2)
       '@rescript/react':
         specifier: ^0.13.0
         version: 0.13.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -547,13 +547,13 @@ importers:
         version: 2.2.5
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(6385e36be782c5285f003147141398d6)
+        version: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(6385e36be782c5285f003147141398d6)
+        version: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(0bdd196d1e6d3433a083b74bcbfb9ab0)
+        version: 10.2.0(0870f7555915b893a3b2f892424eb6c3)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.105.2)
@@ -574,10 +574,10 @@ importers:
         version: 6.5.2(webpack@5.105.2)
       webpack-cli:
         specifier: ^7.0.0
-        version: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2)
+        version: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2)
       webpack-dev-server:
-        specifier: ^5.2.5
-        version: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+        specifier: ^5.2.6
+        version: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
       webpack-merge:
         specifier: '5'
         version: 5.10.0
@@ -787,13 +787,13 @@ importers:
         version: 2.2.5
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(46aace4a41c33bc074fa3ae64b7d6282)
+        version: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(46aace4a41c33bc074fa3ae64b7d6282)
+        version: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(4889f12f827394b2a23f165b9fce8ac2)
+        version: 10.2.0(672bcb4c22174b71b486be259af07b3f)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.104.1)
@@ -860,10 +860,10 @@ importers:
         version: 5.9.3
       webpack-cli:
         specifier: ^7.0.0
-        version: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+        version: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
       webpack-dev-server:
-        specifier: ^5.2.5
-        version: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+        specifier: ^5.2.6
+        version: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
 
   react_on_rails_pro/spec/execjs-compatible-dummy:
     dependencies:
@@ -932,13 +932,13 @@ importers:
         version: 5.2.2(@rspack/core@2.0.5)
       shakapacker:
         specifier: 10.2.0
-        version: 10.2.0(8950c441dd0e41cf1b7d331fb9359931)
+        version: 10.2.0(b449644253a3a1a201d27e2e650f896c)
       shakapacker-rspack:
         specifier: ~10.2.0
-        version: 10.2.0(8950c441dd0e41cf1b7d331fb9359931)
+        version: 10.2.0(b449644253a3a1a201d27e2e650f896c)
       shakapacker-webpack:
         specifier: ~10.2.0
-        version: 10.2.0(c4d9cba1f19c1836d311a61997fe8ea4)
+        version: 10.2.0(8d6a4df69126e8c6c2e4f3bbfaa89af0)
       style-loader:
         specifier: ^4.0.0
         version: 4.0.0(webpack@5.104.1)
@@ -953,14 +953,14 @@ importers:
         version: 6.5.2(webpack@5.104.1)
       webpack-cli:
         specifier: ^7.0.0
-        version: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+        version: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
       webpack-merge:
         specifier: '5'
         version: 5.10.0
     devDependencies:
       '@pmmmwh/react-refresh-webpack-plugin':
         specifier: ^0.5.15
-        version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.104.1)
+        version: 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.104.1)
       '@rspack/plugin-react-refresh':
         specifier: ^2.0.0
         version: 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
@@ -968,8 +968,8 @@ importers:
         specifier: ^0.14.2
         version: 0.14.2
       webpack-dev-server:
-        specifier: ^5.2.5
-        version: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+        specifier: ^5.2.6
+        version: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
 
 packages:
 
@@ -10152,8 +10152,8 @@ packages:
       webpack:
         optional: true
 
-  webpack-dev-server@5.2.5:
-    resolution: {integrity: sha512-4wZtCquSuv9CKX8oybo+mqxtxZqWz47uM1Ch94lxowBztOhWCbhqvRbfC/mODOwxgV2brY+JGZpHq58/SuVFYg==}
+  webpack-dev-server@5.2.6:
+    resolution: {integrity: sha512-HNLRmamRvVavZQ+avceZifmv8hmdUjg43t6MI4SqJDwFdW7RPQwH5vzGhDRZSX59SgfbeHhLnq3g+uooWo7pVw==}
     engines: {node: '>= 18.12.0'}
     hasBin: true
     peerDependencies:
@@ -12846,7 +12846,7 @@ snapshots:
     dependencies:
       playwright: 1.58.2
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.104.1)':
+  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.104.1)':
     dependencies:
       ansi-html: 0.0.9
       core-js-pure: 3.48.0
@@ -12860,10 +12860,10 @@ snapshots:
     optionalDependencies:
       '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       type-fest: 4.41.0
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     optional: true
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.105.2)':
+  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.105.2)':
     dependencies:
       ansi-html: 0.0.9
       core-js-pure: 3.48.0
@@ -12877,9 +12877,9 @@ snapshots:
     optionalDependencies:
       '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       type-fest: 4.41.0
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.104.1)':
+  '@pmmmwh/react-refresh-webpack-plugin@0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.104.1)':
     dependencies:
       ansi-html: 0.0.9
       core-js-pure: 3.48.0
@@ -12893,7 +12893,7 @@ snapshots:
     optionalDependencies:
       '@types/webpack': 5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       type-fest: 4.41.0
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
 
   '@prisma/instrumentation@6.11.1(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -19812,13 +19812,13 @@ snapshots:
       chalk: 4.1.2
       playwright-core: 1.58.2
 
-  shakapacker-rspack@10.2.0(46aace4a41c33bc074fa3ae64b7d6282):
+  shakapacker-rspack@10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(46aace4a41c33bc074fa3ae64b7d6282)
+      shakapacker: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -19846,13 +19846,13 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-rspack@10.2.0(6385e36be782c5285f003147141398d6):
+  shakapacker-rspack@10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(6385e36be782c5285f003147141398d6)
+      shakapacker: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.105.2)
@@ -19880,13 +19880,13 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-rspack@10.2.0(8950c441dd0e41cf1b7d331fb9359931):
+  shakapacker-rspack@10.2.0(b449644253a3a1a201d27e2e650f896c):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(8950c441dd0e41cf1b7d331fb9359931)
+      shakapacker: 10.2.0(b449644253a3a1a201d27e2e650f896c)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -19914,16 +19914,16 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-webpack@10.2.0(0bdd196d1e6d3433a083b74bcbfb9ab0):
+  shakapacker-webpack@10.2.0(0870f7555915b893a3b2f892424eb6c3):
     dependencies:
-      shakapacker: 10.2.0(6385e36be782c5285f003147141398d6)
+      shakapacker: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2)
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.105.2)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2)
     optionalDependencies:
       '@babel/core': 7.29.6
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.105.2)
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.105.2)
       '@swc/core': 1.15.3
       babel-loader: 8.2.4(@babel/core@7.29.6)(webpack@5.105.2)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.105.2)
@@ -19932,7 +19932,7 @@ snapshots:
       sass: 1.97.3
       sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.105.2)
       swc-loader: 0.2.6(@swc/core@1.15.3)(webpack@5.105.2)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
     transitivePeerDependencies:
       - '@babel/plugin-transform-runtime'
       - '@babel/preset-env'
@@ -19948,16 +19948,16 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(4889f12f827394b2a23f165b9fce8ac2):
+  shakapacker-webpack@10.2.0(672bcb4c22174b71b486be259af07b3f):
     dependencies:
-      shakapacker: 10.2.0(46aace4a41c33bc074fa3ae64b7d6282)
+      shakapacker: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
     optionalDependencies:
       '@babel/core': 7.29.6
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.11.0)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.104.1)
       '@swc/core': 1.15.3
       babel-loader: 8.2.4(@babel/core@7.29.6)(webpack@5.104.1)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -19966,7 +19966,7 @@ snapshots:
       sass: 1.97.3
       sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.104.1)
       swc-loader: 0.2.6(@swc/core@1.15.3)(webpack@5.104.1)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     transitivePeerDependencies:
       - '@babel/plugin-transform-runtime'
       - '@babel/preset-env'
@@ -19982,16 +19982,16 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(c4d9cba1f19c1836d311a61997fe8ea4):
+  shakapacker-webpack@10.2.0(8d6a4df69126e8c6c2e4f3bbfaa89af0):
     dependencies:
-      shakapacker: 10.2.0(8950c441dd0e41cf1b7d331fb9359931)
+      shakapacker: 10.2.0(b449644253a3a1a201d27e2e650f896c)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
     optionalDependencies:
       '@babel/core': 7.29.6
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.17(@types/webpack@5.28.5(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3))(react-refresh@0.14.2)(type-fest@4.41.0)(webpack-dev-server@5.2.6)(webpack@5.104.1)
       '@swc/core': 1.15.3
       babel-loader: 8.2.4(@babel/core@7.29.6)(webpack@5.104.1)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -20000,7 +20000,7 @@ snapshots:
       sass: 1.97.3
       sass-loader: 16.0.8(@rspack/core@2.0.5)(sass@1.97.3)(webpack@5.104.1)
       swc-loader: 0.2.6(@swc/core@1.15.3)(webpack@5.104.1)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     transitivePeerDependencies:
       - '@babel/plugin-transform-runtime'
       - '@babel/preset-env'
@@ -20016,7 +20016,7 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker@10.2.0(46aace4a41c33bc074fa3ae64b7d6282):
+  shakapacker@10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20047,12 +20047,12 @@ snapshots:
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     transitivePeerDependencies:
       - ts-node
 
-  shakapacker@10.2.0(6385e36be782c5285f003147141398d6):
+  shakapacker@10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20083,12 +20083,12 @@ snapshots:
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2)
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.105.2)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
     transitivePeerDependencies:
       - ts-node
 
-  shakapacker@10.2.0(8950c441dd0e41cf1b7d331fb9359931):
+  shakapacker@10.2.0(b449644253a3a1a201d27e2e650f896c):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20119,8 +20119,8 @@ snapshots:
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
     transitivePeerDependencies:
       - ts-node
 
@@ -21308,7 +21308,7 @@ snapshots:
       tapable: 2.3.3
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
 
-  webpack-cli@7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1):
+  webpack-cli@7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1):
     dependencies:
       '@discoveryjs/json-ext': 1.1.0
       commander: 14.0.3
@@ -21320,9 +21320,9 @@ snapshots:
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-merge: 6.0.1
     optionalDependencies:
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1)
 
-  webpack-cli@7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2):
+  webpack-cli@7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2):
     dependencies:
       '@discoveryjs/json-ext': 1.1.0
       commander: 14.0.3
@@ -21334,7 +21334,7 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-merge: 6.0.1
     optionalDependencies:
-      webpack-dev-server: 5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
+      webpack-dev-server: 5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2)
 
   webpack-dev-middleware@7.4.5(tslib@2.8.1)(webpack@5.104.1):
     dependencies:
@@ -21362,7 +21362,7 @@ snapshots:
     transitivePeerDependencies:
       - tslib
 
-  webpack-dev-server@5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1):
+  webpack-dev-server@5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.104.1):
     dependencies:
       '@types/bonjour': 3.5.13
       '@types/connect-history-api-fallback': 1.5.4
@@ -21394,7 +21394,7 @@ snapshots:
       ws: 8.21.0
     optionalDependencies:
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -21402,7 +21402,7 @@ snapshots:
       - tslib
       - utf-8-validate
 
-  webpack-dev-server@5.2.5(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2):
+  webpack-dev-server@5.2.6(tslib@2.8.1)(webpack-cli@7.0.3)(webpack@5.105.2):
     dependencies:
       '@types/bonjour': 3.5.13
       '@types/connect-history-api-fallback': 1.5.4
@@ -21434,7 +21434,7 @@ snapshots:
       ws: 8.21.0
     optionalDependencies:
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2)
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -21492,7 +21492,7 @@ snapshots:
       watchpack: 2.5.1
       webpack-sources: 3.3.3
     optionalDependencies:
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.104.1)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.104.1)
     transitivePeerDependencies:
       - '@swc/core'
       - esbuild
@@ -21558,7 +21558,7 @@ snapshots:
       watchpack: 2.5.1
       webpack-sources: 3.3.3
     optionalDependencies:
-      webpack-cli: 7.0.3(webpack-dev-server@5.2.5)(webpack@5.105.2)
+      webpack-cli: 7.0.3(webpack-dev-server@5.2.6)(webpack@5.105.2)
     transitivePeerDependencies:
       - '@swc/core'
       - esbuild
