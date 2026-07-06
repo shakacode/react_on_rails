@@ -153,7 +153,7 @@ class PrMergeLedger
       \b(?:fail(?:s|ed|ing)?|broken|red)\b
     )|
     \bregressed\b|
-    \bregression(?:s)?\b(?!\s+(?:test|tests|spec|specs|coverage|case|cases)\b)|
+    \bregression(?:s)?\b(?!\s+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
     \breopen\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
@@ -1163,6 +1163,16 @@ class PrMergeLedger
 
   def contradicted_disposition_reply?(normalized_body)
     body = normalized_body.gsub(/\bno\s+(?:(?:new|known|more|other|additional)\s+){0,3}regressions?\b/i, "")
+    body = body.gsub(
+      /
+        \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
+        (?:\s+\S+){0,6}\s+
+        \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+        (?:\s+\S+){0,3}\s+
+        \bfail(?:s|ed|ing)?\b
+      /ix,
+      ""
+    )
 
     body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
   end

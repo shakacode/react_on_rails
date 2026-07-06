@@ -2713,6 +2713,14 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. No more regressions found in manual testing. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Addressed by current head `current`. No other regressions found in manual testing. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Added regression testing to cover this case. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Addressed by current head `current`. Covered by the regression suite. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. It doesn't fail on Windows anymore. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. It won\u2019t fail on Windows anymore. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
