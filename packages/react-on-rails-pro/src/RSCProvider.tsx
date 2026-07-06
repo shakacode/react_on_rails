@@ -32,8 +32,13 @@ import {
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
-import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import { createRSCPayloadKey } from './utils.ts';
+import { consumePrefetchedServerComponent, deletePrefetchedServerComponent } from './RSCPrefetchStore.ts';
+import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
+import { createEmbeddedPayloadKey, createRSCPayloadKey } from './utils.ts';
+
+type WindowWithRSCPreloadedPayloads = Window & {
+  REACT_ON_RAILS_RSC_PAYLOADS?: RSCPreloadedPayloadGlobals['REACT_ON_RAILS_RSC_PAYLOADS'];
+};
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
@@ -74,6 +79,22 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
 // way async fetch failures do (#4372).
 const rejectWithError = <T,>(error: unknown): Promise<T> =>
   Promise.reject(error instanceof Error ? error : new Error(String(error)));
+
+const hasEmbeddedPayload = (componentName: string, componentProps: unknown) => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const payloads = (window as WindowWithRSCPreloadedPayloads).REACT_ON_RAILS_RSC_PAYLOADS;
+  if (!payloads) {
+    return false;
+  }
+
+  const embeddedPayloadKeyPrefix = createEmbeddedPayloadKey(componentName, componentProps);
+  return Object.keys(payloads).some(
+    (key) => key === embeddedPayloadKeyPrefix || key.startsWith(`${embeddedPayloadKeyPrefix}-`),
+  );
+};
 
 /**
  * Creates a provider context for React Server Components.
@@ -387,10 +408,13 @@ export const createRSCProvider = ({
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
-        const prefetchedServerComponentPromise = consumePrefetchedServerComponent(
-          key,
-          providerCacheIdentityRef.current,
-        );
+        const preferEmbeddedPayload = hasEmbeddedPayload(componentName, componentProps);
+        if (preferEmbeddedPayload) {
+          deletePrefetchedServerComponent(key);
+        }
+        const prefetchedServerComponentPromise = preferEmbeddedPayload
+          ? undefined
+          : consumePrefetchedServerComponent(key, providerCacheIdentityRef.current);
         if (prefetchedServerComponentPromise) {
           serverComponentPromise = prefetchedServerComponentPromise;
         } else {

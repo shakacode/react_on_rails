@@ -27,7 +27,7 @@ import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import { resetRSCPrefetchStoreForTesting, setPrefetchedServerComponent } from '../src/RSCPrefetchStore.ts';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
-import { createRSCPayloadKey } from '../src/utils.ts';
+import { createEmbeddedPayloadKey, createRSCPayloadKey } from '../src/utils.ts';
 import { flushMacrotasks, getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
@@ -433,6 +433,7 @@ describe('RSCRoute successful-version error reset', () => {
   afterEach(() => {
     jest.useRealTimers();
     process.env.NODE_ENV = originalNodeEnv;
+    delete window.REACT_ON_RAILS_RSC_PAYLOADS;
     resetRSCPrefetchStoreForTesting();
   });
 
@@ -1642,5 +1643,29 @@ describe('RSCRoute successful-version error reset', () => {
       ),
     );
     expect(fetchCount(prefetchedId)).toBe(1);
+  });
+
+  it('s. embedded payloads take precedence over stale loader-time prefetches', async () => {
+    const stalePrefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: stalePrefetchedId });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('Card', { id: stalePrefetchedId }, 'rsc-root')]: ['fresh embedded card'],
+    };
+    setPrefetchedServerComponent(
+      key,
+      Promise.resolve(<span data-testid="payload">stale prefetched card</span>),
+    );
+
+    const result = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: stalePrefetchedId }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() =>
+      expect(result.container).toHaveTextContent(`Card-${JSON.stringify({ id: stalePrefetchedId })}#1`),
+    );
+    expect(result.container).not.toHaveTextContent('stale prefetched card');
+    expect(fetchCount(stalePrefetchedId)).toBe(1);
   });
 });
