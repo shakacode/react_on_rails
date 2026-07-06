@@ -1,17 +1,10 @@
 name: Benchmark Suite (reusable)
 
-# Runs one benchmark suite/shard end to end and tracks it with Bencher. Called twice by
-# benchmark.yml so the INITIAL run and the fresh-runner CONFIRMATION rerun execute the
-# exact same steps (no drift):
-#
-#   mode: initial  — the normal run. On a main-push alert, track_benchmarks.rb writes a
-#                    NON-FATAL regression candidate artifact (the suite stays green).
-#   mode: confirm  — downloads that candidate, reruns the suite against main's baseline on
-#                    a fresh runner WITHOUT polluting main's series, and writes a confirmed
-#                    artifact only if the SAME benchmark+measure pair(s) re-alert.
-#
+# Runs one manually requested hosted benchmark suite/shard end to end and tracks it with
+# Bencher. Automatic push/PR benchmark selection and fresh-runner confirmation jobs are
+# intentionally disabled because GitHub-hosted runners are too noisy for trusted trends.
 # The whole matrix row from benchmarks/generate_matrix.rb is passed as a JSON string and
-# unpacked into job-level env once, so callers only wire two inputs.
+# unpacked into job-level env once.
 on:
   workflow_call:
     inputs:
@@ -19,16 +12,13 @@ on:
         description: 'JSON-encoded benchmark matrix row (one entry of generate_matrix.rb include[])'
         required: true
         type: string
-      mode:
-        description: 'initial (normal run) or confirm (fresh-runner confirmation rerun)'
-        required: false
-        default: 'initial'
-        type: string
     secrets:
       REACT_ON_RAILS_PRO_LICENSE_V2:
         required: true
+      BENCHER_API_KEY:
+        required: false
       BENCHER_API_TOKEN:
-        required: true
+        required: false
 
 # Same benchmark parameters as benchmark.yml's old top-level env: a reusable workflow
 # does NOT inherit the caller's env, but it DOES see the caller's github context, so the
@@ -57,7 +47,7 @@ jobs:
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
       # Matrix row unpacked once. Names that begin with BENCHMARK_ are read by the bench
       # scripts and track_benchmarks.rb directly; the rest drive step conditions/paths.
-      BENCHMARK_MODE: ${{ inputs.mode }}
+      BENCHMARK_MODE: initial
       BENCHMARK_SHARD_INDEX: ${{ fromJSON(inputs.matrix_row).shard_index }}
       BENCHMARK_TOTAL_SHARDS: ${{ fromJSON(inputs.matrix_row).shard_total }}
       BENCHMARK_SHARD_LABEL: ${{ fromJSON(inputs.matrix_row).shard_label }}
@@ -74,11 +64,7 @@ jobs:
       GENERATE_PACKS: ${{ fromJSON(inputs.matrix_row).generate_packs }}
       SUMMARY_FILE: ${{ fromJSON(inputs.matrix_row).summary_file }}
       SUMMARY_TITLE: ${{ fromJSON(inputs.matrix_row).summary_title }}
-      # Artifact names. The results artifact is prefixed in confirm mode so the
-      # confirmation rerun never collides with the initial run's upload.
-      RESULTS_ARTIFACT_NAME: ${{ inputs.mode == 'confirm' && 'confirm-' || '' }}${{ fromJSON(inputs.matrix_row).artifact_name_prefix }}-${{ github.run_number }}${{ fromJSON(inputs.matrix_row).artifact_name_suffix }}
-      CANDIDATE_ARTIFACT_NAME: regression-candidate-${{ fromJSON(inputs.matrix_row).artifact_name_prefix }}-${{ github.run_number }}${{ fromJSON(inputs.matrix_row).artifact_name_suffix }}
-      CONFIRMED_ARTIFACT_NAME: regression-confirmed-${{ fromJSON(inputs.matrix_row).artifact_name_prefix }}-${{ github.run_number }}${{ fromJSON(inputs.matrix_row).artifact_name_suffix }}
+      RESULTS_ARTIFACT_NAME: ${{ fromJSON(inputs.matrix_row).artifact_name_prefix }}-${{ github.run_number }}${{ fromJSON(inputs.matrix_row).artifact_name_suffix }}
 
     steps:
       - name: Checkout repository
@@ -101,7 +87,7 @@ jobs:
         # against a reference payload to confirm each boundary is still symmetric about
         # baseline (lower_limit/upper_limit equidistant). The spec checks the parsing
         # logic, not the payload's statistical symmetry that Boundary#mirror relies on.
-        uses: bencherdev/bencher@v0.6.2
+        uses: bencherdev/bencher@v0.6.8
 
       - name: Add tools directory to PATH
         run: |
@@ -433,48 +419,14 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      # Confirmation reruns need the first run's candidate to learn which
-      # benchmark+measure pair(s) to re-confirm. Download it (by exact name) before the
-      # tracking step; a missing candidate makes track_benchmarks.rb treat the
-      # confirmation as inconclusive (fail without filing).
-      - name: Download first-run candidate
-        if: inputs.mode == 'confirm'
-        uses: actions/download-artifact@v7
-        with:
-          name: ${{ env.CANDIDATE_ARTIFACT_NAME }}
-          path: candidate
-
       - name: Track benchmarks with Bencher
         env:
+          BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
-          # Confirmation mode reads the downloaded candidate from here (recursive glob).
-          BENCHMARK_CANDIDATE_DIR: candidate
         run: ruby benchmarks/track_benchmarks.rb
-
-      # Initial mode: on a main-push alert, track_benchmarks.rb wrote a NON-FATAL
-      # candidate. Upload it on always() so the plan-confirmation gate can read it.
-      - name: Upload regression candidate
-        if: always() && inputs.mode != 'confirm'
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.CANDIDATE_ARTIFACT_NAME }}
-          path: bench_results/regression-candidate.json
-          if-no-files-found: ignore
-          retention-days: 7
-
-      # Confirm mode: track_benchmarks.rb wrote a confirmed payload only if the same
-      # benchmark+measure re-alerted. Upload it so report-regressions can file the issue.
-      - name: Upload confirmed regression
-        if: always() && inputs.mode == 'confirm'
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.CONFIRMED_ARTIFACT_NAME }}
-          path: bench_results/regression-confirmed.json
-          if-no-files-found: ignore
-          retention-days: 7
 
       - name: Benchmark workflow summary
         if: always()

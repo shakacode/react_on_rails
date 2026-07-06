@@ -9,12 +9,9 @@ module TrackBenchmarks
       env.fetch("GITHUB_EVENT_NAME") == "push" && env.fetch("GITHUB_REF") == "refs/heads/main"
     end
 
-    # A main-push Bencher alert is now a NON-FATAL candidate: the gate/confirmation jobs
-    # rerun the alerting suite/shard on a fresh runner and only file the issue if the SAME
-    # benchmark+measure re-alerts, so write the candidate hand-off and exit 0 — the
-    # report-regressions job owns the final pass/fail. (A lost hand-off is the one case we
-    # still fail the suite, rather than silently drop the regression.) A non-zero exit with
-    # NO alert is an operational failure, not a regression, and still fails the suite.
+    # A main-push Bencher alert was treated as a non-fatal candidate by the retired hosted
+    # confirmation pipeline. Keep the payload writer covered for a future dedicated-runner
+    # confirmation path; a non-zero exit with no alert is still an operational failure.
     def report_main_push_candidate(report, report_markdown, bencher_exit_code, suite_name)
       if Summary.regression?(report)
         exit 1 unless write_candidate(report, report_markdown, suite_name)
@@ -26,11 +23,10 @@ module TrackBenchmarks
       end
     end
 
-    # Write the non-fatal first-run candidate for the gate/confirmation jobs. Records the
-    # structured alert pairs so the confirmation rerun can require the SAME pair(s) to
-    # re-alert, plus the un-sharded suite name (so a suite's shards combine downstream) and
-    # the rendered summary. Returns true on success; false means the hand-off was lost, so
-    # the caller fails the suite rather than silently dropping the regression.
+    # Write the non-fatal first-run candidate. Records the structured alert pairs so a
+    # future confirmation rerun can require the SAME pair(s) to re-alert, plus the
+    # un-sharded suite name and rendered summary. Returns true on success; false means the
+    # hand-off was lost.
     def write_candidate(report, report_markdown, suite_name, path: Config::CANDIDATE_REPORT_JSON, env: ENV)
       File.write(
         path,
@@ -55,8 +51,8 @@ module TrackBenchmarks
       false
     end
 
-    # Write the confirmed hand-off for report-regressions: the first run and confirmation
-    # summaries side by side (the comparison is the evidence) and the confirmed alert pairs.
+    # Write the confirmed hand-off: the first run and confirmation summaries side by side
+    # (the comparison is the evidence) and the confirmed alert pairs.
     def write_confirmed(confirmed_alerts, first_run_summary, confirmation_markdown, suite_name,
                         path: Config::CONFIRMED_REPORT_JSON, env: ENV)
       File.write(

@@ -1,6 +1,10 @@
 name: Benchmark Workflow
 
 on:
+  # Hosted benchmarks are manual-only. The trusted trend runs on dedicated local
+  # hardware via benchmarks/run-local-benchmark.rb and uploads to the m1-bench
+  # Bencher testbed; shared GitHub-hosted runners are too noisy for automatic
+  # regression signal.
   workflow_dispatch:
     inputs:
       routes:
@@ -48,48 +52,10 @@ on:
           - 'pro_only'
           - 'pro_rails_only'
           - 'pro_node_renderer_only'
-  push:
-    branches:
-      - main
-    # Always trigger on main; non-runtime detection handles skipping heavy jobs
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    paths-ignore:
-      - '**.md'
-      - 'AGENTS_USER_GUIDE.md'
-      - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - 'llms-full-pro.txt'
-      - '.lychee.toml'
-# Cancel stale PR benchmark runs when new commits are pushed.
-# Main runs are never cancelled so every merge is measured.
+# Cancel stale manual benchmark runs for the same ref.
 concurrency:
-  group: >-
-    ${{
-      github.event_name == 'pull_request' &&
-      github.event.action == 'labeled' &&
-      github.event.label.name != 'benchmark' &&
-      github.event.label.name != 'benchmark-core' &&
-      github.event.label.name != 'benchmark-pro' &&
-      github.event.label.name != 'benchmark-pro-node-renderer' &&
-      github.event.label.name != 'hosted-ci-no-benchmarks' &&
-      format('benchmark-ignored-label-{0}', github.run_id) ||
-      github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) ||
-      format('benchmark-{0}', github.sha)
-    }}
-  cancel-in-progress: >-
-    ${{
-      github.event_name == 'pull_request' &&
-      (
-        github.event.action != 'labeled' ||
-        github.event.label.name == 'benchmark' ||
-        github.event.label.name == 'benchmark-core' ||
-        github.event.label.name == 'benchmark-pro' ||
-        github.event.label.name == 'benchmark-pro-node-renderer' ||
-        github.event.label.name == 'hosted-ci-no-benchmarks'
-      )
-    }}
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   detect-changes:
@@ -104,37 +70,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # On pull_request events GitHub's default checkout ref is the merge
-          # commit (PR merged into the CURRENT main). Diffing that against the
-          # PR's recorded base.sha — which is main as of PR creation and can lag
-          # several commits — sweeps in every change merged to main in between,
-          # miscategorizing an unrelated runtime/JS change onto a CI-only PR and
-          # firing benchmarks spuriously (#3919: a bin/-only PR ran all four
-          # suites because eight intervening main commits leaked into the diff).
-          # Check out the PR head SHA instead so change detection sees only the
-          # PR's own commits. On push, this falls back to the pushed SHA.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 50
           persist-credentials: false
+      - name: Fetch main for change detection
+        run: git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main
+        shell: bash
       - name: Read runtime versions
         id: tool-versions
         uses: ./.github/actions/read-tool-versions
       - name: Detect relevant changes
         id: detect
         run: |
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
-          script/ci-changes-detector "$BASE_REF"
+          script/ci-changes-detector origin/main
         shell: bash
-      - name: Guard docs-only main pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: ./.github/actions/ensure-main-docs-safety
-        with:
-          docs-only: ${{ steps.detect.outputs.docs_only }}
-          previous-sha: ${{ github.event.before }}
-      # detect-changes controls only non_runtime_only (force-skip every suite) and
-      # benchmarks_changed (run the script specs below). Which suites actually run is
-      # decided by event + labels in benchmarks/generate_matrix.rb: PRs are opt-in via
-      # a benchmark* label, so change-detection no longer auto-selects suites (#4012).
+      # detect-changes still controls whether benchmark script specs run on
+      # benchmark plumbing changes. Hosted benchmark suite selection is manual-only
+      # through workflow_dispatch inputs; automatic push/PR suite selection is disabled.
       - name: Set benchmark matrices
         id: benchmark-matrices
         # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
@@ -148,9 +100,6 @@ jobs:
           BENCHMARK_EVENT_NAME: ${{ github.event_name }}
           BENCHMARK_ROUTES: ${{ github.event.inputs.routes || '' }}
           BENCHMARK_NON_RUNTIME_ONLY: ${{ steps.detect.outputs.non_runtime_only }}
-          BENCHMARK_PULL_REQUEST_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
-          BENCHMARK_PULL_REQUEST_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           BENCHMARK_MATRIX=$(ruby benchmarks/generate_matrix.rb)
           export BENCHMARK_MATRIX
@@ -180,13 +129,9 @@ jobs:
         if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
         run: bundle exec rspec benchmarks/spec
 
-  # Initial run of every selected suite/shard. Delegates to the reusable benchmark-suite
-  # workflow in "initial" mode. Which events/labels actually select suites is decided in
-  # benchmarks/generate_matrix.rb (suite_requested_by_event? / suite_selected_by_input?):
-  # push to main, workflow_dispatch, or same-repo PRs carrying a suite-specific benchmark
-  # label (PRs are opt-in — change-detection alone no longer triggers them, see #4012). On a
-  # main-push alert this no longer fails the suite — track_benchmarks.rb writes a non-fatal
-  # candidate that the gate/confirmation jobs act on.
+  # Manual hosted run of every selected suite/shard. Automatic push/PR benchmarks
+  # are intentionally disabled; use the dedicated local M1 runner for the trusted
+  # Bencher trend and reserve this workflow for explicit hosted diagnostics.
   benchmark:
     needs: detect-changes
     name: ${{ matrix.job_name }}
@@ -202,115 +147,7 @@ jobs:
     uses: ./.github/workflows/benchmark-suite.yml
     with:
       matrix_row: ${{ toJSON(matrix) }}
-      mode: initial
     secrets:
       REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}  # yamllint disable-line rule:line-length
+      BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
       BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-
-  # The confirmation gate. Reads the first-run candidates, drops the ones whose only
-  # regressed benchmarks are temporarily ignored (no rerun, no issue), and emits a matrix
-  # of just the alerting suite/shard(s) to rerun on fresh runners. Main pushes only.
-  plan-confirmation:
-    needs: [detect-changes, benchmark]
-    # always() so it still runs after a suite reports a candidate; gated to main pushes
-    # that actually ran benchmark suites so it doesn't spin up on PRs or benchmark-less pushes.
-    # Also gated OFF by default (#4071): on shared GitHub-hosted runners the regression alerts
-    # are dominated by ±50-125% noise and filed a stream of false-positive issues (#4038-#4044).
-    # The trustworthy signal now comes from the dedicated local runner (benchmarks/run-local-
-    # benchmark.rb, #4073). The main-push benchmark job still runs and uploads to Bencher (so the
-    # dashboard and PR-comparison baseline keep updating); only the confirmation + issue-filing
-    # pipeline is disabled. Set the repo variable BENCHMARK_REGRESSION_ISSUES_ENABLED=true to
-    # restore automatic issue filing (e.g. once CI benchmarking moves to a dedicated runner).
-    if: >-
-      always()
-      && github.event_name == 'push'
-      && github.ref == 'refs/heads/main'
-      && needs.detect-changes.outputs.run_benchmark_suites == 'true'
-      && vars.BENCHMARK_REGRESSION_ISSUES_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      has_confirmations: ${{ steps.plan.outputs.has_confirmations }}
-      confirmation_matrix: ${{ steps.plan.outputs.confirmation_matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Download regression candidates
-        uses: actions/download-artifact@v7
-        with:
-          path: candidate-artifacts
-          pattern: regression-candidate-*
-      # Stdlib-only script, so the runner's system Ruby is enough (no Bundler/Rails boot).
-      - name: Plan confirmation reruns
-        id: plan
-        env:
-          BENCHMARK_MATRIX: ${{ needs.detect-changes.outputs.benchmark_matrix }}
-        run: ruby benchmarks/plan_confirmation.rb candidate-artifacts
-
-  # Fresh-runner confirmation reruns of just the alerting suite/shard(s). Runs the same
-  # benchmark-suite workflow in "confirm" mode: re-tests against main's baseline without
-  # polluting main's series, and writes a confirmed artifact only when the SAME
-  # benchmark+measure re-alerts. Skipped when there is nothing to confirm.
-  confirm-regressions:
-    needs: [detect-changes, plan-confirmation]
-    if: needs.plan-confirmation.outputs.has_confirmations == 'true'
-    name: ${{ matrix.job_name }} (confirmation)
-    strategy:
-      fail-fast: false
-      # Fall back to an empty (but valid) matrix if plan-confirmation was skipped/crashed
-      # before setting the output: its output is then "" and fromJSON("") would error at
-      # matrix-construction time even though the if: gate skips this job. The empty matrix
-      # produces zero jobs; the if: gate is what actually decides whether confirmation runs.
-      matrix: ${{ fromJSON(needs.plan-confirmation.outputs.confirmation_matrix || '{"include":[]}') }}
-    permissions:
-      contents: read
-      checks: write
-    uses: ./.github/workflows/benchmark-suite.yml
-    with:
-      matrix_row: ${{ toJSON(matrix) }}
-      mode: confirm
-    secrets:
-      REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}  # yamllint disable-line rule:line-length
-      BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-
-  # Files a single GitHub issue for any CONFIRMED benchmark regressions, with the first
-  # run and confirmation summaries side by side. Runs once after confirmation (always(),
-  # since a confirmed regression / inconclusive rerun fails its job) so reporting is
-  # serialized: parallel suites doing this themselves would create duplicate issues and
-  # clobber each other's sections in the shared comment. This job owns the final pass/fail
-  # — a confirmed regression fails the workflow here. No-ops (exit 0) when every first-run
-  # alert was cleared as noise or short-circuited as ignored.
-  report-regressions:
-    needs: [detect-changes, benchmark, plan-confirmation, confirm-regressions]
-    # Disabled by default with the confirmation pipeline above (#4071): set the repo variable
-    # BENCHMARK_REGRESSION_ISSUES_ENABLED=true to restore automatic issue filing.
-    if: >-
-      always()
-      && github.event_name == 'push'
-      && github.ref == 'refs/heads/main'
-      && needs.detect-changes.outputs.run_benchmark_suites == 'true'
-      && vars.BENCHMARK_REGRESSION_ISSUES_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: read
-      issues: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Download confirmed regressions
-        uses: actions/download-artifact@v7
-        with:
-          path: confirmed-artifacts
-          pattern: regression-confirmed-*
-      # Stdlib-only script, so the runner's system Ruby is enough (no Bundler/Rails boot).
-      - name: File regression issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ruby benchmarks/report_regressions.rb confirmed-artifacts

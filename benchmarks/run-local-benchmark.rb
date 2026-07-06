@@ -15,9 +15,7 @@
 #   - bench.rb                   -> the actual benchmarking (k6)
 #   - lib/bencher_runner.rb      -> upload with the tuned thresholds + the testbed override
 #
-# v1 supports the rails/k6 suites (core, pro). The node-renderer suite needs extra steps
-# (renderer cache pre-seed, a different server + vegeta target) and is intentionally
-# deferred; run it in CI for now.
+# Supports the rails/k6 suites (core, pro) and the Pro node-renderer/vegeta suite.
 
 require "English"
 require "fileutils"
@@ -26,6 +24,7 @@ require "shellwords"
 
 require_relative "generate_matrix"
 require_relative "lib/bencher_runner"
+require_relative "lib/bencher_token"
 require_relative "lib/local_benchmark_runner/process_wait"
 
 REPO_ROOT = File.expand_path("..", __dir__)
@@ -67,10 +66,10 @@ options = {
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: ruby benchmarks/run-local-benchmark.rb SUITE [options]\n  " \
-                "SUITE: core | pro   (node-renderer is deferred; run it in CI)"
+                "SUITE: core | pro | pro-node-renderer"
   opts.on("--testbed NAME", "Bencher testbed to report to (default: m1-bench)") { |v| options[:testbed] = v }
   opts.on("--branch NAME", "Bencher branch/series (default: the checked-out git ref)") { |v| options[:branch] = v }
-  opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_TOKEN)") do |v|
+  opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_KEY)") do |v|
     options[:upload] = v
   end
   opts.on("--fail-on-alert", "Exit non-zero if Bencher flags a regression") { options[:fail_on_alert] = true }
@@ -91,16 +90,17 @@ suite_id = ARGV.shift
 abort parser.help if suite_id.nil?
 
 suite = SUITES.find { |s| s[:id] == suite_id }
-abort "Unknown suite #{suite_id.inspect}. Supported: core, pro." if suite.nil?
-if suite[:server_kind] != "rails"
-  abort "Suite #{suite_id.inspect} (#{suite[:server_kind]}) is not supported by the local runner yet; run it in CI."
-end
+abort "Unknown suite #{suite_id.inspect}. Supported: core, pro, pro-node-renderer." if suite.nil?
 
 # Fail fast on upload prerequisites BEFORE the long build + benchmark, so a missing token or
 # CLI doesn't waste a full dedicated-hardware run that can't be recorded. Treat an empty string
-# as unset (BENCHER_API_TOKEN= would otherwise pass and only fail at upload).
+# as unset (BENCHER_API_KEY= would otherwise pass and only fail at upload).
 if options[:upload]
-  abort "BENCHER_API_TOKEN is not set; export it or pass --no-upload." if ENV["BENCHER_API_TOKEN"].to_s.empty?
+  begin
+    BencherToken.validate_api_key!(ENV.fetch("BENCHER_API_KEY", nil))
+  rescue BencherToken::InvalidToken => e
+    abort e.message
+  end
   abort "bencher CLI not found on PATH; install it or pass --no-upload." if `command -v bencher`.strip.empty?
 end
 
@@ -138,12 +138,15 @@ def git_ref
 end
 
 # Run a command, streaming output, raising on failure. Returns nothing.
-# Clears BENCHER_API_TOKEN for the child: only the final in-process Bencher upload needs it,
-# so setup/build/benchmark subprocesses (pnpm, Rails, the app) shouldn't see the upload token.
+# Clears Bencher upload credentials for the child: only the final in-process Bencher upload
+# needs them, so setup/build/benchmark subprocesses (pnpm, Rails, the app) shouldn't see them.
 # (`nil` in the env hash unsets the key for the child.)
 def run!(command, chdir: REPO_ROOT, env: {})
   puts "+ (#{chdir}) #{command}"
-  success = system({ "BENCHER_API_TOKEN" => nil }.merge(env), "bash", "-lc", command, chdir:)
+  success = system(
+    { "BENCHER_API_KEY" => nil, "BENCHER_API_TOKEN" => nil }.merge(env),
+    "bash", "-lc", command, chdir:
+  )
   # system returns nil (not false) when the command can't be exec'd at all; $CHILD_STATUS is
   # then nil too, so guard the exitstatus lookup to keep the real failure visible.
   raise "command failed (exit #{$CHILD_STATUS&.exitstatus || 'exec error'}): #{command}" unless success
@@ -159,11 +162,13 @@ end
 
 web_concurrency = [cpu_count - 1, 1].max
 pro = suite.fetch(:pro_env)
+pro_app = suite.fetch(:app_directory).start_with?("react_on_rails_pro/")
+node_renderer = suite.fetch(:server_kind) == "node-renderer"
 
-# Fail fast (before the long build) if the pro suite is missing its license: the server would
+# Fail fast (before the long build) if a Pro benchmark is missing its license: the app would
 # otherwise boot with an empty license and die mid-startup with a cryptic error.
-if pro && ENV["REACT_ON_RAILS_PRO_LICENSE"].to_s.empty?
-  abort "REACT_ON_RAILS_PRO_LICENSE is required for the pro suite; export it first."
+if pro_app && ENV["REACT_ON_RAILS_PRO_LICENSE"].to_s.empty?
+  abort "REACT_ON_RAILS_PRO_LICENSE is required for Pro benchmark suites; export it first."
 end
 
 puts "Suite: #{suite[:suite_name]} | Ruby (app): #{MIN_RUBY || 'ambient'} | " \
@@ -184,6 +189,12 @@ if options[:setup]
 
   log "Build production assets"
   run!("bin/prod-assets", chdir: app_dir)
+
+  if node_renderer
+    prod = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
+    log "Pre-seed node renderer bundle cache"
+    run!("bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink", chdir: app_dir, env: prod)
+  end
 
   if pro
     prod = { "RAILS_ENV" => "production" }
@@ -219,35 +230,57 @@ server_env = {
   "RAILS_MIN_THREADS" => "3",
   "PORT" => SERVER_PORT.to_s,
   "RAILS_PORT" => SERVER_PORT.to_s,
-  # The benchmarked app (Rails + Pro node renderer) is checked-out code; keep the Bencher
-  # upload token out of it — only the final in-process upload needs the token.
+  # The benchmarked app (Rails + Pro node renderer) is checked-out code; keep Bencher upload
+  # credentials out of it — only the final in-process upload needs them.
+  "BENCHER_API_KEY" => nil,
   "BENCHER_API_TOKEN" => nil
 }
+server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "") if pro_app
 if pro
-  server_env["REACT_ON_RAILS_PRO_LICENSE"] = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", "")
   # Pin the renderer port AND the URL Rails uses to reach it to the same value, so an ambient
   # RENDERER_PORT override (or a default-vs-override split) can't make Rails talk to the wrong
   # renderer.
   server_env["RENDERER_PORT"] = RENDERER_PORT.to_s
   server_env["REACT_RENDERER_URL"] = "http://localhost:#{RENDERER_PORT}"
 end
+if node_renderer
+  server_env["RAILS_ENV"] = "production"
+  server_env["NODE_ENV"] = "production"
+  server_env["RENDERER_LOG_LEVEL"] = "error"
+  server_env["RENDERER_PORT"] = RENDERER_PORT.to_s
+end
 
 # Reject a pre-existing listener BEFORE spawning: otherwise wait_for_port's check
 # could pass against a stale server/dev process and the benchmark would measure (and upload)
 # the wrong app. On a persistent host this is a real hazard. Pro also needs the renderer port.
-abort "Port #{SERVER_PORT} is already in use — stop the other server/dev process first." if port_open?(SERVER_PORT)
-if pro && port_open?(RENDERER_PORT)
+if !node_renderer && port_open?(SERVER_PORT)
+  abort "Port #{SERVER_PORT} is already in use — stop the other server/dev process first."
+end
+if (pro || node_renderer) && port_open?(RENDERER_PORT)
   abort "Renderer port #{RENDERER_PORT} is already in use — stop the other process first."
 end
 
 server_pid = nil
 begin
-  log "Start #{suite[:suite_name]} production server (WEB_CONCURRENCY=#{web_concurrency})"
+  start_label = node_renderer ? "#{suite[:suite_name]} node renderer" : "#{suite[:suite_name]} production server"
+  log "Start #{start_label} (WEB_CONCURRENCY=#{web_concurrency})"
   # Own process group (pgroup: true) so cleanup can terminate the whole tree: bin/prod runs
   # `rails server` as a child (core) or starts overmind/foreman managing rails + node-renderer
   # (pro), so a TERM to the leader alone would orphan those children or block.
-  server_pid = Process.spawn(server_env, "bin/prod", chdir: app_dir, pgroup: true)
-  wait_for_port(server_pid, SERVER_PORT, "Rails server")
+  FileUtils.mkdir_p(results_dir)
+  renderer_log = File.join(results_dir, "node-renderer.log")
+  spawn_options = { chdir: app_dir, pgroup: true }
+  if node_renderer
+    spawn_options[:out] = [renderer_log, "w"]
+    spawn_options[:err] = %i[child out]
+  end
+  server_command = node_renderer ? ["node", "renderer/node-renderer.js"] : ["bin/prod"]
+  server_pid = Process.spawn(server_env, *server_command, **spawn_options)
+  wait_for_port(
+    server_pid,
+    node_renderer ? RENDERER_PORT : SERVER_PORT,
+    node_renderer ? "node renderer" : "Rails server"
+  )
   # Pro starts the node renderer concurrently; wait for it too so the benchmark doesn't hit a
   # not-yet-ready renderer and record skewed (cold/erroring) numbers.
   wait_for_port(server_pid, RENDERER_PORT, "node renderer") if pro
@@ -260,7 +293,7 @@ begin
   FileUtils.rm_f(benchmark_json)
   bench_env = {
     "PRO" => pro.to_s,
-    "BASE_URL" => "localhost:#{SERVER_PORT}",
+    "BASE_URL" => "localhost:#{node_renderer ? RENDERER_PORT : SERVER_PORT}",
     # Lets bench.rb's BenchmarkTargetMonitor discard metrics if the server dies mid-run
     # instead of uploading numbers from a dead/restarting target (same as the CI suite).
     "TARGET_PID" => server_pid.to_s,
@@ -271,6 +304,7 @@ begin
     "MAX_CONNECTIONS" => options[:connections],
     "REQUEST_TIMEOUT" => "60s"
   }
+  bench_env["TARGET_LOG"] = renderer_log if node_renderer
   run!("ruby #{Shellwords.escape(bench_script)}", chdir: REPO_ROOT, env: bench_env)
 ensure
   if server_pid

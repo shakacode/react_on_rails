@@ -412,17 +412,8 @@ show_status() {
   warn_if_latest_profile_may_be_under_reported
 
   echo "Runtime versions:"
-  if command -v ruby &> /dev/null; then
-    echo "  Ruby: $(ruby --version | awk '{print $2}')"
-  else
-    echo "  Ruby: not found"
-  fi
-
-  if command -v node &> /dev/null; then
-    echo "  Node: $(node --version)"
-  else
-    echo "  Node: not found"
-  fi
+  echo "  Ruby: $(read_tool_version "$PROJECT_ROOT/.tool-versions" ruby) (configured)"
+  echo "  Node: $(read_tool_version "$PROJECT_ROOT/.tool-versions" nodejs) (configured)"
 
   echo ""
   echo "Dependency versions:"

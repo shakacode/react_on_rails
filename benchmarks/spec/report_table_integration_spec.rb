@@ -11,7 +11,7 @@ require_relative "../lib/benchmark_table"
 # significance verdicts flowing through to bolded/tagged cells.
 #
 # The fixture is hand-authored to the `bencher run --format json` shape verified for
-# CLI v0.6.2 (see benchmarks/lib/bencher_report.rb and .github/workflows/benchmark.yml).
+# CLI v0.6.8 (see benchmarks/lib/bencher_report.rb and .github/workflows/benchmark.yml).
 # When bumping the CLI, re-verify it against a real payload — a value-level drift (e.g.
 # the alert `status` vocabulary) would not be caught by the structural parser alone.
 RSpec.describe "BencherReport + BenchmarkTable integration" do
