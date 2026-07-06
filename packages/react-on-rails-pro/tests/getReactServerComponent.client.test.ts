@@ -631,7 +631,7 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fetch when an unscoped embedded SSR payload already exists', async () => {
+  it('does not fetch when an embedded SSR payload already exists', async () => {
     const {
       prefetchServerComponent,
       getReusablePrefetchedServerComponent,
@@ -641,7 +641,7 @@ describe('prefetchServerComponent client API', () => {
     const componentProps = { id: 1 };
     setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
     window.REACT_ON_RAILS_RSC_PAYLOADS = {
-      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps)]: ['payload'],
+      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps, 'dom-node-id')]: ['payload'],
     };
 
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
@@ -652,7 +652,7 @@ describe('prefetchServerComponent client API', () => {
     ).toBeUndefined();
   });
 
-  it('warms the shared prefetch store when only a sibling embedded SSR payload exists', async () => {
+  it('can warm the shared prefetch store when a sibling embedded SSR payload exists', async () => {
     const {
       prefetchServerComponent,
       getReusablePrefetchedServerComponent,
@@ -669,7 +669,9 @@ describe('prefetchServerComponent client API', () => {
     };
     fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('warm payload')));
 
-    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+    await expect(
+      prefetchServerComponent('PrefetchedPanel', componentProps, { skipIfEmbedded: false }),
+    ).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     await expect(

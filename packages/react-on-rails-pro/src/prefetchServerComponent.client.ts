@@ -24,6 +24,7 @@ import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type PrefetchServerComponentOptions = {
   signal?: AbortSignal;
+  skipIfEmbedded?: boolean;
 };
 
 const resolveNoop = () => Promise.resolve();
@@ -55,12 +56,12 @@ const toVoidPrefetchPromise = (promise: Promise<unknown>, signal?: AbortSignal):
 export const prefetchServerComponent = (
   componentName: string,
   componentProps: unknown,
-  { signal }: PrefetchServerComponentOptions = {},
+  { signal, skipIfEmbedded = true }: PrefetchServerComponentOptions = {},
 ): Promise<void> => {
   let key: string;
   try {
     key = createRSCPayloadKey(componentName, componentProps);
-    if (hasEmbeddedRSCPayload(componentName, componentProps)) {
+    if (skipIfEmbedded && hasEmbeddedRSCPayload(componentName, componentProps)) {
       return resolveNoop();
     }
   } catch {

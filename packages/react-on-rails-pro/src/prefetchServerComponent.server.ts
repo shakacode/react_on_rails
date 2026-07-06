@@ -15,6 +15,7 @@
 
 export type PrefetchServerComponentOptions = {
   signal?: AbortSignal;
+  skipIfEmbedded?: boolean;
 };
 
 export const prefetchServerComponent = (

@@ -73,10 +73,13 @@ export const hasEmbeddedRSCPayload = (componentName: string, componentProps: unk
     return Object.prototype.hasOwnProperty.call(window.REACT_ON_RAILS_RSC_PAYLOADS, embeddedPayloadKey);
   }
 
-  // Loader prefetch does not know the eventual provider domNodeId. A scoped
-  // embedded payload belongs to one provider, so only an unscoped payload can
-  // satisfy every sibling root for this component+props pair.
-  return Object.prototype.hasOwnProperty.call(window.REACT_ON_RAILS_RSC_PAYLOADS, embeddedPayloadKey);
+  // Loader prefetch does not know the eventual provider domNodeId by default,
+  // so any embedded root for this component+props pair is enough to avoid a
+  // duplicate initial-load request. Callers that intentionally need to warm a
+  // sibling root can opt out through prefetchServerComponent's options.
+  return Object.keys(window.REACT_ON_RAILS_RSC_PAYLOADS).some(
+    (key) => key === embeddedPayloadKey || key.startsWith(`${embeddedPayloadKey}-`),
+  );
 };
 
 /**
