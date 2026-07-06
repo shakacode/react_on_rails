@@ -631,7 +631,7 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fetch when an embedded SSR payload already exists', async () => {
+  it('does not fetch when an unscoped embedded SSR payload already exists', async () => {
     const {
       prefetchServerComponent,
       getReusablePrefetchedServerComponent,
@@ -641,7 +641,7 @@ describe('prefetchServerComponent client API', () => {
     const componentProps = { id: 1 };
     setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
     window.REACT_ON_RAILS_RSC_PAYLOADS = {
-      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps, 'dom-node-id')]: ['payload'],
+      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps)]: ['payload'],
     };
 
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
@@ -650,6 +650,31 @@ describe('prefetchServerComponent client API', () => {
     expect(
       getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
     ).toBeUndefined();
+  });
+
+  it('warms the shared prefetch store when only a sibling embedded SSR payload exists', async () => {
+    const {
+      prefetchServerComponent,
+      getReusablePrefetchedServerComponent,
+      createEmbeddedPayloadKey,
+      createRSCPayloadKey,
+    } = await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps, 'sibling-root')]: ['payload'],
+    };
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('warm payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    await expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).resolves.toBe('decoded payload');
   });
 
   it('resolves and self-evicts when the shared prefetch fetch rejects', async () => {
