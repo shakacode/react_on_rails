@@ -17,13 +17,21 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+const versionBelowMinimumVersion = (version: string) => {
+  const [major, minor, patch] = version.split('.').map(Number);
+  if (patch > 0) return `${major}.${minor}.${patch - 1}`;
+  if (minor > 0) return `${major}.${minor - 1}.999`;
+  throw new Error('minimumVersion must allow a lower supported-major version for the floor test');
+};
+
 describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
   let runRscPeerCompatibilityCheck: typeof import('../src/shared/runRscPeerCompatibilityCheck').runRscPeerCompatibilityCheck;
-  let belowRecommendedMin: string;
+  let minimumVersion: string;
+  let belowMinimumVersion: string;
 
   const resolveVersions =
-    (rscVersion: string, reactVersion = '19.0.4', reactDomVersion = reactVersion) =>
+    (rscVersion: string, reactVersion = '19.2.7', reactDomVersion = reactVersion) =>
     (spec: string): string | null => {
       if (spec === 'react-on-rails-rsc') return rscVersion;
       if (spec === 'react') return reactVersion;
@@ -38,9 +46,8 @@ describe('runRscPeerCompatibilityCheck', () => {
     const { RSC_PEER_SUPPORT } = jest.requireActual(
       '../src/shared/rscPeerSupport',
     ) as typeof import('../src/shared/rscPeerSupport');
-    const { recommendedMin } = RSC_PEER_SUPPORT.reactOnRailsRsc;
-    const [major, minor, patch] = recommendedMin.split('.').map(Number);
-    belowRecommendedMin = patch > 0 ? `${major}.${minor}.${patch - 1}` : `${major}.${minor - 1}.999`;
+    minimumVersion = RSC_PEER_SUPPORT.reactOnRailsRsc.minimumVersion;
+    belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
     warnSpy = jest.spyOn(log.default, 'warn').mockImplementation(() => undefined);
 
@@ -97,60 +104,50 @@ describe('runRscPeerCompatibilityCheck', () => {
         resolveVersion: resolveVersions('20.0.0'),
       }),
     ).toThrow(/Incompatible react-on-rails-rsc/);
-  });
-
-  it('throws on an unsupported rsc minor', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.1.0', '19.0.4'),
-      }),
-    ).toThrow(/Incompatible react-on-rails-rsc/);
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('warns (does not throw) when below recommendedMin', () => {
+  it('throws below the v17 RSC floor', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions(belowRecommendedMin),
+        resolveVersion: resolveVersions(belowMinimumVersion),
       }),
-    ).not.toThrow();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    ).toThrow(new RegExp(`>= ${minimumVersion}`));
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('warns when on the dormant 19.0.4 build (now below the 19.0.5 floor)', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.0.4'),
-      }),
-    ).not.toThrow();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not warn at the recommended stable floor (19.0.5)', () => {
+  it('throws on the old 19.0 RSC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
         resolveVersion: resolveVersions('19.0.5'),
       }),
+    ).toThrow(new RegExp(`>= ${minimumVersion}`));
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not warn at the stable v17 RSC floor', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions(minimumVersion),
+      }),
     ).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('does not label an existing warning as downgraded when the env hatch is set', () => {
+  it('does not warn for the coordinated RC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
-        resolveVersion: resolveVersions(belowRecommendedMin),
+        resolveVersion: resolveVersions('19.2.1-rc.0'),
       }),
     ).not.toThrow();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledWith(expect.not.stringContaining('downgraded'));
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('downgrades a hard error to a warning when the env hatch is set', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
         env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
-        resolveVersion: resolveVersions('20.0.0'),
+        resolveVersion: resolveVersions(belowMinimumVersion),
       }),
     ).not.toThrow();
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -170,34 +167,25 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws on a react-dom mismatch', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.0.4', '19.0.4', '19.0.5'),
+        resolveVersion: resolveVersions(minimumVersion, '19.2.7', '19.2.8'),
       }),
     ).toThrow(/Incompatible react-dom/);
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-
-  it('does not throw on the coordinated React 19.2.7 runtime floor', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.0-rc.1', '19.2.7'),
-      }),
-    ).not.toThrow();
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-
-  it('throws when React 19.2 is paired with the React 19.0 RSC package line', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.0.5', '19.2.7'),
-      }),
-    ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.0-rc.1', '19.0.4'),
+        resolveVersion: resolveVersions('19.2.1-rc.0', '19.0.4'),
+      }),
+    ).toThrow(/Incompatible react/);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws when React 19.2 patch is below the supported minimum', () => {
+    expect(() =>
+      runRscPeerCompatibilityCheck({
+        resolveVersion: resolveVersions(minimumVersion, '19.2.6'),
       }),
     ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();
@@ -211,9 +199,15 @@ describe('runRscPeerCompatibilityCheck', () => {
   });
 
   it('runs once per process (memoized)', () => {
-    const resolveVersion = resolveVersions(belowRecommendedMin);
-    runRscPeerCompatibilityCheck({ resolveVersion });
-    runRscPeerCompatibilityCheck({ resolveVersion });
+    const resolveVersion = resolveVersions('20.0.0');
+    runRscPeerCompatibilityCheck({
+      env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
+      resolveVersion,
+    });
+    runRscPeerCompatibilityCheck({
+      env: { REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK: '1' },
+      resolveVersion,
+    });
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

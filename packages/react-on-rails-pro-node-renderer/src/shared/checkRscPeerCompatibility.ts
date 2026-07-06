@@ -110,13 +110,6 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
 
-const warnMessage = (found: string, recommendedMin: string, proVersion?: string) =>
-  [
-    `[ReactOnRails] react-on-rails-rsc ${found} is older than the recommended minimum ${recommendedMin}.`,
-    `  ${proLabel(proVersion)} may behave incorrectly (missing coordinated RSC fixes).`,
-    `  Upgrade react-on-rails-rsc to ${recommendedMin} or newer.`,
-  ].join('\n');
-
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
   const { rscVersion, reactVersion, reactDomVersion, proVersion } = input;
 
@@ -135,6 +128,18 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         'react-on-rails-rsc',
         rscVersion,
         `${reactOnRailsRsc.supportedMajor}.x`,
+        proVersion,
+      ),
+    };
+  }
+
+  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.minimumVersion))) {
+    return {
+      level: 'error',
+      message: errorMessage(
+        'react-on-rails-rsc',
+        rscVersion,
+        `>= ${reactOnRailsRsc.minimumVersion}`,
         proVersion,
       ),
     };
@@ -180,10 +185,6 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         message: errorMessage('react-dom', reactDomVersion, `match react ${reactVersion}`, proVersion),
       };
     }
-  }
-
-  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.recommendedMin))) {
-    return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };
   }
 
   return { level: 'ok' };
