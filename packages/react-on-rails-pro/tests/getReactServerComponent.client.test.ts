@@ -559,10 +559,11 @@ describe('prefetchServerComponent client API', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('reuses an adopted settled prefetch for repeated loader calls', async () => {
+  it('starts a fresh warm request after a provider adopts a prefetch', async () => {
     const {
       consumePrefetchedServerComponent,
       createRSCPayloadKey,
+      getReusablePrefetchedServerComponent,
       prefetchServerComponent,
       setPrefetchedServerComponent,
     } = await loadPrefetchModule();
@@ -573,8 +574,10 @@ describe('prefetchServerComponent client API', () => {
 
     await expect(consumePrefetchedServerComponent(key, {})).resolves.toBe('decoded payload');
 
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('fresh payload')));
     await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
   });
 
   it('honors the current caller abort signal when reusing an in-flight prefetch', async () => {
@@ -691,16 +694,11 @@ describe('prefetchServerComponent client API', () => {
 
   it('resolves and self-evicts when decoded payload creation fails', async () => {
     const decodeError = new Error('decode boom');
-    const createFromReadableStream = jest.fn(
-      () =>
-        ({
-          then: () => null,
-          catch: (reject: (error: unknown) => void) => {
-            reject(decodeError);
-            return null;
-          },
-        }) as unknown as Promise<unknown>,
-    );
+    const createFromReadableStream = jest.fn(() => {
+      const rejected = Promise.reject(decodeError);
+      void rejected.catch(() => {});
+      return rejected;
+    });
     const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
       await loadPrefetchModule(createFromReadableStream);
     const componentProps = { id: 1 };
@@ -712,6 +710,31 @@ describe('prefetchServerComponent client API', () => {
     expect(
       getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
     ).toBeUndefined();
+  });
+
+  it('resolves and self-evicts when the decoded payload is an Error value', async () => {
+    const decodedError = new Error('server render boom');
+    const createFromReadableStream = jest
+      .fn()
+      .mockResolvedValueOnce(decodedError)
+      .mockResolvedValueOnce('decoded payload');
+    const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
+      await loadPrefetchModule(createFromReadableStream);
+    const componentProps = { id: 1 };
+    const key = createRSCPayloadKey('PrefetchedPanel', componentProps);
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(getReusablePrefetchedServerComponent(key)).toBeUndefined();
+
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('retry payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
   });
 });
 

@@ -28,7 +28,7 @@ The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider 
 ## Relationships
 
 - Each root component wrapped by `wrapServerComponentRenderer/client` gets its own **RSCProvider**, hence its own **Provider Cache**.
-- The **Prefetch Store** is shared across all providers on the page; a prefetched entry may be adopted once by any number of Provider Caches (payloads for the same key are identical and immutable).
+- The **Prefetch Store** is shared across all providers on the page; a prefetched entry may be adopted once by any number of Provider Caches (payloads for the same key are identical and immutable). Once any provider has adopted an entry, a later same-key loader prefetch starts a fresh warm request for the next render instead of treating the adopted entry as reusable loader state.
 - The Prefetch Store holds **decoded** promises (`Promise<ReactNode>`), never raw fetch streams — a stream body is single-consumption, a decoded promise is not.
 - `refetchComponent` bypasses the Prefetch Store entirely: refetch means "fresh data" and always goes to the network. The store is only consulted on first `getComponent` for a key.
 - The Embedded Payload Registry outranks a network fetch; a prefetch for a key already embedded in the SSR HTML must be a no-op.
@@ -43,6 +43,8 @@ The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider 
 
 > **Dev:** "The router loader prefetched `Dashboard`, but there are two React roots on this page — which one gets the payload?"
 > **Domain expert:** "Both can. The **Prefetch Store** is page-global; each **RSCProvider** performs **Adoption** into its own **Provider Cache** on first `getComponent`. One network fetch, any number of adopters."
+> **Dev:** "If a loader runs again for the same key after adoption, does it just no-op?"
+> **Domain expert:** "No. Adoption means the old store entry has served a render. A later loader prefetch starts a fresh warm request so the next provider cache miss can still be warm."
 > **Dev:** "And if the user hits refresh-data, do we reuse the prefetched entry?"
 > **Domain expert:** "No — `refetchComponent` always bypasses the Prefetch Store."
 

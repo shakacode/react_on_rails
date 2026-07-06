@@ -20,7 +20,7 @@ import {
   getReusablePrefetchedServerComponent,
   setPrefetchedServerComponent,
 } from './RSCPrefetchStore.ts';
-import { createEmbeddedPayloadKey, createRSCPayloadKey } from './utils.ts';
+import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 export type PrefetchServerComponentOptions = {
   signal?: AbortSignal;
@@ -52,19 +52,6 @@ const toVoidPrefetchPromise = (promise: Promise<unknown>, signal?: AbortSignal):
   ]);
 };
 
-const hasEmbeddedPayload = (componentName: string, componentProps: unknown): boolean => {
-  if (typeof window === 'undefined' || !window.REACT_ON_RAILS_RSC_PAYLOADS) {
-    return false;
-  }
-
-  const embeddedPayloadKeyPrefix = createEmbeddedPayloadKey(componentName, componentProps);
-  // The domNodeId suffix is unknown here; component names are assumed not to be generated from
-  // another component's full embedded payload key prefix.
-  return Object.keys(window.REACT_ON_RAILS_RSC_PAYLOADS).some(
-    (key) => key === embeddedPayloadKeyPrefix || key.startsWith(`${embeddedPayloadKeyPrefix}-`),
-  );
-};
-
 export const prefetchServerComponent = (
   componentName: string,
   componentProps: unknown,
@@ -73,7 +60,7 @@ export const prefetchServerComponent = (
   let key: string;
   try {
     key = createRSCPayloadKey(componentName, componentProps);
-    if (hasEmbeddedPayload(componentName, componentProps)) {
+    if (hasEmbeddedRSCPayload(componentName, componentProps)) {
       return resolveNoop();
     }
   } catch {
@@ -99,8 +86,15 @@ export const prefetchServerComponent = (
   });
   setPrefetchedServerComponent(key, prefetchPromise);
 
-  void prefetchPromise.then(undefined, () => {
-    deletePrefetchedServerComponent(key, prefetchPromise);
-  });
+  void prefetchPromise.then(
+    (payload) => {
+      if (payload instanceof Error) {
+        deletePrefetchedServerComponent(key, prefetchPromise);
+      }
+    },
+    () => {
+      deletePrefetchedServerComponent(key, prefetchPromise);
+    },
+  );
   return toVoidPrefetchPromise(prefetchPromise, signal);
 };

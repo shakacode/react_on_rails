@@ -33,7 +33,7 @@ import {
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent, deletePrefetchedServerComponent } from './RSCPrefetchStore.ts';
-import { createEmbeddedPayloadKey, createRSCPayloadKey } from './utils.ts';
+import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
@@ -75,22 +75,6 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
 const rejectWithError = <T,>(error: unknown): Promise<T> =>
   Promise.reject(error instanceof Error ? error : new Error(String(error)));
 
-const hasEmbeddedPayload = (componentName: string, componentProps: unknown) => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS;
-  if (!payloads) {
-    return false;
-  }
-
-  const embeddedPayloadKeyPrefix = createEmbeddedPayloadKey(componentName, componentProps);
-  return Object.keys(payloads).some(
-    (key) => key === embeddedPayloadKeyPrefix || key.startsWith(`${embeddedPayloadKeyPrefix}-`),
-  );
-};
-
 /**
  * Creates a provider context for React Server Components.
  *
@@ -112,8 +96,10 @@ const hasEmbeddedPayload = (componentName: string, componentProps: unknown) => {
  */
 export const createRSCProvider = ({
   getServerComponent,
+  domNodeId,
 }: {
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
+  domNodeId?: string;
 }) => {
   return ({ children }: { children: ReactNode }) => {
     // Companion bookkeeping keyed by the same RSC payload key as the promise
@@ -403,7 +389,7 @@ export const createRSCProvider = ({
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
-        const preferEmbeddedPayload = hasEmbeddedPayload(componentName, componentProps);
+        const preferEmbeddedPayload = hasEmbeddedRSCPayload(componentName, componentProps, domNodeId);
         if (preferEmbeddedPayload) {
           deletePrefetchedServerComponent(key);
         }

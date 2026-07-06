@@ -444,6 +444,8 @@ promise rejections. It does not accept per-call `headers` or `credentials`; anyt
 payload content must stay identical across the normal `RSCRoute` fetch path and the prefetch path.
 Adopted prefetched payloads do not replay server console scripts in the browser console; non-prefetched
 client navigations keep the legacy console replay behavior.
+After a provider adopts a prefetched payload, a later same-key loader prefetch starts a fresh warm
+request so a future provider cache miss can still avoid a cold fetch.
 Build `componentProps` from the same object or shared helper for the loader and `RSCRoute`; the cache
 key uses JSON serialization, so equivalent objects with different key insertion order will not match.
 

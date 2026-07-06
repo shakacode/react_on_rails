@@ -63,6 +63,23 @@ export const createEmbeddedPayloadKey = (
   return domNodeId ? `${componentName}-${propsHash}-${domNodeId}` : `${componentName}-${propsHash}`;
 };
 
+export const hasEmbeddedRSCPayload = (componentName: string, componentProps: unknown, domNodeId?: string) => {
+  if (typeof window === 'undefined' || !window.REACT_ON_RAILS_RSC_PAYLOADS) {
+    return false;
+  }
+
+  const embeddedPayloadKey = createEmbeddedPayloadKey(componentName, componentProps, domNodeId);
+  if (domNodeId) {
+    return Object.prototype.hasOwnProperty.call(window.REACT_ON_RAILS_RSC_PAYLOADS, embeddedPayloadKey);
+  }
+
+  // Loader prefetch does not know the eventual provider domNodeId, so it treats
+  // any embedded root for this component+props pair as sufficient.
+  return Object.keys(window.REACT_ON_RAILS_RSC_PAYLOADS).some(
+    (key) => key === embeddedPayloadKey || key.startsWith(`${embeddedPayloadKey}-`),
+  );
+};
+
 /**
  * Wraps a promise from react-server-dom-webpack in a standard JavaScript Promise.
  *
@@ -74,8 +91,7 @@ export const createEmbeddedPayloadKey = (
  */
 export const wrapInNewPromise = <T>(promise: Promise<T>) => {
   return new Promise<T>((resolve, reject) => {
-    void promise.then(resolve);
-    void promise.catch(reject);
+    void promise.then(resolve, reject);
   });
 };
 

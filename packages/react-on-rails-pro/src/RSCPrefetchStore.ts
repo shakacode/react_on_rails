@@ -21,27 +21,14 @@ export type RSCProviderCacheIdentity = object;
 type PrefetchedServerComponentEntry = {
   promise: Promise<ReactNode>;
   adoptedProviderCaches: WeakSet<RSCProviderCacheIdentity>;
-  hasBeenAdopted: boolean;
-  isSettled: boolean;
+  hasAdoptedProvider: boolean;
 };
 
-const createPrefetchEntry = (promise: Promise<ReactNode>): PrefetchedServerComponentEntry => {
-  const entry: PrefetchedServerComponentEntry = {
-    promise,
-    adoptedProviderCaches: new WeakSet(),
-    hasBeenAdopted: false,
-    isSettled: false,
-  };
-  void promise.then(
-    () => {
-      entry.isSettled = true;
-    },
-    () => {
-      entry.isSettled = true;
-    },
-  );
-  return entry;
-};
+const createPrefetchEntry = (promise: Promise<ReactNode>): PrefetchedServerComponentEntry => ({
+  promise,
+  adoptedProviderCaches: new WeakSet(),
+  hasAdoptedProvider: false,
+});
 
 const createPrefetchStore = () =>
   new BoundedLRU<PrefetchedServerComponentEntry>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
@@ -60,7 +47,7 @@ if (typeof document !== 'undefined') {
 
 export const getReusablePrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined => {
   const entry = prefetchedRSCPromises.get(key, false);
-  if (!entry) {
+  if (!entry || entry.hasAdoptedProvider) {
     return undefined;
   }
   prefetchedRSCPromises.get(key);
@@ -78,7 +65,7 @@ export const consumePrefetchedServerComponent = (
 
   prefetchedRSCPromises.get(key);
   entry.adoptedProviderCaches.add(providerCacheIdentity);
-  entry.hasBeenAdopted = true;
+  entry.hasAdoptedProvider = true;
   return entry.promise;
 };
 
