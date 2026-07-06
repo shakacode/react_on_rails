@@ -158,6 +158,7 @@ module ReactOnRailsPro
           # response attempt.
           reset_response_status
           @received_first_chunk = false
+          renderer_timing_snapshot = renderer_server_timing_collector_snapshot
           stream_response, @emitter = normalize_executor_result(@request_executor.call(send_bundle, tasks))
 
           begin
@@ -173,12 +174,16 @@ module ReactOnRailsPro
           end
           break
         rescue ReactOnRailsPro::RendererHttpClient::HTTPError => e
-          stop_tasks(tasks) if retrying_with_bundle_upload?(e, send_bundle)
+          if retrying_with_bundle_upload?(e, send_bundle)
+            restore_renderer_server_timing_collector_snapshot(renderer_timing_snapshot)
+            stop_tasks(tasks)
+          end
           send_bundle = handle_http_error(e, send_bundle)
         rescue ReactOnRailsPro::RendererHttpClient::TimeoutError,
                ReactOnRailsPro::RendererHttpClient::ConnectionError => e
           raise_or_retry_streaming_transport_error(e, available_retries)
           available_retries -= 1
+          restore_renderer_server_timing_collector_snapshot(renderer_timing_snapshot)
           stop_tasks(tasks)
         end
 
@@ -288,6 +293,20 @@ module ReactOnRailsPro
       tasks.each(&:stop)
       tasks.each(&:wait)
       tasks.clear
+    end
+
+    def renderer_server_timing_collector_snapshot
+      return unless defined?(ReactOnRailsPro::Stream)
+      return unless ReactOnRailsPro::Stream.respond_to?(:renderer_server_timing_collector_snapshot)
+
+      ReactOnRailsPro::Stream.renderer_server_timing_collector_snapshot
+    end
+
+    def restore_renderer_server_timing_collector_snapshot(snapshot)
+      return unless defined?(ReactOnRailsPro::Stream)
+      return unless ReactOnRailsPro::Stream.respond_to?(:restore_renderer_server_timing_collector_snapshot)
+
+      ReactOnRailsPro::Stream.restore_renderer_server_timing_collector_snapshot(snapshot)
     end
 
     def retrying_with_bundle_upload?(error, send_bundle)

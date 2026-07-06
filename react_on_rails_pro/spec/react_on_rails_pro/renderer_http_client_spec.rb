@@ -76,6 +76,15 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       expect(response).not_to respond_to(:status=)
     end
 
+    it "exposes response headers with case-insensitive keys" do
+      response = described_class.new(
+        status: 200,
+        headers: [["Server-Timing", "ror_renderer_prepare;dur=5"], ["server-timing", "upstream;dur=1"]]
+      )
+
+      expect(response.headers["server-timing"]).to eq(["ror_renderer_prepare;dur=5", "upstream;dur=1"])
+    end
+
     it "does not expose a public chunk writer" do
       response = described_class.new(status: 200)
 
@@ -377,7 +386,7 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       )
       stub_const(
         "FakePersistentResponse",
-        Struct.new(:status, :body)
+        Struct.new(:status, :body, :headers)
       )
       stub_const(
         "FakePersistentClient",
@@ -398,8 +407,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
       allow(Async::HTTP::Client).to receive(:new).and_return(async_client)
       allow(Async::HTTP::Client).to receive(:open).and_raise("ephemeral client should not be used")
       allow(async_client).to receive(:post).and_return(
-        FakePersistentResponse.new(200, first_body),
-        FakePersistentResponse.new(200, second_body)
+        FakePersistentResponse.new(200, first_body, { "server-timing" => "ror_renderer_prepare;dur=1" }),
+        FakePersistentResponse.new(200, second_body, { "server-timing" => "ror_renderer_prepare;dur=2" })
       )
       allow(async_client).to receive(:close)
 
@@ -408,6 +417,8 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
 
       expect(first_response.body).to eq("first")
       expect(second_response.body).to eq("second")
+      expect(first_response.headers["server-timing"]).to eq(["ror_renderer_prepare;dur=1"])
+      expect(second_response.headers["server-timing"]).to eq(["ror_renderer_prepare;dur=2"])
       expect(first_body.closed).to be(true)
       expect(second_body.closed).to be(true)
       expect(Async::HTTP::Client).to have_received(:new).once.with(

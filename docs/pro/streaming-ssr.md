@@ -369,14 +369,15 @@ The browser-observable marks above close the client loop. To attribute the serve
 | `ror_stream_shell`     | Rails (gem)              | Duration of the shell `render_to_string`, which blocks on the first renderer chunk for each streamed component — the wait tail. |
 | `ror_renderer_prepare` | Node renderer (response) | Execution-context build (cold or cached) plus the synchronous render that produces the stream object, before the first chunk.   |
 
-`ror_stream_shell` appears on the navigation response your browser sees (visible in the Network panel and in `PerformanceResourceTiming.serverTiming`). `ror_renderer_prepare` rides on the renderer's HTTP response to Rails; it is visible to anything inspecting that hop (logs, tracing, a direct probe of the renderer).
+Both `ror_stream_shell` and `ror_renderer_prepare` appear on the navigation response your browser sees, visible in the Network panel and in `PerformanceResourceTiming.serverTiming`. Rails captures the renderer response's `Server-Timing` value while waiting for the first streamed chunk, then appends it to the browser-facing response before the first stream write commits headers.
 
 Both metrics are emitted only when `rsc_stream_observability: true` is set for the streamed render.
 
-Two figures are intentionally **not** on the browser-facing header:
+One figure is intentionally **not** on the browser-facing header:
 
 - **Total / stream-complete renderer time** is only known after the body is flushed, and `ActionController::Live` does not support HTTP trailers (see the caveat above). It remains available via the `react-on-rails:rsc:stream` mark's `sinceStreamStartMs`.
-- **Merging `ror_renderer_prepare` into the browser-facing header** would require Rails to read the renderer's response headers from the streaming hop; the gem's renderer HTTP client does not yet surface those. Until it does, read `ror_renderer_prepare` from the renderer hop and `ror_stream_shell` from the browser response.
+
+Benchmark harnesses should read both `ror_stream_shell` and `ror_renderer_prepare` from the streamed navigation entry's `PerformanceResourceTiming.serverTiming` collection. The browser-facing header may include upstream renderer `Server-Timing` entries if your renderer response already sets them; React on Rails Pro appends rather than replaces those values.
 
 Existing `Server-Timing` entries set by your app or middleware (for example route-level `action_total`) are preserved — the gem appends to them rather than replacing.
 

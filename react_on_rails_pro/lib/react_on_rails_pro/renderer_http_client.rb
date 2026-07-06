@@ -176,7 +176,7 @@ module ReactOnRailsPro
     end
 
     class PersistentThreadClient
-      ResponseEnvelope = Struct.new(:status, :body)
+      ResponseEnvelope = Struct.new(:status, :body, :headers)
 
       def initialize(endpoint:, protocol:, pool_limit:)
         @queue = Queue.new
@@ -306,9 +306,13 @@ module ReactOnRailsPro
         body = raw_response&.body
         chunks = []
         body&.each { |chunk| chunks << chunk }
-        ResponseEnvelope.new(raw_response.status, BufferedResponseBody.new(chunks))
+        ResponseEnvelope.new(raw_response.status, BufferedResponseBody.new(chunks), response_headers(raw_response))
       ensure
         body&.close
+      end
+
+      def response_headers(raw_response)
+        raw_response.headers if raw_response.respond_to?(:headers)
       end
 
       def register_pending_result(result)
@@ -331,10 +335,11 @@ module ReactOnRailsPro
 
     # Not thread-safe. Each Response instance is owned and consumed by one renderer request path.
     class Response
-      attr_reader :status
+      attr_reader :status, :headers
 
-      def initialize(status: nil, body: nil, error: nil, &executor)
+      def initialize(status: nil, body: nil, headers: nil, error: nil, &executor)
         @status = status
+        @headers = normalize_headers(headers)
         @body_chunks = Array(body || [])
         @body = nil
         @error = error
@@ -368,6 +373,26 @@ module ReactOnRailsPro
 
       private
 
+      def normalize_headers(headers)
+        return {} unless headers
+
+        pairs = if headers.respond_to?(:to_a)
+                  headers.to_a
+                elsif headers.respond_to?(:to_h)
+                  headers.to_h.to_a
+                else
+                  Array(headers)
+                end
+
+        pairs.each_with_object({}) do |(name, value), normalized|
+          next if name.nil?
+
+          key = name.to_s.downcase
+          normalized[key] ||= []
+          normalized[key].concat(Array(value).compact.map(&:to_s))
+        end
+      end
+
       def append_chunk(chunk)
         @body = nil
         @body_chunks << chunk
@@ -377,6 +402,10 @@ module ReactOnRailsPro
         return if @consumed
 
         status_assigner = ->(status) { @status = status }
+        headers_assigner = lambda do |headers|
+          @headers = normalize_headers(headers)
+          record_stream_observability_headers
+        end
         buffer_success_body = !block_given?
         yielder = lambda do |chunk|
           append_chunk(chunk) if buffer_success_body || error?
@@ -387,11 +416,18 @@ module ReactOnRailsPro
         # each re-raises @error, while body can return buffered chunks for error-body access.
         @consumed = true
         begin
-          @executor&.call(yielder, status_assigner)
+          @executor&.call(yielder, status_assigner, headers_assigner)
         rescue StandardError => e
           @error ||= e
           raise
         end
+      end
+
+      def record_stream_observability_headers
+        return unless defined?(ReactOnRailsPro::Stream)
+        return unless ReactOnRailsPro::Stream.respond_to?(:record_renderer_response_headers)
+
+        ReactOnRailsPro::Stream.record_renderer_response_headers(@headers)
       end
     end
 
@@ -539,15 +575,19 @@ module ReactOnRailsPro
     def post(path, form: nil, json: nil, stream: false)
       ensure_open!
       headers, body = request_body(form:, json:)
-      build_response(stream:) do |yielder, status_assigner|
-        execute_request(:post, path, [headers, body], stream:, response_handlers: [yielder, status_assigner])
+      build_response(stream:) do |yielder, status_assigner, headers_assigner|
+        execute_request(:post, path, [headers, body],
+                        stream:,
+                        response_handlers: [yielder, status_assigner, headers_assigner])
       end
     end
 
     def get(path)
       ensure_open!
-      build_response(stream: false) do |yielder, status_assigner|
-        execute_request(:get, path, [[], nil], stream: false, response_handlers: [yielder, status_assigner])
+      build_response(stream: false) do |yielder, status_assigner, headers_assigner|
+        execute_request(:get, path, [[], nil],
+                        stream: false,
+                        response_handlers: [yielder, status_assigner, headers_assigner])
       end
     end
 
@@ -560,8 +600,10 @@ module ReactOnRailsPro
     def post_bidi(path, headers:)
       ensure_open!
       writable = Protocol::HTTP::Body::Writable.new
-      response = build_response(stream: true) do |yielder, status_assigner|
-        execute_request(:post, path, [headers, writable], stream: true, response_handlers: [yielder, status_assigner])
+      response = build_response(stream: true) do |yielder, status_assigner, headers_assigner|
+        execute_request(:post, path, [headers, writable],
+                        stream: true,
+                        response_handlers: [yielder, status_assigner, headers_assigner])
       end
       [writable.output, response]
     end
@@ -633,7 +675,7 @@ module ReactOnRailsPro
 
     def execute_request(method, path, request_body, stream:, response_handlers:)
       headers, body = request_body
-      yielder, status_assigner = response_handlers
+      yielder, status_assigner, headers_assigner = response_handlers
 
       # Capture scheduler BEFORE entering Sync. If a scheduler already exists, we can
       # use persistent mode. If Sync creates an ephemeral scheduler, we must use
@@ -649,6 +691,7 @@ module ReactOnRailsPro
                          end
 
           status_assigner.call(raw_response.status)
+          headers_assigner&.call(response_headers(raw_response))
           stream_body(raw_response, yielder)
         end
       end
@@ -858,6 +901,10 @@ module ReactOnRailsPro
       body&.each { |chunk| yielder.call(chunk) }
     ensure
       body&.close
+    end
+
+    def response_headers(raw_response)
+      raw_response.headers if raw_response.respond_to?(:headers)
     end
   end
 end

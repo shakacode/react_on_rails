@@ -121,6 +121,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   error reporter. [PR 4285](https://github.com/shakacode/react_on_rails/pull/4285) by
   [ihabadham](https://github.com/ihabadham).
 
+- **[Pro]** Streamed RSC responses now append the Node renderer's `ror_renderer_prepare`
+  metric to the browser-visible `Server-Timing` header while preserving existing
+  Rails/application entries, so `rsc_stream_observability` exposes renderer prepare
+  time without relying on HTTP trailers. Closes
+  [Issue 4479](https://github.com/shakacode/react_on_rails/issues/4479).
+  [PR 4487](https://github.com/shakacode/react_on_rails/pull/4487) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Streaming component caches honor `cache_options` on reads**: `cached_stream_react_component`
   wrote cached chunks with the user-supplied `cache_options` but read them back without any options, so
   key-altering options such as `namespace:` meant the cache never hit and every request re-streamed from
