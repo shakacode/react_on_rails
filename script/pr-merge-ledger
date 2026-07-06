@@ -133,7 +133,10 @@ class PrMergeLedger
   TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
-      \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+      \b(?:
+        not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+        (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+      )\b
       (?:\s+\S+){0,3}\s+
       \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|pass(?:es|ed|ing)?)\b
     )|

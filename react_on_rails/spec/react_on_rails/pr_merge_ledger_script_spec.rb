@@ -3577,6 +3577,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "This doesn't work on Windows.",
       "This no longer works on Windows.",
       "CI is no longer passing on Windows.",
+      "CI isn't passing on Windows.",
+      "CI isn\u2019t passing on Windows.",
       "This doesn't pass on Windows.",
       "CI does not pass on Windows.",
       "This doesn't address Windows.",
