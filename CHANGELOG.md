@@ -108,6 +108,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Node renderer rejects unsafe asset filenames**: The Pro Node renderer now rejects path-like,
+  drive-relative, alternate-stream, and control-character asset filenames before uploaded assets are copied
+  or `/asset-exists` probes bundle directories, returning a 400 without reporting rejected names to the
+  error reporter. [PR 4285](https://github.com/shakacode/react_on_rails/pull/4285) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **Streaming component caches honor `cache_options` on reads**: `cached_stream_react_component`
   wrote cached chunks with the user-supplied `cache_options` but read them back without any options, so
   key-altering options such as `namespace:` meant the cache never hit and every request re-streamed from

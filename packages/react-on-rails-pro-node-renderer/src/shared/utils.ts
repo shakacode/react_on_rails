@@ -120,6 +120,38 @@ ${stack}`;
 // https://github.com/fastify/fastify-multipart?tab=readme-ov-file#usage
 const pump = promisify(pipeline);
 
+const hasAsciiControlCharacter = (value: string) => {
+  for (let index = 0; index < value.length; index += 1) {
+    const characterCode = value.charCodeAt(index);
+    if (characterCode <= 0x1f || characterCode === 0x7f) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export function validateAssetFilename(filename: unknown) {
+  if (
+    typeof filename !== 'string' ||
+    !filename ||
+    filename === '.' ||
+    filename === '..' ||
+    filename.includes('/') ||
+    filename.includes('\\') ||
+    filename.includes(':') ||
+    hasAsciiControlCharacter(filename) ||
+    // Catches Windows drive-relative values such as "C:file" that have no separator.
+    path.win32.basename(filename) !== filename
+  ) {
+    throw new Error(
+      `Invalid asset filename: ${JSON.stringify(filename)}. Expected a single filename, not a path.`,
+    );
+  }
+
+  return filename;
+}
+
 export async function saveMultipartFile(
   multipartFile: MultipartFile,
   destinationPath: string,
@@ -152,7 +184,7 @@ export function copyUploadedAsset(
 
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
   const copyMultipleAssets = uploadedAssets.map((asset) => {
-    const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
+    const destinationAssetFilePath = path.join(targetDirectory, validateAssetFilename(asset.filename));
     return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
   });
   await Promise.all(copyMultipleAssets);
@@ -235,11 +267,6 @@ export const delay = (milliseconds: number) =>
 
 // Keep aligned with ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN.
 const BUNDLE_TIMESTAMP_PATH_COMPONENT_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
-const hasAsciiControlCharacter = (value: string) =>
-  Array.from(value).some((character) => {
-    const characterCode = character.charCodeAt(0);
-    return characterCode <= 0x1f || characterCode === 0x7f;
-  });
 
 function bundleTimestampPathComponent(bundleTimestamp: string | number) {
   const pathComponent = String(bundleTimestamp);
@@ -247,31 +274,6 @@ function bundleTimestampPathComponent(bundleTimestamp: string | number) {
     throw new Error(
       `Invalid bundle timestamp path component: ${pathComponent}. ` +
         'Expected only letters, digits, dots, underscores, and hyphens.',
-    );
-  }
-
-  return pathComponent;
-}
-
-export function assetFilenamePathComponent(filename: string) {
-  const pathComponent = filename;
-
-  if (
-    !pathComponent ||
-    pathComponent === '.' ||
-    pathComponent === '..' ||
-    path.isAbsolute(pathComponent) ||
-    path.posix.isAbsolute(pathComponent) ||
-    path.win32.isAbsolute(pathComponent) ||
-    hasAsciiControlCharacter(pathComponent) ||
-    pathComponent.includes('/') ||
-    pathComponent.includes('\\') ||
-    path.basename(pathComponent) !== pathComponent ||
-    path.posix.basename(pathComponent) !== pathComponent ||
-    path.win32.basename(pathComponent) !== pathComponent
-  ) {
-    throw new Error(
-      `Invalid asset filename path component: ${JSON.stringify(pathComponent)}. Expected a single filename, not a path.`,
     );
   }
 
@@ -291,7 +293,7 @@ export function getRequestBundleFilePath(bundleTimestamp: string | number) {
 
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
-  return path.join(bundleDirectory, assetFilenamePathComponent(filename));
+  return path.join(bundleDirectory, validateAssetFilename(filename));
 }
 
 export async function validateBundlesExist(
