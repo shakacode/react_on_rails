@@ -4,5 +4,5 @@
 # so they cannot live in .tool-versions alongside Ruby/Node.
 minimum-shakapacker 8.2.0
 minimum-react 18.0.0
-latest-shakapacker 10.2.0
+latest-shakapacker 10.3.0
 latest-react 19.0.0

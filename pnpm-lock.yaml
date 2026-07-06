@@ -546,14 +546,14 @@ importers:
         specifier: ^2.1.0
         version: 2.2.5
       shakapacker:
-        specifier: 10.2.0
-        version: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
+        specifier: 10.3.0
+        version: 10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       shakapacker-rspack:
-        specifier: ~10.2.0
-        version: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
+        specifier: ~10.3.0
+        version: 10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       shakapacker-webpack:
-        specifier: ~10.2.0
-        version: 10.2.0(0870f7555915b893a3b2f892424eb6c3)
+        specifier: ~10.3.0
+        version: 10.3.0(0870f7555915b893a3b2f892424eb6c3)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.105.2)
@@ -786,14 +786,14 @@ importers:
         specifier: ^2.0.0
         version: 2.2.5
       shakapacker:
-        specifier: 10.2.0
-        version: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
+        specifier: 10.3.0
+        version: 10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       shakapacker-rspack:
-        specifier: ~10.2.0
-        version: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
+        specifier: ~10.3.0
+        version: 10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       shakapacker-webpack:
-        specifier: ~10.2.0
-        version: 10.2.0(672bcb4c22174b71b486be259af07b3f)
+        specifier: ~10.3.0
+        version: 10.3.0(672bcb4c22174b71b486be259af07b3f)
       style-loader:
         specifier: ^3.3.1
         version: 3.3.4(webpack@5.104.1)
@@ -931,14 +931,14 @@ importers:
         specifier: ^5.2.2
         version: 5.2.2(@rspack/core@2.0.5)
       shakapacker:
-        specifier: 10.2.0
-        version: 10.2.0(b449644253a3a1a201d27e2e650f896c)
+        specifier: 10.3.0
+        version: 10.3.0(b449644253a3a1a201d27e2e650f896c)
       shakapacker-rspack:
-        specifier: ~10.2.0
-        version: 10.2.0(b449644253a3a1a201d27e2e650f896c)
+        specifier: ~10.3.0
+        version: 10.3.0(b449644253a3a1a201d27e2e650f896c)
       shakapacker-webpack:
-        specifier: ~10.2.0
-        version: 10.2.0(8d6a4df69126e8c6c2e4f3bbfaa89af0)
+        specifier: ~10.3.0
+        version: 10.3.0(8d6a4df69126e8c6c2e4f3bbfaa89af0)
       style-loader:
         specifier: ^4.0.0
         version: 4.0.0(webpack@5.104.1)
@@ -9018,8 +9018,8 @@ packages:
     peerDependencies:
       playwright-core: ^1.50.0
 
-  shakapacker-rspack@10.2.0:
-    resolution: {integrity: sha512-6MB+tWWa6XuLM3pXqqZr69yZ8NWL5gPA7D8O4WkQr8s2IFIoEWTjjdsWZl6vRu8jnkpBTsOeQC4pY9pRCgIN/w==}
+  shakapacker-rspack@10.3.0:
+    resolution: {integrity: sha512-28E04cdpUzDsqmBuUKk1RmBOBvusVU5a3RmsYouuLUNPDJ9MGjuJUp7QE2o1bUjQ3XoaH2qRPw+TW7qAMQRecQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@rspack/cli': ^2.0.0
@@ -9040,8 +9040,8 @@ packages:
       sass-loader:
         optional: true
 
-  shakapacker-webpack@10.2.0:
-    resolution: {integrity: sha512-9F6kumirIi9h2SrYeM5uREyg+RyLWq68m8Kosmoun3MPUkBkgasg1EXAqMJyi6UmuAf+gLXTD2qllEjzm7Vj1g==}
+  shakapacker-webpack@10.3.0:
+    resolution: {integrity: sha512-QOU4sxlyMkA42rj2Opk3bNfW+aAfBGLwu2UQYud+LY3yhwq28NbIpY5XGHq5ONDtD7+NStgxJ0hKYrE6Wjxqpg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@babel/core': ^7.17.9 || ^8.0.0
@@ -9058,7 +9058,7 @@ packages:
       webpack: ^5.101.0
       webpack-assets-manifest: ^6.0.0
       webpack-cli: ^7.0.0
-      webpack-dev-server: ^5.2.2
+      webpack-dev-server: ^5.2.2 || ^6.0.0
       webpack-subresource-integrity: ^5.1.0
     peerDependenciesMeta:
       '@babel/core':
@@ -9088,8 +9088,8 @@ packages:
       webpack-subresource-integrity:
         optional: true
 
-  shakapacker@10.2.0:
-    resolution: {integrity: sha512-4jHAL3pCjI1BVf45hFPRVrsMRV54VIVVYrw1MmyX/Ks6rl2ydVt3rxpdzzxH4HFZ4umW6AsuAVSVucZE13taCw==}
+  shakapacker@10.3.0:
+    resolution: {integrity: sha512-+MsocLZYaOPoE5giLygxiIF/xpdfl4nsoENtcCI2RPEM50OX4Jb6LKqrJdsK3leJiXXcbVOy6YYCbIqasduTzQ==}
     engines: {node: ^20.19.0 || >=22.12.0, yarn: '>=1 <5'}
     hasBin: true
     peerDependencies:
@@ -9118,7 +9118,7 @@ packages:
       webpack: ^5.101.0
       webpack-assets-manifest: ^5.0.6 || ^6.0.0
       webpack-cli: ^4.9.2 || ^5.0.0 || ^6.0.0 || ^7.0.0
-      webpack-dev-server: ^5.2.2
+      webpack-dev-server: ^5.2.2 || ^6.0.0
       webpack-subresource-integrity: ^5.1.0
     peerDependenciesMeta:
       '@babel/core':
@@ -19812,13 +19812,13 @@ snapshots:
       chalk: 4.1.2
       playwright-core: 1.58.2
 
-  shakapacker-rspack@10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770):
+  shakapacker-rspack@10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
+      shakapacker: 10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -19846,13 +19846,13 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-rspack@10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
+  shakapacker-rspack@10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
+      shakapacker: 10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.11.0)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.105.2)
@@ -19880,13 +19880,13 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-rspack@10.2.0(b449644253a3a1a201d27e2e650f896c):
+  shakapacker-rspack@10.3.0(b449644253a3a1a201d27e2e650f896c):
     dependencies:
       '@rspack/cli': 2.0.5(@rspack/core@2.0.5)(@rspack/dev-server@2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0))
       '@rspack/core': 2.0.5
       '@rspack/dev-server': 2.1.0(@rspack/core@2.0.5)(selfsigned@5.5.0)
       rspack-manifest-plugin: 5.2.2(@rspack/core@2.0.5)
-      shakapacker: 10.2.0(b449644253a3a1a201d27e2e650f896c)
+      shakapacker: 10.3.0(b449644253a3a1a201d27e2e650f896c)
     optionalDependencies:
       '@rspack/plugin-react-refresh': 2.0.2(@rspack/core@2.0.5)(react-refresh@0.14.2)
       css-loader: 7.1.4(@rspack/core@2.0.5)(webpack@5.104.1)
@@ -19914,9 +19914,9 @@ snapshots:
       - webpack-dev-server
       - webpack-subresource-integrity
 
-  shakapacker-webpack@10.2.0(0870f7555915b893a3b2f892424eb6c3):
+  shakapacker-webpack@10.3.0(0870f7555915b893a3b2f892424eb6c3):
     dependencies:
-      shakapacker: 10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
+      shakapacker: 10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.105.2)
       webpack: 5.105.2(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.105.2)
@@ -19948,9 +19948,9 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(672bcb4c22174b71b486be259af07b3f):
+  shakapacker-webpack@10.3.0(672bcb4c22174b71b486be259af07b3f):
     dependencies:
-      shakapacker: 10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770)
+      shakapacker: 10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
@@ -19982,9 +19982,9 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker-webpack@10.2.0(8d6a4df69126e8c6c2e4f3bbfaa89af0):
+  shakapacker-webpack@10.3.0(8d6a4df69126e8c6c2e4f3bbfaa89af0):
     dependencies:
-      shakapacker: 10.2.0(b449644253a3a1a201d27e2e650f896c)
+      shakapacker: 10.3.0(b449644253a3a1a201d27e2e650f896c)
       terser-webpack-plugin: 5.3.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack@5.104.1)
       webpack: 5.104.1(@swc/core@1.15.3)(esbuild@0.28.0)(webpack-cli@7.0.3)
       webpack-assets-manifest: 6.5.2(webpack@5.104.1)
@@ -20016,7 +20016,7 @@ snapshots:
       - ts-node
       - uglify-js
 
-  shakapacker@10.2.0(6ea6ec44eb5fcb64573a3aa31f66f770):
+  shakapacker@10.3.0(6ea6ec44eb5fcb64573a3aa31f66f770):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20052,7 +20052,7 @@ snapshots:
     transitivePeerDependencies:
       - ts-node
 
-  shakapacker@10.2.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
+  shakapacker@10.3.0(954ccac215fcb4be5c5eb7ccd9d57ca4):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0
@@ -20088,7 +20088,7 @@ snapshots:
     transitivePeerDependencies:
       - ts-node
 
-  shakapacker@10.2.0(b449644253a3a1a201d27e2e650f896c):
+  shakapacker@10.3.0(b449644253a3a1a201d27e2e650f896c):
     dependencies:
       js-yaml: 4.1.1
       pack-config-diff: 0.1.0

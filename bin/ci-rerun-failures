@@ -302,10 +302,10 @@ run_command() {
 # Map CI job names to human-readable versions.
 # Keep Shakapacker versions in sync with bin/ci-switch-config and SWITCHING_CI_CONFIGS.md.
 declare -A JOB_VERSION_MAP
-JOB_VERSION_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, Shakapacker 10.2.0, React 19"
+JOB_VERSION_MAP["webpack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, Shakapacker 10.3.0, React 19"
 JOB_VERSION_MAP["webpack-minimum-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
 JOB_VERSION_MAP["rspack-dummy-app-tests / dummy-app-integration-tests*"]="Ruby 4.0, Node 22, React 19 (rspack)"
-JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="Ruby 4.0, Node 22, Shakapacker 10.2.0, React 19"
+JOB_VERSION_MAP["dummy-app-integration-tests (4.0, 22, latest)"]="Ruby 4.0, Node 22, Shakapacker 10.3.0, React 19"
 JOB_VERSION_MAP["dummy-app-integration-tests (3.3, 20, minimum)"]="Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18"
 
 # Helper function to get version info for a job name
