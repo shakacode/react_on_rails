@@ -47,6 +47,6 @@
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "@rspack/plugin-react-refresh": "^2.0.0",
     "react-refresh": "^0.14.2",
-    "webpack-dev-server": "^5.2.4"
+    "webpack-dev-server": "^5.2.6"
   }
 }
