@@ -772,6 +772,28 @@ describe ReactOnRailsProHelper do
         @react_on_rails_rsc_stream_started_at = nil
       end
 
+      it "shares the renderer timing collector with the async stream task" do
+        renderer_timing_entry = 'ror_renderer_prepare;dur=7;desc="child task"'
+        collector = []
+        rendered_html_stream = Struct.new(:chunks) do
+          def each_chunk(&block)
+            chunks.each(&block)
+          end
+        end.new(["<div>first</div>", "<div>second</div>"])
+        allow(self).to receive(:internal_stream_react_component) do
+          ReactOnRailsPro::Stream.record_renderer_response_headers("server-timing" => renderer_timing_entry)
+          rendered_html_stream
+        end
+        ReactOnRailsPro::Stream.renderer_server_timing_collector = collector
+
+        stream_react_component(component_name, props:, **component_options)
+        @async_barrier.wait
+
+        expect(collector).to eq([renderer_timing_entry])
+      ensure
+        ReactOnRailsPro::Stream.renderer_server_timing_collector = nil
+      end
+
       it "adds stream observability to the Rails context when the Pro stream state enables it" do
         @react_on_rails_rsc_stream_observability = true
 
