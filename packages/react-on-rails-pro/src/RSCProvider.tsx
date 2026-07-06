@@ -32,7 +32,7 @@ import {
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
-import { consumePrefetchedServerComponent, deletePrefetchedServerComponent } from './RSCPrefetchStore.ts';
+import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 type RSCContextType = {
@@ -390,9 +390,6 @@ export const createRSCProvider = ({
         };
         let serverComponentPromise: Promise<ReactNode>;
         const preferEmbeddedPayload = hasEmbeddedRSCPayload(componentName, componentProps, domNodeId);
-        if (preferEmbeddedPayload) {
-          deletePrefetchedServerComponent(key);
-        }
         const prefetchedServerComponentPromise = preferEmbeddedPayload
           ? undefined
           : consumePrefetchedServerComponent(key, providerCacheIdentityRef.current);

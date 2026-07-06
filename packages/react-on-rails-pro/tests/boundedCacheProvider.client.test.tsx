@@ -1689,4 +1689,43 @@ describe('RSCRoute successful-version error reset', () => {
     expect(result.container).not.toHaveTextContent('other root embedded card');
     expect(getServerComponent).not.toHaveBeenCalled();
   });
+
+  it('u. embedded roots do not delete shared loader-time prefetches for sibling roots', async () => {
+    const prefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: prefetchedId });
+    const EmbeddedRootProvider = createRSCProvider({ getServerComponent, domNodeId: 'root-a' });
+    const PrefetchRootProvider = createRSCProvider({ getServerComponent, domNodeId: 'root-b' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('Card', { id: prefetchedId }, 'root-a')]: ['root-a embedded card'],
+    };
+    setPrefetchedServerComponent(
+      key,
+      Promise.resolve(<span data-testid="payload">shared prefetched card</span>),
+    );
+
+    const embeddedRoot = await renderInAct(
+      <EmbeddedRootProvider>
+        <Suspense fallback={<div data-testid="fallback">loading…</div>}>
+          <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+        </Suspense>
+      </EmbeddedRootProvider>,
+    );
+
+    await waitFor(() =>
+      expect(embeddedRoot.container).toHaveTextContent(`Card-${JSON.stringify({ id: prefetchedId })}#1`),
+    );
+    expect(embeddedRoot.container).not.toHaveTextContent('shared prefetched card');
+    expect(fetchCount(prefetchedId)).toBe(1);
+
+    const prefetchRoot = await renderInAct(
+      <PrefetchRootProvider>
+        <Suspense fallback={<div data-testid="fallback">loading…</div>}>
+          <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+        </Suspense>
+      </PrefetchRootProvider>,
+    );
+
+    await waitFor(() => expect(prefetchRoot.container).toHaveTextContent('shared prefetched card'));
+    expect(fetchCount(prefetchedId)).toBe(1);
+  });
 });
