@@ -44,6 +44,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Fixes [Issue 4248](https://github.com/shakacode/react_on_rails/issues/4248). [PR 4260](https://github.com/shakacode/react_on_rails/pull/4260) by [justin808](https://github.com/justin808).
 - **[Pro]** **Typed Rails action callers for TanStack Query mutations**: The Pro package mirrors the
   `createRailsAction` helper at `react-on-rails-pro/railsAction`. [PR 4260](https://github.com/shakacode/react_on_rails/pull/4260) by [justin808](https://github.com/justin808).
+- **[Pro]** **Loader-time RSC prefetch through the provider cache**: Client-router loaders can now
+  call `prefetchServerComponent` to warm a bounded page-global prefetch store that `RSCProvider`
+  adopts on the next `RSCRoute` render. Prefetches no-op when the SSR payload is already embedded,
+  support loader abort signals, and resolve without unhandled rejections after fetch/decode failure
+  self-eviction. Fixes [Issue 4460](https://github.com/shakacode/react_on_rails/issues/4460).
+  [PR 4489](https://github.com/shakacode/react_on_rails/pull/4489) by
+  [justin808](https://github.com/justin808).
 
 - **`bin/dev clean` clears generated bundles and caches**: The command stops development processes, reads `config/shakapacker.yml` or `SHAKAPACKER_CONFIG`, removes configured Shakapacker public/private output and cache paths plus common Rails, JavaScript, and renderer bundle caches, and skips unsafe paths outside the app root. [PR 4218](https://github.com/shakacode/react_on_rails/pull/4218) by [justin808](https://github.com/justin808).
 - **[Pro]** **Buffered RSC rendering for static pages**:

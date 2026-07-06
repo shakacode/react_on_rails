@@ -22,6 +22,7 @@ import { setDefaultRSCProviderFactory } from './defaultRSCProviderRegistry.ts';
 if (typeof window !== 'undefined') {
   setDefaultRSCProviderFactory(({ reactElement, railsContext, domNodeId }) => {
     const RSCProvider = createRSCProvider({
+      domNodeId,
       getServerComponent: async (args) => {
         // Keep the RSC browser runtime visible to the RSC Webpack plugin while still loading it lazily.
         await import('react-on-rails-rsc/client.browser');

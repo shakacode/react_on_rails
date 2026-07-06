@@ -32,7 +32,8 @@ import {
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
-import { createRSCPayloadKey } from './utils.ts';
+import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
+import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
 
 type RSCContextType = {
   getComponent: (componentName: string, componentProps: unknown) => Promise<ReactNode>;
@@ -95,8 +96,10 @@ const rejectWithError = <T,>(error: unknown): Promise<T> =>
  */
 export const createRSCProvider = ({
   getServerComponent,
+  domNodeId,
 }: {
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
+  domNodeId?: string;
 }) => {
   return ({ children }: { children: ReactNode }) => {
     // Companion bookkeeping keyed by the same RSC payload key as the promise
@@ -151,6 +154,7 @@ export const createRSCProvider = ({
     // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
     // still observe a later successful refetch after that key was cleaned up.
     const successfulVersionRef = useRef(0);
+    const providerCacheIdentityRef = useRef<object>({});
     const [, startTransition] = useTransition();
 
     // Bounded promise cache (#3564): the authoritative cache `getComponent`
@@ -385,14 +389,22 @@ export const createRSCProvider = ({
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
-        try {
-          serverComponentPromise = getServerComponent({ componentName, componentProps });
-        } catch (error) {
-          // A synchronous producer throw behaves exactly like an immediately
-          // rejected fetch: the rejection flows through the standard
-          // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
-          // settles the evicted-success latch and evicts the cached rejection.
-          serverComponentPromise = rejectWithError(error);
+        const preferEmbeddedPayload = hasEmbeddedRSCPayload(componentName, componentProps, domNodeId);
+        const prefetchedServerComponentPromise = preferEmbeddedPayload
+          ? undefined
+          : consumePrefetchedServerComponent(key, providerCacheIdentityRef.current);
+        if (prefetchedServerComponentPromise) {
+          serverComponentPromise = prefetchedServerComponentPromise;
+        } else {
+          try {
+            serverComponentPromise = getServerComponent({ componentName, componentProps });
+          } catch (error) {
+            // A synchronous producer throw behaves exactly like an immediately
+            // rejected fetch: the rejection flows through the standard
+            // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
+            // settles the evicted-success latch and evicts the cached rejection.
+            serverComponentPromise = rejectWithError(error);
+          }
         }
 
         promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {

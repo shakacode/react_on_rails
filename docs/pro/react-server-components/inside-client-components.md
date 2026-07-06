@@ -388,28 +388,39 @@ export default function AppRouter() {
 
 ### Client router loaders
 
-Client router loaders can still choose which server component a route renders. Keep the loader as a
-coordinator that returns plain route data, then render `RSCRoute` from the route component. React on
-Rails Pro then owns the RSC payload fetch, embedded SSR payload reuse, cache, and retry lifecycle.
+Client router loaders can choose which server component a route renders and warm the RSC payload
+before the route component mounts. Call `prefetchServerComponent` from the loader as fire-and-forget
+work, or return/await its `Promise<void>` if your router should wait for the payload decode. The
+subsequent `RSCRoute` render adopts the prefetched payload into the same `RSCProvider` cache, so it
+deduplicates with the loader request while preserving `RSCRoute`'s Suspense, error-boundary, retry,
+embedded SSR payload, and refetch lifecycle.
 
 If your app enforces a strict Content Security Policy without `'unsafe-inline'`, configure the Rails
-script nonce described in [Strict Content Security Policy](../strict-csp.md). `RSCRoute` uses the
-standard React on Rails Pro RSC path, so streamed payload scripts, console replay scripts, and
-hydration scripts need the same `railsContext.cspNonce` setup as other streamed RSC pages.
+script nonce described in [Strict Content Security Policy](../strict-csp.md). Loader-time prefetch
+uses the shared client fetch helper with console replay disabled; ordinary `RSCRoute` client
+navigation keeps the existing console replay behavior.
+Same-request streamed payload and hydration scripts still need the standard `railsContext.cspNonce`
+setup.
 
 ```tsx
 import { Suspense } from 'react';
 import { createRoute } from '@tanstack/react-router';
+import { prefetchServerComponent } from 'react-on-rails-pro/prefetchServerComponent';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import { rootRoute } from './rootRoute';
+
+const panelRouteData = {
+  componentName: 'Panel',
+  componentProps: { requestedBy: 'TanStack Router loader' },
+};
 
 export const panelRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/panel',
-  loader: () => ({
-    componentName: 'Panel',
-    componentProps: { requestedBy: 'TanStack Router loader' },
-  }),
+  loader: () => {
+    void prefetchServerComponent(panelRouteData.componentName, panelRouteData.componentProps);
+    return panelRouteData;
+  },
   component: PanelRouteComponent,
 });
 
@@ -423,6 +434,27 @@ function PanelRouteComponent() {
   );
 }
 ```
+
+`prefetchServerComponent(componentName, componentProps, { signal, skipIfEmbedded })` is warm-cache-only: it resolves
+after a successful decode, after the caller's `AbortSignal` aborts its wait, or after a failed
+prefetch has removed itself from the prefetch store. The signal does not cancel the shared fetch for
+other same-key callers or a later render. It never resolves to a `ReactNode`, and fetch/decode
+failures do not reject the public promise, so fire-and-forget loader use does not create unhandled
+promise rejections. It does not accept per-call `headers` or `credentials`; anything that can change
+payload content must stay identical across the normal `RSCRoute` fetch path and the prefetch path.
+Adopted prefetched payloads do not replay server console scripts in the browser console; non-prefetched
+client navigations keep the legacy console replay behavior.
+After a provider adopts a prefetched payload, a later same-key loader prefetch starts a fresh warm
+request so a future provider cache miss can still avoid a cold fetch.
+`skipIfEmbedded` defaults to `true`, so initial-route loaders no-op when SSR already embedded the
+payload. Set it to `false` only when deliberately warming a sibling root for the same
+component and props.
+Build `componentProps` from the same object or shared helper for the loader and `RSCRoute`; the cache
+key uses JSON serialization, so equivalent objects with different key insertion order will not match.
+`prefetchServerComponent` and `RSCRoute` must also resolve to the same `react-on-rails-pro` module
+instance so they share the page-global prefetch store. If prefetch calls succeed but `RSCRoute` still
+does a fresh fetch, check that your bundler is not duplicating `react-on-rails-pro` across independent
+chunks.
 
 ### Using `Outlet` in server components
 
@@ -578,17 +610,18 @@ For the `ref` and `useCurrentRSCRoute()` rows, refetching updates the visible tr
 
 Unless noted otherwise, each API below is a default export — use default-import syntax.
 
-| API                                    | Import                                                                                       | Export type | Purpose                                                                                                                                                                                                                                                                            |
-| -------------------------------------- | -------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RSCRoute`                             | `react-on-rails-pro/RSCRoute`                                                                | Default     | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`, `ssr?: boolean` (defaults to `true`; use `false` to defer initial server rendering for this route), `onRefetchError?: (error: ServerComponentFetchError) => void`. |
-| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client`                                      | Default     | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling.                                                                     |
-| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server`                                      | Default     | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument.                                                                                                                                                                     |
-| `registerServerComponent` (client)     | `react-on-rails-pro/registerServerComponent/client`                                          | Default     | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML.                                                    |
-| `registerServerComponent` (server)     | `react-on-rails-pro/registerServerComponent/server`                                          | Default     | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`.                                                                                                                                                                            |
-| `useRSC`                               | `import { useRSC } from 'react-on-rails-pro/RSCProvider'`                                    | **Named**   | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default client provider.                                                         |
-| `RSCRouteHandle`                       | `import type { RSCRouteHandle } from 'react-on-rails-pro/RSCRoute'`                          | **Named**   | TypeScript type of the imperative handle exposed by `<RSCRoute ref={...} />`. Includes `refetch(): Promise<ReactNode>`, `retry(): Promise<ReactNode>`, `refetchError: ServerComponentFetchError \| null`, and `clearRefetchError(): void`.                                         |
-| `useCurrentRSCRoute`                   | `import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute'`                           | **Named**   | Hook returning the `RSCRouteHandle` of the nearest ancestor `<RSCRoute>`. Lets a client component rendered inside the server component's subtree refetch its parent route without being passed any props.                                                                          |
-| `isServerComponentFetchError`          | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named**   | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields.                                                                                                                                  |
+| API                                    | Import                                                                                       | Export type | Purpose                                                                                                                                                                                                                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RSCRoute`                             | `react-on-rails-pro/RSCRoute`                                                                | Default     | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`, `ssr?: boolean` (defaults to `true`; use `false` to defer initial server rendering for this route), `onRefetchError?: (error: ServerComponentFetchError) => void`.      |
+| `prefetchServerComponent`              | `import { prefetchServerComponent } from 'react-on-rails-pro/prefetchServerComponent'`       | **Named**   | Warms the provider-adoptable RSC prefetch store from client-router loaders/preloads. Returns `Promise<void>`, accepts `{ signal?: AbortSignal, skipIfEmbedded?: boolean }`, no-ops by default when an embedded SSR payload already exists, and never rejects for fetch/decode failures. |
+| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client`                                      | Default     | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling.                                                                          |
+| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server`                                      | Default     | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument.                                                                                                                                                                          |
+| `registerServerComponent` (client)     | `react-on-rails-pro/registerServerComponent/client`                                          | Default     | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML.                                                         |
+| `registerServerComponent` (server)     | `react-on-rails-pro/registerServerComponent/server`                                          | Default     | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`.                                                                                                                                                                                 |
+| `useRSC`                               | `import { useRSC } from 'react-on-rails-pro/RSCProvider'`                                    | **Named**   | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default client provider.                                                              |
+| `RSCRouteHandle`                       | `import type { RSCRouteHandle } from 'react-on-rails-pro/RSCRoute'`                          | **Named**   | TypeScript type of the imperative handle exposed by `<RSCRoute ref={...} />`. Includes `refetch(): Promise<ReactNode>`, `retry(): Promise<ReactNode>`, `refetchError: ServerComponentFetchError \| null`, and `clearRefetchError(): void`.                                              |
+| `useCurrentRSCRoute`                   | `import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute'`                           | **Named**   | Hook returning the `RSCRouteHandle` of the nearest ancestor `<RSCRoute>`. Lets a client component rendered inside the server component's subtree refetch its parent route without being passed any props.                                                                               |
+| `isServerComponentFetchError`          | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named**   | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields.                                                                                                                                       |
 
 ## Troubleshooting
 

@@ -24,9 +24,10 @@ import {
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from '../src/RSCProviderCache.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
+import { resetRSCPrefetchStoreForTesting, setPrefetchedServerComponent } from '../src/RSCPrefetchStore.ts';
 import RSCRoute, { type RSCRouteHandle } from '../src/RSCRoute.tsx';
 import { shouldClearRefetchErrorOnSuccessfulVersionChange } from '../src/RSCRouteSuccessfulVersion.ts';
-import { createRSCPayloadKey } from '../src/utils.ts';
+import { createEmbeddedPayloadKey, createRSCPayloadKey } from '../src/utils.ts';
 import { flushMacrotasks, getNodeVersion } from './testUtils';
 
 // Imported from the source so the test cap cannot drift from the real cap.
@@ -425,12 +426,15 @@ describe('RSCRoute successful-version error reset', () => {
 
   beforeEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    resetRSCPrefetchStoreForTesting();
     setupCountingFetcher();
   });
 
   afterEach(() => {
     jest.useRealTimers();
     process.env.NODE_ENV = originalNodeEnv;
+    delete window.REACT_ON_RAILS_RSC_PAYLOADS;
+    resetRSCPrefetchStoreForTesting();
   });
 
   it('a. evicts least-recently-used keys once distinct keys exceed the cap', async () => {
@@ -1560,5 +1564,168 @@ describe('RSCRoute successful-version error reset', () => {
     await resolveLoad(retryReplacement, <span>replacement after rejection</span>);
 
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+  });
+
+  it('q. loader-time prefetched payload is adopted into each provider cache', async () => {
+    const key = createRSCPayloadKey('Card', { id: 123 });
+    setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
+
+    const firstRoot = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(firstRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+
+    const secondRoot = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(secondRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+
+    secondRoot.unmount();
+
+    await rerenderInAct(
+      firstRoot,
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(firstRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+  });
+
+  it('r. consumed prefetch entry is not re-adopted by the same provider after cache eviction', async () => {
+    const prefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: prefetchedId });
+    setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
+
+    const result = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('prefetched card'));
+    await flushMacrotasks();
+    expect(fetchCount(prefetchedId)).toBe(0);
+
+    for (let id = 0; id < CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await rerenderInAct(
+        result,
+        <TestHarness>
+          <RSCRoute componentName="Card" componentProps={{ id }} />
+        </TestHarness>,
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await waitFor(() =>
+        expect(screen.getByTestId('payload')).toHaveTextContent(`Card-${JSON.stringify({ id })}#1`),
+      );
+    }
+
+    await rerenderInAct(
+      result,
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('payload')).toHaveTextContent(
+        `Card-${JSON.stringify({ id: prefetchedId })}#1`,
+      ),
+    );
+    expect(fetchCount(prefetchedId)).toBe(1);
+  });
+
+  it('s. embedded payloads take precedence over stale loader-time prefetches', async () => {
+    const stalePrefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: stalePrefetchedId });
+    RSCProvider = createRSCProvider({ getServerComponent, domNodeId: 'rsc-root' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('Card', { id: stalePrefetchedId }, 'rsc-root')]: ['fresh embedded card'],
+    };
+    setPrefetchedServerComponent(
+      key,
+      Promise.resolve(<span data-testid="payload">stale prefetched card</span>),
+    );
+
+    const result = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: stalePrefetchedId }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() =>
+      expect(result.container).toHaveTextContent(`Card-${JSON.stringify({ id: stalePrefetchedId })}#1`),
+    );
+    expect(result.container).not.toHaveTextContent('stale prefetched card');
+    expect(fetchCount(stalePrefetchedId)).toBe(1);
+  });
+
+  it('t. embedded payload checks are scoped to the provider domNodeId when known', async () => {
+    const prefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: prefetchedId });
+    RSCProvider = createRSCProvider({ getServerComponent, domNodeId: 'root-b' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('Card', { id: prefetchedId }, 'root-a')]: ['other root embedded card'],
+    };
+    setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
+
+    const result = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(result.container).toHaveTextContent('prefetched card'));
+    expect(result.container).not.toHaveTextContent('other root embedded card');
+    expect(getServerComponent).not.toHaveBeenCalled();
+  });
+
+  it('u. embedded roots do not delete shared loader-time prefetches for sibling roots', async () => {
+    const prefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: prefetchedId });
+    const EmbeddedRootProvider = createRSCProvider({ getServerComponent, domNodeId: 'root-a' });
+    const PrefetchRootProvider = createRSCProvider({ getServerComponent, domNodeId: 'root-b' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('Card', { id: prefetchedId }, 'root-a')]: ['root-a embedded card'],
+    };
+    setPrefetchedServerComponent(
+      key,
+      Promise.resolve(<span data-testid="payload">shared prefetched card</span>),
+    );
+
+    const embeddedRoot = await renderInAct(
+      <EmbeddedRootProvider>
+        <Suspense fallback={<div data-testid="fallback">loading…</div>}>
+          <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+        </Suspense>
+      </EmbeddedRootProvider>,
+    );
+
+    await waitFor(() =>
+      expect(embeddedRoot.container).toHaveTextContent(`Card-${JSON.stringify({ id: prefetchedId })}#1`),
+    );
+    expect(embeddedRoot.container).not.toHaveTextContent('shared prefetched card');
+    expect(fetchCount(prefetchedId)).toBe(1);
+
+    const prefetchRoot = await renderInAct(
+      <PrefetchRootProvider>
+        <Suspense fallback={<div data-testid="fallback">loading…</div>}>
+          <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
+        </Suspense>
+      </PrefetchRootProvider>,
+    );
+
+    await waitFor(() => expect(prefetchRoot.container).toHaveTextContent('shared prefetched card'));
+    expect(fetchCount(prefetchedId)).toBe(1);
   });
 });

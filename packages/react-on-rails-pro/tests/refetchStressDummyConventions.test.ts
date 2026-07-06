@@ -34,6 +34,12 @@ describe('refetch stress dummy app conventions', () => {
       types: './lib/RSCRoute.d.ts',
       default: './lib/RSCRoute.js',
     });
+    expect(proPackageJson.exports['./prefetchServerComponent']).toEqual({
+      types: './lib/prefetchServerComponent.client.d.ts',
+      'react-server': './lib/prefetchServerComponent.server.js',
+      node: './lib/prefetchServerComponent.server.js',
+      default: './lib/prefetchServerComponent.client.js',
+    });
   });
 
   it('keeps client-only helpers behind .client.tsx file suffixes', () => {

@@ -84,7 +84,7 @@ const createFromFetch = async (
   {
     componentName,
     cspNonce,
-    replayConsoleScripts = true,
+    replayConsoleScripts = false,
     sourceDescription,
   }: {
     componentName: string;
@@ -415,6 +415,7 @@ const getReactServerComponent =
       componentProps,
       rscPayloadGenerationUrlPath: railsContext.rscPayloadGenerationUrlPath,
       cspNonce: railsContext.cspNonce,
+      replayConsoleScripts: true,
     });
   };
 

@@ -72,6 +72,15 @@ const setDocumentReadyState = (readyState: DocumentReadyState) => {
   });
 };
 
+const setRailsContextElement = (railsContext: Partial<RailsContext>) => {
+  document.getElementById('js-react-on-rails-context')?.remove();
+  const contextElement = document.createElement('script');
+  contextElement.id = 'js-react-on-rails-context';
+  contextElement.type = 'application/json';
+  contextElement.textContent = JSON.stringify(railsContext);
+  document.body.appendChild(contextElement);
+};
+
 describe('fetchRSC HTTP responses', () => {
   afterEach(() => {
     fetchMock.mockReset();
@@ -408,6 +417,351 @@ describe('fetchRSC HTTP responses', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('does not replay console scripts from fetched RSC payloads by default', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { fetchRSC } = await loadClientModule(createFromReadableStream);
+    fetchMock.mockResolvedValue(
+      createWebResponseFromText(
+        toLengthPrefixedRecord('payload', {
+          consoleReplayScript: '<script>console.log("replay")</script>',
+        }),
+      ),
+    );
+
+    await expect(
+      fetchRSC({
+        componentName: 'ConsolePanel',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+      }),
+    ).resolves.toBe('payload');
+
+    expect([...document.body.querySelectorAll('script')].map((script) => script.textContent)).not.toContain(
+      'console.log("replay")',
+    );
+  });
+
+  it('preserves console replay for normal client navigation fetches', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { default: getReactServerComponent } = await loadClientModule(createFromReadableStream);
+    fetchMock.mockResolvedValue(
+      createWebResponseFromText(
+        toLengthPrefixedRecord('payload', {
+          consoleReplayScript: '<script>console.log("navigation replay")</script>',
+        }),
+      ),
+    );
+
+    const getComponent = getReactServerComponent('dom-node-id', {
+      rscPayloadGenerationUrlPath: '/rsc_payload',
+      cspNonce: 'legacyNonce123',
+    } as RailsContext);
+
+    await expect(
+      getComponent({
+        componentName: 'ConsolePanel',
+        componentProps: {},
+      }),
+    ).resolves.toBe('payload');
+
+    const replayScript = [...document.body.querySelectorAll('script')].find(
+      (script) => script.textContent === 'console.log("navigation replay")',
+    );
+    expect(replayScript).toBeDefined();
+    expect(replayScript?.nonce).toBe('legacyNonce123');
+  });
+
+  it('still supports explicit console replay for legacy callers', async () => {
+    const createFromReadableStream = jest.fn((stream: ReadableStream<Uint8Array>) => readStreamText(stream));
+    const { fetchRSC } = await loadClientModule(createFromReadableStream);
+    fetchMock.mockResolvedValue(
+      createWebResponseFromText(
+        toLengthPrefixedRecord('payload', {
+          consoleReplayScript: '<script>console.log("replay")</script>',
+        }),
+      ),
+    );
+
+    await expect(
+      fetchRSC({
+        componentName: 'ConsolePanel',
+        componentProps: {},
+        rscPayloadGenerationUrlPath: '/rsc_payload',
+        cspNonce: 'legacyNonce123',
+        replayConsoleScripts: true,
+      }),
+    ).resolves.toBe('payload');
+
+    const replayScript = [...document.body.querySelectorAll('script')].find(
+      (script) => script.textContent === 'console.log("replay")',
+    );
+    expect(replayScript).toBeDefined();
+    expect(replayScript?.nonce).toBe('legacyNonce123');
+  });
+});
+
+describe('prefetchServerComponent client API', () => {
+  const loadPrefetchModule = async (
+    createFromReadableStream: jest.Mock = jest.fn(async () => 'decoded payload'),
+  ) => {
+    jest.resetModules();
+    jest.doMock('react-on-rails-rsc/client.browser', () => ({
+      createFromReadableStream,
+    }));
+
+    const prefetchModule = await import('../src/prefetchServerComponent.client.ts');
+    const prefetchStore = await import('../src/RSCPrefetchStore.ts');
+    const contextModule = await import('react-on-rails/context');
+    const utils = await import('../src/utils.ts');
+    return { createFromReadableStream, ...prefetchModule, ...prefetchStore, ...contextModule, ...utils };
+  };
+
+  afterEach(async () => {
+    delete window.REACT_ON_RAILS_RSC_PAYLOADS;
+    fetchMock.mockReset();
+    jest.dontMock('react-on-rails-rsc/client.browser');
+    const { resetRailsContext } = await import('react-on-rails/context');
+    resetRailsContext();
+    document.body.innerHTML = '';
+    jest.resetModules();
+  });
+
+  it('warms the shared prefetch store with a decoded payload promise', async () => {
+    const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
+      await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload', cspNonce: 'nonce123' });
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+        props: JSON.stringify(componentProps),
+      })}`,
+    );
+    await expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).resolves.toBe('decoded payload');
+  });
+
+  it('reuses an in-flight prefetch for repeated loader calls', async () => {
+    const { prefetchServerComponent } = await loadPrefetchModule();
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    const firstPrefetch = prefetchServerComponent('PrefetchedPanel', { id: 1 });
+    const secondPrefetch = prefetchServerComponent('PrefetchedPanel', { id: 1 });
+
+    await expect(Promise.all([firstPrefetch, secondPrefetch])).resolves.toEqual([undefined, undefined]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts a fresh warm request after a provider adopts a prefetch', async () => {
+    const {
+      consumePrefetchedServerComponent,
+      createRSCPayloadKey,
+      getReusablePrefetchedServerComponent,
+      prefetchServerComponent,
+      setPrefetchedServerComponent,
+    } = await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    const key = createRSCPayloadKey('PrefetchedPanel', componentProps);
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    setPrefetchedServerComponent(key, Promise.resolve('decoded payload'));
+
+    await expect(consumePrefetchedServerComponent(key, {})).resolves.toBe('decoded payload');
+
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('fresh payload')));
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
+  });
+
+  it('honors the current caller abort signal when reusing an in-flight prefetch', async () => {
+    const { prefetchServerComponent } = await loadPrefetchModule();
+    const abortController = new AbortController();
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockReturnValue(new Promise<Response>(() => {}));
+
+    void prefetchServerComponent('PrefetchedPanel', { id: 1 });
+    const reusedPrefetch = prefetchServerComponent(
+      'PrefetchedPanel',
+      { id: 1 },
+      { signal: abortController.signal },
+    );
+
+    abortController.abort();
+
+    await expect(reusedPrefetch).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let one caller abort cancel the shared in-flight prefetch', async () => {
+    const { prefetchServerComponent } = await loadPrefetchModule();
+    const abortController = new AbortController();
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    let resolveFetch!: (response: Response) => void;
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const abortedCaller = prefetchServerComponent('PrefetchedPanel', componentProps, {
+      signal: abortController.signal,
+    });
+    const joinedCaller = prefetchServerComponent('PrefetchedPanel', componentProps);
+
+    abortController.abort();
+
+    await expect(abortedCaller).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(joinedCaller).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fetch when an embedded SSR payload already exists', async () => {
+    const {
+      prefetchServerComponent,
+      getReusablePrefetchedServerComponent,
+      createEmbeddedPayloadKey,
+      createRSCPayloadKey,
+    } = await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps, 'dom-node-id')]: ['payload'],
+    };
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).toBeUndefined();
+  });
+
+  it('can warm the shared prefetch store when a sibling embedded SSR payload exists', async () => {
+    const {
+      prefetchServerComponent,
+      getReusablePrefetchedServerComponent,
+      createEmbeddedPayloadKey,
+      createRSCPayloadKey,
+    } = await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey('PrefetchedPanel', componentProps, 'sibling-root')]: ['payload'],
+    };
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('warm payload')));
+
+    await expect(
+      prefetchServerComponent('PrefetchedPanel', componentProps, { skipIfEmbedded: false }),
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
+    await expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).resolves.toBe('decoded payload');
+  });
+
+  it('resolves and self-evicts when the shared prefetch fetch rejects', async () => {
+    const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
+      await loadPrefetchModule();
+    const componentProps = { id: 1 };
+    const abortError = new DOMException('The operation was aborted.', 'AbortError');
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockRejectedValueOnce(abortError);
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/rsc_payload/PrefetchedPanel?${new URLSearchParams({
+        props: JSON.stringify(componentProps),
+      })}`,
+    );
+    expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).toBeUndefined();
+
+    fetchMock.mockResolvedValueOnce(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears the prefetch store on soft page unload', async () => {
+    jest.resetModules();
+    const { getReusablePrefetchedServerComponent, setPrefetchedServerComponent } = await import(
+      '../src/RSCPrefetchStore.ts'
+    );
+    const { createRSCPayloadKey } = await import('../src/utils.ts');
+    const key = createRSCPayloadKey('PrefetchedPanel', { id: 1 });
+
+    setPrefetchedServerComponent(key, Promise.resolve('decoded payload'));
+    expect(getReusablePrefetchedServerComponent(key)).toBeDefined();
+
+    document.dispatchEvent(new Event('turbo:before-render'));
+
+    expect(getReusablePrefetchedServerComponent(key)).toBeUndefined();
+  });
+
+  it('resolves and self-evicts when decoded payload creation fails', async () => {
+    const decodeError = new Error('decode boom');
+    const createFromReadableStream = jest.fn(() => {
+      const rejected = Promise.reject(decodeError);
+      void rejected.catch(() => {});
+      return rejected;
+    });
+    const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
+      await loadPrefetchModule(createFromReadableStream);
+    const componentProps = { id: 1 };
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(
+      getReusablePrefetchedServerComponent(createRSCPayloadKey('PrefetchedPanel', componentProps)),
+    ).toBeUndefined();
+  });
+
+  it('resolves and self-evicts when the decoded payload is an Error value', async () => {
+    const decodedError = new Error('server render boom');
+    const createFromReadableStream = jest
+      .fn()
+      .mockResolvedValueOnce(decodedError)
+      .mockResolvedValueOnce('decoded payload');
+    const { prefetchServerComponent, getReusablePrefetchedServerComponent, createRSCPayloadKey } =
+      await loadPrefetchModule(createFromReadableStream);
+    const componentProps = { id: 1 };
+    const key = createRSCPayloadKey('PrefetchedPanel', componentProps);
+    setRailsContextElement({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(getReusablePrefetchedServerComponent(key)).toBeUndefined();
+
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('retry payload')));
+
+    await expect(prefetchServerComponent('PrefetchedPanel', componentProps)).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(getReusablePrefetchedServerComponent(key)).resolves.toBe('decoded payload');
   });
 });
 

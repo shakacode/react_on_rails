@@ -118,6 +118,7 @@ const wrapServerComponentRenderer = (
 
     const RSCProvider = createRSCProvider({
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
+      domNodeId,
     });
 
     const shouldHydrate = !!domNode.innerHTML;
