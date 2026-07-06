@@ -5960,7 +5960,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(Dir.pwd)
           .and_return(
             [
-              JSON.generate("latest" => "19.0.5", "next" => "19.2.1-rc.0"),
+              JSON.generate("latest" => "19.0.5", "next" => "19.2.1-rc.1"),
               instance_double(Process::Status, success?: true)
             ]
           )
@@ -5970,7 +5970,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.1-rc.0",
+            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.1-rc.1",
             "React Server Components track React minor versions"
           )
         )

@@ -8499,7 +8499,7 @@ packages:
   react-dom@19.2.7:
     resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
     peerDependencies:
-      react: ~19.0.4
+      react: ^19.2.7
 
   react-error-boundary@4.1.2:
     resolution: {integrity: sha512-GQDxZ5Jd+Aq/qUxbCm1UtzmL/s++V7zKgE8yMktJiCQXCCFZnMZh9ng+6/Ne6PjNSXH0L9CjeOEREfRnq6Duag==}
@@ -8581,8 +8581,8 @@ packages:
     resolution: {integrity: sha512-bYfuvqPJnHB4CHo2Ze7fQyJAO77TUu1W/aKFt81ICXbLiOTg5jHaO/NPDlpvGWUALoEGaGb7Oi1uXAaO+Bw6jw==}
     engines: {node: '>=0.10.0'}
     peerDependencies:
-      react: ~19.0.4
-      react-dom: ~19.0.4
+      react: ^19.2.7
+      react-dom: ^19.2.7
       webpack: ^5.59.0
 
   react@18.3.1:
