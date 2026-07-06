@@ -60,6 +60,13 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain('19.2.1-rc.0');
   });
 
+  it('errors for future prereleases outside the coordinated RC floor tuple', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.2.2-alpha.0', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('19.2.2-alpha.0');
+    expect(r.message).toContain('19.2.1-rc.0');
+  });
+
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
     expect(
       checkRscPeerCompatibility({ rscVersion: `v${minimumVersion}`, reactVersion: '19.2.7' }).level,
@@ -87,10 +94,10 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors on future unlisted rsc minors before suggesting React changes', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.3.0-rc.1', reactVersion: '19.2.7' });
+    const r = checkRscPeerCompatibility({ rscVersion: '19.3.0', reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-on-rails-rsc');
-    expect(r.message).toContain('19.3.0-rc.1');
+    expect(r.message).toContain('19.3.0');
     expect(r.message).toContain('19.2.x');
   });
 

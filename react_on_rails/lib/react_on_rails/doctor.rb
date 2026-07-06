@@ -3814,8 +3814,10 @@ module ReactOnRails
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
       return false if rsc_version.blank?
-      return true if npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
+      return true if npm_prerelease(rsc_version).blank? &&
+                     npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
       return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
+      return false unless npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION)
 
       npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
     end

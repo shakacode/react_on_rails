@@ -154,7 +154,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   if (!rscVersion) return { level: 'ok' };
 
   const { reactOnRailsRsc, react } = RSC_PEER_SUPPORT;
-  const rscTuple = parseTuple(rscVersion);
+  const rscParsedVersion = parseVersion(rscVersion);
+  const rscTuple = rscParsedVersion.tuple;
   const [rscMajor] = rscTuple;
 
   if (rscMajor !== reactOnRailsRsc.supportedMajor) {
@@ -169,9 +170,15 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
-  const meetsStableFloor = isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumVersion);
+  const meetsStableFloor =
+    !rscParsedVersion.prerelease && isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumVersion);
+  const minimumPrereleaseTuple = reactOnRailsRsc.minimumPrereleaseVersion
+    ? parseTuple(reactOnRailsRsc.minimumPrereleaseVersion)
+    : null;
   const meetsPrereleaseFloor =
     reactOnRailsRsc.minimumPrereleaseVersion &&
+    minimumPrereleaseTuple &&
+    sameTuple(rscTuple, minimumPrereleaseTuple) &&
     isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumPrereleaseVersion);
 
   if (!meetsStableFloor && !meetsPrereleaseFloor) {
