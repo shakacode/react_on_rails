@@ -132,20 +132,35 @@ class PrMergeLedger
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
-      \b(?:not|never|still|cannot|can't|wont|won't)\b
-      .{0,80}
-      \b(?:fixed|addressed|resolved|working|passing)\b
+      \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+      (?:\s+\S+){0,3}\s+
+      \b(?:fixed|addressed|resolved|work(?:s|ed|ing)?|passing)\b
     )|
-    \b(?:regressed|regression|reopen)\b
+    (?:
+      \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
+      [\s\S]{0,80}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+    )|
+    (?:
+      \b(?:ci|build|job|workflow|checks?)\b
+      [\s\S]{0,80}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+    )|
+    \bregressed\b|
+    \bregression(?:s)?\b(?!\s+(?:test|tests|spec|specs|coverage|case|cases)\b)|
+    \breopen\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
     (?:fixed|addressed)\s+
     (?:in|by)\s+
     (?:(?:a|an|the)\s+)?
+    (?:(?:existing|follow[- ]?up|new|separate|tracking)\s+){0,3}
     (?:
       follow[- ]?up\b|
       issue\b|
+      \#\d+\b|
+      https?://\S*/(?:issues|pull)/\d+\b|
       not[- ]?applicable\b|
       n/a\b|
       pr\b|
@@ -156,6 +171,14 @@ class PrMergeLedger
       another\b
     )
   }ix
+  HEDGED_FIXED_DISPOSITION_REPLY_PATTERN = /
+    \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
+    \bwill\s+follow\s+up\b|
+    \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
+    \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
+    \bneeds?\s+(?:a\s+)?(?:follow[- ]?up|revisit)\b|
+    \bmight\s+need\b
+  /ix
 
   class Error < StandardError; end
 
@@ -1042,17 +1065,47 @@ class PrMergeLedger
   def inferred_dispositions_by_comment_id(thread, comments)
     return {} unless thread.fetch("is_resolved")
 
-    comments
-      .select { |comment| comment["reply_to_id"] && comment.fetch("current_head") && !comment.fetch("outdated") }
-      .sort_by { |comment| timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at") }
-      .each_with_object({}) do |reply, inferred|
-        update_inferred_dispositions_from_reply(inferred, reply)
-      end
+    root_comment_ids = root_comment_ids_by_comment_id(comments)
+    replies = comments
+              .select do |comment|
+                comment["reply_to_id"] && comment.fetch("current_head") && !comment.fetch("outdated")
+              end
+    sorted_reply_pairs = replies.each_with_index.to_a.sort_by do |comment, index|
+      [timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at"), index]
+    end
+    sorted_replies = sorted_reply_pairs.map(&:first)
+
+    sorted_replies.each_with_object({}) do |reply, inferred|
+      reply_to_id = reply.fetch("reply_to_id")
+      root_reply_to_id = root_comment_ids.fetch(reply_to_id, reply_to_id)
+      update_inferred_dispositions_from_reply(inferred, reply, root_reply_to_id)
+    end
   end
 
-  def update_inferred_dispositions_from_reply(inferred, reply)
+  def root_comment_ids_by_comment_id(comments)
+    reply_to_by_id = comments.to_h { |comment| [comment.fetch("id"), comment["reply_to_id"]] }
+
+    comments.each_with_object({}) do |comment, roots|
+      roots[comment.fetch("id")] = root_comment_id(comment.fetch("id"), reply_to_by_id)
+    end
+  end
+
+  def root_comment_id(comment_id, reply_to_by_id)
+    seen_ids = {}
+    current_id = comment_id
+
+    while (parent_id = reply_to_by_id[current_id])
+      break if seen_ids[parent_id]
+
+      seen_ids[current_id] = true
+      current_id = parent_id
+    end
+
+    current_id
+  end
+
+  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id)
     disposition = inferred_disposition_from_reply(reply)
-    reply_to_id = reply.fetch("reply_to_id")
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_inferred_disposition_reply?(reply)
@@ -1063,8 +1116,7 @@ class PrMergeLedger
   def inferred_disposition_from_reply(reply)
     body = reply.fetch("body").to_s
     normalized_body = body.lstrip
-    return nil if normalized_body.include?("?")
-    return nil if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return nil if clear_inferred_disposition_reply?(reply)
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     {
@@ -1076,9 +1128,28 @@ class PrMergeLedger
   def clear_inferred_disposition_reply?(reply)
     normalized_body = reply.fetch("body").to_s.lstrip
     return true if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
-    return true if normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN) && normalized_body.include?("?")
+    return true if hedged_fixed_disposition_reply?(normalized_body)
+    return true if ambiguous_fixed_disposition_reply?(normalized_body)
 
-    normalized_body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
+    contradicted_disposition_reply?(normalized_body)
+  end
+
+  def contradicted_disposition_reply?(normalized_body)
+    body = normalized_body.gsub(/\bno\s+(?:new\s+|known\s+)?regressions?\b/i, "")
+
+    body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
+  end
+
+  def hedged_fixed_disposition_reply?(normalized_body)
+    normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN) &&
+      normalized_body.match?(HEDGED_FIXED_DISPOSITION_REPLY_PATTERN)
+  end
+
+  def ambiguous_fixed_disposition_reply?(normalized_body)
+    sentence_boundary = normalized_body.match(/[!\r\n]|\.(?=\s+[A-Z]|\s*\z)/)
+    first_sentence = sentence_boundary ? normalized_body[0...sentence_boundary.begin(0)] : normalized_body
+    first_sentence_without_urls = first_sentence.gsub(%r{https?://\S+}, "")
+    first_sentence.match?(FIXED_DISPOSITION_REPLY_PATTERN) && first_sentence_without_urls.include?("?")
   end
 
   def inferred_disposition_for(finding, context, disposition)

@@ -2504,7 +2504,9 @@ RSpec.describe "script/pr-merge-ledger" do
             {
               "id" => "reply-comment",
               "url" => "https://example.com/reply-comment",
-              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts. " \
+              "body" => "Addressed by current head `current`. Added a regression test. " \
+                        "CI is still passing. " \
+                        "Validation: pnpm test -- colors.test.ts. " \
                         "#{long_validation_tail}",
               "author" => { "login" => "justin808" },
               "createdAt" => "2026-06-01T00:05:00Z",
@@ -2555,6 +2557,152 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "infers fixed dispositions from direct replies that report no regressions" do
+    [
+      "Fixed in current head `current`. No regression observed on Windows. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Addressed by current head `current`. No regressions found in manual testing. " \
+      "Validation: pnpm test -- colors.test.ts."
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "reply-comment",
+                "url" => "https://example.com/reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "justin808" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
+
+      Tempfile.create(["pr-merge-ledger-no-regression-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+        expect(report.fetch("complete_allowed")).to be(true)
+        expect(finding).to include(
+          "id" => "finding-comment",
+          "severity" => "P2",
+          "disposition" => "fixed"
+        )
+      end
+    end
+  end
+
+  it "infers fixed dispositions from direct replies that mention separate validation" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Verified separately in the dummy app. " \
+                        "Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-separate-validation-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+    end
+  end
+
   it "does not infer fixed dispositions from ambiguous direct replies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2582,7 +2730,7 @@ RSpec.describe "script/pr-merge-ledger" do
             {
               "id" => "reply-comment",
               "url" => "https://example.com/reply-comment",
-              "body" => "\nFixed in current head? I still see this failing.",
+              "body" => "\nFixed in v1.2, right?",
               "author" => { "login" => "reviewer" },
               "createdAt" => "2026-06-01T00:05:00Z",
               "outdated" => false,
@@ -2627,6 +2775,148 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "infers fixed dispositions when later validation text contains question marks" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Validation: see https://example.com/ci?run=1. " \
+                        "Should CI be green now?",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-fixed-reply-question-in-validation", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+      expect(finding.fetch("evidence")).to include("https://example.com/ci?run=1")
+    end
+  end
+
+  it "infers fixed dispositions when first-sentence links include query params" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Addressed by current head `current`, see https://example.com/diff?w=1 for the diff. " \
+                        "Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-fixed-reply-url-query", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+      expect(finding.fetch("evidence")).to include("https://example.com/diff?w=1")
+    end
+  end
+
   it "clears inferred fixed dispositions after later ambiguous direct replies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -2664,7 +2954,7 @@ RSpec.describe "script/pr-merge-ledger" do
             {
               "id" => "ambiguous-reply-comment",
               "url" => "https://example.com/ambiguous-reply-comment",
-              "body" => "Fixed in current head `current`.\n\nCan you confirm the lint result?",
+              "body" => "Fixed in current head `current`? Can you confirm the lint result?",
               "author" => { "login" => "justin808" },
               "createdAt" => "2026-06-01T00:10:00Z",
               "outdated" => false,
@@ -2707,6 +2997,165 @@ RSpec.describe "script/pr-merge-ledger" do
         "unknown_priority_finding_disposition"
       )
     end
+  end
+
+  it "does not infer fixed dispositions from contradicted fixed direct replies" do
+    [
+      "Fixed in current head, but not fixed on Windows.",
+      "Fixed in current head `current`. CI is red.",
+      "Addressed by abc123, though the build is broken."
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "reply-comment",
+                "url" => "https://example.com/reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "justin808" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
+
+      Tempfile.create(["pr-merge-ledger-contradicted-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
+
+        stdout, _stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).not_to be_success
+
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+        expect(report.fetch("complete_allowed")).to be(false)
+        expect(finding).to include(
+          "id" => "finding-comment",
+          "severity" => "P2",
+          "disposition" => "UNKNOWN"
+        )
+        expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+          "unknown_priority_finding_disposition"
+        )
+      end
+    end
+  end
+
+  it "uses API order to break tied direct reply timestamps" do
+    finding_comment = {
+      "id" => "finding-comment",
+      "url" => "https://example.com/finding-comment",
+      "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+      "author" => { "login" => "reviewer" },
+      "createdAt" => "2026-06-01T00:00:00Z",
+      "outdated" => false,
+      "commit" => { "oid" => "current" }
+    }
+    fixed_reply = {
+      "id" => "fixed-reply-comment",
+      "url" => "https://example.com/fixed-reply-comment",
+      "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+      "author" => { "login" => "justin808" },
+      "createdAt" => "2026-06-01T00:05:00Z",
+      "outdated" => false,
+      "replyTo" => { "id" => "finding-comment" },
+      "commit" => { "oid" => "current" }
+    }
+    regressed_reply = {
+      "id" => "regressed-reply-comment",
+      "url" => "https://example.com/regressed-reply-comment",
+      "body" => "Actually this regressed, please reopen.",
+      "author" => { "login" => "reviewer" },
+      "createdAt" => "2026-06-01T00:05:00Z",
+      "outdated" => false,
+      "replyTo" => { "id" => "finding-comment" },
+      "commit" => { "oid" => "current" }
+    }
+
+    run_fixture = lambda do |reply_comments|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [finding_comment, *reply_comments]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
+
+      Tempfile.create(["pr-merge-ledger-tied-fixed-replies", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
+
+        stdout, _stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+
+        [JSON.parse(stdout), status]
+      end
+    end
+
+    report, status = run_fixture.call([fixed_reply, regressed_reply])
+    finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+    expect(status).not_to be_success
+    expect(finding).to include("disposition" => "UNKNOWN")
+
+    report, status = run_fixture.call([regressed_reply, fixed_reply])
+    finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+    expect(status).to be_success
+    expect(finding).to include("disposition" => "fixed")
   end
 
   it "clears inferred fixed dispositions after later contradictory direct replies" do
@@ -2791,7 +3240,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "preserves inferred fixed dispositions after later unrelated direct replies" do
+  it "clears inferred fixed dispositions after later still-failing direct replies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -2826,9 +3275,9 @@ RSpec.describe "script/pr-merge-ledger" do
               "commit" => { "oid" => "current" }
             },
             {
-              "id" => "thanks-reply-comment",
-              "url" => "https://example.com/thanks-reply-comment",
-              "body" => "Thanks, that looks good.",
+              "id" => "still-failing-reply-comment",
+              "url" => "https://example.com/still-failing-reply-comment",
+              "body" => "I still see this\nfailing on CI.",
               "author" => { "login" => "reviewer" },
               "createdAt" => "2026-06-01T00:10:00Z",
               "outdated" => false,
@@ -2842,11 +3291,11 @@ RSpec.describe "script/pr-merge-ledger" do
       "comments" => []
     }
 
-    Tempfile.create(["pr-merge-ledger-later-unrelated-fixed-reply", ".json"]) do |file|
+    Tempfile.create(["pr-merge-ledger-later-still-failing-fixed-reply", ".json"]) do |file|
       write_fixture(file, fixture)
       file.flush
 
-      stdout, stderr, status = Open3.capture3(
+      stdout, _stderr, status = Open3.capture3(
         script_path,
         "--fixture",
         file.path,
@@ -2856,18 +3305,275 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
-      expect(status).to be_success, stderr
+      expect(status).not_to be_success
 
       report = JSON.parse(stdout)
       finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
 
-      expect(report.fetch("complete_allowed")).to be(true)
+      expect(report.fetch("complete_allowed")).to be(false)
       expect(finding).to include(
         "id" => "finding-comment",
         "severity" => "P2",
-        "disposition" => "fixed"
+        "disposition" => "UNKNOWN"
       )
-      expect(finding.fetch("evidence")).to include("https://example.com/fixed-reply-comment")
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "clears inferred fixed dispositions after later does-not-work direct replies" do
+    [
+      "This doesn't work on Windows.",
+      "This no longer works on Windows.",
+      "CI is no longer passing on Windows."
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "fixed-reply-comment",
+                "url" => "https://example.com/fixed-reply-comment",
+                "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+                "author" => { "login" => "justin808" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "does-not-work-reply-comment",
+                "url" => "https://example.com/does-not-work-reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:10:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
+
+      Tempfile.create(["pr-merge-ledger-later-does-not-work-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
+
+        stdout, _stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).not_to be_success
+
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+        expect(report.fetch("complete_allowed")).to be(false)
+        expect(finding).to include(
+          "id" => "finding-comment",
+          "severity" => "P2",
+          "disposition" => "UNKNOWN"
+        )
+        expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+          "unknown_priority_finding_disposition"
+        )
+      end
+    end
+  end
+
+  it "clears inferred fixed dispositions after later nested contradictory replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "fixed-reply-comment",
+              "url" => "https://example.com/fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-regression-reply-comment",
+              "url" => "https://example.com/nested-regression-reply-comment",
+              "body" => "Actually this regressed on Windows.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "fixed-reply-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-later-nested-contradictory-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "preserves inferred fixed dispositions after later unrelated direct replies" do
+    [
+      "Thanks, that looks good.",
+      "Not a big deal, but fixed it in the latest commit."
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "fixed-reply-comment",
+                "url" => "https://example.com/fixed-reply-comment",
+                "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+                "author" => { "login" => "justin808" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "thanks-reply-comment",
+                "url" => "https://example.com/thanks-reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:10:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
+
+      Tempfile.create(["pr-merge-ledger-later-unrelated-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+        expect(report.fetch("complete_allowed")).to be(true)
+        expect(finding).to include(
+          "id" => "finding-comment",
+          "severity" => "P2",
+          "disposition" => "fixed"
+        )
+        expect(finding.fetch("evidence")).to include("https://example.com/fixed-reply-comment")
+      end
     end
   end
 
@@ -2944,74 +3650,87 @@ RSpec.describe "script/pr-merge-ledger" do
   end
 
   it "does not infer fixed dispositions from follow-up direct replies" do
-    fixture = {
-      "repository" => "shakacode/react_on_rails",
-      "pull_request" => {
-        "number" => 8,
-        "headRefOid" => "current",
-        "reviewDecision" => "APPROVED"
-      },
-      "files" => [],
-      "review_threads" => [
-        {
-          "id" => "resolved-current-thread",
-          "isResolved" => true,
-          "isOutdated" => false,
-          "comments" => [
-            {
-              "id" => "finding-comment",
-              "url" => "https://example.com/finding-comment",
-              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
-              "author" => { "login" => "reviewer" },
-              "createdAt" => "2026-06-01T00:00:00Z",
-              "outdated" => false,
-              "commit" => { "oid" => "current" }
-            },
-            {
-              "id" => "reply-comment",
-              "url" => "https://example.com/reply-comment",
-              "body" => "Addressed in a follow-up issue #123.",
-              "author" => { "login" => "justin808" },
-              "createdAt" => "2026-06-01T00:05:00Z",
-              "outdated" => false,
-              "replyTo" => { "id" => "finding-comment" },
-              "commit" => { "oid" => "current" }
-            }
-          ]
-        }
-      ],
-      "reviews" => [],
-      "comments" => []
-    }
+    [
+      "Addressed in a follow-up issue #123.",
+      "Addressed by #123.",
+      "Fixed by https://github.com/shakacode/react_on_rails/issues/123.",
+      "Addressed by tracking issue https://github.com/shakacode/react_on_rails/issues/123.",
+      "Addressed by https://github.com/shakacode/react_on_rails/pull/123.",
+      "Fixed in part, will follow up separately.",
+      "Fixed in general but there is a follow-up needed.",
+      "Fixed in a hacky way, might need revisit later on."
+    ].each do |reply_body|
+      fixture = {
+        "repository" => "shakacode/react_on_rails",
+        "pull_request" => {
+          "number" => 8,
+          "headRefOid" => "current",
+          "reviewDecision" => "APPROVED"
+        },
+        "files" => [],
+        "review_threads" => [
+          {
+            "id" => "resolved-current-thread",
+            "isResolved" => true,
+            "isOutdated" => false,
+            "comments" => [
+              {
+                "id" => "finding-comment",
+                "url" => "https://example.com/finding-comment",
+                "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+                "author" => { "login" => "reviewer" },
+                "createdAt" => "2026-06-01T00:00:00Z",
+                "outdated" => false,
+                "commit" => { "oid" => "current" }
+              },
+              {
+                "id" => "reply-comment",
+                "url" => "https://example.com/reply-comment",
+                "body" => reply_body,
+                "author" => { "login" => "justin808" },
+                "createdAt" => "2026-06-01T00:05:00Z",
+                "outdated" => false,
+                "replyTo" => { "id" => "finding-comment" },
+                "commit" => { "oid" => "current" }
+              }
+            ]
+          }
+        ],
+        "reviews" => [],
+        "comments" => []
+      }
 
-    Tempfile.create(["pr-merge-ledger-follow-up-fixed-reply", ".json"]) do |file|
-      write_fixture(file, fixture)
-      file.flush
+      Tempfile.create(["pr-merge-ledger-follow-up-fixed-reply", ".json"]) do |file|
+        write_fixture(file, fixture)
+        file.flush
 
-      stdout, _stderr, status = Open3.capture3(
-        script_path,
-        "--fixture",
-        file.path,
-        "--changelog-classification",
-        "not_user_visible",
-        "--strict",
-        chdir: repo_root
-      )
+        stdout, _stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--strict",
+          chdir: repo_root
+        )
 
-      expect(status).not_to be_success
+        expect(status).not_to be_success
 
-      report = JSON.parse(stdout)
-      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+        report = JSON.parse(stdout)
+        finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
 
-      expect(report.fetch("complete_allowed")).to be(false)
-      expect(finding).to include(
-        "id" => "finding-comment",
-        "severity" => "P2",
-        "disposition" => "UNKNOWN"
-      )
-      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_priority_finding_disposition"
-      )
+        aggregate_failures(reply_body) do
+          expect(report.fetch("complete_allowed")).to be(false)
+          expect(finding).to include(
+            "id" => "finding-comment",
+            "severity" => "P2",
+            "disposition" => "UNKNOWN"
+          )
+          expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+            "unknown_priority_finding_disposition"
+          )
+        end
+      end
     end
   end
 
