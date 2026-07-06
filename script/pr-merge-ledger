@@ -131,9 +131,12 @@ class PrMergeLedger
   }ix
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
-    \b(?:not|never|still|cannot|can't|wont|won't)\b
-    .{0,80}
-    \b(?:fixed|addressed|resolved|working|passing)\b
+    (?:
+      \b(?:not|never|still|cannot|can't|wont|won't)\b
+      .{0,80}
+      \b(?:fixed|addressed|resolved|working|passing)\b
+    )|
+    \b(?:regressed|regression|reopen)\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
