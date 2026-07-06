@@ -105,6 +105,14 @@ const supportedRscRange = (
   return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
 };
 
+const rscFloorRange = ({
+  minimumVersion,
+  minimumPrereleaseVersion,
+}: typeof RSC_PEER_SUPPORT.reactOnRailsRsc) =>
+  minimumPrereleaseVersion
+    ? `>= ${minimumVersion} (or ${minimumPrereleaseVersion} during the RC soak)`
+    : `>= ${minimumVersion}`;
+
 const supportedReactRange = (
   rscTuple: VersionTuple,
   { supportedMajor, supportedRanges }: typeof RSC_PEER_SUPPORT.react,
@@ -184,12 +192,7 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   if (!meetsStableFloor && !meetsPrereleaseFloor) {
     return {
       level: 'error',
-      message: errorMessage(
-        'react-on-rails-rsc',
-        rscVersion,
-        `>= ${reactOnRailsRsc.minimumVersion} (or ${reactOnRailsRsc.minimumPrereleaseVersion} during the RC soak)`,
-        proVersion,
-      ),
+      message: errorMessage('react-on-rails-rsc', rscVersion, rscFloorRange(reactOnRailsRsc), proVersion),
     };
   }
 

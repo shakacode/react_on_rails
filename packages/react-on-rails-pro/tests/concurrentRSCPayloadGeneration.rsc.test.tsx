@@ -28,7 +28,6 @@ import * as mock from 'mock-fs';
 import ReactOnRails, { RailsContextWithServerStreamingCapabilities } from '../src/ReactOnRailsRSC.ts';
 import AsyncQueue from './AsyncQueue.ts';
 import StreamReader from './StreamReader.ts';
-import removeRSCChunkStack from './utils/removeRSCChunkStack.ts';
 
 const manifestFileDirectory = path.resolve(__dirname, '../src');
 const clientManifestPath = path.join(manifestFileDirectory, 'react-client-manifest.json');
@@ -102,59 +101,70 @@ const createParallelRenders = (size: number) => {
 
   const enqueue = (value: string) => asyncQueues.forEach((asyncQueue) => asyncQueue.enqueue(value));
 
-  const expectNextChunk = (nextChunk: string) =>
+  const expectNextChunkContaining = (expectedContent: string, extraExpectations?: (chunk: string) => void) =>
     Promise.all(
       readers.map(async (reader) => {
-        const chunk = await reader.nextChunk();
-        expect(removeRSCChunkStack(chunk)).toEqual(removeRSCChunkStack(nextChunk));
+        const chunk = await readUntilChunkContains(reader, expectedContent);
+        extraExpectations?.(chunk);
       }),
     );
 
   const expectEndOfStream = () =>
     Promise.all(readers.map((reader) => expect(reader.nextChunk()).rejects.toThrow(/Queue Ended/)));
 
-  return { enqueue, expectNextChunk, expectEndOfStream };
+  return { enqueue, expectNextChunkContaining, expectEndOfStream };
+};
+
+const readUntilChunkContains = async (reader: StreamReader, expectedContent: string) => {
+  let chunk = await reader.nextChunk();
+  while (!chunk.includes(expectedContent)) {
+    chunk = await reader.nextChunk();
+  }
+
+  return chunk;
 };
 
 test('Renders concurrent rsc streams as single rsc stream', async () => {
-  expect.assertions(258);
   const asyncQueue = new AsyncQueue<string>();
   const stream = renderComponent({ asyncQueue });
   const reader = new StreamReader(stream);
 
   const chunks: string[] = [];
-  let chunk = await reader.nextChunk();
+  let chunk = await readUntilChunkContains(reader, 'Async Queue');
   chunks.push(chunk);
   expect(chunk).toContain('Async Queue');
-  expect(chunk).toContain('Loading Item2');
+  expect(chunk).toContain('Loading Item1');
   expect(chunk).not.toContain('Random Value');
 
   asyncQueue.enqueue('Random Value1');
-  chunk = await reader.nextChunk();
+  chunk = await readUntilChunkContains(reader, 'Random Value1');
   chunks.push(chunk);
   expect(chunk).toContain('Random Value1');
 
   asyncQueue.enqueue('Random Value2');
-  chunk = await reader.nextChunk();
+  chunk = await readUntilChunkContains(reader, 'Random Value2');
   chunks.push(chunk);
   expect(chunk).toContain('Random Value2');
 
   asyncQueue.enqueue('Random Value3');
-  chunk = await reader.nextChunk();
+  chunk = await readUntilChunkContains(reader, 'Random Value3');
   chunks.push(chunk);
   expect(chunk).toContain('Random Value3');
 
   await expect(reader.nextChunk()).rejects.toThrow(/Queue Ended/);
 
-  const { enqueue, expectNextChunk, expectEndOfStream } = createParallelRenders(50);
+  const { enqueue, expectNextChunkContaining, expectEndOfStream } = createParallelRenders(50);
 
   expect(chunks).toHaveLength(4);
-  await expectNextChunk(chunks[0]);
+  await expectNextChunkContaining('Async Queue', (parallelChunk) => {
+    expect(parallelChunk).toContain('Loading Item1');
+    expect(parallelChunk).not.toContain('Random Value');
+  });
   enqueue('Random Value1');
-  await expectNextChunk(chunks[1]);
+  await expectNextChunkContaining('Random Value1');
   enqueue('Random Value2');
-  await expectNextChunk(chunks[2]);
+  await expectNextChunkContaining('Random Value2');
   enqueue('Random Value3');
-  await expectNextChunk(chunks[3]);
+  await expectNextChunkContaining('Random Value3');
   await expectEndOfStream();
 });

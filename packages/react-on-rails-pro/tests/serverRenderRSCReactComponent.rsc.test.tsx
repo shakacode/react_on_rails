@@ -196,7 +196,7 @@ test('no logs lekage from outside the component', async () => {
   expect(content1).not.toContain('Outside The Component');
 });
 
-test('[bug] catches logs outside the component during reading the stream', async () => {
+test('does not leak logs from outside the component while reading the stream', async () => {
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
       reactClientManifestFileName: 'react-client-manifest.json',
@@ -229,8 +229,7 @@ test('[bug] catches logs outside the component during reading the stream', async
 
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
-  // Here's the bug
-  expect(content1).toContain('Outside The Component');
+  expect(content1).not.toContain('Outside The Component');
 });
 
 test('explains likely missing use client directive when a server component calls a client hook', async () => {

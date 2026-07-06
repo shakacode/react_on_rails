@@ -17,6 +17,11 @@ import { checkRscPeerCompatibility } from '../src/shared/checkRscPeerCompatibili
 import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
 
 const { minimumVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
+type MutableRscSupport = {
+  minimumVersion: string;
+  minimumPrereleaseVersion?: string;
+  supportedMajor: number;
+};
 
 const versionBelowMinimumVersion = (version: string) => {
   const [major, minor, patch] = version.split('.').map(Number);
@@ -43,6 +48,23 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.level).toBe('error');
     expect(r.message).toContain('react-on-rails-rsc');
     expect(r.message).toContain(`>= ${minimumVersion}`);
+  });
+
+  it('omits the RC soak clause when no prerelease floor is configured', () => {
+    const rscSupport = RSC_PEER_SUPPORT.reactOnRailsRsc as MutableRscSupport;
+    const originalMinimumPrereleaseVersion = rscSupport.minimumPrereleaseVersion;
+
+    try {
+      rscSupport.minimumPrereleaseVersion = undefined;
+      const r = checkRscPeerCompatibility({ rscVersion: belowMinimumVersion, reactVersion: '19.2.7' });
+
+      expect(r.level).toBe('error');
+      expect(r.message).toContain(`>= ${minimumVersion}`);
+      expect(r.message).not.toContain('during the RC soak');
+      expect(r.message).not.toContain('undefined');
+    } finally {
+      rscSupport.minimumPrereleaseVersion = originalMinimumPrereleaseVersion;
+    }
   });
 
   it('returns ok for the coordinated RC floor prerelease', () => {

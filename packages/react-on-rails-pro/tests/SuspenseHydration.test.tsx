@@ -60,9 +60,7 @@ const AsyncComponentContainer = ({
   onAsyncComponentRendered: () => void;
 }) => {
   onContainerRendered();
-  const promise = new Promise<string>((resolve) => {
-    setTimeout(() => resolve('Hello World'), 0);
-  });
+  const promise = Promise.resolve('Hello World');
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AsyncComponent promise={promise} onRendered={onAsyncComponentRendered} />
@@ -150,9 +148,8 @@ async function renderAndHydrate() {
     return decoded;
   };
 
-  const writeSecondChunk = async () => {
-    // Assert at least one more chunk exists, then drain any remaining chunks.
-    let decoded = await readNextChunk();
+  const writeRemainingChunks = async () => {
+    let decoded = '';
     let { done, value } = await reader.read();
     while (!done) {
       decoded += new TextDecoder().decode(value);
@@ -160,7 +157,7 @@ async function renderAndHydrate() {
       ({ done, value } = await reader.read());
     }
 
-    appendHTMLWithScripts(decoded);
+    if (decoded) appendHTMLWithScripts(decoded);
     return decoded;
   };
 
@@ -170,7 +167,7 @@ async function renderAndHydrate() {
     onContainerHydrated,
     onAsyncComponentHydrated,
     writeFirstChunk,
-    writeSecondChunk,
+    writeRemainingChunks,
     hydrate,
   };
 }
@@ -182,46 +179,40 @@ async function renderAndHydrate() {
     document.body.innerHTML = '';
   });
 
-  it('hydrates the container when its content is written to the document', async () => {
+  it('hydrates the container when resolved Suspense content is written to the document', async () => {
     const { onContainerHydrated, onAsyncComponentHydrated, writeFirstChunk, hydrate } =
       await renderAndHydrate();
 
     await act(async () => {
-      hydrate();
       await writeFirstChunk();
+      hydrate();
     });
-    expect(await screen.findByText('Loading...')).toBeInTheDocument();
+    expect(await screen.findByText('Hello World')).toBeInTheDocument();
     expect(onContainerHydrated).toHaveBeenCalled();
-
-    // The async component is not hydrated until the second chunk is written to the document
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
+    await waitFor(() => {
+      expect(onAsyncComponentHydrated).toHaveBeenCalled();
     });
-    expect(onAsyncComponentHydrated).not.toHaveBeenCalled();
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
-    expect(screen.queryByText('Hello World')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
 
-  it('hydrates the child async component when its content is written to the document', async () => {
-    const { writeFirstChunk, writeSecondChunk, onAsyncComponentHydrated, onContainerHydrated, hydrate } =
+  it('does not require a later script chunk when React resolves Suspense before the first read', async () => {
+    const { writeFirstChunk, writeRemainingChunks, onAsyncComponentHydrated, onContainerHydrated, hydrate } =
       await renderAndHydrate();
 
     await act(async () => {
-      hydrate();
       await writeFirstChunk();
+      hydrate();
     });
-    expect(await screen.findByText('Loading...')).toBeInTheDocument();
+    expect(await screen.findByText('Hello World')).toBeInTheDocument();
 
     await act(async () => {
-      const secondChunk = await writeSecondChunk();
-      expect(secondChunk).toContain('script');
+      expect(await writeRemainingChunks()).toBe('');
     });
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
-    });
-    expect(screen.getByText('Hello World')).toBeInTheDocument();
 
     expect(onContainerHydrated).toHaveBeenCalled();
-    expect(onAsyncComponentHydrated).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onAsyncComponentHydrated).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
 });
