@@ -13,7 +13,7 @@ overrides:
   react_on_rails>react-dom: ^19.2.0
   react_on_rails_pro_dummy>react: ^19.2.7
   react_on_rails_pro_dummy>react-dom: ^19.2.7
-  react_on_rails_pro_dummy>react-on-rails-rsc: 19.2.0
+  react_on_rails_pro_dummy>react-on-rails-rsc: 19.2.1-rc.0
   sentry-testkit>body-parser: npm:empty-npm-package@1.0.0
   sentry-testkit>express: npm:empty-npm-package@1.0.0
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23 <5'
@@ -750,8 +750,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: 19.2.0
-        version: 19.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(webpack@5.104.1)
+        specifier: 19.2.1-rc.0
+        version: 19.2.1-rc.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(webpack@5.104.1)
       react-proptypes:
         specifier: ^1.0.0
         version: 1.0.0
@@ -8528,8 +8528,8 @@ packages:
       react-dom: ~19.0.4
       webpack: ^5.59.0
 
-  react-on-rails-rsc@19.2.0:
-    resolution: {integrity: sha512-4PlfNFWGHl029al/yi10G3fcREbTwzqQ45uqYs6i9Baqds2OROyWp1xdorfX4Ok46IVJjje14SeaJVyN8pGDGg==}
+  react-on-rails-rsc@19.2.1-rc.0:
+    resolution: {integrity: sha512-lWUQloOMYS2/Jio7M9pKaY84+gNJ1ZD2pMTj37HDZtf6GsJjb0CJfJlizvxbquUdMQawX+1h59c63syFZ7AWmQ==}
     peerDependencies:
       react: ~19.0.4
       react-dom: ~19.0.4
@@ -19254,7 +19254,7 @@ snapshots:
       webpack: 5.105.2(@swc/core@1.15.3)
       webpack-sources: 3.3.3
 
-  react-on-rails-rsc@19.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(webpack@5.104.1):
+  react-on-rails-rsc@19.2.1-rc.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(webpack@5.104.1):
     dependencies:
       acorn-loose: 8.5.2
       neo-async: 2.6.2
