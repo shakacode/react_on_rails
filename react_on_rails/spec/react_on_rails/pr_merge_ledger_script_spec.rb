@@ -132,9 +132,25 @@ RSpec.describe "script/pr-merge-ledger" do
   end
 
   def write_fixture(file, fixture, binary: false)
+    fixture = with_default_fixture_review_reply_author_associations(fixture)
     fixture = fixture.merge(default_ci_readiness) if fixture_needs_default_ci_readiness?(fixture)
     json = JSON.generate(fixture)
     file.write(binary ? json.b : json)
+  end
+
+  def with_default_fixture_review_reply_author_associations(fixture)
+    return fixture unless fixture.is_a?(Hash)
+
+    fixture.fetch("review_threads", []).each do |thread|
+      Array(thread["comments"]).each do |comment|
+        next unless comment.is_a?(Hash)
+        next unless comment.key?("replyTo")
+        next if comment.key?("authorAssociation")
+
+        comment["authorAssociation"] = "MEMBER"
+      end
+    end
+    fixture
   end
 
   def fixture_needs_default_ci_readiness?(fixture)
@@ -2631,6 +2647,79 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not infer fixed dispositions from direct replies with missing author associations" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "authorAssociation" => nil,
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-missing-author-association-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
   it "does not infer fixed dispositions from same-author direct replies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -3829,7 +3918,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head as a stopgap.",
       "Fixed in current head `current`. I believe this should work.",
       "Addressed by current head `current`. Probably fixed now.",
-      "Fixed in current head `current`. I haven't tested it yet."
+      "Fixed in current head `current`. I haven't tested it yet.",
+      "Fixed in current head `current`. I haven't had a chance to test it yet."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",

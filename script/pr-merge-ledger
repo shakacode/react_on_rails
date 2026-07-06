@@ -181,7 +181,7 @@ class PrMergeLedger
     \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
     \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
     \b(?:i\s+(?:think|believe)|probably|should\s+be|not\s+(?:100%\s+)?sure|untested|unverified)\b|
-    \b(?:haven't|have\s+not)\s+(?:tested|verified|confirmed)\b|
+    \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
     \bwill\s+follow\s+up\b|
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
     \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
@@ -1202,7 +1202,6 @@ class PrMergeLedger
     return false if same_author_disposition_reply?(reply, root_comment)
 
     association = reply["author_association"]
-    return true if association.nil?
 
     TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS.include?(association)
   end
