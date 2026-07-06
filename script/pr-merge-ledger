@@ -130,12 +130,28 @@ class PrMergeLedger
     (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
   }ix
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
+  CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
+    \b(?:not|never|still|cannot|can't|wont|won't)\b
+    .{0,80}
+    \b(?:fixed|addressed|resolved|working|passing)\b
+  /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
     (?:fixed|addressed)\s+
     (?:in|by)\s+
     (?:(?:a|an|the)\s+)?
-    (?:follow[- ]?up\b|issue\b|not[- ]?applicable\b|n/a\b)
+    (?:
+      follow[- ]?up\b|
+      issue\b|
+      not[- ]?applicable\b|
+      n/a\b|
+      pr\b|
+      pull[- ]?request\b|
+      separate\b|
+      later\b|
+      next\b|
+      another\b
+    )
   }ix
 
   class Error < StandardError; end
@@ -1027,25 +1043,39 @@ class PrMergeLedger
       .select { |comment| comment["reply_to_id"] && comment.fetch("current_head") && !comment.fetch("outdated") }
       .sort_by { |comment| timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at") }
       .each_with_object({}) do |reply, inferred|
-        disposition = inferred_disposition_from_reply(reply)
-        next unless disposition
-
-        inferred[reply.fetch("reply_to_id")] = disposition
+        update_inferred_dispositions_from_reply(inferred, reply)
       end
+  end
+
+  def update_inferred_dispositions_from_reply(inferred, reply)
+    disposition = inferred_disposition_from_reply(reply)
+    reply_to_id = reply.fetch("reply_to_id")
+    if disposition
+      inferred[reply_to_id] = disposition
+    elsif clear_inferred_disposition_reply?(reply)
+      inferred.delete(reply_to_id)
+    end
   end
 
   def inferred_disposition_from_reply(reply)
     body = reply.fetch("body").to_s
     normalized_body = body.lstrip
-    first_sentence = normalized_body.split(/[.!\r\n]/, 2).first.to_s
-    return nil if first_sentence.include?("?")
+    return nil if normalized_body.include?("?")
     return nil if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     {
       "disposition" => "fixed",
-      "evidence" => "resolved review-thread reply #{reply.fetch('url')}: #{body}"
+      "evidence" => "resolved review-thread reply #{reply.fetch('url')}: #{excerpt(body)}"
     }
+  end
+
+  def clear_inferred_disposition_reply?(reply)
+    normalized_body = reply.fetch("body").to_s.lstrip
+    return true if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return true if normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN) && normalized_body.include?("?")
+
+    normalized_body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
   end
 
   def inferred_disposition_for(finding, context, disposition)
