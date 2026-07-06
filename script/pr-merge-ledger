@@ -242,7 +242,10 @@ class PrMergeLedger
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
     \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
     \bneeds?\s+(?:a\s+)?(?:follow[- ]?up|revisit)\b|
-    \bmight\s+need\b
+    \b(?:might|may)(?:\s+\S+){0,3}\s+need\b|
+    \bstill\s+needs?\b|
+    \bneeds?\s+(?:another|more)\s+(?:look|pass|review|work)\b|
+    \bnot\s+fully\b
   /ix
 
   class Error < StandardError; end

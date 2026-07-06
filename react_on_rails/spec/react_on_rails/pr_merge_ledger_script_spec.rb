@@ -4299,6 +4299,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`, hopefully that does it!",
       "Fixed in current head `current`. I hope that handles it.",
       "Fixed in current head `current`. Assuming this covers the Windows case.",
+      "Fixed in current head `current`. Might still need another look though.",
+      "Fixed in current head `current`. This may need one more pass.",
+      "Fixed in current head `current`. It still needs review.",
+      "Fixed in current head `current`. This is not fully resolved.",
       "Fixed in current head `current`. This should do it."
     ].each do |reply_body|
       fixture = {
