@@ -14,7 +14,6 @@
  */
 
 import type { ReactNode } from 'react';
-import { onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from './RSCProviderCache.ts';
 
 export type RSCProviderCacheIdentity = object;
@@ -53,14 +52,19 @@ const resetRSCPrefetchStore = (): void => {
   prefetchedRSCPromises = createPrefetchStore();
 };
 
-onPageUnloaded(resetRSCPrefetchStore);
+if (typeof document !== 'undefined') {
+  document.addEventListener('turbo:before-render', resetRSCPrefetchStore);
+  document.addEventListener('turbolinks:before-render', resetRSCPrefetchStore);
+  document.addEventListener('page:before-unload', resetRSCPrefetchStore);
+}
 
 export const getReusablePrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined => {
   const entry = prefetchedRSCPromises.get(key, false);
   if (!entry || (entry.hasBeenAdopted && entry.isSettled)) {
     return undefined;
   }
-  return prefetchedRSCPromises.get(key)?.promise;
+  prefetchedRSCPromises.get(key);
+  return entry.promise;
 };
 
 export const consumePrefetchedServerComponent = (

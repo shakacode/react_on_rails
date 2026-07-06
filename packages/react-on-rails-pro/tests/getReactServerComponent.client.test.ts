@@ -522,7 +522,6 @@ describe('prefetchServerComponent client API', () => {
     delete window.REACT_ON_RAILS_RSC_PAYLOADS;
     fetchMock.mockReset();
     jest.dontMock('react-on-rails-rsc/client.browser');
-    jest.dontMock('react-on-rails/pageLifecycle');
     const { resetRailsContext } = await import('react-on-rails/context');
     resetRailsContext();
     document.body.innerHTML = '';
@@ -657,14 +656,7 @@ describe('prefetchServerComponent client API', () => {
   });
 
   it('clears the prefetch store on soft page unload', async () => {
-    let unloadCallback: (() => void) | undefined;
     jest.resetModules();
-    jest.doMock('react-on-rails/pageLifecycle', () => ({
-      onPageUnloaded: jest.fn((callback: () => void) => {
-        unloadCallback = callback;
-      }),
-    }));
-
     const { getReusablePrefetchedServerComponent, setPrefetchedServerComponent } = await import(
       '../src/RSCPrefetchStore.ts'
     );
@@ -674,7 +666,7 @@ describe('prefetchServerComponent client API', () => {
     setPrefetchedServerComponent(key, Promise.resolve('decoded payload'));
     expect(getReusablePrefetchedServerComponent(key)).toBeDefined();
 
-    unloadCallback?.();
+    document.dispatchEvent(new Event('turbo:before-render'));
 
     expect(getReusablePrefetchedServerComponent(key)).toBeUndefined();
   });
