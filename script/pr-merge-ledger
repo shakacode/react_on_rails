@@ -173,7 +173,7 @@ class PrMergeLedger
       (?:\s+\S+){0,4}\s+
       \b(?:
         not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
-        (?:is|are|was|were)(?:\s+not|n't)
+        (?:is|are|was|were|has|have|had)(?:\s+not|n't)
       )\b
     )
     (?:\s+\S+){0,4}\s+
@@ -185,7 +185,7 @@ class PrMergeLedger
     (?:
       \b(?:
         not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
-        (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+        (?:is|are|was|were|has|have|had)(?:\s+not|n't)|no\s+longer
       )\b
       (?:\s+\S+){0,3}\s+
       \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|
@@ -215,7 +215,10 @@ class PrMergeLedger
     (?:fixed|addressed)\s+
     (?:in|by)\s+
     (?:(?:a|an|the)\s+)?
-    (?:(?:existing|follow[- ]?up|new|separate|tracking)\s+){0,3}
+    (?:
+      (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+        corresponding|upstream)\s+
+    ){0,3}
     (?:
       follow[- ]?up\b|
       issue\b|
@@ -1262,7 +1265,7 @@ class PrMergeLedger
         (?:\s+\S+){0,6}\s+
         \b(?:
           not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
-          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+          (?:is|are|was|were|has|have|had)(?:\s+not|n't)|no\s+longer
         )\b
         (?!
           (?:\s+\S+){0,3}\s+
