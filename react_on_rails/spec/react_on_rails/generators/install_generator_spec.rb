@@ -5960,11 +5960,11 @@ describe InstallGenerator, type: :generator do
 
   # RSC React version warning tests
 
-  context "when using --rsc with React 19.0.4" do
+  context "when using --rsc with React 19.2.7" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.0.4")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.7")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
@@ -5979,7 +5979,7 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("RSC requires React 19.0.x")
+      expect(warning_text).to include("RSC requires React 19.2.x")
       expect(warning_text).to include("detected: 19.1.0")
     end
   end
@@ -5992,20 +5992,20 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("RSC requires React 19.0.x")
+      expect(warning_text).to include("RSC requires React 19.2.x")
     end
   end
 
-  context "when using --rsc with React 19.0.0" do
+  context "when using --rsc with React 19.2.0" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc adds minimum version warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.0")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("CVE")
+      expect(warning_text).to include("React 19.2.7")
     end
   end
 

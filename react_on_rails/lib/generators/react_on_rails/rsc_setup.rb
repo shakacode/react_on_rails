@@ -63,7 +63,7 @@ module ReactOnRails
       end
 
       # Warn if React version is not compatible with RSC.
-      # RSC requires React 19.0.x specifically (not 19.1.x or later).
+      # RSC requires React 19.2.x with patch >= 19.2.7.
       #
       # @param force [Boolean] When true, always performs the check.
       #   When false (default), only checks if RSC is enabled (use_rsc? returns true).
@@ -76,25 +76,26 @@ module ReactOnRails
 
         major, minor, patch = react_version.split(".").map(&:to_i)
 
-        if major != 19 || minor != 0
+        if major != 19 || minor != 2
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  RSC requires React 19.0.x (detected: #{react_version})
+            ⚠️  RSC requires React 19.2.x (detected: #{react_version})
 
             React Server Components in React on Rails Pro currently only supports
-            React 19.0.x. React 19.1.x and later are not yet supported.
+            React 19.2.x with patch >= 19.2.7. Other React minor versions are
+            not yet supported.
 
             To install a compatible React version:
-              #{manual_add_packages_command(['react@~19.0.4', 'react-dom@~19.0.4'])}
+              #{manual_add_packages_command(['react@~19.2.7', 'react-dom@~19.2.7'])}
           MSG
-        elsif patch < 4
+        elsif patch < 7
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  React #{react_version} is below the recommended minimum for RSC.
 
-            Please upgrade to at least React 19.0.4:
-              #{manual_add_packages_command(['react@19.0.4', 'react-dom@19.0.4'])}
+            Please upgrade to at least React 19.2.7:
+              #{manual_add_packages_command(['react@19.2.7', 'react-dom@19.2.7'])}
 
-            react-server-dom-webpack 19.0.0–19.0.3 has known vulnerabilities
-            (CVE-2025-55182, CVE-2025-67779, CVE-2026-23864) fixed in 19.0.4+.
+            react-on-rails-rsc 19.2.1+ is coordinated with React/React DOM 19.2.7+
+            for the React on Rails Pro 17 RSC runtime.
           MSG
         end
       end
