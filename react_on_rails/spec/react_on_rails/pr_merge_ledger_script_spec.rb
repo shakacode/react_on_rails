@@ -2995,6 +2995,12 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. No workflow regressions. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No performance regressions. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No visual regressions. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No UI regressions. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`: nested fixed-style replies no longer apply a fixed disposition. " \
       "Validation: bundle exec rspec pr_merge_ledger_script_spec.rb.",
       "Fixed in current head `current`. No follow-up issue needed. " \
@@ -3011,6 +3017,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. No need to reopen. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "**Fixed in** `current`. Validation: pnpm test -- colors.test.ts.",
+      "__Addressed by__ current. Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This fixes the failing test on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|

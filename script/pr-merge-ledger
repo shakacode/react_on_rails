@@ -130,11 +130,17 @@ class PrMergeLedger
     \b(?:fixed|resolved|waived)\s+
     (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
   }ix
-  FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
+  FIXED_DISPOSITION_REPLY_PATTERN = /
+    \A\s*
+    (?:[*_]{1,2})?
+    (?:fixed|addressed)\s+(?:in|by)
+    (?:[*_]{1,2})?
+    \s+\S
+  /ix
   TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
   BENIGN_REGRESSION_MODIFIER_PATTERN = /
     any|more|other|functional|new|known|additional|observable|observed|reported|detected|found|introduced|
-    remaining|runtime|behavioral|user[- ]visible|ci|build|job|workflow|checks?
+    remaining|runtime|behavioral|user[- ]visible|ci|build|job|workflow|checks?|performance|visual|ui
   /ix
   BENIGN_REGRESSION_REPLY_PATTERN = /
     \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
