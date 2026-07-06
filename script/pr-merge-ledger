@@ -1094,7 +1094,8 @@ class PrMergeLedger
         inferred,
         reply,
         root_reply_to_id,
-        root_comment: comments_by_id[root_reply_to_id]
+        root_comment: comments_by_id[root_reply_to_id],
+        direct_reply_to_root: reply_to_id == root_reply_to_id
       )
     end
   end
@@ -1132,9 +1133,11 @@ class PrMergeLedger
     current_id
   end
 
-  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_comment:)
+  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_comment:, direct_reply_to_root:)
     clear_disposition_reply = clear_inferred_disposition_reply?(reply)
-    disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:, root_comment:)
+    disposition = if direct_reply_to_root
+                    inferred_disposition_from_reply(reply, clear_disposition_reply:, root_comment:)
+                  end
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_disposition_reply
@@ -1174,6 +1177,16 @@ class PrMergeLedger
     body = body.gsub(
       /
         \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
+        (?:\s+\S+){0,6}\s+
+        \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+        (?:\s+\S+){0,3}\s+
+        \bfail(?:s|ed|ing)?\b
+      /ix,
+      ""
+    )
+    body = body.gsub(
+      /
+        \b(?:ci|build|job|workflow|checks?)\b
         (?:\s+\S+){0,6}\s+
         \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
         (?:\s+\S+){0,3}\s+
