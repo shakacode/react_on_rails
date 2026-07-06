@@ -397,7 +397,8 @@ embedded SSR payload, and refetch lifecycle.
 
 If your app enforces a strict Content Security Policy without `'unsafe-inline'`, configure the Rails
 script nonce described in [Strict Content Security Policy](../strict-csp.md). Loader-time prefetch
-uses the same client fetch path as `RSCRoute` and does not inject console replay scripts by default.
+uses the shared client fetch helper with console replay disabled; ordinary `RSCRoute` client
+navigation keeps the existing console replay behavior.
 Same-request streamed payload and hydration scripts still need the standard `railsContext.cspNonce`
 setup.
 

@@ -415,6 +415,7 @@ const getReactServerComponent =
       componentProps,
       rscPayloadGenerationUrlPath: railsContext.rscPayloadGenerationUrlPath,
       cspNonce: railsContext.cspNonce,
+      replayConsoleScripts: true,
     });
   };
 

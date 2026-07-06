@@ -16,19 +16,68 @@
 import type { ReactNode } from 'react';
 import { BoundedLRU, RSC_PAYLOAD_CACHE_MAX_ENTRIES } from './RSCProviderCache.ts';
 
-const createPrefetchStore = () => new BoundedLRU<Promise<ReactNode>>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
+export type RSCProviderCacheIdentity = object;
+
+type PrefetchedServerComponentEntry = {
+  promise: Promise<ReactNode>;
+  adoptedProviderCaches: WeakSet<RSCProviderCacheIdentity>;
+  hasBeenAdopted: boolean;
+  isSettled: boolean;
+};
+
+const createPrefetchEntry = (promise: Promise<ReactNode>): PrefetchedServerComponentEntry => {
+  const entry: PrefetchedServerComponentEntry = {
+    promise,
+    adoptedProviderCaches: new WeakSet(),
+    hasBeenAdopted: false,
+    isSettled: false,
+  };
+  void promise.then(
+    () => {
+      entry.isSettled = true;
+    },
+    () => {
+      entry.isSettled = true;
+    },
+  );
+  return entry;
+};
+
+const createPrefetchStore = () =>
+  new BoundedLRU<PrefetchedServerComponentEntry>(RSC_PAYLOAD_CACHE_MAX_ENTRIES, () => {});
 
 let prefetchedRSCPromises = createPrefetchStore();
 
-export const getPrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined =>
+export const getReusablePrefetchedServerComponent = (key: string): Promise<ReactNode> | undefined => {
+  const entry = prefetchedRSCPromises.get(key, false);
+  if (!entry || (entry.hasBeenAdopted && entry.isSettled)) {
+    return undefined;
+  }
+  return prefetchedRSCPromises.get(key)?.promise;
+};
+
+export const consumePrefetchedServerComponent = (
+  key: string,
+  providerCacheIdentity: RSCProviderCacheIdentity,
+): Promise<ReactNode> | undefined => {
+  const entry = prefetchedRSCPromises.get(key, false);
+  if (!entry || entry.adoptedProviderCaches.has(providerCacheIdentity)) {
+    return undefined;
+  }
+
   prefetchedRSCPromises.get(key);
+  entry.adoptedProviderCaches.add(providerCacheIdentity);
+  entry.hasBeenAdopted = true;
+  return entry.promise;
+};
 
 export const setPrefetchedServerComponent = (key: string, promise: Promise<ReactNode>): void => {
-  prefetchedRSCPromises.set(key, promise);
+  prefetchedRSCPromises.set(key, createPrefetchEntry(promise));
 };
 
 export const deletePrefetchedServerComponent = (key: string, promise?: Promise<ReactNode>): void => {
-  if (promise && prefetchedRSCPromises.get(key, false) !== promise) {
+  const entry = prefetchedRSCPromises.get(key, false);
+  if (promise && entry?.promise !== promise) {
     return;
   }
   prefetchedRSCPromises.deleteWithoutEvict(key);

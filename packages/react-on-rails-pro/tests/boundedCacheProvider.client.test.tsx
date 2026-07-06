@@ -1565,27 +1565,82 @@ describe('RSCRoute successful-version error reset', () => {
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });
 
-  it('q. loader-time prefetched payload is adopted into the provider cache', async () => {
+  it('q. loader-time prefetched payload is adopted into each provider cache', async () => {
     const key = createRSCPayloadKey('Card', { id: 123 });
+    setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
+
+    const firstRoot = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(firstRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+
+    const secondRoot = await renderInAct(
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(secondRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+
+    secondRoot.unmount();
+
+    await rerenderInAct(
+      firstRoot,
+      <TestHarness>
+        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+      </TestHarness>,
+    );
+
+    await waitFor(() => expect(firstRoot.container).toHaveTextContent('prefetched card'));
+    expect(getServerComponent).not.toHaveBeenCalled();
+  });
+
+  it('r. consumed prefetch entry is not re-adopted by the same provider after cache eviction', async () => {
+    const prefetchedId = 123;
+    const key = createRSCPayloadKey('Card', { id: prefetchedId });
     setPrefetchedServerComponent(key, Promise.resolve(<span data-testid="payload">prefetched card</span>));
 
     const result = await renderInAct(
       <TestHarness>
-        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+        <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
       </TestHarness>,
     );
 
     await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('prefetched card'));
-    expect(getServerComponent).not.toHaveBeenCalled();
+    await flushMacrotasks();
+    expect(fetchCount(prefetchedId)).toBe(0);
+
+    for (let id = 0; id < CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await rerenderInAct(
+        result,
+        <TestHarness>
+          <RSCRoute componentName="Card" componentProps={{ id }} />
+        </TestHarness>,
+      );
+      // eslint-disable-next-line no-await-in-loop
+      await waitFor(() =>
+        expect(screen.getByTestId('payload')).toHaveTextContent(`Card-${JSON.stringify({ id })}#1`),
+      );
+    }
 
     await rerenderInAct(
       result,
       <TestHarness>
-        <RSCRoute componentName="Card" componentProps={{ id: 123 }} />
+        <RSCRoute componentName="Card" componentProps={{ id: prefetchedId }} />
       </TestHarness>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('payload')).toHaveTextContent('prefetched card'));
-    expect(getServerComponent).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByTestId('payload')).toHaveTextContent(
+        `Card-${JSON.stringify({ id: prefetchedId })}#1`,
+      ),
+    );
+    expect(fetchCount(prefetchedId)).toBe(1);
   });
 });

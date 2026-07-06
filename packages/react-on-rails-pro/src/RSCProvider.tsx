@@ -32,7 +32,7 @@ import {
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
 } from './RSCProviderCache.ts';
-import { getPrefetchedServerComponent } from './RSCPrefetchStore.ts';
+import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
 import { createRSCPayloadKey } from './utils.ts';
 
 type RSCContextType = {
@@ -152,6 +152,7 @@ export const createRSCProvider = ({
     // token lets a mounted route ignore eviction cleanup decreases (N -> 0) but
     // still observe a later successful refetch after that key was cleaned up.
     const successfulVersionRef = useRef(0);
+    const providerCacheIdentityRef = useRef<object>({});
     const [, startTransition] = useTransition();
 
     // Bounded promise cache (#3564): the authoritative cache `getComponent`
@@ -386,7 +387,10 @@ export const createRSCProvider = ({
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
-        const prefetchedServerComponentPromise = getPrefetchedServerComponent(key);
+        const prefetchedServerComponentPromise = consumePrefetchedServerComponent(
+          key,
+          providerCacheIdentityRef.current,
+        );
         if (prefetchedServerComponentPromise) {
           serverComponentPromise = prefetchedServerComponentPromise;
         } else {

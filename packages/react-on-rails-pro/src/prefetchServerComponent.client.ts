@@ -17,7 +17,7 @@ import { getRailsContext } from 'react-on-rails/context';
 import { fetchRSC } from './getReactServerComponent.client.ts';
 import {
   deletePrefetchedServerComponent,
-  getPrefetchedServerComponent,
+  getReusablePrefetchedServerComponent,
   setPrefetchedServerComponent,
 } from './RSCPrefetchStore.ts';
 import { createEmbeddedPayloadKey, createRSCPayloadKey } from './utils.ts';
@@ -28,12 +28,38 @@ export type PrefetchServerComponentOptions = {
 
 const resolveNoop = () => Promise.resolve();
 
+const toVoidPrefetchPromise = (promise: Promise<unknown>, signal?: AbortSignal): Promise<void> => {
+  const settledPrefetch = promise.then(
+    () => undefined,
+    () => undefined,
+  );
+  if (!signal) {
+    return settledPrefetch;
+  }
+  if (signal.aborted) {
+    return resolveNoop();
+  }
+  return Promise.race([
+    settledPrefetch,
+    new Promise<void>((resolve) => {
+      const handleAbort = () => {
+        signal.removeEventListener('abort', handleAbort);
+        resolve();
+      };
+      signal.addEventListener('abort', handleAbort, { once: true });
+      void settledPrefetch.finally(() => signal.removeEventListener('abort', handleAbort));
+    }),
+  ]);
+};
+
 const hasEmbeddedPayload = (componentName: string, componentProps: unknown): boolean => {
   if (typeof window === 'undefined' || !window.REACT_ON_RAILS_RSC_PAYLOADS) {
     return false;
   }
 
   const embeddedPayloadKeyPrefix = createEmbeddedPayloadKey(componentName, componentProps);
+  // The domNodeId suffix is unknown here; component names are assumed not to be generated from
+  // another component's full embedded payload key prefix.
   return Object.keys(window.REACT_ON_RAILS_RSC_PAYLOADS).some(
     (key) => key === embeddedPayloadKeyPrefix || key.startsWith(`${embeddedPayloadKeyPrefix}-`),
   );
@@ -54,12 +80,9 @@ export const prefetchServerComponent = (
     return resolveNoop();
   }
 
-  const cached = getPrefetchedServerComponent(key);
+  const cached = getReusablePrefetchedServerComponent(key);
   if (cached !== undefined) {
-    return cached.then(
-      () => undefined,
-      () => undefined,
-    );
+    return toVoidPrefetchPromise(cached, signal);
   }
 
   const railsContext = getRailsContext();
@@ -77,12 +100,8 @@ export const prefetchServerComponent = (
   });
   setPrefetchedServerComponent(key, prefetchPromise);
 
-  return prefetchPromise.then(
-    () => undefined,
-    () => {
-      deletePrefetchedServerComponent(key, prefetchPromise);
-    },
-  );
+  void prefetchPromise.then(undefined, () => {
+    deletePrefetchedServerComponent(key, prefetchPromise);
+  });
+  return toVoidPrefetchPromise(prefetchPromise, signal);
 };
-
-export default prefetchServerComponent;

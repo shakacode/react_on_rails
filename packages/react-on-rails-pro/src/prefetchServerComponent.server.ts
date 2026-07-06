@@ -22,5 +22,3 @@ export const prefetchServerComponent = (
   _componentProps: unknown,
   _options: PrefetchServerComponentOptions = {},
 ): Promise<void> => Promise.resolve();
-
-export default prefetchServerComponent;
