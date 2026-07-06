@@ -2888,6 +2888,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Regression-free per the full suite run. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Verified it has not regressed. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. It did not regress under the full suite. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Added a test that fails before the fix and passes after. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Positive fixed replies with before/after regression-test evidence " \
@@ -3366,6 +3370,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. The specs are failing.",
       "Fixed in current head `current`. This fix fails on Windows.",
       "Fixed in current head `current`. This fix is broken.",
+      "Fixed in current head `current`. This doesn't build on Windows.",
+      "Fixed in current head `current`. This doesn't compile.",
       "Fixed in current head `current`. This doesn't fix the failing test on Windows.",
       "Fixed in current head `current`. No this doesn't fix the regression on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
@@ -3779,6 +3785,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "CI isn\u2019t passing on Windows.",
       "This doesn't pass on Windows.",
       "CI does not pass on Windows.",
+      "This doesn't build on Windows.",
+      "This doesn't compile.",
       "This doesn't address Windows.",
       "This doesn\u2019t fix Windows.",
       "This fails on Windows.",

@@ -140,6 +140,8 @@ class PrMergeLedger
     \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bavoid(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bregression[- ]free\b|
+    \b(?:has|have|had|is|are|was|were)\s+not\s+regressed\b|
+    \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
     \b(?:test|tests|spec|specs|case|coverage)(?:\s+\S+){0,6}\s+fail(?:s|ed|ing)?\s+
       before\s+(?:the\s+)?fix\b
   /ix
@@ -186,7 +188,8 @@ class PrMergeLedger
         (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
       )\b
       (?:\s+\S+){0,3}\s+
-      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|pass(?:es|ed|ing)?)\b
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|
+        pass(?:es|ed|ing)?|build(?:s|ing)?|built|compil(?:e|es|ed|ing))\b
     )|
     (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
