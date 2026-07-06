@@ -2815,6 +2815,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Added a test that fails before the fix and passes after. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Positive fixed replies with before/after regression-test evidence " \
+      "remain inferable. Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI no longer fails on Windows. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI is not failing anymore on Windows. " \
@@ -3862,7 +3864,8 @@ RSpec.describe "script/pr-merge-ledger" do
   it "preserves inferred fixed dispositions after later unrelated direct replies" do
     [
       "Thanks, that looks good.",
-      "Not a big deal, but fixed it in the latest commit."
+      "Not a big deal, but fixed it in the latest commit.",
+      "By the way, unrelated flaky CI checks are failing on main today, nothing to do with this thread."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
@@ -4031,7 +4034,9 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. I believe this should work.",
       "Addressed by current head `current`. Probably fixed now.",
       "Fixed in current head `current`. I haven't tested it yet.",
-      "Fixed in current head `current`. I haven't had a chance to test it yet."
+      "Fixed in current head `current`. I haven't had a chance to test it yet.",
+      "Fixed in a bit, will verify shortly.",
+      "Fixed in current head `current`. Will verify shortly."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",

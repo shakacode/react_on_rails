@@ -138,6 +138,17 @@ class PrMergeLedger
     \b(?:test|tests|spec|specs|case|coverage)(?:\s+\S+){0,6}\s+fail(?:s|ed|ing)?\s+
       before\s+(?:the\s+)?fix\b
   /ix
+  UNRELATED_FAILURE_REPLY_PATTERN = /
+    \b(?:unrelated|separate)\b
+    [\s\S]{0,120}
+    \b(?:ci|build|job|workflow|checks?)\b
+    [\s\S]{0,120}
+    \b(?:fail(?:s|ed|ing)?|broken|red)\b
+    [\s\S]{0,120}
+    \b(?:nothing\s+to\s+do\s+with|unrelated\s+to)\b
+    [\s\S]{0,80}
+    \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+  /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
       \b(?:
@@ -163,7 +174,7 @@ class PrMergeLedger
       \b(?:fail(?:s|ed|ing)?|broken|red)\b
     )|
     \bregressed\b|
-    \bregression(?:s)?\b(?!\s+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
+    \bregression(?:s)?\b(?![-\s]+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
     \breopen\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
@@ -193,7 +204,8 @@ class PrMergeLedger
     \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
     \b(?:i\s+(?:think|believe)|probably|should\s+be|not\s+(?:100%\s+)?sure|untested|unverified)\b|
     \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
-    \bwill\s+follow\s+up\b|
+    \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
+    \b(?:shortly|soon|in\s+a\s+bit|in\s+a\s+moment)\b|
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
     \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
     \bneeds?\s+(?:a\s+)?(?:follow[- ]?up|revisit)\b|
@@ -1184,6 +1196,7 @@ class PrMergeLedger
 
   def contradicted_disposition_reply?(normalized_body)
     body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
+    body = body.gsub(UNRELATED_FAILURE_REPLY_PATTERN, "")
     body = body.gsub(
       /
         \bno\s+longer\s+
