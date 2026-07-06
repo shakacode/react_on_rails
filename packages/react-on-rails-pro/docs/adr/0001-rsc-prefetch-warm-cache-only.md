@@ -13,7 +13,7 @@ Status: accepted (2026-07-05, design session for #4460)
 ## Consequences
 
 - Prefetch has no CSP/console-replay surface of its own; it inherits the shared client-fetch path's policy. Adoption makes prefetched and render-fetched payloads interchangeable, so a per-path CSP fork would make inline-script emission timing-dependent.
-- Failed or aborted prefetches self-evict from the store — a failed prefetch behaves as if it never happened.
+- Failed or aborted prefetches self-evict from the store and the returned `Promise<void>` resolves after that cleanup — a failed prefetch behaves as if it never happened.
 - The server-side export is a resolving no-op (not a rejecting stub like `createRscPayloadNode.server.ts` was): loaders legitimately run during SSR, where the payload is guaranteed to be embedded anyway.
 
 See `packages/react-on-rails-pro/CONTEXT.md` for the supporting vocabulary (Prefetch Store, Adoption, Self-eviction).
