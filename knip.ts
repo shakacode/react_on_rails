@@ -247,6 +247,7 @@ const config: KnipConfig = {
         // Used by dynamically registered dummy app components, which are intentionally ignored above.
         '@dr.pogodin/react-helmet',
         'create-react-class',
+        'prop-types',
         'react-redux',
         'react-router-dom',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
