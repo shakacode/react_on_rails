@@ -271,6 +271,7 @@ class PrMergeLedger
     \b(?:i\s+(?:think|believe|hope)|hopefully|assuming|probably)\b|
     \bshould\s+(?:be|do\s+it|work|pass)\b|
     \b(?:not\s+(?:100%\s+)?sure|untested|unverified)\b|
+    \bnot\s+(?:yet\s+)?(?:been\s+)?(?:tested|verified|confirmed|validated)\b|
     \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
     \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
     \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
