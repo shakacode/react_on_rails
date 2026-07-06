@@ -142,6 +142,11 @@ class PrMergeLedger
       \b(?:fail(?:s|ed|ing)?|broken|red)\b
     )|
     (?:
+      \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
+      (?:\s+\S+){0,6}\s+
+      \b(?:fails?|failed)\b
+    )|
+    (?:
       \b(?:ci|build|job|workflow|checks?)\b
       [\s\S]{0,80}
       \b(?:fail(?:s|ed|ing)?|broken|red)\b
