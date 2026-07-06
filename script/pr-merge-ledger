@@ -728,7 +728,7 @@ class PrMergeLedger
       "author_association" => comment["authorAssociation"],
       "body" => comment["body"].to_s,
       "outdated" => comment["outdated"] == true,
-      "reply_to_id" => comment.dig("replyTo", "id"),
+      "reply_to_id" => review_thread_comment_reply_to_identifier(comment),
       "review_state" => review["state"],
       "review_head_sha" => review.dig("commit", "oid"),
       "comment_head_sha" => comment.dig("commit", "oid"),
@@ -741,6 +741,13 @@ class PrMergeLedger
     return identifier.to_s if identifier.to_s.match?(/\S/)
 
     raise Error, "review thread comment is missing id, databaseId, and url"
+  end
+
+  def review_thread_comment_reply_to_identifier(comment)
+    reply_to = comment["replyTo"]
+    return nil unless reply_to
+
+    review_thread_comment_identifier(reply_to)
   end
 
   def normalize_review(review, pull_request)
@@ -1176,9 +1183,21 @@ class PrMergeLedger
     body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
     body = body.gsub(
       /
+        \bno\s+longer\s+
+        (?:apply|applies|applied|applying)\s+
+        (?:a\s+)?
+        fixed\s+disposition\b
+      /ix,
+      ""
+    )
+    body = body.gsub(
+      /
         \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
         (?:\s+\S+){0,6}\s+
-        \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+        \b(?:
+          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+        )\b
         (?:\s+\S+){0,3}\s+
         \bfail(?:s|ed|ing)?\b
       /ix,
@@ -1188,7 +1207,10 @@ class PrMergeLedger
       /
         \b(?:ci|build|job|workflow|checks?)\b
         (?:\s+\S+){0,6}\s+
-        \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
+        \b(?:
+          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+          (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
+        )\b
         (?:\s+\S+){0,3}\s+
         \bfail(?:s|ed|ing)?\b
       /ix,
@@ -2123,7 +2145,7 @@ class PrMergeLedger
                       line
                       createdAt
                       outdated
-                      replyTo { id }
+                      replyTo { id databaseId url }
                       commit { oid }
                       pullRequestReview {
                         id
@@ -2161,7 +2183,7 @@ class PrMergeLedger
                   line
                   createdAt
                   outdated
-                  replyTo { id }
+                  replyTo { id databaseId url }
                   commit { oid }
                   pullRequestReview {
                     id

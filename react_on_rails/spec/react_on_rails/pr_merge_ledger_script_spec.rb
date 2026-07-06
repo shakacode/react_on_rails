@@ -2815,6 +2815,12 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI no longer fails on Windows. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. CI is not failing anymore on Windows. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. CI isn't failing anymore on Windows. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`: nested fixed-style replies no longer apply a fixed disposition. " \
+      "Validation: bundle exec rspec pr_merge_ledger_script_spec.rb.",
       "Fixed in current head `current`. It doesn't fail on Windows anymore. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It won\u2019t fail on Windows anymore. " \
