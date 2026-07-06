@@ -3869,6 +3869,86 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "applies direct fixed replies to nested priority findings" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "root-comment",
+              "url" => "https://example.com/root-comment",
+              "body" => "Looks close, one follow-up below.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-finding-comment",
+              "url" => "https://example.com/nested-finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "root-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-fixed-reply-comment",
+              "url" => "https://example.com/nested-fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "nested-finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-nested-finding-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(finding).to include(
+        "id" => "nested-finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+      expect(finding.fetch("evidence")).to include("https://example.com/nested-fixed-reply-comment")
+    end
+  end
+
   it "preserves inferred fixed dispositions after later unrelated direct replies" do
     [
       "Thanks, that looks good.",
