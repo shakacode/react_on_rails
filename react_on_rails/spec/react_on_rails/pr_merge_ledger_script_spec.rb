@@ -3364,6 +3364,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`, but this doesn\u2019t fix Windows.",
       "Fixed in current head `current`. Tests fail on Windows.",
       "Fixed in current head `current`. The specs are failing.",
+      "Fixed in current head `current`. This fix fails on Windows.",
+      "Fixed in current head `current`. This fix is broken.",
       "Fixed in current head `current`. This doesn't fix the failing test on Windows.",
       "Fixed in current head `current`. No this doesn't fix the regression on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
