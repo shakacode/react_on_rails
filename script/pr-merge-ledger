@@ -429,8 +429,8 @@ class PrMergeLedger
     end
     opts.separator "    Top-level PR comments have no head SHA; priority findings in those comments " \
                    "require dispositions."
-    opts.separator "    Resolved review-thread replies beginning with \"Fixed in ...\" can satisfy " \
-                   "single priority finding dispositions."
+    opts.separator "    Resolved review-thread replies beginning with \"Fixed in ...\" or " \
+                   "\"Addressed by ...\" can satisfy single priority finding dispositions."
   end
 
   def add_help_option(opts)
@@ -1077,20 +1077,29 @@ class PrMergeLedger
     return {} unless thread.fetch("current_head")
 
     root_comment_ids = root_comment_ids_by_comment_id(comments)
-    replies = comments
-              .select do |comment|
-                comment["reply_to_id"] && !comment.fetch("outdated")
-              end
+    comments_by_id = comments.to_h { |comment| [comment.fetch("id"), comment] }
+
+    sorted_inference_replies(comments).each_with_object({}) do |reply, inferred|
+      reply_to_id = reply.fetch("reply_to_id")
+      root_reply_to_id = root_comment_ids.fetch(reply_to_id, reply_to_id)
+      update_inferred_dispositions_from_reply(
+        inferred,
+        reply,
+        root_reply_to_id,
+        root_comment: comments_by_id[root_reply_to_id]
+      )
+    end
+  end
+
+  def sorted_inference_replies(comments)
+    replies = comments.select do |comment|
+      comment["reply_to_id"] && !comment.fetch("outdated")
+    end
     sorted_reply_pairs = replies.each_with_index.to_a.sort_by do |comment, index|
       [timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at"), index]
     end
-    sorted_replies = sorted_reply_pairs.map(&:first)
 
-    sorted_replies.each_with_object({}) do |reply, inferred|
-      reply_to_id = reply.fetch("reply_to_id")
-      root_reply_to_id = root_comment_ids.fetch(reply_to_id, reply_to_id)
-      update_inferred_dispositions_from_reply(inferred, reply, root_reply_to_id)
-    end
+    sorted_reply_pairs.map(&:first)
   end
 
   def root_comment_ids_by_comment_id(comments)
@@ -1115,9 +1124,9 @@ class PrMergeLedger
     current_id
   end
 
-  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id)
+  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_comment:)
     clear_disposition_reply = clear_inferred_disposition_reply?(reply)
-    disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:)
+    disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:, root_comment:)
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_disposition_reply
@@ -1125,12 +1134,16 @@ class PrMergeLedger
     end
   end
 
-  def inferred_disposition_from_reply(reply, clear_disposition_reply: clear_inferred_disposition_reply?(reply))
+  def inferred_disposition_from_reply(
+    reply,
+    clear_disposition_reply: clear_inferred_disposition_reply?(reply),
+    root_comment: nil
+  )
     body = reply.fetch("body").to_s
     normalized_body = normalized_disposition_reply_body(body)
     return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
-    return nil unless trusted_disposition_reply_author?(reply)
+    return nil unless trusted_disposition_reply_author?(reply, root_comment:)
 
     {
       "disposition" => "fixed",
@@ -1175,11 +1188,21 @@ class PrMergeLedger
     )
   end
 
-  def trusted_disposition_reply_author?(reply)
+  def trusted_disposition_reply_author?(reply, root_comment: nil)
+    return false if same_author_disposition_reply?(reply, root_comment)
+
     association = reply["author_association"]
     return true if association.nil?
 
     TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS.include?(association)
+  end
+
+  def same_author_disposition_reply?(reply, root_comment)
+    return false unless root_comment
+
+    reply_author = reply["author"]
+    root_author = root_comment["author"]
+    reply_author && root_author && reply_author == root_author
   end
 
   def normalized_disposition_reply_body(body)
