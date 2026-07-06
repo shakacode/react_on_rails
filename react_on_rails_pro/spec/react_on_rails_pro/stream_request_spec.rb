@@ -50,11 +50,12 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     end
   end
 
-  def mock_stream_response_with_headers(headers, *chunks, error: nil)
+  def mock_stream_response_with_headers(headers, *chunks, error: nil, before_error: nil)
     ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner, headers_assigner|
       status_assigner.call(200)
       headers_assigner.call(headers)
       chunks.each { |c| yielder.call(c) }
+      before_error&.call if error
       raise error if error
     end
   end
@@ -510,19 +511,29 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(stream.http_status_recorded?).to be(true)
     end
 
-    it "rolls back renderer Server-Timing entries from retried attempts" do
+    it "rolls back only renderer Server-Timing entries from the retried attempt" do
       collector = []
       call_count = 0
+      failed_attempt_timing = 'ror_renderer_prepare;dur=1;desc="shared renderer timing"'
+      other_stream_timing = failed_attempt_timing.dup
+      successful_retry_timing = 'ror_renderer_prepare;dur=2;desc="successful retry"'
       request = described_class.send(:new) do |_send_bundle, _tasks|
         call_count += 1
         if call_count == 1
           mock_stream_response_with_headers(
-            { "server-timing" => 'ror_renderer_prepare;dur=1;desc="failed attempt"' },
-            error: ReactOnRailsPro::RendererHttpClient::ConnectionError.new("Connection reset")
+            { "server-timing" => failed_attempt_timing },
+            error: ReactOnRailsPro::RendererHttpClient::ConnectionError.new("Connection reset"),
+            before_error: lambda do
+              Fiber.new do
+                ReactOnRailsPro::Stream.with_renderer_server_timing_collector(collector) do
+                  ReactOnRailsPro::Stream.record_renderer_response_headers("server-timing" => other_stream_timing)
+                end
+              end.resume
+            end
           )
         else
           mock_stream_response_with_headers(
-            { "server-timing" => 'ror_renderer_prepare;dur=2;desc="successful retry"' },
+            { "server-timing" => successful_retry_timing },
             to_length_prefixed("ok")
           )
         end
@@ -538,7 +549,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       expect(call_count).to eq(2)
       expect(chunks.first).to include("html" => "ok")
-      expect(collector).to eq(['ror_renderer_prepare;dur=2;desc="successful retry"'])
+      expect(collector).to eq([other_stream_timing, successful_retry_timing])
     end
 
     it "stops and clears tasks before retrying on transport error" do

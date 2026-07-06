@@ -65,7 +65,9 @@ module ReactOnRailsPro
   module Stream # rubocop:disable Metrics/ModuleLength
     extend ActiveSupport::Concern
     RENDERER_SERVER_TIMING_COLLECTOR_KEY = :react_on_rails_pro_rsc_stream_renderer_server_timing_entries
+    RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY = :react_on_rails_pro_rsc_stream_renderer_server_timing_attempt
     private_constant :RENDERER_SERVER_TIMING_COLLECTOR_KEY
+    private_constant :RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY
 
     included do
       include ActionController::Live
@@ -81,6 +83,7 @@ module ReactOnRailsPro
           next if entry.blank?
 
           collector << entry
+          renderer_server_timing_attempt_collector&.append(entry, collector:)
         end
       end
 
@@ -104,19 +107,62 @@ module ReactOnRailsPro
         collector = renderer_server_timing_collector
         return unless collector
 
-        { collector:, length: collector.length }
+        attempt_collector = RendererServerTimingAttemptCollector.new(
+          collector:,
+          previous_attempt_collector: renderer_server_timing_attempt_collector
+        )
+        self.renderer_server_timing_attempt_collector = attempt_collector
+
+        attempt_collector
       end
 
-      def restore_renderer_server_timing_collector_snapshot(snapshot)
-        return unless snapshot
+      def restore_renderer_server_timing_collector_snapshot(attempt_collector)
+        return unless attempt_collector
 
         collector = renderer_server_timing_collector
-        return unless collector.equal?(snapshot[:collector])
+        return unless collector.equal?(attempt_collector.collector)
 
-        collector.slice!(snapshot[:length]..)
+        attempt_collector.remove_appended_entries
+      ensure
+        if attempt_collector && renderer_server_timing_attempt_collector.equal?(attempt_collector)
+          self.renderer_server_timing_attempt_collector = attempt_collector.previous_attempt_collector
+        end
+      end
+
+      class RendererServerTimingAttemptCollector
+        attr_reader :collector, :previous_attempt_collector
+
+        def initialize(collector:, previous_attempt_collector:)
+          @collector = collector
+          @previous_attempt_collector = previous_attempt_collector
+          @appended_entries = []
+        end
+
+        def append(entry, collector:)
+          return unless collector.equal?(@collector)
+
+          @appended_entries << entry
+        end
+
+        def remove_appended_entries
+          appended_entries = {}.compare_by_identity
+          @appended_entries.each do |entry|
+            appended_entries[entry] = true
+          end
+
+          @collector.delete_if { |entry| appended_entries[entry] }
+        end
       end
 
       private
+
+      def renderer_server_timing_attempt_collector
+        Thread.current[RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY]
+      end
+
+      def renderer_server_timing_attempt_collector=(attempt_collector)
+        Thread.current[RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY] = attempt_collector
+      end
 
       def sanitize_server_timing_header_entry(value)
         value.to_s.gsub(/[\r\n\0]/, "")
