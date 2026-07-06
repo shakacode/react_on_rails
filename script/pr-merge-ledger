@@ -145,6 +145,7 @@ class PrMergeLedger
   BENIGN_REGRESSION_REPLY_PATTERN = /
     \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bavoid(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bprevent(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
     \bregression[- ]free\b|
     \b(?:has|have|had|is|are|was|were)(?:\s+not|n't)\s+regressed\b|
     \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
@@ -234,7 +235,8 @@ class PrMergeLedger
   /ix
   NEGATED_REOPEN_REPLY_PATTERN = /
     \b(?:no\s+need\s+to|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|should(?:\s+not|n't)|never)\s+reopen\b|
-    \breopen(?:ing)?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
+    \breopen(?:ing)?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b|
+    \b(?:can|could|may|might)\s+reopen\s+(?:this|the)\s+(?:thread|comment|review|discussion)\b
   /ix
   NEGATED_FOLLOW_UP_REPLY_PATTERN = /
     \bno\s+follow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:needed|required|necessary)\b|
@@ -250,19 +252,18 @@ class PrMergeLedger
         corresponding|upstream)\s+
     ){0,3}
     (?:
-      follow[- ]?up\b|
-      issue\b|
-      \#\d+\b|
-      https?://\S*/(?:issues|pull)/\d+\b|
-      not[- ]?applicable\b|
-      n/a\b|
-      pr\b|
-      pull[- ]?request\b|
-      ticket\b|
-      separate\b|
-      later\b|
-      next\b|
-      another\b
+      (?:
+        (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+          corresponding|upstream)\s+
+      ){1,3}
+      (?:issue|pr|pull[- ]?request|ticket)\b|
+      (?:issue|pr|pull[- ]?request|ticket)\s+(?:\#\d+|\d+|[A-Z][A-Z0-9_-]*-\d+)\b|
+      (?:
+        (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+          corresponding|upstream)\s+
+      ){0,3}
+      (?:follow[- ]?up\b|\#\d+\b|https?://\S*/(?:issues|pull)/\d+\b|not[- ]?applicable\b|n/a\b|
+        separate\b|later\b|next\b|another\b)
     )
   }ix
   HEDGED_FIXED_DISPOSITION_REPLY_PATTERN = /
@@ -272,7 +273,8 @@ class PrMergeLedger
     \bshould\s+(?:be|do\s+it|work|pass)\b|
     \b(?:not\s+(?:100%\s+)?sure|untested|unverified)\b|
     \bnot\s+(?:yet\s+)?(?:been\s+)?(?:tested|verified|confirmed|validated)\b|
-    \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
+    \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+
+      (?:test(?:ed)?|verify|verified|confirm(?:ed)?|validate|validated)\b|
     \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
     \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
     \b(?:shortly|soon|in\s+a\s+bit|in\s+a\s+moment)\b|

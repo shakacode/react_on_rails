@@ -2969,6 +2969,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This avoids regressions in the color parsing. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. This prevents regressions in the future. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. No functional regressions observed. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Regression-free per the full suite run. " \
@@ -3019,8 +3021,12 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. No need to reopen. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. The reviewer can reopen this thread if anything looks off. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "**Fixed in** `current`. Validation: pnpm test -- colors.test.ts.",
       "__Addressed by__ current. Validation: pnpm test -- colors.test.ts.",
+      "Fixed in the PR. Validation: pnpm test -- colors.test.ts.",
+      "Fixed in this pull request. Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`; does it also apply to nested routes? " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This fixes the failing test on Windows. " \
@@ -4533,6 +4539,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Addressed by current head `current`. Probably fixed now.",
       "Fixed in current head `current`. I haven't tested it yet.",
       "Fixed in current head `current`. I haven't had a chance to test it yet.",
+      "Fixed in current head `current`. I haven't validated it on Windows yet.",
       "Fixed in current head `current`. Not verified on Windows.",
       "Fixed in current head `current`. Not tested on Windows.",
       "Fixed in current head `current`. Need to test on Windows.",
