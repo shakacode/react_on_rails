@@ -2828,6 +2828,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. It doesn't fail on Windows anymore. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It won\u2019t fail on Windows anymore. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. This change no longer breaks the Windows build. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. CI is no longer broken. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
@@ -3276,7 +3280,9 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. CI is red.",
       "Addressed by abc123, though the build is broken.",
       "Fixed in current head `current`, but this doesn't address Windows.",
-      "Fixed in current head `current`, but this doesn\u2019t fix Windows."
+      "Fixed in current head `current`, but this doesn\u2019t fix Windows.",
+      "Fixed in current head `current`. Tests fail on Windows.",
+      "Fixed in current head `current`. The specs are failing."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
@@ -3607,6 +3613,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "This doesn't address Windows.",
       "This doesn\u2019t fix Windows.",
       "This fails on Windows.",
+      "Tests fail on Windows.",
+      "The specs are failing.",
       "The fix failed on Windows.",
       "This is broken on Windows.",
       "This breaks Windows.",

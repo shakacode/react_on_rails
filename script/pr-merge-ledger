@@ -149,6 +149,16 @@ class PrMergeLedger
     [\s\S]{0,80}
     \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
   /ix
+  FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN = /
+    this|that|it|fix|change|patch|issue|tests?|specs?|suites?|cases?
+  /ix
+  FAILURE_DISPOSITION_REPLY_VERB_PATTERN = /
+    fail(?:s|ed|ing)?|
+    break(?:s|ing)?|broke|broken|
+    red|
+    repro(?:s)?|reproduc(?:e[sd]?|ing)|
+    occurs?|happens?
+  /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
       \b(?:
@@ -161,17 +171,17 @@ class PrMergeLedger
     (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
       [\s\S]{0,80}
-      \b(?:fail(?:s|ed|ing)?|broken|red|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\b
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
     (?:
-      \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
+      \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
       (?:\s+\S+){0,6}\s+
-      \b(?:fails?|failed|breaks?|broke|broken|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\b
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
     (?:
       \b(?:ci|build|job|workflow|checks?)\b
       [\s\S]{0,80}
-      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
     \bregressed\b|
     \bregression(?:s)?\b(?![-\s]+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
@@ -1208,14 +1218,14 @@ class PrMergeLedger
     )
     body = body.gsub(
       /
-        \b(?:this|that|it|fix|change|patch|issue|test|spec|suite|case)\b
+        \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
         (?:\s+\S+){0,6}\s+
         \b(?:
           not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
           (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
         )\b
         (?:\s+\S+){0,3}\s+
-        \bfail(?:s|ed|ing)?\b
+        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
       /ix,
       ""
     )
@@ -1228,7 +1238,7 @@ class PrMergeLedger
           (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
         )\b
         (?:\s+\S+){0,3}\s+
-        \bfail(?:s|ed|ing)?\b
+        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
       /ix,
       ""
     )
