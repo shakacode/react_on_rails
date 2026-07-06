@@ -69,7 +69,7 @@ parser = OptionParser.new do |opts|
                 "SUITE: core | pro | pro-node-renderer"
   opts.on("--testbed NAME", "Bencher testbed to report to (default: m1-bench)") { |v| options[:testbed] = v }
   opts.on("--branch NAME", "Bencher branch/series (default: the checked-out git ref)") { |v| options[:branch] = v }
-  opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_KEY)") do |v|
+  opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_KEY or BENCHER_API_TOKEN)") do |v|
     options[:upload] = v
   end
   opts.on("--fail-on-alert", "Exit non-zero if Bencher flags a regression") { options[:fail_on_alert] = true }
@@ -92,12 +92,16 @@ abort parser.help if suite_id.nil?
 suite = SUITES.find { |s| s[:id] == suite_id }
 abort "Unknown suite #{suite_id.inspect}. Supported: core, pro, pro-node-renderer." if suite.nil?
 
-# Fail fast on upload prerequisites BEFORE the long build + benchmark, so a missing token or
+upload_env = {}
+# Fail fast on upload prerequisites BEFORE the long build + benchmark, so a missing credential or
 # CLI doesn't waste a full dedicated-hardware run that can't be recorded. Treat an empty string
 # as unset (BENCHER_API_KEY= would otherwise pass and only fail at upload).
 if options[:upload]
   begin
-    BencherToken.validate_api_key!(ENV.fetch("BENCHER_API_KEY", nil))
+    upload_env = BencherToken.upload_env(
+      api_key: ENV.fetch("BENCHER_API_KEY", nil),
+      api_token: ENV.fetch("BENCHER_API_TOKEN", nil)
+    )
   rescue BencherToken::InvalidToken => e
     abort e.message
   end
@@ -367,6 +371,9 @@ start_point_args = if branch == "main"
                      ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
                    end
 ENV["BENCHER_TESTBED"] = options[:testbed]
+upload_env.each do |key, value|
+  value.nil? ? ENV.delete(key) : ENV[key] = value
+end
 # BencherRunner#run already echoes the CLI's stderr, so don't print it again here.
 result = BencherRunner.new(benchmark_json:, report_json:).run(branch:, start_point_args:)
 

@@ -63,6 +63,13 @@ RSpec.describe "run-local-benchmark-comparison" do
     expect(stderr).to include("A/B scenario names must be distinct")
   end
 
+  it "rejects non-positive quiet sample counts before mutating thresholds" do
+    _stdout, stderr, status = run_script("--quiet-samples", "0")
+
+    expect(status).not_to be_success
+    expect(stderr).to include("--quiet-samples must be positive")
+  end
+
   it "rejects baselines and candidates that do not match a scenario name" do
     _stdout, stderr, status = run_script(
       "--a-ref", "main",

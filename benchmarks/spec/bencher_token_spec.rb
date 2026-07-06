@@ -43,4 +43,30 @@ RSpec.describe BencherToken do
         .to raise_error(BencherToken::InvalidToken, /must be a Bencher API key/)
     end
   end
+
+  describe ".upload_env" do
+    it "prefers a valid API key and clears the legacy token" do
+      expect(described_class.upload_env(api_key: " bencher_run_123 ", api_token: "legacy-token")).to eq(
+        "BENCHER_API_KEY" => "bencher_run_123",
+        "BENCHER_API_TOKEN" => nil
+      )
+    end
+
+    it "uses a legacy token when no API key is present" do
+      expect(described_class.upload_env(api_key: nil, api_token: " legacy-token ")).to eq(
+        "BENCHER_API_KEY" => nil,
+        "BENCHER_API_TOKEN" => "legacy-token"
+      )
+    end
+  end
+
+  describe ".apply_upload_env!" do
+    it "removes the unused credential from the target environment" do
+      env = { "BENCHER_API_KEY" => "old-key", "BENCHER_API_TOKEN" => "old-token" }
+
+      described_class.apply_upload_env!(env, api_key: "bencher_run_123", api_token: "legacy-token")
+
+      expect(env).to eq("BENCHER_API_KEY" => "bencher_run_123")
+    end
+  end
 end

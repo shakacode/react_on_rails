@@ -710,7 +710,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - **Remove hosted readiness when no longer needed** with `+ci-stop-hosted` if the PR returns to active iteration. Use `+ci-stop-full` when only the force-full override should be removed and optimized hosted CI should remain.
 - **Record intentional hosted-CI waivers** with `+ci-skip-hosted [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run hosted CI.
 - **Prefer comment commands for agents and batch coordinators.** A direct label added by a local human/user token can start label-triggered workflows; a label added by a GitHub workflow's `GITHUB_TOKEN` cannot. Agents should use `+ci-run-hosted` or `+ci-force-full` unless a human explicitly uses the local helper or direct label path.
-- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: ready-for-hosted-ci`, `Labels: force-full-hosted-ci`, `Labels: benchmark`, `Labels: ready-for-hosted-ci, benchmark`, or `Labels: ready-for-hosted-ci, force-full-hosted-ci`, with one sentence explaining why.
+- In PR descriptions and handoffs, state the recommended label decision explicitly: `Labels: none`, `Labels: ready-for-hosted-ci`, `Labels: force-full-hosted-ci`, or `Labels: ready-for-hosted-ci, force-full-hosted-ci`, with one sentence explaining why. For performance-sensitive PRs, record the local benchmark decision separately, for example `Benchmarks: local M1 A/B required`, `Benchmarks: local M1 A/B run`, or `Benchmarks: not applicable`.
 
 ### For All PRs
 
@@ -720,7 +720,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - If branch protection still reports `REVIEW_REQUIRED`, verify whether a formal GitHub approving review is missing. Positive AI issue comments such as "LGTM" or "Ready to merge" support triage but do not satisfy a required review.
 - Security-category findings such as XSS, injection, exposed secrets, or auth bypass still require investigation before dismissal, regardless of source.
 - Treat public review requests as durable GitHub writes. Do not use live PRs for reviewer-bot debugging, placeholder/test review bodies, or pasted instruction dumps; use a sandbox repo, private test repo, or clearly labeled dedicated draft PR instead.
-- For `ready-for-hosted-ci`, `force-full-hosted-ci`, `benchmark`, accelerated-RC, high-risk, concurrent-batch, or
+- For `ready-for-hosted-ci`, `force-full-hosted-ci`, accelerated-RC, high-risk, concurrent-batch, or
   repeatedly churny PRs, avoid nit-only, comment-only, optional wording-only, or
   evidence-only pushes after the declared final candidate has completed its
   configured review pass. Treat a PR as repeatedly churny after two or more

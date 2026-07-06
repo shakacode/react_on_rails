@@ -153,7 +153,8 @@ if __FILE__ == $PROGRAM_NAME
   SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
   REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
   begin
-    BencherToken.validate_upload_auth!(
+    BencherToken.apply_upload_env!(
+      ENV,
       api_key: ENV.fetch("BENCHER_API_KEY", nil),
       api_token: ENV.fetch("BENCHER_API_TOKEN", nil)
     )

@@ -88,6 +88,8 @@ parser = OptionParser.new do |opts|
     options[:quiet_thresholds].max_top_process_percent = value
   end
   opts.on("--quiet-samples N", Integer, "Consecutive quiet samples required (default: 6)") do |value|
+    abort "--quiet-samples must be positive." unless value.positive?
+
     options[:quiet_thresholds].required_samples = value
   end
   opts.on("--quiet-interval SECONDS", Integer, "Quiet sample interval (default: 10)") do |value|

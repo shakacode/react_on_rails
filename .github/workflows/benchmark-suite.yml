@@ -422,7 +422,7 @@ jobs:
       - name: Track benchmarks with Bencher
         env:
           BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
-          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_KEY == '' && secrets.BENCHER_API_TOKEN || '' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
