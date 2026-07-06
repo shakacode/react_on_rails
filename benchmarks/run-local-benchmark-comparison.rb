@@ -24,6 +24,7 @@ REPO_ROOT = File.expand_path("..", __dir__)
 RUNNER_SHIM_FILES = %w[
   benchmarks/generate_matrix.rb
   benchmarks/bench.rb
+  benchmarks/k6.ts
   benchmarks/bench-node-renderer.rb
   benchmarks/run-local-benchmark.rb
   benchmarks/lib/benchmark_config.rb
@@ -38,6 +39,7 @@ RUNNER_SHIM_FILES = %w[
   benchmarks/lib/github.rb
   benchmarks/lib/local_benchmark_runner/process_wait.rb
 ].freeze
+MAX_MARKDOWN_ROUTE_ROWS = 10
 
 options = {
   repetitions: 3,
@@ -273,13 +275,21 @@ end
 
 def top_route_groups(summary)
   routes = summary.route_summaries.values
+  improvements = routes.select { |route| route.rps_delta_percent&.positive? }
+                       .sort_by { |route| -route.rps_delta_percent }
+  regressions = routes.select { |route| route.rps_delta_percent&.negative? }
+                      .sort_by(&:rps_delta_percent)
+
   {
-    improvements: routes.select { |route| route.rps_delta_percent&.positive? }
-                        .sort_by { |route| -route.rps_delta_percent }
-                        .first(10),
-    regressions: routes.select { |route| route.rps_delta_percent&.negative? }
-                       .sort_by(&:rps_delta_percent)
-                       .first(10)
+    improvements: route_group(improvements),
+    regressions: route_group(regressions)
+  }
+end
+
+def route_group(sorted_routes)
+  {
+    rows: sorted_routes.first(MAX_MARKDOWN_ROUTE_ROWS),
+    total_count: sorted_routes.size
   }
 end
 
@@ -308,9 +318,18 @@ def write_markdown_metadata(file, summary)
   file.puts
 end
 
-def write_markdown_section(file, title, rows)
+def write_markdown_section(file, title, group)
+  rows = group.fetch(:rows)
+  total_count = group.fetch(:total_count)
+
   file.puts "## #{title}"
   file.puts
+  if total_count > rows.size
+    message = "_Showing #{rows.size} of #{total_count} routes. " \
+              "Full data is in `comparison_summary.json`._"
+    file.puts message
+    file.puts
+  end
   write_markdown_rows(file, rows)
   file.puts
 end
