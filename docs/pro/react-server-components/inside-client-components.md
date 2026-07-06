@@ -451,6 +451,10 @@ payload. Set it to `false` only when deliberately warming a sibling root for the
 component and props.
 Build `componentProps` from the same object or shared helper for the loader and `RSCRoute`; the cache
 key uses JSON serialization, so equivalent objects with different key insertion order will not match.
+`prefetchServerComponent` and `RSCRoute` must also resolve to the same `react-on-rails-pro` module
+instance so they share the page-global prefetch store. If prefetch calls succeed but `RSCRoute` still
+does a fresh fetch, check that your bundler is not duplicating `react-on-rails-pro` across independent
+chunks.
 
 ### Using `Outlet` in server components
 
