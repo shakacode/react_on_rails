@@ -64,9 +64,44 @@ module ReactOnRailsPro
 
   module Stream # rubocop:disable Metrics/ModuleLength
     extend ActiveSupport::Concern
+    RENDERER_SERVER_TIMING_COLLECTOR_KEY = :react_on_rails_pro_rsc_stream_renderer_server_timing_entries
+    private_constant :RENDERER_SERVER_TIMING_COLLECTOR_KEY
 
     included do
       include ActionController::Live
+    end
+
+    class << self
+      def record_renderer_response_headers(headers)
+        collector = Thread.current.thread_variable_get(RENDERER_SERVER_TIMING_COLLECTOR_KEY)
+        return unless collector
+
+        server_timing_values(headers).each do |value|
+          next if value.blank?
+
+          collector << value
+        end
+      end
+
+      private
+
+      def server_timing_values(headers)
+        return [] unless headers
+
+        pairs = if headers.respond_to?(:to_a)
+                  headers.to_a
+                elsif headers.respond_to?(:to_h)
+                  headers.to_h.to_a
+                else
+                  Array(headers)
+                end
+
+        pairs.each_with_object([]) do |(name, value), values|
+          next unless name.to_s.casecmp("server-timing").zero?
+
+          values.concat(Array(value).flatten.compact.map(&:to_s))
+        end
+      end
     end
 
     # Streams React components within a specified template to the client.
@@ -163,7 +198,9 @@ module ReactOnRailsPro
         enabled: @react_on_rails_rsc_stream_observability,
         started_at: @react_on_rails_rsc_stream_started_at,
         initial_chunk_bytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
-        initial_render_duration_ms: @react_on_rails_rsc_stream_initial_render_duration_ms
+        initial_render_duration_ms: @react_on_rails_rsc_stream_initial_render_duration_ms,
+        renderer_server_timing_entries: @react_on_rails_rsc_stream_renderer_server_timing_entries,
+        renderer_server_timing_collector: Thread.current.thread_variable_get(RENDERER_SERVER_TIMING_COLLECTOR_KEY)
       }
     end
 
@@ -172,6 +209,11 @@ module ReactOnRailsPro
       @react_on_rails_rsc_stream_started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       @react_on_rails_rsc_stream_initial_chunk_bytes = nil
       @react_on_rails_rsc_stream_initial_render_duration_ms = nil
+      @react_on_rails_rsc_stream_renderer_server_timing_entries = []
+      Thread.current.thread_variable_set(
+        RENDERER_SERVER_TIMING_COLLECTOR_KEY,
+        @react_on_rails_rsc_stream_observability ? @react_on_rails_rsc_stream_renderer_server_timing_entries : nil
+      )
     end
 
     def restore_rsc_stream_observability_state(state)
@@ -179,6 +221,11 @@ module ReactOnRailsPro
       @react_on_rails_rsc_stream_started_at = state[:started_at]
       @react_on_rails_rsc_stream_initial_chunk_bytes = state[:initial_chunk_bytes]
       @react_on_rails_rsc_stream_initial_render_duration_ms = state[:initial_render_duration_ms]
+      @react_on_rails_rsc_stream_renderer_server_timing_entries = state[:renderer_server_timing_entries]
+      Thread.current.thread_variable_set(
+        RENDERER_SERVER_TIMING_COLLECTOR_KEY,
+        state[:renderer_server_timing_collector]
+      )
     end
 
     def render_stream_template_chunk(template:, render_options:)
@@ -207,9 +254,9 @@ module ReactOnRailsPro
     #   ActionController::Live does not support HTTP trailers, so that figure is exposed via the
     #   `rsc_stream_observability` PerformanceMark (`sinceStreamStartMs`) instead of a header.
     # - The renderer worker's own internal breakdown (exec-context build + render start) is
-    #   emitted as a `Server-Timing` header on the Node renderer's HTTP response; merging it
-    #   into this header is a documented follow-up because RendererHttpClient::Response does not
-    #   yet capture renderer response headers.
+    #   emitted as a `Server-Timing` header on the Node renderer's HTTP response. The renderer
+    #   response headers are captured while waiting for first chunks, then appended here before
+    #   ActionController::Live commits the browser response.
     def emit_rsc_stream_server_timing_header
       return unless rsc_stream_observability_enabled?
 
@@ -219,7 +266,7 @@ module ReactOnRailsPro
       desc = server_timing_quoted_string("RoR Pro streamed RSC shell render (includes first renderer chunk)")
       entry = "ror_stream_shell;dur=#{duration};desc=\"#{desc}\""
       existing = response.headers["Server-Timing"]
-      entries = Array(existing).flatten.compact.reject(&:blank?) + [entry]
+      entries = Array(existing).flatten.compact.reject(&:blank?) + [entry] + renderer_server_timing_entries
       response.headers["Server-Timing"] = entries.join(", ")
     rescue StandardError => e
       # Observability must never break a real response. Swallow and log.
@@ -230,6 +277,10 @@ module ReactOnRailsPro
       rescue StandardError
         # Logging itself can fail if the logger is unavailable; keep the response alive.
       end
+    end
+
+    def renderer_server_timing_entries
+      Array(@react_on_rails_rsc_stream_renderer_server_timing_entries).flatten.compact.reject(&:blank?)
     end
 
     def server_timing_quoted_string(value)

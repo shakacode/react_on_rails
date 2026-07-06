@@ -22,12 +22,15 @@ class StreamController
 
   attr_reader :response
 
-  def initialize(component_queues:, initial_response: "TEMPLATE")
+  def initialize(component_queues:, initial_response: "TEMPLATE", renderer_response_headers: nil)
     @component_queues = component_queues
     @initial_response = initial_response
+    @renderer_response_headers = renderer_response_headers
   end
 
   def render_to_string(**_opts)
+    ReactOnRailsPro::Stream.record_renderer_response_headers(@renderer_response_headers)
+
     # Simulate component helpers creating async tasks
     # In real implementation, first chunks are part of template HTML
     # For testing, we enqueue all chunks including first ones
@@ -57,9 +60,9 @@ RSpec.describe ReactOnRailsPro::Stream do
       end
     end
 
-    def setup_stream_test(component_count: 2, initial_response: "TEMPLATE")
+    def setup_stream_test(component_count: 2, initial_response: "TEMPLATE", renderer_response_headers: nil)
       component_queues = Array.new(component_count) { Async::Queue.new }
-      controller = StreamController.new(component_queues:, initial_response:)
+      controller = StreamController.new(component_queues:, initial_response:, renderer_response_headers:)
 
       mocked_response, mocked_stream = build_mocked_response
       allow(controller).to receive(:response).and_return(mocked_response)
@@ -223,6 +226,25 @@ RSpec.describe ReactOnRailsPro::Stream do
 
       server_timing = controller.response.headers["Server-Timing"]
       expect(server_timing).to start_with("action_total;dur=5, ror_stream_shell;dur=")
+    end
+
+    it "appends renderer Server-Timing entries to the browser-visible stream header" do
+      renderer_server_timing = "ror_renderer_prepare;dur=7;desc=\"Node renderer prepare\""
+      _queues, controller, stream = setup_stream_test(
+        component_count: 0,
+        renderer_response_headers: { "server-timing" => [renderer_server_timing] }
+      )
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = "action_total;dur=5"
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to include("action_total;dur=5")
+      expect(server_timing).to include("ror_stream_shell;dur=")
+      expect(server_timing).to end_with(renderer_server_timing)
     end
 
     it "appends to array-valued Server-Timing headers without stringifying the array" do
