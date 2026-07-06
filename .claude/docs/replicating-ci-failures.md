@@ -21,7 +21,7 @@
 
 The project tests against two configurations:
 
-- **Latest**: Ruby 4.0, Node 22, Shakapacker 10.2.0, React 19 (runs on all PRs)
+- **Latest**: Ruby 4.0, Node 22, Shakapacker 10.3.0, React 19 (runs on all PRs)
 - **Minimum**: Ruby 3.3, Node 20, Shakapacker 8.2.0, React 18 (runs only on master)
 
 ```bash

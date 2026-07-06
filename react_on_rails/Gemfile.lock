@@ -331,7 +331,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (10.2.0)
+    shakapacker (10.3.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -443,7 +443,7 @@ DEPENDENCIES
   sass-rails (~> 6.0)
   sdoc
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 10.2.0)
+  shakapacker (= 10.3.0)
   simplecov (~> 0.16.1)
   spring (~> 4.0)
   sprockets (~> 4.0)

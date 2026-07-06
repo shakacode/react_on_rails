@@ -119,7 +119,7 @@ Start with the docs here:
 ## Requirements
 
 - Ruby on Rails >= 5.2
-- Shakapacker >= 6.0 (autobundling requires >= 7.0; CI tested: 8.2.0 - 10.2.0)
+- Shakapacker >= 6.0 (autobundling requires >= 7.0; CI tested: 8.2.0 - 10.3.0)
 - Ruby >= 3.3 (CI tested: 3.3 - 4.0)
 - Node.js >= 18
 - A JavaScript package manager such as pnpm, npm, yarn, or bun

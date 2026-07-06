@@ -305,7 +305,7 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    shakapacker (10.2.0)
+    shakapacker (10.3.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -364,7 +364,7 @@ DEPENDENCIES
   react_on_rails!
   react_on_rails_pro!
   selenium-webdriver
-  shakapacker (= 10.2.0)
+  shakapacker (= 10.3.0)
   sprockets-rails
   sqlite3 (~> 1.4)
   tzinfo-data
