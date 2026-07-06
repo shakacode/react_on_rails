@@ -2509,6 +2509,7 @@ RSpec.describe "script/pr-merge-ledger" do
                         "Validation: pnpm test -- colors.test.ts. " \
                         "#{long_validation_tail}",
               "author" => { "login" => "justin808" },
+              "authorAssociation" => "MEMBER",
               "createdAt" => "2026-06-01T00:05:00Z",
               "outdated" => false,
               "replyTo" => { "id" => "finding-comment" },
@@ -2557,11 +2558,88 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not infer fixed dispositions from untrusted direct replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "external-contributor" },
+              "authorAssociation" => "CONTRIBUTOR",
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-untrusted-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
   it "infers fixed dispositions from direct replies that report no regressions" do
     [
       "Fixed in current head `current`. No regression observed on Windows. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Addressed by current head `current`. No regressions found in manual testing. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No more regressions found in manual testing. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Addressed by current head `current`. No other regressions found in manual testing. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
@@ -2730,7 +2808,7 @@ RSpec.describe "script/pr-merge-ledger" do
             {
               "id" => "reply-comment",
               "url" => "https://example.com/reply-comment",
-              "body" => "\nFixed in v1.2, right?",
+              "body" => "\nFixed in current head `current`. Does this look right?",
               "author" => { "login" => "reviewer" },
               "createdAt" => "2026-06-01T00:05:00Z",
               "outdated" => false,
@@ -3003,7 +3081,9 @@ RSpec.describe "script/pr-merge-ledger" do
     [
       "Fixed in current head, but not fixed on Windows.",
       "Fixed in current head `current`. CI is red.",
-      "Addressed by abc123, though the build is broken."
+      "Addressed by abc123, though the build is broken.",
+      "Fixed in current head `current`, but this doesn't address Windows.",
+      "Fixed in current head `current`, but this doesn\u2019t fix Windows."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
@@ -3329,6 +3409,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "CI is no longer passing on Windows.",
       "This doesn't pass on Windows.",
       "CI does not pass on Windows.",
+      "This doesn't address Windows.",
+      "This doesn\u2019t fix Windows.",
       "This fails on Windows.",
       "The fix failed on Windows."
     ].each do |reply_body|
@@ -3581,7 +3663,7 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
-  it "does not infer fixed dispositions from stale direct replies" do
+  it "infers fixed dispositions from non-outdated direct replies on current review threads" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
       "pull_request" => {
@@ -3622,11 +3704,11 @@ RSpec.describe "script/pr-merge-ledger" do
       "comments" => []
     }
 
-    Tempfile.create(["pr-merge-ledger-stale-fixed-reply", ".json"]) do |file|
+    Tempfile.create(["pr-merge-ledger-non-outdated-fixed-reply", ".json"]) do |file|
       write_fixture(file, fixture)
       file.flush
 
-      stdout, _stderr, status = Open3.capture3(
+      stdout, stderr, status = Open3.capture3(
         script_path,
         "--fixture",
         file.path,
@@ -3636,20 +3718,18 @@ RSpec.describe "script/pr-merge-ledger" do
         chdir: repo_root
       )
 
-      expect(status).not_to be_success
+      expect(status).to be_success, stderr
 
       report = JSON.parse(stdout)
       finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
 
-      expect(report.fetch("complete_allowed")).to be(false)
+      expect(report.fetch("complete_allowed")).to be(true)
       expect(finding).to include(
         "id" => "finding-comment",
         "severity" => "P2",
-        "disposition" => "UNKNOWN"
+        "disposition" => "fixed"
       )
-      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-        "unknown_priority_finding_disposition"
-      )
+      expect(finding.fetch("evidence")).to include("https://example.com/reply-comment")
     end
   end
 
@@ -3662,7 +3742,13 @@ RSpec.describe "script/pr-merge-ledger" do
       "Addressed by https://github.com/shakacode/react_on_rails/pull/123.",
       "Fixed in part, will follow up separately.",
       "Fixed in general but there is a follow-up needed.",
-      "Fixed in a hacky way, might need revisit later on."
+      "Fixed in a hacky way, might need revisit later on.",
+      "Fixed in current head for now.",
+      "Addressed by current head temporarily.",
+      "Fixed in current head as a stopgap.",
+      "Fixed in current head `current`. I believe this should work.",
+      "Addressed by current head `current`. Probably fixed now.",
+      "Fixed in current head `current`. I haven't tested it yet."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",

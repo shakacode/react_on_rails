@@ -130,11 +130,12 @@ class PrMergeLedger
     (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
   }ix
   FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
+  TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
       \b(?:not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|no\s+longer)\b
       (?:\s+\S+){0,3}\s+
-      \b(?:fixed|addressed|resolved|work(?:s|ed|ing)?|pass(?:es|ed|ing)?)\b
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|pass(?:es|ed|ing)?)\b
     )|
     (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
@@ -178,6 +179,9 @@ class PrMergeLedger
   }ix
   HEDGED_FIXED_DISPOSITION_REPLY_PATTERN = /
     \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
+    \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
+    \b(?:i\s+(?:think|believe)|probably|should\s+be|not\s+(?:100%\s+)?sure|untested|unverified)\b|
+    \b(?:haven't|have\s+not)\s+(?:tested|verified|confirmed)\b|
     \bwill\s+follow\s+up\b|
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
     \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
@@ -713,6 +717,7 @@ class PrMergeLedger
       "line" => comment["line"],
       "created_at" => comment["createdAt"],
       "author" => comment.dig("author", "login"),
+      "author_association" => comment["authorAssociation"],
       "body" => comment["body"].to_s,
       "outdated" => comment["outdated"] == true,
       "reply_to_id" => comment.dig("replyTo", "id"),
@@ -1069,11 +1074,12 @@ class PrMergeLedger
 
   def inferred_dispositions_by_comment_id(thread, comments)
     return {} unless thread.fetch("is_resolved")
+    return {} unless thread.fetch("current_head")
 
     root_comment_ids = root_comment_ids_by_comment_id(comments)
     replies = comments
               .select do |comment|
-                comment["reply_to_id"] && comment.fetch("current_head") && !comment.fetch("outdated")
+                comment["reply_to_id"] && !comment.fetch("outdated")
               end
     sorted_reply_pairs = replies.each_with_index.to_a.sort_by do |comment, index|
       [timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at"), index]
@@ -1121,18 +1127,20 @@ class PrMergeLedger
 
   def inferred_disposition_from_reply(reply, clear_disposition_reply: clear_inferred_disposition_reply?(reply))
     body = reply.fetch("body").to_s
-    normalized_body = body.lstrip
+    normalized_body = normalized_disposition_reply_body(body)
     return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+    return nil unless trusted_disposition_reply_author?(reply)
 
     {
       "disposition" => "fixed",
-      "evidence" => "resolved review-thread reply #{reply.fetch('url')}: #{excerpt(body)}"
+      "evidence" => "resolved review-thread reply #{reply.fetch('url')} by #{reply['author'] || 'UNKNOWN'}: " \
+                    "#{excerpt(body)}"
     }
   end
 
   def clear_inferred_disposition_reply?(reply)
-    normalized_body = reply.fetch("body").to_s.lstrip
+    normalized_body = normalized_disposition_reply_body(reply.fetch("body"))
     return true if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
     return true if hedged_fixed_disposition_reply?(normalized_body)
     return true if ambiguous_fixed_disposition_reply?(normalized_body)
@@ -1141,7 +1149,7 @@ class PrMergeLedger
   end
 
   def contradicted_disposition_reply?(normalized_body)
-    body = normalized_body.gsub(/\bno\s+(?:new\s+|known\s+)?regressions?\b/i, "")
+    body = normalized_body.gsub(/\bno\s+(?:(?:new|known|more|other|additional)\s+){0,3}regressions?\b/i, "")
 
     body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
   end
@@ -1152,10 +1160,30 @@ class PrMergeLedger
   end
 
   def ambiguous_fixed_disposition_reply?(normalized_body)
-    sentence_boundary = normalized_body.match(/[!\r\n]|\.(?=\s+[A-Z]|\s*\z)/)
-    first_sentence = sentence_boundary ? normalized_body[0...sentence_boundary.begin(0)] : normalized_body
-    first_sentence_without_urls = first_sentence.gsub(%r{https?://\S+}, "")
-    first_sentence.match?(FIXED_DISPOSITION_REPLY_PATTERN) && first_sentence_without_urls.include?("?")
+    return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+
+    body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
+    sentence_boundary = body_without_urls.match(/[!\r\n.]/)
+    first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
+    return true if first_sentence.include?("?")
+
+    follow_up = sentence_boundary ? body_without_urls[sentence_boundary.end(0)..].to_s : ""
+    follow_up.match?(
+      /\b(?:can|could)\s+you\s+(?:confirm|verify|check)\b|
+       \b(?:does|do|did|would)\s+this\s+(?:look|cover|address|fix|work)\b|
+       \b(?:is|are)\s+this\s+(?:right|okay|ok)\b/ix
+    )
+  end
+
+  def trusted_disposition_reply_author?(reply)
+    association = reply["author_association"]
+    return true if association.nil?
+
+    TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS.include?(association)
+  end
+
+  def normalized_disposition_reply_body(body)
+    body.to_s.lstrip.gsub(/[\u2018\u2019]/, "'")
   end
 
   def inferred_disposition_for(finding, context, disposition)
@@ -2036,6 +2064,7 @@ class PrMergeLedger
                       databaseId
                       body
                       author { login }
+                      authorAssociation
                       url
                       path
                       line
@@ -2073,6 +2102,7 @@ class PrMergeLedger
                   databaseId
                   body
                   author { login }
+                  authorAssociation
                   url
                   path
                   line
