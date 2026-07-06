@@ -2894,6 +2894,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Added a test that fails before the fix and passes after. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. CI failed before the fix and passes now. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. The build failed before the fix and passes now. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Positive fixed replies with before/after regression-test evidence " \
       "remain inferable. Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI no longer fails on Windows. " \
@@ -3966,6 +3970,115 @@ RSpec.describe "script/pr-merge-ledger" do
         "id" => "finding-comment",
         "severity" => "P2",
         "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "keeps root fixed dispositions after later nested finding contradictions" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "root-finding-comment",
+              "url" => "https://example.com/root-finding-comment",
+              "body" => "[P2] Preserve root disposition handling.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "root-fixed-reply-comment",
+              "url" => "https://example.com/root-fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- root.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "root-finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-finding-comment",
+              "url" => "https://example.com/nested-finding-comment",
+              "body" => "[P2] Preserve nested disposition handling.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "root-finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-fixed-reply-comment",
+              "url" => "https://example.com/nested-fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- nested.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:15:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "nested-finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-regression-reply-comment",
+              "url" => "https://example.com/nested-regression-reply-comment",
+              "body" => "This still fails on Windows.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:20:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "nested-finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-later-nested-finding-contradictory-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(findings).to contain_exactly(
+        include(
+          "id" => "root-finding-comment",
+          "severity" => "P2",
+          "disposition" => "fixed"
+        ),
+        include(
+          "id" => "nested-finding-comment",
+          "severity" => "P2",
+          "disposition" => "UNKNOWN"
+        )
       )
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "unknown_priority_finding_disposition"

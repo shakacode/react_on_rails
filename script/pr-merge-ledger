@@ -142,7 +142,8 @@ class PrMergeLedger
     \bregression[- ]free\b|
     \b(?:has|have|had|is|are|was|were)\s+not\s+regressed\b|
     \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
-    \b(?:test|tests|spec|specs|case|coverage)(?:\s+\S+){0,6}\s+fail(?:s|ed|ing)?\s+
+    \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
+      fail(?:s|ed|ing)?\s+
       before\s+(?:the\s+)?fix\b
   /ix
   UNRELATED_FAILURE_REPLY_PATTERN = /
@@ -1204,9 +1205,24 @@ class PrMergeLedger
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_disposition_reply
-      inferred.delete(reply_to_id)
-      inferred.delete(root_reply_to_id)
+      inferred.delete(
+        clear_disposition_target_id(
+          inferred,
+          reply_to_id,
+          root_reply_to_id:,
+          target_comment:
+        )
+      )
     end
+  end
+
+  def clear_disposition_target_id(inferred, reply_to_id, root_reply_to_id:, target_comment:)
+    return reply_to_id if inferred.key?(reply_to_id)
+
+    parent_id = target_comment && target_comment["reply_to_id"]
+    return parent_id if parent_id && inferred.key?(parent_id)
+
+    root_reply_to_id
   end
 
   def inferred_disposition_from_reply(
