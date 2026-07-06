@@ -2920,6 +2920,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI is no longer broken. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No need to reopen. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This fixes the failing test on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
@@ -4253,7 +4255,8 @@ RSpec.describe "script/pr-merge-ledger" do
     [
       "Thanks, that looks good.",
       "Not a big deal, but fixed it in the latest commit.",
-      "By the way, unrelated flaky CI checks are failing on main today, nothing to do with this thread."
+      "By the way, unrelated flaky CI checks are failing on main today, nothing to do with this thread.",
+      "CI is failing on main today, unrelated to this thread."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",

@@ -147,15 +147,26 @@ class PrMergeLedger
       before\s+(?:the\s+)?fix\b
   /ix
   UNRELATED_FAILURE_REPLY_PATTERN = /
-    \b(?:unrelated|separate)\b
-    [\s\S]{0,120}
-    \b(?:ci|build|job|workflow|checks?)\b
-    [\s\S]{0,120}
-    \b(?:fail(?:s|ed|ing)?|broken|red)\b
-    [\s\S]{0,120}
-    \b(?:nothing\s+to\s+do\s+with|unrelated\s+to)\b
-    [\s\S]{0,80}
-    \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+    (?:
+      \b(?:unrelated|separate)\b
+      [\s\S]{0,120}
+      \b(?:ci|build|job|workflow|checks?)\b
+      [\s\S]{0,120}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      [\s\S]{0,120}
+      \b(?:nothing\s+to\s+do\s+with|unrelated\s+to)\b
+      [\s\S]{0,80}
+      \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+    )|
+    (?:
+      \b(?:ci|build|job|workflow|checks?)\b
+      [\s\S]{0,120}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      [\s\S]{0,120}
+      \b(?:unrelated|separate)\b
+      [\s\S]{0,80}
+      \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+    )
   /ix
   FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN = /
     this|that|it|fix|change|patch|issue|tests?|specs?|suites?|cases?
@@ -214,6 +225,10 @@ class PrMergeLedger
     \bregressed\b|
     \bregression(?:s)?\b(?![-\s]+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
     \breopen\b
+  /ix
+  NEGATED_REOPEN_REPLY_PATTERN = /
+    \b(?:no\s+need\s+to|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|should(?:\s+not|n't)|never)\s+reopen\b|
+    \breopen(?:ing)?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
@@ -1263,6 +1278,7 @@ class PrMergeLedger
     body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
     body = body.gsub(UNRELATED_FAILURE_REPLY_PATTERN, "")
     body = body.gsub(FIXED_FAILURE_REFERENCE_REPLY_PATTERN, "")
+    body = body.gsub(NEGATED_REOPEN_REPLY_PATTERN, "")
     body = body.gsub(
       /
         \bno\s+longer\s+
