@@ -1164,12 +1164,15 @@ module ReactOnRailsProHelper
     # Async::Promise replaces Async::Variable (deprecated in async v2.29.0).
     first_chunk_promise = Async::Promise.new
     all_chunks = [] if on_complete # Only collect if callback provided
+    renderer_server_timing_collector = ReactOnRailsPro::Stream.renderer_server_timing_collector
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
-      stream = yield
-      fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
-      on_complete&.call(all_chunks) if fully_consumed
+      ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector) do
+        stream = yield
+        fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
+        on_complete&.call(all_chunks) if fully_consumed
+      end
     rescue StandardError => e
       # Propagate the error to the calling fiber via the promise.
       # A promise can only be resolved/rejected once — check before acting.

@@ -73,17 +73,54 @@ module ReactOnRailsPro
 
     class << self
       def record_renderer_response_headers(headers)
-        collector = Thread.current.thread_variable_get(RENDERER_SERVER_TIMING_COLLECTOR_KEY)
+        collector = renderer_server_timing_collector
         return unless collector
 
         server_timing_values(headers).each do |value|
-          next if value.blank?
+          entry = sanitize_server_timing_header_entry(value)
+          next if entry.blank?
 
-          collector << value
+          collector << entry
         end
       end
 
+      def renderer_server_timing_collector
+        Thread.current[RENDERER_SERVER_TIMING_COLLECTOR_KEY]
+      end
+
+      def renderer_server_timing_collector=(collector)
+        Thread.current[RENDERER_SERVER_TIMING_COLLECTOR_KEY] = collector
+      end
+
+      def with_renderer_server_timing_collector(collector)
+        previous_collector = renderer_server_timing_collector
+        self.renderer_server_timing_collector = collector
+        yield
+      ensure
+        self.renderer_server_timing_collector = previous_collector
+      end
+
+      def renderer_server_timing_collector_snapshot
+        collector = renderer_server_timing_collector
+        return unless collector
+
+        { collector:, length: collector.length }
+      end
+
+      def restore_renderer_server_timing_collector_snapshot(snapshot)
+        return unless snapshot
+
+        collector = renderer_server_timing_collector
+        return unless collector.equal?(snapshot[:collector])
+
+        collector.slice!(snapshot[:length]..)
+      end
+
       private
+
+      def sanitize_server_timing_header_entry(value)
+        value.to_s.gsub(/[\r\n\0]/, "")
+      end
 
       def server_timing_values(headers)
         return [] unless headers
@@ -140,45 +177,15 @@ module ReactOnRailsPro
       initialize_rsc_stream_observability_state(rsc_stream_observability)
 
       Sync do |parent_task|
-        # Initialize async primitives for concurrent component streaming
-        @async_barrier = Async::Barrier.new
-        buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
-        @main_output_queue = Async::LimitedQueue.new(buffer_size)
-        @react_on_rails_pending_stream_cache_writes = []
-
-        # Render template - components will start streaming immediately.
-        # If a shell error occurs, consumer_stream_async raises PrerenderError here
-        # (BEFORE the response is committed), enabling a proper HTTP redirect.
-        # View may contain extra newlines, chunk already contains a newline
-        # Having multiple newlines between chunks causes hydration errors
-        # So we strip extra newlines from the template string and add a single newline
-        # `formats: [:text]` causes render_to_string to set response.content_type
-        # to `text/plain`; override it here before the first stream write, which
-        # is when ActionController::Live commits headers. render_to_string itself
-        # never writes to response.stream, so this assignment is always safe.
-        response.content_type = content_type if content_type
-        # Render the shell chunk first so its measured duration is available, then emit the
-        # Server-Timing header, then write. Both steps run BEFORE the first
-        # response.stream.write, which is when ActionController::Live commits response headers.
-        initial_chunk = render_stream_template_chunk(template:, render_options:)
-        emit_rsc_stream_server_timing_header
-        response.stream.write(initial_chunk)
-
-        drain_streams_concurrently(parent_task)
-        write_rsc_stream_observability_mark
-        flush_pending_stream_cache_writes
-        # Do not close the response stream in an ensure block.
-        # If an error occurs we may need the stream open to send diagnostic/error details
-        # (for example, ApplicationController#rescue_from in the dummy app).
-        response.stream.close if close_stream_at_end
-      rescue StandardError
-        # Stop all streaming tasks to prevent leaked async work.
-        # For pre-commit errors (e.g., shell error raised during render_to_string),
-        # the barrier may still have pending tasks that must be cancelled.
-        # For post-commit errors (from drain_streams_concurrently), the barrier
-        # is already stopped inside that method — stopping again is a no-op.
-        stop_streaming_and_flush_cache_writes
-        raise
+        ReactOnRailsPro::Stream.with_renderer_server_timing_collector(renderer_server_timing_collector_for_stream) do
+          stream_view_containing_react_components_in_sync(
+            parent_task,
+            template:,
+            close_stream_at_end:,
+            content_type:,
+            render_options:
+          )
+        end
       end
     ensure
       @react_on_rails_pending_stream_cache_writes = nil
@@ -193,6 +200,54 @@ module ReactOnRailsPro
       require "async/limited_queue"
     end
 
+    def stream_view_containing_react_components_in_sync(
+      parent_task,
+      template:,
+      close_stream_at_end:,
+      content_type:,
+      render_options:
+    )
+      # Initialize async primitives for concurrent component streaming
+      @async_barrier = Async::Barrier.new
+      buffer_size = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+      @main_output_queue = Async::LimitedQueue.new(buffer_size)
+      @react_on_rails_pending_stream_cache_writes = []
+
+      # Render template - components will start streaming immediately.
+      # If a shell error occurs, consumer_stream_async raises PrerenderError here
+      # (BEFORE the response is committed), enabling a proper HTTP redirect.
+      # View may contain extra newlines, chunk already contains a newline
+      # Having multiple newlines between chunks causes hydration errors
+      # So we strip extra newlines from the template string and add a single newline
+      # `formats: [:text]` causes render_to_string to set response.content_type
+      # to `text/plain`; override it here before the first stream write, which
+      # is when ActionController::Live commits headers. render_to_string itself
+      # never writes to response.stream, so this assignment is always safe.
+      response.content_type = content_type if content_type
+      # Render the shell chunk first so its measured duration is available, then emit the
+      # Server-Timing header, then write. Both steps run BEFORE the first
+      # response.stream.write, which is when ActionController::Live commits response headers.
+      initial_chunk = render_stream_template_chunk(template:, render_options:)
+      emit_rsc_stream_server_timing_header
+      response.stream.write(initial_chunk)
+
+      drain_streams_concurrently(parent_task)
+      write_rsc_stream_observability_mark
+      flush_pending_stream_cache_writes
+      # Do not close the response stream in an ensure block.
+      # If an error occurs we may need the stream open to send diagnostic/error details
+      # (for example, ApplicationController#rescue_from in the dummy app).
+      response.stream.close if close_stream_at_end
+    rescue StandardError
+      # Stop all streaming tasks to prevent leaked async work.
+      # For pre-commit errors (e.g., shell error raised during render_to_string),
+      # the barrier may still have pending tasks that must be cancelled.
+      # For post-commit errors (from drain_streams_concurrently), the barrier
+      # is already stopped inside that method — stopping again is a no-op.
+      stop_streaming_and_flush_cache_writes
+      raise
+    end
+
     def current_rsc_stream_observability_state
       {
         enabled: @react_on_rails_rsc_stream_observability,
@@ -200,7 +255,7 @@ module ReactOnRailsPro
         initial_chunk_bytes: @react_on_rails_rsc_stream_initial_chunk_bytes,
         initial_render_duration_ms: @react_on_rails_rsc_stream_initial_render_duration_ms,
         renderer_server_timing_entries: @react_on_rails_rsc_stream_renderer_server_timing_entries,
-        renderer_server_timing_collector: Thread.current.thread_variable_get(RENDERER_SERVER_TIMING_COLLECTOR_KEY)
+        renderer_server_timing_collector: ReactOnRailsPro::Stream.renderer_server_timing_collector
       }
     end
 
@@ -210,10 +265,6 @@ module ReactOnRailsPro
       @react_on_rails_rsc_stream_initial_chunk_bytes = nil
       @react_on_rails_rsc_stream_initial_render_duration_ms = nil
       @react_on_rails_rsc_stream_renderer_server_timing_entries = []
-      Thread.current.thread_variable_set(
-        RENDERER_SERVER_TIMING_COLLECTOR_KEY,
-        @react_on_rails_rsc_stream_observability ? @react_on_rails_rsc_stream_renderer_server_timing_entries : nil
-      )
     end
 
     def restore_rsc_stream_observability_state(state)
@@ -222,10 +273,13 @@ module ReactOnRailsPro
       @react_on_rails_rsc_stream_initial_chunk_bytes = state[:initial_chunk_bytes]
       @react_on_rails_rsc_stream_initial_render_duration_ms = state[:initial_render_duration_ms]
       @react_on_rails_rsc_stream_renderer_server_timing_entries = state[:renderer_server_timing_entries]
-      Thread.current.thread_variable_set(
-        RENDERER_SERVER_TIMING_COLLECTOR_KEY,
-        state[:renderer_server_timing_collector]
-      )
+      ReactOnRailsPro::Stream.renderer_server_timing_collector = state[:renderer_server_timing_collector]
+    end
+
+    def renderer_server_timing_collector_for_stream
+      return unless @react_on_rails_rsc_stream_observability
+
+      @react_on_rails_rsc_stream_renderer_server_timing_entries
     end
 
     def render_stream_template_chunk(template:, render_options:)

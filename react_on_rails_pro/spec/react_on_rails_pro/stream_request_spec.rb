@@ -15,6 +15,7 @@
 
 require_relative "spec_helper"
 require "async"
+require "react_on_rails_pro/concerns/stream"
 require "react_on_rails_pro/stream_request"
 require "react_on_rails_pro/renderer_http_client"
 
@@ -46,6 +47,15 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
     ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
       status_assigner.call(status)
       chunks.each { |c| yielder.call(c) }
+    end
+  end
+
+  def mock_stream_response_with_headers(headers, *chunks, error: nil)
+    ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner, headers_assigner|
+      status_assigner.call(200)
+      headers_assigner.call(headers)
+      chunks.each { |c| yielder.call(c) }
+      raise error if error
     end
   end
 
@@ -498,6 +508,37 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       expect(chunks.first).to include("html" => "ok")
       expect(stream.http_status).to eq(200)
       expect(stream.http_status_recorded?).to be(true)
+    end
+
+    it "rolls back renderer Server-Timing entries from retried attempts" do
+      collector = []
+      call_count = 0
+      request = described_class.send(:new) do |_send_bundle, _tasks|
+        call_count += 1
+        if call_count == 1
+          mock_stream_response_with_headers(
+            { "server-timing" => 'ror_renderer_prepare;dur=1;desc="failed attempt"' },
+            error: ReactOnRailsPro::RendererHttpClient::ConnectionError.new("Connection reset")
+          )
+        else
+          mock_stream_response_with_headers(
+            { "server-timing" => 'ror_renderer_prepare;dur=2;desc="successful retry"' },
+            to_length_prefixed("ok")
+          )
+        end
+      end
+
+      chunks = []
+      Sync do
+        ReactOnRailsPro::Stream.renderer_server_timing_collector = collector
+        request.send(:consume_with_bundle_reupload) { |c| chunks << c }
+      ensure
+        ReactOnRailsPro::Stream.renderer_server_timing_collector = nil
+      end
+
+      expect(call_count).to eq(2)
+      expect(chunks.first).to include("html" => "ok")
+      expect(collector).to eq(['ror_renderer_prepare;dur=2;desc="successful retry"'])
     end
 
     it "stops and clears tasks before retrying on transport error" do

@@ -25,11 +25,18 @@ class StreamController
   def initialize(component_queues:, initial_response: "TEMPLATE", renderer_response_headers: nil)
     @component_queues = component_queues
     @initial_response = initial_response
-    @renderer_response_headers = renderer_response_headers
+    @renderer_response_headers =
+      if renderer_response_headers.is_a?(Array)
+        renderer_response_headers
+      else
+        [renderer_response_headers]
+      end
   end
 
   def render_to_string(**_opts)
-    ReactOnRailsPro::Stream.record_renderer_response_headers(@renderer_response_headers)
+    @renderer_response_headers.each do |headers|
+      ReactOnRailsPro::Stream.record_renderer_response_headers(headers)
+    end
 
     # Simulate component helpers creating async tasks
     # In real implementation, first chunks are part of template HTML
@@ -245,6 +252,93 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(server_timing).to include("action_total;dur=5")
       expect(server_timing).to include("ror_stream_shell;dur=")
       expect(server_timing).to end_with(renderer_server_timing)
+    end
+
+    it "appends renderer Server-Timing when stream_view creates the top-level Sync fiber" do
+      renderer_server_timing = "ror_renderer_prepare;dur=7;desc=\"Node renderer prepare\""
+      _queues, controller, stream = setup_stream_test(
+        component_count: 0,
+        renderer_response_headers: { "server-timing" => renderer_server_timing }
+      )
+      allow(stream).to receive(:write)
+
+      controller.stream_view_containing_react_components(
+        template: "ignored",
+        rsc_stream_observability: true
+      )
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to include("ror_stream_shell;dur=")
+      expect(server_timing).to end_with(renderer_server_timing)
+    end
+
+    it "accumulates renderer Server-Timing entries from multiple renderer responses" do
+      renderer_entries = [
+        "ror_renderer_prepare;dur=7;desc=\"first component\"",
+        "ror_renderer_prepare;dur=11;desc=\"second component\""
+      ]
+      _queues, controller, stream = setup_stream_test(
+        component_count: 2,
+        renderer_response_headers: renderer_entries.map { |entry| { "server-timing" => entry } }
+      )
+      allow(stream).to receive(:write)
+      controller.response.headers["Server-Timing"] = "action_total;dur=5"
+
+      run_stream(controller, rsc_stream_observability: true) do |parent|
+        parent.async do
+          sleep 0.01
+          controller.instance_variable_get(:@component_queues).each(&:close)
+        end
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to include("action_total;dur=5")
+      expect(server_timing).to include("ror_stream_shell;dur=")
+      expect(server_timing).to end_with(renderer_entries.join(", "))
+    end
+
+    it "strips control characters from renderer-supplied Server-Timing entries" do
+      _queues, controller, stream = setup_stream_test(
+        component_count: 0,
+        renderer_response_headers: { "server-timing" => "renderer;dur=7;desc=\"ok\r\nX-Injected: yes\0\"" }
+      )
+      allow(stream).to receive(:write)
+
+      run_stream(controller, rsc_stream_observability: true) do |_parent|
+        sleep 0.1
+      end
+
+      server_timing = controller.response.headers["Server-Timing"]
+      expect(server_timing).to include('renderer;dur=7;desc="okX-Injected: yes"')
+      expect(server_timing).not_to include("\r")
+      expect(server_timing).not_to include("\n")
+      expect(server_timing).not_to include("\0")
+    end
+
+    it "keeps renderer Server-Timing collectors isolated across fibers on the same thread" do
+      main_collector = []
+      fiber_collector = []
+      described_class.renderer_server_timing_collector = main_collector
+
+      fiber = Fiber.new do
+        described_class.renderer_server_timing_collector = fiber_collector
+        described_class.record_renderer_response_headers(
+          "server-timing" => 'ror_renderer_prepare;dur=2;desc="fiber"'
+        )
+        Fiber.yield
+      ensure
+        described_class.renderer_server_timing_collector = nil
+      end
+
+      fiber.resume
+      described_class.record_renderer_response_headers(
+        "server-timing" => 'ror_renderer_prepare;dur=1;desc="main"'
+      )
+
+      expect(main_collector).to eq(['ror_renderer_prepare;dur=1;desc="main"'])
+      expect(fiber_collector).to eq(['ror_renderer_prepare;dur=2;desc="fiber"'])
+    ensure
+      described_class.renderer_server_timing_collector = nil
     end
 
     it "appends to array-valued Server-Timing headers without stringifying the array" do
