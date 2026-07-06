@@ -5112,7 +5112,7 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("config/webpack")
             File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
             File.write("config/webpack/rscWebpackConfig.js", "module.exports = {}")
-            File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
+            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1-rc.0"}}')
             File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
@@ -5153,7 +5153,7 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("config/webpack")
             File.write("config/routes.rb", "rsc_payload_route")
             File.write("config/webpack/rscWebpackConfig.js", "{}")
-            File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
+            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1-rc.0"}}')
             File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
@@ -5330,7 +5330,7 @@ RSpec.describe ReactOnRails::Doctor do
           assets_bundler: #{assets_bundler}
       YAML
 
-      dependencies = { "react" => "19.0.4" }
+      dependencies = { "react" => "19.2.7" }
       dev_dependencies = {}
       package_json = { "dependencies" => dependencies, "devDependencies" => dev_dependencies }
       if rspack_core_version
@@ -5638,11 +5638,11 @@ RSpec.describe ReactOnRails::Doctor do
       stub_package_root(Dir.pwd)
     end
 
-    context "when React 19.0.4+" do
+    context "when React 19.2.7+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            install_react("19.0.4")
+            install_react("19.2.7")
             example.run
           end
         end
@@ -5655,20 +5655,20 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when React 19.0.0-19.0.3" do
+    context "when React 19.2.0-19.2.6" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            install_react("19.0.2")
+            install_react("19.2.6")
             example.run
           end
         end
       end
 
-      it "reports warning about security vulnerabilities" do
+      it "reports warning about the Pro 17 floor" do
         doctor.send(:check_rsc_react_version)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
-        expect(warning_msgs.any? { |m| m[:content].include?("security vulnerabilities") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("React on Rails Pro 17 RSC floor") }).to be true
       end
     end
 
@@ -5730,7 +5730,7 @@ RSpec.describe ReactOnRails::Doctor do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
             File.write("package.json", '{"dependencies":{"react":"^19.0.0"}}')
-            install_react("19.0.4")
+            install_react("19.2.7")
             example.run
           end
         end
@@ -5739,7 +5739,7 @@ RSpec.describe ReactOnRails::Doctor do
       it "uses the installed version, not the declared range" do
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+        expect(success_msgs.any? { |m| m[:content].include?("19.2.7") }).to be true
       end
     end
 
@@ -5747,7 +5747,7 @@ RSpec.describe ReactOnRails::Doctor do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            File.write("package.json", '{"dependencies":{"react":"19.0.4"}}')
+            File.write("package.json", '{"dependencies":{"react":"19.2.7"}}')
             install_react("canary")
             example.run
           end
@@ -5757,7 +5757,7 @@ RSpec.describe ReactOnRails::Doctor do
       it "falls back to the declared package version" do
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+        expect(success_msgs.any? { |m| m[:content].include?("19.2.7") }).to be true
       end
     end
 
@@ -5767,7 +5767,7 @@ RSpec.describe ReactOnRails::Doctor do
           Dir.chdir(tmpdir) do
             File.write(
               "package.json",
-              '{"dependencies":{"react":"18.2.0"},"devDependencies":{"react":"19.0.4"}}'
+              '{"dependencies":{"react":"18.2.0"},"devDependencies":{"react":"19.2.7"}}'
             )
             example.run
           end
@@ -5779,7 +5779,7 @@ RSpec.describe ReactOnRails::Doctor do
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         error_msgs = checker.messages.select { |m| m[:type] == :error }
 
-        expect(success_msgs.any? { |m| m[:content].include?("React 19.0.4") }).to be true
+        expect(success_msgs.any? { |m| m[:content].include?("React 19.2.7") }).to be true
         expect(error_msgs).to be_empty
       end
     end
@@ -5841,6 +5841,43 @@ RSpec.describe ReactOnRails::Doctor do
         expect(success_msgs).not_to include(a_string_including("peer dependencies are compatible"))
       end
 
+      it "errors when the installed RSC package is below the Pro 17 floor" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.2.7",
+                  "react-dom" => "19.2.7",
+                  "react-on-rails-rsc" => "19.0.5"
+                }
+              )
+            )
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.2.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.0.5",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:capture_rsc_dist_tags)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.0.5 is not supported by React on Rails Pro 17 RSC",
+                "requires react-on-rails-rsc >= 19.2.1"
+              )
+            )
+            expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+          end
+        end
+      end
+
       it "reports an error when the declared RSC package cannot be resolved from node_modules" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
@@ -5897,24 +5934,24 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
-      it "keeps the React 19.0.4 security floor warning when broad RSC peer ranges allow older React" do
+      it "keeps the React 19.2.7 floor warning when broad RSC peer ranges allow older React" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
             File.write(
               "package.json",
               JSON.generate(
                 "dependencies" => {
-                  "react" => "19.0.2",
-                  "react-dom" => "19.0.2",
-                  "react-on-rails-rsc" => "19.0.5"
+                  "react" => "19.0.7",
+                  "react-dom" => "19.0.7",
+                  "react-on-rails-rsc" => "19.2.1-rc.0"
                 }
               )
             )
-            install_react("19.0.2")
-            install_package("react-dom", "version" => "19.0.2")
+            install_react("19.0.7")
+            install_package("react-dom", "version" => "19.0.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.0.5",
+              "version" => "19.2.1-rc.0",
               "peerDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" }
             )
             stub_package_root(Dir.pwd)
@@ -5923,7 +5960,7 @@ RSpec.describe ReactOnRails::Doctor do
             doctor.send(:check_rsc_react_version)
 
             warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-            expect(warning_msgs).to include(a_string_including("security vulnerabilities fixed in 19.0.4+"))
+            expect(warning_msgs).to include(a_string_including("RSC support currently targets React 19.2.x"))
           end
         end
       end
@@ -5937,18 +5974,18 @@ RSpec.describe ReactOnRails::Doctor do
               "package.json",
               JSON.generate(
                 "dependencies" => {
-                  "react" => "19.0.7",
-                  "react-dom" => "19.0.7",
-                  "react-on-rails-rsc" => "19.0.5"
+                  "react" => "19.2.7",
+                  "react-dom" => "19.2.7",
+                  "react-on-rails-rsc" => "19.2.1-rc.0"
                 }
               )
             )
-            install_react("19.0.7")
-            install_package("react-dom", "version" => "19.0.7")
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.2.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.0.5",
-              "peerDependencies" => { "react" => "^19.0.4", "react-dom" => "^19.0.4" }
+              "version" => "19.2.1-rc.0",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             example.run
           end
@@ -5970,7 +6007,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.0.5 is behind the npm next dist-tag 19.2.1-rc.1",
+            "react-on-rails-rsc 19.2.1-rc.0 is behind the npm next dist-tag 19.2.1-rc.1",
             "React Server Components track React minor versions"
           )
         )
@@ -6140,9 +6177,9 @@ RSpec.describe ReactOnRails::Doctor do
       it "uses the configured package root for node module resolution" do
         package_root = File.join(Dir.pwd, "client")
         FileUtils.mkdir_p("client")
-        File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
+        File.write("client/package.json", '{"dependencies":{"react":"^19.2.0"}}')
         FileUtils.mkdir_p("client/node_modules/react")
-        File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
+        File.write("client/node_modules/react/package.json", '{"version":"19.2.7"}')
         stub_package_root(package_root)
         allow(Open3).to receive(:capture3)
           .with(
@@ -6162,12 +6199,12 @@ RSpec.describe ReactOnRails::Doctor do
 
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+        expect(success_msgs.any? { |m| m[:content].include?("19.2.7") }).to be true
       end
 
       it "falls back to the declared React version in the nested package.json when node is unavailable" do
         FileUtils.mkdir_p("client")
-        File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
+        File.write("client/package.json", '{"dependencies":{"react":"19.2.7"}}')
         stub_package_root(File.join(Dir.pwd, "client"))
         allow(Open3).to receive(:capture3).and_return(
           ["", "", instance_double(Process::Status, success?: false)]
@@ -6175,7 +6212,7 @@ RSpec.describe ReactOnRails::Doctor do
 
         doctor.send(:check_rsc_react_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+        expect(success_msgs.any? { |m| m[:content].include?("19.2.7") }).to be true
       end
 
       it "warns when the configured package root does not exist" do

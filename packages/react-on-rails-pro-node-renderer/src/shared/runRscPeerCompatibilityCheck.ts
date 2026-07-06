@@ -122,12 +122,6 @@ export function runRscPeerCompatibilityCheck(options: RunRscPeerCompatibilityChe
   });
   if (result.level === 'ok') return;
 
-  if (result.level === 'warn') {
-    // DISABLE_ENV only downgrades hard errors; warnings still fire so operators see the degraded-version signal.
-    log.warn(result.message);
-    return;
-  }
-
   if (env[DISABLE_ENV] === '1') {
     log.warn(`${result.message}\n(Version check downgraded to a warning via ${DISABLE_ENV}.)`);
     return;

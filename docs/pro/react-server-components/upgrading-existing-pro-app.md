@@ -8,38 +8,38 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                                                                                  | Expected                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                                                                                                                    |
-| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                                                                                                                    |
-| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                                                                                                         |
-| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.0.x with patch >= 19.0.4 (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
-| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version                                                                                                  |
-| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | Exact stable `19.0.5` pin                                                                                                   |
-| Node.js                  | `node --version`                                                                                                               | 18+                                                                                                                         |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                                                                                                                 |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                                                                                                        |
+| Requirement              | Check command                                                                                                                  | Expected                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                                                               | v16.4.0+                             |
+| React on Rails gem       | `bundle show react_on_rails`                                                                                                   | v16.4.0+                             |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` / `bun pm why react-on-rails-pro` | Matches gem version                  |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react` / `bun pm why react`                                                     | 19.2.x with patch >= 19.2.7          |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom` / `bun pm why react-dom`                                     | Must match `react` version           |
+| `react-on-rails-rsc`     | `npm ls react-on-rails-rsc` / `yarn why react-on-rails-rsc` / `pnpm list react-on-rails-rsc` / `bun pm why react-on-rails-rsc` | 19.2.1 or newer on the React 19 line |
+| Node.js                  | `node --version`                                                                                                               | 18+                                  |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                                                                 | File exists                          |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                                                           | NodeRenderer enabled                 |
 
-If React is outside the supported 19.0.x range or below 19.0.4, upgrade it first:
+If React is outside the supported 19.2.x range or below 19.2.7, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# or: yarn add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
-# or: npm install react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@19.0.5
+pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
+# or: yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
+# or: npm install react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
 ```
 
-> **React 19.0.x with patch >= 19.0.4** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
+> **React 19.2.x with patch >= 19.2.7** is required for the React on Rails Pro 17 RSC path. React 19.0.x is no longer a supported Pro RSC runtime line in v17.
 
 > [!NOTE]
-> The RSC generator intentionally stays on React 19.0.x and does not widen generated apps to React 19.1 or 19.2 yet. React's RSC runtime and bundler APIs can change between minor releases, so advance the React range only when the generator, docs, and package metadata policy are reviewed together.
+> The RSC generator uses the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package line. During the React on Rails Pro 17 release-candidate soak, the generator pins `react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not published yet. For the 17.0 final release, use `react-on-rails-rsc >= 19.2.1` on the React 19 line.
 
 > [!NOTE]
-> The generator pins `react-on-rails-rsc` to exactly `19.0.5` (no `^` or `~`). Because the RSC bundler APIs are version-coupled, record `react-on-rails-rsc` as exactly `19.0.5` in `package.json` rather than the default caret range so a later `19.1.x`/`19.2.x` is not picked up; `react` and `react-dom` stay on `~19.0.4`. This is separate from the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609): metadata can allow RSC packages broadly enough for `npm ls`, while the generator still installs the tested exact RSC package pin.
+> Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set. The RSC bundler APIs are version-coupled, so do not bump `react-on-rails-rsc` by itself.
 
-That exact pin is what goes in your app's `package.json`. Separately, the Pro package itself declares an optional peer range, which is broader on purpose:
+The generator-managed RSC version is what goes in your app's `package.json`. Separately, the Pro package itself declares an optional peer range, which is broader on purpose:
 
 > [!NOTE]
-> The Pro package's optional `react-on-rails-rsc` peer range is `^19.0.5` (i.e. `>= 19.0.5 < 20.0.0`, see [issue #3965](https://github.com/shakacode/react_on_rails/issues/3965)). This is an advisory range: it sets the **floor** at `19.0.5` (the RSC CSS FOUC fix) and a **ceiling** below the next major `20.0.0` (a new `react-on-rails-rsc` major is a deliberate, reviewed bump). Within the `19.x` line it admits any `>= 19.0.5` release, including `19.1.x` and `19.2.x`; per-version compatibility is enforced not by this range but by the Pro node renderer's runtime version check (`rscPeerSupport.ts`), which tiers `react-on-rails-rsc` `19.0.x` against React `19.0.4+` and `19.2.x` against React `19.2.7+`. Compared to the old `"*"`, this range simply excludes pre-`19.0.5` builds (which lack the FOUC fix) and the unknown next major.
+> The Pro package's optional `react-on-rails-rsc` peer range for the 17.0 final release is `>= 19.2.1 < 20.0.0`. Release candidates temporarily admit the matching prerelease tuple (`>= 19.2.1-rc.0 < 20.0.0`) so the RC package can be tested before the stable `19.2.1` package is published. The Pro node renderer also checks the installed `react-on-rails-rsc`, React, and React DOM versions at startup and hard-errors on unsupported combinations. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch; it downgrades that startup error to a warning.
 
 ## Pre-Migration: Audit Components for Client API Usage
 
@@ -268,8 +268,8 @@ Then run `bundle install` before retrying the generator.
 
 If the RSC bundle build fails but server and client builds succeed, the issue is likely in `rscWebpackConfig.js`. Common causes:
 
-- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.0.5`
-- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.0.x with patch >= 19.0.4 and the exact `react-on-rails-rsc@19.0.5` pin. Check with `pnpm list react react-dom react-on-rails-rsc`
+- **Missing `react-on-rails-rsc` package**: Run `pnpm add react-on-rails-rsc@19.2.1-rc.0` during the 17.0 RC soak, or install the stable `react-on-rails-rsc >= 19.2.1` package once it is published.
+- **React or `react-on-rails-rsc` version mismatch**: RSC currently requires React 19.2.x with patch >= 19.2.7 and `react-on-rails-rsc` 19.2.1 or newer on the React 19 line. Check with `pnpm list react react-dom react-on-rails-rsc`
 - **Custom webpack config incompatibility**: If your `serverWebpackConfig.js` was heavily customized, the generator's transforms may not apply cleanly. See [Preparing Your App: Step 4](../../oss/migrating/rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle) for the underlying intent of each webpack change
 
 ### Manifest Files Not Generated
