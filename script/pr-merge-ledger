@@ -129,6 +129,14 @@ class PrMergeLedger
     \b(?:fixed|resolved|waived)\s+
     (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
   }ix
+  FIXED_DISPOSITION_REPLY_PATTERN = /\A\s*(?:fixed|addressed)\s+(?:in|by)\s+\S/i
+  DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
+    \A\s*
+    (?:fixed|addressed)\s+
+    (?:in|by)\s+
+    (?:(?:a|an|the)\s+)?
+    (?:follow[- ]?up\b|issue\b|not[- ]?applicable\b|n/a\b)
+  }ix
 
   class Error < StandardError; end
 
@@ -370,6 +378,8 @@ class PrMergeLedger
     end
     opts.separator "    Top-level PR comments have no head SHA; priority findings in those comments " \
                    "require dispositions."
+    opts.separator "    Resolved review-thread replies beginning with \"Fixed in ...\" can satisfy " \
+                   "single priority finding dispositions."
   end
 
   def add_help_option(opts)
@@ -658,6 +668,7 @@ class PrMergeLedger
       "author" => comment.dig("author", "login"),
       "body" => comment["body"].to_s,
       "outdated" => comment["outdated"] == true,
+      "reply_to_id" => comment.dig("replyTo", "id") || comment["reply_to_id"],
       "review_state" => review["state"],
       "review_head_sha" => review.dig("commit", "oid"),
       "comment_head_sha" => comment.dig("commit", "oid"),
@@ -901,7 +912,13 @@ class PrMergeLedger
   def append_findings(records, text_key, findings, context)
     records.each do |record|
       findings.concat(
-        findings_from_text(record.fetch(text_key), record.fetch("url"), record.fetch("id"), context)
+        findings_from_text(
+          record.fetch(text_key),
+          record.fetch("url"),
+          record.fetch("id"),
+          context,
+          inferred_disposition: record["inferred_disposition"]
+        )
       )
     end
   end
@@ -910,8 +927,19 @@ class PrMergeLedger
     review_threads
       .select { |thread| complete_current_head_thread?(thread) }
       # Incomplete comment pages are blocked through unknown_fields; unfetched bodies cannot be scanned for priorities.
-      .flat_map { |thread| thread.fetch("comments") }
+      .flat_map { |thread| comments_with_inferred_dispositions(thread) }
       .reject { |comment| comment.fetch("outdated") }
+  end
+
+  def comments_with_inferred_dispositions(thread)
+    comments = thread.fetch("comments")
+    inferred_dispositions = inferred_dispositions_by_comment_id(thread, comments)
+
+    comments.map do |comment|
+      next comment unless inferred_dispositions.key?(comment.fetch("id"))
+
+      comment.merge("inferred_disposition" => inferred_dispositions.fetch(comment.fetch("id")))
+    end
   end
 
   def complete_current_head_thread?(thread)
@@ -924,7 +952,7 @@ class PrMergeLedger
     end
   end
 
-  def findings_from_text(text, url, id, context)
+  def findings_from_text(text, url, id, context, inferred_disposition: nil)
     lines = text.to_s.each_line.map(&:chomp)
     if lines.length > MAX_BODY_LINES
       warn "pr-merge-ledger: #{url} body has #{lines.length} lines; scanning first #{MAX_BODY_LINES}"
@@ -951,7 +979,8 @@ class PrMergeLedger
     line_context = {
       source_finding_count:,
       dispositions: context.fetch(:dispositions),
-      used_disposition_keys: context.fetch(:used_disposition_keys)
+      used_disposition_keys: context.fetch(:used_disposition_keys),
+      inferred_disposition:
     }
 
     finding_lines.flat_map do |line_text, source_line, occurrences|
@@ -976,6 +1005,7 @@ class PrMergeLedger
       multiple_source_findings: context.fetch(:source_finding_count) > 1
     )
     disposition = disposition_for(finding, context.fetch(:dispositions), context.fetch(:used_disposition_keys))
+    disposition = inferred_disposition_for(finding, context, disposition)
 
     {
       "id" => source.fetch(:id),
@@ -988,6 +1018,42 @@ class PrMergeLedger
       "disposition" => disposition.fetch("disposition"),
       "evidence" => disposition["evidence"]
     }
+  end
+
+  def inferred_dispositions_by_comment_id(thread, comments)
+    return {} unless thread.fetch("is_resolved")
+
+    comments
+      .select { |comment| comment["reply_to_id"] && comment.fetch("current_head") && !comment.fetch("outdated") }
+      .sort_by { |comment| timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at") }
+      .each_with_object({}) do |reply, inferred|
+        disposition = inferred_disposition_from_reply(reply)
+        next unless disposition
+
+        inferred[reply.fetch("reply_to_id")] = disposition
+      end
+  end
+
+  def inferred_disposition_from_reply(reply)
+    body = reply.fetch("body").to_s
+    normalized_body = body.lstrip
+    first_sentence = normalized_body.split(/[.!\r\n]/, 2).first.to_s
+    return nil if first_sentence.include?("?")
+    return nil if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+
+    {
+      "disposition" => "fixed",
+      "evidence" => "resolved review-thread reply #{reply.fetch('url')}: #{body}"
+    }
+  end
+
+  def inferred_disposition_for(finding, context, disposition)
+    return disposition unless disposition.fetch("disposition") == UNKNOWN
+    return disposition unless context.fetch(:source_finding_count) == 1
+    return disposition unless finding.fetch(:multiple_markers) == false
+
+    context.fetch(:inferred_disposition) || disposition
   end
 
   def finding_severity(line)
@@ -1865,6 +1931,7 @@ class PrMergeLedger
                       line
                       createdAt
                       outdated
+                      replyTo { id }
                       commit { oid }
                       pullRequestReview {
                         id
@@ -1901,6 +1968,7 @@ class PrMergeLedger
                   line
                   createdAt
                   outdated
+                  replyTo { id }
                   commit { oid }
                   pullRequestReview {
                     id

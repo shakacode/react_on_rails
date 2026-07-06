@@ -2476,6 +2476,297 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "infers fixed dispositions from direct replies in resolved current-head review threads" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-resolved-thread-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      pr_ledger = report.fetch("pull_requests").first
+      finding = pr_ledger.dig("priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(true)
+      expect(pr_ledger.dig("unresolved_current_head_review_threads", "count")).to eq(0)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "fixed"
+      )
+      expect(finding.fetch("evidence")).to include(
+        "https://example.com/reply-comment",
+        "Validation: pnpm test -- colors.test.ts"
+      )
+    end
+  end
+
+  it "does not infer fixed dispositions from ambiguous direct replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "\nFixed in current head? I still see this failing.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-ambiguous-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "does not infer fixed dispositions from stale direct replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Fixed in old head `old`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "old" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-stale-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
+  it "does not infer fixed dispositions from follow-up direct replies" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "reply-comment",
+              "url" => "https://example.com/reply-comment",
+              "body" => "Addressed in a follow-up issue #123.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-follow-up-fixed-reply", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
   it "ignores findings from superseded review bodies" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -5801,6 +6092,9 @@ RSpec.describe "script/pr-merge-ledger" do
     )
     expect(schema.dig("$defs", "violation", "properties", "reviewer", "type")).to eq(%w[string null])
     expect(schema.dig("$defs", "review_thread", "additionalProperties")).to be(false)
+    expect(schema.dig("$defs", "review_thread_comment", "properties", "reply_to_id", "type")).to eq(
+      %w[string null]
+    )
     expect(schema.dig("$defs", "review_object", "required")).to include("body_excerpt")
     expect(schema.dig("$defs", "review_object", "properties")).not_to include("body_text")
     expect(schema.dig("$defs", "issue_comment", "required")).to include("body_excerpt")
