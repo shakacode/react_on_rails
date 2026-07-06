@@ -230,6 +230,10 @@ class PrMergeLedger
     \b(?:no\s+need\s+to|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|should(?:\s+not|n't)|never)\s+reopen\b|
     \breopen(?:ing)?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
   /ix
+  NEGATED_FOLLOW_UP_REPLY_PATTERN = /
+    \bno\s+follow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:needed|required|necessary)\b|
+    \bfollow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
+  /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
     (?:fixed|addressed)\s+
@@ -1219,8 +1223,17 @@ class PrMergeLedger
 
   def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_reply_to_id:, target_comment:)
     trusted_reply = trusted_disposition_reply_author_association?(reply)
-    clear_disposition_reply = trusted_reply && clear_inferred_disposition_reply?(reply)
-    disposition = inferred_disposition_from_reply(reply, clear_disposition_reply:, target_comment:)
+    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
+    normalized_body = normalized_disposition_reply_body(body)
+    clear_disposition_reply = trusted_reply && clear_inferred_disposition_reply?(normalized_body, truncated:)
+    disposition = inferred_disposition_from_reply(
+      reply,
+      body:,
+      truncated:,
+      normalized_body:,
+      clear_disposition_reply:,
+      target_comment:
+    )
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_disposition_reply
@@ -1246,11 +1259,12 @@ class PrMergeLedger
 
   def inferred_disposition_from_reply(
     reply,
-    clear_disposition_reply: clear_inferred_disposition_reply?(reply),
+    body:,
+    truncated:,
+    normalized_body:,
+    clear_disposition_reply:,
     target_comment: nil
   )
-    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
-    normalized_body = normalized_disposition_reply_body(body)
     return nil if truncated
     return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
@@ -1263,15 +1277,15 @@ class PrMergeLedger
     }
   end
 
-  def clear_inferred_disposition_reply?(reply)
-    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
-    normalized_body = normalized_disposition_reply_body(body)
+  def clear_inferred_disposition_reply?(normalized_body, truncated:)
     return true if truncated
-    return true if normalized_body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
-    return true if hedged_fixed_disposition_reply?(normalized_body)
+
+    body = normalized_body.gsub(NEGATED_FOLLOW_UP_REPLY_PATTERN, "")
+    return true if body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return true if hedged_fixed_disposition_reply?(body)
     return true if ambiguous_fixed_disposition_reply?(normalized_body)
 
-    contradicted_disposition_reply?(normalized_body)
+    contradicted_disposition_reply?(body)
   end
 
   def contradicted_disposition_reply?(normalized_body)
