@@ -114,6 +114,7 @@ bench_script = File.join(REPO_ROOT, suite.fetch(:benchmark_script))
 # root (same as CI), so results land at REPO_ROOT/bench_results — not under the app dir.
 results_dir = File.join(REPO_ROOT, "bench_results")
 benchmark_json = File.join(results_dir, "benchmark.json")
+display_json = File.join(results_dir, "benchmark_display.json")
 report_json = File.join(results_dir, "bencher_report.json")
 
 # Cross-platform CPU count: works on macOS (sysctl-backed) and Linux. Used to size Puma
@@ -292,9 +293,9 @@ begin
 
   log "Run #{suite[:suite_name]} benchmark"
   FileUtils.mkdir_p(results_dir)
-  # Drop any prior payload so the post-run existence check can't pass on a stale file if this
-  # run exits 0 without writing fresh metrics (e.g. k6 metrics MISSING -> no BMF written).
-  FileUtils.rm_f(benchmark_json)
+  # Drop prior payloads so the post-run checks and summary tables cannot pass on stale files if
+  # this run exits 0 without writing fresh metrics (e.g. k6 metrics MISSING -> no BMF written).
+  FileUtils.rm_f([benchmark_json, display_json])
   bench_env = {
     "PRO" => pro.to_s,
     "BASE_URL" => "localhost:#{node_renderer ? RENDERER_PORT : SERVER_PORT}",

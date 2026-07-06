@@ -58,13 +58,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  detect-changes:
+  prepare-benchmark-matrix:
     permissions:
       contents: read
       actions: read
     runs-on: ubuntu-24.04
     outputs:
-      non_runtime_only: ${{ steps.detect.outputs.non_runtime_only }}
       run_benchmark_suites: ${{ steps.benchmark-matrices.outputs.run_benchmark_suites }}
       benchmark_matrix: ${{ steps.benchmark-matrices.outputs.benchmark_matrix }}
     steps:
@@ -73,20 +72,9 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 50
           persist-credentials: false
-      - name: Fetch main for change detection
-        run: git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main
-        shell: bash
       - name: Read runtime versions
         id: tool-versions
         uses: ./.github/actions/read-tool-versions
-      - name: Detect relevant changes
-        id: detect
-        run: |
-          script/ci-changes-detector origin/main
-        shell: bash
-      # detect-changes still controls whether benchmark script specs run on
-      # benchmark plumbing changes. Hosted benchmark suite selection is manual-only
-      # through workflow_dispatch inputs; automatic push/PR suite selection is disabled.
       - name: Set benchmark matrices
         id: benchmark-matrices
         # Always runs. GitHub Actions evaluates `strategy.matrix` for downstream jobs at
@@ -99,7 +87,6 @@ jobs:
           BENCHMARK_APP_VERSION: ${{ github.event.inputs.app_version || 'both' }}
           BENCHMARK_EVENT_NAME: ${{ github.event_name }}
           BENCHMARK_ROUTES: ${{ github.event.inputs.routes || '' }}
-          BENCHMARK_NON_RUNTIME_ONLY: ${{ steps.detect.outputs.non_runtime_only }}
         run: |
           BENCHMARK_MATRIX=$(ruby benchmarks/generate_matrix.rb)
           export BENCHMARK_MATRIX
@@ -112,10 +99,10 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         shell: bash
-      # Only pay the Bundler setup when benchmarks will run or the scripts
-      # themselves changed; unrelated PRs keep this job stdlib-only and fast.
+      # Only pay the Bundler setup when benchmarks will run; the manual workflow
+      # does not run for unrelated PRs.
       - name: Install gems for benchmark specs
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true'
         uses: ./.github/actions/setup-bundle
         with:
           working-directory: .
@@ -124,21 +111,21 @@ jobs:
       # any benchmark runs: if this logic is wrong, the matrix and routes feeding
       # the run are wrong, so the results would be invalid. Running it here (rather
       # than a separate job) reuses this job's checkout/runner and still gates the
-      # benchmark job, which needs detect-changes to succeed.
+      # benchmark job, which needs matrix generation to succeed.
       - name: Run benchmark script specs
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true' || steps.detect.outputs.benchmarks_changed == 'true'
+        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true'
         run: bundle exec rspec benchmarks/spec
 
   # Manual hosted run of every selected suite/shard. Automatic push/PR benchmarks
   # are intentionally disabled; use the dedicated local M1 runner for the trusted
   # Bencher trend and reserve this workflow for explicit hosted diagnostics.
   benchmark:
-    needs: detect-changes
+    needs: prepare-benchmark-matrix
     name: ${{ matrix.job_name }}
-    if: needs.detect-changes.outputs.run_benchmark_suites == 'true'
+    if: needs.prepare-benchmark-matrix.outputs.run_benchmark_suites == 'true'
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.detect-changes.outputs.benchmark_matrix) }}
+      matrix: ${{ fromJSON(needs.prepare-benchmark-matrix.outputs.benchmark_matrix) }}
     permissions:
       contents: read
       issues: write
