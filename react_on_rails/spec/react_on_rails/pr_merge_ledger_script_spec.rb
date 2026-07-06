@@ -2813,6 +2813,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Regression-free per the full suite run. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Added a test that fails before the fix and passes after. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI no longer fails on Windows. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI is not failing anymore on Windows. " \
@@ -4018,6 +4020,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Addressed by #123.",
       "Fixed by https://github.com/shakacode/react_on_rails/issues/123.",
       "Addressed by tracking issue https://github.com/shakacode/react_on_rails/issues/123.",
+      "Addressed by tracking ticket ABC-123.",
       "Addressed by https://github.com/shakacode/react_on_rails/pull/123.",
       "Fixed in part, will follow up separately.",
       "Fixed in general but there is a follow-up needed.",

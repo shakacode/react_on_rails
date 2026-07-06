@@ -134,7 +134,9 @@ class PrMergeLedger
   BENIGN_REGRESSION_REPLY_PATTERN = /
     \b(?:no|without)\s+(?:\S+\s+){0,4}regressions?\b|
     \bavoid(?:s|ed|ing)?\s+(?:\S+\s+){0,4}regressions?\b|
-    \bregression[- ]free\b
+    \bregression[- ]free\b|
+    \b(?:test|tests|spec|specs|case|coverage)(?:\s+\S+){0,6}\s+fail(?:s|ed|ing)?\s+
+      before\s+(?:the\s+)?fix\b
   /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
@@ -179,6 +181,7 @@ class PrMergeLedger
       n/a\b|
       pr\b|
       pull[- ]?request\b|
+      ticket\b|
       separate\b|
       later\b|
       next\b|
