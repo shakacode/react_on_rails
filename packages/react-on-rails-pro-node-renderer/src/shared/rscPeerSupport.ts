@@ -18,11 +18,11 @@
 //
 // `minimumVersion` is the React on Rails 17 RSC floor. The 19.2.1 line pairs
 // with React/React DOM 19.2.7 and carries the coordinated RSC fixes required by
-// the Pro RSC renderer path. Prereleases such as 19.2.1-rc.0 compare as 19.2.1
-// in the compatibility checker so release-candidate soak builds remain valid
-// until the stable 19.2.1 package is published.
+// the Pro RSC renderer path. `minimumPrereleaseVersion` keeps the 17.0 RC soak
+// installable until the stable 19.2.1 package is published without accepting
+// older prereleases on the same tuple.
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { minimumVersion: '19.2.1', supportedMajor: 19 },
+  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.2.1-rc.0', supportedMajor: 19 },
   react: {
     supportedMajor: 19,
     supportedRanges: [

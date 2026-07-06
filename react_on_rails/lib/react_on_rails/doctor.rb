@@ -3487,6 +3487,7 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
+    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.2.1-rc.0"
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
@@ -3795,6 +3796,7 @@ module ReactOnRails
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
         React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}
+        (or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
         Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@19.2.1-rc.0 --save-exact
@@ -3806,7 +3808,7 @@ module ReactOnRails
       return false if rsc_version.blank?
 
       npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0 ||
-        npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_VERSION)
+        npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
     end
 
     def unsupported_rsc_react_version?(react_version)

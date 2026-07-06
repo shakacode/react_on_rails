@@ -237,16 +237,16 @@ packages therefore apply to this stack, and the project's response is enforced i
 - **The patched-version requirement is checked, not just documented.** For React on Rails Pro 17 RSC, the
   supported React range is `19.2.x` with patch `>= 19.2.7` (`~19.2.7`) and
   `react-on-rails-rsc >= 19.2.1` on the React 19 line:
-  - `rake react_on_rails:doctor` warns when the installed React is below the supported patch floor, citing the known
-    security vulnerabilities (`check_rsc_react_version` in `react_on_rails/lib/react_on_rails/doctor.rb`).
-  - The RSC generator emits the same warning at setup time, naming CVE-2025-55182, CVE-2025-67779, and
-    CVE-2026-23864 (`react_on_rails/lib/generators/react_on_rails/rsc_setup.rb`).
+  - `rake react_on_rails:doctor` warns when the installed React is below the supported patch floor and reports the
+    Pro 17 RSC floor (`check_rsc_react_version` in `react_on_rails/lib/react_on_rails/doctor.rb`).
+  - The RSC generator emits the same floor/coordination warning at setup time
+    (`react_on_rails/lib/generators/react_on_rails/rsc_setup.rb`).
   - The Node renderer runs an RSC peer-compatibility check at startup (`runRscPeerCompatibilityCheck`,
     called from the renderer's master, worker, and wrapper entry points in
     `packages/react-on-rails-pro-node-renderer/src/`). Incompatible `react`, `react-dom`, or
     `react-on-rails-rsc` versions **fail startup**. Setting `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1`
-    downgrades the hard startup failure to a warning — **do not set this in production: it allows the renderer to boot on React
-    versions with known critical vulnerabilities (CVE-2025-55182 and related).**
+    downgrades the hard startup failure to a warning — **do not set this in production: it allows the renderer to
+    boot below the verified React/RSC floor.**
 
 ### How to verify your own status
 

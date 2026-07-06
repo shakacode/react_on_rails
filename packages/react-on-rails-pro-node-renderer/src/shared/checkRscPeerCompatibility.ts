@@ -26,30 +26,70 @@ export interface RscPeerCheckInput {
 }
 
 type VersionTuple = [number, number, number];
+type ParsedVersion = { tuple: VersionTuple; prerelease: string | null };
 
-// Strip build metadata (`+...`) and prerelease (`-...`) so a coordinated RC such as
-// `19.0.5-rc.7` compares as `19.0.5`. We only need major/minor/patch ordering, so this
-// avoids semver's prerelease rules (and a `semver` dependency) entirely.
-const parseTuple = (version: string): VersionTuple => {
+const parseVersion = (version: string): ParsedVersion => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
   // Malformed versions intentionally coerce to 0 segments so the major mismatch
   // branch reports the original string instead of hiding it behind a parse error.
   const normalized = version.replace(/^[v=]+/, '');
   const [withoutBuild = ''] = normalized.split('+', 1);
-  const [core = ''] = withoutBuild.split('-', 1);
+  const [core = '', prerelease] = withoutBuild.split('-', 2);
   const parts = core.split('.');
-  return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
+  return {
+    tuple: [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0],
+    prerelease: prerelease || null,
+  };
 };
 
-const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
-  for (let i = 0; i < 3; i += 1) {
-    const a = actual[i] ?? 0;
-    const f = floor[i] ?? 0;
-    if (a > f) return true;
-    if (a < f) return false;
-  }
-  return true;
+const parseTuple = (version: string): VersionTuple => parseVersion(version).tuple;
+
+const comparePrereleasePart = (left: string, right: string): number => {
+  const leftNumeric = /^\d+$/.test(left);
+  const rightNumeric = /^\d+$/.test(right);
+  if (leftNumeric && rightNumeric) return Number(left) - Number(right);
+  if (leftNumeric) return -1;
+  if (rightNumeric) return 1;
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 };
+
+const comparePrerelease = (left: string | null, right: string | null): number => {
+  if (left === right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+
+  const leftParts = left.split('.');
+  const rightParts = right.split('.');
+  const maxParts = Math.max(leftParts.length, rightParts.length);
+  for (let i = 0; i < maxParts; i += 1) {
+    const leftPart = leftParts[i];
+    const rightPart = rightParts[i];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+
+    const comparison = comparePrereleasePart(leftPart, rightPart);
+    if (comparison !== 0) return comparison;
+  }
+
+  return 0;
+};
+
+const compareVersions = (actual: string, floor: string): number => {
+  const actualVersion = parseVersion(actual);
+  const floorVersion = parseVersion(floor);
+  for (let i = 0; i < 3; i += 1) {
+    const a = actualVersion.tuple[i] ?? 0;
+    const f = floorVersion.tuple[i] ?? 0;
+    if (a > f) return 1;
+    if (a < f) return -1;
+  }
+
+  return comparePrerelease(actualVersion.prerelease, floorVersion.prerelease);
+};
+
+const isAtLeastVersion = (actual: string, floor: string): boolean => compareVersions(actual, floor) >= 0;
 
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
@@ -129,13 +169,18 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
     };
   }
 
-  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.minimumVersion))) {
+  const meetsStableFloor = isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumVersion);
+  const meetsPrereleaseFloor =
+    reactOnRailsRsc.minimumPrereleaseVersion &&
+    isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumPrereleaseVersion);
+
+  if (!meetsStableFloor && !meetsPrereleaseFloor) {
     return {
       level: 'error',
       message: errorMessage(
         'react-on-rails-rsc',
         rscVersion,
-        `>= ${reactOnRailsRsc.minimumVersion}`,
+        `>= ${reactOnRailsRsc.minimumVersion} (or ${reactOnRailsRsc.minimumPrereleaseVersion} during the RC soak)`,
         proVersion,
       ),
     };

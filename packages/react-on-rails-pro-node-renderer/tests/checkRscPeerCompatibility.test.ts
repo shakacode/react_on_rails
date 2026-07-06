@@ -45,8 +45,19 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain(`>= ${minimumVersion}`);
   });
 
-  it('returns ok for a coordinated prerelease (prerelease stripped for comparison)', () => {
+  it('returns ok for the coordinated RC floor prerelease', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.0', reactVersion: '19.2.7' }).level).toBe('ok');
+  });
+
+  it('returns ok for a prerelease newer than the coordinated RC floor', () => {
+    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.1', reactVersion: '19.2.7' }).level).toBe('ok');
+  });
+
+  it('errors for prereleases older than the coordinated RC floor', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-beta.0', reactVersion: '19.2.7' });
+    expect(r.level).toBe('error');
+    expect(r.message).toContain('19.2.1-beta.0');
+    expect(r.message).toContain('19.2.1-rc.0');
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
