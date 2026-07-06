@@ -165,6 +165,20 @@ class PrMergeLedger
     repro(?:s)?|reproduc(?:e[sd]?|ing)|
     occurs?|happens?
   /ix
+  FIXED_FAILURE_REFERENCE_REPLY_PATTERN = /
+    \b(?:this|that|it|fix|change|patch|issue)\b
+    (?!
+      (?:\s+\S+){0,4}\s+
+      \b(?:
+        not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+        (?:is|are|was|were)(?:\s+not|n't)
+      )\b
+    )
+    (?:\s+\S+){0,4}\s+
+    \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|cover(?:s|ed|ing)?)\b
+    (?:\s+\S+){0,6}\s+
+    \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+  /ix
   CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
     (?:
       \b(?:
@@ -218,7 +232,9 @@ class PrMergeLedger
   HEDGED_FIXED_DISPOSITION_REPLY_PATTERN = /
     \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
     \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
-    \b(?:i\s+(?:think|believe)|probably|should\s+be|not\s+(?:100%\s+)?sure|untested|unverified)\b|
+    \b(?:i\s+(?:think|believe|hope)|hopefully|assuming|probably)\b|
+    \bshould\s+(?:be|do\s+it|work|pass)\b|
+    \b(?:not\s+(?:100%\s+)?sure|untested|unverified)\b|
     \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+(?:test(?:ed)?|verify|verified|confirm(?:ed)?)\b|
     \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
     \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
@@ -1217,6 +1233,7 @@ class PrMergeLedger
   def contradicted_disposition_reply?(normalized_body)
     body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
     body = body.gsub(UNRELATED_FAILURE_REPLY_PATTERN, "")
+    body = body.gsub(FIXED_FAILURE_REFERENCE_REPLY_PATTERN, "")
     body = body.gsub(
       /
         \bno\s+longer\s+
@@ -1241,6 +1258,10 @@ class PrMergeLedger
           not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
           (?:is|are|was|were)(?:\s+not|n't)|no\s+longer
         )\b
+        (?!
+          (?:\s+\S+){0,3}\s+
+          \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+        )
         (?:\s+\S+){0,3}\s+
         \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
       /ix,

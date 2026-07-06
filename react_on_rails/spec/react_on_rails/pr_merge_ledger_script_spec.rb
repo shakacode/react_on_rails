@@ -2911,6 +2911,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. This change no longer breaks the Windows build. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI is no longer broken. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. This fixes the failing test on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
@@ -3362,6 +3364,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`, but this doesn\u2019t fix Windows.",
       "Fixed in current head `current`. Tests fail on Windows.",
       "Fixed in current head `current`. The specs are failing.",
+      "Fixed in current head `current`. This doesn't fix the failing test on Windows.",
       "Fixed in current head `current`. No this doesn't fix the regression on Windows. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
@@ -3419,20 +3422,21 @@ RSpec.describe "script/pr-merge-ledger" do
           chdir: repo_root
         )
 
-        expect(status).not_to be_success
-
         report = JSON.parse(stdout)
         finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
 
-        expect(report.fetch("complete_allowed")).to be(false)
-        expect(finding).to include(
-          "id" => "finding-comment",
-          "severity" => "P2",
-          "disposition" => "UNKNOWN"
-        )
-        expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
-          "unknown_priority_finding_disposition"
-        )
+        aggregate_failures(reply_body) do
+          expect(status).not_to be_success
+          expect(report.fetch("complete_allowed")).to be(false)
+          expect(finding).to include(
+            "id" => "finding-comment",
+            "severity" => "P2",
+            "disposition" => "UNKNOWN"
+          )
+          expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+            "unknown_priority_finding_disposition"
+          )
+        end
       end
     end
   end
@@ -4289,7 +4293,11 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. Need to test on Windows.",
       "Addressed by current head `current`. Needs to verify this manually.",
       "Fixed in a bit, will verify shortly.",
-      "Fixed in current head `current`. Will verify shortly."
+      "Fixed in current head `current`. Will verify shortly.",
+      "Fixed in current head `current`, hopefully that does it!",
+      "Fixed in current head `current`. I hope that handles it.",
+      "Fixed in current head `current`. Assuming this covers the Windows case.",
+      "Fixed in current head `current`. This should do it."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
