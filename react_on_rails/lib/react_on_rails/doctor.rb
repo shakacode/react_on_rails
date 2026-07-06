@@ -17,6 +17,7 @@ require_relative "version_synchronizer"
 require_relative "system_checker"
 require_relative "pro_migration"
 require_relative "node_renderer_procfile"
+require_relative "../generators/react_on_rails/js_dependency_manager"
 
 begin
   require "rainbow"
@@ -3487,7 +3488,9 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
-    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION = "19.2.1-rc.0"
+    RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
+      RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
@@ -3792,23 +3795,29 @@ module ReactOnRails
       rsc_version = rsc_package["version"].to_s
       return true if rsc_package_version_at_or_above_minimum?(rsc_version)
 
+      prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
+                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)"
+                               else
+                                 ""
+                               end
+
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
-        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}
-        (or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)
+        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
-        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@19.2.1-rc.0 --save-exact
+        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
       MSG
       false
     end
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
       return false if rsc_version.blank?
+      return true if npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
+      return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
 
-      npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0 ||
-        npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
+      npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
     end
 
     def unsupported_rsc_react_version?(react_version)

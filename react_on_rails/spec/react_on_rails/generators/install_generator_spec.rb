@@ -3680,19 +3680,20 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end
 
-    it "explains why every RSC install is pinned to the stable package" do
+    it "explains why every RSC install is pinned during the RC soak" do
       allow(install_generator).to receive(:add_packages).and_return(true)
 
       install_generator.send(:add_rsc_dependencies)
 
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("all --rsc installs")
+      expect(message_text).to include("temporarily")
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
-      expect(message_text).not_to include("prerelease")
-      expect(message_text).not_to include("temporarily")
-      expect(message_text).not_to include("until stable")
+      expect(message_text).to include("prerelease")
+      expect(message_text).to include("until stable")
+      expect(message_text).to include("react-on-rails-rsc@19.2.1")
     end
 
     it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do
