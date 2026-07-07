@@ -173,6 +173,14 @@ export class BoundedLRU<V> {
   }
 
   unpin(key: string): void {
+    this.releasePin(key, true);
+  }
+
+  unpinWithoutEvict(key: string): void {
+    this.releasePin(key, false);
+  }
+
+  private releasePin(key: string, reconcileEviction: boolean): void {
     this.assertNotEvicting('unpin');
     const count = this.pins.get(key);
     if (count === undefined) {
@@ -184,6 +192,9 @@ export class BoundedLRU<V> {
     }
 
     this.pins.delete(key);
+    if (!reconcileEviction) {
+      return;
+    }
     // The in-flight operation that held this pin just settled, so the key is
     // now the most-recently-used. `get` promotes only when the key is still
     // present; a key already deleted, e.g. by `restoreLastSuccessfulPromise`,

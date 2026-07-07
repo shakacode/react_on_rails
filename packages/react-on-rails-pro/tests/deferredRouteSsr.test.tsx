@@ -509,6 +509,104 @@ describe('RSCRoute deferred SSR behavior', () => {
     }
   });
 
+  it('shows the user ErrorBoundary fallback when an updated deferred route fetch rejects', async () => {
+    let rejectPayload: ((error: Error) => void) | undefined;
+    const failingPayloadPromise = new Promise<React.ReactNode>((_resolve, reject) => {
+      rejectPayload = reject;
+    });
+    type DeferredRouteProps = { simulateError: boolean };
+    let simulatedErrorFetchCount = 0;
+    const getServerComponent = jest.fn(({ componentProps }: { componentProps: unknown }) => {
+      const routeProps = componentProps as DeferredRouteProps;
+      if (!routeProps.simulateError) {
+        return Promise.resolve(<div>Loaded deferred route</div>);
+      }
+
+      simulatedErrorFetchCount += 1;
+      return simulatedErrorFetchCount === 1
+        ? failingPayloadPromise
+        : new Promise<React.ReactNode>(() => undefined);
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    let root: Root | undefined;
+    let triggerErrorRoute: (() => void) | undefined;
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const RouteSwitcher = () => {
+      const [simulateError, setSimulateError] = React.useState(false);
+      triggerErrorRoute = () => {
+        React.startTransition(() => {
+          setSimulateError(true);
+        });
+      };
+
+      return (
+        <TestErrorBoundary
+          fallback={({ error }) => <div data-testid="rsc-error-fallback">{error.message}</div>}
+        >
+          <React.Suspense fallback={<div>Loading deferred route...</div>}>
+            <RSCRoute componentName="DeferredRoute" componentProps={{ simulateError }} ssr={false} />
+          </React.Suspense>
+        </TestErrorBoundary>
+      );
+    };
+
+    try {
+      root = createRoot(container);
+
+      await act(async () => {
+        root?.render(
+          <RSCProvider>
+            <RouteSwitcher />
+          </RSCProvider>,
+        );
+        await Promise.resolve();
+      });
+
+      expect(container.textContent).toContain('Loaded deferred route');
+      expect(getServerComponent).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        triggerErrorRoute?.();
+        await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(2);
+      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+        componentName: 'DeferredRoute',
+        componentProps: { simulateError: true },
+      });
+
+      await act(async () => {
+        rejectPayload?.(new Error('Server component fetch failed'));
+        await failingPayloadPromise.catch(() => undefined);
+        await Promise.resolve();
+        await flushMacrotasks();
+        await Promise.resolve();
+      });
+
+      expect(container.querySelector('[data-testid="rsc-error-fallback"]')?.textContent).toBe(
+        'Server component fetch failed',
+      );
+      expect(container.textContent).not.toContain('Loaded deferred route');
+    } finally {
+      const mountedRoot = root;
+      try {
+        if (mountedRoot) {
+          await act(async () => {
+            mountedRoot.unmount();
+            await Promise.resolve();
+          });
+        }
+        container.remove();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    }
+  });
+
   it('dedupes identical deferred routes under the same default provider', async () => {
     const sharedPayloadPromise = new Promise<React.ReactNode>(() => undefined);
     const getServerComponent = jest.fn(() => sharedPayloadPromise);
@@ -732,9 +830,10 @@ describe('RSCRoute deferred SSR behavior', () => {
         );
         await Promise.resolve();
         await Promise.resolve();
-        // The provider evicts synchronously-rejected payload promises one
-        // macrotask after the rejection; flush so no eviction timer leaks
-        // past unmount.
+        // The provider evicts synchronously-rejected payload promises after
+        // React can observe the rejection and the in-flight pin releases; flush
+        // both timers so no eviction timer leaks past unmount.
+        await flushMacrotasks();
         await flushMacrotasks();
       });
 
