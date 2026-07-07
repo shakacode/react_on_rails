@@ -120,6 +120,7 @@ run_cmd corepack enable
 
 # Install JavaScript dependencies
 echo "📦 Installing JavaScript dependencies..."
+run_cmd ./script/clean-stale-pnpm-bin-links .
 run_cmd pnpm install
 
 # Build TypeScript (required for tests)

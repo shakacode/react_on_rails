@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Remove dangling package-manager generated bin links before pnpm relinks bins.
+
+set -euo pipefail
+
+ROOT_DIR="${1:-$(pwd)}"
+
+if [ ! -d "$ROOT_DIR" ]; then
+  echo "Usage: script/clean-stale-pnpm-bin-links [repo-root]" >&2
+  exit 1
+fi
+
+cd "$ROOT_DIR"
+
+shopt -s dotglob nullglob
+
+while IFS= read -r -d '' node_modules_dir; do
+  bin_dir="$node_modules_dir/.bin"
+  [ -d "$bin_dir" ] || continue
+
+  for link_path in "$bin_dir"/*; do
+    [ -L "$link_path" ] || continue
+    [ ! -e "$link_path" ] || continue
+
+    relative_path="${link_path#./}"
+    rm -f -- "$link_path"
+    printf 'Removed stale pnpm bin link: %s\n' "$relative_path"
+  done
+done < <(
+  find . \
+    \( -path "./.git" -o -path "./.claude" -o -path "./.Codex" -o -path "./.codex" -o -path "./.agents" -o -path "./.cursor" \) -prune -o \
+    -type d \
+    -name node_modules \
+    -print0 \
+    -prune
+)
