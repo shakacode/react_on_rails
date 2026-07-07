@@ -35,6 +35,7 @@ class PrMergeLedger
   }.freeze
   UNKNOWN_VIOLATION_CODES = [
     [/\Aci_readiness/, "unknown_ci_readiness"],
+    [/\Apr\.body_code_formatted_closing_keyword_scan/, "unknown_pr_body_closing_keyword_scan"],
     [/\Apriority_finding_dispositions\.body_scan/, "unknown_priority_finding_body_scan"],
     [/\Apriority_finding_dispositions/, "unknown_priority_finding_disposition"],
     [/\Achangelog_classification/, "unknown_changelog_classification"],
@@ -1853,6 +1854,15 @@ class PrMergeLedger
       unknowns << unknown_field(pull_request, "pr.head_sha", "GitHub headRefOid is UNKNOWN")
     end
 
+    if pull_request_body_truncated_for_closing_keyword_scan?(pull_request)
+      unknowns << unknown_field(
+        pull_request,
+        "pr.body_code_formatted_closing_keyword_scan",
+        "PR body exceeded the code-formatted closing keyword scan limit",
+        pull_request["url"]
+      )
+    end
+
     unknowns
   end
 
@@ -2011,6 +2021,10 @@ class PrMergeLedger
     body_lines.each_with_index.filter_map do |line, index|
       code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
     end
+  end
+
+  def pull_request_body_truncated_for_closing_keyword_scan?(pull_request)
+    pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "").each_line.count > MAX_BODY_LINES
   end
 
   def code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
@@ -2668,6 +2682,7 @@ class PrMergeLedger
 
   def next_gfm_table_header_candidate_active(line)
     boundary_line = line.chomp
+    return false if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
     return false if boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
 
     boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)

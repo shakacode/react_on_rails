@@ -346,14 +346,14 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_equal 1000, violation.fetch("line")
   end
 
-  def test_code_formatted_closing_keyword_scan_stops_after_max_body_lines
+  def test_code_formatted_closing_keyword_scan_truncation_blocks_strict_closeout
     body = ((["plain prose"] * 1_000) + ["`Fixes #4410`"]).join("\n")
     output, status = run_fixture(fixture_with_body(body))
 
-    assert status.success?, output
+    refute status.success?, output
     data = JSON.parse(output)
-    assert data.fetch("complete_allowed")
-    assert_empty violation_codes(data)
+    assert_equal ["unknown_pr_body_closing_keyword_scan"], violation_codes(data)
+    assert_equal ["pr.body_code_formatted_closing_keyword_scan"], unknown_field_names(data)
   end
 
   def test_backticked_url_closing_keyword_blocks_strict_closeout
@@ -825,6 +825,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_table_separator_without_header_allows_paragraph_closing_keyword
     output, status = run_fixture(fixture_with_body("--|--\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_indented_pipe_line_does_not_start_gfm_table_before_plain_closing_keyword
+    output, status = run_fixture(fixture_with_body("    A | B\n--|--\n    Fixes #4410\n"))
 
     assert status.success?, output
     data = JSON.parse(output)
