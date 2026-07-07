@@ -196,7 +196,7 @@ test('no logs lekage from outside the component', async () => {
   expect(content1).not.toContain('Outside The Component');
 });
 
-test('documents that React 19.2 RSC streaming keeps outer data-listener logs out of the payload', async () => {
+test('[bug] catches logs outside the component during reading the stream', async () => {
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
       reactClientManifestFileName: 'react-client-manifest.json',
@@ -229,9 +229,8 @@ test('documents that React 19.2 RSC streaming keeps outer data-listener logs out
 
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
-  // This documents the dependency-bump behavior observed with React/RSC 19.2.
-  // This PR does not change the local stream-capture implementation.
-  expect(content1).not.toContain('Outside The Component');
+  // Here's the bug
+  expect(content1).toContain('Outside The Component');
 });
 
 test('explains likely missing use client directive when a server component calls a client hook', async () => {
