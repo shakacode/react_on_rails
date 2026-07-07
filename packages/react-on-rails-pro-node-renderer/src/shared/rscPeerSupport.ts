@@ -22,7 +22,7 @@
 // the coordinated RSC fixes required by the Pro RSC renderer path.
 // `minimumPrereleaseVersion` keeps the 17.0 RC soak installable until the stable
 // 19.2.1 package is published without accepting older prereleases on the same
-// tuple.
+// tuple. When it is set, keep its core tuple equal to `minimumVersion`.
 export const RSC_PEER_SUPPORT = {
   reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.2.1-rc.0', supportedMajor: 19 },
   react: {

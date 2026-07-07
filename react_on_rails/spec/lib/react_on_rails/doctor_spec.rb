@@ -6045,7 +6045,7 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
-      it "keeps the React 19.2.7 floor warning when broad RSC peer ranges allow older React" do
+      it "errors when broad RSC peer ranges allow React below the supported floor" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
             File.write(
@@ -6070,8 +6070,53 @@ RSpec.describe ReactOnRails::Doctor do
 
             doctor.send(:check_rsc_react_version)
 
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
             warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-            expect(warning_msgs).to include(a_string_including("RSC support currently targets React 19.2.x"))
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.0.7",
+                "React 19.2.x with patch >= 19.2.7"
+              )
+            )
+            expect(warning_msgs).not_to include(a_string_including("RSC support currently targets React 19.2.x"))
+          end
+        end
+      end
+
+      it "errors when broad RSC peer ranges allow a future unsupported React minor" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.3.0",
+                  "react-dom" => "19.3.0",
+                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                }
+              )
+            )
+            install_react("19.3.0")
+            install_package("react-dom", "version" => "19.3.0")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.2.1-rc.0",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.3.0",
+                "React 19.2.x with patch >= 19.2.7"
+              )
+            )
+            expect(warning_msgs).not_to include(a_string_including("RSC support currently targets React 19.2.x"))
           end
         end
       end
