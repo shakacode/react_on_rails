@@ -17,6 +17,8 @@ DEFAULT_REQUIRED_CHECKS = [
 SUCCESS_CONCLUSION = "success"
 USER_AGENT = "react-on-rails-ci-required-merge-group-gate"
 
+class FetchCheckRunsError < StandardError; end
+
 def truthy?(value)
   %w[1 true yes on].include?(value.to_s.downcase)
 end
@@ -94,6 +96,17 @@ def next_link_from(headers)
   nil
 end
 
+def github_api_base_url
+  ENV.fetch("CI_REQUIRED_GITHUB_API_BASE_URL", "https://api.github.com").delete_suffix("/")
+end
+
+def github_api_uri(path, query = {})
+  encoded_query = URI.encode_www_form(query)
+  uri = "#{github_api_base_url}#{path}"
+  uri = "#{uri}?#{encoded_query}" unless encoded_query.empty?
+  URI(uri)
+end
+
 def fetch_json_page(uri, token)
   request = Net::HTTP::Get.new(uri)
   request["Accept"] = "application/vnd.github+json"
@@ -105,11 +118,11 @@ def fetch_json_page(uri, token)
     http.request(request)
   end
 
-  unless response.is_a?(Net::HTTPSuccess)
-    abort "Unable to read check runs for merge-group gate: HTTP #{response.code} #{response.message}"
-  end
+  raise FetchCheckRunsError, "HTTP #{response.code} #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
   [JSON.parse(response.body), next_link_from(response)]
+rescue JSON::ParserError => e
+  raise FetchCheckRunsError, "invalid JSON response: #{e.message}"
 end
 
 def fetch_paginated_json(uri, token)
@@ -126,7 +139,7 @@ def fetch_paginated_json(uri, token)
   payloads
 end
 
-def fetch_check_runs_from_github
+def github_fetch_context
   repository = ENV.fetch("GITHUB_REPOSITORY", "")
   sha = ENV.fetch("GITHUB_SHA", "")
   token = ENV.fetch("GITHUB_TOKEN", nil) || ENV.fetch("GH_TOKEN", nil)
@@ -136,14 +149,25 @@ def fetch_check_runs_from_github
   missing << "GITHUB_TOKEN or GH_TOKEN" if token.to_s.empty?
   abort "Missing #{missing.join(', ')} for merge-group gate" unless missing.empty?
 
-  check_runs_uri = URI("https://api.github.com/repos/#{repository}/commits/#{sha}/check-runs?per_page=100")
-  actions_runs_uri = URI(
-    "https://api.github.com/repos/#{repository}/actions/runs?#{URI.encode_www_form(head_sha: sha, per_page: 100)}"
-  )
+  { repository:, sha:, token: }
+end
+
+def fetch_check_runs_from_github
+  context = github_fetch_context
+  repository = context.fetch(:repository)
+  sha = context.fetch(:sha)
+  token = context.fetch(:token)
+
+  check_runs_uri = github_api_uri("/repos/#{repository}/commits/#{sha}/check-runs", per_page: 100)
+  actions_runs_uri = github_api_uri("/repos/#{repository}/actions/runs", head_sha: sha, per_page: 100)
   check_runs = fetch_paginated_json(check_runs_uri, token).flat_map { |payload| check_runs_from_payload(payload) }
   actions_runs = fetch_paginated_json(actions_runs_uri, token).flat_map { |payload| actions_runs_from_payload(payload) }
 
   { check_runs:, workflow_names_by_suite_id: workflow_names_by_suite_id(actions_runs) }
+rescue FetchCheckRunsError
+  raise
+rescue StandardError => e
+  raise FetchCheckRunsError, "#{e.class}: #{e.message}"
 end
 
 def fetch_check_runs
@@ -231,6 +255,17 @@ def evaluate_check_runs(check_runs, required_groups, workflow_names_by_suite_id)
   { pending:, failures: }
 end
 
+def fetch_evaluation_result(required_groups)
+  fetch_result = fetch_check_runs
+  evaluate_check_runs(
+    fetch_result.fetch(:check_runs),
+    required_groups,
+    fetch_result.fetch(:workflow_names_by_suite_id)
+  )
+rescue FetchCheckRunsError => e
+  { pending: ["GitHub API fetch failed: #{e.message}"], failures: [] }
+end
+
 def print_waiting(result, required_groups, timeout_seconds)
   warn "Waiting for required merge-group check(s) before ci-required can pass:"
   required_groups.each { |aliases| warn "  - #{aliases.join(' or ')}" }
@@ -250,12 +285,7 @@ poll_seconds = integer_env("CI_REQUIRED_MERGE_GROUP_GATE_POLL_SECONDS", 20)
 deadline = Time.now + timeout_seconds
 
 loop do
-  fetch_result = fetch_check_runs
-  result = evaluate_check_runs(
-    fetch_result.fetch(:check_runs),
-    required_groups,
-    fetch_result.fetch(:workflow_names_by_suite_id)
-  )
+  result = fetch_evaluation_result(required_groups)
 
   if result[:failures].any?
     warn "Required merge-group check failed:"

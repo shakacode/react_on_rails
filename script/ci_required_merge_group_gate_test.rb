@@ -2,9 +2,17 @@
 
 require "json"
 require "open3"
+require "socket"
 
 SCRIPT = File.expand_path("ci-required-merge-group-gate", __dir__)
 PACKAGE_JS_WORKFLOW = "JS unit tests for Renderer package"
+SERVICE_UNAVAILABLE_RESPONSE = [
+  "HTTP/1.1 503 Service Unavailable",
+  "Content-Type: application/json",
+  "Content-Length: 23",
+  "",
+  '{"message":"try later"}'
+].join("\r\n")
 
 def check_run(name:, status: "completed", conclusion: "success", id: 1, check_suite_id: 100)
   {
@@ -36,6 +44,28 @@ def action_runs_payload(*action_runs)
   JSON.generate("workflow_runs" => action_runs)
 end
 
+def with_http_response(response)
+  server = TCPServer.new("127.0.0.1", 0)
+  thread = Thread.new do
+    client = server.accept
+    client.readpartial(4096)
+    client.write(response)
+  ensure
+    client&.close
+    server.close
+  end
+
+  yield "http://127.0.0.1:#{server.addr[1]}"
+ensure
+  thread&.join(1)
+end
+
+def ruby_subprocess_command
+  return ["ruby"] if ENV["CI"] == "true"
+
+  %w[bundle exec ruby]
+end
+
 class Runner
   def initialize
     @tests = []
@@ -53,10 +83,11 @@ class Runner
       "CI_REQUIRED_MERGE_GROUP_GATE_POLL_SECONDS" => "0",
       "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
       "GITHUB_SHA" => "abc123",
+      "GITHUB_TOKEN" => "test-token",
       "CI_REQUIRED_ACTION_RUNS_JSON" => action_runs_payload(action_run)
     }
 
-    stdout, stderr, status = Open3.capture3(base_env.merge(env), "ruby", SCRIPT)
+    stdout, stderr, status = Open3.capture3(base_env.merge(env), *ruby_subprocess_command, SCRIPT)
     output = "#{stdout}\n#{stderr}"
 
     return if status.exitstatus == expected_status && output.include?(expected_output)
@@ -175,6 +206,17 @@ runner.run_case(
   expected_status: 1,
   expected_output: "build (20): in_progress"
 )
+
+with_http_response(SERVICE_UNAVAILABLE_RESPONSE) do |api_base_url|
+  runner.run_case(
+    "retries GitHub API fetch failures until timeout",
+    env: {
+      "CI_REQUIRED_GITHUB_API_BASE_URL" => api_base_url
+    },
+    expected_status: 1,
+    expected_output: "GitHub API fetch failed: HTTP 503 Service Unavailable"
+  )
+end
 
 runner.run_case(
   "uses the latest attempt for duplicate check names",
