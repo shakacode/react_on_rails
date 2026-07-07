@@ -1988,7 +1988,7 @@ class PrMergeLedger
 
   def code_formatted_closing_keyword_violations(pull_request)
     body = pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "")
-    body_lines = body.each_line.to_a
+    body_lines = body.each_line.first(MAX_BODY_LINES)
     markdown_state = {
       "body_lines" => body_lines,
       "opening_fence" => nil,

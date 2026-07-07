@@ -335,6 +335,27 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_code_formatted_closing_keyword_scan_includes_max_body_line
+    body = ((["plain prose"] * 999) + ["`Fixes #4410`"]).join("\n")
+    output, status = run_fixture(fixture_with_body(body))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1000, violation.fetch("line")
+  end
+
+  def test_code_formatted_closing_keyword_scan_stops_after_max_body_lines
+    body = ((["plain prose"] * 1_000) + ["`Fixes #4410`"]).join("\n")
+    output, status = run_fixture(fixture_with_body(body))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_backticked_url_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(
       fixture_with_body("This will not close: `Fixes https://github.com/shakacode/react_on_rails/issues/4410`.")
