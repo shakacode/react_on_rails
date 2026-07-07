@@ -68,6 +68,10 @@ RSpec.describe "pnpm bin cleanup setup support" do
     end
   end
 
+  it "does not rely on GNU-only find depth flags" do
+    expect(File.read(script_path)).not_to match(/\s-(?:min|max)depth\b/)
+  end
+
   describe "bin/setup" do
     let(:setup_script_path) { File.join(repo_root, "bin/setup") }
 
