@@ -1,0 +1,51 @@
+# frozen_string_literal: true
+
+require "fileutils"
+require "open3"
+require "tmpdir"
+require_relative "spec_helper"
+
+RSpec.describe "script/clean-stale-pnpm-bin-links" do
+  let(:repo_root) { File.expand_path("../../..", __dir__) }
+  let(:script_path) { File.join(repo_root, "script/clean-stale-pnpm-bin-links") }
+
+  def run_cleaner(root)
+    Open3.capture3(script_path, root)
+  end
+
+  it "removes broken generated pnpm bin symlinks before install relinks bins" do
+    Dir.mktmpdir do |tmpdir|
+      stale_link = File.join(tmpdir, "react_on_rails_pro/spec/dummy/node_modules/.bin/node")
+      FileUtils.mkdir_p(File.dirname(stale_link))
+      File.symlink("../@sentry/node/bin/node", stale_link)
+
+      stdout, stderr, status = run_cleaner(tmpdir)
+
+      expect(status).to be_success, stderr
+      expect(stderr).to be_empty
+      expect(File.symlink?(stale_link)).to be(false)
+      expect(stdout).to include(
+        "Removed stale pnpm bin link: react_on_rails_pro/spec/dummy/node_modules/.bin/node"
+      )
+    end
+  end
+
+  it "keeps valid generated pnpm bin symlinks" do
+    Dir.mktmpdir do |tmpdir|
+      target = File.join(tmpdir, "app/node_modules/tool/bin/tool")
+      valid_link = File.join(tmpdir, "app/node_modules/.bin/tool")
+      FileUtils.mkdir_p(File.dirname(target))
+      FileUtils.mkdir_p(File.dirname(valid_link))
+      File.write(target, "#!/usr/bin/env node\n")
+      File.symlink("../tool/bin/tool", valid_link)
+
+      stdout, stderr, status = run_cleaner(tmpdir)
+
+      expect(status).to be_success, stderr
+      expect(stderr).to be_empty
+      expect(File.symlink?(valid_link)).to be(true)
+      expect(File.exist?(valid_link)).to be(true)
+      expect(stdout).to be_empty
+    end
+  end
+end
