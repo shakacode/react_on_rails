@@ -1465,8 +1465,10 @@ describe('RSCRoute successful-version error reset', () => {
     syncThrowIds.add(0);
     await act(async () => {
       await expect(rscApi.getComponent('Card', { id: 0 })).rejects.toThrow('sync boom 0');
-      // The cached rejection is evicted one macrotask later; flush so the next
-      // same-key load starts fresh instead of reusing the rejected promise.
+      // The cached rejection is evicted after the Suspense-observation and
+      // unpin macrotasks; flush both so the next same-key load starts fresh
+      // instead of reusing the rejected promise.
+      await flushMacrotasks();
       await flushMacrotasks();
     });
 
@@ -1523,8 +1525,10 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.reject(new Error(message));
         await expect(started.promise).rejects.toThrow(message);
-        // evictPromiseIfRejected removes the cached promise via setTimeout(0),
-        // so wait one macrotask before asserting the slot is free.
+        // evictPromiseIfRejected keeps the rejected promise through the first
+        // macrotask so React can commit the user ErrorBoundary fallback; wait
+        // for the second macrotask before asserting the slot is free.
+        await flushMacrotasks();
         await flushMacrotasks();
       });
     };
