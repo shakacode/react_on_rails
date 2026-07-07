@@ -1,0 +1,218 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Enforce selected asynchronous merge-group checks through the stable
+# ci-required / required-pr-gate context. Branch protection can require only the
+# required gate while this helper waits for merge-group-only full-matrix checks
+# that run in separate workflows.
+
+require "json"
+require "net/http"
+require "time"
+require "uri"
+
+DEFAULT_REQUIRED_CHECKS = [
+  ["JS unit tests for Renderer package / build (20)", "build (20)"]
+].freeze
+SUCCESS_CONCLUSION = "success"
+USER_AGENT = "react-on-rails-ci-required-merge-group-gate"
+
+def truthy?(value)
+  %w[1 true yes on].include?(value.to_s.downcase)
+end
+
+def integer_env(name, default)
+  Integer(ENV.fetch(name, default.to_s), 10)
+rescue ArgumentError
+  abort "#{name} must be an integer"
+end
+
+def required_check_groups
+  raw_value = ENV.fetch("CI_REQUIRED_MERGE_GROUP_REQUIRED_CHECKS", "").strip
+  return DEFAULT_REQUIRED_CHECKS if raw_value.empty?
+
+  raw_value
+    .lines
+    .map(&:strip)
+    .reject(&:empty?)
+    .map { |line| line.split("|").map(&:strip).reject(&:empty?) }
+    .reject(&:empty?)
+end
+
+def check_runs_from_payload(payload)
+  case payload
+  when Array
+    payload.flat_map { |item| check_runs_from_payload(item) }
+  when Hash
+    payload.key?("check_runs") ? Array(payload["check_runs"]) : [payload]
+  else
+    []
+  end
+end
+
+def next_link_from(headers)
+  link_header = headers["link"]
+  return nil unless link_header
+
+  link_header.split(",").each do |entry|
+    url, rel = entry.strip.split(";", 2)
+    next unless rel&.include?('rel="next"')
+    next unless url
+    next unless url.start_with?("<") && url.end_with?(">")
+
+    return url[1...-1]
+  end
+
+  nil
+end
+
+def fetch_json_page(uri, token)
+  request = Net::HTTP::Get.new(uri)
+  request["Accept"] = "application/vnd.github+json"
+  request["Authorization"] = "Bearer #{token}"
+  request["User-Agent"] = USER_AGENT
+  request["X-GitHub-Api-Version"] = "2022-11-28"
+
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
+    http.request(request)
+  end
+
+  unless response.is_a?(Net::HTTPSuccess)
+    abort "Unable to read check runs for merge-group gate: HTTP #{response.code} #{response.message}"
+  end
+
+  [JSON.parse(response.body), next_link_from(response)]
+end
+
+def fetch_check_runs_from_github
+  repository = ENV.fetch("GITHUB_REPOSITORY", "")
+  sha = ENV.fetch("GITHUB_SHA", "")
+  token = ENV.fetch("GITHUB_TOKEN", nil) || ENV.fetch("GH_TOKEN", nil)
+  missing = []
+  missing << "GITHUB_REPOSITORY" if repository.empty?
+  missing << "GITHUB_SHA" if sha.empty?
+  missing << "GITHUB_TOKEN or GH_TOKEN" if token.to_s.empty?
+  abort "Missing #{missing.join(', ')} for merge-group gate" unless missing.empty?
+
+  uri = URI("https://api.github.com/repos/#{repository}/commits/#{sha}/check-runs?per_page=100")
+  check_runs = []
+
+  loop do
+    payload, next_link = fetch_json_page(uri, token)
+    check_runs.concat(check_runs_from_payload(payload))
+    break unless next_link
+
+    uri = URI(next_link)
+  end
+
+  check_runs
+end
+
+def fetch_check_runs
+  injected_json = ENV.fetch("CI_REQUIRED_CHECK_RUNS_JSON", nil)
+  return check_runs_from_payload(JSON.parse(injected_json)) if injected_json && !injected_json.empty?
+
+  fetch_check_runs_from_github
+end
+
+def parse_time(value)
+  Time.parse(value.to_s)
+rescue ArgumentError, TypeError
+  Time.at(0)
+end
+
+def check_names(check_run)
+  name = check_run["name"].to_s
+  workflow_name = check_run["workflow_name"] || check_run.dig("check_suite", "workflow_name")
+  names = [name, check_run["display_name"].to_s]
+  names << "#{workflow_name} / #{name}" if workflow_name && !workflow_name.empty? && !name.empty?
+  names.reject(&:empty?).uniq
+end
+
+def latest_check_for(check_runs, aliases)
+  candidates = check_runs.select do |check_run|
+    (check_names(check_run) & aliases).any?
+  end
+
+  candidates.max_by do |check_run|
+    [
+      parse_time(check_run["completed_at"] || check_run["started_at"] || check_run["created_at"]).to_i,
+      check_run["id"].to_i
+    ]
+  end
+end
+
+def check_url(check_run)
+  url = check_run["html_url"] || check_run["details_url"]
+  url && !url.empty? ? " (#{url})" : ""
+end
+
+def evaluate_check_runs(check_runs, required_groups)
+  pending = []
+  failures = []
+
+  required_groups.each do |aliases|
+    label = aliases.first
+    check_run = latest_check_for(check_runs, aliases)
+
+    unless check_run
+      pending << "#{label}: missing"
+      next
+    end
+
+    status = check_run["status"].to_s.downcase
+    conclusion = check_run["conclusion"].to_s.downcase
+
+    if status == "completed" && conclusion == SUCCESS_CONCLUSION
+      next
+    elsif status == "completed" && !conclusion.empty?
+      failures << "#{label}: concluded #{conclusion}#{check_url(check_run)}"
+    else
+      pending << "#{label}: #{status.empty? ? 'pending' : status}#{check_url(check_run)}"
+    end
+  end
+
+  { pending:, failures: }
+end
+
+def print_waiting(result, required_groups, timeout_seconds)
+  warn "Waiting for required merge-group check(s) before ci-required can pass:"
+  required_groups.each { |aliases| warn "  - #{aliases.join(' or ')}" }
+  result[:pending].each { |line| warn "  pending: #{line}" }
+  warn "Timeout: #{timeout_seconds}s"
+end
+
+if ENV.fetch("GITHUB_EVENT_NAME", "") != "merge_group" ||
+   !truthy?(ENV.fetch("REQUIRE_PACKAGE_JS_BUILD_20", "false"))
+  puts "Merge-group full-matrix gate skipped."
+  exit 0
+end
+
+required_groups = required_check_groups
+timeout_seconds = integer_env("CI_REQUIRED_MERGE_GROUP_GATE_TIMEOUT_SECONDS", 1200)
+poll_seconds = integer_env("CI_REQUIRED_MERGE_GROUP_GATE_POLL_SECONDS", 20)
+deadline = Time.now + timeout_seconds
+
+loop do
+  result = evaluate_check_runs(fetch_check_runs, required_groups)
+
+  if result[:failures].any?
+    warn "Required merge-group check failed:"
+    result[:failures].each { |line| warn "  - #{line}" }
+    exit 1
+  end
+
+  if result[:pending].empty?
+    puts "Required merge-group check(s) passed."
+    exit 0
+  end
+
+  if Time.now >= deadline
+    warn "Timed out waiting for required merge-group check(s):"
+    result[:pending].each { |line| warn "  - #{line}" }
+    exit 1
+  end
+
+  print_waiting(result, required_groups, timeout_seconds)
+  sleep((deadline - Time.now).clamp(0, poll_seconds))
+end

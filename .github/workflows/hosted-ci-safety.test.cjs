@@ -41,6 +41,28 @@ assertMatches(
   labelDispatchWorkflow,
   /createWorkflowDispatch\({[\s\S]*workflow_id: 'ci-required\.yml'[\s\S]*force_required_hosted_ci_recheck: 'true'/,
 );
+assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
+assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
+assertMatches(
+  'ci-required mirrored-block lint tests',
+  requiredWorkflow,
+  /bash script\/lint-mirrored-blocks-test\.bash/,
+);
+assertMatches(
+  'ci-required merge-group gate',
+  requiredWorkflow,
+  /ruby script\/ci-required-merge-group-gate/,
+);
+assertMatches(
+  'ci-required merge-group gate tests',
+  requiredWorkflow,
+  /ruby script\/ci_required_merge_group_gate_test\.rb/,
+);
+assertMatches(
+  'ci-required merge-group JS selector',
+  requiredWorkflow,
+  /REQUIRE_PACKAGE_JS_BUILD_20: \$\{\{ steps\.changes\.outputs\.run_js_tests \}\}/,
+);
 assertMatches('closed PR hosted-CI guard', ciCommandsWorkflow, /pr\.state !== 'open'/);
 assertMatches(
   'closed PR degraded evidence comment',

@@ -21,6 +21,7 @@ on:
         default: false
 
 permissions:
+  checks: read
   contents: read
   issues: read
 
@@ -48,7 +49,7 @@ jobs:
   required-pr-gate:
     name: required-pr-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -59,7 +60,7 @@ jobs:
         run: |
           ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }"
 
-      - name: Validate CI shell scripts
+      - name: Validate CI scripts
         run: |
           for script in \
             bin/ci-local \
@@ -70,13 +71,19 @@ jobs:
           do
             bash -n "$script"
           done
+          ruby -c script/ci-required-merge-group-gate
 
       - name: Run CI gate tests
         run: |
           bash script/ci-required-hosted-gate-test.bash
+          bash script/lint-mirrored-blocks-test.bash
+          ruby script/ci_required_merge_group_gate_test.rb
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
           ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb
+
+      - name: Check mirrored blocks
+        run: ruby bin/lint-mirrored-blocks
 
       - name: Fetch workflow dispatch base
         if: github.event_name == 'workflow_dispatch'
@@ -121,6 +128,14 @@ jobs:
             }}
         run: |
           script/ci-required-hosted-gate
+
+      - name: Enforce merge-group package JS minimum gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REQUIRE_PACKAGE_JS_BUILD_20: ${{ steps.changes.outputs.run_js_tests }}
+          CI_REQUIRED_MERGE_GROUP_REQUIRED_CHECKS: |
+            JS unit tests for Renderer package / build (20)|build (20)
+        run: ruby script/ci-required-merge-group-gate
 
       - name: Lightweight repo sanity check
         run: |
