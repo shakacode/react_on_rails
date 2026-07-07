@@ -86,10 +86,15 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
+      - { ecosystem: npm, name: shakapacker-rspack }
     needs_pro: true
+    package_manager: yarn_classic
+    ruby_test: bin/rspec
+    build: cd client && yarn start build.rspec.sequential
     smoke: [/]
     verify: true
 
