@@ -262,7 +262,7 @@ module ReactOnRails
     end
 
     def detected_rspack_version_for_rsc
-      package_root = File.dirname(node_package_version.package_json)
+      package_root = rsc_configured_package_root(File.dirname(node_package_version.package_json))
       declared_spec = package_dependency_spec(RSC_RSPACK_PACKAGE)
       declared_version = rsc_normalized_declared_package_version(declared_spec) || declared_spec
       declared_major_version = rsc_package_major_version(declared_spec)
