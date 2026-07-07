@@ -142,11 +142,52 @@ jobs:
           rails_pid="$!"
           echo "$rails_pid" > "$RUNNER_TEMP/shakaperf-rails.pid"
 
+          probe_renderer_info() {
+            node <<'NODE'
+          const http2 = require('node:http2');
+
+          const client = http2.connect('http://127.0.0.1:3800');
+          let status;
+          let timeout;
+          let completed = false;
+
+          const finish = (exitCode, destroyClient = false) => {
+            if (completed) return;
+            completed = true;
+            clearTimeout(timeout);
+            if (destroyClient) {
+              client.destroy();
+            } else {
+              client.close();
+            }
+            process.exit(exitCode);
+          };
+
+          const fail = () => finish(1, true);
+
+          client.on('error', fail);
+          const request = client.request({
+            ':method': 'GET',
+            ':path': '/info',
+          });
+          request.on('error', fail);
+          request.on('response', (headers) => {
+            status = headers[':status'];
+          });
+          request.on('data', () => {});
+          request.on('end', () => {
+            finish(status >= 200 && status < 300 ? 0 : 1);
+          });
+          request.end();
+          timeout = setTimeout(fail, 5000);
+          NODE
+          }
+
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
             # /info proves the renderer socket responds, /empty proves Rails responds,
             # and the RSC page proves both sides are warm enough for the gate.
-            if curl --connect-timeout 2 --max-time 5 -fsS "http://127.0.0.1:3800/info" > /dev/null &&
+            if probe_renderer_info &&
               curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
               curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
             then

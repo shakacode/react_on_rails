@@ -9,10 +9,15 @@ function assertMatches(name, text, pattern) {
   assert.match(text, pattern, `${name} is missing ${pattern}`);
 }
 
+function assertDoesNotMatch(name, text, pattern) {
+  assert.doesNotMatch(text, pattern, `${name} unexpectedly matches ${pattern}`);
+}
+
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
+const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -40,6 +45,25 @@ assertMatches(
   'required gate cleanup recheck',
   labelDispatchWorkflow,
   /createWorkflowDispatch\({[\s\S]*workflow_id: 'ci-required\.yml'[\s\S]*force_required_hosted_ci_recheck: 'true'/,
+);
+assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
+assertMatches('ci-required actions-run read permission', requiredWorkflow, /actions: read/);
+assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
+assertMatches(
+  'ci-required mirrored-block lint tests',
+  requiredWorkflow,
+  /bash script\/lint-mirrored-blocks-test\.bash/,
+);
+assertMatches('ci-required merge-group gate', requiredWorkflow, /ruby script\/ci-required-merge-group-gate/);
+assertMatches(
+  'ci-required merge-group gate tests',
+  requiredWorkflow,
+  /ruby script\/ci_required_merge_group_gate_test\.rb/,
+);
+assertMatches(
+  'ci-required merge-group JS selector',
+  requiredWorkflow,
+  /REQUIRE_PACKAGE_JS_BUILD_20: \$\{\{ steps\.changes\.outputs\.run_js_tests \}\}/,
 );
 assertMatches('closed PR hosted-CI guard', ciCommandsWorkflow, /pr\.state !== 'open'/);
 assertMatches(
@@ -70,5 +94,17 @@ assertMatches(
   /const isTrustedReleaseTarget = isReleaseTarget[\s\S]*!isDependabotPullRequest \|\| trustedDependabotHostedRequest/,
 );
 assertMatches('Dependabot trusted-dispatch retry', hostedSelectorsAction, /const maxAttempts = 4/);
+
+assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);
+assertMatches(
+  'ShakaPerf renderer h2c /info request',
+  shakaperfReleaseGateWorkflow,
+  /client\.request\(\{[\s\S]*':method': 'GET',[\s\S]*':path': '\/info'/,
+);
+assertDoesNotMatch(
+  'ShakaPerf renderer plain curl probe',
+  shakaperfReleaseGateWorkflow,
+  /curl [^\n]*http:\/\/127\.0\.0\.1:3800\/info/,
+);
 
 console.log('hosted CI workflow safety tests passed');

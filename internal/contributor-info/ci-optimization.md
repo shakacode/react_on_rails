@@ -26,9 +26,12 @@ The `required-pr-gate` job intentionally stays lightweight:
 
 - validates workflow YAML can be loaded by Ruby
 - syntax-checks CI shell helpers
+- checks mirrored Ruby/TypeScript protocol blocks with `bin/lint-mirrored-blocks`
 - runs `script/ci-changes-detector`
 - fails ordinary pull requests with generator-sensitive changes until hosted CI
   is requested
+- on `merge_group`, waits for the package JS minimum Node check
+  (`JS unit tests for Renderer package / build (20)`) when JS tests are relevant
 - checks basic repository structure
 
 Repository branch protection should require `ci-required / required-pr-gate`.
@@ -188,9 +191,20 @@ script/ci-changes-detector origin/main
 
 ## Merge Queue
 
-Merge queue is a repository setting, not a file in this PR. After this policy
-lands, maintainers should enable merge queue for `react_on_rails` so merge
-candidates run the same hosted workflow entry points before landing.
+Merge queue is a repository setting, not a file in this PR. The repo-local
+required gate enforces selected merge-group-only checks that run in separate
+workflows by polling the current merge-group SHA. Today that includes the
+package JS minimum Node lane, so a failing
+`JS unit tests for Renderer package / build (20)` check blocks `ci-required /
+required-pr-gate` and therefore blocks the merge queue even when branch
+protection requires only the stable required gate context. The gate maps check
+runs back to Actions workflow runs by `check_suite_id`; a bare `build (20)` from
+another workflow does not satisfy this gate.
+
+Directly requiring every hosted full-matrix check context remains an
+administrator branch-protection setting. Use that setting only when maintainers
+want GitHub branch protection itself, rather than the repo-local required gate,
+to enumerate each heavyweight job.
 
 If merge queue is not yet enabled, maintainers should request optimized hosted
 CI with `+ci-run-hosted` before merging PRs that need remote confirmation. Use

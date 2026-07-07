@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.7] - 2026-07-06
+
 #### Breaking Changes
 
 - **[Pro] React Server Components now require the React 19.2.x RSC line**: React on Rails Pro 17 raises the optional RSC peer and runtime floor from `react-on-rails-rsc` 19.0.x to stable 19.2.x with patch >= 19.2.1. Apps using Pro RSC should upgrade `react-on-rails-rsc` to stable 19.2.x with patch >= 19.2.1 and React/React DOM to 19.2.x with patch >= 19.2.7. The release-candidate peer range accepts `19.2.1-rc.0` so the RC soak path can install before the stable package is published, and the Pro RSC generator now scaffolds the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1-rc.0 pair. This is a breaking change for Pro RSC apps still on the 19.0.x RSC package line; the existing `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` escape hatch still downgrades the startup error to a warning for emergency rollouts. [PR 4490](https://github.com/shakacode/react_on_rails/pull/4490) by [justin808](https://github.com/justin808).
@@ -98,7 +100,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 4319](https://github.com/shakacode/react_on_rails/issues/4319).
   [PR 4443](https://github.com/shakacode/react_on_rails/pull/4443) by
   [justin808](https://github.com/justin808).
-- **Lighter `npx create-react-on-rails-app` install**: The scaffolder now colorizes its terminal output with the zero-dependency [`picocolors`](https://github.com/alexeyraspopov/picocolors) instead of `chalk@4`, dropping `chalk` and its transitive tree (`ansi-styles`, `supports-color`, `color-convert`, `color-name`, `has-flag`) from the package's runtime dependencies. This trims the weight of every cold `npx create-react-on-rails-app` install with no change to the CLI's colored output. Fixes [Issue 4411](https://github.com/shakacode/react_on_rails/issues/4411). [PR 4444](https://github.com/shakacode/react_on_rails/pull/4444) by [justin808](https://github.com/justin808).
+- **Lighter `npx create-react-on-rails-app` install**: The scaffolder now colorizes its terminal output with the zero-dependency [`picocolors`](https://github.com/alexeyraspopov/picocolors) instead of `chalk@4`, dropping `chalk` and its transitive tree (`ansi-styles`, `supports-color`, `color-convert`, `color-name`, `has-flag`) from the package's runtime dependencies. This trims the weight of every cold `npx create-react-on-rails-app` install. The TTY color-fallback now also mirrors chalk@4/`supports-color`'s actual signal precedence (recognized CI vendors, `TERM`, `COLORTERM`, Windows) instead of coloring any non-dumb TTY, matching the prior colored-output behavior in full. Fixes [Issue 4411](https://github.com/shakacode/react_on_rails/issues/4411) and [Issue 4455](https://github.com/shakacode/react_on_rails/issues/4455). [PR 4444](https://github.com/shakacode/react_on_rails/pull/4444) and [PR 4473](https://github.com/shakacode/react_on_rails/pull/4473) by [justin808](https://github.com/justin808).
+- **[Pro]** **Removed unused `addressable`/`rainbow` runtime gem dependencies**: `react_on_rails_pro.gemspec` no longer declares direct runtime dependencies on `addressable` or `rainbow` — no Pro Ruby code referenced either gem, and both still arrive transitively through the required `react_on_rails` gem, so behavior is unchanged. Fixes [Issue 4416](https://github.com/shakacode/react_on_rails/issues/4416). [PR 4422](https://github.com/shakacode/react_on_rails/pull/4422) by [justin808](https://github.com/justin808).
 - **[Pro]** **Fail fast for RSC with Rspack v1**: When React Server Components are enabled and Shakapacker is
   configured for Rspack, app boot and `react_on_rails:doctor` now reject `@rspack/core` v1 or a missing
   `@rspack/core` package with explicit Rspack v2 upgrade instructions. This guard only runs when RSC is enabled,
@@ -112,9 +115,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   React on Rails Pro scaffold by default. Automation note: non-TTY environments, including CI and piped
   commands, previously auto-selected Standard mode; they now select Pro. Add `--standard` to any command
   that intentionally checks or creates an open-source-only scaffold. Use `--rsc` when you want Pro with the
-  generated React Server Components example.
+  generated React Server Components example. The canonical `reactonrails.com` "Start a new app" AI-agent
+  prompt (`prompts.yml`) was updated to match, so AI assistants following it also default to the Pro path
+  and mention the license requirement. [PR 4217](https://github.com/shakacode/react_on_rails/pull/4217) and
+  [PR 4232](https://github.com/shakacode/react_on_rails/pull/4232) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **Missing renderer password error now leads with the local-development fix**: When the Pro renderer password is unset and both `RAILS_ENV` and `NODE_ENV` are unset, the fail-closed error from both the Ruby configuration guard and the Node renderer now includes explicit `export RAILS_ENV=development NODE_ENV=development` guidance. Password-optional behavior for explicit development/test envs and password-required behavior for production-like or mixed envs are unchanged. Fixes [Issue 4201](https://github.com/shakacode/react_on_rails/issues/4201). [PR 4211](https://github.com/shakacode/react_on_rails/pull/4211) by [justin808](https://github.com/justin808).
 
 #### Fixed
+
+- **`hydrate_on: visible` no longer leaks a detached root or blocks re-hydrating a replacement node**: When a `hydrate_on: visible` target was detached from the DOM before it became visible, the intersection observer left a stale scheduled root entry that kept the removed node reachable and could stop a replacement node with the same DOM id from scheduling its own hydration. The observer now runs its scheduled callback after disconnecting from a detached target; the callback's existing `isConnected` guard deletes the stale entry without hydrating the removed node, so a fresh node with the same id schedules cleanly. Fixes [Issue 4328](https://github.com/shakacode/react_on_rails/issues/4328). [PR 4374](https://github.com/shakacode/react_on_rails/pull/4374) by [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSCRoute error recovery now covers synchronous route failures and fire-and-forget retries**: Synchronous throws from RSC route fetch/render setup are normalized into rejected fetch promises so they flow through the same `RSCRoute` error-recovery path (and `RSCRouteErrorBoundary`) as async fetch failures instead of bypassing it, keeping retry/refetch bookkeeping consistent when a fetch fails synchronously. Fire-and-forget recover-on-error retries also no longer surface as unhandled promise rejections in production: the caller-visible retry promise stays rejected for callers that await or catch it, while an internal no-op handler prevents an unhandled rejection when the retry is not awaited. Fixes [Issue 4330](https://github.com/shakacode/react_on_rails/issues/4330) and [Issue 4372](https://github.com/shakacode/react_on_rails/issues/4372). [PR 4378](https://github.com/shakacode/react_on_rails/pull/4378) and [PR 4393](https://github.com/shakacode/react_on_rails/pull/4393) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Node renderer rejects unsafe asset filenames**: The Pro Node renderer now rejects path-like,
   drive-relative, alternate-stream, and control-character asset filenames before uploaded assets are copied
@@ -407,6 +419,43 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Clear page-scoped RSC payload globals on client navigation**: Pro's client-navigation teardown (`unmountAll`, fired on page unload) now deletes the page-scoped `REACT_ON_RAILS_RSC_PAYLOADS` and `REACT_ON_RAILS_RSC_ERRORS` globals that injected RSC payload `<script>` tags populate during server-streamed hydration. Previously they were left in place after components and stores unmounted, so they accumulated one entry per embedded RSC component for the life of a long-lived client-navigation (Turbo) session; and with non-random DOM ids (`config.random_dom_id = false`) a revisited payload key could append the next page's streamed chunks onto the previous page's array. Same-page streaming (the `||=` append used while a page is still rendering) is unchanged. This affects only the not-yet-released Pro RSC feature, so no published version is impacted. Closes [Issue 3932](https://github.com/shakacode/react_on_rails/issues/3932). [PR 4023](https://github.com/shakacode/react_on_rails/pull/4023) by [justin808](https://github.com/justin808).
 
 - **[Pro]** **Precompile hook no longer crashes under a non-UTF-8 (C/POSIX) locale**: The shared Shakapacker precompile hook now forces a UTF-8 locale on every `bundle exec` / shakapacker subprocess it spawns — pack generation, the i18n locale generation added in [PR 4128](https://github.com/shakacode/react_on_rails/pull/4128), and the RSC client-reference discovery build. Without `LANG`/`LC_ALL` set, those children inherited a US-ASCII default external encoding and died parsing Gemfiles containing non-ASCII bytes (e.g. `react_on_rails_pro/Gemfile.loader`: `invalid byte sequence in US-ASCII`), aborting the entire precompile. Extends the UTF-8 hardening from [PR 3949](https://github.com/shakacode/react_on_rails/pull/3949) from the hook's own file reads to the subprocess boundary. [PR 4169](https://github.com/shakacode/react_on_rails/pull/4169) by [justin808](https://github.com/justin808).
+
+- **OSS renders no longer compute or emit Pro-only generated-stylesheet metadata**: Rendering a component
+  now skips `generated_stylesheet_hrefs_json`'s stylesheet-href discovery entirely when React on Rails Pro
+  is not installed, instead of running that Pro-only work on every open-source render. Fixes
+  [Issue 4341](https://github.com/shakacode/react_on_rails/issues/4341).
+  [PR 4395](https://github.com/shakacode/react_on_rails/pull/4395) by
+  [justin808](https://github.com/justin808).
+
+- **`create_render_options` no longer mutates the caller's options hash**: Adding default store
+  dependencies and internal stream-observability state now operates on a duplicate of the supplied
+  options, so a frozen or reused options hash passed to a helper no longer raises `FrozenError` or leaks
+  observability state into a later render that reuses the same hash. Fixes
+  [Issue 4343](https://github.com/shakacode/react_on_rails/issues/4343).
+  [PR 4396](https://github.com/shakacode/react_on_rails/pull/4396) by
+  [justin808](https://github.com/justin808).
+
+- **Locale-file regeneration check no longer reads the whole generated file, and correctly detects a
+  legacy import after custom content**: The obsolete-locale-file check now streams `default.js` line by
+  line, stopping as soon as it finds either the legacy `react-intl`/`defineMessages` import (regenerate)
+  or the current `const defaultLocale = ...` marker (up to date), instead of reading and matching the
+  entire file from the start. This also fixes a false negative where a legacy import following custom
+  file content was not detected. Fixes [Issue 4345](https://github.com/shakacode/react_on_rails/issues/4345).
+  [PR 4398](https://github.com/shakacode/react_on_rails/pull/4398) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Static RSC payload script stripping is robust to generated body-shape changes**: Pro-generated
+  RSC initialization, payload-chunk, and diagnostic `<script>` tags now carry an explicit
+  `data-react-on-rails-rsc-payload="true"` marker, and static RSC cache stripping
+  (`cached_static_rsc_component`) now prefers that marker over inferring payload scripts from body shape,
+  while still falling back to the previous shape-based detection for older generated HTML. Fixes
+  [Issue 4459](https://github.com/shakacode/react_on_rails/issues/4459).
+  [PR 4477](https://github.com/shakacode/react_on_rails/pull/4477) by
+  [justin808](https://github.com/justin808).
+
+#### Removed
+
+- **[Pro]** **Removed the `react-on-rails-pro/rscPayloadNode` export and its `createRscPayloadNode` helper**: The duplicate RSC payload route-data API added during the 17.0 RC line (in [PR 3783](https://github.com/shakacode/react_on_rails/pull/3783)) is gone; `RSCRoute` is the canonical Pro RSC client-router integration. Client-router loaders return plain route data (`componentName`, `componentProps`) and route components render `RSCRoute`, which keeps React on Rails Pro in control of payload fetching, caching, embedded SSR payload reuse, and retry behavior. This affects only the not-yet-released Pro RSC feature line. Fixes [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439). [PR 4440](https://github.com/shakacode/react_on_rails/pull/4440) by [ihabadham](https://github.com/ihabadham).
 
 ### [17.0.0.rc.6] - 2026-06-21
 
@@ -2736,7 +2785,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...main
+[17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
 [17.0.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.5...v17.0.0.rc.6
 [17.0.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.4...v17.0.0.rc.5
 [17.0.0.rc.4]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.3...v17.0.0.rc.4
