@@ -5665,6 +5665,20 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_MINIMUM_REACT_VERSION).to eq(
         "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{react_support[:minor]}.#{react_support[:min_patch]}"
       )
+      expect(described_class::RSC_SUPPORTED_REACT_MAJOR).to eq(described_class::RSC_SUPPORTED_PACKAGE_MAJOR)
+      expect(described_class::RSC_SUPPORTED_REACT_LINE).to eq(
+        "#{described_class::RSC_SUPPORTED_REACT_MAJOR}.#{react_support[:minor]}.x"
+      )
+    end
+
+    it "derives the RSC React support predicate from the configured floor and line" do
+      minimum_major, minimum_minor, minimum_patch = described_class::RSC_MINIMUM_REACT_VERSION_TUPLE
+      below_floor = "#{minimum_major}.#{minimum_minor}.#{minimum_patch - 1}"
+      unsupported_minor = "#{minimum_major}.#{minimum_minor + 1}.0"
+
+      expect(doctor.send(:unsupported_rsc_react_version?, described_class::RSC_MINIMUM_REACT_VERSION)).to be false
+      expect(doctor.send(:unsupported_rsc_react_version?, below_floor)).to be true
+      expect(doctor.send(:unsupported_rsc_react_version?, unsupported_minor)).to be true
     end
 
     context "when React 19.2.7+" do

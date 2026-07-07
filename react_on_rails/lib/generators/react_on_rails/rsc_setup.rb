@@ -2,6 +2,7 @@
 
 require_relative "generator_messages"
 require_relative "demo_page_config"
+require_relative "js_dependency_manager"
 require_relative "rsc_setup/client_references"
 require_relative "rsc_setup/layouts"
 
@@ -33,6 +34,13 @@ module ReactOnRails
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
+      RSC_REACT_VERSION_RANGE = ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE
+      RSC_MINIMUM_REACT_VERSION = RSC_REACT_VERSION_RANGE.sub(/\A[~^]/, "")
+      RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
+      RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
+      RSC_SUPPORTED_REACT_MINOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(1)
+      RSC_MINIMUM_REACT_PATCH = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(2)
+      RSC_SUPPORTED_REACT_LINE = "#{RSC_SUPPORTED_REACT_MAJOR}.#{RSC_SUPPORTED_REACT_MINOR}.x".freeze
       MAX_LAYOUT_NAME_ATTEMPTS = 99
 
       # Main entry point for RSC setup.
@@ -63,7 +71,7 @@ module ReactOnRails
       end
 
       # Warn if React version is not compatible with RSC.
-      # RSC requires React 19.2.x with patch >= 19.2.7.
+      # RSC requires the generated React support line with the configured minimum patch.
       #
       # @param force [Boolean] When true, always performs the check.
       #   When false (default), only checks if RSC is enabled (use_rsc? returns true).
@@ -76,25 +84,25 @@ module ReactOnRails
 
         major, minor, patch = react_version.split(".").map(&:to_i)
 
-        if major != 19 || minor != 2
+        if major != RSC_SUPPORTED_REACT_MAJOR || minor != RSC_SUPPORTED_REACT_MINOR
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  RSC requires React 19.2.x (detected: #{react_version})
+            ⚠️  RSC requires React #{RSC_SUPPORTED_REACT_LINE} (detected: #{react_version})
 
             React Server Components in React on Rails Pro currently only supports
-            React 19.2.x with patch >= 19.2.7. Other React minor versions are
+            React #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}. Other React minor versions are
             not yet supported.
 
             To install a compatible React version:
-              #{manual_add_packages_command(['react@~19.2.7', 'react-dom@~19.2.7'])}
+              #{manual_add_packages_command(["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}"])}
           MSG
-        elsif patch < 7
+        elsif patch < RSC_MINIMUM_REACT_PATCH
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  React #{react_version} is below the recommended minimum for RSC.
 
-            Please upgrade to at least React 19.2.7:
-              #{manual_add_packages_command(['react@19.2.7', 'react-dom@19.2.7'])}
+            Please upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
+              #{manual_add_packages_command(["react@#{RSC_MINIMUM_REACT_VERSION}", "react-dom@#{RSC_MINIMUM_REACT_VERSION}"])}
 
-            react-on-rails-rsc 19.2.1+ is coordinated with React/React DOM 19.2.7+
+            react-on-rails-rsc 19.2.1+ is coordinated with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+
             for the React on Rails Pro 17 RSC runtime.
           MSG
         end

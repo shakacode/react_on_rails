@@ -5961,6 +5961,17 @@ describe InstallGenerator, type: :generator do
 
   # RSC React version warning tests
 
+  describe "RSC React warning constants" do
+    specify "derive from the RSC dependency manager React range" do
+      dependency_manager = ReactOnRails::Generators::JsDependencyManager
+      rsc_setup = ReactOnRails::Generators::RscSetup
+      minimum_react_version = dependency_manager::RSC_REACT_VERSION_RANGE.sub(/\A[~^]/, "")
+
+      expect(rsc_setup::RSC_REACT_VERSION_RANGE).to eq(dependency_manager::RSC_REACT_VERSION_RANGE)
+      expect(rsc_setup::RSC_MINIMUM_REACT_VERSION).to eq(minimum_react_version)
+    end
+  end
+
   context "when using --rsc with React 19.2.7" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 

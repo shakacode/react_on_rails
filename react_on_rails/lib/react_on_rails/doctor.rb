@@ -3499,6 +3499,11 @@ module ReactOnRails
     RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
       RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
     RSC_MINIMUM_REACT_VERSION = "19.2.7"
+    RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
+    RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
+    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+      "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
+    end.join(" or ")
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -3735,29 +3740,28 @@ module ReactOnRails
     end
 
     def check_legacy_rsc_react_version(react_version)
-      major, minor, patch = react_version.split(".").map(&:to_i)
-
-      if major == 19 && minor == 2 && patch >= 7
+      if supported_rsc_react_version?(react_version)
         checker.add_success("✅ React #{react_version} is compatible with RSC")
-      elsif major == 19 && minor == 2
+      elsif supported_rsc_react_line?(react_version)
         checker.add_warning(<<~MSG.strip)
           ⚠️  React #{react_version} is below the React on Rails Pro 17 RSC floor.
 
           Upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
             npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION}
         MSG
-      elsif major >= 19
+      elsif rsc_react_major_or_newer?(react_version)
+        major, minor, = npm_version_tuple(react_version)
         checker.add_warning(<<~MSG.strip)
           ⚠️  React #{react_version} has not been verified with React on Rails Pro RSC.
 
-          RSC support currently targets React 19.2.x. React #{major}.#{minor}.x may work
+          RSC support currently targets React #{RSC_SUPPORTED_REACT_LINE}. React #{major}.#{minor}.x may work
           but has not been tested. Verified compatibility: React #{RSC_MINIMUM_REACT_VERSION}+.
         MSG
       else
         checker.add_error(<<~MSG.strip)
           🚫 React #{react_version} is not compatible with RSC.
 
-          React Server Components in React on Rails Pro requires React 19.x or higher.
+          React Server Components in React on Rails Pro requires React #{RSC_SUPPORTED_REACT_MAJOR}.x or higher.
 
           Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION}
         MSG
@@ -3841,8 +3845,22 @@ module ReactOnRails
     end
 
     def unsupported_rsc_react_version?(react_version)
-      major, minor, patch = react_version.split(".").map(&:to_i)
-      major != 19 || minor != 2 || patch < 7
+      !supported_rsc_react_version?(react_version)
+    end
+
+    def supported_rsc_react_version?(react_version)
+      supported_rsc_react_line?(react_version) &&
+        !npm_version_less_than?(react_version, RSC_MINIMUM_REACT_VERSION)
+    end
+
+    def supported_rsc_react_line?(react_version)
+      major, minor, = npm_version_tuple(react_version)
+      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_PACKAGE_MINORS.include?(minor)
+    end
+
+    def rsc_react_major_or_newer?(react_version)
+      major, = npm_version_tuple(react_version)
+      major >= RSC_SUPPORTED_REACT_MAJOR
     end
 
     def check_rsc_supported_react_packages_for_package(rsc_package, react_version)
@@ -3863,7 +3881,7 @@ module ReactOnRails
       checker.add_error(<<~MSG.strip)
         🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React/React DOM 19.2.x with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}.
         The node renderer enforces the same support window at startup.
 
         Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
