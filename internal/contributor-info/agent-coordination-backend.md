@@ -154,10 +154,10 @@ dispatching dependent workers. Use the state backend README, schema files, and
 statuses. A released claim is audit state and does not unblock dependent lanes
 by itself.
 
-If a worker lane declares `depends_on` but `agent-coord status` shows no matching
-batch file or lane state, the worker must treat dependency state as `UNKNOWN` and
-stop to report the missing private batch state instead of proceeding as
-independent.
+If a worker lane declares `depends_on` but targeted
+`agent-coord status --batch-id <batch-id> --json` shows no matching batch file
+or lane state, the worker must treat dependency state as `UNKNOWN` and stop to
+report the missing private batch state instead of proceeding as independent.
 
 ## Capacity Profiles And Inbox Queues
 
