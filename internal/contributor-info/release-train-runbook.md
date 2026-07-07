@@ -428,16 +428,16 @@ Reading the gate is mechanical:
 ### How the phase is published (agent-coord)
 
 So that every agent reads the current gate without being told, the active phase for each release line is
-published through the `shakacode/agent-coordination` backend and read with `agent-coord`. Keep the
-schema and exact subcommand surface in the private backend repo; this repo carries only the contract,
+published through the private `agent-coord` state backend and read with `agent-coord`. Keep the schema
+and exact subcommand surface in the backend schema and CLI docs; this repo carries only the contract,
 mirroring [`agent-coordination-backend.md`](agent-coordination-backend.md).
 
 **Contract (public pointer):**
 
 - The backend exposes a **phase** value (`beta` | `rc` | `final`) per release line / target branch.
   For PR/issue lanes, read it from
-  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`; the private
-  backend README, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the
+  `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`; the backend
+  schema, `agent-coord --help`, and `agent-coord config show --json` are authoritative for the
   exact phase field. There is no separate `none` value; a missing entry (no published phase for that
   line) means "no explicit override is published" — derive the phase from the target branch exactly as
   in the backend-UNKNOWN fallback below (`main` → `beta`; `release/*` → `rc`, or `final` in
