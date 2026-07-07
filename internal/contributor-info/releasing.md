@@ -2,6 +2,14 @@
 
 We're releasing this as a unified release with 6 packages total. We keep the version numbers in sync across all packages using unified versioning.
 
+This page covers the mechanical `rake release` steps: version bumps, package
+publishing, tags, and GitHub releases. For the release-train branching model
+that decides when to cut `release/X.Y.Z`, stabilize RCs, promote the last good
+RC to final, and close out the release branch, see
+[Release-Train Runbook](release-train-runbook.md). For RC hard-gate evidence and
+behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
+and [Release Verification Runbook](release-verification-runbook.md).
+
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md)
