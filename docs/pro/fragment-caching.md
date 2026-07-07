@@ -26,6 +26,11 @@ Fragment caching skips all four steps when the cache is warm. This is different 
 
 **Recommendation**: Start with prerender caching (`config.prerender_caching = true`), then add fragment caching to your most expensive components.
 
+Prerender caching does not apply to `stream_react_component_with_async_props` or other async-props renders. Those
+renders can include per-request async output that is not represented in the prerender cache key, so React on Rails Pro
+renders them uncached on that layer. For async-props pages, use fragment-caching helpers only around content with an
+explicit cache key that is safe to share across requests, or leave the async stream uncached.
+
 ## Usage
 
 Use `cached_react_component` instead of `react_component`. The key differences:

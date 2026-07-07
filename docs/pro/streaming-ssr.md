@@ -55,6 +55,11 @@ Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer
   <img src="images/async-props-sequence.svg" alt="Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state." width="840" />
 </p>
 
+`config.prerender_caching` does not cache async-props streams. React on Rails Pro bypasses prerender caching for
+`stream_react_component_with_async_props` because the async output can depend on request-specific data outside the
+prerender cache key. Use explicit fragment cache keys only for async-props content that is safe to reuse across
+requests.
+
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
 
 ```erb

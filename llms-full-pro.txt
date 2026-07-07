@@ -1309,6 +1309,13 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+> [!IMPORTANT]
+> `config.prerender_caching` is safe for ordinary prerendered and streamed renders, but React on Rails Pro skips that
+> cache for `stream_react_component_with_async_props` and other async-props renders. Async props can include
+> per-request data that is not part of the prerender cache key. Keep prerender caching enabled as a default performance
+> win, but use explicit fragment cache keys for async-props pages only when the rendered output is safe to share across
+> requests.
+
 ### Configuration Options
 
 See [Rails Configuration Options](../oss/configuration/configuration-pro.md) for all available settings.
@@ -1318,7 +1325,8 @@ Pay attention to:
 - `config.server_renderer = "NodeRenderer"` - Required to use node renderer
 - `config.renderer_url` - URL where your node renderer is running
 - `config.renderer_password` - Shared secret for authentication
-- `config.prerender_caching` - Enable caching (recommended)
+- `config.prerender_caching` - Enable prerender caching for supported SSR/streaming renders; async-props renders skip
+  this cache
 
 ## Webpack Configuration
 
@@ -1917,6 +1925,11 @@ This is the recommended answer to "my component needs Rails data during render":
 Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
 [Diagram: Sequence diagram across three lanes — Browser, Rails, and the Node Renderer. The browser asks for a page, Rails starts the page with placeholders, the renderer returns an HTML shell with loading states, and the browser shows the shell. Then a loop runs for each slow data value: Rails sends the value, the renderer returns the HTML for that section, and the browser replaces the loading state.]
+
+`config.prerender_caching` does not cache async-props streams. React on Rails Pro bypasses prerender caching for
+`stream_react_component_with_async_props` because the async output can depend on request-specific data outside the
+prerender cache key. Use explicit fragment cache keys only for async-props content that is safe to reuse across
+requests.
 
 The view helper is `stream_react_component_with_async_props`, which yields an emitter:
 
@@ -4016,6 +4029,11 @@ Fragment caching skips all four steps when the cache is warm. This is different 
 | **Best for**               | Quick win with minimal code changes | Maximum performance on high-traffic pages                             |
 
 **Recommendation**: Start with prerender caching (`config.prerender_caching = true`), then add fragment caching to your most expensive components.
+
+Prerender caching does not apply to `stream_react_component_with_async_props` or other async-props renders. Those
+renders can include per-request async output that is not represented in the prerender cache key, so React on Rails Pro
+renders them uncached on that layer. For async-props pages, use fragment-caching helpers only around content with an
+explicit cache key that is safe to share across requests, or leave the async stream uncached.
 
 ## Usage
 
