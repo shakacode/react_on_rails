@@ -75,6 +75,10 @@ describe('checkRscPeerCompatibility', () => {
     expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.1', reactVersion: '19.2.7' }).level).toBe('ok');
   });
 
+  it('returns ok for a hyphenated prerelease newer than the coordinated RC floor', () => {
+    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc-1', reactVersion: '19.2.7' }).level).toBe('ok');
+  });
+
   it('errors for prereleases older than the coordinated RC floor', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-beta.0', reactVersion: '19.2.7' });
     expect(r.level).toBe('error');

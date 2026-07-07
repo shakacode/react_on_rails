@@ -33,8 +33,11 @@ const parseVersion = (version: string): ParsedVersion => {
   // Malformed versions intentionally coerce to 0 segments so the major mismatch
   // branch reports the original string instead of hiding it behind a parse error.
   const normalized = version.replace(/^[v=]+/, '');
-  const [withoutBuild = ''] = normalized.split('+', 1);
-  const [core = '', prerelease] = withoutBuild.split('-', 2);
+  const buildIndex = normalized.indexOf('+');
+  const withoutBuild = buildIndex === -1 ? normalized : normalized.slice(0, buildIndex);
+  const prereleaseIndex = withoutBuild.indexOf('-');
+  const core = prereleaseIndex === -1 ? withoutBuild : withoutBuild.slice(0, prereleaseIndex);
+  const prerelease = prereleaseIndex === -1 ? null : withoutBuild.slice(prereleaseIndex + 1) || null;
   const parts = core.split('.');
   return {
     tuple: [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0],
