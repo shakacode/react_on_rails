@@ -17,6 +17,7 @@ require_relative "version_synchronizer"
 require_relative "system_checker"
 require_relative "pro_migration"
 require_relative "node_renderer_procfile"
+require_relative "../generators/react_on_rails/js_dependency_manager"
 
 begin
   require "rainbow"
@@ -3486,6 +3487,23 @@ module ReactOnRails
       config/rspack/rscWebpackConfig.js
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
+    RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
+    RSC_SUPPORTED_PACKAGE_MAJOR = 19
+    RSC_SUPPORTED_PACKAGE_MINORS = [2].freeze
+    RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+      "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
+    end.join(" or ")
+    RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+    # While the 17.0 RC soak accepts a prerelease package, the prerelease floor
+    # must share the same core tuple as RSC_MINIMUM_PACKAGE_VERSION.
+    RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
+      RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
+    RSC_MINIMUM_REACT_VERSION = "19.2.7"
+    RSC_MINIMUM_REACT_VERSION_TUPLE = RSC_MINIMUM_REACT_VERSION.split(".").map(&:to_i).freeze
+    RSC_SUPPORTED_REACT_MAJOR = RSC_MINIMUM_REACT_VERSION_TUPLE.fetch(0)
+    RSC_SUPPORTED_REACT_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+      "#{RSC_SUPPORTED_REACT_MAJOR}.#{minor}.x"
+    end.join(" or ")
     RSC_DIST_TAGS_TO_CHECK = %w[next rc].freeze
     NPM_VIEW_FETCH_TIMEOUT_MS = 5_000
     NPM_VIEW_FETCH_TIMEOUT_SECONDS = NPM_VIEW_FETCH_TIMEOUT_MS / 1000.0
@@ -3722,31 +3740,30 @@ module ReactOnRails
     end
 
     def check_legacy_rsc_react_version(react_version)
-      major, minor, patch = react_version.split(".").map(&:to_i)
-
-      if major == 19 && minor.zero? && patch >= 4
+      if supported_rsc_react_version?(react_version)
         checker.add_success("✅ React #{react_version} is compatible with RSC")
-      elsif major == 19 && minor.zero?
+      elsif supported_rsc_react_line?(react_version)
         checker.add_warning(<<~MSG.strip)
-          ⚠️  React #{react_version} has known security vulnerabilities fixed in 19.0.4+.
+          ⚠️  React #{react_version} is below the React on Rails Pro 17 RSC floor.
 
-          Upgrade to at least React 19.0.4:
-            npm install react@~19.0.4 react-dom@~19.0.4
+          Upgrade to at least React #{RSC_MINIMUM_REACT_VERSION}:
+            npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION}
         MSG
-      elsif major >= 19
+      elsif rsc_react_major_or_newer?(react_version)
+        major, minor, = npm_version_tuple(react_version)
         checker.add_warning(<<~MSG.strip)
           ⚠️  React #{react_version} has not been verified with React on Rails Pro RSC.
 
-          RSC support currently targets React 19.0.x. React #{major}.#{minor}.x may work
-          but has not been tested. Verified compatibility: React 19.0.4+.
+          RSC support currently targets React #{RSC_SUPPORTED_REACT_LINE}. React #{major}.#{minor}.x may work
+          but has not been tested. Verified compatibility: React #{RSC_MINIMUM_REACT_VERSION}+.
         MSG
       else
         checker.add_error(<<~MSG.strip)
           🚫 React #{react_version} is not compatible with RSC.
 
-          React Server Components in React on Rails Pro requires React 19.x or higher.
+          React Server Components in React on Rails Pro requires React #{RSC_SUPPORTED_REACT_MAJOR}.x or higher.
 
-          Fix: npm install react@~19.0.4 react-dom@~19.0.4
+          Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION}
         MSG
       end
     end
@@ -3767,6 +3784,8 @@ module ReactOnRails
         return true
       end
 
+      return true unless check_rsc_package_minimum_version(rsc_package)
+
       unless rsc_package_declares_react_peer_dependencies?(rsc_package)
         checker.add_warning(<<~MSG.strip)
           ⚠️  #{RSC_PACKAGE_NAME} #{rsc_package['version']} does not declare React peer dependencies.
@@ -3778,16 +3797,110 @@ module ReactOnRails
 
       peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
 
-      if peer_compatible && vulnerable_legacy_rsc_react_version?(react_version)
-        check_legacy_rsc_react_version(react_version)
-      end
-      check_rsc_package_dist_tags(rsc_package, package_root) if peer_compatible
+      return true unless peer_compatible
+      return true unless check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+
+      check_rsc_package_dist_tags(rsc_package, package_root)
       true
     end
 
-    def vulnerable_legacy_rsc_react_version?(react_version)
-      major, minor, patch = react_version.split(".").map(&:to_i)
-      major == 19 && minor.zero? && patch < 4
+    def check_rsc_package_minimum_version(rsc_package)
+      rsc_version = rsc_package["version"].to_s
+      return true if rsc_package_version_at_or_above_minimum?(rsc_version)
+
+      prerelease_requirement = if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.present?
+                                 "\n(or #{RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION} during the 17.0 RC soak)"
+                               else
+                                 ""
+                               end
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
+
+        React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
+        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
+        with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
+
+        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
+      MSG
+      false
+    end
+
+    def rsc_package_version_at_or_above_minimum?(rsc_version)
+      return false if rsc_version.blank?
+      return true if rsc_stable_package_version_supported?(rsc_version)
+      return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
+      return false unless npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION)
+
+      npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
+    end
+
+    def rsc_stable_package_version_supported?(rsc_version)
+      return false if npm_prerelease(rsc_version).present?
+
+      major, minor, = npm_version_tuple(rsc_version)
+      major == RSC_SUPPORTED_PACKAGE_MAJOR &&
+        RSC_SUPPORTED_PACKAGE_MINORS.include?(minor) &&
+        npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
+    end
+
+    def unsupported_rsc_react_version?(react_version)
+      !supported_rsc_react_version?(react_version)
+    end
+
+    def supported_rsc_react_version?(react_version)
+      supported_rsc_react_line?(react_version) &&
+        !npm_version_less_than?(react_version, RSC_MINIMUM_REACT_VERSION)
+    end
+
+    def supported_rsc_react_line?(react_version)
+      major, minor, = npm_version_tuple(react_version)
+      major == RSC_SUPPORTED_REACT_MAJOR && RSC_SUPPORTED_PACKAGE_MINORS.include?(minor)
+    end
+
+    def rsc_react_major_or_newer?(react_version)
+      major, = npm_version_tuple(react_version)
+      major >= RSC_SUPPORTED_REACT_MAJOR
+    end
+
+    def check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+      return false unless check_rsc_supported_react_version_for_package(rsc_package, "react", react_version)
+
+      react_dom_version = detect_package_version_from_deps("react-dom")
+      return false unless check_rsc_supported_react_version_for_package(rsc_package, "react-dom", react_dom_version)
+
+      check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)
+    end
+
+    def check_rsc_supported_react_version_for_package(rsc_package, package_name, package_version)
+      return true if package_version.blank?
+      return true unless unsupported_rsc_react_version?(package_version)
+
+      package_label = package_name == "react" ? "React" : "React DOM"
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
+
+        React on Rails Pro 17 RSC currently supports React/React DOM #{RSC_SUPPORTED_REACT_LINE} with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        The node renderer enforces the same support window at startup.
+
+        Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
+      MSG
+      false
+    end
+
+    def check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)
+      return true if react_dom_version.blank? || react_dom_version == react_version
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with React #{react_version} but React DOM #{react_dom_version}.
+
+        React on Rails Pro 17 RSC requires react and react-dom to resolve to the same version.
+        The node renderer enforces the same exact-version match at startup.
+
+        Fix: npm install react@#{react_version} react-dom@#{react_version} --save-exact
+      MSG
+      false
     end
 
     def rsc_package_declares_react_peer_dependencies?(rsc_package)
@@ -4295,8 +4408,8 @@ module ReactOnRails
 
     def detect_react_version_from_deps
       # Prefer the actually installed version from node_modules over the declared
-      # range in package.json. Declared ranges like "^19.0.0" would be misleading
-      # (stripped to "19.0.0" even though 19.0.4+ may be installed).
+      # range in package.json. Declared ranges like "^19.2.0" would be misleading
+      # (stripped to "19.2.0" even though 19.2.7+ may be installed).
       package_root = resolved_package_root
       if package_root_missing?(package_root)
         # This check only needs the directory before Node chdirs into it; an

@@ -430,22 +430,19 @@ Earlier versions re-broadcast shared vendor and common CSS _per client reference
 - [react_on_rails_rsc#110](https://github.com/shakacode/react_on_rails_rsc/pull/110)
 - [react_on_rails_rsc#113](https://github.com/shakacode/react_on_rails_rsc/pull/113)
 
-If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use a coordinated
-React 19.2-compatible release set once stable Pro metadata is available. Key constraints:
+If you see the same vendor stylesheet `<link>` repeated many times in an RSC page, use the coordinated
+React on Rails Pro 17 RSC release set. Key constraints:
 
-- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3. Check the
+- The fix landed in `react-on-rails-rsc` 19.2.0-rc.3 and is included in the 19.2.1 package line. Check the
   [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
-  and the Pro release notes to determine whether a stable, coordinated release incorporating 19.2.x
-  is available and accepted by your Pro peer metadata. Do not install the rc prerelease in production
-  unless the Pro release notes name a matching package or peer range.
+  and the Pro release notes for the exact package to install. React on Rails Pro 17 RC packages use
+  `react-on-rails-rsc@19.2.1-rc.0`; the 17.0 final release requires `react-on-rails-rsc >= 19.2.1`
+  on the supported RSC 19.2.x package line.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.
-- **Do not** use the default React 19.0.x generator pin from
-  [Upgrading an existing Pro app](../../pro/react-server-components/upgrading-existing-pro-app.md)
-  for this duplicate-CSS fix; that guide remains the baseline 19.0.x RSC setup path.
-- Use maintainer-provided 19.2 compatibility guidance for the exact React, React DOM, React on Rails
-  Pro, and `react-on-rails-rsc` versions.
+- Use React 19.2.x with patch >= 19.2.7 and React DOM on the same version. React 19.0.x is no longer a
+  supported Pro RSC runtime line in v17.
 
 On a supported, coordinated version set this is resolved — the shared CSS is emitted once.
 

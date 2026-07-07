@@ -3680,19 +3680,20 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:fallback_package_manager).and_return("pnpm")
     end
 
-    it "explains why every RSC install is pinned to the stable package" do
+    it "explains why every RSC install is pinned during the RC soak" do
       allow(install_generator).to receive(:add_packages).and_return(true)
 
       install_generator.send(:add_rsc_dependencies)
 
       message_text = GeneratorMessages.messages.join("\n")
       expect(message_text).to include("all --rsc installs")
+      expect(message_text).to include("temporarily")
       expect(message_text).to include("react-on-rails-rsc@#{rsc_pin}")
       expect(message_text).to include("react-on-rails-rsc/RspackPlugin")
       expect(message_text).to include("Webpack")
-      expect(message_text).not_to include("prerelease")
-      expect(message_text).not_to include("temporarily")
-      expect(message_text).not_to include("until stable")
+      expect(message_text).to include("prerelease")
+      expect(message_text).to include("until stable")
+      expect(message_text).to include("react-on-rails-rsc@19.2.1")
     end
 
     it "keeps the version pin and uses the detected package manager when manual RSC recovery is needed" do
@@ -5960,11 +5961,22 @@ describe InstallGenerator, type: :generator do
 
   # RSC React version warning tests
 
-  context "when using --rsc with React 19.0.4" do
+  describe "RSC React warning constants" do
+    specify "derive from the RSC dependency manager React range" do
+      dependency_manager = ReactOnRails::Generators::JsDependencyManager
+      rsc_setup = ReactOnRails::Generators::RscSetup
+      minimum_react_version = dependency_manager::RSC_REACT_VERSION_RANGE.sub(/\A[~^]/, "")
+
+      expect(rsc_setup::RSC_REACT_VERSION_RANGE).to eq(dependency_manager::RSC_REACT_VERSION_RANGE)
+      expect(rsc_setup::RSC_MINIMUM_REACT_VERSION).to eq(minimum_react_version)
+    end
+  end
+
+  context "when using --rsc with React 19.2.7" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc does not add warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.0.4")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.7")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("⚠️")
@@ -5979,7 +5991,7 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("RSC requires React 19.0.x")
+      expect(warning_text).to include("RSC requires React 19.2.x")
       expect(warning_text).to include("detected: 19.1.0")
     end
   end
@@ -5992,20 +6004,20 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
-      expect(warning_text).to include("RSC requires React 19.0.x")
+      expect(warning_text).to include("RSC requires React 19.2.x")
     end
   end
 
-  context "when using --rsc with React 19.0.0" do
+  context "when using --rsc with React 19.2.0" do
     let(:install_generator) { install_generator_fixture(rsc: true) }
 
     specify "warn_about_react_version_for_rsc adds minimum version warning" do
-      allow(install_generator).to receive(:detect_react_version).and_return("19.0.0")
+      allow(install_generator).to receive(:detect_react_version).and_return("19.2.0")
 
       install_generator.send(:warn_about_react_version_for_rsc)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("below the recommended minimum")
-      expect(warning_text).to include("CVE")
+      expect(warning_text).to include("React 19.2.7")
     end
   end
 

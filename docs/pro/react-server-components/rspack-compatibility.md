@@ -12,23 +12,22 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the stable `react-on-rails-rsc@19.0.5` pin.
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the `react-on-rails-rsc` 19.2.1 package line (`19.2.1-rc.0` during the React on Rails Pro 17 RC soak).
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
 
-Generated RSC apps intentionally stay on React 19.0.x: `react@~19.0.4` and
-`react-dom@~19.0.4`. That range admits stable 19.0 patch releases with a 19.0.4
-minimum, but does not opt into React 19.1 or 19.2. The RSC runtime and bundler
-integration can change between React minor releases, so the generator range should
-advance only after the Webpack and Rspack paths are verified against the new React
-minor.
+Generated RSC apps on React on Rails Pro 17 use React 19.2.x: `react@~19.2.7`
+and `react-dom@~19.2.7`. React 19.0.x is no longer a supported Pro RSC runtime
+line in v17 because the generator, peer metadata, and node-renderer startup check
+now target the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
+line.
 
-The generator separately pins the stable `react-on-rails-rsc@19.0.5` release
-exactly. That package pin is separate from
-the Pro package peer metadata tracked in [issue #3609](https://github.com/shakacode/react_on_rails/issues/3609):
-metadata can allow prerelease RSC packages broadly enough for `npm ls`, while the
-generator still installs the tested React range and exact RSC package pin.
+During the React on Rails Pro 17 release-candidate soak, the generator pins
+`react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not
+published yet. For the 17.0 final release, use a stable `react-on-rails-rsc`
+19.2.x package with patch >= 19.2.1. Keep React, React DOM, and
+`react-on-rails-rsc` upgraded as a coordinated set.
 
 ## Compatibility Matrix
 
@@ -71,9 +70,8 @@ two plugins share the same `{ isServer, clientReferences }` options.
 > A/B on a real app showed the webpack-plugin path producing valid-looking manifests that
 > still failed ~7/11 RSC routes at runtime under Rspack, while the native `RSCRspackPlugin`
 > rendered and hydrated every route. The native plugin is therefore the supported Rspack
-> path. The remaining work to drop the "experimental" label — publishing a stable
-> `react-on-rails-rsc` ≥ 19.0.5 and wiring the demo route-hydration gate into this repo's
-> CI — is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
+> path. The remaining work to drop the "experimental" label — wiring the demo
+> route-hydration gate into this repo's CI — is tracked in [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488)
 > (superseding the abandoned manifest-helper approach in
 > [PR #3385](https://github.com/shakacode/react_on_rails/pull/3385)).
 

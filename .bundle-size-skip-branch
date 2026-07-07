@@ -1,9 +1,11 @@
-# Audited intentional growth for PR #4097 (RSCProvider bounded LRU cache):
-# The direct RSC client entrypoints exceed the dynamic base+512 B budget by small
-# margins after source-level trims; growth is from the bounded provider cache
-# needed for #3564 rather than an accidental dependency import.
-# Local audit evidence: dynamic size-limit reproduced the hosted failure; after
-# trims, remaining misses were registerServerComponent +92 B gzip/+141 B brotli
-# and wrapServerComponentRenderer +54 B gzip/+20 B brotli.
+# Audited intentional growth for PR #4490 (React on Rails Pro 17 RSC floor):
+# The Pro RSC client helper bundles exceed the dynamic base+512 B budget because
+# this PR deliberately moves the Pro RSC runtime from the React 19.0.x RSC line
+# to react-on-rails-rsc 19.2.1-rc.0 with React/React DOM 19.2.7.
+# Hosted CI evidence before this skip:
+# - registerServerComponent/client: 138045 B gzip vs 78728 B limit,
+#   83078 B brotli vs 67927 B limit.
+# - wrapServerComponentRenderer/client: 130323 B gzip vs 70958 B limit,
+#   76207 B brotli vs 61025 B limit.
 # Clear this file in a follow-up after the PR merges.
-jg/3564-rscroute-bounded-lru
+jg-codex/rsc-19-2-1-rc-0

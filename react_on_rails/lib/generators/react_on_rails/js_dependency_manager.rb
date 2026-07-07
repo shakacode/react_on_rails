@@ -145,24 +145,24 @@ module ReactOnRails
       ].freeze
 
       # React Server Components dependencies (only installed when --rsc flag is used)
-      # Requires React 19.0.x - see https://react.dev/reference/rsc/server-components
+      # Requires React 19.2.x with patch >= 19.2.7 - see https://react.dev/reference/rsc/server-components
       RSC_DEPENDENCIES = %w[
         react-on-rails-rsc
       ].freeze
 
       # React peer-dependency range for generated RSC apps. This governs the `react` / `react-dom`
-      # installs (see add_react_dependencies) and intentionally stays on the stable React 19.0.x
-      # line with a 19.0.4 minimum. Do not widen this to React 19.1/19.2 just because those releases
-      # are current on npm; React's RSC runtime and bundler integration can change between minors.
+      # installs (see add_react_dependencies) and intentionally stays on the React 19.2.x line
+      # with a 19.2.7 minimum. Do not widen this to later minors just because those releases are
+      # current on npm; React's RSC runtime and bundler integration can change between minors.
       #
       # This is intentionally distinct from RSC_PACKAGE_VERSION_PIN below, which pins
-      # `react-on-rails-rsc`. Coordination note for #3609: Pro package metadata may accept the
-      # prerelease RSC package broadly enough to keep `npm ls` healthy, but generator behavior still
-      # installs the tested React 19.0.x range and exact RSC package pin until both policies advance.
-      RSC_REACT_VERSION_RANGE = "~19.0.4"
-      # Pinned to the stable 19.0.5 release, which carries the discovery plugin export, native
-      # Rspack plugin, and RSC manifest CSS fixes.
-      RSC_PACKAGE_VERSION_PIN = "19.0.5"
+      # `react-on-rails-rsc`. Coordination note for #3609: Pro package metadata accepts the
+      # prerelease RSC package broadly enough to keep `npm ls` healthy, while generated apps still
+      # install the tested React 19.2.x range and exact RSC package pin until stable 19.2.1 ships.
+      RSC_REACT_VERSION_RANGE = "~19.2.7"
+      # Pinned to the 19.2.1 release candidate, which carries the coordinated React 19.2.7 RSC
+      # peer floor required by the React on Rails Pro 17 runtime check.
+      RSC_PACKAGE_VERSION_PIN = "19.2.1-rc.0"
 
       private
 
@@ -255,8 +255,8 @@ module ReactOnRails
       def add_react_dependencies
         say "Installing React dependencies..."
 
-        # RSC requires React 19.0.x specifically (not 19.1.x or later)
-        # Pin React to ~19.0.4 while using an RSC package release that exports manifest discovery.
+        # RSC requires the coordinated React 19.2.x patch line.
+        # Pin React to ~19.2.7 while using the matching RSC package release candidate.
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
                        ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}",
                         "prop-types@^15.0.0"]

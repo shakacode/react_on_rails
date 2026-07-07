@@ -13,21 +13,21 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// Single source of truth for react-on-rails-pro's RSC peer compatibility window.
-// This is the only value to bump when compatibility changes.
+// Node-renderer source of truth for react-on-rails-pro's RSC peer compatibility window.
+// Ruby Doctor mirrors these values and has a parity spec to catch cross-language drift.
 //
-// `recommendedMin` is the published stable `react-on-rails-rsc` floor we recommend.
-// It is now raised to 19.0.5 (the published stable release), which activates the warn
-// tier for anyone still on an older 19.x build in the 19.0.2–19.0.4 range — those
-// predate the coordinated fixes (FOUC stylesheet preloading, async manifest signatures).
-// Bump tracked by https://github.com/shakacode/react_on_rails/issues/3632
-// (the stable 19.0.5 ship/pin is tracked by issue #3634).
+// `minimumVersion` is the React on Rails 17 RSC floor. Keep it in sync with the
+// Ruby Doctor/generator constants that install and diagnose the same Pro RSC
+// package line. The 19.2.1 line pairs with React/React DOM 19.2.7 and carries
+// the coordinated RSC fixes required by the Pro RSC renderer path.
+// `minimumPrereleaseVersion` keeps the 17.0 RC soak installable until the stable
+// 19.2.1 package is published without accepting older prereleases on the same
+// tuple. When it is set, keep its core tuple equal to `minimumVersion`.
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { recommendedMin: '19.0.5', supportedMajor: 19 },
+  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.2.1-rc.0', supportedMajor: 19 },
   react: {
     supportedMajor: 19,
     supportedRanges: [
-      { rscMinor: 0, minor: 0, minPatch: 4 },
       // React 19.2.7 is the coordinated floor for react-on-rails-rsc 19.2.x.
       { rscMinor: 2, minor: 2, minPatch: 7 },
     ],

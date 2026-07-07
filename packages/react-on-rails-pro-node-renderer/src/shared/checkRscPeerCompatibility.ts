@@ -15,11 +15,7 @@
 
 import { RSC_PEER_SUPPORT } from './rscPeerSupport.js';
 
-export type RscPeerCheckLevel = 'ok' | 'warn' | 'error';
-
-export type RscPeerCheckResult =
-  | { level: 'ok'; message?: undefined }
-  | { level: Exclude<RscPeerCheckLevel, 'ok'>; message: string };
+export type RscPeerCheckResult = { level: 'ok'; message?: undefined } | { level: 'error'; message: string };
 
 export interface RscPeerCheckInput {
   rscVersion: string | null;
@@ -30,30 +26,73 @@ export interface RscPeerCheckInput {
 }
 
 type VersionTuple = [number, number, number];
+type ParsedVersion = { tuple: VersionTuple; prerelease: string | null };
 
-// Strip build metadata (`+...`) and prerelease (`-...`) so a coordinated RC such as
-// `19.0.5-rc.7` compares as `19.0.5`. We only need major/minor/patch ordering, so this
-// avoids semver's prerelease rules (and a `semver` dependency) entirely.
-const parseTuple = (version: string): VersionTuple => {
+const parseVersion = (version: string): ParsedVersion => {
   // `resolveVersion` is a public injection point, so tolerate a leading `v`/`=` (e.g. `v19.0.4`).
   // Malformed versions intentionally coerce to 0 segments so the major mismatch
   // branch reports the original string instead of hiding it behind a parse error.
   const normalized = version.replace(/^[v=]+/, '');
-  const [withoutBuild = ''] = normalized.split('+', 1);
-  const [core = ''] = withoutBuild.split('-', 1);
+  const buildIndex = normalized.indexOf('+');
+  const withoutBuild = buildIndex === -1 ? normalized : normalized.slice(0, buildIndex);
+  const prereleaseIndex = withoutBuild.indexOf('-');
+  const core = prereleaseIndex === -1 ? withoutBuild : withoutBuild.slice(0, prereleaseIndex);
+  const prerelease = prereleaseIndex === -1 ? null : withoutBuild.slice(prereleaseIndex + 1) || null;
   const parts = core.split('.');
-  return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0];
+  return {
+    tuple: [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0],
+    prerelease: prerelease || null,
+  };
 };
 
-const isAtLeast = (actual: VersionTuple, floor: VersionTuple): boolean => {
-  for (let i = 0; i < 3; i += 1) {
-    const a = actual[i] ?? 0;
-    const f = floor[i] ?? 0;
-    if (a > f) return true;
-    if (a < f) return false;
-  }
-  return true;
+const parseTuple = (version: string): VersionTuple => parseVersion(version).tuple;
+
+const comparePrereleasePart = (left: string, right: string): number => {
+  const leftNumeric = /^\d+$/.test(left);
+  const rightNumeric = /^\d+$/.test(right);
+  if (leftNumeric && rightNumeric) return Number(left) - Number(right);
+  if (leftNumeric) return -1;
+  if (rightNumeric) return 1;
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 };
+
+const comparePrerelease = (left: string | null, right: string | null): number => {
+  if (left === right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+
+  const leftParts = left.split('.');
+  const rightParts = right.split('.');
+  const maxParts = Math.max(leftParts.length, rightParts.length);
+  for (let i = 0; i < maxParts; i += 1) {
+    const leftPart = leftParts[i];
+    const rightPart = rightParts[i];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+
+    const comparison = comparePrereleasePart(leftPart, rightPart);
+    if (comparison !== 0) return comparison;
+  }
+
+  return 0;
+};
+
+const compareVersions = (actual: string, floor: string): number => {
+  const actualVersion = parseVersion(actual);
+  const floorVersion = parseVersion(floor);
+  for (let i = 0; i < 3; i += 1) {
+    const a = actualVersion.tuple[i] ?? 0;
+    const f = floorVersion.tuple[i] ?? 0;
+    if (a > f) return 1;
+    if (a < f) return -1;
+  }
+
+  return comparePrerelease(actualVersion.prerelease, floorVersion.prerelease);
+};
+
+const isAtLeastVersion = (actual: string, floor: string): boolean => compareVersions(actual, floor) >= 0;
 
 const sameTuple = (left: VersionTuple, right: VersionTuple): boolean =>
   left.every((value, index) => value === right[index]);
@@ -68,6 +107,14 @@ const supportedRscRange = (
 
   return supportedMinors.map((minor) => `${supportedMajor}.${minor}.x`).join(' or ');
 };
+
+const rscFloorRange = ({
+  minimumVersion,
+  minimumPrereleaseVersion,
+}: typeof RSC_PEER_SUPPORT.reactOnRailsRsc) =>
+  minimumPrereleaseVersion
+    ? `>= ${minimumVersion} (or ${minimumPrereleaseVersion} during the RC soak)`
+    : `>= ${minimumVersion}`;
 
 const supportedReactRange = (
   rscTuple: VersionTuple,
@@ -110,13 +157,6 @@ const errorMessage = (pkg: string, found: string, want: string, proVersion?: str
     `  (Set REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1 to downgrade this error to a warning.)`,
   ].join('\n');
 
-const warnMessage = (found: string, recommendedMin: string, proVersion?: string) =>
-  [
-    `[ReactOnRails] react-on-rails-rsc ${found} is older than the recommended minimum ${recommendedMin}.`,
-    `  ${proLabel(proVersion)} may behave incorrectly (missing coordinated RSC fixes).`,
-    `  Upgrade react-on-rails-rsc to ${recommendedMin} or newer.`,
-  ].join('\n');
-
 export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerCheckResult {
   const { rscVersion, reactVersion, reactDomVersion, proVersion } = input;
 
@@ -125,7 +165,8 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
   if (!rscVersion) return { level: 'ok' };
 
   const { reactOnRailsRsc, react } = RSC_PEER_SUPPORT;
-  const rscTuple = parseTuple(rscVersion);
+  const rscParsedVersion = parseVersion(rscVersion);
+  const rscTuple = rscParsedVersion.tuple;
   const [rscMajor] = rscTuple;
 
   if (rscMajor !== reactOnRailsRsc.supportedMajor) {
@@ -137,6 +178,24 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         `${reactOnRailsRsc.supportedMajor}.x`,
         proVersion,
       ),
+    };
+  }
+
+  const meetsStableFloor =
+    !rscParsedVersion.prerelease && isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumVersion);
+  const minimumPrereleaseTuple = reactOnRailsRsc.minimumPrereleaseVersion
+    ? parseTuple(reactOnRailsRsc.minimumPrereleaseVersion)
+    : null;
+  const meetsPrereleaseFloor =
+    reactOnRailsRsc.minimumPrereleaseVersion &&
+    minimumPrereleaseTuple &&
+    sameTuple(rscTuple, minimumPrereleaseTuple) &&
+    isAtLeastVersion(rscVersion, reactOnRailsRsc.minimumPrereleaseVersion);
+
+  if (!meetsStableFloor && !meetsPrereleaseFloor) {
+    return {
+      level: 'error',
+      message: errorMessage('react-on-rails-rsc', rscVersion, rscFloorRange(reactOnRailsRsc), proVersion),
     };
   }
 
@@ -180,10 +239,6 @@ export function checkRscPeerCompatibility(input: RscPeerCheckInput): RscPeerChec
         message: errorMessage('react-dom', reactDomVersion, `match react ${reactVersion}`, proVersion),
       };
     }
-  }
-
-  if (!isAtLeast(rscTuple, parseTuple(reactOnRailsRsc.recommendedMin))) {
-    return { level: 'warn', message: warnMessage(rscVersion, reactOnRailsRsc.recommendedMin, proVersion) };
   }
 
   return { level: 'ok' };

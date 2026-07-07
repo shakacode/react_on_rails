@@ -84,18 +84,18 @@ Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `Abor
 
 > **This example uses async props**, which build on React Server Components. Enable RSC before you start: set `config.enable_rsc_support = true` in your React on Rails Pro configuration (see the [RSC tutorial](./react-server-components/tutorial.md)). Without it, the `async function` server component won't render and `stream_react_component_with_async_props` raises `ReactOnRailsPro::Error`. If all your data is fast and you don't need progressive streaming, you can skip RSC and use the synchronous [`stream_react_component`](../oss/migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with all props passed at once (no `enable_rsc_support` required).
 
-### 1. Use React 19
+### 1. Use React 19.2
 
-Ensure you're using React 19 in your `package.json`:
+Ensure you're using the coordinated React 19.2.x line in your `package.json`:
 
 ```json
 "dependencies": {
-  "react": "19.0.4",
-  "react-dom": "19.0.4"
+  "react": "19.2.7",
+  "react-dom": "19.2.7"
 }
 ```
 
-> Note: Use the latest React 19 patch release that is compatible with your app and tooling.
+> Note: React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7`. Keep these versions coordinated with a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1` (or `19.2.1-rc.0` during the 17.0 RC soak).
 
 ### 2. Prepare Your React Components
 
