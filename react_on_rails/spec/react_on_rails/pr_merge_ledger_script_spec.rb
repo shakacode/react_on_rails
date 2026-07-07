@@ -4132,13 +4132,23 @@ RSpec.describe "script/pr-merge-ledger" do
               "commit" => { "oid" => "current" }
             },
             {
-              "id" => "nested-regression-reply-comment",
-              "url" => "https://example.com/nested-regression-reply-comment",
-              "body" => "Actually this regressed on Windows.",
+              "id" => "clarifying-reply-comment",
+              "url" => "https://example.com/clarifying-reply-comment",
+              "body" => "Can you also check Windows?",
               "author" => { "login" => "reviewer" },
               "createdAt" => "2026-06-01T00:10:00Z",
               "outdated" => false,
               "replyTo" => { "id" => "fixed-reply-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-regression-reply-comment",
+              "url" => "https://example.com/nested-regression-reply-comment",
+              "body" => "Actually this regressed on Windows.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:15:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "clarifying-reply-comment" },
               "commit" => { "oid" => "current" }
             }
           ]

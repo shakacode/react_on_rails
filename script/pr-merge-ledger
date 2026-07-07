@@ -1194,7 +1194,8 @@ class PrMergeLedger
     return {} unless thread.fetch("is_resolved")
     return {} unless thread.fetch("current_head")
 
-    root_comment_ids = root_comment_ids_by_comment_id(comments)
+    reply_to_by_id = comments.to_h { |comment| [comment.fetch("id"), comment["reply_to_id"]] }
+    root_comment_ids = root_comment_ids_by_comment_id(comments, reply_to_by_id:)
     comments_by_id = comments.to_h { |comment| [comment.fetch("id"), comment] }
 
     sorted_inference_replies(comments).each_with_object({}) do |reply, inferred|
@@ -1204,6 +1205,7 @@ class PrMergeLedger
         inferred,
         reply,
         reply_to_id,
+        reply_to_by_id:,
         root_reply_to_id:,
         target_comment: comments_by_id[reply_to_id]
       )
@@ -1221,9 +1223,7 @@ class PrMergeLedger
     sorted_reply_pairs.map(&:first)
   end
 
-  def root_comment_ids_by_comment_id(comments)
-    reply_to_by_id = comments.to_h { |comment| [comment.fetch("id"), comment["reply_to_id"]] }
-
+  def root_comment_ids_by_comment_id(comments, reply_to_by_id:)
     comments.each_with_object({}) do |comment, roots|
       roots[comment.fetch("id")] = root_comment_id(comment.fetch("id"), reply_to_by_id)
     end
@@ -1243,7 +1243,14 @@ class PrMergeLedger
     current_id
   end
 
-  def update_inferred_dispositions_from_reply(inferred, reply, reply_to_id, root_reply_to_id:, target_comment:)
+  def update_inferred_dispositions_from_reply(
+    inferred,
+    reply,
+    reply_to_id,
+    reply_to_by_id:,
+    root_reply_to_id:,
+    target_comment:
+  )
     trusted_reply = trusted_disposition_reply_author_association?(reply)
     body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
     normalized_body = normalized_disposition_reply_body(body)
@@ -1263,8 +1270,8 @@ class PrMergeLedger
         clear_disposition_target_id(
           inferred,
           reply_to_id,
-          root_reply_to_id:,
-          target_comment:
+          reply_to_by_id:,
+          root_reply_to_id:
         )
       )
     end
@@ -1276,12 +1283,16 @@ class PrMergeLedger
     end
   end
 
-  def clear_disposition_target_id(inferred, reply_to_id, root_reply_to_id:, target_comment:)
-    return reply_to_id if inferred.key?(reply_to_id)
+  def clear_disposition_target_id(inferred, reply_to_id, reply_to_by_id:, root_reply_to_id:)
+    seen_ids = {}
+    current_id = reply_to_id
+    while current_id
+      return current_id if inferred.key?(current_id)
+      break if seen_ids[current_id]
 
-    parent_id = target_comment && target_comment["reply_to_id"]
-    return parent_id if parent_id && inferred.key?(parent_id)
-
+      seen_ids[current_id] = true
+      current_id = reply_to_by_id[current_id]
+    end
     root_reply_to_id
   end
 
