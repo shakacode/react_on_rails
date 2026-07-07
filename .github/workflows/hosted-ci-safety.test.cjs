@@ -9,10 +9,15 @@ function assertMatches(name, text, pattern) {
   assert.match(text, pattern, `${name} is missing ${pattern}`);
 }
 
+function assertDoesNotMatch(name, text, pattern) {
+  assert.doesNotMatch(text, pattern, `${name} unexpectedly matches ${pattern}`);
+}
+
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
+const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -89,5 +94,17 @@ assertMatches(
   /const isTrustedReleaseTarget = isReleaseTarget[\s\S]*!isDependabotPullRequest \|\| trustedDependabotHostedRequest/,
 );
 assertMatches('Dependabot trusted-dispatch retry', hostedSelectorsAction, /const maxAttempts = 4/);
+
+assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);
+assertMatches(
+  'ShakaPerf renderer h2c /info request',
+  shakaperfReleaseGateWorkflow,
+  /client\.request\(\{[\s\S]*':method': 'GET',[\s\S]*':path': '\/info'/,
+);
+assertDoesNotMatch(
+  'ShakaPerf renderer plain curl probe',
+  shakaperfReleaseGateWorkflow,
+  /curl [^\n]*http:\/\/127\.0\.0\.1:3800\/info/,
+);
 
 console.log('hosted CI workflow safety tests passed');
