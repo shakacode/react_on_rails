@@ -42,17 +42,14 @@ assertMatches(
   /createWorkflowDispatch\({[\s\S]*workflow_id: 'ci-required\.yml'[\s\S]*force_required_hosted_ci_recheck: 'true'/,
 );
 assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
+assertMatches('ci-required actions-run read permission', requiredWorkflow, /actions: read/);
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(
   'ci-required mirrored-block lint tests',
   requiredWorkflow,
   /bash script\/lint-mirrored-blocks-test\.bash/,
 );
-assertMatches(
-  'ci-required merge-group gate',
-  requiredWorkflow,
-  /ruby script\/ci-required-merge-group-gate/,
-);
+assertMatches('ci-required merge-group gate', requiredWorkflow, /ruby script\/ci-required-merge-group-gate/);
 assertMatches(
   'ci-required merge-group gate tests',
   requiredWorkflow,

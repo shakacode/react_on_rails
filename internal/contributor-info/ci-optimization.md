@@ -194,9 +194,12 @@ script/ci-changes-detector origin/main
 Merge queue is a repository setting, not a file in this PR. The repo-local
 required gate enforces selected merge-group-only checks that run in separate
 workflows by polling the current merge-group SHA. Today that includes the
-package JS minimum Node lane, so a failing `build (20)` check blocks
-`ci-required / required-pr-gate` and therefore blocks the merge queue even when
-branch protection requires only the stable required gate context.
+package JS minimum Node lane, so a failing
+`JS unit tests for Renderer package / build (20)` check blocks `ci-required /
+required-pr-gate` and therefore blocks the merge queue even when branch
+protection requires only the stable required gate context. The gate maps check
+runs back to Actions workflow runs by `check_suite_id`; a bare `build (20)` from
+another workflow does not satisfy this gate.
 
 Directly requiring every hosted full-matrix check context remains an
 administrator branch-protection setting. Use that setting only when maintainers

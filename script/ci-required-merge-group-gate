@@ -12,7 +12,7 @@ require "time"
 require "uri"
 
 DEFAULT_REQUIRED_CHECKS = [
-  ["JS unit tests for Renderer package / build (20)", "build (20)"]
+  ["JS unit tests for Renderer package / build (20)"]
 ].freeze
 SUCCESS_CONCLUSION = "success"
 USER_AGENT = "react-on-rails-ci-required-merge-group-gate"
@@ -27,16 +27,23 @@ rescue ArgumentError
   abort "#{name} must be an integer"
 end
 
+def parse_required_check_groups(raw_value)
+  raw_value.lines
+           .map(&:strip)
+           .reject(&:empty?)
+           .map { |line| line.split("|").map(&:strip).reject(&:empty?) }
+           .reject(&:empty?)
+end
+
 def required_check_groups
   raw_value = ENV.fetch("CI_REQUIRED_MERGE_GROUP_REQUIRED_CHECKS", "").strip
   return DEFAULT_REQUIRED_CHECKS if raw_value.empty?
 
-  raw_value
-    .lines
-    .map(&:strip)
-    .reject(&:empty?)
-    .map { |line| line.split("|").map(&:strip).reject(&:empty?) }
-    .reject(&:empty?)
+  groups = parse_required_check_groups(raw_value)
+
+  abort "CI_REQUIRED_MERGE_GROUP_REQUIRED_CHECKS did not contain any check aliases" if groups.empty?
+
+  groups
 end
 
 def check_runs_from_payload(payload)
@@ -47,6 +54,27 @@ def check_runs_from_payload(payload)
     payload.key?("check_runs") ? Array(payload["check_runs"]) : [payload]
   else
     []
+  end
+end
+
+def actions_runs_from_payload(payload)
+  case payload
+  when Array
+    payload.flat_map { |item| actions_runs_from_payload(item) }
+  when Hash
+    payload.key?("workflow_runs") ? Array(payload["workflow_runs"]) : [payload]
+  else
+    []
+  end
+end
+
+def workflow_names_by_suite_id(actions_runs)
+  actions_runs.each_with_object({}) do |run, names|
+    suite_id = run["check_suite_id"]
+    name = run["name"].to_s
+    next if suite_id.nil? || name.empty?
+
+    names[suite_id.to_i] = name
   end
 end
 
@@ -84,6 +112,20 @@ def fetch_json_page(uri, token)
   [JSON.parse(response.body), next_link_from(response)]
 end
 
+def fetch_paginated_json(uri, token)
+  payloads = []
+
+  loop do
+    payload, next_link = fetch_json_page(uri, token)
+    payloads << payload
+    break unless next_link
+
+    uri = URI(next_link)
+  end
+
+  payloads
+end
+
 def fetch_check_runs_from_github
   repository = ENV.fetch("GITHUB_REPOSITORY", "")
   sha = ENV.fetch("GITHUB_SHA", "")
@@ -94,23 +136,32 @@ def fetch_check_runs_from_github
   missing << "GITHUB_TOKEN or GH_TOKEN" if token.to_s.empty?
   abort "Missing #{missing.join(', ')} for merge-group gate" unless missing.empty?
 
-  uri = URI("https://api.github.com/repos/#{repository}/commits/#{sha}/check-runs?per_page=100")
-  check_runs = []
+  check_runs_uri = URI("https://api.github.com/repos/#{repository}/commits/#{sha}/check-runs?per_page=100")
+  actions_runs_uri = URI(
+    "https://api.github.com/repos/#{repository}/actions/runs?#{URI.encode_www_form(head_sha: sha, per_page: 100)}"
+  )
+  check_runs = fetch_paginated_json(check_runs_uri, token).flat_map { |payload| check_runs_from_payload(payload) }
+  actions_runs = fetch_paginated_json(actions_runs_uri, token).flat_map { |payload| actions_runs_from_payload(payload) }
 
-  loop do
-    payload, next_link = fetch_json_page(uri, token)
-    check_runs.concat(check_runs_from_payload(payload))
-    break unless next_link
-
-    uri = URI(next_link)
-  end
-
-  check_runs
+  { check_runs:, workflow_names_by_suite_id: workflow_names_by_suite_id(actions_runs) }
 end
 
 def fetch_check_runs
   injected_json = ENV.fetch("CI_REQUIRED_CHECK_RUNS_JSON", nil)
-  return check_runs_from_payload(JSON.parse(injected_json)) if injected_json && !injected_json.empty?
+  if injected_json && !injected_json.empty?
+    injected_actions_json = ENV.fetch("CI_REQUIRED_ACTION_RUNS_JSON", nil)
+    actions_runs =
+      if injected_actions_json && !injected_actions_json.empty?
+        actions_runs_from_payload(JSON.parse(injected_actions_json))
+      else
+        []
+      end
+
+    return {
+      check_runs: check_runs_from_payload(JSON.parse(injected_json)),
+      workflow_names_by_suite_id: workflow_names_by_suite_id(actions_runs)
+    }
+  end
 
   fetch_check_runs_from_github
 end
@@ -121,17 +172,22 @@ rescue ArgumentError, TypeError
   Time.at(0)
 end
 
-def check_names(check_run)
+def check_suite_id(check_run)
+  check_run.dig("check_suite", "id") || check_run["check_suite_id"]
+end
+
+def check_names(check_run, workflow_names_by_suite_id)
   name = check_run["name"].to_s
-  workflow_name = check_run["workflow_name"] || check_run.dig("check_suite", "workflow_name")
+  suite_id = check_suite_id(check_run)
+  workflow_name = suite_id.nil? ? nil : workflow_names_by_suite_id[suite_id.to_i]
   names = [name, check_run["display_name"].to_s]
   names << "#{workflow_name} / #{name}" if workflow_name && !workflow_name.empty? && !name.empty?
   names.reject(&:empty?).uniq
 end
 
-def latest_check_for(check_runs, aliases)
+def latest_check_for(check_runs, aliases, workflow_names_by_suite_id)
   candidates = check_runs.select do |check_run|
-    (check_names(check_run) & aliases).any?
+    (check_names(check_run, workflow_names_by_suite_id) & aliases).any?
   end
 
   candidates.max_by do |check_run|
@@ -147,13 +203,13 @@ def check_url(check_run)
   url && !url.empty? ? " (#{url})" : ""
 end
 
-def evaluate_check_runs(check_runs, required_groups)
+def evaluate_check_runs(check_runs, required_groups, workflow_names_by_suite_id)
   pending = []
   failures = []
 
   required_groups.each do |aliases|
     label = aliases.first
-    check_run = latest_check_for(check_runs, aliases)
+    check_run = latest_check_for(check_runs, aliases, workflow_names_by_suite_id)
 
     unless check_run
       pending << "#{label}: missing"
@@ -194,7 +250,12 @@ poll_seconds = integer_env("CI_REQUIRED_MERGE_GROUP_GATE_POLL_SECONDS", 20)
 deadline = Time.now + timeout_seconds
 
 loop do
-  result = evaluate_check_runs(fetch_check_runs, required_groups)
+  fetch_result = fetch_check_runs
+  result = evaluate_check_runs(
+    fetch_result.fetch(:check_runs),
+    required_groups,
+    fetch_result.fetch(:workflow_names_by_suite_id)
+  )
 
   if result[:failures].any?
     warn "Required merge-group check failed:"
