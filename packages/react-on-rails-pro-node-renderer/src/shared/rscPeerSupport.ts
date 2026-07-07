@@ -13,8 +13,8 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-// Single source of truth for react-on-rails-pro's RSC peer compatibility window.
-// This is the only value to bump when compatibility changes.
+// Node-renderer source of truth for react-on-rails-pro's RSC peer compatibility window.
+// Ruby Doctor mirrors these values and has a parity spec to catch cross-language drift.
 //
 // `minimumVersion` is the React on Rails 17 RSC floor. Keep it in sync with the
 // Ruby Doctor/generator constants that install and diagnose the same Pro RSC

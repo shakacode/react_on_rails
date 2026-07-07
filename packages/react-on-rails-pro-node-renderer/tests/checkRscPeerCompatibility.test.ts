@@ -30,9 +30,26 @@ const versionBelowMinimumVersion = (version: string) => {
   throw new Error('minimumVersion must allow a lower supported-major version for the floor test');
 };
 
+const coreTuple = (version: string) => {
+  const [core = ''] = version
+    .replace(/^[v=]+/, '')
+    .split('+')[0]
+    .split('-');
+  return core.split('.').map(Number);
+};
+
 const belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
 describe('checkRscPeerCompatibility', () => {
+  it('keeps the prerelease floor on the stable floor tuple when RC soak is configured', () => {
+    const { minimumPrereleaseVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
+
+    expect(
+      minimumPrereleaseVersion === undefined ||
+        coreTuple(minimumPrereleaseVersion).join('.') === coreTuple(minimumVersion).join('.'),
+    ).toBe(true);
+  });
+
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
     expect(checkRscPeerCompatibility({ rscVersion: null, reactVersion: '19.2.7' })).toEqual({ level: 'ok' });
   });

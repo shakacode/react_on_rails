@@ -3794,7 +3794,7 @@ module ReactOnRails
       peer_compatible = check_rsc_package_peer_compatibility(rsc_package, react_version)
 
       return true unless peer_compatible
-      return true unless check_rsc_supported_react_version_for_package(rsc_package, react_version)
+      return true unless check_rsc_supported_react_packages_for_package(rsc_package, react_version)
 
       check_rsc_package_dist_tags(rsc_package, package_root)
       true
@@ -3845,16 +3845,42 @@ module ReactOnRails
       major != 19 || minor != 2 || patch < 7
     end
 
-    def check_rsc_supported_react_version_for_package(rsc_package, react_version)
-      return true unless unsupported_rsc_react_version?(react_version)
+    def check_rsc_supported_react_packages_for_package(rsc_package, react_version)
+      return false unless check_rsc_supported_react_version_for_package(rsc_package, "react", react_version)
+
+      react_dom_version = detect_package_version_from_deps("react-dom")
+      return false unless check_rsc_supported_react_version_for_package(rsc_package, "react-dom", react_dom_version)
+
+      check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)
+    end
+
+    def check_rsc_supported_react_version_for_package(rsc_package, package_name, package_version)
+      return true if package_version.blank?
+      return true unless unsupported_rsc_react_version?(package_version)
+
+      package_label = package_name == "react" ? "React" : "React DOM"
 
       checker.add_error(<<~MSG.strip)
-        🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported React #{react_version}.
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with unsupported #{package_label} #{package_version}.
 
-        React on Rails Pro 17 RSC currently supports React 19.2.x with patch >= #{RSC_MINIMUM_REACT_VERSION}.
+        React on Rails Pro 17 RSC currently supports React/React DOM 19.2.x with patch >= #{RSC_MINIMUM_REACT_VERSION}.
         The node renderer enforces the same support window at startup.
 
         Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} --save-exact
+      MSG
+      false
+    end
+
+    def check_rsc_react_dom_matches_react_for_package(rsc_package, react_version, react_dom_version)
+      return true if react_dom_version.blank? || react_dom_version == react_version
+
+      checker.add_error(<<~MSG.strip)
+        🚫 #{RSC_PACKAGE_NAME} #{rsc_package['version']} is installed with React #{react_version} but React DOM #{react_dom_version}.
+
+        React on Rails Pro 17 RSC requires react and react-dom to resolve to the same version.
+        The node renderer enforces the same exact-version match at startup.
+
+        Fix: npm install react@#{react_version} react-dom@#{react_version} --save-exact
       MSG
       false
     end

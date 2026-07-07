@@ -5638,6 +5638,35 @@ RSpec.describe ReactOnRails::Doctor do
       stub_package_root(Dir.pwd)
     end
 
+    it "keeps Doctor RSC support constants in sync with the node-renderer peer support window" do
+      support_source = File.read(
+        File.expand_path(
+          "../../../../packages/react-on-rails-pro-node-renderer/src/shared/rscPeerSupport.ts",
+          __dir__
+        )
+      )
+      rsc_support = support_source.match(/reactOnRailsRsc:\s*\{(?<body>[^}]+)\}/)&.[](:body)
+      react_support = support_source.match(
+        /rscMinor:\s*(?<rsc_minor>\d+),\s*minor:\s*(?<minor>\d+),\s*minPatch:\s*(?<min_patch>\d+)/
+      )
+
+      expect(rsc_support).not_to be_nil
+      expect(react_support).not_to be_nil
+      expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
+        rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
+      )
+      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(
+        rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)[:version]
+      )
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
+        rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
+      )
+      expect(described_class::RSC_SUPPORTED_PACKAGE_MINORS).to eq([react_support[:rsc_minor].to_i])
+      expect(described_class::RSC_MINIMUM_REACT_VERSION).to eq(
+        "#{described_class::RSC_SUPPORTED_PACKAGE_MAJOR}.#{react_support[:minor]}.#{react_support[:min_patch]}"
+      )
+    end
+
     context "when React 19.2.7+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -6075,7 +6104,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.0.7",
-                "React 19.2.x with patch >= 19.2.7"
+                "React/React DOM 19.2.x with patch >= 19.2.7"
               )
             )
             expect(warning_msgs).not_to include(a_string_including("RSC support currently targets React 19.2.x"))
@@ -6113,10 +6142,82 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.3.0",
-                "React 19.2.x with patch >= 19.2.7"
+                "React/React DOM 19.2.x with patch >= 19.2.7"
               )
             )
             expect(warning_msgs).not_to include(a_string_including("RSC support currently targets React 19.2.x"))
+          end
+        end
+      end
+
+      it "errors when broad RSC peer ranges allow a future unsupported React DOM minor" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.2.7",
+                  "react-dom" => "19.3.0",
+                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                }
+              )
+            )
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.3.0")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.2.1-rc.0",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React DOM 19.3.0",
+                "React/React DOM 19.2.x with patch >= 19.2.7"
+              )
+            )
+          end
+        end
+      end
+
+      it "errors when React DOM does not match the supported React version" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.2.7",
+                  "react-dom" => "19.2.8",
+                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                }
+              )
+            )
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.2.8")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.2.1-rc.0",
+              "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:rsc_dist_tags).and_return({})
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.2.1-rc.0 is installed with React 19.2.7 but React DOM 19.2.8",
+                "react and react-dom to resolve to the same version"
+              )
+            )
           end
         end
       end
