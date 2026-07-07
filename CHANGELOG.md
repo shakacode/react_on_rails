@@ -123,6 +123,28 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Missing renderer password error now leads with the local-development fix**: When the Pro renderer password is unset and both `RAILS_ENV` and `NODE_ENV` are unset, the fail-closed error from both the Ruby configuration guard and the Node renderer now includes explicit `export RAILS_ENV=development NODE_ENV=development` guidance. Password-optional behavior for explicit development/test envs and password-required behavior for production-like or mixed envs are unchanged. Fixes [Issue 4201](https://github.com/shakacode/react_on_rails/issues/4201). [PR 4211](https://github.com/shakacode/react_on_rails/pull/4211) by [justin808](https://github.com/justin808).
 
+#### Removed
+
+- **[Pro]** **Removed the RC-only RSC payload route-data helper**:
+  The `react-on-rails-pro/rscPayloadNode` package subpath and `createRscPayloadNode` helper, introduced
+  during the 17.0.0 RC cycle, are removed before 17.0.0 final. Client-router loaders should return plain
+  route data and render through `RSCRoute`, so Pro owns payload fetching, embedded SSR payload reuse,
+  caching, and retry behavior. Fixes [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439).
+  [PR 4440](https://github.com/shakacode/react_on_rails/pull/4440) by
+  [ihabadham](https://github.com/ihabadham).
+
+#### Security
+
+- **[Pro]** **Async-props prerender stream cache isolation**:
+  Pro prerender stream caching now bypasses renders that use async props, keeping per-request async stream
+  output isolated from prerender-cache hits. Prerelease builds `v16.7.0.rc.0` through `v16.7.0.rc.3` and
+  `v17.0.0.rc.0` through `v17.0.0.rc.6` included async-props streaming before this fix; no stable tag
+  contains the affected async-props feature. Upgrade to a 17.0.0 RC or final release that includes this fix
+  before enabling global prerender caching on async-props streaming pages. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **`hydrate_on: visible` no longer leaks a detached root or blocks re-hydrating a replacement node**: When a `hydrate_on: visible` target was detached from the DOM before it became visible, the intersection observer left a stale scheduled root entry that kept the removed node reachable and could stop a replacement node with the same DOM id from scheduling its own hydration. The observer now runs its scheduled callback after disconnecting from a detached target; the callback's existing `isConnected` guard deletes the stale entry without hydrating the removed node, so a fresh node with the same id schedules cleanly. Fixes [Issue 4328](https://github.com/shakacode/react_on_rails/issues/4328). [PR 4374](https://github.com/shakacode/react_on_rails/pull/4374) by [justin808](https://github.com/justin808).
@@ -352,30 +374,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Fixes [Issue 4330](https://github.com/shakacode/react_on_rails/issues/4330).
   [PR 4378](https://github.com/shakacode/react_on_rails/pull/4378) by
   [justin808](https://github.com/justin808).
-
-#### Removed
-
-- **[Pro]** **Removed the RC-only RSC payload route-data helper**:
-  The `react-on-rails-pro/rscPayloadNode` package subpath and `createRscPayloadNode` helper, introduced
-  during the 17.0.0 RC cycle, are removed before 17.0.0 final. Client-router loaders should return plain
-  route data and render through `RSCRoute`, so Pro owns payload fetching, embedded SSR payload reuse,
-  caching, and retry behavior. Fixes [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439).
-  [PR 4440](https://github.com/shakacode/react_on_rails/pull/4440) by
-  [ihabadham](https://github.com/ihabadham).
-
-#### Security
-
-- **[Pro]** **Async-props prerender stream cache isolation**:
-  Pro prerender stream caching now bypasses renders that use async props, keeping per-request async stream
-  output isolated from prerender-cache hits. Prerelease builds `v16.7.0.rc.0` through `v16.7.0.rc.3` and
-  `v17.0.0.rc.0` through `v17.0.0.rc.6` included async-props streaming before this fix; no stable tag
-  contains the affected async-props feature. Upgrade to a 17.0.0 RC or final release that includes this fix
-  before enabling global prerender caching on async-props streaming pages. Fixes
-  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
-  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
-  [justin808](https://github.com/justin808).
-
-#### Fixed
 
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
   The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess
