@@ -54,7 +54,8 @@ module PrMergeLedgerFixtureHelpers
         "headRefName" => "codex/fixture",
         "headRefOid" => "abc123",
         "mergedAt" => nil,
-        "reviewDecision" => "APPROVED"
+        "reviewDecision" => "APPROVED",
+        "body" => "Fixes #123"
       },
       "files" => ["script/pr-merge-ledger"],
       "review_threads" => [],
@@ -252,5 +253,106 @@ class PrMergeLedgerTest < Minitest::Test
     pending_check_names = ci_readiness.fetch("pending").map { |check| check.fetch("name") }
     assert_equal ["rspec-package-tests"], pending_check_names
     assert_equal ["ci_check_cancelled"], violation_codes(data)
+  end
+end
+
+class PrMergeLedgerClosingKeywordTest < Minitest::Test
+  include PrMergeLedgerFixtureHelpers
+
+  def test_backticked_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This should close the issue, but `Fixes #4410` will not."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/`Fixes #4410`/, violation.fetch("message"))
+  end
+
+  def test_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          This should close the issue, but a fenced code block will not.
+
+          ```text
+          Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_nested_shorter_fence_keeps_closing_keyword_inside_outer_code_block
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ````markdown
+          ```text
+          Fixes #4410
+          ```
+          ````
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close.\n\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_plain_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("Fixes #4410"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_plain_closing_keyword_between_inline_code_spans_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body("Update `ledger` and Fixes #4410 while documenting `keyword`.")
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  private
+
+  def fixture_with_body(body)
+    fixture(
+      ci_readiness: ci_readiness(
+        verdict: "READY",
+        checks: [ci_check("required-pr-gate", bucket: "pass", state: "SUCCESS")]
+      )
+    ).tap do |dataset|
+      dataset.fetch("pull_request")["body"] = body
+    end
   end
 end
