@@ -3918,6 +3918,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "This doesn\u2019t fix Windows.",
       "This fails on Windows.",
       "Tests fail on Windows.",
+      "Fails on Windows.",
+      "Broken on Windows.",
       "The specs are failing.",
       "The fix failed on Windows.",
       "This is broken on Windows.",

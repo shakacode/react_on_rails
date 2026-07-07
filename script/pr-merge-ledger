@@ -238,6 +238,12 @@ class PrMergeLedger
       [\s\S]{0,80}
       \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
     )|
+    (?:
+      (?:\A|[\r\n.!?]\s*)
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+      (?:\s+(?:on|in|under|with)\s+\S+(?:\s+\S+){0,4})?
+      \s*(?:[.!?]|\z)
+    )|
     \bregressed\b|
     \bregression(?:s)?\b(?![-\s]+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
     \breopen\b
