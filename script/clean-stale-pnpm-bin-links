@@ -12,15 +12,27 @@ fi
 
 cd "$ROOT_DIR"
 
-while IFS= read -r -d '' link_path; do
-  relative_path="${link_path#./}"
-  rm -f -- "$link_path"
-  printf 'Removed stale pnpm bin link: %s\n' "$relative_path"
+while IFS= read -r -d '' node_modules_dir; do
+  bin_dir="$node_modules_dir/.bin"
+  [ -d "$bin_dir" ] || continue
+
+  while IFS= read -r -d '' link_path; do
+    relative_path="${link_path#./}"
+    rm -f -- "$link_path"
+    printf 'Removed stale pnpm bin link: %s\n' "$relative_path"
+  done < <(
+    find "$bin_dir" \
+      -mindepth 1 \
+      -maxdepth 1 \
+      -type l \
+      ! -exec test -e {} \; \
+      -print0
+  )
 done < <(
   find . \
-    \( -path "./.git" -o -path "./.claude" -o -path "./.Codex" \) -prune -o \
-    -path "*/node_modules/.bin/*" \
-    -type l \
-    ! -exec test -e {} \; \
-    -print0
+    \( -path "./.git" -o -path "./.claude" -o -path "./.Codex" -o -path "./.agents" -o -path "./.cursor" \) -prune -o \
+    -type d \
+    -name node_modules \
+    -print0 \
+    -prune
 )

@@ -5,7 +5,7 @@ require "open3"
 require "tmpdir"
 require_relative "spec_helper"
 
-RSpec.describe "script/clean-stale-pnpm-bin-links" do
+RSpec.describe "pnpm bin cleanup setup support" do
   let(:repo_root) { File.expand_path("../../..", __dir__) }
   let(:script_path) { File.join(repo_root, "script/clean-stale-pnpm-bin-links") }
 
@@ -46,6 +46,41 @@ RSpec.describe "script/clean-stale-pnpm-bin-links" do
       expect(File.symlink?(valid_link)).to be(true)
       expect(File.exist?(valid_link)).to be(true)
       expect(stdout).to be_empty
+    end
+  end
+
+  it "leaves agent and editor workspace bin links alone" do
+    Dir.mktmpdir do |tmpdir|
+      stale_agent_link = File.join(tmpdir, ".agents/node_modules/.bin/tool")
+      stale_editor_link = File.join(tmpdir, ".cursor/node_modules/.bin/tool")
+      FileUtils.mkdir_p(File.dirname(stale_agent_link))
+      FileUtils.mkdir_p(File.dirname(stale_editor_link))
+      File.symlink("../tool/bin/tool", stale_agent_link)
+      File.symlink("../tool/bin/tool", stale_editor_link)
+
+      stdout, stderr, status = run_cleaner(tmpdir)
+
+      expect(status).to be_success, stderr
+      expect(stderr).to be_empty
+      expect(File.symlink?(stale_agent_link)).to be(true)
+      expect(File.symlink?(stale_editor_link)).to be(true)
+      expect(stdout).to be_empty
+    end
+  end
+
+  describe "bin/setup" do
+    let(:setup_script_path) { File.join(repo_root, "bin/setup") }
+
+    it "reports cleaner failures with setup's friendly error path" do
+      setup_script = File.read(setup_script_path)
+      expected_block = [
+        '    if ! "$STALE_PNPM_BIN_LINK_CLEANER" "$dir"; then',
+        '      print_error "Failed to clean stale pnpm bin links in $name"',
+        "      exit 1",
+        "    fi"
+      ].join("\n")
+
+      expect(setup_script).to include(expected_block)
     end
   end
 end

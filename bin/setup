@@ -240,7 +240,10 @@ install_dependencies() {
   # Skip pnpm install for workspace members (no lockfile) — they're covered by root install
   if [ -f "package.json" ] && [ -f "pnpm-lock.yaml" ]; then
     echo "  Installing JavaScript dependencies..."
-    "$STALE_PNPM_BIN_LINK_CLEANER" "$dir"
+    if ! "$STALE_PNPM_BIN_LINK_CLEANER" "$dir"; then
+      print_error "Failed to clean stale pnpm bin links in $name"
+      exit 1
+    fi
     if ! pnpm install --frozen-lockfile; then
       print_error "Failed to install JavaScript dependencies in $name"
       exit 1
