@@ -113,6 +113,8 @@ repos:
       # No cpflow package until a CPFlow review-app pipeline exists for this repo.
     needs_pro: true
     package_manager: npm
+    ruby_test: ALLOW_DEMO_RENDERER_PASSWORD=true bin/rails test
+    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
     # Recorded for future review-app wiring; skipped while cpflow_app_name is null.
     smoke: [/]
     review_app:
@@ -129,10 +131,13 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: true
+    ruby_test: bin/rails test && bin/rails test:system
+    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
     smoke: [/, /news]
     verify: true
 
@@ -144,10 +149,12 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: true
+    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
     smoke: [/, /products]
     verify: true
 
@@ -159,10 +166,11 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
-      - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: true
+    package_manager: npm
     smoke: [/]
     verify: true
 
@@ -172,10 +180,16 @@ repos:
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
+      - { ecosystem: gem, name: react_on_rails_pro }
+      - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-    needs_pro: false
+      - { ecosystem: gem, name: cpflow }
+    needs_pro: true
     package_manager: yarn_classic
+    build: bin/rails react_on_rails:generate_packs && bin/shakapacker
     smoke: [/]
     verify: true
 
@@ -206,10 +220,12 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
+      - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
+      - { ecosystem: npm, name: react-on-rails-rsc }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: true
+    package_manager: npm
     smoke: [/]
     verify: true
 
@@ -221,8 +237,8 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: false
+    package_manager: yarn_berry
     smoke: [/]
     verify: true
 
@@ -234,8 +250,8 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: false
+    package_manager: npm
     smoke: [/]
     verify: true
 
@@ -247,7 +263,6 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: false
     package_manager: yarn_classic
     smoke: [/]
@@ -261,7 +276,7 @@ repos:
       - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: shakapacker }
       - { ecosystem: npm, name: shakapacker }
-      - { ecosystem: gem, name: cpflow }
     needs_pro: false
+    package_manager: yarn_classic
     smoke: [/]
     verify: true
