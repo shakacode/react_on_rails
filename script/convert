@@ -7,6 +7,7 @@ require "json"
 # This script converts the codebase to use minimum supported dependency versions.
 # It's run during CI when testing the "minimum" dependency matrix to ensure
 # backward compatibility.
+# Tests: bash script/convert-test.bash
 #
 # React/Shakapacker version compatibility is now tested through generator smoke tests
 # (see examples_config.yml for minimum version examples like basic-minimum).
@@ -57,6 +58,20 @@ def remove_file(path)
   warn "Warning: File not found: #{path}"
 end
 
+MINIMUM_REACT_OVERRIDE_KEYS = %w[
+  react_on_rails>react
+  react_on_rails>react-dom
+  react-on-rails-pro>react
+  react-on-rails-pro>react-dom
+  react-on-rails-pro>react-on-rails-rsc
+  react-on-rails-pro-node-renderer>react
+  react-on-rails-pro-node-renderer>react-dom
+  react-on-rails-pro-node-renderer>react-on-rails-rsc
+  react_on_rails_pro_dummy>react
+  react_on_rails_pro_dummy>react-dom
+  react_on_rails_pro_dummy>react-on-rails-rsc
+].freeze
+
 # The below packages don't work on the oldest supported Node version and aren't needed there anyway
 # Note: All dev dependencies remain in root package.json even after workspace migration
 gsub_file_content("../package.json", /"[^"]*eslint[^"]*": "[^"]*",?/, "")
@@ -83,8 +98,7 @@ update_json_file("../package.json") do |package_json|
   overrides = package_json.dig("pnpm", "overrides")
   next false unless overrides
 
-  overrides.delete("react_on_rails>react")
-  overrides.delete("react_on_rails>react-dom")
+  MINIMUM_REACT_OVERRIDE_KEYS.each { |key| overrides.delete(key) }
 end
 gsub_file_content("../react_on_rails/spec/dummy/config/routes.rb",
                   /^\s*get "client_side_activity" => "pages#client_side_activity"\n/, "")
