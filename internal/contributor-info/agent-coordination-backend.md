@@ -172,8 +172,12 @@ contract:
   process-level escape hatch for wedged workers, and the rule that restarting
   with updated skills requires fresh worker processes from an updated checkout.
 - Only a coordinator or maintainer publishes or clears a batch's cancellation,
-  exactly as for the release phase. Record the cancellation, and any hard
-  process-level stop, in the batch handoff as the authoritative incident note.
+  exactly as for the release phase. After old workers have drained, released, or
+  been stopped, clear every relevant batch- and lane-scope cancellation field
+  immediately before launching fresh workers so stale cancellation state cannot
+  refuse the new claims. Record the cancellation, any hard process-level stop,
+  and the relaunch/clearance in the batch handoff as the authoritative incident
+  note.
 
 ## Release Phase
 
