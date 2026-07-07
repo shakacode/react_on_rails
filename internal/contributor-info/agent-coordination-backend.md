@@ -54,7 +54,7 @@ skill so a slow private read becomes explicit degraded state instead of an
 indefinite wait:
 
 ```bash
-PR_BATCH_SKILL_DIR="$(.agents/bin/shared-skill-dir pr-batch)"
+PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
 "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 doctor --json
 "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --repo OWNER/REPO --target TARGET --json
 "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status --batch-id BATCH_ID --json
@@ -85,6 +85,12 @@ state so later machine agents can observe the override through targeted status.
 Mirror the same note to the issue or PR when that is the active lane discussion,
 but do not use a public claim comment as the machine-readable override channel
 or to bypass a live or stale holder that can be contacted.
+
+Do not use an unverified private clone or CLI for hard-stop gates. If the local
+private CLI or README no longer matches this public pointer and the operator
+cannot validate the current private backend version/config output, report private
+state as `UNKNOWN` and stay in advisory fallback mode until a coordinator
+validates the backend.
 
 Use a temporary local state directory for smoke checks that should not write to
 GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads

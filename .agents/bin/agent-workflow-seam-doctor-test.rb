@@ -52,7 +52,10 @@ module AgentWorkflowSeamDoctorTestHelpers
       "merge_ledger" => "script/pr-merge-ledger <PR> --strict",
       "review_gate" => "claude-review",
       "approval_exempt" => "focused trusted workflow/build/dependency edits",
-      "coordination_backend" => "private shakacode/agent-coordination"
+      "coordination_backend" =>
+        "private agent-coord state backend (current default from config: shakacode/agent-coordination-state; " \
+        "claims/heartbeats namespaced by full repo name); external adopters use the structured public " \
+        "claim-comment fallback in .agents/workflows/pr-processing.md."
     }.merge(overrides)
 
     File.write(File.join(root, ".agents/agent-workflow.yml"), YAML.dump(config))
