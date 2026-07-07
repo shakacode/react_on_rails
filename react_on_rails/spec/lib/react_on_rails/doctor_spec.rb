@@ -5360,6 +5360,9 @@ RSpec.describe ReactOnRails::Doctor do
     before do
       allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
       allow(doctor).to receive(:resolved_package_root).and_return(Dir.pwd)
+      allow(ReactOnRails).to receive(:configuration).and_return(
+        instance_double(ReactOnRails::Configuration, node_modules_location: "")
+      )
       allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
       stub_const("ReactOnRailsPro", Module.new)
       stub_const("ReactOnRailsPro::Configuration", Class.new { attr_reader :enable_rsc_support })
@@ -5409,6 +5412,30 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_rspack_version)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.0 is compatible with RSC") }).to be true
+      end
+    end
+
+    context "when Rspack is installed under a configured client package root" do
+      before do
+        write_rspack_project(assets_bundler: "rspack", rspack_core_version: "latest")
+        FileUtils.mkdir_p("client/node_modules/@rspack/core")
+        File.write(
+          "client/node_modules/@rspack/core/package.json",
+          JSON.generate("name" => "@rspack/core", "version" => "2.0.8")
+        )
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        doctor.send(:resolved_package_root)
+      end
+
+      it "uses the current configured package root instead of stale root resolution" do
+        doctor.send(:check_rsc_rspack_version)
+
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(success_msgs.any? { |m| m[:content].include?("Rspack 2.0.8 is compatible with RSC") }).to be true
+        expect(error_msgs).to be_empty
       end
     end
 
@@ -6456,8 +6483,9 @@ RSpec.describe ReactOnRails::Doctor do
           .with(
             "node",
             "-e",
-            "console.log(require.resolve(process.argv[1] + '/package.json'))",
+            ReactOnRails::RscRspackSupport::NODE_PACKAGE_RESOLUTION_SCRIPT,
             "react",
+            File.join(package_root, "node_modules"),
             chdir: package_root
           )
           .and_return(

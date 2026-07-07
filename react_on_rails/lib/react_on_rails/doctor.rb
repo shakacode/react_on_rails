@@ -3644,18 +3644,18 @@ module ReactOnRails
     end
 
     def detected_rspack_version_for_rsc
-      package_root = resolved_package_root
+      package_root = resolved_rsc_package_root
       installed_version = nil
       unless package_root_missing?(package_root)
         installed_version = installed_package_version(package_root, RSC_RSPACK_PACKAGE)
       end
-      installed_version || declared_rspack_version_for_rsc
+      installed_version || declared_rspack_version_for_rsc(package_root)
     rescue StandardError
       nil
     end
 
-    def declared_rspack_version_for_rsc
-      package_json_path = package_json_path_for("declared Rspack version")
+    def declared_rspack_version_for_rsc(package_root = resolved_rsc_package_root)
+      package_json_path = package_json_path_for("declared Rspack version", package_root)
       return nil unless package_json_path
 
       rsc_declared_package_version(package_json_path, RSC_RSPACK_PACKAGE)
@@ -3665,8 +3665,12 @@ module ReactOnRails
       rsc_rspack_version_requirement_error(
         rspack_version,
         error_prefix: "🚫",
-        package_json_path: package_json_path_for("RSC Rspack version")
+        package_json_path: package_json_path_for("RSC Rspack version", resolved_rsc_package_root)
       )
+    end
+
+    def resolved_rsc_package_root
+      rsc_configured_package_root(resolved_package_root)
     end
 
     def check_rsc_rspack_lazy_compilation
