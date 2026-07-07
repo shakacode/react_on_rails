@@ -375,6 +375,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
   [justin808](https://github.com/justin808).
 
+#### Fixed
+
 - **Precompile hook no longer forces UTF-8 onto a non-UTF-8 locale**:
   The shared Shakapacker precompile hook now widens a spawned `bundle exec` / shakapacker subprocess
   to UTF-8 **only** under a bare C/POSIX locale, where the locale-derived encoding is US-ASCII — a
