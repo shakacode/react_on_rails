@@ -3030,6 +3030,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`; does it also apply to nested routes? " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. This fixes the failing test on Windows. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. The tests that were failing now pass. " \
       "Validation: pnpm test -- colors.test.ts."
     ].each do |reply_body|
       fixture = {
@@ -3174,7 +3176,9 @@ RSpec.describe "script/pr-merge-ledger" do
   it "does not infer fixed dispositions from ambiguous direct replies" do
     [
       "\nFixed in current head `current`. Does this look right?",
-      "Fixed in colors.test.ts. Is that correct?"
+      "Fixed in colors.test.ts. Is that correct?",
+      "Fixed in current head `current`. Please verify on Windows.",
+      "Fixed in current head `current`. Please check the CI result."
     ].each do |reply_body|
       fixture = {
         "repository" => "shakacode/react_on_rails",
@@ -3203,7 +3207,7 @@ RSpec.describe "script/pr-merge-ledger" do
                 "id" => "reply-comment",
                 "url" => "https://example.com/reply-comment",
                 "body" => reply_body,
-                "author" => { "login" => "reviewer" },
+                "author" => { "login" => "justin808" },
                 "createdAt" => "2026-06-01T00:05:00Z",
                 "outdated" => false,
                 "replyTo" => { "id" => "finding-comment" },

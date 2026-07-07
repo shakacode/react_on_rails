@@ -151,7 +151,11 @@ class PrMergeLedger
     \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
     \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
       fail(?:s|ed|ing)?\s+
-      before\s+(?:the\s+)?fix\b
+      before\s+(?:the\s+)?fix\b|
+    \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
+      fail(?:s|ed|ing)?\s+
+      (?:\S+\s+){0,4}
+      \b(?:now|again|currently)?\s*(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed|ing)?)\b
   /ix
   UNRELATED_FAILURE_REPLY_PATTERN = /
     (?:
@@ -1384,6 +1388,7 @@ class PrMergeLedger
     follow_up = sentence_boundary ? body_without_urls[sentence_boundary.end(0)..].to_s : ""
     follow_up.match?(
       /\b(?:can|could)\s+you\s+(?:confirm|verify|check)\b|
+       \bplease\s+(?:confirm|verify|check)\b|
        \b(?:does|do|did|would)\s+(?:this|that|it)\s+(?:look|cover|address|fix|work)\b|
        \b(?:is|are)\s+(?:this|that|it|these|those)\s+(?:correct|right|okay|ok)\b/ix
     )
