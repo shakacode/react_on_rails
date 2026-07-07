@@ -49,21 +49,28 @@ RSpec.describe "pnpm bin cleanup setup support" do
     end
   end
 
-  it "leaves agent and editor workspace bin links alone" do
+  it "leaves agent, editor, and Codex workspace bin links alone" do
     Dir.mktmpdir do |tmpdir|
-      stale_agent_link = File.join(tmpdir, ".agents/node_modules/.bin/tool")
-      stale_editor_link = File.join(tmpdir, ".cursor/node_modules/.bin/tool")
-      FileUtils.mkdir_p(File.dirname(stale_agent_link))
-      FileUtils.mkdir_p(File.dirname(stale_editor_link))
-      File.symlink("../tool/bin/tool", stale_agent_link)
-      File.symlink("../tool/bin/tool", stale_editor_link)
+      ignored_links = {
+        ".agents" => "agent-tool",
+        ".cursor" => "editor-tool",
+        ".Codex" => "codex-upper-tool",
+        ".codex" => "codex-lower-tool"
+      }.map do |dir, tool|
+        File.join(tmpdir, "#{dir}/node_modules/.bin/#{tool}")
+      end
+      ignored_links.each do |link_path|
+        FileUtils.mkdir_p(File.dirname(link_path))
+        File.symlink("../tool/bin/tool", link_path)
+      end
 
       stdout, stderr, status = run_cleaner(tmpdir)
 
       expect(status).to be_success, stderr
       expect(stderr).to be_empty
-      expect(File.symlink?(stale_agent_link)).to be(true)
-      expect(File.symlink?(stale_editor_link)).to be(true)
+      ignored_links.each do |link_path|
+        expect(File.symlink?(link_path)).to be(true)
+      end
       expect(stdout).to be_empty
     end
   end
@@ -77,14 +84,26 @@ RSpec.describe "pnpm bin cleanup setup support" do
 
     it "reports cleaner failures with setup's friendly error path" do
       setup_script = File.read(setup_script_path)
-      expected_block = [
-        '    if ! "$STALE_PNPM_BIN_LINK_CLEANER" "$dir"; then',
-        '      print_error "Failed to clean stale pnpm bin links in $name"',
-        "      exit 1",
-        "    fi"
-      ].join("\n")
+      expected_pattern = /
+        if\s+!\s+"\$STALE_PNPM_BIN_LINK_CLEANER"\s+"\$dir";\s+then
+        \s+print_error\s+"Failed\ to\ clean\ stale\ pnpm\ bin\ links\ in\ \$name"
+        \s+exit\s+1
+        \s+fi
+      /x
 
-      expect(setup_script).to include(expected_block)
+      expect(setup_script).to match(expected_pattern)
+    end
+  end
+
+  describe "conductor-setup.sh" do
+    let(:conductor_setup_script_path) { File.join(repo_root, "conductor-setup.sh") }
+
+    it "cleans stale pnpm bin links before installing JavaScript dependencies" do
+      conductor_setup_script = File.read(conductor_setup_script_path)
+
+      expect(conductor_setup_script).to match(
+        %r{run_cmd \./script/clean-stale-pnpm-bin-links \.\s+run_cmd pnpm install}
+      )
     end
   end
 end

@@ -28,7 +28,7 @@ while IFS= read -r -d '' node_modules_dir; do
   done
 done < <(
   find . \
-    \( -path "./.git" -o -path "./.claude" -o -path "./.Codex" -o -path "./.agents" -o -path "./.cursor" \) -prune -o \
+    \( -path "./.git" -o -path "./.claude" -o -path "./.Codex" -o -path "./.codex" -o -path "./.agents" -o -path "./.cursor" \) -prune -o \
     -type d \
     -name node_modules \
     -print0 \
