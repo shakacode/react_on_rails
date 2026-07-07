@@ -256,6 +256,7 @@ class PrMergeLedgerTest < Minitest::Test
   end
 end
 
+# rubocop:disable Metrics/ClassLength
 class PrMergeLedgerClosingKeywordTest < Minitest::Test
   include PrMergeLedgerFixtureHelpers
 
@@ -267,7 +268,139 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_equal ["backticked_closing_keyword"], violation_codes(data)
     violation = ledger(data).fetch("violations").first
     assert_equal 1, violation.fetch("line")
-    assert_match(/`Fixes #4410`/, violation.fetch("message"))
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_backticked_issue_reference_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: Fixes `#4410`."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_backticked_closing_keyword_only_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: `Fixes` #4410."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_soft_wrapped_backticked_closing_keyword_only_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close:\n`Fixes`\n#4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_soft_wrapped_backticked_issue_reference_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close:\nFixes\n`#4410`\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_soft_wrapped_open_multiline_inline_issue_reference_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close:\nFixes `\n#4410`\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_soft_wrapped_plain_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("Fixes\n#4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_backticked_url_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body("This will not close: `Fixes https://github.com/shakacode/react_on_rails/issues/4410`.")
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(%r{https://github\.com/shakacode/react_on_rails/issues/4410}, violation.fetch("message"))
+  end
+
+  def test_backticked_closing_keyword_with_backslash_before_delimiter_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: `Fixes #4410\\`."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_multiline_inline_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: `Fixes #4410\nbecause it is code`."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_split_multiline_inline_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: `Fixes\n#4410`."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_blockquoted_split_multiline_inline_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> `Fixes\n> #4410`\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_blockquoted_multiline_inline_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> `Fixes #4410\n> still code`\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
   def test_fenced_code_closing_keyword_blocks_strict_closeout
@@ -288,6 +421,137 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
     violation = ledger(data).fetch("violations").first
     assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_split_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```text
+          Fixes
+          #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_blockquoted_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          > ```text
+          > Fixes #4410
+          > ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_root_fenced_code_after_blockquote_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          > quoted context
+          ```text
+          Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_unquoted_closing_keyword_after_blockquote_fence_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          > ```text
+          > example
+
+          Fixes #4410
+        MARKDOWN
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_fence_opener_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```text Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_backtick_fence_with_backtick_in_info_allows_plain_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ``` te`xt
+          Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_tilde_fence_with_backtick_in_info_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ~~~ te`xt
+          Fixes #4410
+          ~~~
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
@@ -312,6 +576,46 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_indented_fence_marker_does_not_close_fenced_block
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```markdown
+              ```
+          Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_quoted_fence_marker_does_not_close_root_fenced_block
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```markdown
+          > ```
+          Fixes #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_indented_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("This will not close.\n\n    Fixes #4410\n"))
 
@@ -323,8 +627,500 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_split_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("    Fixes\n    #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_thematic_break_before_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("---\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_setext_heading_before_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("Summary\n---\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_setext_underline_without_paragraph_allows_paragraph_closing_keyword
+    output, status = run_fixture(fixture_with_body("===\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_gfm_table_before_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("A | B\n--|--\n1 | 2\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_gfm_table_no_pipe_body_row_before_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("A | B\n--|--\nno pipe\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_blockquoted_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> This will not close.\n>\n>     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_blockquote_indented_code_after_root_text_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("Root paragraph.\n>     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_blockquote_indented_paragraph_continuation_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("> This remains prose.\n>     Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_blockquote_tabbed_paragraph_continuation_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("> \tFixes #4410\n>  \tFixes #4411\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_blockquote_tabbed_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body(">   \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_nested_blockquote_tabbed_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> > \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_blockquote_lazy_indented_paragraph_continuation_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("> This remains prose.\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_blockquote_blank_before_root_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> This quote ended.\n>\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_tab_expanded_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close.\n\n \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_indented_paragraph_continuation_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("This remains prose\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_plain_pipe_paragraph_continuation_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("This | remains prose\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_table_separator_without_header_allows_paragraph_closing_keyword
+    output, status = run_fixture(fixture_with_body("--|--\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_indented_code_inside_list_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          1. Closeout evidence:
+
+                 Fixes #4410
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_indented_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          - Closeout evidence:
+
+              ```text
+              Fixes #4410
+              ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_marker_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          - ```text
+            Fixes #4410
+            ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_nested_list_marker_tilde_fenced_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          - a
+            - b
+              - ~~~text
+                Fixes #4410
+                ~~~
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_outdented_closing_keyword_after_list_fence_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          - ```text
+            example
+          Fixes #4410
+            ```
+        MARKDOWN
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_marker_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("-     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_marker_indented_code_continuation_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("-     code\n      Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_ordered_list_marker_indented_code_continuation_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("1.     code\n       Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_marker_tab_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("-   \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_marker_tab_aligned_prose_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("-  \tFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_blockquoted_list_marker_tab_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> - \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_blockquote_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- >     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_blockquote_tab_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- > \tFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_quoted_list_blockquote_indented_code_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("> - >     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_plain_closing_keyword_allows_strict_closeout
     output, status = run_fixture(fixture_with_body("Fixes #4410"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_escaped_backticks_around_closing_keyword_allow_strict_closeout
+    output, status = run_fixture(fixture_with_body("Escaped backticks stay prose: \\`Fixes #4410\\`."))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_unmatched_backtick_before_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("Unmatched `backtick remains prose.\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_unmatched_backtick_before_paragraph_boundary_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body("Summary has an unmatched `backtick.\n\nFixes #4410\n\nTests: `ruby test`\n")
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_unmatched_backtick_before_list_boundary_allows_plain_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body("Summary has an unmatched `backtick.\n- Fixes #4410 `cmd`\n")
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_unmatched_backtick_before_heading_boundary_allows_plain_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body("Summary has an unmatched `backtick.\n# Fixes #4410 `cmd`\n")
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_continuation_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          1. Closeout evidence:
+
+              Fixes #4410
+        MARKDOWN
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_paragraph_continuation_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("- This remains prose\n      Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_reduced_blockquote_depth_after_fence_allows_plain_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          > > ```text
+          > > example
+          > > ```
+          > Fixes #4410
+        MARKDOWN
+      )
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_continuation_with_tab_stop_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("1. Closeout evidence:\n\n   \tFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_tab_indented_list_fence_closer_allows_following_plain_closing_keyword
+    output, status = run_fixture(fixture_with_body("- ```\n\tcode\n\t```\n  Fixes #4410\n"))
 
     assert status.success?, output
     data = JSON.parse(output)
@@ -356,3 +1152,4 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     end
   end
 end
+# rubocop:enable Metrics/ClassLength

@@ -51,11 +51,22 @@ class PrMergeLedger
   INTERNAL_PULL_REQUEST_BODY_KEY = "body_text"
   CLOSING_KEYWORD_PATTERN = %r{
     \b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+
-    (?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?
-    \#\d+
+    (?:
+      (?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?\#\d+ |
+      https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/\d+
+    )
   }ix
-  FENCED_CODE_BLOCK_PATTERN = /\A\s*(?<fence>`{3,}|~{3,})/
-  INDENTED_CODE_BLOCK_PATTERN = /\A(?: {4}|\t)/
+  FENCED_CODE_BLOCK_PATTERN = /\A {0,3}(?<fence>`{3,}|~{3,})/
+  INDENTED_CODE_BLOCK_PATTERN = /\A(?: {4}| {0,3}\t)/
+  INDENTATION_CHARACTERS = [" ", "\t"].freeze
+  LIST_ITEM_PATTERN = /\A {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+/
+  LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
+  LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent> {0,3})(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
+  ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
+  THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
+  SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
+  TABLE_SEPARATOR_BOUNDARY_PATTERN = /\A {0,3}\|?[ \t]*:?-{2,}:?[ \t]*(?:\|[ \t]*:?-{2,}:?[ \t]*)+\|?[ \t]*\z/
+  GFM_TABLE_ROW_BOUNDARY_PATTERN = /\A {0,3}.+\|.+\z/
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
@@ -1977,68 +1988,803 @@ class PrMergeLedger
 
   def code_formatted_closing_keyword_violations(pull_request)
     body = pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "")
-    opening_fence = nil
+    body_lines = body.each_line.to_a
+    markdown_state = {
+      "body_lines" => body_lines,
+      "opening_fence" => nil,
+      "inline_code_delimiter" => nil,
+      "inline_code_multiline_content" => nil,
+      "inline_code_multiline_reported" => false,
+      "code_block_multiline_content" => nil,
+      "code_block_multiline_reported" => false,
+      "blockquote_depth" => 0,
+      "list_content_indent" => nil,
+      "list_indented_code_indent" => nil,
+      "list_indented_code_allowed" => true,
+      "gfm_table_block_active" => false,
+      "gfm_table_header_candidate_active" => false,
+      "setext_heading_candidate_active" => false,
+      "blockquote_lazy_continuation_allowed" => false,
+      "root_indented_code_allowed" => true
+    }
 
-    body.each_line.with_index.filter_map do |line, index|
-      current_line_in_fenced_code = !opening_fence.nil?
-      opening_fence = next_opening_fence(line, opening_fence)
+    body_lines.each_with_index.filter_map do |line, index|
+      code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
+    end
+  end
 
-      inline_match = closing_keyword_in_inline_code(line)
-      block_match = closing_keyword_in_code_block(line, current_line_in_fenced_code)
-      match_text = inline_match || block_match&.[](0)
-      next unless match_text
+  def code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
+    markdown_line, blockquote_depth = body_markdown_line_and_depth(line, markdown_state)
+    close_blockquote_fence_if_needed(markdown_state, blockquote_depth)
+    close_outdented_list_fence_if_needed(markdown_state, markdown_line)
+    markdown_state["current_blockquote_depth"] = blockquote_depth
+    current_line_in_fenced_code = !markdown_state.fetch("opening_fence").nil?
+    reset_markdown_state_for_blockquote_change(markdown_state, blockquote_depth) unless current_line_in_fenced_code
+    update_body_markdown_state_before_scan(
+      markdown_line,
+      current_line_in_fenced_code,
+      blockquote_depth,
+      markdown_state
+    )
 
-      violation(
-        pull_request,
-        inline_match ? "backticked_closing_keyword" : "code_formatted_closing_keyword",
-        "Code-formatted closing keyword does not auto-close linked issue: #{match_text}",
-        pull_request["url"],
-        "line" => index + 1
+    code_block_line = code_block_line_for_state?(markdown_line, current_line_in_fenced_code, markdown_state)
+    block_match = code_block_closing_keyword_match(
+      markdown_line,
+      current_line_in_fenced_code,
+      code_block_line,
+      markdown_state
+    )
+    inline_match =
+      if code_block_line
+        reset_inline_code_soft_wrap_state(markdown_state)
+        nil
+      else
+        closing_keyword_in_inline_code(markdown_line, index, markdown_state)
+      end
+    match_text = inline_match || block_match&.[](0)
+    update_body_markdown_state_after_scan(markdown_line, current_line_in_fenced_code, markdown_state)
+    markdown_state["blockquote_depth"] = effective_blockquote_depth(markdown_state, blockquote_depth)
+    update_blockquote_lazy_continuation_state(markdown_state, markdown_line, current_line_in_fenced_code)
+
+    return unless match_text
+
+    violation(
+      pull_request,
+      inline_match ? "backticked_closing_keyword" : "code_formatted_closing_keyword",
+      "Code-formatted closing keyword does not auto-close linked issue: #{match_text}",
+      pull_request["url"],
+      "line" => index + 1
+    )
+  end
+
+  def code_block_closing_keyword_match(line, current_line_in_fenced_code, code_block_line, markdown_state)
+    block_match = closing_keyword_in_code_block_for_state(line, current_line_in_fenced_code, markdown_state)
+    block_match ||= closing_keyword_in_multiline_code_block(line, markdown_state) if code_block_line
+    reset_multiline_code_block_state(markdown_state) unless code_block_line
+    block_match
+  end
+
+  def close_blockquote_fence_if_needed(markdown_state, blockquote_depth)
+    opening_fence = markdown_state.fetch("opening_fence")
+    return unless opening_fence
+    return unless blockquote_depth < opening_fence.fetch(:blockquote_depth)
+
+    markdown_state["opening_fence"] = nil
+  end
+
+  def close_outdented_list_fence_if_needed(markdown_state, line)
+    opening_fence = markdown_state.fetch("opening_fence")
+    return unless opening_fence
+
+    container_indent = opening_fence.fetch(:container_indent)
+    return if container_indent.zero?
+    return if line.strip.empty?
+    return if leading_indentation_columns(line) >= container_indent
+
+    markdown_state["opening_fence"] = nil
+  end
+
+  def body_markdown_line_and_depth(line, markdown_state)
+    opening_fence = markdown_state.fetch("opening_fence")
+    return fenced_code_markdown_line_and_depth(line, opening_fence) if opening_fence
+
+    markdown_line = line
+    blockquote_depth = 0
+    line_has_blockquote_marker = false
+    line_has_list_blockquote_marker = false
+
+    loop do
+      marker_match = markdown_line.match(/\A {0,3}> ?/)
+      break unless marker_match
+
+      blockquote_depth += 1
+      line_has_blockquote_marker = true
+      markdown_line = markdown_line[marker_match.end(0)..] || ""
+    end
+
+    list_blockquote_match = markdown_line.match(/\A {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+> ?/)
+    if list_blockquote_match
+      blockquote_depth += 1
+      line_has_blockquote_marker = true
+      line_has_list_blockquote_marker = true
+      markdown_line = markdown_line[list_blockquote_match.end(0)..] || ""
+    end
+
+    normalized_blockquote_markdown_line_and_depth(
+      line,
+      markdown_line,
+      blockquote_depth,
+      {
+        marker_found: line_has_blockquote_marker,
+        list_blockquote_marker_found: line_has_list_blockquote_marker,
+        markdown_state:
+      }
+    )
+  end
+
+  def normalized_blockquote_markdown_line_and_depth(line, markdown_line, blockquote_depth, context)
+    if context.fetch(:marker_found)
+      return [
+        normalize_blockquote_content_indentation(
+          markdown_line,
+          blockquote_depth,
+          context.fetch(:list_blockquote_marker_found)
+        ),
+        blockquote_depth
+      ]
+    end
+
+    markdown_state = context.fetch(:markdown_state)
+    if markdown_state.fetch("blockquote_depth").positive? &&
+       markdown_state.fetch("blockquote_lazy_continuation_allowed") &&
+       blockquote_lazy_continuation_line(line)
+      return [markdown_line, markdown_state.fetch("blockquote_depth")]
+    end
+
+    [markdown_line, blockquote_depth]
+  end
+
+  def blockquote_lazy_continuation_allowed_for_next_line?(line, current_line_in_fenced_code, blockquote_depth)
+    return false unless blockquote_depth.positive?
+    return false if current_line_in_fenced_code
+
+    !line.strip.empty?
+  end
+
+  def normalize_blockquote_content_indentation(line, blockquote_depth, list_blockquote_marker_found)
+    return line unless blockquote_depth == 1 && !list_blockquote_marker_found
+
+    case line
+    when /\A\t/
+      "  #{line[1..]}"
+    when /\A \t/
+      "   #{line[2..]}"
+    else
+      line
+    end
+  end
+
+  def fenced_code_markdown_line_and_depth(line, opening_fence)
+    markdown_line = line
+    blockquote_depth = 0
+
+    opening_fence.fetch(:blockquote_depth).times do
+      marker_match = markdown_line.match(/\A {0,3}> ?/)
+      break unless marker_match
+
+      blockquote_depth += 1
+      markdown_line = markdown_line[marker_match.end(0)..] || ""
+    end
+
+    [markdown_line, blockquote_depth + blockquote_depth_for_line(markdown_line)]
+  end
+
+  def blockquote_depth_for_line(line)
+    blockquote_depth = 0
+    markdown_line = line
+
+    loop do
+      marker_match = markdown_line.match(/\A {0,3}> ?/)
+      return blockquote_depth unless marker_match
+
+      blockquote_depth += 1
+      markdown_line = markdown_line[marker_match.end(0)..] || ""
+    end
+  end
+
+  def reset_markdown_state_for_blockquote_change(markdown_state, blockquote_depth)
+    return if blockquote_depth == markdown_state.fetch("blockquote_depth")
+
+    markdown_state["list_content_indent"] = nil
+    markdown_state["list_indented_code_indent"] = nil
+    markdown_state["list_indented_code_allowed"] = true
+    markdown_state["root_indented_code_allowed"] = true
+  end
+
+  def effective_blockquote_depth(markdown_state, blockquote_depth)
+    opening_fence = markdown_state.fetch("opening_fence")
+    return opening_fence.fetch(:blockquote_depth) if opening_fence
+
+    blockquote_depth
+  end
+
+  def update_blockquote_lazy_continuation_state(markdown_state, line, current_line_in_fenced_code)
+    markdown_state["blockquote_lazy_continuation_allowed"] = blockquote_lazy_continuation_allowed_for_next_line?(
+      line,
+      current_line_in_fenced_code,
+      markdown_state.fetch("blockquote_depth")
+    )
+  end
+
+  def update_body_markdown_state_before_scan(line, current_line_in_fenced_code, blockquote_depth, markdown_state)
+    unless current_line_in_fenced_code
+      markdown_state["list_content_indent"] =
+        list_content_indent_for_line(line, markdown_state.fetch("list_content_indent"))
+    end
+
+    markdown_state["fence_opener_match"] =
+      if markdown_state.fetch("opening_fence")
+        nil
+      else
+        fenced_code_block_match(line, markdown_state.fetch("list_content_indent"))
+      end
+    markdown_state["opening_fence"] = next_opening_fence(
+      line,
+      markdown_state.fetch("opening_fence"),
+      markdown_state.fetch("list_content_indent"),
+      blockquote_depth
+    )
+  end
+
+  def closing_keyword_in_code_block_for_state(line, current_line_in_fenced_code, markdown_state)
+    closing_keyword_in_code_block(
+      line,
+      current_line_in_fenced_code,
+      markdown_state
+    )
+  end
+
+  def code_block_line_for_state?(line, current_line_in_fenced_code, markdown_state)
+    current_line_in_fenced_code ||
+      markdown_state.fetch("fence_opener_match") ||
+      list_marker_indented_code_match(line, markdown_state) ||
+      list_indented_code_continuation_line?(line, markdown_state) ||
+      indented_code_block_line?(
+        line,
+        markdown_state.fetch("list_content_indent"),
+        markdown_state.fetch("list_indented_code_allowed"),
+        markdown_state.fetch("root_indented_code_allowed")
+      )
+  end
+
+  def update_body_markdown_state_after_scan(line, current_line_in_fenced_code, markdown_state)
+    markdown_state["list_indented_code_indent"] = next_list_indented_code_indent(line, markdown_state)
+    markdown_state["list_indented_code_allowed"] = next_list_indented_code_allowed(
+      line,
+      current_line_in_fenced_code,
+      markdown_state.fetch("list_content_indent"),
+      markdown_state.fetch("list_indented_code_allowed"),
+      markdown_state
+    )
+    markdown_state["root_indented_code_allowed"] = next_root_indented_code_allowed(
+      line,
+      current_line_in_fenced_code,
+      markdown_state.fetch("root_indented_code_allowed"),
+      markdown_state
+    )
+    markdown_state["setext_heading_candidate_active"] = next_setext_heading_candidate_active(
+      line,
+      current_line_in_fenced_code,
+      markdown_state
+    )
+    markdown_state["gfm_table_block_active"] = next_gfm_table_block_active(line, markdown_state)
+    markdown_state["gfm_table_header_candidate_active"] = next_gfm_table_header_candidate_active(line)
+  end
+
+  def closing_keyword_in_inline_code(line, line_index, markdown_state)
+    normalized_line, inline_code_flags = inline_code_normalized_line(line, line_index, markdown_state)
+    multiline_match = markdown_state.delete("inline_code_multiline_match")
+    if multiline_match
+      reset_inline_code_soft_wrap_state(markdown_state)
+      return multiline_match
+    end
+
+    match = inline_code_closing_keyword_match(normalized_line, inline_code_flags)
+    if markdown_state["inline_code_delimiter"]
+      remember_inline_code_soft_wrap_line(normalized_line, inline_code_flags, markdown_state) unless match
+      return match
+    end
+
+    match ||= soft_wrapped_inline_code_closing_keyword_match(normalized_line, inline_code_flags, markdown_state)
+    remember_inline_code_soft_wrap_line(normalized_line, inline_code_flags, markdown_state)
+    match
+  end
+
+  def inline_code_closing_keyword_match(normalized_line, inline_code_flags)
+    index = 0
+
+    loop do
+      match = normalized_line.match(CLOSING_KEYWORD_PATTERN, index)
+      return nil unless match
+
+      return match[0] if inline_code_flags[match.begin(0)...match.end(0)].any?
+
+      index = match.end(0)
+    end
+  end
+
+  def soft_wrapped_inline_code_closing_keyword_match(normalized_line, inline_code_flags, markdown_state)
+    previous_line = markdown_state["inline_code_previous_normalized_line"]
+    previous_flags = markdown_state["inline_code_previous_flags"]
+    return unless previous_line && previous_flags
+    return if inline_code_soft_wrap_boundary?(normalized_line)
+
+    combined_line = "#{previous_line}\n#{normalized_line}"
+    combined_flags = previous_flags + [false] + inline_code_flags
+    inline_code_closing_keyword_match(combined_line, combined_flags)
+  end
+
+  def remember_inline_code_soft_wrap_line(normalized_line, inline_code_flags, markdown_state)
+    if inline_code_soft_wrap_boundary?(normalized_line)
+      reset_inline_code_soft_wrap_state(markdown_state)
+    else
+      markdown_state["inline_code_previous_normalized_line"] = normalized_line
+      markdown_state["inline_code_previous_flags"] = inline_code_flags
+    end
+  end
+
+  def reset_inline_code_soft_wrap_state(markdown_state)
+    markdown_state.delete("inline_code_previous_normalized_line")
+    markdown_state.delete("inline_code_previous_flags")
+  end
+
+  def inline_code_soft_wrap_boundary?(line)
+    line.strip.empty? || inline_code_block_boundary?(line)
+  end
+
+  def inline_code_normalized_line(line, line_index, markdown_state)
+    normalized_line = +""
+    inline_code_flags = []
+    context = {
+      line:,
+      line_index:,
+      markdown_state:,
+      normalized_line:,
+      inline_code_flags:
+    }
+    index = consume_open_inline_code(line, markdown_state, normalized_line, inline_code_flags)
+    return [normalized_line, inline_code_flags] unless index
+
+    loop do
+      index = consume_next_inline_code_span(context, index)
+      return [normalized_line, inline_code_flags] unless index
+    end
+  end
+
+  def consume_next_inline_code_span(context, index)
+    line = context.fetch(:line)
+    opening_match = next_unescaped_backtick_run(line, index)
+    unless opening_match
+      append_inline_code_segment(context.fetch(:normalized_line), context.fetch(:inline_code_flags), line[index..],
+                                 in_code: false)
+      return nil
+    end
+
+    append_inline_code_segment(
+      context.fetch(:normalized_line),
+      context.fetch(:inline_code_flags),
+      line[index...opening_match.begin(0)],
+      in_code: false
+    )
+
+    closing_match = matching_closing_backtick_run(line, opening_match[0], opening_match.end(0))
+    unless closing_match
+      append_unmatched_or_multiline_inline_code(context, opening_match)
+      return nil
+    end
+
+    append_inline_code_segment(
+      context.fetch(:normalized_line),
+      context.fetch(:inline_code_flags),
+      line[opening_match.end(0)...closing_match.begin(0)],
+      in_code: true
+    )
+    closing_match.end(0)
+  end
+
+  def append_unmatched_or_multiline_inline_code(context, opening_match)
+    line = context.fetch(:line)
+    markdown_state = context.fetch(:markdown_state)
+
+    if inline_code_delimiter_closes_later?(
+      markdown_state.fetch("body_lines"),
+      context.fetch(:line_index),
+      opening_match[0],
+      markdown_state.fetch("current_blockquote_depth", 0)
+    )
+      code_segment = line[opening_match.end(0)..]
+      append_inline_code_segment(context.fetch(:normalized_line), context.fetch(:inline_code_flags), code_segment,
+                                 in_code: true)
+      markdown_state["inline_code_multiline_content"] = code_segment.to_s.dup
+      markdown_state["inline_code_multiline_reported"] = code_segment.to_s.match?(CLOSING_KEYWORD_PATTERN)
+      markdown_state["inline_code_delimiter"] = opening_match[0]
+    else
+      append_inline_code_segment(
+        context.fetch(:normalized_line),
+        context.fetch(:inline_code_flags),
+        line[opening_match.begin(0)..],
+        in_code: false
       )
     end
   end
 
-  def closing_keyword_in_inline_code(line)
-    index = 0
+  def inline_code_delimiter_closes_later?(body_lines, line_index, delimiter, blockquote_depth)
+    body_lines[(line_index + 1)..].to_a.each do |line|
+      continuation_line = inline_code_continuation_line(line, blockquote_depth)
+      return false unless continuation_line
+      return false if continuation_line.strip.empty?
+      return false if inline_code_block_boundary?(continuation_line)
+      return true if matching_closing_backtick_run(continuation_line, delimiter, 0)
+    end
 
+    false
+  end
+
+  def inline_code_continuation_line(line, blockquote_depth)
+    return line if blockquote_depth.zero?
+
+    markdown_line = line
+    blockquote_depth.times do
+      marker_match = markdown_line.match(/\A {0,3}> ?/)
+      return blockquote_lazy_continuation_line(line) unless marker_match
+
+      markdown_line = markdown_line[marker_match.end(0)..] || ""
+    end
+    markdown_line
+  end
+
+  def blockquote_lazy_continuation_line(line)
+    return nil if root_block_boundary_line?(line)
+    return nil if line.match?(FENCED_CODE_BLOCK_PATTERN)
+
+    line
+  end
+
+  def inline_code_block_boundary?(line)
+    root_block_boundary_line?(line) || line.match?(FENCED_CODE_BLOCK_PATTERN)
+  end
+
+  def consume_open_inline_code(line, markdown_state, normalized_line, inline_code_flags)
+    delimiter = markdown_state.fetch("inline_code_delimiter")
+    return 0 unless delimiter
+
+    closing_match = matching_closing_backtick_run(line, delimiter, 0)
+    unless closing_match
+      append_inline_code_segment(normalized_line, inline_code_flags, line, in_code: true)
+      append_multiline_inline_code_content(markdown_state, line)
+      return nil
+    end
+
+    code_segment = line[...closing_match.begin(0)]
+    append_inline_code_segment(normalized_line, inline_code_flags, code_segment, in_code: true)
+    append_multiline_inline_code_content(markdown_state, code_segment)
+    markdown_state["inline_code_delimiter"] = nil
+    markdown_state["inline_code_multiline_content"] = nil
+    markdown_state["inline_code_multiline_reported"] = false
+    closing_match.end(0)
+  end
+
+  def append_multiline_inline_code_content(markdown_state, code_segment)
+    content = markdown_state["inline_code_multiline_content"]
+    return unless content
+
+    content << code_segment.to_s
+    return if markdown_state.fetch("inline_code_multiline_reported")
+
+    match = content.match(CLOSING_KEYWORD_PATTERN)
+    return unless match
+
+    markdown_state["inline_code_multiline_match"] = match[0]
+    markdown_state["inline_code_multiline_reported"] = true
+  end
+
+  def append_inline_code_segment(normalized_line, inline_code_flags, segment, in_code:)
+    return unless segment
+
+    normalized_line << segment
+    inline_code_flags.concat(Array.new(segment.length, in_code))
+  end
+
+  def next_unescaped_backtick_run(line, index)
     loop do
-      opening_match = line.match(/`+/, index)
-      return nil unless opening_match
+      match = line.match(/`+/, index)
+      return nil unless match
+      return match unless escaped_character?(line, match.begin(0))
 
-      delimiter = opening_match[0]
-      content_start = opening_match.end(0)
-      closing_pattern = /(?<!`)#{Regexp.escape(delimiter)}(?!`)/
-      closing_match = line.match(closing_pattern, content_start)
-      unless closing_match
-        index = content_start
-        next
-      end
-
-      content = line[content_start...closing_match.begin(0)]
-      return "#{delimiter}#{content}#{delimiter}" if content.match?(CLOSING_KEYWORD_PATTERN)
-
-      index = closing_match.end(0)
+      index = match.end(0)
     end
   end
 
-  def closing_keyword_in_code_block(line, in_fenced_code_block)
-    return line.match(CLOSING_KEYWORD_PATTERN) if in_fenced_code_block || line.match?(INDENTED_CODE_BLOCK_PATTERN)
+  def matching_closing_backtick_run(line, delimiter, index)
+    loop do
+      match = line.match(/`+/, index)
+      return nil unless match
+      return match if match[0] == delimiter
+
+      index = match.end(0)
+    end
+  end
+
+  def escaped_character?(line, index)
+    backslashes = 0
+    cursor = index - 1
+    while cursor >= 0 && line[cursor] == "\\"
+      backslashes += 1
+      cursor -= 1
+    end
+
+    backslashes.odd?
+  end
+
+  def closing_keyword_in_code_block(line, in_fenced_code_block, markdown_state)
+    fence_opener_closing_keyword = closing_keyword_in_fence_opener(line, markdown_state.fetch("fence_opener_match"))
+    return fence_opener_closing_keyword if fence_opener_closing_keyword
+
+    list_indented_code_match = closing_keyword_in_list_indented_code(line, markdown_state)
+    return list_indented_code_match if list_indented_code_match
+    return line.match(CLOSING_KEYWORD_PATTERN) if list_indented_code_continuation_line?(line, markdown_state)
+
+    if in_fenced_code_block ||
+       indented_code_block_line?(
+         line,
+         markdown_state.fetch("list_content_indent"),
+         markdown_state.fetch("list_indented_code_allowed"),
+         markdown_state.fetch("root_indented_code_allowed")
+       )
+      return line.match(CLOSING_KEYWORD_PATTERN)
+    end
 
     nil
   end
 
-  def next_opening_fence(line, opening_fence)
-    fence = line.match(FENCED_CODE_BLOCK_PATTERN)&.[](:fence)
-    return opening_fence unless fence
+  def closing_keyword_in_fence_opener(line, fence_opener_match)
+    return unless fence_opener_match
+
+    line[fence_opener_match.end(0)..]&.match(CLOSING_KEYWORD_PATTERN)
+  end
+
+  def closing_keyword_in_list_indented_code(line, markdown_state)
+    list_marker_indented_code_match(line, markdown_state)&.[](:code)&.match(CLOSING_KEYWORD_PATTERN)
+  end
+
+  def closing_keyword_in_multiline_code_block(line, markdown_state)
+    content = markdown_state.fetch("code_block_multiline_content")
+    content = content ? "#{content}\n#{line}" : line.to_s.dup
+    markdown_state["code_block_multiline_content"] = content
+    return if markdown_state.fetch("code_block_multiline_reported")
+
+    match = content.match(CLOSING_KEYWORD_PATTERN)
+    return unless match
+
+    markdown_state["code_block_multiline_reported"] = true
+    match
+  end
+
+  def reset_multiline_code_block_state(markdown_state)
+    markdown_state["code_block_multiline_content"] = nil
+    markdown_state["code_block_multiline_reported"] = false
+  end
+
+  def list_marker_indented_code_match(line, markdown_state = nil)
+    match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
+    return unless match
+
+    marker_end_column = column_after_prefix(line[...match.begin(:padding)])
+    content_column = column_after_prefix(line[...match.begin(:code)])
+    blockquote_depth = markdown_state&.fetch("current_blockquote_depth", 0).to_i
+    tab_indented_code = blockquote_depth.positive? &&
+                        match[:padding].include?("\t") &&
+                        content_column >= marker_end_column + 3
+    return unless tab_indented_code || content_column >= marker_end_column + 5
+
+    match
+  end
+
+  def list_marker_indented_code_indent(line, markdown_state = nil)
+    match = list_marker_indented_code_match(line, markdown_state)
+    return unless match
+
+    column_after_prefix(line[...match.begin(:code)])
+  end
+
+  def list_indented_code_continuation_line?(line, markdown_state)
+    active_indent = markdown_state.fetch("list_indented_code_indent")
+    return false unless active_indent
+    return false unless markdown_state.fetch("list_indented_code_allowed")
+
+    leading_indentation_columns(line) >= active_indent
+  end
+
+  def indented_code_block_line?(line, list_content_indent, list_indented_code_allowed, root_indented_code_allowed)
+    return root_indented_code_allowed && line.match?(INDENTED_CODE_BLOCK_PATTERN) if list_content_indent.nil?
+
+    list_indented_code_allowed && leading_indentation_columns(line) >= list_content_indent + 4
+  end
+
+  def next_list_indented_code_indent(line, markdown_state)
+    active_indent = markdown_state.fetch("list_indented_code_indent")
+    return active_indent if line.strip.empty?
+
+    marker_indent = list_marker_indented_code_indent(line, markdown_state)
+    return marker_indent if marker_indent
+    return active_indent if active_indent && leading_indentation_columns(line) >= active_indent
+
+    nil
+  end
+
+  def next_list_indented_code_allowed(line, in_fenced_code_block, list_content_indent, list_indented_code_allowed,
+                                      markdown_state)
+    return true if list_content_indent.nil?
+    return true if line.strip.empty?
+    return true if in_fenced_code_block || fenced_code_block_match(line, list_content_indent)
+    return true if list_marker_indented_code_match(line, markdown_state)
+    return true if list_indented_code_allowed && leading_indentation_columns(line) >= list_content_indent + 4
+
+    false
+  end
+
+  def next_root_indented_code_allowed(line, in_fenced_code_block, root_indented_code_allowed, markdown_state)
+    stripped_line = line.strip
+    return true if stripped_line.empty?
+    return true if in_fenced_code_block || line.match?(FENCED_CODE_BLOCK_PATTERN)
+    return true if root_indented_code_allowed && line.match?(INDENTED_CODE_BLOCK_PATTERN)
+    return true if root_block_boundary_line?(line, markdown_state)
+
+    false
+  end
+
+  def next_gfm_table_block_active(line, markdown_state)
+    boundary_line = line.chomp
+    return true if markdown_state.fetch("gfm_table_header_candidate_active") &&
+                   boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    return true if gfm_table_body_row_line?(line, markdown_state)
+
+    false
+  end
+
+  def next_gfm_table_header_candidate_active(line)
+    boundary_line = line.chomp
+    return false if boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+
+    boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
+  end
+
+  def next_setext_heading_candidate_active(line, current_line_in_fenced_code, markdown_state)
+    return false if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
+    return false if line.strip.empty?
+    return false if line.match?(INDENTED_CODE_BLOCK_PATTERN)
+    return false if root_block_boundary_line?(line, markdown_state)
+
+    true
+  end
+
+  def root_block_boundary_line?(line, markdown_state = nil)
+    boundary_line = line.chomp
+    boundary_line.match?(ROOT_BLOCK_BOUNDARY_PATTERN) ||
+      boundary_line.match?(THEMATIC_BOUNDARY_PATTERN) ||
+      (markdown_state&.fetch("setext_heading_candidate_active", false) &&
+        boundary_line.match?(SETEXT_BOUNDARY_PATTERN)) ||
+      (markdown_state&.fetch("gfm_table_header_candidate_active", false) &&
+        boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)) ||
+      gfm_table_body_row_line?(line, markdown_state)
+  end
+
+  def gfm_table_body_row_line?(line, markdown_state)
+    return false unless markdown_state&.fetch("gfm_table_block_active", false)
+
+    boundary_line = line.chomp
+    return false if boundary_line.strip.empty?
+    return false if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
+    return true if boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
+
+    gfm_table_plain_body_row_line?(boundary_line)
+  end
+
+  def gfm_table_plain_body_row_line?(line)
+    return false if line.match?(ROOT_BLOCK_BOUNDARY_PATTERN)
+    return false if line.match?(THEMATIC_BOUNDARY_PATTERN)
+    return false if line.match?(SETEXT_BOUNDARY_PATTERN)
+
+    true
+  end
+
+  def list_content_indent_for_line(line, current_indent)
+    return current_indent if line.strip.empty?
+
+    list_match = line.match(LIST_ITEM_PATTERN)
+    return column_after_prefix(list_match[0]) if list_match
+    return current_indent if current_indent && leading_indentation_columns(line) >= current_indent
+
+    nil
+  end
+
+  def column_after_prefix(prefix)
+    characters = prefix.respond_to?(:each_char) ? prefix.each_char : prefix.each
+
+    characters.reduce(0) do |column, character|
+      character == "\t" ? column + (4 - (column % 4)) : column + 1
+    end
+  end
+
+  def leading_indentation_columns(line)
+    indentation = line.each_char.take_while { |character| INDENTATION_CHARACTERS.include?(character) }
+    column_after_prefix(indentation)
+  end
+
+  def next_opening_fence(line, opening_fence, list_content_indent, blockquote_depth)
+    fence_match = fenced_code_block_match(line, list_content_indent)
+    return opening_fence unless fence_match
     return nil if opening_fence && closing_fenced_code_block?(line, opening_fence)
     return opening_fence if opening_fence
 
-    fence
+    {
+      fence: fence_match[:fence],
+      container_indent: list_content_indent || 0,
+      blockquote_depth:
+    }
   end
 
   def closing_fenced_code_block?(line, opening_fence)
-    fence_char = Regexp.escape(opening_fence[0])
-    line.match?(/\A\s*#{Regexp.escape(opening_fence)}#{fence_char}*\s*\z/)
+    fence = opening_fence.fetch(:fence)
+    container_indent = opening_fence.fetch(:container_indent)
+    fence_char = Regexp.escape(fence[0])
+    indentation_match = line.match(/\A[ \t]*/)
+    indentation_columns = column_after_prefix(indentation_match[0].each_char)
+    return false unless indentation_columns.between?(container_indent, container_indent + 3)
+
+    line[indentation_match.end(0)..].to_s.match?(/\A#{Regexp.escape(fence)}#{fence_char}*\s*\z/)
+  end
+
+  def fenced_code_block_match(line, list_content_indent)
+    list_fence_match = list_fenced_code_block_match(line, list_content_indent)
+    return list_fence_match if list_fence_match
+
+    unless list_content_indent
+      root_fence_match = line.match(FENCED_CODE_BLOCK_PATTERN)
+      return root_fence_match if valid_fenced_code_block_opener?(line, root_fence_match)
+
+      return nil
+    end
+
+    indented_fence_match = line.match(/\A[ \t]*(?<fence>`{3,}|~{3,})/)
+    return unless indented_fence_match
+    return unless valid_fenced_code_block_opener?(line, indented_fence_match)
+
+    indentation_columns = column_after_prefix(line[...indented_fence_match.begin(:fence)].each_char)
+    return unless indentation_columns.between?(list_content_indent, list_content_indent + 3)
+
+    indented_fence_match
+  end
+
+  def list_fenced_code_block_match(line, list_content_indent)
+    match = line.match(LIST_FENCED_CODE_BLOCK_PATTERN)
+    return unless match
+    return unless valid_fenced_code_block_opener?(line, match)
+
+    marker_indent = column_after_prefix(match[:indent].each_char)
+    return match if marker_indent <= 3
+    return match if list_content_indent && marker_indent.between?(list_content_indent, list_content_indent + 3)
+
+    nil
+  end
+
+  def valid_fenced_code_block_opener?(line, match)
+    return false unless match
+
+    fence = match[:fence]
+    return true unless fence.start_with?("`")
+
+    !line[match.end(:fence)..].to_s.include?("`")
   end
 
   def unknown_field_violations(pull_request, unknown_fields)
