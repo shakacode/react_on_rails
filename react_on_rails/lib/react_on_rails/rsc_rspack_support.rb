@@ -5,7 +5,7 @@ require "open3"
 require_relative "utils"
 
 module ReactOnRails
-  module RscRspackSupport
+  module RscRspackSupport # rubocop:disable Metrics/ModuleLength
     RSC_RSPACK_PACKAGE = "@rspack/core"
     RSC_RSPACK_V2_PACKAGES = %w[
       @rspack/core
@@ -37,6 +37,11 @@ module ReactOnRails
       [a-z0-9][a-z0-9._-]*
       \z
     }x
+    NODE_PACKAGE_RESOLUTION_SCRIPT = <<~JS
+      const packageName = process.argv[1];
+      const nodeModulesPath = process.argv[2];
+      console.log(require.resolve(packageName + '/package.json', { paths: [nodeModulesPath] }));
+    JS
 
     private
 
@@ -83,25 +88,32 @@ module ReactOnRails
       MSG
     end
 
-    def rsc_installed_package_version(package_root, package_name, &)
-      version = rsc_installed_package_json(package_root, package_name, &)&.fetch("version", nil)
+    def rsc_installed_package_version(package_root, package_name, node_modules_path: nil, &)
+      version = rsc_installed_package_json(package_root, package_name, node_modules_path:, &)&.fetch("version", nil)
       version if version&.match?(/\A\d+\.\d+\.\d+/)
     end
 
-    def rsc_flat_installed_package_version(package_root, package_name)
-      version = rsc_flat_installed_package_json(package_root, package_name)&.fetch("version", nil)
+    def rsc_flat_installed_package_version(package_root, package_name, node_modules_path: nil)
+      version = rsc_flat_installed_package_json(package_root, package_name, node_modules_path:)&.fetch("version", nil)
       version if version&.match?(/\A\d+\.\d+\.\d+/)
     end
 
-    def rsc_installed_package_json(package_root, package_name, &)
+    def rsc_installed_package_json(package_root, package_name, node_modules_path: nil, &)
       return nil unless valid_rsc_package_name?(package_name)
 
-      script = "console.log(require.resolve(process.argv[1] + '/package.json'))"
-      resolved_path = rsc_resolved_node_package_json_path(package_root, package_name, script, &)
+      resolved_path = rsc_resolved_node_package_json_path(
+        package_root,
+        package_name,
+        NODE_PACKAGE_RESOLUTION_SCRIPT,
+        node_modules_path:,
+        &
+      )
       # package_name has passed PACKAGE_NAME_PATTERN, so this fallback cannot escape node_modules.
       # It covers classic flat node_modules layouts; pnpm virtual-store layouts rely on Node resolution above.
       # Limitation: a stale orphaned directory can still be read if Node resolution fails.
-      resolved_path = rsc_flat_installed_package_json_path(package_root, package_name) if resolved_path.empty?
+      if resolved_path.empty?
+        resolved_path = rsc_flat_installed_package_json_path(package_root, package_name, node_modules_path:)
+      end
       return nil unless File.exist?(resolved_path)
 
       JSON.parse(File.read(resolved_path))
@@ -109,10 +121,10 @@ module ReactOnRails
       nil
     end
 
-    def rsc_flat_installed_package_json(package_root, package_name)
+    def rsc_flat_installed_package_json(package_root, package_name, node_modules_path: nil)
       return nil unless valid_rsc_package_name?(package_name)
 
-      package_json_path = rsc_flat_installed_package_json_path(package_root, package_name)
+      package_json_path = rsc_flat_installed_package_json_path(package_root, package_name, node_modules_path:)
       return nil unless File.exist?(package_json_path)
 
       JSON.parse(File.read(package_json_path))
@@ -120,8 +132,8 @@ module ReactOnRails
       nil
     end
 
-    def rsc_flat_installed_package_json_path(package_root, package_name)
-      File.join(package_root, "node_modules", package_name, "package.json")
+    def rsc_flat_installed_package_json_path(package_root, package_name, node_modules_path: nil)
+      File.join(rsc_node_modules_path(package_root, node_modules_path), package_name, "package.json")
     end
 
     def rsc_support_enabled_config_value
@@ -164,9 +176,16 @@ module ReactOnRails
       major.to_i
     end
 
-    def rsc_resolved_node_package_json_path(package_root, package_name, script, &)
+    def rsc_resolved_node_package_json_path(package_root, package_name, script, node_modules_path: nil, &)
       # Boot/doctor validation only. This is intentionally outside the request path.
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, package_name, chdir: package_root)
+      stdout, _stderr, status = Open3.capture3(
+        "node",
+        "-e",
+        script,
+        package_name,
+        rsc_node_modules_path(package_root, node_modules_path),
+        chdir: package_root
+      )
       unless status.success?
         yield(package_name) if block_given?
         return ""
@@ -176,6 +195,26 @@ module ReactOnRails
     rescue StandardError
       yield(package_name) if block_given?
       ""
+    end
+
+    def rsc_configured_package_root(default_package_root)
+      configured_path = ReactOnRails.configuration.node_modules_location.to_s
+      return default_package_root if configured_path.empty?
+
+      rails_root = defined?(Rails) && Rails.respond_to?(:root) ? Rails.root.to_s : Dir.pwd
+      File.expand_path(configured_path, rails_root)
+    rescue StandardError
+      default_package_root
+    end
+
+    def rsc_node_modules_path(package_root, node_modules_path = nil)
+      resolved_node_modules_path = node_modules_path.to_s
+      return resolved_node_modules_path unless resolved_node_modules_path.empty?
+
+      package_root_string = package_root.to_s
+      return package_root_string if File.basename(package_root_string) == "node_modules"
+
+      File.join(package_root_string, "node_modules")
     end
 
     def rsc_detected_package_manager
