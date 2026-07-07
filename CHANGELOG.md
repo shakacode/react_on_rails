@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.7] - 2026-07-06
+
 #### Breaking Changes
 
 - **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API**:
