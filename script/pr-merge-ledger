@@ -215,6 +215,11 @@ class PrMergeLedger
         pass(?:es|ed|ing)?|build(?:s|ing)?|built|compil(?:e|es|ed|ing))\b
     )|
     (?:
+      \b(?:still|remains?)\s+
+      (?:needs?\s+(?:to\s+be\s+|to\s+)?|requires?\s+)
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+    )|
+    (?:
       \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
       [\s\S]{0,80}
       \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
@@ -241,6 +246,14 @@ class PrMergeLedger
   NEGATED_FOLLOW_UP_REPLY_PATTERN = /
     \bno\s+follow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:needed|required|necessary)\b|
     \bfollow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
+  /ix
+  FOLLOW_UP_DEFERRED_REPLY_PATTERN = /
+    \b(?:open(?:ed|ing)?|create(?:d|s|ing)?|file(?:d|s|ing)?|track(?:ed|s|ing)?)\s+
+    (?:(?:a|an|the)\s+)?
+    (?:(?:follow[- ]?up|tracking|separate|new|linked|related)\s+)?
+    (?:issue|pr|pull[- ]?request|ticket)\b|
+    \bfollow[- ]?up\s+(?:issue|pr|pull[- ]?request|ticket|work)\b|
+    \b(?:remaining|separate|later|next)\s+(?:\S+\s+){0,4}?follow[- ]?up\b
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
@@ -1297,6 +1310,7 @@ class PrMergeLedger
 
     body = normalized_body.gsub(NEGATED_FOLLOW_UP_REPLY_PATTERN, "")
     return true if body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return true if body.match?(FOLLOW_UP_DEFERRED_REPLY_PATTERN)
     return true if hedged_fixed_disposition_reply?(body)
     return true if ambiguous_fixed_disposition_reply?(normalized_body)
 
