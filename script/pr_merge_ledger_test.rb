@@ -369,6 +369,26 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(%r{https://github\.com/shakacode/react_on_rails/issues/4410}, violation.fetch("message"))
   end
 
+  def test_backticked_colon_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("This will not close: `Fixes: #4410`."))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes: #4410/, violation.fetch("message"))
+  end
+
+  def test_plain_colon_closing_keyword_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("Fixes: #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_backticked_closing_keyword_with_backslash_before_delimiter_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("This will not close: `Fixes #4410\\`."))
 
@@ -443,6 +463,25 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 4, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_fenced_code_colon_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```text
+          Closes: #4410
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Closes: #4410/, violation.fetch("message"))
   end
 
   def test_split_fenced_code_closing_keyword_blocks_strict_closeout

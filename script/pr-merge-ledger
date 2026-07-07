@@ -51,7 +51,7 @@ class PrMergeLedger
   INTERNAL_REVIEW_DECISION_RAW_KEY = "review_decision_raw"
   INTERNAL_PULL_REQUEST_BODY_KEY = "body_text"
   CLOSING_KEYWORD_PATTERN = %r{
-    \b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+
+    \b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+
     (?:
       (?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?\#\d+ |
       https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/\d+
