@@ -133,7 +133,9 @@ class PrMergeLedger
   FIXED_DISPOSITION_REPLY_PATTERN = /
     \A\s*
     (?:[*_]{1,2})?
-    (?:fixed|addressed)\s+(?:in|by)
+    (?:fixed|addressed)
+    (?:[*_]{1,2})?
+    \s+(?:in|by)
     (?:[*_]{1,2})?
     \s+\S
   /ix
@@ -150,6 +152,15 @@ class PrMergeLedger
     \bregression[- ]free\b|
     \b(?:has|have|had|is|are|was|were)(?:\s+not|n't)\s+regressed\b|
     \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
+    \bregression(?:s)?[-\s]+
+      (?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases|ci|build|job|workflow|checks?)
+      (?:\s+\S+){0,4}\s+
+      \b(?:now|again|currently)?\s*(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed|ing)?)\b|
+    \bregression(?:s)?[-\s]+
+      (?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases|ci|build|job|workflow|checks?)
+      (?:\s+\S+){0,6}\s+
+      \b(?:fail(?:s|ed|ing)?|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\s+
+      before\s+(?:the\s+)?fix\b|
     \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
       fail(?:s|ed|ing)?\s+
       before\s+(?:the\s+)?fix\b|
@@ -204,7 +215,7 @@ class PrMergeLedger
     \b(?:fix(?:es|ed|ing)|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|cover(?:s|ed|ing)?)\b
     (?:
       \s+
-      (?!\b(?:but|however|though|although|still|continues?|keeps?|remains?|regress(?:ed|ion)?|fails?)\b)
+      (?!\b(?:and|or|nor|but|however|though|although|still|continues?|keeps?|remains?|regress(?:ed|ion)?|fails?)\b)
       [^\s,.;:!?()]+
     ){0,6}\s+
     \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
@@ -221,6 +232,12 @@ class PrMergeLedger
     )|
     (?:
       \b(?:still|remains?)\s+
+      (?:needs?\s+(?:to\s+be\s+|to\s+)?|requires?\s+)
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+    )|
+    (?:
+      \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
+      (?:\s+\S+){0,6}\s+
       (?:needs?\s+(?:to\s+be\s+|to\s+)?|requires?\s+)
       \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
     )|
@@ -255,7 +272,9 @@ class PrMergeLedger
     \b(?:can|could|may|might)\s+reopen\s+(?:this|the)\s+(?:thread|comment|review|discussion)\b
   /ix
   NEGATED_FOLLOW_UP_REPLY_PATTERN = /
-    \bno\s+follow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:needed|required|necessary)\b|
+    \bno\s+(?:(?:further|additional|more|remaining|other)\s+)?follow[- ]?up
+      (?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?
+      (?:\s+(?:is\s+)?(?:needed|required|necessary))?\b|
     \bfollow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
   /ix
   FOLLOW_UP_DEFERRED_REPLY_PATTERN = /
@@ -268,7 +287,10 @@ class PrMergeLedger
   /ix
   DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
     \A\s*
-    (?:fixed|addressed)\s+
+    (?:[*_]{1,2})?
+    (?:fixed|addressed)
+    (?:[*_]{1,2})?
+    \s+
     (?:in|by)\s+
     (?:(?:a|an|the)\s+)?
     (?:
@@ -294,6 +316,7 @@ class PrMergeLedger
     \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
     \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
     \b(?:i\s+(?:think|believe|hope)|hopefully|assuming|probably)\b|
+    \b(?:this|that|it|these|those)\s+should\s+(?:\S+\s+){0,2}(?:be|do\s+it|work|pass)\b|
     \bshould\s+(?:be|do\s+it|work|pass)\b|
     \b(?:not\s+(?:100%\s+)?sure|untested|unverified)\b|
     \bnot\s+(?:yet\s+)?(?:been\s+)?(?:tested|verified|confirmed|validated)\b|
@@ -1219,7 +1242,8 @@ class PrMergeLedger
         reply_to_id,
         reply_to_by_id:,
         root_reply_to_id:,
-        target_comment: comments_by_id[reply_to_id]
+        target_comment: comments_by_id[reply_to_id],
+        comments_by_id:
       )
     end
   end
@@ -1261,7 +1285,8 @@ class PrMergeLedger
     reply_to_id,
     reply_to_by_id:,
     root_reply_to_id:,
-    target_comment:
+    target_comment:,
+    comments_by_id:
   )
     trusted_reply = trusted_disposition_reply_author_association?(reply)
     body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
@@ -1278,14 +1303,14 @@ class PrMergeLedger
     if disposition
       inferred[reply_to_id] = disposition
     elsif clear_disposition_reply && !priority_finding_reply?(normalized_body)
-      inferred.delete(
-        clear_disposition_target_id(
-          inferred,
-          reply_to_id,
-          reply_to_by_id:,
-          root_reply_to_id:
-        )
+      clear_target_id = clear_disposition_target_id(
+        inferred,
+        reply_to_id,
+        reply_to_by_id:,
+        root_reply_to_id:,
+        comments_by_id:
       )
+      inferred.delete(clear_target_id) if clear_target_id
     end
   end
 
@@ -1295,17 +1320,25 @@ class PrMergeLedger
     end
   end
 
-  def clear_disposition_target_id(inferred, reply_to_id, reply_to_by_id:, root_reply_to_id:)
+  def clear_disposition_target_id(inferred, reply_to_id, reply_to_by_id:, root_reply_to_id:, comments_by_id:)
     seen_ids = {}
     current_id = reply_to_id
     while current_id
       return current_id if inferred.key?(current_id)
+      return nil if priority_finding_comment?(comments_by_id[current_id])
       break if seen_ids[current_id]
 
       seen_ids[current_id] = true
       current_id = reply_to_by_id[current_id]
     end
-    root_reply_to_id
+
+    root_reply_to_id if inferred.key?(root_reply_to_id)
+  end
+
+  def priority_finding_comment?(comment)
+    return false unless comment
+
+    priority_finding_reply?(normalized_disposition_reply_body(comment["body"]))
   end
 
   def inferred_disposition_from_reply(
@@ -1319,6 +1352,7 @@ class PrMergeLedger
     return nil if truncated
     return nil if clear_disposition_reply
     return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+    return nil unless priority_finding_comment?(target_comment)
     return nil unless trusted_disposition_reply_author?(reply, target_comment:)
 
     {
@@ -1348,7 +1382,7 @@ class PrMergeLedger
     body = body.gsub(
       /
         \bno\s+longer\s+
-        (?:apply|applies|applied|applying)\s+
+        (?:apply|applies|applied|applying|infer|infers|inferred|inferring|mark|marks|marked|marking)\s+
         (?:a\s+)?
         fixed\s+disposition\b
       /ix,
@@ -1389,20 +1423,21 @@ class PrMergeLedger
     return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
-    sentence_boundary = body_without_urls.match(/[!\r\n]|[.,;](?=\s|$)/)
+    sentence_boundary = body_without_urls.match(/[!\r\n]|[.,;:](?=\s|$)/)
     first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
     return true if first_sentence.include?("?")
 
     follow_up = sentence_boundary ? body_without_urls[sentence_boundary.end(0)..].to_s : ""
     follow_up.match?(
-      /\b(?:can|could)\s+you\s+(?:confirm|verify|check)\b|
-       \bplease\s+(?:confirm|verify|check)\b|
+      /\b(?:can|could)\s+you\s+(?:please\s+)?(?:confirm|verify|check|validate|test)\b|
+       \bplease\s+(?:confirm|verify|check|validate|test)\b|
        \b(?:does|do|did|would)\s+(?:this|that|it)\s+(?:look|cover|address|fix|work)\b|
        \b(?:is|are)\s+(?:this|that|it|these|those)\s+(?:correct|right|okay|ok)\b/ix
     )
   end
 
   def trusted_disposition_reply_author?(reply, target_comment: nil)
+    return false unless target_comment
     return false if same_author_disposition_reply?(reply, target_comment)
 
     trusted_disposition_reply_author_association?(reply)

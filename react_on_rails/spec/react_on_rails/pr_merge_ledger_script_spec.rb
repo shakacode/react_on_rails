@@ -2987,6 +2987,12 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. The build failed before the fix and passes now. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. The regression spec reproduces before the fix and passes after. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Regression checks pass. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. Regression CI passes. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. Positive fixed replies with before/after regression-test evidence " \
       "remain inferable. Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. CI no longer fails on Windows. " \
@@ -3009,9 +3015,19 @@ RSpec.describe "script/pr-merge-ledger" do
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`: nested fixed-style replies no longer apply a fixed disposition. " \
       "Validation: bundle exec rspec pr_merge_ledger_script_spec.rb.",
+      "Fixed in current head `current`: nested replies no longer infer a fixed disposition. " \
+      "Validation: bundle exec rspec pr_merge_ledger_script_spec.rb.",
       "Fixed in current head `current`. No follow-up issue needed. " \
       "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No follow-up issue. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No follow-up work. " \
+      "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. No follow-up required. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No further follow-up needed. " \
+      "Validation: pnpm test -- colors.test.ts.",
+      "Fixed in current head `current`. No additional follow-up work is required. " \
       "Validation: pnpm test -- colors.test.ts.",
       "Fixed in current head `current`. It doesn't fail on Windows anymore. " \
       "Validation: pnpm test -- colors.test.ts.",
@@ -3026,6 +3042,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. The reviewer can reopen this thread if anything looks off. " \
       "Validation: pnpm test -- colors.test.ts.",
       "**Fixed in** `current`. Validation: pnpm test -- colors.test.ts.",
+      "**Fixed** in `current`. Validation: pnpm test -- colors.test.ts.",
       "__Addressed by__ current. Validation: pnpm test -- colors.test.ts.",
       "Fixed in the PR. Validation: pnpm test -- colors.test.ts.",
       "Fixed in this pull request. Validation: pnpm test -- colors.test.ts.",
@@ -3180,6 +3197,10 @@ RSpec.describe "script/pr-merge-ledger" do
       "\nFixed in current head `current`. Does this look right?",
       "Fixed in colors.test.ts. Is that correct?",
       "Fixed in current head `current`. Please verify on Windows.",
+      "Fixed in current head `current`: please verify on Windows.",
+      "Fixed in current head `current`. Can you validate on Windows?",
+      "Fixed in current head `current`. Can you please validate on Windows?",
+      "Fixed in current head `current`. Please test on Windows.",
       "Fixed in current head `current`. Please check the CI result."
     ].each do |reply_body|
       fixture = {
@@ -3491,6 +3512,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. This fix is broken.",
       "Fixed in current head `current`. This doesn't build on Windows.",
       "Fixed in current head `current`. This doesn't compile.",
+      "Fixed in current head. This fixes Linux and fails on Windows.",
+      "Fixed in current head. This addresses macOS and breaks Windows.",
       "Fixed in current head `current`. This hasn't been fixed on Windows.",
       "Fixed in current head `current`. This hasn't been addressed on Windows.",
       "Fixed in current head `current`. This hasn't been resolved on Windows.",
@@ -3930,6 +3953,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "I can still reproduce this issue.",
       "This issue still occurs on Windows.",
       "This still happens on Windows.",
+      "This needs to be fixed on Windows.",
       "This still needs to be fixed.",
       "This still needs to be addressed.",
       "This still needs resolving."
@@ -4197,6 +4221,98 @@ RSpec.describe "script/pr-merge-ledger" do
     end
   end
 
+  it "does not let nested fixed replies shield root dispositions from later contradictions" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "finding-comment",
+              "url" => "https://example.com/finding-comment",
+              "body" => "[P2] Pin non-Windows for negative TTY color cases.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "fixed-reply-comment",
+              "url" => "https://example.com/fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- colors.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-fixed-reply-comment",
+              "url" => "https://example.com/nested-fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: manual smoke.",
+              "author" => { "login" => "maintainer-b" },
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "fixed-reply-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-regression-reply-comment",
+              "url" => "https://example.com/nested-regression-reply-comment",
+              "body" => "Actually this still fails on Windows.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:15:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "nested-fixed-reply-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+
+    Tempfile.create(["pr-merge-ledger-nested-fixed-shielding", ".json"]) do |file|
+      write_fixture(file, fixture)
+      file.flush
+
+      stdout, _stderr, status = Open3.capture3(
+        script_path,
+        "--fixture",
+        file.path,
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status).not_to be_success
+
+      report = JSON.parse(stdout)
+      finding = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings").first
+
+      expect(report.fetch("complete_allowed")).to be(false)
+      expect(finding).to include(
+        "id" => "finding-comment",
+        "severity" => "P2",
+        "disposition" => "UNKNOWN"
+      )
+      expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_priority_finding_disposition"
+      )
+    end
+  end
+
   it "keeps root fixed dispositions after later nested finding contradictions" do
     fixture = {
       "repository" => "shakacode/react_on_rails",
@@ -4303,6 +4419,111 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "unknown_priority_finding_disposition"
       )
+    end
+  end
+
+  it "keeps root fixed dispositions when disposed nested findings later contradict" do
+    fixture = {
+      "repository" => "shakacode/react_on_rails",
+      "pull_request" => {
+        "number" => 8,
+        "headRefOid" => "current",
+        "reviewDecision" => "APPROVED"
+      },
+      "files" => [],
+      "review_threads" => [
+        {
+          "id" => "resolved-current-thread",
+          "isResolved" => true,
+          "isOutdated" => false,
+          "comments" => [
+            {
+              "id" => "root-finding-comment",
+              "url" => "https://example.com/root-finding-comment",
+              "body" => "[P2] Preserve root disposition handling.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:00:00Z",
+              "outdated" => false,
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "root-fixed-reply-comment",
+              "url" => "https://example.com/root-fixed-reply-comment",
+              "body" => "Fixed in current head `current`. Validation: pnpm test -- root.test.ts.",
+              "author" => { "login" => "justin808" },
+              "createdAt" => "2026-06-01T00:05:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "root-finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-finding-comment",
+              "url" => "https://example.com/nested-finding-comment",
+              "body" => "[P2] Windows tests still fail for nested disposition handling.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:10:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "root-finding-comment" },
+              "commit" => { "oid" => "current" }
+            },
+            {
+              "id" => "nested-regression-reply-comment",
+              "url" => "https://example.com/nested-regression-reply-comment",
+              "body" => "This still fails on Windows.",
+              "author" => { "login" => "reviewer" },
+              "createdAt" => "2026-06-01T00:20:00Z",
+              "outdated" => false,
+              "replyTo" => { "id" => "nested-finding-comment" },
+              "commit" => { "oid" => "current" }
+            }
+          ]
+        }
+      ],
+      "reviews" => [],
+      "comments" => []
+    }
+    dispositions = {
+      "https://example.com/nested-finding-comment" => "follow_up_issue"
+    }
+
+    Tempfile.create(["pr-merge-ledger-disposed-nested-finding-contradiction", ".json"]) do |fixture_file|
+      Tempfile.create(["pr-merge-ledger-disposed-nested-finding-disposition", ".json"]) do |dispositions_file|
+        write_fixture(fixture_file, fixture)
+        fixture_file.flush
+        dispositions_file.write(JSON.generate(dispositions))
+        dispositions_file.flush
+
+        stdout, stderr, status = Open3.capture3(
+          script_path,
+          "--fixture",
+          fixture_file.path,
+          "--changelog-classification",
+          "not_user_visible",
+          "--finding-dispositions",
+          dispositions_file.path,
+          "--strict",
+          chdir: repo_root
+        )
+
+        expect(status).to be_success, stderr
+
+        report = JSON.parse(stdout)
+        findings = report.dig("pull_requests", 0, "priority_finding_dispositions", "findings")
+
+        expect(report.fetch("complete_allowed")).to be(true)
+        expect(findings).to contain_exactly(
+          include(
+            "id" => "root-finding-comment",
+            "severity" => "P2",
+            "disposition" => "fixed"
+          ),
+          include(
+            "id" => "nested-finding-comment",
+            "severity" => "P2",
+            "disposition" => "follow_up_issue"
+          )
+        )
+      end
     end
   end
 
@@ -4633,7 +4854,9 @@ RSpec.describe "script/pr-merge-ledger" do
       "Addressed by tracking issue https://github.com/shakacode/react_on_rails/issues/123.",
       "Addressed by tracking ticket ABC-123.",
       "Addressed by https://github.com/shakacode/react_on_rails/pull/123.",
+      "**Addressed** by #123.",
       "Fixed in the linked PR.",
+      "**Fixed** in the linked PR.",
       "Addressed by the related issue.",
       "Fixed in a companion PR.",
       "Addressed by the referenced ticket.",
@@ -4661,6 +4884,7 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`, hopefully that does it!",
       "Fixed in current head `current`. I hope that handles it.",
       "Fixed in current head `current`. Assuming this covers the Windows case.",
+      "Fixed in current head `current`. It should now pass on Windows.",
       "Fixed in current head `current`. Might still need another look though.",
       "Fixed in current head `current`. This may need one more pass.",
       "Fixed in current head `current`. It still needs review.",
