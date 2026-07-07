@@ -235,8 +235,8 @@ packages therefore apply to this stack, and the project's response is enforced i
   CVE-2025-55182 ([PR 2175](https://github.com/shakacode/react_on_rails/pull/2175)) and
   CVE-2025-55183/55184/67779 ([PR 2233](https://github.com/shakacode/react_on_rails/pull/2233)).
 - **The patched-version requirement is checked, not just documented.** For React on Rails Pro 17 RSC, the
-  supported React range is `19.2.x` with patch `>= 19.2.7` (`~19.2.7`) and
-  `react-on-rails-rsc >= 19.2.1` on the supported RSC 19.2.x package line:
+  supported React range is `19.2.x` with patch `>= 19.2.7` (`~19.2.7`) and a stable
+  `react-on-rails-rsc` 19.2.x package with patch >= 19.2.1:
   - `rake react_on_rails:doctor` warns when the installed React is below the supported patch floor and reports the
     Pro 17 RSC floor (`check_rsc_react_version` in `react_on_rails/lib/react_on_rails/doctor.rb`).
   - The RSC generator emits the same floor/coordination warning at setup time

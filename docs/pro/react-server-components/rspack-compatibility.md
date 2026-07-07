@@ -25,9 +25,9 @@ line.
 
 During the React on Rails Pro 17 release-candidate soak, the generator pins
 `react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not
-published yet. For the 17.0 final release, use `react-on-rails-rsc >= 19.2.1`
-on the React 19 line. Keep React, React DOM, and `react-on-rails-rsc` upgraded
-as a coordinated set.
+published yet. For the 17.0 final release, use a stable `react-on-rails-rsc`
+19.2.x package with patch >= 19.2.1. Keep React, React DOM, and
+`react-on-rails-rsc` upgraded as a coordinated set.
 
 ## Compatibility Matrix
 
