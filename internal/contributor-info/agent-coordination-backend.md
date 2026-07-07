@@ -121,6 +121,33 @@ Workers refresh heartbeats at every phase transition:
 Use stable agent ids that identify machine role, capability profile, and lane,
 for example `mobile-batch2-lane1` or `desktop-highcap-lane1`.
 
+Create one stable `BATCH_ID` at coordinated batch kickoff, then reuse it for
+every worker in that batch. The coordinator can keep a local temp-file pointer
+for fresh shells on the same machine, but cross-machine handoffs should include
+the literal `BATCH_ID` value.
+
+```bash
+BATCH_ID="agent-coord-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4)-coord-layer"
+BATCH_ID_FILE=$(mktemp "${TMPDIR:-/tmp}/agent-coord-batch-id.coord-layer.XXXXXX")
+printf '%s\n' "$BATCH_ID" > "$BATCH_ID_FILE"
+printf 'Batch id: %s\n' "$BATCH_ID"
+printf 'Local batch id file: %s\n' "$BATCH_ID_FILE"
+
+# In a fresh shell on the same machine, set BATCH_ID_FILE to the recorded path,
+# then restore:
+# BATCH_ID_FILE=/tmp/agent-coord-batch-id.coord-layer.abc123
+# BATCH_ID=$(cat "$BATCH_ID_FILE")
+# At batch closeout, remove the temporary pointer: rm -f "$BATCH_ID_FILE"
+
+agent-coord heartbeat \
+  --agent-id mobile-batch2-lane1 \
+  --repo shakacode/react_on_rails \
+  --target 3970 \
+  --batch-id "$BATCH_ID" \
+  --branch jg-codex/3970-agent-heartbeats
+agent-coord status --batch-id "$BATCH_ID" --json
+```
+
 For dependency-sensitive lanes, coordinators create or update batch state before
 dispatching dependent workers. Use the state backend README, schema files, and
 `agent-coord config show --json` output for the current JSON layout and terminal
