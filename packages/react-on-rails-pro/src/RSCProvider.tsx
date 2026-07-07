@@ -383,7 +383,9 @@ export const createRSCProvider = ({
         // NOTE: payloads that RESOLVE with an `Error` value are intentionally
         // left cached here; whether those should also retry is a separate
         // `getServerComponent` contract decision tracked apart from #3929.
+        let payloadRejected = false;
         const evictPromiseIfRejected = (error: unknown) => {
+          payloadRejected = true;
           setTimeout(() => {
             setTimeout(() => {
               if (fetchRSCPromises.get(key, false) === promise) {
@@ -422,6 +424,14 @@ export const createRSCProvider = ({
           // resolving mounted routes can evict early visible keys before their
           // layout effects get to pin them as mounted.
           setTimeout(() => {
+            if (payloadRejected) {
+              // The rejected entry is already scheduled for deletion in the
+              // next macrotask. Releasing its pin must not reconcile over-cap
+              // eviction against healthy entries during this short grace
+              // window.
+              fetchRSCPromises.unpinWithoutEvict(key);
+              return;
+            }
             fetchRSCPromises.unpin(key);
           }, 0);
         });

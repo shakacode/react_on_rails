@@ -972,6 +972,93 @@ describe('RSCRoute successful-version error reset', () => {
     });
   });
 
+  it('h2. rejected over-cap initial load does not evict a healthy settled entry before deferred deletion', async () => {
+    process.env.NODE_ENV = 'production';
+
+    type PendingEntry = Deferred & { args: GetServerComponentArgs; settled: boolean };
+    const pending: PendingEntry[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = makeDeferred();
+      const entry: PendingEntry = {
+        ...d,
+        args: _args[0],
+        settled: false,
+        resolve: (value) => {
+          entry.settled = true;
+          d.resolve(value);
+        },
+        reject: (error) => {
+          entry.settled = true;
+          d.reject(error);
+        },
+      };
+      pending.push(entry);
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await renderInAct(
+      <RSCProvider>
+        <Probe />
+      </RSCProvider>,
+    );
+
+    const startLoad = async (id: number) => {
+      let promise!: Promise<React.ReactNode>;
+      await act(async () => {
+        promise = rscApi.getComponent('Card', { id });
+        await Promise.resolve();
+      });
+      return { promise, deferred: findPendingForId(pending, id) };
+    };
+
+    const started: Awaited<ReturnType<typeof startLoad>>[] = [];
+    for (let id = 0; id <= CACHE_CAP; id += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      started.push(await startLoad(id));
+    }
+    expect(getServerComponent).toHaveBeenCalledTimes(CACHE_CAP + 1);
+
+    await act(async () => {
+      started[0].deferred.resolve(<span>healthy payload 0</span>);
+      await started[0].promise;
+      await flushMacrotasks();
+    });
+    expect(fetchCount(0)).toBe(1);
+
+    void started[1].promise.catch(() => undefined);
+    await act(async () => {
+      started[1].deferred.reject(new Error('boom 1'));
+      await expect(started[1].promise).rejects.toThrow('boom 1');
+      // First macrotask: rejected-promise deletion is scheduled, and the
+      // failed load releases its pin. The actual cache delete is still one
+      // macrotask away so React can observe the rejection.
+      await flushMacrotasks();
+    });
+
+    await act(async () => {
+      void rscApi.getComponent('Card', { id: 0 });
+      await Promise.resolve();
+    });
+    expect(fetchCount(0)).toBe(1);
+
+    await act(async () => {
+      await flushMacrotasks();
+      pending
+        .filter((entry) => !entry.settled)
+        .forEach((entry) =>
+          entry.resolve(<span>{`cleanup ${(entry.args.componentProps as { id: number }).id}`}</span>),
+        );
+      await Promise.allSettled(pending.map((entry) => entry.promise));
+      await flushMacrotasks();
+    });
+  });
+
   it('i. evicted-success markers survive marker-cache churn while a replacement load is pending', async () => {
     process.env.NODE_ENV = 'production';
 
