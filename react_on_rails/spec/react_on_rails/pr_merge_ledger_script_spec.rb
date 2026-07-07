@@ -4652,6 +4652,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in current head `current`. Not tested on Windows.",
       "Fixed in current head `current`. Need to test on Windows.",
       "Addressed by current head `current`. Needs to verify this manually.",
+      "Fixed in current head `current`. Needs validation on Windows.",
+      "Addressed by current head `current`. Requires verification on Windows.",
       "Fixed in a bit, will verify shortly.",
       "Fixed in current head `current`. Will verify shortly.",
       "Fixed in current head `current`, hopefully that does it!",

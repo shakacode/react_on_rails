@@ -299,6 +299,7 @@ class PrMergeLedger
     \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+
       (?:test(?:ed)?|verify|verified|confirm(?:ed)?|validate|validated)\b|
     \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
+    \b(?:needs?|requires?)\s+(?:a\s+)?(?:test(?:ing)?|verification|confirmation|validation)\b|
     \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
     \b(?:shortly|soon|in\s+a\s+bit|in\s+a\s+moment)\b|
     \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
