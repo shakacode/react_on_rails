@@ -28,16 +28,10 @@ import { getNodeVersion } from './testUtils';
 /**
  * Tests React's Suspense hydration behavior for async components
  *
- * This test verifies that async components are only hydrated on the client side after:
- * 1. The component is rendered on the server
- * 2. The rendered HTML is streamed to the client
- *
- * This behavior is critical for RSCRoute components, as they require their server-side
- * RSC payload to be present in the page before client-side hydration can occur.
- * And because the RSCRoute is rendered on the server because it's being hydrated on the client,
- * we can sure that the RSC payload is present in the page before the RSCRoute is hydrated on the client.
- * That's because `getRSCPayloadStream` function embeds the RSC payload immediately to the HTML stream even before the RSCRoute is rendered on the server.
- * Without this guarantee, hydration would fail or produce incorrect results.
+ * React 19.2's browser stream waits for the async content before exposing the
+ * first readable chunk in the cases below, including a macrotask-delayed promise.
+ * Keep these tests focused on the current hydration contract instead of assuming
+ * the older fallback-first, later-script-chunk shape.
  */
 
 const AsyncComponent = async ({
@@ -52,15 +46,24 @@ const AsyncComponent = async ({
   return <div>{result}</div>;
 };
 
+const resolvedHelloWorldPromise = () => Promise.resolve('Hello World');
+
+const delayedHelloWorldPromise = () =>
+  new Promise<string>((resolve) => {
+    setTimeout(() => resolve('Hello World'), 100);
+  });
+
 const AsyncComponentContainer = ({
   onContainerRendered,
   onAsyncComponentRendered,
+  createPromise = resolvedHelloWorldPromise,
 }: {
   onContainerRendered: () => void;
   onAsyncComponentRendered: () => void;
+  createPromise?: () => Promise<string>;
 }) => {
   onContainerRendered();
-  const promise = Promise.resolve('Hello World');
+  const promise = createPromise();
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <AsyncComponent promise={promise} onRendered={onAsyncComponentRendered} />
@@ -106,7 +109,7 @@ function appendHTMLWithScripts(htmlString: string) {
   document.body.appendChild(frag);
 }
 
-async function renderAndHydrate() {
+async function renderAndHydrate(createPromise: () => Promise<string> = resolvedHelloWorldPromise) {
   // create container div element
   const container = document.createElement('div');
   container.id = 'container';
@@ -118,6 +121,7 @@ async function renderAndHydrate() {
     <AsyncComponentContainer
       onContainerRendered={onContainerRendered}
       onAsyncComponentRendered={onAsyncComponentRendered}
+      createPromise={createPromise}
     />,
   );
 
@@ -129,6 +133,7 @@ async function renderAndHydrate() {
       <AsyncComponentContainer
         onContainerRendered={onContainerHydrated}
         onAsyncComponentRendered={onAsyncComponentHydrated}
+        createPromise={createPromise}
       />,
     );
 
@@ -168,6 +173,9 @@ async function renderAndHydrate() {
     onAsyncComponentHydrated,
     writeFirstChunk,
     writeRemainingChunks,
+    cancelStream: () => {
+      void reader.cancel();
+    },
     hydrate,
   };
 }
@@ -215,4 +223,13 @@ async function renderAndHydrate() {
     });
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
+
+  it('inlines macrotask-delayed Suspense content before the first read in React 19.2', async () => {
+    const { writeFirstChunk, cancelStream } = await renderAndHydrate(delayedHelloWorldPromise);
+
+    const firstChunk = await writeFirstChunk();
+    expect(firstChunk).toContain('Hello World');
+    expect(firstChunk).not.toContain('Loading...');
+    cancelStream();
+  }, 10_000);
 });

@@ -5952,6 +5952,43 @@ RSpec.describe ReactOnRails::Doctor do
         end
       end
 
+      it "errors when the installed RSC package is a future stable minor outside the supported line" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "package.json",
+              JSON.generate(
+                "dependencies" => {
+                  "react" => "19.2.7",
+                  "react-dom" => "19.2.7",
+                  "react-on-rails-rsc" => "19.3.0"
+                }
+              )
+            )
+            install_react("19.2.7")
+            install_package("react-dom", "version" => "19.2.7")
+            install_package(
+              "react-on-rails-rsc",
+              "version" => "19.3.0",
+              "peerDependencies" => { "react" => "^19.3.0", "react-dom" => "^19.3.0" }
+            )
+            stub_package_root(Dir.pwd)
+            allow(doctor).to receive(:capture_rsc_dist_tags)
+
+            doctor.send(:check_rsc_react_version)
+
+            error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
+            expect(error_msgs).to include(
+              a_string_including(
+                "react-on-rails-rsc 19.3.0 is not supported by React on Rails Pro 17 RSC",
+                "supported 19.2.x package line"
+              )
+            )
+            expect(doctor).not_to have_received(:capture_rsc_dist_tags)
+          end
+        end
+      end
+
       it "reports an error when the declared RSC package cannot be resolved from node_modules" do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do

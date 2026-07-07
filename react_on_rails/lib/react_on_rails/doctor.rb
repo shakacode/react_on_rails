@@ -3488,6 +3488,11 @@ module ReactOnRails
     ].freeze
     RSC_PACKAGE_NAME = "react-on-rails-rsc"
     RSC_MINIMUM_PACKAGE_VERSION = "19.2.1"
+    RSC_SUPPORTED_PACKAGE_MAJOR = 19
+    RSC_SUPPORTED_PACKAGE_MINORS = [2].freeze
+    RSC_SUPPORTED_PACKAGE_LINE = RSC_SUPPORTED_PACKAGE_MINORS.map do |minor|
+      "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
+    end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
     RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
       RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
@@ -3805,6 +3810,7 @@ module ReactOnRails
         🚫 #{RSC_PACKAGE_NAME} #{rsc_version.presence || 'unknown'} is not supported by React on Rails Pro 17 RSC.
 
         React on Rails Pro 17 requires #{RSC_PACKAGE_NAME} >= #{RSC_MINIMUM_PACKAGE_VERSION}#{prerelease_requirement}
+        on the supported #{RSC_SUPPORTED_PACKAGE_LINE} package line
         with React/React DOM #{RSC_MINIMUM_REACT_VERSION}+.
 
         Fix: npm install react@~#{RSC_MINIMUM_REACT_VERSION} react-dom@~#{RSC_MINIMUM_REACT_VERSION} #{RSC_PACKAGE_NAME}@#{RSC_PACKAGE_INSTALL_VERSION} --save-exact
@@ -3814,12 +3820,20 @@ module ReactOnRails
 
     def rsc_package_version_at_or_above_minimum?(rsc_version)
       return false if rsc_version.blank?
-      return true if npm_prerelease(rsc_version).blank? &&
-                     npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
+      return true if rsc_stable_package_version_supported?(rsc_version)
       return false if RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION.blank?
       return false unless npm_version_tuple(rsc_version) == npm_version_tuple(RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION)
 
       npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION) >= 0
+    end
+
+    def rsc_stable_package_version_supported?(rsc_version)
+      return false if npm_prerelease(rsc_version).present?
+
+      major, minor, = npm_version_tuple(rsc_version)
+      major == RSC_SUPPORTED_PACKAGE_MAJOR &&
+        RSC_SUPPORTED_PACKAGE_MINORS.include?(minor) &&
+        npm_version_compare(rsc_version, RSC_MINIMUM_PACKAGE_VERSION) >= 0
     end
 
     def unsupported_rsc_react_version?(react_version)

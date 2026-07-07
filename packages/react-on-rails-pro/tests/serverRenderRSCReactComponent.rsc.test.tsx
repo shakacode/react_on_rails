@@ -196,7 +196,7 @@ test('no logs lekage from outside the component', async () => {
   expect(content1).not.toContain('Outside The Component');
 });
 
-test('does not leak logs from outside the component while reading the stream', async () => {
+test('documents that React 19.2 RSC streaming keeps outer data-listener logs out of the payload', async () => {
   const readable1 = ReactOnRails.serverRenderRSCReactComponent({
     railsContext: {
       reactClientManifestFileName: 'react-client-manifest.json',
@@ -229,6 +229,8 @@ test('does not leak logs from outside the component while reading the stream', a
 
   expect(content1).toContain('First Unique Name');
   expect(content1).not.toContain('From Interval');
+  // This documents the dependency-bump behavior observed with React/RSC 19.2.
+  // This PR does not change the local stream-capture implementation.
   expect(content1).not.toContain('Outside The Component');
 });
 
