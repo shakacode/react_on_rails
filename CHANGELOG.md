@@ -31,7 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
   the same null Suspense boundary used by the server stream. This prevents recoverable hydration
   mismatches on streamed RSC apps such as the flagship demo. Fixes
-  [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525).
+  [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
 
