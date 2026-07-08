@@ -1,0 +1,4 @@
+interface:
+  display_name: "React on Rails Release Train Issue Evaluation"
+  short_description: "Classify issues for release train or main"
+  default_prompt: "Use $react-on-rails-release-train-issue-evaluation to decide whether recent React on Rails issues belong on release/17.0.0 or main."
