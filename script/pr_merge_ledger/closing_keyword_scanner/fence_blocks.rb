@@ -10,15 +10,34 @@ class PrMergeLedger
         return current_indent if line.strip.empty?
         return current_indent if ordered_list_marker_continues_paragraph?(line.chomp, markdown_state)
 
-        list_match = line.match(LIST_ITEM_PATTERN)
-        if list_match
-          marker_indent = column_after_prefix(list_match[:indent].each_char)
-          return column_after_prefix(list_match[0]) if list_marker_indent_allowed?(marker_indent, current_indent)
-        end
+        marker_content_indent = list_marker_content_indent_for_line(line, current_indent)
+        return marker_content_indent if marker_content_indent
+
+        empty_marker_content_indent = empty_list_item_content_indent_for_line(line, current_indent)
+        return empty_marker_content_indent if empty_marker_content_indent
 
         return current_indent if current_indent && leading_indentation_columns(line) >= current_indent
 
         nil
+      end
+
+      def list_marker_content_indent_for_line(line, current_indent)
+        list_match = line.match(LIST_ITEM_PATTERN)
+        return unless list_match
+
+        marker_indent = column_after_prefix(list_match[:indent].each_char)
+        column_after_prefix(list_match[0]) if list_marker_indent_allowed?(marker_indent, current_indent)
+      end
+
+      def empty_list_item_content_indent_for_line(line, current_indent)
+        empty_list_match = empty_list_item_match(line)
+        return unless empty_list_match
+
+        marker_indent = column_after_prefix(empty_list_match[:indent].each_char)
+        empty_list_item_content_indent(line, empty_list_match) if list_marker_indent_allowed?(
+          marker_indent,
+          current_indent
+        )
       end
 
       def column_after_prefix(prefix)
@@ -32,6 +51,14 @@ class PrMergeLedger
       def leading_indentation_columns(line)
         indentation = line.each_char.take_while { |character| INDENTATION_CHARACTERS.include?(character) }
         column_after_prefix(indentation)
+      end
+
+      def empty_list_item_match(line)
+        line.match(EMPTY_LIST_ITEM_PATTERN)
+      end
+
+      def empty_list_item_content_indent(line, match)
+        column_after_prefix(line[...match.end(:marker)].each_char) + 1
       end
 
       def next_opening_fence(line, opening_fence, list_content_indent, blockquote_depth)

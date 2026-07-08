@@ -34,6 +34,7 @@ class PrMergeLedger
     INDENTED_CODE_BLOCK_PATTERN = /\A(?: {4}| {0,3}\t)/
     INDENTATION_CHARACTERS = [" ", "\t"].freeze
     LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+/
+    EMPTY_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])[ \t]*(?:\n)?\z/
     LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
     LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
     LIST_BLOCKQUOTE_MARKER_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<blockquotes>(?:> ?)+)/
@@ -55,7 +56,8 @@ class PrMergeLedger
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
     HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
-    HTML_TYPE_7_BLOCK_OPEN_PATTERN = %r{\A {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>\n]*)?>[ \t]*(?:\n)?\z}
+    HTML_TYPE_7_BLOCK_OPEN_PATTERN =
+      %r{\A {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+(?:[^<>"'\n]|"[^"\n]*"|'[^'\n]*')*)?>[ \t]*(?:\n)?\z}
     THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
     SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
     LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/

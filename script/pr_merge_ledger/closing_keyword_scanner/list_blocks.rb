@@ -158,7 +158,18 @@ class PrMergeLedger
           in_fenced_code_block ||
           fenced_code_block_match(line, list_content_indent) ||
           list_marker_indented_code_match(line, markdown_state) ||
+          empty_list_item_line?(line, markdown_state) ||
           list_item_atx_heading_line?(line, markdown_state)
+      end
+
+      def empty_list_item_line?(line, markdown_state)
+        match = empty_list_item_match(line)
+        return false unless match
+
+        list_marker_indent_allowed?(
+          column_after_prefix(match[:indent].each_char),
+          markdown_state.fetch("list_content_indent")
+        )
       end
 
       def list_item_atx_heading_line?(line, markdown_state)
