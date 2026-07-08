@@ -143,6 +143,38 @@ describe ReactOnRailsProHelper do
           end.not_to yield_control
         end
 
+        it "skips the cache when if is false" do
+          props_calls = 0
+          render_uncached = lambda do
+            cached_react_component("App", cache_key: "skip-if-false", if: false) do
+              props_calls += 1
+              { a: props_calls }
+            end
+          end
+
+          render_uncached.call
+          render_uncached.call
+
+          expect(props_calls).to eq(2)
+          expect(cache_data.keys).not_to include(%r{/App/skip-if-false})
+        end
+
+        it "skips the cache when unless is true" do
+          props_calls = 0
+          render_uncached = lambda do
+            cached_react_component("App", cache_key: "skip-unless-true", unless: true) do
+              props_calls += 1
+              { a: props_calls }
+            end
+          end
+
+          render_uncached.call
+          render_uncached.call
+
+          expect(props_calls).to eq(2)
+          expect(cache_data.keys).not_to include(%r{/App/skip-unless-true})
+        end
+
         context "with cache_tags" do
           it "serves from cache until revalidate_tag, then renders fresh content" do
             props_calls = 0
