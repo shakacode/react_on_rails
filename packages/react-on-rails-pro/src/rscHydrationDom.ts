@@ -13,8 +13,11 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-const RSC_PAYLOAD_SCRIPT_ATTRIBUTE = 'data-react-on-rails-rsc-payload';
-const RSC_STYLESHEET_PRECEDENCE = 'rsc-css';
+import {
+  RSC_PAYLOAD_SCRIPT_ATTRIBUTE,
+  RSC_PAYLOAD_SCRIPT_ATTRIBUTE_VALUE,
+  RSC_STYLESHEET_PRECEDENCE,
+} from './rscDomMarkers.ts';
 
 type RSCHydrationRailsContext = { rscPayloadGenerationUrlPath?: unknown };
 
@@ -24,7 +27,10 @@ export function shouldPrepareRSCHydrationRoot(railsContext: RSCHydrationRailsCon
 }
 
 function isRSCPayloadScript(node: Element): boolean {
-  return node.tagName === 'SCRIPT' && node.getAttribute(RSC_PAYLOAD_SCRIPT_ATTRIBUTE) === 'true';
+  return (
+    node.tagName === 'SCRIPT' &&
+    node.getAttribute(RSC_PAYLOAD_SCRIPT_ATTRIBUTE) === RSC_PAYLOAD_SCRIPT_ATTRIBUTE_VALUE
+  );
 }
 
 function isRSCStylesheetResource(node: Element): boolean {
@@ -36,6 +42,8 @@ function isRSCStylesheetResource(node: Element): boolean {
 }
 
 function isAsyncScriptResource(node: Element): boolean {
+  // React floats streamed RSC chunk scripts after the payload marker and before the Suspense reveal
+  // comment without adding an RSC-specific marker to those scripts.
   return node.tagName === 'SCRIPT' && node.hasAttribute('src') && node.hasAttribute('async');
 }
 

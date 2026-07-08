@@ -297,7 +297,35 @@ describe('ClientSideRenderer', () => {
     expect(document.head.querySelector('script[src="/app-authored-widget.js"]')).toBeNull();
   });
 
-  it('removes direct RSC payload scripts before hydrating RSC roots', async () => {
+  it('moves first streamed RSC resources into head before hydrating RSC roots', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom(
+      'dom-id-rsc-resource-move',
+      '<script data-react-on-rails-rsc-payload="true">window.__rscPayloadInitialized = true</script>' +
+        '<link rel="stylesheet" href="/packs/css/client0.css" data-precedence="rsc-css">' +
+        '<script src="/packs/js/client0.chunk.js" async=""></script>' +
+        '<!--$--><div>Server fallback</div><!--/$-->',
+    );
+    addRailsContext({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+
+    await renderOrHydrateComponent(componentSpec);
+
+    const mountNode = document.getElementById('dom-id-rsc-resource-move') as HTMLElement;
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender.mock.calls[0][0]).toBe(mountNode);
+    expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(true);
+    expect(mountNode.querySelector('script[data-react-on-rails-rsc-payload="true"]')).toBeNull();
+    expect(mountNode.querySelector('link[data-precedence="rsc-css"]')).toBeNull();
+    expect(mountNode.querySelector('script[src="/packs/js/client0.chunk.js"]')).toBeNull();
+    expect(
+      document.head.querySelector('link[data-precedence="rsc-css"][href="/packs/css/client0.css"]'),
+    ).not.toBeNull();
+    expect(document.head.querySelector('script[src="/packs/js/client0.chunk.js"]')).not.toBeNull();
+    expect(mountNode.innerHTML).toContain('<div>Server fallback</div>');
+  });
+
+  it('deduplicates existing streamed RSC resources before hydrating RSC roots', async () => {
     const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
     ComponentRegistry.register({ TestComponent });
     document.head.innerHTML =
