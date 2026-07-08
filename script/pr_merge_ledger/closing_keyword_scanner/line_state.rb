@@ -79,6 +79,7 @@ class PrMergeLedger
           next_gfm_table_header_candidate_cell_count(line, current_line_in_fenced_code, markdown_state)
         markdown_state["gfm_table_header_candidate_active"] =
           !markdown_state.fetch("gfm_table_header_candidate_cell_count").nil?
+        update_link_reference_title_state(markdown_state, line, current_line_in_fenced_code)
         markdown_state["list_paragraph_continuation_active"] = next_list_paragraph_continuation_active(
           line,
           current_line_in_fenced_code,

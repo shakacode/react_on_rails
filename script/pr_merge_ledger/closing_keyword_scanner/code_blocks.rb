@@ -9,6 +9,9 @@ class PrMergeLedger
         fence_opener_closing_keyword = closing_keyword_in_fence_opener(line, markdown_state.fetch("fence_opener_match"))
         return fence_opener_closing_keyword if fence_opener_closing_keyword
 
+        link_reference_closing_keyword = closing_keyword_in_link_reference(line, markdown_state)
+        return link_reference_closing_keyword if link_reference_closing_keyword
+
         html_block_closing_keyword = closing_keyword_in_html_block(line, markdown_state)
         return html_block_closing_keyword if html_block_closing_keyword
 
