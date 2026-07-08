@@ -31,7 +31,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `cached_react_component_hash`, and related helpers) instead of calling the low-level cache class
   directly. The helper cache path still preserves generated-pack loading on cache hits, tag
   registration, and `expires_at` handling internally. Fixes
-  [Issue 4497](https://github.com/shakacode/react_on_rails/issues/4497). [PR TBD] by
+  [Issue 4497](https://github.com/shakacode/react_on_rails/issues/4497).
+  [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
   [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
