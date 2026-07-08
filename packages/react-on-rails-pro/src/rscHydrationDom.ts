@@ -36,6 +36,8 @@ function isRSCStylesheetResource(node: Element): boolean {
 }
 
 function isAsyncScriptResource(node: Element): boolean {
+  // React floats streamed RSC chunk scripts before the Suspense reveal comment without an RSC marker.
+  // App-authored markup stays behind that comment, where the cleanup loop stops.
   return node.tagName === 'SCRIPT' && node.hasAttribute('src') && node.hasAttribute('async');
 }
 
