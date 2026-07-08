@@ -24,6 +24,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API**:
+  Pro apps should use the supported cached helper APIs (`cached_react_component`,
+  `cached_react_component_hash`, and related helpers) instead of calling the low-level cache class
+  directly. The helper cache path still preserves generated-pack loading on cache hits, tag
+  registration, and `expires_at` handling internally. Fixes
+  [Issue 4497](https://github.com/shakacode/react_on_rails/issues/4497).
+  [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
@@ -361,9 +372,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Cached component hits load generated packs consistently**:
-  Pro cached component helpers now share the `ReactOnRailsPro::Cache.fetch_react_component` path and
-  run the cache-hit pack-loading callback, so cached `cached_react_component` and
-  `cached_react_component_hash` output preserves generated pack behavior.
+  Pro cached component helpers now run the cache-hit pack-loading path consistently, so cached
+  `cached_react_component` and `cached_react_component_hash` output preserves generated pack behavior.
   Explicit per-call `auto_load_bundle: false` now also wins over the global auto-load default on both
   cache hits and misses, so static or sidecar-owned renders can reliably skip generated pack tags. Fixes
   [Issue 4316](https://github.com/shakacode/react_on_rails/issues/4316).
