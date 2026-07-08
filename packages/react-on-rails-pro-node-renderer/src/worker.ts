@@ -687,6 +687,10 @@ export default function run(config: Partial<Config>) {
     let incrementalExecutionContextReleased = false;
     let pullModeRequestCanIdle = false;
     let incrementalRequestClosePromise: Promise<void> | undefined;
+    let incrementalRequestCloseSettled = false;
+    let incrementalRequestCloseTimedOut = false;
+    let incrementalRequestCloseTimeoutMs = INCREMENTAL_REQUEST_CLOSE_TIMEOUT_MS;
+    let incrementalRequestCloseTimeoutWarned = false;
     let incrementalResponseFinishTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let incrementalPullModeIdleTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let stopIncrementalRequestReader: (() => void) | undefined;
@@ -743,11 +747,29 @@ export default function run(config: Partial<Config>) {
       incrementalSink.executionContext.release();
     };
 
+    const warnIfIncrementalRequestCloseTimedOut = () => {
+      if (
+        !incrementalRequestCloseTimedOut ||
+        incrementalRequestCloseSettled ||
+        incrementalRequestCloseTimeoutWarned ||
+        !incrementalResponseFinished
+      ) {
+        return;
+      }
+
+      incrementalRequestCloseTimeoutWarned = true;
+      log.warn({
+        msg: 'Timed out waiting for incremental render close hook after response started',
+        timeoutMs: incrementalRequestCloseTimeoutMs,
+      });
+    };
+
     const markIncrementalResponseFinished = () => {
       clearIncrementalResponseFinishTimeout();
       clearIncrementalPullModeIdleTimeout();
       incrementalResponseFinished = true;
       wakeIncrementalRequestReader();
+      warnIfIncrementalRequestCloseTimedOut();
       releaseIncrementalExecutionContextWhenDone();
     };
 
@@ -785,16 +807,24 @@ export default function run(config: Partial<Config>) {
         timeoutId = setTimeout(() => resolve('timeout'), timeoutMs);
       });
 
-      const result = await Promise.race([closeRequestPromise.then(() => 'closed' as const), timeoutPromise]);
+      // A slow close hook can be part of normal incremental streaming after the
+      // Rails request has ended. The response-finish watchdog emits the warning
+      // if cleanup truly stalls while the response is still open; this short
+      // race only prevents request-reader bookkeeping from waiting on a healthy
+      // stream.
+      const closeRequestSettledPromise = closeRequestPromise.then(() => {
+        incrementalRequestCloseSettled = true;
+        return 'closed' as const;
+      });
+      const result = await Promise.race([closeRequestSettledPromise, timeoutPromise]);
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
 
       if (result === 'timeout') {
-        log.warn({
-          msg: 'Timed out waiting for incremental render close hook after response started',
-          timeoutMs,
-        });
+        incrementalRequestCloseTimedOut = true;
+        incrementalRequestCloseTimeoutMs = timeoutMs;
+        warnIfIncrementalRequestCloseTimedOut();
       }
     };
 
