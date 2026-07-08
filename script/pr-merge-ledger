@@ -2841,13 +2841,30 @@ class PrMergeLedger
 
   def next_list_indented_code_allowed(line, in_fenced_code_block, list_content_indent, list_indented_code_allowed,
                                       markdown_state)
-    return true if list_content_indent.nil?
-    return true if line.strip.empty?
-    return true if in_fenced_code_block || fenced_code_block_match(line, list_content_indent)
-    return true if list_marker_indented_code_match(line, markdown_state)
+    return true if list_indented_code_always_allowed?(line, in_fenced_code_block, list_content_indent, markdown_state)
     return true if list_indented_code_allowed && leading_indentation_columns(line) >= list_content_indent + 4
 
     false
+  end
+
+  def list_indented_code_always_allowed?(line, in_fenced_code_block, list_content_indent, markdown_state)
+    list_content_indent.nil? ||
+      line.strip.empty? ||
+      in_fenced_code_block ||
+      fenced_code_block_match(line, list_content_indent) ||
+      list_marker_indented_code_match(line, markdown_state) ||
+      list_item_atx_heading_line?(line, markdown_state)
+  end
+
+  def list_item_atx_heading_line?(line, markdown_state)
+    list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
+    return false unless list_match
+
+    list_content_indent = markdown_state.fetch("list_content_indent")
+    marker_indent = column_after_prefix(list_match[:indent].each_char)
+    return false unless list_marker_indent_allowed?(marker_indent, list_content_indent)
+
+    list_match[:code].match?(/\A\#{1,6}(?:\s|\z)/)
   end
 
   def next_root_indented_code_allowed(line, in_fenced_code_block, root_indented_code_allowed, markdown_state)

@@ -1144,6 +1144,24 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_indented_code_after_list_heading_blocks_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          - # Summary
+                Fixes #4410
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_list_indented_fenced_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(
       fixture_with_body(
