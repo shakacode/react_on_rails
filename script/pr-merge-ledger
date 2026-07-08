@@ -65,6 +65,7 @@ class PrMergeLedger
   LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
   LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
   LIST_BLOCKQUOTE_MARKER_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<blockquotes>(?:> ?)+)/
+  ORDERED_ROOT_LIST_ITEM_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)][ \t]+/
   ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
   HTML_BLOCK_TAG_NAMES = %w[
     address article aside base basefont blockquote body caption center col colgroup dd details dialog dir div dl dt
@@ -2067,6 +2068,7 @@ class PrMergeLedger
       "gfm_table_header_candidate_active" => false,
       "gfm_table_header_candidate_cell_count" => nil,
       "setext_heading_candidate_active" => false,
+      "paragraph_continuation_active" => false,
       "blockquote_lazy_continuation_allowed" => false,
       "root_indented_code_allowed" => true
     }
@@ -2346,6 +2348,11 @@ class PrMergeLedger
     markdown_state["gfm_table_header_candidate_cell_count"] = next_gfm_table_header_candidate_cell_count(line)
     markdown_state["gfm_table_header_candidate_active"] =
       !markdown_state.fetch("gfm_table_header_candidate_cell_count").nil?
+    markdown_state["paragraph_continuation_active"] = next_paragraph_continuation_active(
+      line,
+      current_line_in_fenced_code,
+      markdown_state
+    )
   end
 
   def closing_keyword_in_inline_code(line, line_index, markdown_state)
@@ -2832,11 +2839,31 @@ class PrMergeLedger
 
   def root_block_boundary_line?(line, markdown_state = nil)
     boundary_line = line.chomp
+    return false if ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
+
     static_root_block_boundary_line?(boundary_line) ||
       (markdown_state&.fetch("setext_heading_candidate_active", false) &&
         boundary_line.match?(SETEXT_BOUNDARY_PATTERN)) ||
       gfm_table_separator_matches_header_candidate?(line, markdown_state) ||
       gfm_table_body_row_line?(line, markdown_state)
+  end
+
+  def ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
+    return false unless markdown_state&.fetch("paragraph_continuation_active", false)
+
+    match = boundary_line.match(ORDERED_ROOT_LIST_ITEM_PATTERN)
+    match && match[:start] != "1"
+  end
+
+  def next_paragraph_continuation_active(line, current_line_in_fenced_code, markdown_state)
+    return false if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
+    return false if line.strip.empty?
+    return false if line.match?(INDENTED_CODE_BLOCK_PATTERN) && markdown_state.fetch("root_indented_code_allowed")
+
+    boundary_line = line.chomp
+    return true if ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
+
+    !root_block_boundary_line?(line, markdown_state)
   end
 
   def static_root_block_boundary_line?(boundary_line)

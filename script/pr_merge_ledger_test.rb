@@ -981,6 +981,37 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_ordered_list_non_one_marker_does_not_interrupt_paragraph_before_indented_closeout
+    output, status = run_fixture(fixture_with_body("This remains prose\n2. details\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_ordered_list_one_marker_interrupts_paragraph_before_indented_closeout
+    output, status = run_fixture(fixture_with_body("This starts a paragraph\n1. details\n\n       Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_ordered_list_non_one_marker_at_root_before_indented_closeout_blocks
+    output, status = run_fixture(fixture_with_body("2. details\n\n       Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_plain_pipe_paragraph_continuation_closing_keyword_allows_strict_closeout
     output, status = run_fixture(fixture_with_body("This | remains prose\n    Fixes #4410\n"))
 
