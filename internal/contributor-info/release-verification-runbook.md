@@ -57,10 +57,16 @@ inspected and filed as follow-up unless a maintainer explicitly promotes them.
 ```text
 You are updating the React on Rails demo fleet for {{RC_TAG}}.
 
-Work from a clean checkout of `shakacode/react_on_rails`. First read `AGENTS.md`,
-`internal/contributor-info/demo-fleet.yml`, `internal/contributor-info/demo-fleet-design.md`,
-`internal/contributor-info/rc-testing-plan.md`, `internal/contributor-info/release-verification-runbook.md`,
-and `CHANGELOG.md`. Run `git fetch --prune origin main` and
+Work from a clean checkout of `shakacode/react_on_rails`. Run `git fetch --prune origin main
+{{RELEASE_BRANCH}} --tags`, then check out `{{RC_TAG}}` before deriving feature coverage or demo
+work. If `{{RC_TAG}}` is not published yet, check out `origin/{{RELEASE_BRANCH}}`, verify the
+version files match the target versions below, and record that the tag is not yet available.
+
+First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
+`internal/contributor-info/rc-testing-plan.md`,
+`internal/contributor-info/release-verification-runbook.md`, and `CHANGELOG.md`. If
+`internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
+do not block the fleet update if that draft design file has already been removed. Run
 `.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
 appear missing and `load_api_tokens` is available, run it before reporting missing env vars.
 
@@ -71,8 +77,9 @@ Target versions:
 - Expected npm package version: `{{TARGET_NPM_VERSION}}`
 - Release tracker: `{{TRACKING_ISSUE}}`
 - Verify the actual published/tagged artifacts before bumping demo repos.
-- Resolve `react-on-rails-rsc` from the release plan/manifests; expected line for this release is
-  `{{RSC_VERSION}}`.
+- Use `{{RSC_VERSION}}` as the release-manager-supplied `react-on-rails-rsc` line. If release
+  plans, manifests, or published artifacts disagree with `{{RSC_VERSION}}`, stop and report the
+  mismatch instead of choosing a different RSC package line.
 
 Goal:
 Update every relevant demo, starter, flagship, and hard-gate app in `demo-fleet.yml` so it is
@@ -129,11 +136,12 @@ For each repo:
 Tracking and issues:
 - Find or create the release tracker: `{{TRACKING_ISSUE}}`.
 - Add a section for `{{RC_TAG}}` linking every hard-gate PR and evidence.
-- Before filing issues, confirm labels exist: `release:{{FINAL_VERSION}}-must-have`, `P2`, and
-  `documentation`.
+- Before filing issues, confirm labels exist: the concrete `release:<X.Y.Z>-must-have` label
+  derived from `{{FINAL_VERSION}}` (for example, `release:17.0.0-must-have` when
+  `{{FINAL_VERSION}}` is `17.0.0`), `P2`, and `documentation`.
 - File every suspected RC regression, release blocker, docs gap, missing feature coverage, or
   manifest/orchestrator gap in `shakacode/react_on_rails`.
-- Use `release:{{FINAL_VERSION}}-must-have` for anything that would block or seriously mislead a
+- Use the concrete release must-have label for anything that would block or seriously mislead a
   real RC/final upgrader; otherwise use the normal priority/docs labels.
 - If a failure is clearly demo-local, still record it in the release tracker and file/link the
   appropriate issue; do not silently waive it.
