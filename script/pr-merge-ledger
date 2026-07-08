@@ -63,6 +63,7 @@ class PrMergeLedger
   MAX_GRAPHQL_PAGES = 500
   GITHUB_REPO_NAME_PATTERN = /\A[A-Za-z0-9._-]+\z/
   MAX_BODY_LINES = 1_000
+  MAX_DISPOSITION_REPLY_BODY_LENGTH = 16_384
   MAX_EXCERPT_LENGTH = 180
   LIST_MARKER_PATTERN = /(?:[-*]\s*(?:\[[ xX]\]\s*)?|\d+[.)]\s*)/
   FINDING_LINE_PREFIX_PATTERN = /(?:#{LIST_MARKER_PATTERN.source})?(?:\#{1,6}\s+)?/
@@ -129,6 +130,210 @@ class PrMergeLedger
     \b(?:fixed|resolved|waived)\s+
     (?:#{PRIORITY_MARKER_PATTERN.source})(?:\s|:|-|/|$)
   }ix
+  FIXED_DISPOSITION_REPLY_PATTERN = /
+    \A\s*
+    (?:[*_]{1,2})?
+    (?:fixed|addressed)
+    (?:[*_]{1,2})?
+    \s+(?:in|by)
+    (?:[*_]{1,2})?
+    \s+\S
+  /ix
+  TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
+  BENIGN_REGRESSION_MODIFIER_PATTERN = /
+    any|more|other|functional|new|known|additional|observable|observed|reported|detected|found|introduced|
+    remaining|runtime|behavioral|user[- ]visible|ci|build|job|workflow|checks?|performance|visual|ui
+  /ix
+  BENIGN_REGRESSION_REPLY_PATTERN = /
+    \b(?:no|without)\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bnot\s+(?:an?\s+)?(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bavoid(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bprevent(?:s|ed|ing)?\s+(?:(?:#{BENIGN_REGRESSION_MODIFIER_PATTERN.source})\s+){0,4}regressions?\b|
+    \bregression[- ]free\b|
+    \b(?:has|have|had|is|are|was|were)(?:\s+not|n't)\s+regressed\b|
+    \b(?:did|do|does)(?:\s+not|n't)\s+regress\b|
+    \bregression(?:s)?[-\s]+
+      (?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases|ci|build|job|workflow|checks?)
+      (?:\s+\S+){0,4}\s+
+      \b(?:now|again|currently)?\s*(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed|ing)?)\b|
+    \bregression(?:s)?[-\s]+
+      (?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases|ci|build|job|workflow|checks?)
+      (?:\s+\S+){0,6}\s+
+      \b(?:fail(?:s|ed|ing)?|repro(?:s)?|reproduc(?:e[sd]?|ing)|occurs?|happens?)\s+
+      before\s+(?:the\s+)?fix\b|
+    \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
+      fail(?:s|ed|ing)?\s+
+      before\s+(?:the\s+)?fix\b|
+    \b(?:test|tests|spec|specs|case|coverage|ci|build|job|workflow|checks?)(?:\s+\S+){0,6}\s+
+      fail(?:s|ed|ing)?\s+
+      (?:\S+\s+){0,4}
+      \b(?:now|again|currently)?\s*(?:pass(?:es|ed|ing)?|green|succeed(?:s|ed|ing)?)\b
+  /ix
+  UNRELATED_FAILURE_REPLY_PATTERN = /
+    (?:
+      \b(?:unrelated|separate)\b
+      [\s\S]{0,120}
+      \b(?:ci|build|job|workflow|checks?)\b
+      [\s\S]{0,120}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      [\s\S]{0,120}
+      \b(?:nothing\s+to\s+do\s+with|unrelated\s+to)\b
+      [\s\S]{0,80}
+      \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+    )|
+    (?:
+      \b(?:ci|build|job|workflow|checks?)\b
+      [\s\S]{0,120}
+      \b(?:fail(?:s|ed|ing)?|broken|red)\b
+      [\s\S]{0,120}
+      \b(?:unrelated|separate)\b
+      [\s\S]{0,80}
+      \b(?:this|the)\s+(?:thread|finding|change|patch|pr|pull[- ]?request)\b
+    )
+  /ix
+  FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN = /
+    this|that|it|fix|change|patch|issue|tests?|specs?|suites?|cases?
+  /ix
+  FAILURE_STATUS_SUBJECT_PATTERN = /ci|build|job|workflow|checks?/ix
+  FAILURE_DISPOSITION_REPLY_VERB_PATTERN = /
+    fail(?:s|ed|ing)?|
+    break(?:s|ing)?|broke|broken|
+    red|
+    repro(?:s)?|reproduc(?:e[sd]?|ing)|
+    occurs?|happens?
+  /ix
+  FIXED_FAILURE_REFERENCE_REPLY_PATTERN = /
+    \b(?:this|that|it|fix|change|patch|issue)\b
+    (?!
+      (?:\s+\S+){0,4}\s+
+      \b(?:
+        not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+        (?:is|are|was|were|has|have|had)(?:\s+not|n't)
+      )\b
+    )
+    (?:\s+\S+){0,4}\s+
+    \b(?:fix(?:es|ed|ing)|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|cover(?:s|ed|ing)?)\b
+    (?:
+      \s+
+      (?!\b(?:and|or|nor|but|however|though|although|still|continues?|keeps?|remains?|regress(?:ed|ion)?|fails?)\b)
+      [^\s,.;:!?()]+
+    ){0,6}\s+
+    \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+  /ix
+  CONTRADICTED_DISPOSITION_REPLY_PATTERN = /
+    (?:
+      \b(?:
+        not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+        (?:is|are|was|were|has|have|had)(?:\s+not|n't)|no\s+longer
+      )\b
+      (?:\s+\S+){0,3}\s+
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving|work(?:s|ed|ing)?|
+        pass(?:es|ed|ing)?|build(?:s|ing)?|built|compil(?:e|es|ed|ing))\b
+    )|
+    (?:
+      \b(?:still|remains?)\s+
+      (?:needs?\s+(?:to\s+be\s+|to\s+)?|requires?\s+)
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+    )|
+    (?:
+      \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
+      (?:\s+\S+){0,6}\s+
+      (?:needs?\s+(?:to\s+be\s+|to\s+)?|requires?\s+)
+      \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+    )|
+    (?:
+      \b(?:still|continues?\s+to|keeps?\s+|(?:is|are|was|were)\s+still|remains?)\s*
+      [\s\S]{0,80}
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+    )|
+    (?:
+      \b(?:#{FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN.source})\b
+      (?:\s+\S+){0,6}\s+
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+    )|
+    (?:
+      \b(?:#{FAILURE_STATUS_SUBJECT_PATTERN.source})\b
+      [\s\S]{0,80}
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+    )|
+    (?:
+      (?:\A|[\r\n.!?]\s*)
+      \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+      (?:\s+(?:on|in|under|with)\s+\S+(?:\s+\S+){0,4})?
+      \s*(?:[.!?]|\z)
+    )|
+    \bregressed\b|
+    \bregression(?:s)?\b(?![-\s]+(?:test|tests|testing|spec|specs|coverage|suite|suites|case|cases)\b)|
+    \breopen\b
+  /ix
+  NEGATED_REOPEN_REPLY_PATTERN = /
+    \b(?:no\s+need\s+to|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|should(?:\s+not|n't)|never)\s+reopen\b|
+    \breopen(?:ing)?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b|
+    \b(?:can|could|may|might)\s+reopen\s+(?:this|the)\s+(?:thread|comment|review|discussion)\b
+  /ix
+  NEGATED_FOLLOW_UP_REPLY_PATTERN = /
+    \bno\s+(?:(?:further|additional|more|remaining|other)\s+)?follow[- ]?up
+      (?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?
+      (?:\s+(?:is\s+)?(?:needed|required|necessary))?\b|
+    \bfollow[- ]?up(?:\s+(?:issue|pr|pull[- ]?request|ticket|work))?\s+(?:is\s+)?(?:not\s+needed|unnecessary)\b
+  /ix
+  FOLLOW_UP_DEFERRED_REPLY_PATTERN = /
+    \b(?:open(?:ed|ing)?|create(?:d|s|ing)?|file(?:d|s|ing)?|track(?:ed|s|ing)?)\s+
+    (?:(?:a|an|the)\s+)?
+    (?:(?:follow[- ]?up|tracking|separate|new|linked|related)\s+)?
+    (?:issue|pr|pull[- ]?request|ticket)\b|
+    \bfollow[- ]?up\s+(?:issue|pr|pull[- ]?request|ticket|work)\b|
+    \b(?:remaining|separate|later|next)\s+(?:\S+\s+){0,4}?follow[- ]?up\b
+  /ix
+  DEFERRED_DISPOSITION_REPLY_PATTERN = %r{
+    \A\s*
+    (?:[*_]{1,2})?
+    (?:fixed|addressed)
+    (?:[*_]{1,2})?
+    \s+
+    (?:in|by)\s+
+    (?:(?:a|an|the)\s+)?
+    (?:
+      (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+        corresponding|upstream)\s+
+    ){0,3}
+    (?:
+      (?:
+        (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+          corresponding|upstream)\s+
+      ){1,3}
+      (?:issue|pr|pull[- ]?request|ticket)\b|
+      (?:issue|pr|pull[- ]?request|ticket)\s+(?:\#\d+|\d+|[A-Z][A-Z0-9_-]*-\d+)\b|
+      (?:
+        (?:existing|follow[- ]?up|new|separate|tracking|linked|related|referenced|companion|associated|
+          corresponding|upstream)\s+
+      ){0,3}
+      (?:follow[- ]?up\b|\#\d+\b|https?://\S*/(?:issues|pull)/\d+\b|not[- ]?applicable\b|n/a\b|
+        separate\b|later\b|next\b|another\b)
+    )
+  }ix
+  HEDGED_FIXED_DISPOSITION_REPLY_PATTERN = /
+    \b(?:in\s+part|partial(?:ly)?|hacky|revisit(?:ed|ing)?)\b|
+    \b(?:for\s+now|temporar(?:y|ily)|stopgap)\b|
+    \b(?:i\s+(?:think|believe|hope)|hopefully|assuming|probably)\b|
+    \b(?:this|that|it|these|those)\s+should\s+(?:\S+\s+){0,2}(?:be|do\s+it|work|pass)\b|
+    \bshould\s+(?:be|do\s+it|work|pass)\b|
+    \b(?:not\s+(?:100%\s+)?sure|untested|unverified)\b|
+    \bnot\s+(?:yet\s+)?(?:been\s+)?(?:tested|verified|confirmed|validated)\b|
+    \b(?:haven't|have\s+not)(?:\s+\S+){0,5}\s+
+      (?:test(?:ed)?|verify|verified|confirm(?:ed)?|validate|validated)\b|
+    \bneeds?\s+to\s+(?:test|verify|confirm|validate)\b|
+    \b(?:needs?|requires?)\s+(?:a\s+)?(?:test(?:ing)?|verification|confirmation|validation)\b|
+    \bwill\s+(?:follow\s+up|test|verify|confirm|validate)\b|
+    \b(?:shortly|soon|in\s+a\s+bit|in\s+a\s+moment)\b|
+    \bfollow[- ]?up\s+(?:needed|required|separately|later|issue|pr|pull|ticket)\b|
+    \bthere\s+(?:is|are)\s+(?:a\s+)?follow[- ]?up\b|
+    \bneeds?\s+(?:a\s+)?(?:follow[- ]?up|revisit)\b|
+    \b(?:might|may)(?:\s+\S+){0,3}\s+need\b|
+    \bstill\s+needs?\b|
+    \bneeds?\s+(?:another|more)\s+(?:look|pass|review|work)\b|
+    \bnot\s+fully\b
+  /ix
 
   class Error < StandardError; end
 
@@ -370,6 +575,8 @@ class PrMergeLedger
     end
     opts.separator "    Top-level PR comments have no head SHA; priority findings in those comments " \
                    "require dispositions."
+    opts.separator "    Resolved review-thread replies beginning with \"Fixed in ...\" or " \
+                   "\"Addressed by ...\" can satisfy single priority finding dispositions."
   end
 
   def add_help_option(opts)
@@ -656,8 +863,10 @@ class PrMergeLedger
       "line" => comment["line"],
       "created_at" => comment["createdAt"],
       "author" => comment.dig("author", "login"),
+      "author_association" => comment["authorAssociation"],
       "body" => comment["body"].to_s,
       "outdated" => comment["outdated"] == true,
+      "reply_to_id" => review_thread_comment_reply_to_identifier(comment),
       "review_state" => review["state"],
       "review_head_sha" => review.dig("commit", "oid"),
       "comment_head_sha" => comment.dig("commit", "oid"),
@@ -670,6 +879,13 @@ class PrMergeLedger
     return identifier.to_s if identifier.to_s.match?(/\S/)
 
     raise Error, "review thread comment is missing id, databaseId, and url"
+  end
+
+  def review_thread_comment_reply_to_identifier(comment)
+    reply_to = comment["replyTo"]
+    return nil unless reply_to
+
+    review_thread_comment_identifier(reply_to)
   end
 
   def normalize_review(review, pull_request)
@@ -901,7 +1117,13 @@ class PrMergeLedger
   def append_findings(records, text_key, findings, context)
     records.each do |record|
       findings.concat(
-        findings_from_text(record.fetch(text_key), record.fetch("url"), record.fetch("id"), context)
+        findings_from_text(
+          record.fetch(text_key),
+          record.fetch("url"),
+          record.fetch("id"),
+          context,
+          inferred_disposition: record["inferred_disposition"]
+        )
       )
     end
   end
@@ -910,8 +1132,19 @@ class PrMergeLedger
     review_threads
       .select { |thread| complete_current_head_thread?(thread) }
       # Incomplete comment pages are blocked through unknown_fields; unfetched bodies cannot be scanned for priorities.
-      .flat_map { |thread| thread.fetch("comments") }
+      .flat_map { |thread| comments_with_inferred_dispositions(thread) }
       .reject { |comment| comment.fetch("outdated") }
+  end
+
+  def comments_with_inferred_dispositions(thread)
+    comments = thread.fetch("comments")
+    inferred_dispositions = inferred_dispositions_by_comment_id(thread, comments)
+
+    comments.map do |comment|
+      next comment unless inferred_dispositions.key?(comment.fetch("id"))
+
+      comment.merge("inferred_disposition" => inferred_dispositions.fetch(comment.fetch("id")))
+    end
   end
 
   def complete_current_head_thread?(thread)
@@ -924,7 +1157,7 @@ class PrMergeLedger
     end
   end
 
-  def findings_from_text(text, url, id, context)
+  def findings_from_text(text, url, id, context, inferred_disposition: nil)
     lines = text.to_s.each_line.map(&:chomp)
     if lines.length > MAX_BODY_LINES
       warn "pr-merge-ledger: #{url} body has #{lines.length} lines; scanning first #{MAX_BODY_LINES}"
@@ -951,7 +1184,8 @@ class PrMergeLedger
     line_context = {
       source_finding_count:,
       dispositions: context.fetch(:dispositions),
-      used_disposition_keys: context.fetch(:used_disposition_keys)
+      used_disposition_keys: context.fetch(:used_disposition_keys),
+      inferred_disposition:
     }
 
     finding_lines.flat_map do |line_text, source_line, occurrences|
@@ -976,6 +1210,7 @@ class PrMergeLedger
       multiple_source_findings: context.fetch(:source_finding_count) > 1
     )
     disposition = disposition_for(finding, context.fetch(:dispositions), context.fetch(:used_disposition_keys))
+    disposition = inferred_disposition_for(finding, context, disposition)
 
     {
       "id" => source.fetch(:id),
@@ -988,6 +1223,268 @@ class PrMergeLedger
       "disposition" => disposition.fetch("disposition"),
       "evidence" => disposition["evidence"]
     }
+  end
+
+  def inferred_dispositions_by_comment_id(thread, comments)
+    return {} unless thread.fetch("is_resolved")
+    return {} unless thread.fetch("current_head")
+
+    reply_to_by_id = comments.to_h { |comment| [comment.fetch("id"), comment["reply_to_id"]] }
+    root_comment_ids = root_comment_ids_by_comment_id(comments, reply_to_by_id:)
+    comments_by_id = comments.to_h { |comment| [comment.fetch("id"), comment] }
+
+    sorted_inference_replies(comments).each_with_object({}) do |reply, inferred|
+      reply_to_id = reply.fetch("reply_to_id")
+      root_reply_to_id = root_comment_ids.fetch(reply_to_id, reply_to_id)
+      update_inferred_dispositions_from_reply(
+        inferred,
+        reply,
+        reply_to_id,
+        reply_to_by_id:,
+        root_reply_to_id:,
+        target_comment: comments_by_id[reply_to_id],
+        comments_by_id:
+      )
+    end
+  end
+
+  def sorted_inference_replies(comments)
+    replies = comments.select do |comment|
+      comment["reply_to_id"] && !comment.fetch("outdated")
+    end
+    sorted_reply_pairs = replies.each_with_index.to_a.sort_by do |comment, index|
+      [timestamp_sort_key(comment["created_at"], "comment #{comment.fetch('id')} created_at"), index]
+    end
+
+    sorted_reply_pairs.map(&:first)
+  end
+
+  def root_comment_ids_by_comment_id(comments, reply_to_by_id:)
+    comments.each_with_object({}) do |comment, roots|
+      roots[comment.fetch("id")] = root_comment_id(comment.fetch("id"), reply_to_by_id)
+    end
+  end
+
+  def root_comment_id(comment_id, reply_to_by_id)
+    seen_ids = {}
+    current_id = comment_id
+
+    while (parent_id = reply_to_by_id[current_id])
+      break if seen_ids[parent_id]
+
+      seen_ids[current_id] = true
+      current_id = parent_id
+    end
+
+    current_id
+  end
+
+  def update_inferred_dispositions_from_reply(
+    inferred,
+    reply,
+    reply_to_id,
+    reply_to_by_id:,
+    root_reply_to_id:,
+    target_comment:,
+    comments_by_id:
+  )
+    trusted_reply = trusted_disposition_reply_author_association?(reply)
+    body, truncated = bounded_disposition_reply_body(reply.fetch("body"))
+    normalized_body = normalized_disposition_reply_body(body)
+    clear_disposition_reply = trusted_reply && clear_inferred_disposition_reply?(normalized_body, truncated:)
+    disposition = inferred_disposition_from_reply(
+      reply,
+      body:,
+      truncated:,
+      normalized_body:,
+      clear_disposition_reply:,
+      target_comment:
+    )
+    if disposition
+      inferred[reply_to_id] = disposition
+    elsif clear_disposition_reply && !priority_finding_reply?(normalized_body)
+      clear_target_id = clear_disposition_target_id(
+        inferred,
+        reply_to_id,
+        reply_to_by_id:,
+        root_reply_to_id:,
+        comments_by_id:
+      )
+      inferred.delete(clear_target_id) if clear_target_id
+    end
+  end
+
+  def priority_finding_reply?(normalized_body)
+    normalized_body.to_s.each_line.any? do |line|
+      !non_actionable_finding_summary?(line) && finding_occurrences(line).any?
+    end
+  end
+
+  def clear_disposition_target_id(inferred, reply_to_id, reply_to_by_id:, root_reply_to_id:, comments_by_id:)
+    seen_ids = {}
+    current_id = reply_to_id
+    while current_id
+      return current_id if inferred.key?(current_id)
+      return nil if priority_finding_comment?(comments_by_id[current_id])
+      break if seen_ids[current_id]
+
+      seen_ids[current_id] = true
+      current_id = reply_to_by_id[current_id]
+    end
+
+    root_reply_to_id if inferred.key?(root_reply_to_id)
+  end
+
+  def priority_finding_comment?(comment)
+    return false unless comment
+
+    priority_finding_reply?(normalized_disposition_reply_body(comment["body"]))
+  end
+
+  def inferred_disposition_from_reply(
+    reply,
+    body:,
+    truncated:,
+    normalized_body:,
+    clear_disposition_reply:,
+    target_comment: nil
+  )
+    return nil if truncated
+    return nil if clear_disposition_reply
+    return nil unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+    return nil unless priority_finding_comment?(target_comment)
+    return nil unless trusted_disposition_reply_author?(reply, target_comment:)
+
+    {
+      "disposition" => "fixed",
+      "evidence" => "resolved review-thread reply #{reply.fetch('url')} by #{reply['author'] || 'UNKNOWN'}: " \
+                    "#{excerpt(body)}"
+    }
+  end
+
+  def clear_inferred_disposition_reply?(normalized_body, truncated:)
+    return true if truncated
+
+    body = normalized_body.gsub(NEGATED_FOLLOW_UP_REPLY_PATTERN, "")
+    return true if body.match?(DEFERRED_DISPOSITION_REPLY_PATTERN)
+    return true if body.match?(FOLLOW_UP_DEFERRED_REPLY_PATTERN)
+    return true if hedged_fixed_disposition_reply?(body)
+    return true if ambiguous_fixed_disposition_reply?(normalized_body)
+
+    contradicted_disposition_reply?(body)
+  end
+
+  def contradicted_disposition_reply?(normalized_body)
+    body = normalized_body.gsub(BENIGN_REGRESSION_REPLY_PATTERN, "")
+    body = body.gsub(UNRELATED_FAILURE_REPLY_PATTERN, "")
+    body = body.gsub(FIXED_FAILURE_REFERENCE_REPLY_PATTERN, "")
+    body = body.gsub(NEGATED_REOPEN_REPLY_PATTERN, "")
+    body = body.gsub(
+      /
+        \bno\s+longer\s+
+        (?:apply|applies|applied|applying|infer|infers|inferred|inferring|mark|marks|marked|marking)\s+
+        (?:a\s+)?
+        fixed\s+disposition\b
+      /ix,
+      ""
+    )
+    body = strip_negated_failure_reply_clauses(body, FAILURE_DISPOSITION_REPLY_SUBJECT_PATTERN)
+    body = strip_negated_failure_reply_clauses(body, FAILURE_STATUS_SUBJECT_PATTERN)
+
+    body.match?(CONTRADICTED_DISPOSITION_REPLY_PATTERN)
+  end
+
+  def strip_negated_failure_reply_clauses(body, subject_pattern)
+    body.gsub(
+      /
+        \b(?:#{subject_pattern.source})\b
+        (?:\s+\S+){0,6}\s+
+        \b(?:
+          not|never|cannot|can't|wont|won't|do(?:es)?(?:\s+not|n't)|did(?:\s+not|n't)|
+          (?:is|are|was|were|has|have|had)(?:\s+not|n't)|no\s+longer
+        )\b
+        (?!
+          (?:\s+\S+){0,3}\s+
+          \b(?:fix(?:es|ed|ing)?|address(?:es|ed|ing)?|resolve(?:s|d)?|resolving)\b
+        )
+        (?:\s+\S+){0,3}\s+
+        \b(?:#{FAILURE_DISPOSITION_REPLY_VERB_PATTERN.source})\b
+      /ix,
+      ""
+    )
+  end
+
+  def hedged_fixed_disposition_reply?(normalized_body)
+    normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN) &&
+      normalized_body.match?(HEDGED_FIXED_DISPOSITION_REPLY_PATTERN)
+  end
+
+  def ambiguous_fixed_disposition_reply?(normalized_body)
+    return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
+
+    body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
+    sentence_boundary = body_without_urls.match(
+      /[!\r\n]|
+       [.,;:](?=\s|$)|
+       (?:\s-\s+|\s*\(\s*)(?=(?:can|could|please|does|do|did|would|is|are)\b)/ix
+    )
+    first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
+    return true if first_sentence.include?("?")
+
+    follow_up = sentence_boundary ? body_without_urls[sentence_boundary.end(0)..].to_s : ""
+    follow_up.match?(
+      /\b(?:can|could)\s+you\s+(?:please\s+)?(?:confirm|verify|check|validate|test)\b|
+       \bplease\s+(?:confirm|verify|check|validate|test)\b|
+       \b(?:does|do|did|would)\s+(?:this|that|it)\s+(?:look|cover|address|fix|work)\b|
+       \b(?:is|are)\s+(?:this|that|it|these|those)\s+(?:correct|right|okay|ok)\b/ix
+    )
+  end
+
+  def trusted_disposition_reply_author?(reply, target_comment: nil)
+    return false unless target_comment
+    return false if same_author_disposition_reply?(reply, target_comment)
+
+    trusted_disposition_reply_author_association?(reply)
+  end
+
+  def trusted_disposition_reply_author_association?(reply)
+    association = reply["author_association"]
+
+    TRUSTED_DISPOSITION_REPLY_AUTHOR_ASSOCIATIONS.include?(association)
+  end
+
+  def same_author_disposition_reply?(reply, target_comment)
+    return false unless target_comment
+
+    reply_author = reply["author"]
+    target_author = target_comment["author"]
+    reply_author && target_author && reply_author == target_author
+  end
+
+  def normalized_disposition_reply_body(body)
+    body.to_s.lstrip.gsub(/[\u2018\u2019]/, "'")
+  end
+
+  def bounded_disposition_reply_body(body)
+    bounded_lines = +""
+    body.to_s.each_line.with_index(1) do |line, line_number|
+      return [bounded_lines, true] if line_number > MAX_BODY_LINES
+
+      bounded_lines << line
+      if bounded_lines.length > MAX_DISPOSITION_REPLY_BODY_LENGTH
+        return [bounded_lines[0, MAX_DISPOSITION_REPLY_BODY_LENGTH], true]
+      end
+    end
+
+    [bounded_lines, false]
+  end
+
+  def inferred_disposition_for(finding, context, disposition)
+    return disposition unless disposition.fetch("disposition") == UNKNOWN
+    return disposition unless context.fetch(:source_finding_count) == 1
+    return disposition unless finding.fetch(:multiple_markers) == false
+
+    context.fetch(:inferred_disposition) || disposition
   end
 
   def finding_severity(line)
@@ -1860,11 +2357,13 @@ class PrMergeLedger
                       databaseId
                       body
                       author { login }
+                      authorAssociation
                       url
                       path
                       line
                       createdAt
                       outdated
+                      replyTo { id databaseId url }
                       commit { oid }
                       pullRequestReview {
                         id
@@ -1896,11 +2395,13 @@ class PrMergeLedger
                   databaseId
                   body
                   author { login }
+                  authorAssociation
                   url
                   path
                   line
                   createdAt
                   outdated
+                  replyTo { id databaseId url }
                   commit { oid }
                   pullRequestReview {
                     id

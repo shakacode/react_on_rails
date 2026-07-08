@@ -405,11 +405,17 @@
         "author": {
           "type": ["string", "null"]
         },
+        "author_association": {
+          "type": ["string", "null"]
+        },
         "body": {
           "type": "string"
         },
         "outdated": {
           "type": "boolean"
+        },
+        "reply_to_id": {
+          "type": ["string", "null"]
         },
         "review_state": {
           "type": ["string", "null"]
