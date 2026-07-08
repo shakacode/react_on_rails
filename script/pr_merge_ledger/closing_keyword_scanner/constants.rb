@@ -31,11 +31,11 @@ class PrMergeLedger
     HTML_BLOCK_TAG_NAMES = %w[
       address article aside base basefont blockquote body caption center col colgroup dd details dialog dir div dl dt
       fieldset figcaption figure footer form frame frameset h1 h2 h3 h4 h5 h6 head header hr html iframe legend li
-      link main menu menuitem nav noframes ol optgroup option p param pre script search section style summary table
-      tbody
+      link main menu menuitem nav noframes ol optgroup option p param pre script search section source style summary
+      table tbody
       td textarea tfoot th thead title tr track ul
     ].freeze
-    HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style textarea].freeze
+    HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style].freeze
     HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
     HTML_BLOCK_BOUNDARY_PATTERN =
       %r{\A {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[|</?(?:#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z))}i

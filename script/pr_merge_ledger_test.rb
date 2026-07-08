@@ -1003,6 +1003,28 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_source_html_block_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("<source\nFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_textarea_html_block_continues_until_blank_line_after_closing_tag
+    output, status = run_fixture(fixture_with_body("<textarea>\n</textarea>\nFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_raw_html_block_blank_line_does_not_end_before_closeout
     output, status = run_fixture(fixture_with_body("<pre>\n\nFixes #4410\n</pre>\n"))
 
