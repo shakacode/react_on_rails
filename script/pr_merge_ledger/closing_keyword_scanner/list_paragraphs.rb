@@ -54,7 +54,7 @@ class PrMergeLedger
         content_column = column_after_prefix(line[...list_match.begin(:code)])
         return false unless list_marker_indent_allowed_for_line?(marker_indent, list_content_indent, content_column)
 
-        !static_root_block_boundary_line?(list_match[:code].chomp)
+        !list_item_content_block_boundary_line?(list_match[:code].chomp, markdown_state)
       end
 
       def list_content_continues_paragraph?(line, markdown_state)

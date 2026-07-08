@@ -199,7 +199,7 @@ class PrMergeLedger
         marker_indent = column_after_prefix(list_match[:indent].each_char)
         return false unless list_marker_indent_allowed?(marker_indent, list_content_indent)
 
-        static_root_block_boundary_line?(list_match[:code].chomp)
+        list_item_content_block_boundary_line?(list_match[:code].chomp, markdown_state)
       end
 
       def next_root_indented_code_allowed(line, in_fenced_code_block, root_indented_code_allowed, markdown_state)
@@ -210,6 +210,10 @@ class PrMergeLedger
         return true if root_block_boundary_line?(line, markdown_state)
 
         false
+      end
+
+      def list_item_content_block_boundary_line?(line, markdown_state)
+        static_root_block_boundary_line?(line) || link_reference_definition_line?(line, markdown_state)
       end
     end
   end

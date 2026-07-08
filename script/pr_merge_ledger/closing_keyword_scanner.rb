@@ -57,7 +57,9 @@ class PrMergeLedger
         "paragraph_continuation_active" => false,
         "list_paragraph_continuation_active" => false,
         "blockquote_lazy_continuation_allowed" => false,
+        "link_reference_destination_allowed" => false,
         "link_reference_title_allowed" => false,
+        "link_reference_title_delimiter" => nil,
         "root_indented_code_allowed" => true
       }
 
