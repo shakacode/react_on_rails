@@ -160,7 +160,7 @@ class PrMergeLedger
           fenced_code_block_match(line, list_content_indent) ||
           list_marker_indented_code_match(line, markdown_state) ||
           empty_list_item_line?(line, markdown_state) ||
-          list_item_atx_heading_line?(line, markdown_state)
+          list_item_block_boundary_line?(line, markdown_state)
       end
 
       def empty_list_item_line?(line, markdown_state)
@@ -173,7 +173,7 @@ class PrMergeLedger
         )
       end
 
-      def list_item_atx_heading_line?(line, markdown_state)
+      def list_item_block_boundary_line?(line, markdown_state)
         list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
         return false unless list_match
 
@@ -181,7 +181,7 @@ class PrMergeLedger
         marker_indent = column_after_prefix(list_match[:indent].each_char)
         return false unless list_marker_indent_allowed?(marker_indent, list_content_indent)
 
-        list_match[:code].match?(/\A\#{1,6}(?:\s|\z)/)
+        static_root_block_boundary_line?(list_match[:code].chomp)
       end
 
       def next_root_indented_code_allowed(line, in_fenced_code_block, root_indented_code_allowed, markdown_state)
