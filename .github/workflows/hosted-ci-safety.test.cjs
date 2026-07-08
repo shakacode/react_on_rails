@@ -17,6 +17,7 @@ const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.y
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
+const claudeWorkflow = read('.github/workflows/claude.yml');
 const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
 
 assertMatches(
@@ -70,6 +71,24 @@ assertMatches(
   'closed PR degraded evidence comment',
   ciCommandsWorkflow,
   /branch-ref hosted-CI evidence is degraded\/invalid/,
+);
+assertMatches('Claude authorization job', claudeWorkflow, /authorize_claude_actor:/);
+assertMatches('Claude permission lookup', claudeWorkflow, /getCollaboratorPermissionLevel\({[\s\S]*username/);
+assertMatches('Claude write permission guard', claudeWorkflow, /hasWriteAccessFor\(context\.actor\)/);
+assertMatches(
+  'Claude job needs authorization',
+  claudeWorkflow,
+  /claude:[\s\S]*needs: authorize_claude_actor/,
+);
+assertMatches(
+  'Claude job checks authorization output',
+  claudeWorkflow,
+  /if: needs\.authorize_claude_actor\.outputs\.authorized == 'true'/,
+);
+assertMatches(
+  'Claude unauthorized failure',
+  claudeWorkflow,
+  /does not have write\/admin repository permission/,
 );
 
 assertMatches(

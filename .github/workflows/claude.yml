@@ -9,11 +9,68 @@ on:
     types: [opened, assigned]
 
 jobs:
-  claude:
+  authorize_claude_actor:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      authorized: ${{ steps.permission-gate.outputs.authorized }}
+    steps:
+      - name: Verify actor can run Claude
+        id: permission-gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const permissionByLogin = new Map();
+
+            async function hasWriteAccessFor(username) {
+              if (!username) {
+                return false;
+              }
+
+              if (permissionByLogin.has(username)) {
+                return permissionByLogin.get(username);
+              }
+
+              let hasWriteAccess = false;
+              try {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username
+                });
+                hasWriteAccess = ['admin', 'write'].includes(permission.permission);
+              } catch (error) {
+                core.warning(
+                  `Unable to verify ${username} write permission for Claude; ` +
+                    `treating the @claude request as untrusted: ${error.message || error}`
+                );
+              }
+
+              permissionByLogin.set(username, hasWriteAccess);
+              return hasWriteAccess;
+            }
+
+            if (!(await hasWriteAccessFor(context.actor))) {
+              core.setOutput('authorized', 'false');
+              core.setFailed(
+                `Unable to run Claude because ${context.actor} does not have write/admin repository permission.`
+              );
+              return;
+            }
+
+            core.setOutput('authorized', 'true');
+            core.info(`Authorized ${context.actor} to run Claude.`);
+
+  claude:
+    needs: authorize_claude_actor
+    if: needs.authorize_claude_actor.outputs.authorized == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
