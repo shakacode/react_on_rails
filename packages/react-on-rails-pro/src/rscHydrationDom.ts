@@ -16,6 +16,13 @@
 const RSC_PAYLOAD_SCRIPT_ATTRIBUTE = 'data-react-on-rails-rsc-payload';
 const RSC_STYLESHEET_PRECEDENCE = 'rsc-css';
 
+type RSCHydrationRailsContext = { rscPayloadGenerationUrlPath?: unknown };
+
+export function shouldPrepareRSCHydrationRoot(railsContext: RSCHydrationRailsContext | undefined): boolean {
+  const rscPayloadGenerationUrlPath = railsContext?.rscPayloadGenerationUrlPath;
+  return typeof rscPayloadGenerationUrlPath === 'string' && rscPayloadGenerationUrlPath.length > 0;
+}
+
 function isRSCPayloadScript(node: Element): boolean {
   return node.tagName === 'SCRIPT' && node.getAttribute(RSC_PAYLOAD_SCRIPT_ATTRIBUTE) === 'true';
 }
@@ -38,6 +45,7 @@ function isIgnorableWhitespace(node: ChildNode): boolean {
 
 function moveResourceToHead(node: Element): void {
   if (document.head) {
+    // Streamed RSC currently emits one rsc-css precedence bucket; append leading resources in stream order.
     document.head.appendChild(node);
   } else {
     node.remove();

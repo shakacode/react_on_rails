@@ -41,7 +41,7 @@ import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderR
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 import { isPageUnloadRegistryError } from './CallbackRegistry.ts';
-import prepareRSCHydrationRoot from './rscHydrationDom.ts';
+import prepareRSCHydrationRoot, { shouldPrepareRSCHydrationRoot } from './rscHydrationDom.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -336,7 +336,9 @@ class ComponentRenderer {
           return;
         }
 
-        prepareRSCHydrationRoot(domNode);
+        if (shouldPrepareRSCHydrationRoot(railsContext)) {
+          prepareRSCHydrationRoot(domNode);
+        }
 
         // Hydrate if available and was server rendered
         const shouldHydrate = supportsHydrate && !!domNode.innerHTML;

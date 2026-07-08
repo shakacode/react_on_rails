@@ -257,7 +257,27 @@ describe('ClientSideRenderer', () => {
     expect(reactElement.type).toBe(TestComponent);
   });
 
-  it('removes direct RSC payload scripts before hydrating ordinary roots', async () => {
+  it('does not move leading async scripts from non-RSC roots before hydrating', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom(
+      'dom-id-non-rsc-leading-async-script',
+      '<script src="/third-party-widget.js" async=""></script><div>Server fallback</div>',
+    );
+    addRailsContext();
+
+    await renderOrHydrateComponent(componentSpec);
+
+    const mountNode = document.getElementById('dom-id-non-rsc-leading-async-script') as HTMLElement;
+    const leadingScript = mountNode.firstElementChild as HTMLScriptElement;
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(true);
+    expect(leadingScript.tagName).toBe('SCRIPT');
+    expect(leadingScript.getAttribute('src')).toBe('/third-party-widget.js');
+    expect(document.head.querySelector('script[src="/third-party-widget.js"]')).toBeNull();
+  });
+
+  it('removes direct RSC payload scripts before hydrating RSC roots', async () => {
     const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
     ComponentRegistry.register({ TestComponent });
     const componentSpec = setupTestComponentDom(
