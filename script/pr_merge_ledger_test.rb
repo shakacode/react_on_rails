@@ -799,6 +799,18 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_gfm_table_long_delimiter_cells_do_not_backtrack
+    long_separator_line = "#{'-' * 32_000} | #{'-' * 32_000}"
+    output, status = run_fixture(fixture_with_body("A | B\n#{long_separator_line}\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_blockquoted_indented_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("> This will not close.\n>\n>     Fixes #4410\n"))
 

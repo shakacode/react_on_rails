@@ -67,7 +67,7 @@ class PrMergeLedger
   ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
-  TABLE_SEPARATOR_BOUNDARY_PATTERN = /\A {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*\z/
+  TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/
   GFM_TABLE_ROW_BOUNDARY_PATTERN = /\A {0,3}.+\|.+\z/
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
@@ -2693,7 +2693,7 @@ class PrMergeLedger
   def next_gfm_table_header_candidate_cell_count(line)
     boundary_line = line.chomp
     return nil if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
-    return nil if boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    return nil unless gfm_table_separator_cell_count(boundary_line).nil?
     return nil unless boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
 
     gfm_table_cell_count(boundary_line)
@@ -2728,16 +2728,22 @@ class PrMergeLedger
 
   def gfm_table_separator_cell_count(line)
     boundary_line = line.chomp
-    return nil unless boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    cells = gfm_table_cells(boundary_line)
+    return nil if cells.length < 2
+    return nil unless cells.all? { |cell| cell.strip.match?(TABLE_SEPARATOR_CELL_PATTERN) }
 
-    gfm_table_cell_count(boundary_line)
+    cells.length
   end
 
   def gfm_table_cell_count(line)
+    gfm_table_cells(line).length
+  end
+
+  def gfm_table_cells(line)
     cells = line.sub(/\A {0,3}/, "")
     cells = cells[1..] || "" if cells.start_with?("|")
     cells = cells[...-1] || "" if cells.end_with?("|")
-    cells.split("|", -1).length
+    cells.split("|", -1)
   end
 
   def gfm_table_body_row_line?(line, markdown_state)
