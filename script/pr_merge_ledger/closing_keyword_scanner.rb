@@ -38,6 +38,10 @@ class PrMergeLedger
     LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
     LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
     LIST_BLOCKQUOTE_MARKER_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<blockquotes>(?:> ?)+)/
+    SAME_LINE_LIST_ITEM_WITH_PADDING_PATTERN =
+      /\G(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
+    SAME_LINE_BLOCKQUOTE_MARKER_PATTERN = /\G(?:> ?)+/
+    SAME_LINE_FENCED_CODE_BLOCK_PATTERN = /\G {0,3}(?<fence>`{3,}|~{3,})/
     ORDERED_ROOT_LIST_ITEM_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)][ \t]+/
     ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
     HTML_BLOCK_TAG_NAMES = %w[

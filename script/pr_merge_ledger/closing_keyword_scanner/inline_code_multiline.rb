@@ -13,7 +13,8 @@ class PrMergeLedger
           markdown_state.fetch("body_lines"),
           context.fetch(:line_index),
           opening_match[0],
-          markdown_state.fetch("current_blockquote_depth", 0)
+          markdown_state.fetch("current_blockquote_depth", 0),
+          markdown_state
         )
           code_segment = line[opening_match.end(0)..]
           append_inline_code_segment(context.fetch(:normalized_line), context.fetch(:inline_code_flags), code_segment,
@@ -31,40 +32,45 @@ class PrMergeLedger
         end
       end
 
-      def inline_code_delimiter_closes_later?(body_lines, line_index, delimiter, blockquote_depth)
+      def inline_code_delimiter_closes_later?(body_lines, line_index, delimiter, blockquote_depth, markdown_state)
+        lookahead_state = markdown_state.merge("paragraph_continuation_active" => true)
+
         body_lines[(line_index + 1)..].to_a.each do |line|
-          continuation_line = inline_code_continuation_line(line, blockquote_depth)
+          continuation_line = inline_code_continuation_line(line, blockquote_depth, lookahead_state)
           return false unless continuation_line
           return false if continuation_line.strip.empty?
-          return false if inline_code_block_boundary?(continuation_line)
+          return false if inline_code_block_boundary?(continuation_line, lookahead_state)
           return true if matching_closing_backtick_run(continuation_line, delimiter, 0)
+
+          lookahead_state["paragraph_continuation_active"] =
+            next_paragraph_continuation_active(continuation_line, false, lookahead_state)
         end
 
         false
       end
 
-      def inline_code_continuation_line(line, blockquote_depth)
+      def inline_code_continuation_line(line, blockquote_depth, markdown_state)
         return line if blockquote_depth.zero?
 
         markdown_line = line
         blockquote_depth.times do
           marker_match = markdown_line.match(/\A {0,3}> ?/)
-          return blockquote_lazy_continuation_line(line) unless marker_match
+          return blockquote_lazy_continuation_line(line, markdown_state) unless marker_match
 
           markdown_line = markdown_line[marker_match.end(0)..] || ""
         end
         markdown_line
       end
 
-      def blockquote_lazy_continuation_line(line)
-        return nil if root_block_boundary_line?(line)
+      def blockquote_lazy_continuation_line(line, markdown_state = nil)
+        return nil if root_block_boundary_line?(line, markdown_state)
         return nil if line.match?(FENCED_CODE_BLOCK_PATTERN)
 
         line
       end
 
-      def inline_code_block_boundary?(line)
-        root_block_boundary_line?(line) || line.match?(FENCED_CODE_BLOCK_PATTERN)
+      def inline_code_block_boundary?(line, markdown_state = nil)
+        root_block_boundary_line?(line, markdown_state) || line.match?(FENCED_CODE_BLOCK_PATTERN)
       end
 
       def consume_open_inline_code(line, markdown_state, normalized_line, inline_code_flags)
@@ -90,10 +96,9 @@ class PrMergeLedger
       def append_multiline_inline_code_content(markdown_state, code_segment)
         content = markdown_state["inline_code_multiline_content"]
         return unless content
-
-        content << code_segment.to_s
         return if markdown_state.fetch("inline_code_multiline_reported")
 
+        content << code_segment.to_s
         match = content.match(CLOSING_KEYWORD_PATTERN)
         return unless match
 

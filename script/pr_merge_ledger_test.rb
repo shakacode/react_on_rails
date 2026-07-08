@@ -440,6 +440,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_multiline_inline_code_over_noninterrupting_ordered_marker_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("`Fixes #4410\n2) more text here\nend`\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_split_multiline_inline_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("This will not close: `Fixes\n#4410`."))
 
@@ -891,6 +902,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_type_7_html_block_with_quoted_greater_than_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("<ins title=\">\">\nFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_list_item_html_block_closing_keyword_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- <div>\n  Fixes #4410\n"))
 
     refute status.success?, output
     data = JSON.parse(output)
@@ -1461,6 +1483,18 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_deep_same_line_nested_list_marker_indented_code_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- - -     Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_very_deep_same_line_nested_list_marker_indented_code_blocks_strict_closeout
+    nested_markers = Array.new(100, "- ").join
+    output, status = run_fixture(fixture_with_body("#{nested_markers}    Fixes #4410\n"))
 
     refute status.success?, output
     data = JSON.parse(output)

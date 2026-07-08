@@ -40,10 +40,10 @@ class PrMergeLedger
         )
       end
 
-      def column_after_prefix(prefix)
+      def column_after_prefix(prefix, start_column = 0)
         characters = prefix.respond_to?(:each_char) ? prefix.each_char : prefix.each
 
-        characters.reduce(0) do |column, character|
+        characters.reduce(start_column) do |column, character|
           character == "\t" ? column + (4 - (column % 4)) : column + 1
         end
       end
@@ -131,36 +131,22 @@ class PrMergeLedger
       end
 
       def same_line_nested_list_fenced_code_block_match(line, outer_match, outer_content_column)
-        nested_line_offset = outer_match.begin(:code)
-        list_content_column = outer_content_column
-
-        loop do
-          nested_line = line[nested_line_offset..] || ""
-          nested_match = nested_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-          return unless nested_match
-
-          content_column = column_after_prefix(line[...nested_line_offset + nested_match.begin(:code)].each_char)
-          marker_indent = column_after_prefix(line[...nested_line_offset + nested_match.begin(0)].each_char)
-          return unless list_marker_indent_allowed?(marker_indent, list_content_column)
-
-          fence_line_offset = nested_line_offset + nested_match.begin(:code)
+        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_match, fence_line_offset,
+                                                                                     _marker_end_column,
+                                                                                     content_column|
           fence_match = same_line_nested_list_fence_match(line, fence_line_offset, content_column)
           return fence_match if fence_match
-
-          nested_line_offset = fence_line_offset
-          list_content_column = content_column
         end
       end
 
       def same_line_nested_list_fence_match(line, fence_line_offset, content_column)
-        fence_line = line[fence_line_offset..] || ""
-        fence_match = fence_line.match(FENCED_CODE_BLOCK_PATTERN)
-        return unless valid_fenced_code_block_opener?(fence_line, fence_match)
+        fence_match = line.match(SAME_LINE_FENCED_CODE_BLOCK_PATTERN, fence_line_offset)
+        return unless valid_fenced_code_block_opener?(line, fence_match)
 
         FencedCodeBlockMatch.new(
           fence_match[:fence],
-          fence_line_offset + fence_match.begin(:fence),
-          fence_line_offset + fence_match.end(:fence),
+          fence_match.begin(:fence),
+          fence_match.end(:fence),
           content_column
         )
       end

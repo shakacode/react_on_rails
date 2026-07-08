@@ -25,25 +25,12 @@ class PrMergeLedger
       end
 
       def same_line_nested_list_marker_indented_code_match(line, outer_match, outer_content_column)
-        nested_line_offset = outer_match.begin(:code)
-        list_content_column = outer_content_column
-
-        loop do
-          nested_line = line[nested_line_offset..] || ""
-          nested_match = nested_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-          return unless nested_match
-
-          marker_end_column = column_after_prefix(line[...nested_line_offset + nested_match.begin(:padding)])
-          content_column = column_after_prefix(line[...nested_line_offset + nested_match.begin(:code)])
-          marker_indent = column_after_prefix(line[...nested_line_offset + nested_match.begin(0)])
-          return unless list_marker_indent_allowed?(marker_indent, list_content_column)
-
+        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |nested_match, code_offset,
+                                                                                     marker_end_column,
+                                                                                     content_column|
           if content_column >= marker_end_column + 5
-            return ListMarkerIndentedCodeMatch.new(nested_match[:code], nested_line_offset + nested_match.begin(:code))
+            return ListMarkerIndentedCodeMatch.new(nested_match[:code], code_offset)
           end
-
-          nested_line_offset += nested_match.begin(:code)
-          list_content_column = content_column
         end
       end
 
@@ -69,28 +56,42 @@ class PrMergeLedger
       end
 
       def same_line_nested_list_blockquote_marker_match(line, outer_match, outer_content_column)
-        nested_line_offset = outer_match.begin(:code)
-        list_content_column = outer_content_column
-
-        loop do
-          nested_line = line[nested_line_offset..] || ""
-          nested_match = nested_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-          return unless nested_match
-
-          content_column = column_after_prefix(line[...nested_line_offset + nested_match.begin(:code)])
-          marker_indent = column_after_prefix(line[...nested_line_offset + nested_match.begin(0)])
-          return unless list_marker_indent_allowed?(marker_indent, list_content_column)
-
-          blockquote_line_offset = nested_line_offset + nested_match.begin(:code)
-          blockquote_match = line[blockquote_line_offset..].to_s.match(/\A(?:> ?)+/)
+        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_match, blockquote_line_offset,
+                                                                                     _marker_end_column,
+                                                                                     _content_column|
+          blockquote_match = line.match(SAME_LINE_BLOCKQUOTE_MARKER_PATTERN, blockquote_line_offset)
           if blockquote_match
             return ListBlockquoteMarkerMatch.new(
-              blockquote_line_offset + blockquote_match.end(0),
+              blockquote_match.end(0),
               blockquote_marker_depth(blockquote_match[0])
             )
           end
+        end
+      end
 
-          nested_line_offset = blockquote_line_offset
+      def each_same_line_nested_list_item(line, outer_match, outer_content_column)
+        nested_line_offset = outer_match.begin(:code)
+        nested_line_column = outer_content_column
+        list_content_column = outer_content_column
+
+        loop do
+          nested_match = line.match(SAME_LINE_LIST_ITEM_WITH_PADDING_PATTERN, nested_line_offset)
+          return unless nested_match
+
+          marker_indent = column_after_prefix(line[nested_line_offset...nested_match.begin(0)], nested_line_column)
+          marker_end_column = column_after_prefix(
+            line[nested_line_offset...nested_match.begin(:padding)],
+            nested_line_column
+          )
+          content_column = column_after_prefix(line[nested_line_offset...nested_match.begin(:code)], nested_line_column)
+          return unless list_marker_indent_allowed?(marker_indent, list_content_column)
+
+          code_offset = nested_match.begin(:code)
+          result = yield nested_match, code_offset, marker_end_column, content_column
+          return result if result
+
+          nested_line_offset = code_offset
+          nested_line_column = content_column
           list_content_column = content_column
         end
       end
