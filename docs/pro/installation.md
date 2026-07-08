@@ -347,6 +347,13 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+> [!IMPORTANT]
+> `config.prerender_caching` is safe for ordinary prerendered and streamed renders, but React on Rails Pro skips that
+> cache for `stream_react_component_with_async_props` and other async-props renders. Async props can include
+> per-request data that is not part of the prerender cache key. Keep prerender caching enabled as a default performance
+> win, but use explicit fragment cache keys for async-props pages only when the rendered output is safe to share across
+> requests.
+
 ### Configuration Options
 
 See [Rails Configuration Options](../oss/configuration/configuration-pro.md) for all available settings.
@@ -356,7 +363,8 @@ Pay attention to:
 - `config.server_renderer = "NodeRenderer"` - Required to use node renderer
 - `config.renderer_url` - URL where your node renderer is running
 - `config.renderer_password` - Shared secret for authentication
-- `config.prerender_caching` - Enable caching (recommended)
+- `config.prerender_caching` - Enable prerender caching for supported SSR/streaming renders; async-props renders skip
+  this cache
 
 ## Webpack Configuration
 
