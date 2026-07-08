@@ -68,7 +68,8 @@ First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
 do not block the fleet update if that draft design file has already been removed. Run
 `.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
-appear missing and `load_api_tokens` is available, run it before reporting missing env vars.
+appear missing and `load_api_tokens` is available as a local helper outside this repo, run it before
+reporting missing env vars.
 
 Target versions:
 - RC tag under verification: `{{RC_TAG}}`
