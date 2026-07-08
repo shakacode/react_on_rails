@@ -64,6 +64,7 @@ class PrMergeLedger
   LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+/
   LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
   LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
+  LIST_BLOCKQUOTE_MARKER_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<blockquotes>(?:> ?)+)/
   ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
@@ -110,7 +111,7 @@ class PrMergeLedger
       nil
     end
   end
-  ListBlockquoteMarkerMatch = Struct.new(:match_end) do
+  ListBlockquoteMarkerMatch = Struct.new(:match_end, :blockquote_depth) do
     def end(key = 0)
       return match_end if key.eql?(0)
 
@@ -2167,7 +2168,7 @@ class PrMergeLedger
 
     list_blockquote_match = list_blockquote_marker_match(markdown_line, markdown_state)
     if list_blockquote_match
-      blockquote_depth += 1
+      blockquote_depth += list_blockquote_match.blockquote_depth
       line_has_blockquote_marker = true
       line_has_list_blockquote_marker = true
       markdown_line = markdown_line[list_blockquote_match.end(0)..] || ""
@@ -2681,11 +2682,13 @@ class PrMergeLedger
   end
 
   def list_blockquote_marker_match(line, markdown_state)
-    match = line.match(/\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+> ?/)
+    match = line.match(LIST_BLOCKQUOTE_MARKER_PATTERN)
     if match
       marker_indent = column_after_prefix(match[:indent].each_char)
       list_content_indent = markdown_state.fetch("list_content_indent")
-      return match if list_marker_indent_allowed?(marker_indent, list_content_indent)
+      if list_marker_indent_allowed?(marker_indent, list_content_indent)
+        return ListBlockquoteMarkerMatch.new(match.end(0), blockquote_marker_depth(match[:blockquotes]))
+      end
     end
 
     list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
@@ -2713,12 +2716,21 @@ class PrMergeLedger
       return unless list_marker_indent_allowed?(marker_indent, list_content_column)
 
       blockquote_line_offset = nested_line_offset + nested_match.begin(:code)
-      blockquote_match = line[blockquote_line_offset..].to_s.match(/\A> ?/)
-      return ListBlockquoteMarkerMatch.new(blockquote_line_offset + blockquote_match.end(0)) if blockquote_match
+      blockquote_match = line[blockquote_line_offset..].to_s.match(/\A(?:> ?)+/)
+      if blockquote_match
+        return ListBlockquoteMarkerMatch.new(
+          blockquote_line_offset + blockquote_match.end(0),
+          blockquote_marker_depth(blockquote_match[0])
+        )
+      end
 
       nested_line_offset = blockquote_line_offset
       list_content_column = content_column
     end
+  end
+
+  def blockquote_marker_depth(markers)
+    markers.count(">")
   end
 
   def list_marker_indent_allowed?(marker_indent, list_content_indent)
