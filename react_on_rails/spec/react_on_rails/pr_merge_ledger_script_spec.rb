@@ -3198,6 +3198,8 @@ RSpec.describe "script/pr-merge-ledger" do
       "Fixed in colors.test.ts. Is that correct?",
       "Fixed in current head `current`. Please verify on Windows.",
       "Fixed in current head `current`: please verify on Windows.",
+      "Fixed in current head `current` - please verify on Windows.",
+      "Fixed in current head `current` (please verify on Windows).",
       "Fixed in current head `current`. Can you validate on Windows?",
       "Fixed in current head `current`. Can you please validate on Windows?",
       "Fixed in current head `current`. Please test on Windows.",

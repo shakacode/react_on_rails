@@ -1423,7 +1423,11 @@ class PrMergeLedger
     return false unless normalized_body.match?(FIXED_DISPOSITION_REPLY_PATTERN)
 
     body_without_urls = normalized_body.gsub(%r{https?://\S+}, "URL")
-    sentence_boundary = body_without_urls.match(/[!\r\n]|[.,;:](?=\s|$)/)
+    sentence_boundary = body_without_urls.match(
+      /[!\r\n]|
+       [.,;:](?=\s|$)|
+       (?:\s-\s+|\s*\(\s*)(?=(?:can|could|please|does|do|did|would|is|are)\b)/ix
+    )
     first_sentence = sentence_boundary ? body_without_urls[0...sentence_boundary.begin(0)] : body_without_urls
     return true if first_sentence.include?("?")
 
