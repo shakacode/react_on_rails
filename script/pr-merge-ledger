@@ -76,6 +76,11 @@ class PrMergeLedger
   HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
   HTML_BLOCK_BOUNDARY_PATTERN =
     %r{\A {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[|</?(?:#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z))}i
+  HTML_COMMENT_OPEN_PATTERN = /\A {0,3}<!--/
+  HTML_CDATA_OPEN_PATTERN = /\A {0,3}<!\[CDATA\[/
+  HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
+  HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
+  HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
   LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/
@@ -2060,6 +2065,7 @@ class PrMergeLedger
       "inline_code_multiline_reported" => false,
       "code_block_multiline_content" => nil,
       "code_block_multiline_reported" => false,
+      "html_block" => nil,
       "blockquote_depth" => 0,
       "list_content_indent" => nil,
       "list_indented_code_indent" => nil,
@@ -2353,6 +2359,7 @@ class PrMergeLedger
       current_line_in_fenced_code,
       markdown_state
     )
+    markdown_state["html_block"] = next_html_block(line, markdown_state)
   end
 
   def closing_keyword_in_inline_code(line, line_index, markdown_state)
@@ -2604,6 +2611,9 @@ class PrMergeLedger
     fence_opener_closing_keyword = closing_keyword_in_fence_opener(line, markdown_state.fetch("fence_opener_match"))
     return fence_opener_closing_keyword if fence_opener_closing_keyword
 
+    html_block_closing_keyword = closing_keyword_in_html_block(line, markdown_state)
+    return html_block_closing_keyword if html_block_closing_keyword
+
     list_indented_code_match = closing_keyword_in_list_indented_code(line, markdown_state)
     return list_indented_code_match if list_indented_code_match
     return line.match(CLOSING_KEYWORD_PATTERN) if list_indented_code_continuation_line?(line, markdown_state)
@@ -2629,6 +2639,12 @@ class PrMergeLedger
 
   def closing_keyword_in_list_indented_code(line, markdown_state)
     list_marker_indented_code_match(line, markdown_state)&.[](:code)&.match(CLOSING_KEYWORD_PATTERN)
+  end
+
+  def closing_keyword_in_html_block(line, markdown_state)
+    return unless html_block_line?(line, markdown_state)
+
+    line.match(CLOSING_KEYWORD_PATTERN)
   end
 
   def closing_keyword_in_multiline_code_block(line, markdown_state)
@@ -2856,14 +2872,68 @@ class PrMergeLedger
   end
 
   def next_paragraph_continuation_active(line, current_line_in_fenced_code, markdown_state)
-    return false if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
-    return false if line.strip.empty?
-    return false if line.match?(INDENTED_CODE_BLOCK_PATTERN) && markdown_state.fetch("root_indented_code_allowed")
+    return false if paragraph_continuation_blocked_line?(line, current_line_in_fenced_code, markdown_state)
 
     boundary_line = line.chomp
     return true if ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
 
     !root_block_boundary_line?(line, markdown_state)
+  end
+
+  def paragraph_continuation_blocked_line?(line, current_line_in_fenced_code, markdown_state)
+    current_line_in_fenced_code ||
+      markdown_state.fetch("opening_fence") ||
+      line.strip.empty? ||
+      html_block_line?(line, markdown_state) ||
+      (line.match?(INDENTED_CODE_BLOCK_PATTERN) && markdown_state.fetch("root_indented_code_allowed"))
+  end
+
+  def next_html_block(line, markdown_state)
+    active_block = markdown_state.fetch("html_block")
+    if active_block
+      return nil if html_block_closes_on_line?(line, active_block)
+
+      return active_block
+    end
+
+    block = html_block_context_for_line(line)
+    return nil unless block
+    return nil if html_block_closes_on_line?(line, block)
+
+    block
+  end
+
+  def html_block_context_for_line(line)
+    return { "type" => "comment" } if line.match?(HTML_COMMENT_OPEN_PATTERN)
+    return { "type" => "cdata" } if line.match?(HTML_CDATA_OPEN_PATTERN)
+    return { "type" => "declaration" } if line.match?(HTML_DECLARATION_OPEN_PATTERN)
+    return { "type" => "processing_instruction" } if line.match?(HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN)
+
+    tag_match = line.match(HTML_BLOCK_TAG_OPEN_PATTERN)
+    return unless tag_match
+
+    { "type" => "tag", "tag" => tag_match[:tag].downcase }
+  end
+
+  def html_block_closes_on_line?(line, html_block)
+    case html_block.fetch("type")
+    when "comment"
+      line.include?("-->")
+    when "cdata"
+      line.include?("]]>")
+    when "declaration"
+      line.include?(">")
+    when "processing_instruction"
+      line.include?("?>")
+    when "tag"
+      line.strip.empty? || line.match?(%r{</#{Regexp.escape(html_block.fetch('tag'))}\s*>}i) || line.include?("/>")
+    else
+      false
+    end
+  end
+
+  def html_block_line?(line, markdown_state)
+    markdown_state.fetch("html_block") || html_block_context_for_line(line)
   end
 
   def static_root_block_boundary_line?(boundary_line)
