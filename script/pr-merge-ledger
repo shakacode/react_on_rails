@@ -67,6 +67,7 @@ class PrMergeLedger
   ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
+  LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/
   TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
@@ -2775,6 +2776,7 @@ class PrMergeLedger
     boundary_line = line.chomp
     boundary_line.match?(ROOT_BLOCK_BOUNDARY_PATTERN) ||
       boundary_line.match?(THEMATIC_BOUNDARY_PATTERN) ||
+      boundary_line.match?(LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN) ||
       (markdown_state&.fetch("setext_heading_candidate_active", false) &&
         boundary_line.match?(SETEXT_BOUNDARY_PATTERN)) ||
       gfm_table_separator_matches_header_candidate?(line, markdown_state) ||
