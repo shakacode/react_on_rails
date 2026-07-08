@@ -58,9 +58,12 @@ inspected and filed as follow-up unless a maintainer explicitly promotes them.
 You are updating the React on Rails demo fleet for {{RC_TAG}}.
 
 Work from a clean checkout of `shakacode/react_on_rails`. Run `git fetch --prune origin main
-{{RELEASE_BRANCH}} --tags`, then check out `{{RC_TAG}}` before deriving feature coverage or demo
-work. If `{{RC_TAG}}` is not published yet, check out `origin/{{RELEASE_BRANCH}}`, verify the
-version files match the target versions below, and record that the tag is not yet available.
+--tags`, then check out `{{RC_TAG}}` before deriving feature coverage or demo work. If
+`{{RC_TAG}}` is not published yet, confirm `{{RELEASE_BRANCH}}` still exists with `git ls-remote
+--exit-code --heads origin {{RELEASE_BRANCH}}`, fetch it with `git fetch --prune origin
+{{RELEASE_BRANCH}}:refs/remotes/origin/{{RELEASE_BRANCH}}`, check out `origin/{{RELEASE_BRANCH}}`,
+verify the version files match the target versions below, and record that the tag is not yet
+available. If neither the tag nor release branch exists, stop and report the missing release ref.
 
 First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/rc-testing-plan.md`,
