@@ -356,6 +356,34 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_equal ["pr.body_code_formatted_closing_keyword_scan"], unknown_field_names(data)
   end
 
+  def test_code_formatted_closing_keyword_on_non_default_branch_allows_strict_closeout
+    output, status = run_fixture(
+      fixture_with_body("This will not close the issue from a release branch: `Fixes #4410`.").tap do |dataset|
+        dataset.fetch("pull_request")["baseRefName"] = "release/17.0.0"
+      end
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_long_non_default_branch_body_skips_closing_keyword_scan_unknown
+    body = ((["plain prose"] * 1_000) + ["`Fixes #4410`"]).join("\n")
+    output, status = run_fixture(
+      fixture_with_body(body).tap do |dataset|
+        dataset.fetch("pull_request")["baseRefName"] = "release/17.0.0"
+      end
+    )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+    assert_empty unknown_field_names(data)
+  end
+
   def test_backticked_url_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(
       fixture_with_body("This will not close: `Fixes https://github.com/shakacode/react_on_rails/issues/4410`.")

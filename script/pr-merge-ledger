@@ -50,6 +50,7 @@ class PrMergeLedger
   KNOWN_REVIEW_DECISION_STATES = (NON_BLOCKING_REVIEW_DECISION_STATES + BLOCKING_REVIEW_DECISION_STATES).freeze
   INTERNAL_REVIEW_DECISION_RAW_KEY = "review_decision_raw"
   INTERNAL_PULL_REQUEST_BODY_KEY = "body_text"
+  DEFAULT_BRANCH = "main"
   CLOSING_KEYWORD_PATTERN = %r{
     \b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+
     (?:
@@ -1997,6 +1998,8 @@ class PrMergeLedger
   end
 
   def code_formatted_closing_keyword_violations(pull_request)
+    return [] unless default_branch_pull_request?(pull_request)
+
     body = pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "")
     body_lines = body.each_line.first(MAX_BODY_LINES)
     markdown_state = {
@@ -2024,7 +2027,13 @@ class PrMergeLedger
   end
 
   def pull_request_body_truncated_for_closing_keyword_scan?(pull_request)
+    return false unless default_branch_pull_request?(pull_request)
+
     pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "").each_line.count > MAX_BODY_LINES
+  end
+
+  def default_branch_pull_request?(pull_request)
+    pull_request["base_ref"] == DEFAULT_BRANCH
   end
 
   def code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
