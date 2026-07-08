@@ -12,21 +12,22 @@ class PrMergeLedger
       def list_item_link_reference_content_line(line, markdown_state)
         return unless markdown_state
 
-        list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-        return unless list_match
+        content_indent = markdown_state.fetch("list_content_indent")
+        content_line = line
 
-        marker_indent = column_after_prefix(list_match[:indent].each_char)
-        content_column = column_after_prefix(line[...list_match.begin(:code)])
-        return unless list_marker_indent_allowed_for_line?(
-          marker_indent,
-          markdown_state.fetch("list_content_indent"),
-          content_column
-        )
+        loop do
+          list_match = content_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
+          return unless list_match
 
-        content_line = list_match[:code]
-        return unless link_reference_definition_line?(content_line, markdown_state)
+          marker_indent = column_after_prefix(list_match[:indent].each_char)
+          content_column = column_after_prefix(content_line[...list_match.begin(:code)])
+          return unless list_marker_indent_allowed_for_line?(marker_indent, content_indent, content_column)
 
-        content_line
+          content_line = list_match[:code]
+          return content_line if link_reference_definition_line?(content_line, markdown_state)
+
+          content_indent = content_column
+        end
       end
 
       def link_reference_definition_parts(line)
@@ -77,11 +78,37 @@ class PrMergeLedger
         closing_delimiter = LINK_REFERENCE_TITLE_DELIMITERS[stripped_title[0]]
         return unless closing_delimiter
 
-        closing_index = stripped_title[1..].to_s.index(closing_delimiter)
+        closing_index = unescaped_delimiter_index(stripped_title[1..].to_s, closing_delimiter)
         return { delimiter: closing_delimiter, complete: false } if closing_index.nil?
         return unless stripped_title[(closing_index + 2)..].to_s.strip.empty?
 
         { delimiter: closing_delimiter, complete: true }
+      end
+
+      def line_has_unescaped_delimiter?(line, delimiter)
+        !unescaped_delimiter_index(line, delimiter).nil?
+      end
+
+      def unescaped_delimiter_index(text, delimiter)
+        search_start = 0
+        loop do
+          delimiter_index = text.index(delimiter, search_start)
+          return unless delimiter_index
+          return delimiter_index if even_backslash_run_before?(text, delimiter_index)
+
+          search_start = delimiter_index + delimiter.length
+        end
+      end
+
+      def even_backslash_run_before?(text, index)
+        backslash_count = 0
+        cursor = index - 1
+        while cursor >= 0 && text[cursor] == "\\"
+          backslash_count += 1
+          cursor -= 1
+        end
+
+        backslash_count.even?
       end
     end
   end

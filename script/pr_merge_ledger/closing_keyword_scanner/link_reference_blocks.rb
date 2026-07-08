@@ -77,7 +77,7 @@ class PrMergeLedger
       def next_link_reference_title_delimiter(line, current_line_in_fenced_code, markdown_state)
         link_reference_line = link_reference_content_line(line, markdown_state)
         active_delimiter = markdown_state.fetch("link_reference_title_delimiter")
-        return link_reference_line.include?(active_delimiter) ? nil : active_delimiter if active_delimiter
+        return next_active_link_reference_title_delimiter(link_reference_line, active_delimiter) if active_delimiter
         return nil if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
 
         if link_reference_definition_boundary_line?(link_reference_line, markdown_state)
@@ -91,6 +91,12 @@ class PrMergeLedger
         return unless markdown_state.fetch("link_reference_title_allowed")
 
         unclosed_link_reference_title_delimiter(link_reference_line)
+      end
+
+      def next_active_link_reference_title_delimiter(link_reference_line, active_delimiter)
+        return nil if link_reference_line.strip.empty?
+
+        line_has_unescaped_delimiter?(link_reference_line, active_delimiter) ? nil : active_delimiter
       end
 
       def link_reference_definition_line?(line, _markdown_state = nil)

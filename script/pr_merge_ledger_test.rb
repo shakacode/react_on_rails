@@ -835,6 +835,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_nested_list_item_link_reference_definition_same_line_title_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- - [foo]: /url \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_malformed_link_reference_definition_with_extra_title_text_allows_visible_closeout
     output, status = run_fixture(fixture_with_body("[foo]: /url \"title\" ok Fixes #4410\n"))
 
@@ -842,6 +853,26 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     data = JSON.parse(output)
     assert data.fetch("complete_allowed")
     assert_empty violation_codes(data)
+  end
+
+  def test_link_reference_multiline_title_blank_line_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: /url '\n\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_link_reference_definition_escaped_title_delimiter_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: /url \"foo \\\" Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
   def test_link_reference_definition_split_destination_blocks_strict_closeout
