@@ -174,6 +174,8 @@ class PrMergeLedger
       end
 
       def list_item_block_boundary_line?(line, markdown_state)
+        return false if ordered_list_marker_continues_list_paragraph?(line.chomp, markdown_state)
+
         list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
         return false unless list_match
 

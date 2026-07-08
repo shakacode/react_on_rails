@@ -1678,6 +1678,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_list_paragraph_continuation_over_noninterrupting_ordered_marker_heading_text_allows_closeout
+    output, status = run_fixture(fixture_with_body("- Intro\n  2. # details\n      Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_nested_list_marker_with_indented_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- a\n  - b\n    -     Fixes #4410\n"))
 
