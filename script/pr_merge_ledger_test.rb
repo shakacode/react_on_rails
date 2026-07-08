@@ -554,6 +554,31 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes\s+#4410/, violation.fetch("message"))
   end
 
+  def test_adjacent_split_fenced_code_blocks_each_report_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body(
+        <<~MARKDOWN
+          ```text
+          Fixes
+          #4410
+          ```
+          ```text
+          Resolves
+          #4411
+          ```
+        MARKDOWN
+      )
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal %w[code_formatted_closing_keyword code_formatted_closing_keyword], violation_codes(data)
+    violations = ledger(data).fetch("violations")
+    assert_equal([3, 7], violations.map { |violation| violation.fetch("line") })
+    assert_match(/Fixes\s+#4410/, violations[0].fetch("message"))
+    assert_match(/Resolves\s+#4411/, violations[1].fetch("message"))
+  end
+
   def test_large_fenced_code_block_stops_accumulating_after_first_report
     filler = (["x" * 200] * 996).join("\n")
     output, status = run_fixture(fixture_with_body("```text\nFixes\n#4410\n#{filler}\n```\n"))
@@ -824,6 +849,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_link_reference_definition_escaped_angle_destination_title_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: <my \\<url> \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_list_item_link_reference_definition_same_line_title_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- [foo]: /url \"Fixes #4410\"\n"))
 
@@ -855,6 +891,24 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_malformed_angle_link_reference_without_closing_angle_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: <url \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_malformed_angle_link_reference_with_unescaped_angle_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: <my <url> \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_link_reference_multiline_title_blank_line_allows_visible_closeout
     output, status = run_fixture(fixture_with_body("[foo]: /url '\n\nFixes #4410\n"))
 
@@ -877,6 +931,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_link_reference_definition_split_destination_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("[foo]:\n/url \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_link_reference_definition_label_only_crlf_split_destination_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]:\r\n/url \"Fixes #4410\"\r\n"))
 
     refute status.success?, output
     data = JSON.parse(output)
@@ -970,6 +1035,18 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 3, violation.fetch("line")
     assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_adjacent_multiline_html_comments_each_report_split_closing_keyword
+    output, status = run_fixture(fixture_with_body("<!--\nFixes\n#4410\n-->\n<!--\nResolves\n#4411\n-->\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal %w[code_formatted_closing_keyword code_formatted_closing_keyword], violation_codes(data)
+    violations = ledger(data).fetch("violations")
+    assert_equal([3, 7], violations.map { |violation| violation.fetch("line") })
+    assert_match(/Fixes\s+#4410/, violations[0].fetch("message"))
+    assert_match(/Resolves\s+#4411/, violations[1].fetch("message"))
   end
 
   def test_html_block_closing_keyword_blocks_strict_closeout
@@ -1527,6 +1604,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_empty_list_marker_indented_code_continuation_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("-\n      Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_empty_list_marker_crlf_indented_code_continuation_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("-\r\n      Fixes #4410\r\n"))
 
     refute status.success?, output
     data = JSON.parse(output)

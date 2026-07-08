@@ -41,7 +41,10 @@ class PrMergeLedger
         stripped = line.to_s.sub(/\A {0,3}/, "").strip
         return { destination: nil, title: nil, complete_title: false } if stripped.empty?
 
-        destination, title = link_reference_destination_and_title(stripped)
+        destination_and_title = link_reference_destination_and_title(stripped)
+        return unless destination_and_title
+
+        destination, title = destination_and_title
         return { destination:, title: nil, complete_title: false } if title.nil?
 
         title_parts = link_reference_title_parts_from_text(title)
@@ -58,7 +61,10 @@ class PrMergeLedger
         return stripped.split(/[ \t]+/, 2) unless stripped.start_with?("<")
 
         destination_end = stripped.index(">")
-        return [stripped, nil] unless destination_end
+        return unless destination_end
+
+        destination_text = stripped[1...destination_end]
+        return if line_has_unescaped_delimiter?(destination_text, "<")
 
         destination = stripped[..destination_end]
         title = stripped[(destination_end + 1)..].to_s.strip

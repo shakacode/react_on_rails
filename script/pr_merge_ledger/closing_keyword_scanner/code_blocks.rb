@@ -43,12 +43,22 @@ class PrMergeLedger
       end
 
       def closing_keyword_in_html_block(line, markdown_state)
-        unless html_block_line?(line, markdown_state)
+        html_block = html_block_context_for_scan(line, markdown_state)
+        unless html_block
           reset_multiline_html_block_state(markdown_state)
           return
         end
 
+        reset_multiline_html_block_state(markdown_state) if new_html_block?(markdown_state, html_block)
         line.match(CLOSING_KEYWORD_PATTERN) || closing_keyword_in_multiline_html_block(line, markdown_state)
+      end
+
+      def html_block_context_for_scan(line, markdown_state)
+        markdown_state.fetch("html_block") || html_block_context_for_line(line, markdown_state)
+      end
+
+      def new_html_block?(markdown_state, html_block)
+        markdown_state.fetch("html_block").nil? && !html_block.nil?
       end
 
       def closing_keyword_in_multiline_html_block(line, markdown_state)

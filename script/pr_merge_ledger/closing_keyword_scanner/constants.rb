@@ -17,7 +17,7 @@ class PrMergeLedger
     LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+/
     ORDERED_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<start>\d{1,9})[.)][ \t]+/
     ORDERED_LIST_MARKER_OR_EMPTY_PATTERN = /\A(?<indent>[ \t]*)(?<start>\d{1,9})[.)](?:[ \t]+|[ \t]*\z)/
-    EMPTY_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])[ \t]*(?:\n)?\z/
+    EMPTY_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])[ \t]*(?:\r?\n)?\z/
     LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
     LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
     LIST_BLOCKQUOTE_MARKER_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<blockquotes>(?:> ?)+)/
@@ -49,8 +49,8 @@ class PrMergeLedger
     HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze
     THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
     SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
-    LINK_REFERENCE_DEFINITION_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*(?<tail>[^\n]*)(?:\n)?\z/
-    LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*(?:\n)?\z/
+    LINK_REFERENCE_DEFINITION_PATTERN = /\A {0,3}\[[^\]\r\n]+\]:[ \t]*(?<tail>[^\r\n]*)(?:\r?\n)?\z/
+    LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN = /\A {0,3}\[[^\]\r\n]+\]:[ \t]*(?:\r?\n)?\z/
     LINK_REFERENCE_DESTINATION_LINE_PATTERN = /\A {0,3}\S/
     LINK_REFERENCE_TITLE_DELIMITERS = { "\"" => "\"", "'" => "'", "(" => ")" }.freeze
     TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/

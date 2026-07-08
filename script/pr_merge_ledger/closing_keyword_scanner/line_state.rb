@@ -6,10 +6,18 @@ class PrMergeLedger
       private
 
       def code_block_closing_keyword_match(line, current_line_in_fenced_code, code_block_line, markdown_state)
+        if new_fenced_code_block_opener?(current_line_in_fenced_code, markdown_state)
+          reset_multiline_code_block_state(markdown_state)
+        end
+
         block_match = closing_keyword_in_code_block(line, current_line_in_fenced_code, markdown_state)
         block_match ||= closing_keyword_in_multiline_code_block(line, markdown_state) if code_block_line
         reset_multiline_code_block_state(markdown_state) unless code_block_line
         block_match
+      end
+
+      def new_fenced_code_block_opener?(current_line_in_fenced_code, markdown_state)
+        !current_line_in_fenced_code && markdown_state.fetch("fence_opener_match")
       end
 
       def update_blockquote_lazy_continuation_state(markdown_state, line, current_line_in_fenced_code)
