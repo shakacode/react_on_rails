@@ -181,6 +181,43 @@ describe ReactOnRailsProHelper do
 
             expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
           end
+
+          it "converts expires_at before writing tagged entries when the cache store lacks expires_at support" do
+            allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+            allow(Rails.cache).to receive(:fetch).and_call_original
+            expires_at = Time.now + 3600
+
+            cached_react_component("App", cache_key: "expires-at-tagged-key", cache_tags: ["post:42"],
+                                          cache_options: { expires_at: }) do
+              { a: 1 }
+            end
+
+            expect(Rails.cache).to have_received(:fetch) do |_cache_key, cache_options|
+              expect(cache_options).not_to have_key(:expires_at)
+              expect(cache_options[:expires_in]).to be_within(5).of(3600)
+            end
+            expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
+          end
+
+          it "does not cache entries whose expires_at has already passed" do
+            allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+            props_calls = 0
+
+            render_cached = lambda do
+              cached_react_component("App", cache_key: "expired-expires-at-key", cache_tags: ["post:42"],
+                                            cache_options: { expires_at: Time.now - 60 }) do
+                props_calls += 1
+                { a: 1 }
+              end
+            end
+
+            render_cached.call
+            render_cached.call
+
+            expect(props_calls).to eq(2)
+            expect(cache_data.keys).not_to include(%r{/App/expired-expires-at-key})
+            expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(0)
+          end
         end
 
         context "with multiple cache keys" do

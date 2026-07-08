@@ -46,17 +46,29 @@ module ReactOnRailsProHelper
     end
   end
 
-  def fetch_react_component(component_name, options, &)
-    ReactOnRailsPro::Cache.fetch_react_component(
-      component_name,
-      options,
-      {
-        on_cache_hit: lambda do |cached_component_name, cached_options|
-          load_pack_for_cached_react_component(cached_component_name, cached_options)
-        end
-      },
-      &
-    )
+  def fetch_react_component(component_name, options = {})
+    options ||= {}
+
+    return yield unless ReactOnRailsPro::Cache.use_cache?(options)
+
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+    Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
+    if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
+      return add_component_cache_metadata(yield, cache_key, false)
+    end
+
+    cache_hit = true
+    normalized_cache_tags = []
+    result = Rails.cache.fetch(cache_key, cache_options) do
+      cache_hit = false
+      normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
+      yield
+    end
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
+    load_pack_for_cached_react_component(component_name, options) if cache_hit
+
+    add_component_cache_metadata(result, cache_key, cache_hit)
   end
 
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -445,6 +457,14 @@ module ReactOnRailsProHelper
   end
 
   private
+
+  def add_component_cache_metadata(result, cache_key, cache_hit)
+    return result unless result.is_a?(Hash)
+
+    result[:RORP_CACHE_KEY] = cache_key
+    result[:RORP_CACHE_HIT] = cache_hit
+    result
+  end
 
   def load_pack_for_cached_react_component(component_name, options)
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
