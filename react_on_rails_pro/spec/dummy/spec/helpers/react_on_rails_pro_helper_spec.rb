@@ -117,6 +117,22 @@ describe ReactOnRailsProHelper do
           expect(cache_data.keys).to include(/xyz123/)
         end
 
+        it "uses callable cache keys" do
+          props_calls = 0
+          render_cached = lambda do
+            cached_react_component("App", cache_key: -> { "callable-cache-key" }) do
+              props_calls += 1
+              { a: 1, b: 2 }
+            end
+          end
+
+          render_cached.call
+          render_cached.call
+
+          expect(props_calls).to eq(1)
+          expect(cache_data.keys).to include(%r{/App/callable-cache-key})
+        end
+
         it "doesn't call the block if content is cached" do
           cached_react_component("App", cache_key: "cache-key") do
             { a: 1, b: 2 }
@@ -330,6 +346,33 @@ describe ReactOnRailsProHelper do
 
           expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
           expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
+        end
+
+        it "adds cache metadata to hash results on cache misses and hits" do
+          cache_key = "hash-cache-metadata"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            "ReactHelmetApp",
+            cache_key:,
+            prerender: true
+          )
+          props_calls = 0
+          allow(self).to receive(:react_component_hash).and_return({ component_html: "<div>rendered component</div>" })
+
+          render_cached = lambda do
+            cached_react_component_hash("ReactHelmetApp", cache_key:) do
+              props_calls += 1
+              { helloWorldData: { name: "Mr. Server Side Rendering" } }
+            end
+          end
+
+          miss_result = render_cached.call
+          hit_result = render_cached.call
+
+          expect(props_calls).to eq(1)
+          expect(miss_result[:RORP_CACHE_KEY]).to eq(expected_cache_key)
+          expect(miss_result[:RORP_CACHE_HIT]).to be(false)
+          expect(hit_result[:RORP_CACHE_KEY]).to eq(expected_cache_key)
+          expect(hit_result[:RORP_CACHE_HIT]).to be(true)
         end
 
         context "with prerender_caching off" do
