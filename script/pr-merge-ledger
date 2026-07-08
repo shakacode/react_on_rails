@@ -68,7 +68,6 @@ class PrMergeLedger
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
   TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/
-  GFM_TABLE_ROW_BOUNDARY_PATTERN = /\A {0,3}.+\|.+\z/
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
@@ -2082,7 +2081,7 @@ class PrMergeLedger
   end
 
   def code_block_closing_keyword_match(line, current_line_in_fenced_code, code_block_line, markdown_state)
-    block_match = closing_keyword_in_code_block_for_state(line, current_line_in_fenced_code, markdown_state)
+    block_match = closing_keyword_in_code_block(line, current_line_in_fenced_code, markdown_state)
     block_match ||= closing_keyword_in_multiline_code_block(line, markdown_state) if code_block_line
     reset_multiline_code_block_state(markdown_state) unless code_block_line
     block_match
@@ -2126,7 +2125,7 @@ class PrMergeLedger
       markdown_line = markdown_line[marker_match.end(0)..] || ""
     end
 
-    list_blockquote_match = markdown_line.match(/\A {0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+> ?/)
+    list_blockquote_match = list_blockquote_marker_match(markdown_line, markdown_state)
     if list_blockquote_match
       blockquote_depth += 1
       line_has_blockquote_marker = true
@@ -2257,14 +2256,6 @@ class PrMergeLedger
       markdown_state.fetch("opening_fence"),
       markdown_state.fetch("list_content_indent"),
       blockquote_depth
-    )
-  end
-
-  def closing_keyword_in_code_block_for_state(line, current_line_in_fenced_code, markdown_state)
-    closing_keyword_in_code_block(
-      line,
-      current_line_in_fenced_code,
-      markdown_state
     )
   end
 
@@ -2584,10 +2575,16 @@ class PrMergeLedger
   end
 
   def closing_keyword_in_multiline_code_block(line, markdown_state)
-    content = markdown_state.fetch("code_block_multiline_content")
-    content = content ? "#{content}\n#{line}" : line.to_s.dup
-    markdown_state["code_block_multiline_content"] = content
     return if markdown_state.fetch("code_block_multiline_reported")
+
+    content = markdown_state.fetch("code_block_multiline_content")
+    content = if content
+                content << "\n"
+                content << line.to_s
+              else
+                line.to_s.dup
+              end
+    markdown_state["code_block_multiline_content"] = content
 
     match = content.match(CLOSING_KEYWORD_PATTERN)
     return unless match
@@ -2616,6 +2613,17 @@ class PrMergeLedger
                         match[:padding].include?("\t") &&
                         content_column >= marker_end_column + 3
     return unless tab_indented_code || content_column >= marker_end_column + 5
+
+    match
+  end
+
+  def list_blockquote_marker_match(line, markdown_state)
+    match = line.match(/\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+> ?/)
+    return unless match
+
+    marker_indent = column_after_prefix(match[:indent].each_char)
+    list_content_indent = markdown_state.fetch("list_content_indent")
+    return unless list_marker_indent_allowed?(marker_indent, list_content_indent)
 
     match
   end
@@ -2694,7 +2702,7 @@ class PrMergeLedger
     boundary_line = line.chomp
     return nil if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
     return nil unless gfm_table_separator_cell_count(boundary_line).nil?
-    return nil unless boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
+    return nil unless gfm_table_row_boundary_line?(boundary_line)
 
     gfm_table_cell_count(boundary_line)
   end
@@ -2729,7 +2737,7 @@ class PrMergeLedger
   def gfm_table_separator_cell_count(line)
     boundary_line = line.chomp
     cells = gfm_table_cells(boundary_line)
-    return nil if cells.length < 2
+    return nil if cells.empty?
     return nil unless cells.all? { |cell| cell.strip.match?(TABLE_SEPARATOR_CELL_PATTERN) }
 
     cells.length
@@ -2740,10 +2748,32 @@ class PrMergeLedger
   end
 
   def gfm_table_cells(line)
-    cells = line.sub(/\A {0,3}/, "")
-    cells = cells[1..] || "" if cells.start_with?("|")
-    cells = cells[...-1] || "" if cells.end_with?("|")
-    cells.split("|", -1)
+    row = line.sub(/\A {0,3}/, "")
+    cells = split_gfm_table_row(row)
+    cells.shift if row.start_with?("|")
+    cells.pop if row.end_with?("|") && !escaped_character?(row, row.length - 1)
+    cells
+  end
+
+  def split_gfm_table_row(row)
+    cells = []
+    cell = +""
+    row.each_char.with_index do |character, index|
+      if character == "|" && !escaped_character?(row, index)
+        cells << cell
+        cell = +""
+      else
+        cell << character
+      end
+    end
+    cells << cell
+  end
+
+  def gfm_table_row_boundary_line?(line)
+    row = line.sub(/\A {0,3}/, "")
+    row.each_char.with_index.any? do |character, index|
+      character == "|" && !escaped_character?(row, index)
+    end
   end
 
   def gfm_table_body_row_line?(line, markdown_state)
@@ -2752,7 +2782,7 @@ class PrMergeLedger
     boundary_line = line.chomp
     return false if boundary_line.strip.empty?
     return false if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
-    return true if boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
+    return true if gfm_table_row_boundary_line?(boundary_line)
 
     gfm_table_plain_body_row_line?(boundary_line)
   end
