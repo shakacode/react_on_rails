@@ -265,6 +265,7 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
     refute status.success?, output
     data = JSON.parse(output)
+    refute_includes ledger(data).fetch("pr").keys, "body_text"
     assert_equal ["backticked_closing_keyword"], violation_codes(data)
     violation = ledger(data).fetch("violations").first
     assert_equal 1, violation.fetch("line")
