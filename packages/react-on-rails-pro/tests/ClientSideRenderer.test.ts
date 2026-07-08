@@ -277,9 +277,32 @@ describe('ClientSideRenderer', () => {
     expect(document.head.querySelector('script[src="/third-party-widget.js"]')).toBeNull();
   });
 
+  it('does not move leading async scripts from RSC-enabled roots without a payload initializer', async () => {
+    const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
+    ComponentRegistry.register({ TestComponent });
+    const componentSpec = setupTestComponentDom(
+      'dom-id-rsc-without-payload-script',
+      '<script src="/app-authored-widget.js" async=""></script><div>Server fallback</div>',
+    );
+    addRailsContext({ rscPayloadGenerationUrlPath: '/rsc_payload' });
+
+    await renderOrHydrateComponent(componentSpec);
+
+    const mountNode = document.getElementById('dom-id-rsc-without-payload-script') as HTMLElement;
+    const leadingScript = mountNode.firstElementChild as HTMLScriptElement;
+    expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+    expect(mockReactHydrateOrRender.mock.calls[0][2]).toBe(true);
+    expect(leadingScript.tagName).toBe('SCRIPT');
+    expect(leadingScript.getAttribute('src')).toBe('/app-authored-widget.js');
+    expect(document.head.querySelector('script[src="/app-authored-widget.js"]')).toBeNull();
+  });
+
   it('removes direct RSC payload scripts before hydrating RSC roots', async () => {
     const TestComponent = ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting);
     ComponentRegistry.register({ TestComponent });
+    document.head.innerHTML =
+      '<link rel="stylesheet" href="/packs/css/client0.css" data-precedence="rsc-css">' +
+      '<script src="/packs/js/client0.chunk.js" async=""></script>';
     const componentSpec = setupTestComponentDom(
       'dom-id-rsc-payload-cleanup',
       '<script data-react-on-rails-rsc-payload="true">window.__rscPayloadInitialized = true</script>' +
@@ -298,8 +321,10 @@ describe('ClientSideRenderer', () => {
     expect(mountNode.querySelector('script[data-react-on-rails-rsc-payload="true"]')).toBeNull();
     expect(mountNode.querySelector('link[data-precedence="rsc-css"]')).toBeNull();
     expect(mountNode.querySelector('script[src="/packs/js/client0.chunk.js"]')).toBeNull();
-    expect(document.head.querySelector('link[data-precedence="rsc-css"]')).not.toBeNull();
-    expect(document.head.querySelector('script[src="/packs/js/client0.chunk.js"]')).not.toBeNull();
+    expect(
+      document.head.querySelectorAll('link[data-precedence="rsc-css"][href="/packs/css/client0.css"]'),
+    ).toHaveLength(1);
+    expect(document.head.querySelectorAll('script[src="/packs/js/client0.chunk.js"]')).toHaveLength(1);
     expect(mountNode.innerHTML).toContain('<div>Server fallback</div>');
   });
 
