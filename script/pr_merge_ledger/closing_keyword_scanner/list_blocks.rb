@@ -164,6 +164,10 @@ class PrMergeLedger
       end
 
       def empty_list_item_line?(line, markdown_state)
+        boundary_line = line.chomp
+        return false if ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
+        return false if ordered_list_marker_continues_list_paragraph?(boundary_line, markdown_state)
+
         match = empty_list_item_match(line)
         return false unless match
 

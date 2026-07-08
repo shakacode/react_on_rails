@@ -48,7 +48,7 @@ class PrMergeLedger
       def ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
         return false unless markdown_state&.fetch("paragraph_continuation_active", false)
 
-        match = boundary_line.match(ORDERED_ROOT_LIST_ITEM_PATTERN)
+        match = boundary_line.match(ORDERED_ROOT_LIST_MARKER_OR_EMPTY_PATTERN)
         match && match[:start] != "1"
       end
 

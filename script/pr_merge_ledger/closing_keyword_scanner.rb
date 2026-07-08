@@ -38,6 +38,7 @@ class PrMergeLedger
     INDENTATION_CHARACTERS = [" ", "\t"].freeze
     LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+/
     ORDERED_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<start>\d{1,9})[.)][ \t]+/
+    ORDERED_LIST_MARKER_OR_EMPTY_PATTERN = /\A(?<indent>[ \t]*)(?<start>\d{1,9})[.)](?:[ \t]+|[ \t]*\z)/
     EMPTY_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])[ \t]*(?:\n)?\z/
     LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
     LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
@@ -47,6 +48,7 @@ class PrMergeLedger
     SAME_LINE_BLOCKQUOTE_MARKER_PATTERN = /\G(?:> ?)+/
     SAME_LINE_FENCED_CODE_BLOCK_PATTERN = /\G {0,3}(?<fence>`{3,}|~{3,})/
     ORDERED_ROOT_LIST_ITEM_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)][ \t]+/
+    ORDERED_ROOT_LIST_MARKER_OR_EMPTY_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)](?:[ \t]+|[ \t]*\z)/
     ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
     HTML_BLOCK_TAG_NAMES = %w[
       address article aside base basefont blockquote body caption center col colgroup dd details dialog dir div dl dt

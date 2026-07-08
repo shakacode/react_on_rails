@@ -1415,7 +1415,6 @@ Also verify:
 - PR is not draft unless the user is only asking for readiness work.
 - `mergeStateStatus` is clean or the remaining instability is understood and non-required.
 - No current `CHANGES_REQUESTED` from a human or required reviewer; use `latestReviews` to verify the source before treating an advisory AI request as non-blocking. If an advisory AI system requested changes, triage the review content for confirmed blockers instead of treating the review state alone as a merge block.
-- For agent-batch PRs, any substantive post-approval commit makes earlier bot-only approval advisory. Rerun the configured review gate on the current head or require a current-head human approval before treating the PR as merge-ready. Repository admin stale-approval dismissal is branch-protection configuration outside this checklist; the workflow records current-head evidence through the merge ledger.
 - No unresolved current review thread changes correctness, tests, security, or required scope.
 - No pending, stale, late, or untriaged configured review-agent feedback remains for the current head SHA.
 - No AI reviewer finding remains untriaged as a confirmed blocker; do not wait for AI approval objects or positive AI issue comments as special gates.

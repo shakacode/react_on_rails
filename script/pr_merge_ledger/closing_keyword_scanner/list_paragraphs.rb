@@ -11,7 +11,7 @@ class PrMergeLedger
         list_content_indent = markdown_state.fetch("list_content_indent", nil)
         return false unless list_content_indent
 
-        match = boundary_line.match(ORDERED_LIST_ITEM_PATTERN)
+        match = boundary_line.match(ORDERED_LIST_MARKER_OR_EMPTY_PATTERN)
         return false unless match && match[:start] != "1"
 
         marker_indent = column_after_prefix(match[:indent].each_char)
