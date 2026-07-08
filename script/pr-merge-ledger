@@ -67,7 +67,7 @@ class PrMergeLedger
   ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
-  TABLE_SEPARATOR_BOUNDARY_PATTERN = /\A {0,3}\|?[ \t]*:?-{2,}:?[ \t]*(?:\|[ \t]*:?-{2,}:?[ \t]*)+\|?[ \t]*\z/
+  TABLE_SEPARATOR_BOUNDARY_PATTERN = /\A {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*\z/
   GFM_TABLE_ROW_BOUNDARY_PATTERN = /\A {0,3}.+\|.+\z/
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
@@ -2016,6 +2016,7 @@ class PrMergeLedger
       "list_indented_code_allowed" => true,
       "gfm_table_block_active" => false,
       "gfm_table_header_candidate_active" => false,
+      "gfm_table_header_candidate_cell_count" => nil,
       "setext_heading_candidate_active" => false,
       "blockquote_lazy_continuation_allowed" => false,
       "root_indented_code_allowed" => true
@@ -2301,7 +2302,9 @@ class PrMergeLedger
       markdown_state
     )
     markdown_state["gfm_table_block_active"] = next_gfm_table_block_active(line, markdown_state)
-    markdown_state["gfm_table_header_candidate_active"] = next_gfm_table_header_candidate_active(line)
+    markdown_state["gfm_table_header_candidate_cell_count"] = next_gfm_table_header_candidate_cell_count(line)
+    markdown_state["gfm_table_header_candidate_active"] =
+      !markdown_state.fetch("gfm_table_header_candidate_cell_count").nil?
   end
 
   def closing_keyword_in_inline_code(line, line_index, markdown_state)
@@ -2681,20 +2684,19 @@ class PrMergeLedger
   end
 
   def next_gfm_table_block_active(line, markdown_state)
-    boundary_line = line.chomp
-    return true if markdown_state.fetch("gfm_table_header_candidate_active") &&
-                   boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    return true if gfm_table_separator_matches_header_candidate?(line, markdown_state)
     return true if gfm_table_body_row_line?(line, markdown_state)
 
     false
   end
 
-  def next_gfm_table_header_candidate_active(line)
+  def next_gfm_table_header_candidate_cell_count(line)
     boundary_line = line.chomp
-    return false if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
-    return false if boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    return nil if boundary_line.match?(INDENTED_CODE_BLOCK_PATTERN)
+    return nil if boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+    return nil unless boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
 
-    boundary_line.match?(GFM_TABLE_ROW_BOUNDARY_PATTERN)
+    gfm_table_cell_count(boundary_line)
   end
 
   def next_setext_heading_candidate_active(line, current_line_in_fenced_code, markdown_state)
@@ -2712,9 +2714,30 @@ class PrMergeLedger
       boundary_line.match?(THEMATIC_BOUNDARY_PATTERN) ||
       (markdown_state&.fetch("setext_heading_candidate_active", false) &&
         boundary_line.match?(SETEXT_BOUNDARY_PATTERN)) ||
-      (markdown_state&.fetch("gfm_table_header_candidate_active", false) &&
-        boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)) ||
+      gfm_table_separator_matches_header_candidate?(line, markdown_state) ||
       gfm_table_body_row_line?(line, markdown_state)
+  end
+
+  def gfm_table_separator_matches_header_candidate?(line, markdown_state)
+    return false unless markdown_state&.fetch("gfm_table_header_candidate_active", false)
+
+    header_cell_count = markdown_state.fetch("gfm_table_header_candidate_cell_count")
+    separator_cell_count = gfm_table_separator_cell_count(line)
+    !separator_cell_count.nil? && separator_cell_count == header_cell_count
+  end
+
+  def gfm_table_separator_cell_count(line)
+    boundary_line = line.chomp
+    return nil unless boundary_line.match?(TABLE_SEPARATOR_BOUNDARY_PATTERN)
+
+    gfm_table_cell_count(boundary_line)
+  end
+
+  def gfm_table_cell_count(line)
+    cells = line.sub(/\A {0,3}/, "")
+    cells = cells[1..] || "" if cells.start_with?("|")
+    cells = cells[...-1] || "" if cells.end_with?("|")
+    cells.split("|", -1).length
   end
 
   def gfm_table_body_row_line?(line, markdown_state)

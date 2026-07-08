@@ -779,6 +779,26 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_gfm_table_mismatched_delimiter_cell_count_allows_paragraph_continuation
+    output, status = run_fixture(fixture_with_body("A | B\n--- | --- | ---\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_gfm_table_single_hyphen_delimiter_before_indented_code_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("A | B\n:-: | -:\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_blockquoted_indented_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("> This will not close.\n>\n>     Fixes #4410\n"))
 
