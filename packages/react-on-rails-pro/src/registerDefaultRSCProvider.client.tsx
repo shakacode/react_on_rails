@@ -31,6 +31,10 @@ if (typeof window !== 'undefined') {
       },
     });
 
-    return <RSCProvider>{reactElement}</RSCProvider>;
+    return (
+      <RSCProvider>
+        <React.Suspense fallback={null}>{reactElement}</React.Suspense>
+      </RSCProvider>
+    );
   });
 }

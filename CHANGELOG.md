@@ -24,6 +24,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
+  removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
+  RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
+  the same null Suspense boundary used by the server stream. This prevents recoverable hydration
+  mismatches on streamed RSC apps such as the flagship demo. Fixes
+  [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525).
+
 ### [17.0.0.rc.7] - 2026-07-06
 
 #### Breaking Changes

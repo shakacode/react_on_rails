@@ -39,6 +39,7 @@ import {
   scheduleRSCClientHydrationInteractiveMark,
   type RSCClientHydrationMarkDetail,
 } from '../rscClientPerformanceMarks.tsx';
+import prepareRSCHydrationRoot from '../rscHydrationDom.ts';
 
 ensureReactUseAvailable();
 
@@ -121,6 +122,7 @@ const wrapServerComponentRenderer = (
       domNodeId,
     });
 
+    prepareRSCHydrationRoot(domNode);
     const shouldHydrate = !!domNode.innerHTML;
     const componentElement = <Component {...props} />;
     let hydrationMarkDetail: RSCClientHydrationMarkDetail | undefined;

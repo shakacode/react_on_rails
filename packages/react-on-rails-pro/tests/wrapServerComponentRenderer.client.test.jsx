@@ -272,7 +272,7 @@ describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
       domNode.id,
     );
 
-    return { teardownResult, unmount, render, hydrateRoot, createRoot };
+    return { teardownResult, unmount, render, hydrateRoot, createRoot, domNode };
   };
 
   beforeEach(() => {
@@ -310,6 +310,23 @@ describe('wrapServerComponentRenderer/client teardown (issue #3209)', () => {
     await teardownResult.teardown();
 
     expect(unmount).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes direct RSC payload scripts from server HTML before hydrating', async () => {
+    const { wrapServerComponentRenderer, hydrateRoot } = loadWrappedRendererWithMocks();
+    const domNode = document.createElement('div');
+    domNode.id = 'wrapped-rsc-payload-script-cleanup';
+    domNode.innerHTML =
+      '<script data-react-on-rails-rsc-payload="true">window.__rscPayloadInitialized = true</script>' +
+      '<!--$--><main>server html</main><!--/$-->';
+    document.body.appendChild(domNode);
+
+    const WrappedComponent = wrapServerComponentRenderer(() => null, 'WrappedComponent');
+    await WrappedComponent({}, { rscPayloadGenerationUrlPath: '/rsc_payload' }, domNode.id);
+
+    expect(hydrateRoot).toHaveBeenCalledTimes(1);
+    expect(domNode.querySelector('script[data-react-on-rails-rsc-payload="true"]')).toBeNull();
+    expect(domNode.innerHTML).toContain('<main>server html</main>');
   });
 });
 
