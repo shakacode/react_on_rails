@@ -33,9 +33,97 @@ class PrMergeLedger
           return { "type" => tag_type, "tag" => tag_name }
         end
 
-        return { "type" => "type7_tag" } if line.match?(HTML_TYPE_7_BLOCK_OPEN_PATTERN)
+        return { "type" => "type7_tag" } if html_type_7_block_open_line?(line)
 
         list_item_html_block_context_for_line(line, markdown_state)
+      end
+
+      def html_type_7_block_open_line?(line)
+        markdown_line = line.chomp
+        index = html_type_7_start_index(markdown_line)
+        return false unless index
+
+        index += 1
+        index += 1 if markdown_line[index] == "/"
+        return false unless ascii_letter?(markdown_line[index])
+
+        index += 1
+        index += 1 while html_tag_name_character?(markdown_line[index])
+        html_type_7_attributes_close?(markdown_line, index)
+      end
+
+      def html_type_7_start_index(markdown_line)
+        index = 0
+        index += 1 while markdown_line[index] == " "
+        return nil if index > 3
+        return nil unless markdown_line[index] == "<"
+
+        index
+      end
+
+      def html_type_7_attributes_close?(markdown_line, index)
+        loop do
+          index += 1 while html_attribute_space?(markdown_line[index])
+          return trailing_html_tag_close?(markdown_line, index) if markdown_line[index] == ">"
+          return false unless html_type_7_attribute_content?(markdown_line[index])
+
+          index = next_html_type_7_attribute_index(markdown_line, index)
+          return false unless index
+        end
+      end
+
+      def next_html_type_7_attribute_index(markdown_line, index)
+        while index < markdown_line.length
+          character = markdown_line[index]
+          return index if html_attribute_delimiter?(character)
+          return nil if html_attribute_invalid?(character)
+
+          index = if html_attribute_quote?(character)
+                    next_quoted_html_attribute_index(markdown_line, index, character)
+                  else
+                    index + 1
+                  end
+          return nil unless index
+        end
+
+        index
+      end
+
+      def next_quoted_html_attribute_index(markdown_line, index, quote)
+        closing_index = markdown_line.index(quote, index + 1)
+        closing_index && (closing_index + 1)
+      end
+
+      def trailing_html_tag_close?(markdown_line, index)
+        markdown_line[(index + 1)..].to_s.match?(/\A[ \t]*\z/)
+      end
+
+      def html_type_7_attribute_content?(character)
+        character && !html_attribute_delimiter?(character) && !html_attribute_invalid?(character)
+      end
+
+      def html_attribute_space?(character)
+        HTML_ATTRIBUTE_SPACES.include?(character)
+      end
+
+      def html_attribute_delimiter?(character)
+        html_attribute_space?(character) || character == ">"
+      end
+
+      def html_attribute_invalid?(character)
+        HTML_ATTRIBUTE_INVALID_CHARACTERS.include?(character)
+      end
+
+      def html_attribute_quote?(character)
+        HTML_ATTRIBUTE_QUOTES.include?(character)
+      end
+
+      def ascii_letter?(character)
+        character&.match?(/[A-Za-z]/)
+      end
+
+      def html_tag_name_character?(character)
+        character&.match?(/[A-Za-z0-9-]/)
       end
 
       def list_item_html_block_context_for_line(line, markdown_state)

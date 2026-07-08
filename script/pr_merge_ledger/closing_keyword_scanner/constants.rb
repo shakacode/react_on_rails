@@ -44,8 +44,9 @@ class PrMergeLedger
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
     HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
-    HTML_TYPE_7_BLOCK_OPEN_PATTERN =
-      %r{\A {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+(?:[^<>"'\n \t]+|"[^"\n]*"|'[^'\n]*')+)*[ \t]*>[ \t]*(?:\n)?\z}
+    HTML_ATTRIBUTE_SPACES = [" ", "\t"].freeze
+    HTML_ATTRIBUTE_INVALID_CHARACTERS = ["<", "\n"].freeze
+    HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze
     THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
     SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
     LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/

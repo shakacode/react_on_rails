@@ -72,7 +72,7 @@ class PrMergeLedger
       def static_root_block_boundary_line?(boundary_line)
         boundary_line.match?(ROOT_BLOCK_BOUNDARY_PATTERN) ||
           boundary_line.match?(HTML_BLOCK_BOUNDARY_PATTERN) ||
-          boundary_line.match?(HTML_TYPE_7_BLOCK_OPEN_PATTERN) ||
+          html_type_7_block_open_line?(boundary_line) ||
           boundary_line.match?(THEMATIC_BOUNDARY_PATTERN) ||
           boundary_line.match?(LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN)
       end
