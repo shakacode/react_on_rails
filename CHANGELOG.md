@@ -495,10 +495,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4477](https://github.com/shakacode/react_on_rails/pull/4477) by
   [justin808](https://github.com/justin808).
 
-#### Removed
-
-- **[Pro]** **Removed the `react-on-rails-pro/rscPayloadNode` export and its `createRscPayloadNode` helper**: The duplicate RSC payload route-data API added during the 17.0 RC line (in [PR 3783](https://github.com/shakacode/react_on_rails/pull/3783)) is gone; `RSCRoute` is the canonical Pro RSC client-router integration. Client-router loaders return plain route data (`componentName`, `componentProps`) and route components render `RSCRoute`, which keeps React on Rails Pro in control of payload fetching, caching, embedded SSR payload reuse, and retry behavior. This affects only the not-yet-released Pro RSC feature line. Fixes [Issue 4439](https://github.com/shakacode/react_on_rails/issues/4439). [PR 4440](https://github.com/shakacode/react_on_rails/pull/4440) by [ihabadham](https://github.com/ihabadham).
-
 ### [17.0.0.rc.6] - 2026-06-21
 
 #### Added
