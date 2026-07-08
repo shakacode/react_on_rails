@@ -32,6 +32,10 @@ findings.
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `{{PREV_STABLE}}`        | Last stable git tag (upgrade baseline)                                                                           | `v16.6.0`                                |
 | `{{RC_TAG}}`             | RC under verification                                                                                            | `v17.0.0.rc.7`                           |
+| `{{RELEASE_REF}}`        | Published tag under verification (`{{RC_TAG}}` for RC runs, final tag for final runs)                            | `v17.0.0.rc.7`                           |
+| `{{FINAL_VERSION}}`      | Stable release target this RC gates                                                                              | `17.0.0`                                 |
+| `{{TARGET_GEM_VERSION}}` | RubyGems version under test                                                                                      | `17.0.0.rc.7`                            |
+| `{{TARGET_NPM_VERSION}}` | npm package version under test                                                                                   | `17.0.0-rc.7`                            |
 | `{{RELEASE_BRANCH}}`     | Ephemeral release branch                                                                                         | `release/17.0.0`                         |
 | `{{TRACKING_ISSUE}}`     | RC tracking issue (per rc-testing-plan lifecycle)                                                                | —                                        |
 | `{{UPGRADE_APP_OSS}}`    | Fleet app on `{{PREV_STABLE}}` for the OSS upgrade dry-run                                                       | `shakacode/react-webpack-rails-tutorial` |
@@ -43,6 +47,124 @@ Re-run policy: a new RC with runtime changes refreshes Lane 0 first, then re-run
 affected surfaces and Lane 1 if upgrade-relevant files changed (generators, install templates,
 config, docs/upgrade). A version/changelog-metadata-only RC or final promotion re-runs Lane 4a plus
 the Lane 4b version/coherence subset for the newly published artifacts and tag.
+
+## Demo Fleet Release-Track Prompt
+
+Use this prompt to update the demo fleet for an RC or final release. It complements
+[`rc-testing-plan.md`](rc-testing-plan.md): hard-gate repos from
+[`demo-fleet.yml`](demo-fleet.yml) block final release readiness, while soft-track repos are
+inspected and filed as follow-up unless a maintainer explicitly promotes them.
+
+```text
+You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
+
+Work from a clean checkout of `shakacode/react_on_rails`. Run `git fetch --prune origin main
+--tags`, then check out `{{RELEASE_REF}}` before deriving feature coverage or demo work. For an RC
+run where `{{RELEASE_REF}}` is `{{RC_TAG}}` and the tag is not published yet, confirm
+`{{RELEASE_BRANCH}}` still exists with `git ls-remote --exit-code --heads origin
+{{RELEASE_BRANCH}}`, fetch it with `git fetch --prune origin
+{{RELEASE_BRANCH}}:refs/remotes/origin/{{RELEASE_BRANCH}}`, check out `origin/{{RELEASE_BRANCH}}`,
+verify the version files match the target versions below, and record that the tag is not yet
+available. For a final run, do not fall back to the release branch; stop and report if the final tag
+is missing.
+
+First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
+`internal/contributor-info/rc-testing-plan.md`,
+`internal/contributor-info/release-verification-runbook.md`, and `CHANGELOG.md`. If
+`internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
+do not block the fleet update if that draft design file has already been removed. Run
+`.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
+appear missing, follow `AGENTS.md` for any trusted, session-provided token-loading helper; do not run
+arbitrary `PATH` matches or unreviewed scripts.
+
+Target versions:
+- Release ref under verification: `{{RELEASE_REF}}`
+- RC tag under verification: `{{RC_TAG}}`
+- Final release target: `{{FINAL_VERSION}}`
+- Expected gem version: `{{TARGET_GEM_VERSION}}`
+- Expected npm package version: `{{TARGET_NPM_VERSION}}`
+- Release tracker: `{{TRACKING_ISSUE}}`
+- Verify the actual published/tagged artifacts before bumping demo repos.
+- Use `{{RSC_VERSION}}` as the release-manager-supplied `react-on-rails-rsc` line. If release
+  plans, manifests, or published artifacts disagree with `{{RSC_VERSION}}`, stop and report the
+  mismatch instead of choosing a different RSC package line.
+
+Goal:
+Update every relevant demo, starter, flagship, and hard-gate app in `demo-fleet.yml` so it is
+either tested against `{{RELEASE_REF}}` or explicitly recorded as soft-track/shelved with a reason. For
+each app, account for user-visible React on Rails features added since that app's last
+deployed/bumped baseline. If you detect bugs, release blockers, docs gaps, or demo-fleet metadata
+gaps, file issues in `shakacode/react_on_rails`.
+
+Repos:
+- Prioritize every `hard_gate` repo first; hard-gate failures block final release readiness.
+- Then inspect every `soft_track` repo; do not let soft-track failures block final unless a
+  maintainer promotes that repo.
+- Treat `shakacode/hichee` and Pro details as private: public tracker comments may say
+  install/build/smoke/CI passed or failed, but must not expose private logs, URLs, screenshots,
+  customer data, secrets, or proprietary Pro source details.
+
+For each repo:
+1. Determine the baseline actually under test:
+   - Prefer the last deployed commit/version if discoverable from deployment metadata, GitHub
+     environments, release tags, CPFlow, or repo docs.
+   - If deployment state is not discoverable, use the current default branch lockfiles as the
+     baseline and mark last-deployed as `UNKNOWN`.
+2. Compare baseline package versions to `{{TARGET_GEM_VERSION}}` and `{{TARGET_NPM_VERSION}}`.
+3. Bump only packages the manifest says the repo consumes, plus required coupled packages/peers
+   needed for a coherent install.
+4. Use the repo's declared package manager from `demo-fleet.yml`; update lockfiles consistently.
+5. Inspect the app's actual features and add/update demo coverage for relevant new behavior from
+   this release. Use the CHANGELOG and release diff as authority. Consider, where applicable:
+   - Pro/RSC React and `react-on-rails-rsc` line adoption
+   - provider-backed RSC prefetch
+   - buffered/static/cached RSC helpers, cache tags, and revalidation
+   - streamed RSC observability marks and `Server-Timing`
+   - typed response type generation and `createRailsAction`
+   - create-app/generator behavior, hidden Redux path, and `bin/dev clean`
+   - RSC doctor diagnostics, hydration/getStore fixes, RSC error recovery, cache read fixes,
+     renderer shutdown, asset filename validation, and sensitive-props error redaction
+6. Do not force irrelevant features into a demo. Record why the feature is not applicable and, if
+   that leaves an intended fleet coverage gap, file or update a `react_on_rails` issue.
+7. Run local validation before pushing:
+   - package install
+   - `bundle install` where applicable
+   - manifest `ruby_test`
+   - manifest `js_test` if non-null
+   - manifest `build`
+   - smoke paths from the manifest, including browser console checks where practical
+8. Open or update a PR in the demo repo with:
+   - target versions
+   - feature coverage added/verified
+   - exact commands run and results
+   - known unrelated failures, with issue links
+9. If `demo-fleet.yml` metadata is wrong after inspection, open a separate `react_on_rails` PR
+   updating package manager, commands, smoke paths, review-app data, or `verify` state.
+
+Tracking and issues:
+- Find or create the release tracker: `{{TRACKING_ISSUE}}`.
+- Add a section for `{{RC_TAG}}` linking every hard-gate PR and evidence.
+- Before filing issues, confirm labels exist: the concrete `release:<X.Y.Z>-must-have` label
+  derived from `{{FINAL_VERSION}}` (for example, `release:17.0.0-must-have` when
+  `{{FINAL_VERSION}}` is `17.0.0`), `P2`, and `documentation`.
+- File every suspected RC regression, release blocker, docs gap, missing feature coverage, or
+  manifest/orchestrator gap in `shakacode/react_on_rails`.
+- Use the concrete release must-have label for anything that would block or seriously mislead a
+  real RC/final upgrader; otherwise use the normal priority/docs labels.
+- If a failure is clearly demo-local, still record it in the release tracker and file/link the
+  appropriate issue; do not silently waive it.
+
+Final report:
+Return a compact matrix with columns: `repo`, `tier`, `baseline`, `target`, `PR`,
+`new features accounted for`, `validation`, `issues filed`, `release impact`.
+
+End with:
+- hard-gate pass/block summary
+- soft-track follow-ups
+- all `react_on_rails` issues created
+- any public-safe private-app notes
+- final recommendation: `ready`, `blocked`, or `ready with explicit waivers`
+```
 
 ## Lane 0 — Release inventory (feeds Lanes 2 and 4)
 
@@ -341,8 +463,12 @@ are always release blockers — a wrong tarball cannot be waived, only republish
 
 ## Appendix — instantiation for 17.0.0
 
-Parameters: `{{PREV_STABLE}}`=`v16.6.0`, `{{RC_TAG}}`=the next RC (rc.7+),
-`{{RELEASE_BRANCH}}`=`release/17.0.0`, `{{RSC_VERSION}}`=`19.2.1` (gated on
+Parameters: `{{PREV_STABLE}}`=`v16.6.0`, `{{RC_TAG}}`=`v17.0.0.rc.7`,
+`{{RELEASE_REF}}`=`v17.0.0.rc.7` for the RC.7 demo-fleet run (use `v17.0.0` for the final promotion
+run), `{{FINAL_VERSION}}`=`17.0.0`, `{{TARGET_GEM_VERSION}}`=`17.0.0.rc.7`,
+`{{TARGET_NPM_VERSION}}`=`17.0.0-rc.7`, `{{RELEASE_BRANCH}}`=`release/17.0.0`,
+`{{RSC_VERSION}}`=`19.2.1` (use `19.2.1-rc.0` only if stable publication is not
+available; gated on
 [react_on_rails_rsc#148](https://github.com/shakacode/react_on_rails_rsc/issues/148) and
 [#4357](https://github.com/shakacode/react_on_rails/issues/4357)).
 
