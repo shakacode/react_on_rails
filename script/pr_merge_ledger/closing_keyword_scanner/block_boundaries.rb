@@ -109,21 +109,30 @@ class PrMergeLedger
       def split_gfm_table_row(row)
         cells = []
         cell = +""
-        row.each_char.with_index do |character, index|
-          if character == "|" && !escaped_character?(row, index)
+        backslash_run_length = 0
+
+        row.each_char do |character|
+          if character == "|" && backslash_run_length.even?
             cells << cell
             cell = +""
           else
             cell << character
           end
+
+          backslash_run_length = character == "\\" ? backslash_run_length + 1 : 0
         end
+
         cells << cell
       end
 
       def gfm_table_row_boundary_line?(line)
         row = line.sub(/\A {0,3}/, "")
-        row.each_char.with_index.any? do |character, index|
-          character == "|" && !escaped_character?(row, index)
+        backslash_run_length = 0
+
+        row.each_char.any? do |character|
+          unescaped_pipe = character == "|" && backslash_run_length.even?
+          backslash_run_length = character == "\\" ? backslash_run_length + 1 : 0
+          unescaped_pipe
         end
       end
 

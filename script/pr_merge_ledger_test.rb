@@ -357,6 +357,16 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_equal ["pr.body_code_formatted_closing_keyword_scan"], unknown_field_names(data)
   end
 
+  def test_code_formatted_closing_keyword_scan_oversized_line_blocks_strict_closeout
+    body = "#{'a' * 100_001}\nFixes #4410\n"
+    output, status = run_fixture(fixture_with_body(body))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["unknown_pr_body_closing_keyword_scan"], violation_codes(data)
+    assert_equal ["pr.body_code_formatted_closing_keyword_scan"], unknown_field_names(data)
+  end
+
   def test_code_formatted_closing_keyword_on_non_default_branch_allows_strict_closeout
     output, status = run_fixture(
       fixture_with_body("This will not close the issue from a release branch: `Fixes #4410`.").tap do |dataset|
@@ -1009,6 +1019,20 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_gfm_table_escaped_pipe_cells_do_not_backtrack
+    escaped_pipe_header_cell = "\\| " * 20_000
+    output, status = run_fixture(
+      fixture_with_body("#{escaped_pipe_header_cell} | B\n--- | ---\n    Fixes #4410\n")
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_blockquoted_indented_code_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("> This will not close.\n>\n>     Fixes #4410\n"))
 
@@ -1641,6 +1665,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     data = JSON.parse(output)
     assert data.fetch("complete_allowed")
     assert_empty violation_codes(data)
+  end
+
+  def test_list_paragraph_continuation_over_noninterrupting_ordered_marker_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- Intro\n  2. details\n\n      Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
   def test_nested_list_marker_with_indented_code_closing_keyword_blocks_strict_closeout

@@ -1841,7 +1841,7 @@ class PrMergeLedger
       unknowns << unknown_field(pull_request, "pr.head_sha", "GitHub headRefOid is UNKNOWN")
     end
 
-    if pull_request_body_truncated_for_closing_keyword_scan?(pull_request)
+    if pull_request_body_exceeds_closing_keyword_scan_limit?(pull_request)
       unknowns << unknown_field(
         pull_request,
         "pr.body_code_formatted_closing_keyword_scan",

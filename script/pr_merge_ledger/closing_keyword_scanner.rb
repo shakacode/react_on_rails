@@ -9,6 +9,7 @@ require_relative "closing_keyword_scanner/inline_code"
 require_relative "closing_keyword_scanner/inline_code_multiline"
 require_relative "closing_keyword_scanner/line_state"
 require_relative "closing_keyword_scanner/list_blocks"
+require_relative "closing_keyword_scanner/list_paragraphs"
 
 class PrMergeLedger
   module ClosingKeywordScanner
@@ -21,6 +22,7 @@ class PrMergeLedger
     include InlineCodeMultiline
     include LineState
     include ListBlocks
+    include ListParagraphs
 
     # Parser constants stay beside the closeout scanner because they model Markdown state, not ledger state.
     CLOSING_KEYWORD_PATTERN = %r{
@@ -30,10 +32,12 @@ class PrMergeLedger
         https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/\d+
       )
     }ix
+    MAX_BODY_LINE_BYTES = 100_000
     FENCED_CODE_BLOCK_PATTERN = /\A {0,3}(?<fence>`{3,}|~{3,})/
     INDENTED_CODE_BLOCK_PATTERN = /\A(?: {4}| {0,3}\t)/
     INDENTATION_CHARACTERS = [" ", "\t"].freeze
     LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+/
+    ORDERED_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<start>\d{1,9})[.)][ \t]+/
     EMPTY_LIST_ITEM_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])[ \t]*(?:\n)?\z/
     LIST_FENCED_CODE_BLOCK_PATTERN = /\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+(?<fence>`{3,}|~{3,})/
     LIST_ITEM_WITH_PADDING_PATTERN = /\A(?<indent>[ \t]*)(?<marker>[-+*]|\d{1,9}[.)])(?<padding>[ \t]+)(?<code>.*)/
@@ -112,6 +116,7 @@ class PrMergeLedger
 
     def code_formatted_closing_keyword_violations(pull_request)
       return [] unless default_branch_pull_request?(pull_request)
+      return [] if pull_request_body_line_too_long_for_closing_keyword_scan?(pull_request)
 
       body = pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "")
       body_lines = body.each_line.first(MAX_BODY_LINES)
@@ -135,6 +140,7 @@ class PrMergeLedger
         "gfm_table_header_candidate_cell_count" => nil,
         "setext_heading_candidate_active" => false,
         "paragraph_continuation_active" => false,
+        "list_paragraph_continuation_active" => false,
         "blockquote_lazy_continuation_allowed" => false,
         "root_indented_code_allowed" => true
       }
@@ -148,6 +154,20 @@ class PrMergeLedger
       return false unless default_branch_pull_request?(pull_request)
 
       pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "").each_line.count > MAX_BODY_LINES
+    end
+
+    def pull_request_body_line_too_long_for_closing_keyword_scan?(pull_request)
+      return false unless default_branch_pull_request?(pull_request)
+
+      pull_request.fetch(INTERNAL_PULL_REQUEST_BODY_KEY, "")
+                  .each_line
+                  .first(MAX_BODY_LINES)
+                  .any? { |line| line.bytesize > MAX_BODY_LINE_BYTES }
+    end
+
+    def pull_request_body_exceeds_closing_keyword_scan_limit?(pull_request)
+      pull_request_body_truncated_for_closing_keyword_scan?(pull_request) ||
+        pull_request_body_line_too_long_for_closing_keyword_scan?(pull_request)
     end
 
     def default_branch_pull_request?(pull_request)

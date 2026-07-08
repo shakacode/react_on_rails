@@ -9,6 +9,7 @@ class PrMergeLedger
         current_indent = markdown_state.fetch("list_content_indent")
         return current_indent if line.strip.empty?
         return current_indent if ordered_list_marker_continues_paragraph?(line.chomp, markdown_state)
+        return current_indent if ordered_list_marker_continues_list_paragraph?(line.chomp, markdown_state)
 
         marker_content_indent = list_marker_content_indent_for_line(line, current_indent)
         return marker_content_indent if marker_content_indent
