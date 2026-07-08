@@ -116,6 +116,7 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
     - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
     - `config.defer_generated_component_packs = false` → **delete the line.** The old option was truthy-gated — only `= true` did anything (it set `:defer`); `= false` was a no-op that fell through to the default strategy. Deleting the line preserves that behavior. Set `config.generated_component_packs_loading_strategy = :sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
     - The default strategy (when you don't set one) is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
+- **The inert `config.server_render_method` option was removed.** The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
 
 ### Migration Steps
 
