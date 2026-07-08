@@ -32,6 +32,7 @@ findings.
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `{{PREV_STABLE}}`        | Last stable git tag (upgrade baseline)                                                                           | `v16.6.0`                                |
 | `{{RC_TAG}}`             | RC under verification                                                                                            | `v17.0.0.rc.7`                           |
+| `{{RELEASE_REF}}`        | Published tag under verification (`{{RC_TAG}}` for RC runs, final tag for final runs)                            | `v17.0.0.rc.7`                           |
 | `{{FINAL_VERSION}}`      | Stable release target this RC gates                                                                              | `17.0.0`                                 |
 | `{{TARGET_GEM_VERSION}}` | RubyGems version under test                                                                                      | `17.0.0.rc.7`                            |
 | `{{TARGET_NPM_VERSION}}` | npm package version under test                                                                                   | `17.0.0-rc.7`                            |
@@ -55,15 +56,17 @@ Use this prompt to update the demo fleet for an RC or final release. It compleme
 inspected and filed as follow-up unless a maintainer explicitly promotes them.
 
 ```text
-You are updating the React on Rails demo fleet for {{RC_TAG}}.
+You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
 
 Work from a clean checkout of `shakacode/react_on_rails`. Run `git fetch --prune origin main
---tags`, then check out `{{RC_TAG}}` before deriving feature coverage or demo work. If
-`{{RC_TAG}}` is not published yet, confirm `{{RELEASE_BRANCH}}` still exists with `git ls-remote
---exit-code --heads origin {{RELEASE_BRANCH}}`, fetch it with `git fetch --prune origin
+--tags`, then check out `{{RELEASE_REF}}` before deriving feature coverage or demo work. For an RC
+run where `{{RELEASE_REF}}` is `{{RC_TAG}}` and the tag is not published yet, confirm
+`{{RELEASE_BRANCH}}` still exists with `git ls-remote --exit-code --heads origin
+{{RELEASE_BRANCH}}`, fetch it with `git fetch --prune origin
 {{RELEASE_BRANCH}}:refs/remotes/origin/{{RELEASE_BRANCH}}`, check out `origin/{{RELEASE_BRANCH}}`,
 verify the version files match the target versions below, and record that the tag is not yet
-available. If neither the tag nor release branch exists, stop and report the missing release ref.
+available. For a final run, do not fall back to the release branch; stop and report if the final tag
+is missing.
 
 First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/rc-testing-plan.md`,
@@ -71,10 +74,11 @@ First read `AGENTS.md`, `internal/contributor-info/demo-fleet.yml`,
 `internal/contributor-info/demo-fleet-design.md` exists, read it as historical design context only;
 do not block the fleet update if that draft design file has already been removed. Run
 `.agents/bin/agent-workflow-seam-doctor` before relying on repo workflow policy. If API tokens
-appear missing and `load_api_tokens` is available as a local helper outside this repo, run it before
-reporting missing env vars.
+appear missing, follow `AGENTS.md` for any trusted, session-provided token-loading helper; do not run
+arbitrary `PATH` matches or unreviewed scripts.
 
 Target versions:
+- Release ref under verification: `{{RELEASE_REF}}`
 - RC tag under verification: `{{RC_TAG}}`
 - Final release target: `{{FINAL_VERSION}}`
 - Expected gem version: `{{TARGET_GEM_VERSION}}`
@@ -87,7 +91,7 @@ Target versions:
 
 Goal:
 Update every relevant demo, starter, flagship, and hard-gate app in `demo-fleet.yml` so it is
-either tested against `{{RC_TAG}}` or explicitly recorded as soft-track/shelved with a reason. For
+either tested against `{{RELEASE_REF}}` or explicitly recorded as soft-track/shelved with a reason. For
 each app, account for user-visible React on Rails features added since that app's last
 deployed/bumped baseline. If you detect bugs, release blockers, docs gaps, or demo-fleet metadata
 gaps, file issues in `shakacode/react_on_rails`.
@@ -460,7 +464,8 @@ are always release blockers — a wrong tarball cannot be waived, only republish
 ## Appendix — instantiation for 17.0.0
 
 Parameters: `{{PREV_STABLE}}`=`v16.6.0`, `{{RC_TAG}}`=`v17.0.0.rc.7`,
-`{{FINAL_VERSION}}`=`17.0.0`, `{{TARGET_GEM_VERSION}}`=`17.0.0.rc.7`,
+`{{RELEASE_REF}}`=`v17.0.0.rc.7` for the RC.7 demo-fleet run (use `v17.0.0` for the final promotion
+run), `{{FINAL_VERSION}}`=`17.0.0`, `{{TARGET_GEM_VERSION}}`=`17.0.0.rc.7`,
 `{{TARGET_NPM_VERSION}}`=`17.0.0-rc.7`, `{{RELEASE_BRANCH}}`=`release/17.0.0`,
 `{{RSC_VERSION}}`=`19.2.1` (use `19.2.1-rc.0` only if stable publication is not
 available; gated on
