@@ -25,12 +25,14 @@ should use this PR branch or `main` for the current workflow docs.
    gh auth status
    gh repo view shakacode/react_on_rails
    gh repo view shakacode/agent-coordination
+   gh repo view shakacode/agent-coordination-state
    ```
 
 2. Check out the public repo branch that contains the active workflow docs,
    normally `main` after the workflow docs land or the active PR branch while it
    is still open.
-3. Clone or update the private backend and put `agent-coord` on `PATH`:
+3. Clone or update the `agent-coord` CLI/bootstrap source and put
+   `agent-coord` on `PATH`:
 
    ```bash
    gh repo clone shakacode/agent-coordination
@@ -48,18 +50,18 @@ should use this PR branch or `main` for the current workflow docs.
 
    The remaining snippets assume that `PATH` entry is present in the active
    shell. In another shell, add the export first or replace each `agent-coord`
-   command below with `"$HOME/.local/bin/agent-coord"`. The private bootstrap
-   also installs `agent_coord` as an underscore alias for launchers or prompts
-   that use that spelling.
+   command below with `"$HOME/.local/bin/agent-coord"`. The CLI bootstrap also
+   installs `agent_coord` as an underscore alias for launchers or prompts that
+   use that spelling.
 
 4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
    degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
    structured public claim comment fallback where dependency rules allow it. Do
    not start a dependency-sensitive lane when the lane declares `depends_on` and
    private status cannot be checked.
-5. Before dependent lanes start, the coordinator creates or updates
-   `batches/<batch-id>.json` in the private backend so targeted batch status can
-   render `blocked_on` refs.
+5. Before dependent lanes start, the coordinator creates or updates batch state
+   in the private `agent-coord` backend so targeted batch status can render
+   `blocked_on` refs.
 6. Each worker claims before creating a worktree, branch, or conductor session:
 
    ```bash
@@ -150,18 +152,19 @@ the lease exists, batch workers must skip that PR unless the lease is released,
 dead, or explicitly transferred by the coordinator.
 
 Do not let conductor become an invisible side channel. If conductor takes a PR,
-record the claim in shakacode/agent-coordination with the same repo and target
-identity that batch workers use, then refresh heartbeats while conductor owns
-the lane. If `agent-coord` is not installed in the conductor environment, install
-it with the private backend bootstrap first or use the structured public claim
-comment fallback until the host is configured; do not treat an unbootstrapped
-conductor session as a private claim override.
+record the claim in the private `agent-coord` state backend with the same repo
+and target identity that batch workers use, then refresh heartbeats while
+conductor owns the lane. If `agent-coord` is not installed in the conductor
+environment, install it with the CLI bootstrap first or use the structured
+public claim comment fallback until the host is configured; do not treat an
+unbootstrapped conductor session as a private claim override.
 
 ## Coordination Lifecycle
 
-The private shakacode/agent-coordination repository is the coordination source
-of truth for concurrent batches. Public issue or PR claim comments are human
-hints and recovery aids only.
+The private `agent-coord` state backend reported by
+`agent-coord config show --json` is the coordination source of truth for
+concurrent batches. Public issue or PR claim comments are human hints and
+recovery aids only.
 
 Use stable agent ids with the base format `<machine-or-profile>-<batch>-<lane>`,
 for example `mobile-batch2-lane1`, `desktop-highcap-lane1`, or
@@ -196,8 +199,8 @@ Use this lifecycle for every lane:
    and validation evidence, then releases or lets the claim expire according to
    the backend policy.
 
-If the private backend is unavailable, use the structured public claim comment
-fallback from
+If the private `agent-coord` state backend is unavailable, use the structured
+public claim comment fallback from
 [pr-processing.md](../../.agents/workflows/pr-processing.md#coordination-state),
 but do not use a public comment to override a refused private claim.
 
@@ -212,8 +215,8 @@ For whole-surface triage, derive the number of implementation groups from
 registered capacity profiles and enabled inboxes. The flow is:
 
 1. Read live `agent-coord` claims and heartbeats.
-2. Read runtime capacity profiles and inbox config from the private backend or
-   a gitignored local config file.
+2. Read runtime capacity profiles and inbox config from the private
+   `agent-coord` state backend or a gitignored local config file.
 3. Convert the registered profiles into lane slots, bound the total by enabled
    inboxes, then subtract the unique occupied/reserved lane-ref set. That set
    includes live in-progress lanes, live blocked lanes, blocked lanes without a
@@ -270,8 +273,8 @@ one batch wait for the other lane's done heartbeat.
    in the same package.
 4. If the heartbeat is dead, a replacement worker may claim the target only
    after checking the branch/PR state and recording the takeover in coordination
-   status. Use `agent-coord config show --json`, the private backend README, and
-   CLI help for the current TTL and dead-threshold calculation.
+   status. Use `agent-coord config show --json`, the backend schema, and CLI help
+   for the current TTL and dead-threshold calculation.
 5. If local unpushed work may exist on the laptop, mark the lane blocked instead
    of recreating a competing implementation.
 
@@ -307,8 +310,8 @@ one batch wait for the other lane's done heartbeat.
 
 ## Cross-Repo Operation
 
-Adopting repos join the same private shakacode/agent-coordination backend.
-Claims and heartbeats are namespaced by full repo name, so
+Adopting repos join the same private `agent-coord` state backend. Claims and
+heartbeats are namespaced by full repo name, so
 `shakacode/react_on_rails#3973` and `shakacode/react_on_rails_rsc#3973` are
 different targets even if the issue numbers match.
 

@@ -1,8 +1,8 @@
 # Coordination Backend
 
 Shared workflow skills do not require one specific coordination backend. Each
-consumer repo declares its backend in `AGENTS.md` under
-`## Agent Workflow Configuration`.
+consumer repo declares its backend in `.agents/agent-workflow.yml` under
+`coordination_backend`.
 
 ## Supported Models
 
@@ -14,7 +14,8 @@ consumer repo declares its backend in `AGENTS.md` under
   [workflows/pr-processing.md](../workflows/pr-processing.md#coordination-state)
   when no private backend is available.
 - **No coordination backend**: acceptable for single-agent work; write `n/a` in
-  the seam and keep batch guidance serial or explicitly low concurrency.
+  `coordination_backend` and keep batch guidance serial or explicitly low
+  concurrency.
 
 ## Backend Contract
 

@@ -13,4 +13,4 @@ changelog: "/CHANGELOG.md, user-visible changes only; [Pro] scope tag; version-s
 merge_ledger: "script/pr-merge-ledger <PR> --strict — per-PR merge-readiness check emitting changelog classification and a complete_allowed verdict."
 review_gate: "claude-review is the preferred independent review check; see the Review Workflow section."
 approval_exempt: "workflow, build-config, package-script, dependency, lockfile, and Pro edits on trusted assignments — focused scope, validation, and clear PR evidence (not standing pre-approval). See Boundaries Always."
-coordination_backend: "private shakacode/agent-coordination (claims/heartbeats namespaced by full repo name); external adopters use the structured public claim-comment fallback in .agents/workflows/pr-processing.md."
+coordination_backend: "private agent-coord state backend (current default from config: shakacode/agent-coordination-state; claims/heartbeats namespaced by full repo name); external adopters use the structured public claim-comment fallback in .agents/workflows/pr-processing.md."
