@@ -31,6 +31,7 @@ import {
   createBrowserPerformanceMarkScript,
   RSC_STREAM_PERFORMANCE_MARK_PREFIX,
 } from './browserPerformanceMarks.ts';
+import { RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE, RSC_STYLESHEET_PRECEDENCE } from './rscDomMarkers.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -55,8 +56,6 @@ function cacheKeyDiagnosticObject(cacheKey: string) {
 function resetCacheKeyDiagnosticObject(cacheKey: string) {
   return `delete (self.REACT_ON_RAILS_RSC_ERRORS||={})[${JSON.stringify(cacheKey)}]`;
 }
-
-const RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = 'data-react-on-rails-rsc-payload="true"';
 
 function nonceAttribute(sanitizedNonce?: string) {
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
@@ -328,7 +327,7 @@ function escapeAttributeValue(value: string) {
 }
 
 function createStylesheetTag(href: string) {
-  return `<link rel="stylesheet" href="${escapeAttributeValue(href)}" data-precedence="rsc-css">`;
+  return `<link rel="stylesheet" href="${escapeAttributeValue(href)}" data-precedence="${RSC_STYLESHEET_PRECEDENCE}">`;
 }
 
 function includesReactSuspenseRevealScript(htmlBuffer: Buffer) {
@@ -1452,7 +1451,7 @@ function promoteStylesheetPreloadTag(linkTag: string) {
   }
 
   const closing = promotedTag.endsWith('/>') ? '/>' : '>';
-  return promotedTag.replace(/\s*\/?>$/, ` data-precedence="rsc-css"${closing}`);
+  return promotedTag.replace(/\s*\/?>$/, ` data-precedence="${RSC_STYLESHEET_PRECEDENCE}"${closing}`);
 }
 
 function utf8ContinuationByteCount(leadByte: number) {

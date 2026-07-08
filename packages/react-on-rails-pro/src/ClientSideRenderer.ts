@@ -41,6 +41,7 @@ import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderR
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
 import { isPageUnloadRegistryError } from './CallbackRegistry.ts';
+import prepareRSCHydrationRoot, { shouldPrepareRSCHydrationRoot } from './rscHydrationDom.ts';
 
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
@@ -333,6 +334,10 @@ class ComponentRenderer {
         // @ts-expect-error The state can change while awaiting delegateToRenderer
         if (this.state === 'unmounted') {
           return;
+        }
+
+        if (shouldPrepareRSCHydrationRoot(railsContext)) {
+          prepareRSCHydrationRoot(domNode);
         }
 
         // Hydrate if available and was server rendered
