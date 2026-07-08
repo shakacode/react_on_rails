@@ -79,6 +79,24 @@ const waitForMockCalls = async (mockFn: jest.Mock, expectedCalls: number) => {
   expect(mockFn).toHaveBeenCalledTimes(expectedCalls);
 };
 
+const waitForMockCallsWithRealTimers = async (
+  mockFn: jest.Mock,
+  expectedCalls: number,
+  timeoutMs = 2_000,
+) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (mockFn.mock.calls.length >= expectedCalls) {
+      return;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  expect(mockFn).toHaveBeenCalledTimes(expectedCalls);
+};
+
 // Helper to create worker with standard options
 const createWorker = (options: Parameters<typeof worker>[0] = {}) =>
   worker({
@@ -1787,5 +1805,335 @@ describe('worker', () => {
         jest.useRealTimers();
       }
     });
+
+    test('does not warn while a slow request close hook finishes a healthy incremental stream', async () => {
+      const requestStream = new PassThrough();
+      const responseStream = new Readable({
+        read() {
+          // Test pushes the final response after the request close hook resolves.
+        },
+      });
+      let finishRequestClose: (() => void) | undefined;
+      const handleRequestClosed = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRequestClose = resolve;
+          }),
+      );
+      const releaseExecutionContext = jest.fn();
+      await jest.isolateModulesAsync(async () => {
+        const warn = jest.fn();
+        jest.doMock('../src/shared/log.js', () => ({
+          __esModule: true,
+          default: {
+            error: jest.fn(),
+            fatal: jest.fn(),
+            info: jest.fn(),
+            warn,
+          },
+          sharedLoggerOptions: {},
+        }));
+
+        const isolatedWorkerModule = await import('../src/worker');
+        const isolatedIncremental = await import('../src/worker/handleIncrementalRenderRequest');
+        isolatedWorkerModule.disableHttp2();
+
+        const handleSpy = jest
+          .spyOn(isolatedIncremental, 'handleIncrementalRenderRequest')
+          .mockResolvedValue({
+            response: {
+              status: 200,
+              headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+              stream: responseStream,
+            },
+            sink: {
+              add: jest.fn(),
+              handleRequestClosed,
+              executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+            },
+          });
+
+        try {
+          const password = 'long-enough-renderer-password';
+          const app = isolatedWorkerModule.default({
+            serverBundleCachePath: serverBundleCachePathForTest(),
+            supportModules: true,
+            stubTimers: false,
+            password,
+          });
+          const payload = {
+            gemVersion,
+            protocolVersion,
+            password,
+            renderingRequest: 'ReactOnRails.dummy',
+            dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+            pullEnabled: true,
+          };
+
+          const responsePromise = app
+            .inject()
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .payload(requestStream)
+            .headers({
+              'Content-Type': 'application/x-ndjson',
+            })
+            .end();
+
+          requestStream.write(createNDJSONPayload(payload));
+          await waitForMockCallsWithRealTimers(handleSpy, 1);
+          requestStream.end();
+          await waitForMockCallsWithRealTimers(handleRequestClosed, 1);
+
+          await new Promise((resolve) => setTimeout(resolve, 1_100));
+
+          expect(warn).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              msg: 'Timed out waiting for incremental render close hook after response started',
+            }),
+          );
+          expect(responseStream.destroyed).toBe(false);
+          expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+          finishRequestClose?.();
+          responseStream.push('finished after slow close hook');
+          responseStream.push(null);
+
+          const responseResult = await responsePromise;
+
+          expect(responseResult.statusCode).toBe(200);
+          expect(responseResult.payload).toBe('finished after slow close hook');
+          expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+          expect(warn).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              msg: 'Timed out waiting for incremental render close hook after response started',
+            }),
+          );
+        } finally {
+          requestStream.destroy();
+          responseStream.destroy();
+          handleSpy.mockRestore();
+          jest.dontMock('../src/shared/log.js');
+        }
+      });
+    }, 5_000);
+
+    test('warns when a slow request close hook outlives an already finished incremental stream', async () => {
+      const requestStream = new PassThrough();
+      const responseStream = new Readable({
+        read() {
+          // Test pushes the full response before the request close hook resolves.
+        },
+      });
+      let finishRequestClose: (() => void) | undefined;
+      const handleRequestClosed = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRequestClose = resolve;
+          }),
+      );
+      const releaseExecutionContext = jest.fn();
+      await jest.isolateModulesAsync(async () => {
+        const warn = jest.fn();
+        jest.doMock('../src/shared/log.js', () => ({
+          __esModule: true,
+          default: {
+            error: jest.fn(),
+            fatal: jest.fn(),
+            info: jest.fn(),
+            warn,
+          },
+          sharedLoggerOptions: {},
+        }));
+
+        const isolatedWorkerModule = await import('../src/worker');
+        const isolatedIncremental = await import('../src/worker/handleIncrementalRenderRequest');
+        isolatedWorkerModule.disableHttp2();
+
+        const handleSpy = jest
+          .spyOn(isolatedIncremental, 'handleIncrementalRenderRequest')
+          .mockResolvedValue({
+            response: {
+              status: 200,
+              headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+              stream: responseStream,
+            },
+            sink: {
+              add: jest.fn(),
+              handleRequestClosed,
+              executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+            },
+          });
+
+        try {
+          const password = 'long-enough-renderer-password';
+          const app = isolatedWorkerModule.default({
+            serverBundleCachePath: serverBundleCachePathForTest(),
+            supportModules: true,
+            stubTimers: false,
+            password,
+          });
+          const payload = {
+            gemVersion,
+            protocolVersion,
+            password,
+            renderingRequest: 'ReactOnRails.dummy',
+            dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+            pullEnabled: true,
+          };
+
+          const responsePromise = app
+            .inject()
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .payload(requestStream)
+            .headers({
+              'Content-Type': 'application/x-ndjson',
+            })
+            .end();
+
+          requestStream.write(createNDJSONPayload(payload));
+          await waitForMockCallsWithRealTimers(handleSpy, 1);
+          responseStream.push('finished before slow close hook');
+          responseStream.push(null);
+          requestStream.end();
+          await waitForMockCallsWithRealTimers(handleRequestClosed, 1);
+
+          await new Promise((resolve) => setTimeout(resolve, 1_100));
+
+          expect(warn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              msg: 'Timed out waiting for incremental render close hook after response started',
+              timeoutMs: 1_000,
+            }),
+          );
+          expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+
+          finishRequestClose?.();
+
+          const responseResult = await responsePromise;
+
+          expect(responseResult.statusCode).toBe(200);
+          expect(responseResult.payload).toBe('finished before slow close hook');
+        } finally {
+          requestStream.destroy();
+          responseStream.destroy();
+          handleSpy.mockRestore();
+          jest.dontMock('../src/shared/log.js');
+        }
+      });
+    }, 5_000);
+
+    test('warns when a slow request close hook remains open after a later incremental stream finish', async () => {
+      const requestStream = new PassThrough();
+      const responseStream = new Readable({
+        read() {
+          // Test finishes the response after the close hook timeout fires.
+        },
+      });
+      let finishRequestClose: (() => void) | undefined;
+      const handleRequestClosed = jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishRequestClose = resolve;
+          }),
+      );
+      const releaseExecutionContext = jest.fn();
+      await jest.isolateModulesAsync(async () => {
+        const warn = jest.fn();
+        jest.doMock('../src/shared/log.js', () => ({
+          __esModule: true,
+          default: {
+            error: jest.fn(),
+            fatal: jest.fn(),
+            info: jest.fn(),
+            warn,
+          },
+          sharedLoggerOptions: {},
+        }));
+
+        const isolatedWorkerModule = await import('../src/worker');
+        const isolatedIncremental = await import('../src/worker/handleIncrementalRenderRequest');
+        isolatedWorkerModule.disableHttp2();
+
+        const handleSpy = jest
+          .spyOn(isolatedIncremental, 'handleIncrementalRenderRequest')
+          .mockResolvedValue({
+            response: {
+              status: 200,
+              headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+              stream: responseStream,
+            },
+            sink: {
+              add: jest.fn(),
+              handleRequestClosed,
+              executionContext: { release: releaseExecutionContext } as unknown as ExecutionContext,
+            },
+          });
+
+        try {
+          const password = 'long-enough-renderer-password';
+          const app = isolatedWorkerModule.default({
+            serverBundleCachePath: serverBundleCachePathForTest(),
+            supportModules: true,
+            stubTimers: false,
+            password,
+          });
+          const payload = {
+            gemVersion,
+            protocolVersion,
+            password,
+            renderingRequest: 'ReactOnRails.dummy',
+            dependencyBundleTimestamps: [String(BUNDLE_TIMESTAMP)],
+            pullEnabled: true,
+          };
+
+          const responsePromise = app
+            .inject()
+            .post(`/bundles/${BUNDLE_TIMESTAMP}/incremental-render/d41d8cd98f00b204e9800998ecf8427e`)
+            .payload(requestStream)
+            .headers({
+              'Content-Type': 'application/x-ndjson',
+            })
+            .end();
+
+          requestStream.write(createNDJSONPayload(payload));
+          await waitForMockCallsWithRealTimers(handleSpy, 1);
+          requestStream.end();
+          await waitForMockCallsWithRealTimers(handleRequestClosed, 1);
+
+          await new Promise((resolve) => setTimeout(resolve, 1_100));
+
+          expect(warn).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              msg: 'Timed out waiting for incremental render close hook after response started',
+            }),
+          );
+          expect(releaseExecutionContext).not.toHaveBeenCalled();
+
+          responseStream.push('finished after close hook timeout');
+          responseStream.push(null);
+          await waitForMockCallsWithRealTimers(warn, 1);
+
+          expect(warn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              msg: 'Timed out waiting for incremental render close hook after response started',
+              timeoutMs: 1_000,
+            }),
+          );
+          expect(releaseExecutionContext).toHaveBeenCalledTimes(1);
+
+          finishRequestClose?.();
+
+          const responseResult = await responsePromise;
+
+          expect(responseResult.statusCode).toBe(200);
+          expect(responseResult.payload).toBe('finished after close hook timeout');
+        } finally {
+          requestStream.destroy();
+          responseStream.destroy();
+          handleSpy.mockRestore();
+          jest.dontMock('../src/shared/log.js');
+        }
+      });
+    }, 5_000);
   });
 });
