@@ -1087,6 +1087,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_ordered_list_non_one_marker_before_blank_keeps_root_indented_closeout
+    output, status = run_fixture(fixture_with_body("This remains prose\n2. details\n\n    Fixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 4, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_ordered_list_one_marker_interrupts_paragraph_before_indented_closeout
     output, status = run_fixture(fixture_with_body("This starts a paragraph\n1. details\n\n       Fixes #4410\n"))
 

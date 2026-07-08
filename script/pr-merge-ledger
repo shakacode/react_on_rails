@@ -2304,7 +2304,7 @@ class PrMergeLedger
   def update_body_markdown_state_before_scan(line, current_line_in_fenced_code, blockquote_depth, markdown_state)
     unless current_line_in_fenced_code
       markdown_state["list_content_indent"] =
-        list_content_indent_for_line(line, markdown_state.fetch("list_content_indent"))
+        list_content_indent_for_line(line, markdown_state)
     end
 
     markdown_state["fence_opener_match"] =
@@ -3073,8 +3073,10 @@ class PrMergeLedger
     true
   end
 
-  def list_content_indent_for_line(line, current_indent)
+  def list_content_indent_for_line(line, markdown_state)
+    current_indent = markdown_state.fetch("list_content_indent")
     return current_indent if line.strip.empty?
+    return current_indent if ordered_list_marker_continues_paragraph?(line.chomp, markdown_state)
 
     list_match = line.match(LIST_ITEM_PATTERN)
     if list_match
