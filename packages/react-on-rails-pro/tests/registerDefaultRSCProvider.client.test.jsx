@@ -27,11 +27,15 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
   afterEach(() => {
     const { clearDefaultRSCProviderFactory } = require('../src/defaultRSCProviderRegistry.ts');
     clearDefaultRSCProviderFactory();
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
   });
 
   it('wraps default-provider roots in Suspense to match server-streamed markup', () => {
     const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
     require('../src/registerDefaultRSCProvider.client.tsx');
+    document.body.innerHTML =
+      '<div id="TasksApp-react-component-test"><!--$--><section data-testid="tasks-app">Tasks</section><!--/$--></div>';
 
     const appElement = <section data-testid="tasks-app">Tasks</section>;
     const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
@@ -44,5 +48,22 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
     expect(reactElement.props.children.type).toBe(React.Suspense);
     expect(reactElement.props.children.props.fallback).toBeNull();
     expect(reactElement.props.children.props.children).toBe(appElement);
+  });
+
+  it('keeps client-resolved RSC routes aligned with ordinary server HTML', () => {
+    const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
+    require('../src/registerDefaultRSCProvider.client.tsx');
+    document.body.innerHTML =
+      '<div id="TanStackStarterApp-react-component-test"><div class="container">Server shell</div></div>';
+
+    const appElement = <section id="tanstack-starter-server-data">Client route</section>;
+    const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
+      appElement,
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      'TanStackStarterApp-react-component-test',
+    );
+
+    expect(wrappedByDefaultRSCProvider).toBe(true);
+    expect(reactElement.props.children).toBe(appElement);
   });
 });

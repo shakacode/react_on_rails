@@ -18,9 +18,13 @@
 import * as React from 'react';
 import { createRSCProvider } from './RSCProvider.tsx';
 import { setDefaultRSCProviderFactory } from './defaultRSCProviderRegistry.ts';
+import { hasLeadingSuspenseBoundary } from './rscHydrationDom.ts';
 
 if (typeof window !== 'undefined') {
   setDefaultRSCProviderFactory(({ reactElement, railsContext, domNodeId }) => {
+    const shouldMatchStreamedSuspenseBoundary = hasLeadingSuspenseBoundary(
+      document.getElementById(domNodeId),
+    );
     const RSCProvider = createRSCProvider({
       domNodeId,
       getServerComponent: async (args) => {
@@ -33,7 +37,11 @@ if (typeof window !== 'undefined') {
 
     return (
       <RSCProvider>
-        <React.Suspense fallback={null}>{reactElement}</React.Suspense>
+        {shouldMatchStreamedSuspenseBoundary ? (
+          <React.Suspense fallback={null}>{reactElement}</React.Suspense>
+        ) : (
+          reactElement
+        )}
       </RSCProvider>
     );
   });

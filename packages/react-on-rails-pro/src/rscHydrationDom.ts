@@ -18,12 +18,10 @@ import {
   RSC_PAYLOAD_SCRIPT_ATTRIBUTE_VALUE,
   RSC_STYLESHEET_PRECEDENCE,
 } from './rscDomMarkers.ts';
+import type { RailsContext } from 'react-on-rails/types';
 
-type RSCHydrationRailsContext = { rscPayloadGenerationUrlPath?: unknown };
-
-export function shouldPrepareRSCHydrationRoot(railsContext: RSCHydrationRailsContext | undefined): boolean {
-  const rscPayloadGenerationUrlPath = railsContext?.rscPayloadGenerationUrlPath;
-  return typeof rscPayloadGenerationUrlPath === 'string' && rscPayloadGenerationUrlPath.length > 0;
+export function shouldPrepareRSCHydrationRoot(railsContext: RailsContext | undefined): boolean {
+  return !!railsContext?.rscPayloadGenerationUrlPath;
 }
 
 function isRSCPayloadScript(node: Element): boolean {
@@ -43,12 +41,31 @@ function isRSCStylesheetResource(node: Element): boolean {
 
 function isAsyncScriptResource(node: Element): boolean {
   // React floats streamed RSC chunk scripts after the payload marker and before the Suspense reveal
-  // comment without adding an RSC-specific marker to those scripts.
+  // comment without adding an RSC-specific marker to those scripts. This heuristic is intentionally
+  // scoped to nodes after the payload marker; an app-authored async script in that position is moved
+  // to head too, matching React's expected resource placement before hydration.
   return node.tagName === 'SCRIPT' && node.hasAttribute('src') && node.hasAttribute('async');
 }
 
 function isIgnorableWhitespace(node: ChildNode): boolean {
   return node.nodeType === Node.TEXT_NODE && (node.textContent || '').trim() === '';
+}
+
+function firstNonWhitespaceChild(domNode: Element): ChildNode | null {
+  let node = domNode.firstChild;
+
+  while (node && isIgnorableWhitespace(node)) {
+    node = node.nextSibling;
+  }
+
+  return node;
+}
+
+export function hasLeadingSuspenseBoundary(domNode: Element | null | undefined): boolean {
+  if (!domNode) return false;
+
+  const node = firstNonWhitespaceChild(domNode);
+  return node?.nodeType === Node.COMMENT_NODE && (node.textContent || '').startsWith('$');
 }
 
 function resourcesMatch(node: Element, headNode: Element): boolean {
