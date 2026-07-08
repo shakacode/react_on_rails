@@ -110,6 +110,13 @@ class PrMergeLedger
       nil
     end
   end
+  ListBlockquoteMarkerMatch = Struct.new(:match_end) do
+    def end(key = 0)
+      return match_end if key.eql?(0)
+
+      nil
+    end
+  end
   DEFAULT_GITHUB_API_TIMEOUT_SECONDS = "30"
   GITHUB_API_MAX_ATTEMPTS = 3
   GITHUB_API_RETRY_BASE_DELAY_SECONDS = 0.25
@@ -2675,13 +2682,43 @@ class PrMergeLedger
 
   def list_blockquote_marker_match(line, markdown_state)
     match = line.match(/\A(?<indent>[ \t]*)(?:[-+*]|\d{1,9}[.)])[ \t]+> ?/)
-    return unless match
+    if match
+      marker_indent = column_after_prefix(match[:indent].each_char)
+      list_content_indent = markdown_state.fetch("list_content_indent")
+      return match if list_marker_indent_allowed?(marker_indent, list_content_indent)
+    end
 
-    marker_indent = column_after_prefix(match[:indent].each_char)
+    list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
+    return unless list_match
+
+    marker_indent = column_after_prefix(list_match[:indent].each_char)
+    content_column = column_after_prefix(line[...list_match.begin(:code)])
     list_content_indent = markdown_state.fetch("list_content_indent")
-    return unless list_marker_indent_allowed?(marker_indent, list_content_indent)
+    return unless list_marker_indent_allowed_for_line?(marker_indent, list_content_indent, content_column)
 
-    match
+    same_line_nested_list_blockquote_marker_match(line, list_match, content_column)
+  end
+
+  def same_line_nested_list_blockquote_marker_match(line, outer_match, outer_content_column)
+    nested_line_offset = outer_match.begin(:code)
+    list_content_column = outer_content_column
+
+    loop do
+      nested_line = line[nested_line_offset..] || ""
+      nested_match = nested_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
+      return unless nested_match
+
+      content_column = column_after_prefix(line[...nested_line_offset + nested_match.begin(:code)])
+      marker_indent = column_after_prefix(line[...nested_line_offset + nested_match.begin(0)])
+      return unless list_marker_indent_allowed?(marker_indent, list_content_column)
+
+      blockquote_line_offset = nested_line_offset + nested_match.begin(:code)
+      blockquote_match = line[blockquote_line_offset..].to_s.match(/\A> ?/)
+      return ListBlockquoteMarkerMatch.new(blockquote_line_offset + blockquote_match.end(0)) if blockquote_match
+
+      nested_line_offset = blockquote_line_offset
+      list_content_column = content_column
+    end
   end
 
   def list_marker_indent_allowed?(marker_indent, list_content_indent)
