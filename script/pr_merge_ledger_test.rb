@@ -813,6 +813,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_link_reference_definition_angle_destination_title_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: <my url> \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_list_item_link_reference_definition_same_line_title_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- [foo]: /url \"Fixes #4410\"\n"))
 
