@@ -10,6 +10,7 @@ require_relative "closing_keyword_scanner/inline_code"
 require_relative "closing_keyword_scanner/inline_code_multiline"
 require_relative "closing_keyword_scanner/line_state"
 require_relative "closing_keyword_scanner/link_reference_blocks"
+require_relative "closing_keyword_scanner/link_reference_parser"
 require_relative "closing_keyword_scanner/list_blocks"
 require_relative "closing_keyword_scanner/list_paragraphs"
 
@@ -24,6 +25,7 @@ class PrMergeLedger
     include InlineCodeMultiline
     include LineState
     include LinkReferenceBlocks
+    include LinkReferenceParser
     include ListBlocks
     include ListParagraphs
 

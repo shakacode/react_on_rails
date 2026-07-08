@@ -49,15 +49,9 @@ class PrMergeLedger
     HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze
     THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
     SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
-    LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*.*(?:\n)?\z/
-    LINK_REFERENCE_DEFINITION_WITH_DESTINATION_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/
+    LINK_REFERENCE_DEFINITION_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*(?<tail>[^\n]*)(?:\n)?\z/
     LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*(?:\n)?\z/
     LINK_REFERENCE_DESTINATION_LINE_PATTERN = /\A {0,3}\S/
-    LINK_REFERENCE_TITLE_PATTERN = /\A {0,3}(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\))[ \t]*(?:\n)?\z/
-    LINK_REFERENCE_DEFINITION_WITH_TITLE_PATTERN =
-      /\A {0,3}\[[^\]\n]+\]:[ \t]*\S+[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\))[ \t]*(?:\n)?\z/
-    LINK_REFERENCE_DESTINATION_WITH_TITLE_PATTERN =
-      /\A {0,3}\S+[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\))[ \t]*(?:\n)?\z/
     LINK_REFERENCE_TITLE_DELIMITERS = { "\"" => "\"", "'" => "'", "(" => ")" }.freeze
     TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/
 
