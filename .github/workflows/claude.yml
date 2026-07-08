@@ -29,6 +29,21 @@ jobs:
             const repo = context.repo.repo;
             const permissionByLogin = new Map();
 
+            function claudeRequester() {
+              if (
+                context.eventName === 'issue_comment' ||
+                context.eventName === 'pull_request_review_comment'
+              ) {
+                return context.payload.comment?.user?.login;
+              }
+
+              if (context.eventName === 'issues') {
+                return context.payload.issue?.user?.login;
+              }
+
+              return null;
+            }
+
             async function hasWriteAccessFor(username) {
               if (!username) {
                 return false;
@@ -57,16 +72,31 @@ jobs:
               return hasWriteAccess;
             }
 
-            if (!(await hasWriteAccessFor(context.actor))) {
+            const actor = context.actor;
+            const requester = claudeRequester();
+
+            if (!requester) {
+              core.setOutput('authorized', 'false');
+              core.setFailed('Unable to run Claude because the @claude requester could not be determined.');
+              return;
+            }
+
+            if (!(await hasWriteAccessFor(actor))) {
+              core.setOutput('authorized', 'false');
+              core.setFailed(`Unable to run Claude because ${actor} does not have write/admin repository permission.`);
+              return;
+            }
+
+            if (!(await hasWriteAccessFor(requester))) {
               core.setOutput('authorized', 'false');
               core.setFailed(
-                `Unable to run Claude because ${context.actor} does not have write/admin repository permission.`
+                `Unable to run Claude because @claude requester ${requester} does not have write/admin repository permission.`
               );
               return;
             }
 
             core.setOutput('authorized', 'true');
-            core.info(`Authorized ${context.actor} to run Claude.`);
+            core.info(`Authorized ${actor} and @claude requester ${requester} to run Claude.`);
 
   claude:
     needs: authorize_claude_actor

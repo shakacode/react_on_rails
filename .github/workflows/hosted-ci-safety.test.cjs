@@ -74,7 +74,10 @@ assertMatches(
 );
 assertMatches('Claude authorization job', claudeWorkflow, /authorize_claude_actor:/);
 assertMatches('Claude permission lookup', claudeWorkflow, /getCollaboratorPermissionLevel\({[\s\S]*username/);
-assertMatches('Claude write permission guard', claudeWorkflow, /hasWriteAccessFor\(context\.actor\)/);
+assertMatches('Claude actor permission guard', claudeWorkflow, /hasWriteAccessFor\(actor\)/);
+assertMatches('Claude comment requester guard', claudeWorkflow, /context\.payload\.comment\?\.user\?\.login/);
+assertMatches('Claude issue requester guard', claudeWorkflow, /context\.payload\.issue\?\.user\?\.login/);
+assertMatches('Claude requester permission guard', claudeWorkflow, /hasWriteAccessFor\(requester\)/);
 assertMatches(
   'Claude job needs authorization',
   claudeWorkflow,
