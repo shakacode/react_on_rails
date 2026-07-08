@@ -82,6 +82,7 @@ class PrMergeLedger
   HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
   HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
   HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
+  HTML_TYPE_7_BLOCK_OPEN_PATTERN = %r{\A {0,3}</?[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>\n]*)?>[ \t]*(?:\n)?\z}
   THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
   SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
   LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN = /\A {0,3}\[[^\]\n]+\]:[ \t]*\S/
@@ -2963,11 +2964,13 @@ class PrMergeLedger
     return { "type" => "processing_instruction" } if line.match?(HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN)
 
     tag_match = line.match(HTML_BLOCK_TAG_OPEN_PATTERN)
-    return unless tag_match
+    if tag_match
+      tag_name = tag_match[:tag].downcase
+      tag_type = HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name) ? "raw_tag" : "tag"
+      return { "type" => tag_type, "tag" => tag_name }
+    end
 
-    tag_name = tag_match[:tag].downcase
-    tag_type = HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name) ? "raw_tag" : "tag"
-    { "type" => tag_type, "tag" => tag_name }
+    { "type" => "type7_tag" } if line.match?(HTML_TYPE_7_BLOCK_OPEN_PATTERN)
   end
 
   def html_block_closes_on_line?(line, html_block)
@@ -2982,7 +2985,7 @@ class PrMergeLedger
       line.include?("?>")
     when "raw_tag"
       line.match?(%r{</#{Regexp.escape(html_block.fetch('tag'))}\s*>}i)
-    when "tag"
+    when "tag", "type7_tag"
       line.strip.empty?
     else
       false
@@ -2996,6 +2999,7 @@ class PrMergeLedger
   def static_root_block_boundary_line?(boundary_line)
     boundary_line.match?(ROOT_BLOCK_BOUNDARY_PATTERN) ||
       boundary_line.match?(HTML_BLOCK_BOUNDARY_PATTERN) ||
+      boundary_line.match?(HTML_TYPE_7_BLOCK_OPEN_PATTERN) ||
       boundary_line.match?(THEMATIC_BOUNDARY_PATTERN) ||
       boundary_line.match?(LINK_REFERENCE_DEFINITION_BOUNDARY_PATTERN)
   end
