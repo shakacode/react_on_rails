@@ -23,11 +23,14 @@ class PrMergeLedger
       end
 
       def list_marker_content_indent_for_line(line, current_indent)
-        list_match = line.match(LIST_ITEM_PATTERN)
+        list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
         return unless list_match
 
         marker_indent = column_after_prefix(list_match[:indent].each_char)
-        column_after_prefix(list_match[0]) if list_marker_indent_allowed?(marker_indent, current_indent)
+        return unless list_marker_indent_allowed?(marker_indent, current_indent)
+
+        content_column = column_after_prefix(line[...list_match.begin(:code)])
+        same_line_nested_list_content_indent(line, list_match, content_column) || content_column
       end
 
       def empty_list_item_content_indent_for_line(line, current_indent)

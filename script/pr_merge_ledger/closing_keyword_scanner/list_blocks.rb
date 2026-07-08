@@ -96,6 +96,18 @@ class PrMergeLedger
         end
       end
 
+      def same_line_nested_list_content_indent(line, outer_match, outer_content_column)
+        deepest_content_column = nil
+        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_nested_match, _code_offset,
+                                                                                     _marker_end_column,
+                                                                                     content_column|
+          deepest_content_column = content_column
+          nil
+        end
+
+        deepest_content_column
+      end
+
       def blockquote_marker_depth(markers)
         markers.count(">")
       end

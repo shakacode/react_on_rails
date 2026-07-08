@@ -52,7 +52,7 @@ class PrMergeLedger
           content_column
         )
 
-        html_block_context_for_line(list_match[:code])
+        html_block_context_for_line(list_match[:code], markdown_state)
       end
 
       def html_block_closes_on_line?(line, html_block)
