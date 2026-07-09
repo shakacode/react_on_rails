@@ -22,7 +22,8 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   workflow `SKILL.md` files installed in the user's or agent's normal skill
   directory; duplicating them here creates duplicate Codex skill picker entries.
   Current repo-specific skills include `$stress-test`,
-  `$optimize-rsc-performance`, and `$react-on-rails-update-changelog`.
+  `$optimize-rsc-performance`, `$react-on-rails-update-changelog`, and
+  `$react-on-rails-release-train-issue-evaluation`.
 - `.claude/skills`: symlink to `.agents/skills` so Claude Code exposes the
   repo-specific local skills kept by this checkout. Shared skills should come
   from the installed shared pack, not this symlink.
@@ -58,6 +59,11 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When deciding whether an issue or proposed fix is worth doing, use the
   installed/shared `$evaluate-issue` skill; a short invocation is
   `$evaluate-issue` or "Is this issue worth fixing?"
+- When deciding whether a React on Rails issue belongs on the active release
+  train (`release/X.Y.Z`, especially `release/17.0.0`) or should wait for
+  `main`, use the repo-local
+  `.agents/skills/react-on-rails-release-train-issue-evaluation/SKILL.md`; a
+  short invocation is `$react-on-rails-release-train-issue-evaluation`.
 - When the user wants a ready prompt for review-only GitHub issue triage or an
   all-open-issues audit, use the installed/shared `$plan-issue-triage` skill; a
   short invocation is `$plan-issue-triage` or "Plan an issue triage"
