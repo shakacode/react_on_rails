@@ -952,13 +952,17 @@ describe('RSCRoute deferred SSR behavior', () => {
     container.innerHTML = serverHtml;
     document.body.appendChild(container);
 
-    // Exercise the real default-provider factory (the production wrapping logic).
+    // Exercise the real default-provider factory (the production wrapping logic). Requiring this
+    // module runs its `setDefaultRSCProviderFactory` side effect; asserting `wrappedByDefaultRSCProvider`
+    // below guarantees the factory was actually registered, so the test cannot silently degrade into a
+    // pass if the registration is ever skipped (e.g. a cached no-op require after a prior clear).
     require('../src/registerDefaultRSCProvider.client.tsx');
-    const { reactElement } = maybeWrapWithDefaultRSCProviderWithStatus(
+    const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
       <AppReturningSuspense />,
       { rscPayloadGenerationUrlPath: '/rsc_payload' } as RailsContext,
       container.id,
     );
+    expect(wrappedByDefaultRSCProvider).toBe(true);
 
     const recoverableErrors: string[] = [];
     let root: Root | undefined;
