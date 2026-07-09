@@ -10,6 +10,7 @@ class PrMergeLedger
         https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/\d+
       )
     }ix
+    CLOSING_KEYWORD_TAIL_OVERLAP_CHARACTERS = 512
     MAX_BODY_LINE_BYTES = 100_000
     FENCED_CODE_BLOCK_PATTERN = /\A {0,3}(?<fence>`{3,}|~{3,})/
     INDENTED_CODE_BLOCK_PATTERN = /\A(?: {4}| {0,3}\t)/

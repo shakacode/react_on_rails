@@ -30,6 +30,7 @@ class PrMergeLedger
         return fenced_code_markdown_line_and_depth(line, opening_fence) if opening_fence
 
         markdown_line = line
+        markdown_column = 0
         blockquote_depth = 0
         line_has_blockquote_marker = false
         line_has_list_blockquote_marker = false
@@ -40,6 +41,7 @@ class PrMergeLedger
 
           blockquote_depth += 1
           line_has_blockquote_marker = true
+          markdown_column = column_after_prefix(markdown_line[...marker_match.end(0)], markdown_column)
           markdown_line = markdown_line[marker_match.end(0)..] || ""
         end
 
@@ -48,6 +50,7 @@ class PrMergeLedger
           blockquote_depth += list_blockquote_match.blockquote_depth
           line_has_blockquote_marker = true
           line_has_list_blockquote_marker = true
+          markdown_column = column_after_prefix(markdown_line[...list_blockquote_match.end(0)], markdown_column)
           markdown_line = markdown_line[list_blockquote_match.end(0)..] || ""
         end
 
@@ -58,6 +61,7 @@ class PrMergeLedger
           {
             marker_found: line_has_blockquote_marker,
             list_blockquote_marker_found: line_has_list_blockquote_marker,
+            marker_content_column: markdown_column,
             markdown_state:
           }
         )
@@ -69,7 +73,8 @@ class PrMergeLedger
             normalize_blockquote_content_indentation(
               markdown_line,
               blockquote_depth,
-              context.fetch(:list_blockquote_marker_found)
+              context.fetch(:list_blockquote_marker_found),
+              context.fetch(:marker_content_column)
             ),
             blockquote_depth
           ]
@@ -92,17 +97,22 @@ class PrMergeLedger
         !line.strip.empty?
       end
 
-      def normalize_blockquote_content_indentation(line, blockquote_depth, list_blockquote_marker_found)
-        return line unless blockquote_depth == 1 && !list_blockquote_marker_found
+      def normalize_blockquote_content_indentation(line, blockquote_depth, _list_blockquote_marker_found,
+                                                   marker_content_column)
+        return line unless blockquote_depth.positive?
 
-        case line
-        when /\A\t/
-          "  #{line[1..]}"
-        when /\A \t/
-          "   #{line[2..]}"
-        else
-          line
+        indentation = line.each_char.take_while { |character| INDENTATION_CHARACTERS.include?(character) }
+        return line if indentation.empty?
+
+        column = marker_content_column
+        relative_indent = 0
+        indentation.each do |character|
+          next_column = character == "\t" ? column + (4 - (column % 4)) : column + 1
+          relative_indent += next_column - column
+          column = next_column
         end
+
+        "#{' ' * relative_indent}#{line[indentation.length..]}"
       end
 
       def fenced_code_markdown_line_and_depth(line, opening_fence)

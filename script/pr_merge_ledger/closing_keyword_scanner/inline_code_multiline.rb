@@ -33,20 +33,44 @@ class PrMergeLedger
       end
 
       def inline_code_delimiter_closes_later?(body_lines, line_index, delimiter, blockquote_depth, markdown_state)
+        return false if cached_failed_inline_code_lookahead?(markdown_state, line_index, delimiter, blockquote_depth)
+
         lookahead_state = markdown_state.merge("paragraph_continuation_active" => true)
 
-        body_lines[(line_index + 1)..].to_a.each do |line|
+        body_lines[(line_index + 1)..].to_a.each_with_index do |line, offset|
+          lookahead_index = line_index + 1 + offset
           continuation_line = inline_code_continuation_line(line, blockquote_depth, lookahead_state)
-          return false unless continuation_line
-          return false if continuation_line.strip.empty?
-          return false if inline_code_block_boundary?(continuation_line, lookahead_state)
+          unless continuation_line &&
+                 !continuation_line.strip.empty? &&
+                 !inline_code_block_boundary?(continuation_line, lookahead_state)
+            cache_failed_inline_code_lookahead(markdown_state, delimiter, blockquote_depth, lookahead_index)
+            return false
+          end
           return true if matching_closing_backtick_run(continuation_line, delimiter, 0)
 
           lookahead_state["paragraph_continuation_active"] =
             next_paragraph_continuation_active(continuation_line, false, lookahead_state)
         end
 
+        cache_failed_inline_code_lookahead(markdown_state, delimiter, blockquote_depth, body_lines.length)
         false
+      end
+
+      def cached_failed_inline_code_lookahead?(markdown_state, line_index, delimiter, blockquote_depth)
+        cache = markdown_state.fetch("inline_code_failed_lookahead")
+        return false unless cache
+
+        cache.fetch(:delimiter) == delimiter &&
+          cache.fetch(:blockquote_depth) == blockquote_depth &&
+          line_index < cache.fetch(:through_line_index)
+      end
+
+      def cache_failed_inline_code_lookahead(markdown_state, delimiter, blockquote_depth, through_line_index)
+        markdown_state["inline_code_failed_lookahead"] = {
+          delimiter:,
+          blockquote_depth:,
+          through_line_index:
+        }
       end
 
       def inline_code_continuation_line(line, blockquote_depth, markdown_state)
@@ -98,8 +122,12 @@ class PrMergeLedger
         return unless content
         return if markdown_state.fetch("inline_code_multiline_reported")
 
-        content << code_segment.to_s
-        match = content.match(CLOSING_KEYWORD_PATTERN)
+        content, previous_length = append_multiline_scan_content(
+          markdown_state,
+          "inline_code_multiline_content",
+          code_segment
+        )
+        match = closing_keyword_in_updated_multiline_content(content, previous_length)
         return unless match
 
         markdown_state["inline_code_multiline_match"] = match[0]

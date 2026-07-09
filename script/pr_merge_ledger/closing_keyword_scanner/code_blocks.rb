@@ -64,16 +64,14 @@ class PrMergeLedger
       def closing_keyword_in_multiline_html_block(line, markdown_state)
         return if markdown_state.fetch("html_block_multiline_reported")
 
-        content = markdown_state.fetch("html_block_multiline_content")
-        content = if content
-                    content << "\n"
-                    content << line.to_s
-                  else
-                    line.to_s.dup
-                  end
-        markdown_state["html_block_multiline_content"] = content
+        content, previous_length = append_multiline_scan_content(
+          markdown_state,
+          "html_block_multiline_content",
+          line,
+          separator: "\n"
+        )
 
-        match = content.match(CLOSING_KEYWORD_PATTERN)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length)
         return unless match
 
         markdown_state["html_block_multiline_reported"] = true
@@ -88,16 +86,14 @@ class PrMergeLedger
       def closing_keyword_in_multiline_code_block(line, markdown_state)
         return if markdown_state.fetch("code_block_multiline_reported")
 
-        content = markdown_state.fetch("code_block_multiline_content")
-        content = if content
-                    content << "\n"
-                    content << line.to_s
-                  else
-                    line.to_s.dup
-                  end
-        markdown_state["code_block_multiline_content"] = content
+        content, previous_length = append_multiline_scan_content(
+          markdown_state,
+          "code_block_multiline_content",
+          line,
+          separator: "\n"
+        )
 
-        match = content.match(CLOSING_KEYWORD_PATTERN)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length)
         return unless match
 
         markdown_state["code_block_multiline_reported"] = true
@@ -107,6 +103,26 @@ class PrMergeLedger
       def reset_multiline_code_block_state(markdown_state)
         markdown_state["code_block_multiline_content"] = nil
         markdown_state["code_block_multiline_reported"] = false
+      end
+
+      def append_multiline_scan_content(markdown_state, state_key, segment, separator: nil)
+        content = markdown_state.fetch(state_key)
+        previous_length = content&.length || 0
+        content = if content
+                    content << separator.to_s if separator
+                    content << segment.to_s
+                  else
+                    segment.to_s.dup
+                  end
+        markdown_state[state_key] = content
+
+        [content, previous_length]
+      end
+
+      def closing_keyword_in_updated_multiline_content(content, previous_length)
+        scan_start = [previous_length - CLOSING_KEYWORD_TAIL_OVERLAP_CHARACTERS, 0].max
+
+        content[scan_start..].to_s.match(CLOSING_KEYWORD_PATTERN)
       end
     end
   end

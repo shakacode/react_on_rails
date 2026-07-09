@@ -972,6 +972,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_nested_list_link_reference_definition_split_destination_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("- - [foo]:\n    /url \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_link_reference_definition_label_only_crlf_split_destination_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("[foo]:\r\n/url \"Fixes #4410\"\r\n"))
 
@@ -1429,6 +1440,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 1, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_compact_nested_blockquote_tabbed_paragraph_continuation_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body(">>\tFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
   end
 
   def test_blockquote_lazy_indented_paragraph_continuation_allows_strict_closeout
@@ -2012,6 +2032,16 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     output, status = run_fixture(
       fixture_with_body("Summary has an unmatched `backtick.\n# Fixes #4410 `cmd`\n")
     )
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_repeated_unmatched_backticks_before_plain_closeout_allow_strict_closeout
+    unmatched_lines = Array.new(999) { |index| "line #{index} has an unmatched `backtick" }
+    output, status = run_fixture(fixture_with_body("#{unmatched_lines.join("\n")}\nFixes #4410\n"))
 
     assert status.success?, output
     data = JSON.parse(output)

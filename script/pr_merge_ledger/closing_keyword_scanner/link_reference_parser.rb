@@ -6,7 +6,9 @@ class PrMergeLedger
       private
 
       def link_reference_content_line(line, markdown_state)
-        list_item_link_reference_content_line(line, markdown_state) || line
+        list_item_link_reference_content_line(line, markdown_state) ||
+          list_indented_link_reference_content_line(line, markdown_state) ||
+          line
       end
 
       def list_item_link_reference_content_line(line, markdown_state)
@@ -14,20 +16,48 @@ class PrMergeLedger
 
         content_indent = markdown_state.fetch("list_content_indent")
         content_line = line
+        stripped_list_marker = false
 
         loop do
           list_match = content_line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-          return unless list_match
+          return stripped_list_marker ? content_line : nil unless list_match
 
           marker_indent = column_after_prefix(list_match[:indent].each_char)
           content_column = column_after_prefix(content_line[...list_match.begin(:code)])
           return unless list_marker_indent_allowed_for_line?(marker_indent, content_indent, content_column)
 
           content_line = list_match[:code]
+          stripped_list_marker = true
           return content_line if link_reference_definition_line?(content_line, markdown_state)
 
           content_indent = content_column
         end
+      end
+
+      def list_indented_link_reference_content_line(line, markdown_state)
+        return unless markdown_state
+
+        content_indent = markdown_state.fetch("list_content_indent")
+        return unless content_indent
+        return unless leading_indentation_columns(line) >= content_indent
+
+        line_without_indentation_columns(line, content_indent)
+      end
+
+      def line_without_indentation_columns(line, columns)
+        column = 0
+
+        line.each_char.with_index do |character, index|
+          break unless INDENTATION_CHARACTERS.include?(character)
+
+          next_column = character == "\t" ? column + (4 - (column % 4)) : column + 1
+          return "#{' ' * (next_column - columns)}#{line[(index + 1)..]}" if next_column > columns
+          return line[(index + 1)..] if next_column == columns
+
+          column = next_column
+        end
+
+        line
       end
 
       def link_reference_definition_parts(line)

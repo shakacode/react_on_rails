@@ -41,6 +41,7 @@ class PrMergeLedger
         "body_lines" => body_lines,
         "opening_fence" => nil,
         "inline_code_delimiter" => nil,
+        "inline_code_failed_lookahead" => nil,
         "inline_code_multiline_content" => nil,
         "inline_code_multiline_reported" => false,
         "code_block_multiline_content" => nil,

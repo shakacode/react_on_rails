@@ -28,16 +28,14 @@ class PrMergeLedger
       def closing_keyword_in_multiline_link_reference(line, markdown_state)
         return if markdown_state.fetch("link_reference_multiline_reported")
 
-        content = markdown_state.fetch("link_reference_multiline_content")
-        content = if content
-                    content << "\n"
-                    content << line.to_s
-                  else
-                    line.to_s.dup
-                  end
-        markdown_state["link_reference_multiline_content"] = content
+        content, previous_length = append_multiline_scan_content(
+          markdown_state,
+          "link_reference_multiline_content",
+          line,
+          separator: "\n"
+        )
 
-        match = content.match(CLOSING_KEYWORD_PATTERN)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length)
         return unless match
 
         markdown_state["link_reference_multiline_reported"] = true
