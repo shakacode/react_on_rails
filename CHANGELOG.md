@@ -43,6 +43,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   the same null Suspense boundary used by the server stream. This prevents recoverable hydration
   mismatches on streamed RSC apps such as the flagship demo. Fixes
   [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
+- **[Pro]** **Default RSC provider no longer double-wraps user Suspense roots**: the default-provider
+  hydration guard from PR 4532 keyed its extra client `<React.Suspense>` wrapper on the hydration
+  root starting with a `<!--$-->` comment, which also matches an app-authored top-level `<Suspense>`
+  root (such as `<Suspense><RSCRoute ssr={false} /></Suspense>`). It now skips the wrapper when the
+  client root already renders its own top-level Suspense boundary, preventing a recoverable hydration
+  mismatch on that supported path. Fixes
+  [Issue 4535](https://github.com/shakacode/react_on_rails/issues/4535). [PR 4545](https://github.com/shakacode/react_on_rails/pull/4545) by [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
 
