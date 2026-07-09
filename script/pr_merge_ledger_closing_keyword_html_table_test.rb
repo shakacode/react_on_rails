@@ -311,6 +311,33 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_blockquote_html_block_ends_at_blockquote_boundary_before_plain_closeout
+    output, status = run_fixture(fixture_with_body("> <div>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_item_html_block_ends_at_sibling_item_before_plain_closeout
+    output, status = run_fixture(fixture_with_body("- <div>\n- Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_item_html_block_ends_at_outdented_plain_closeout
+    output, status = run_fixture(fixture_with_body("- <div>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_nested_list_continuation_html_block_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- outer\n  - inner\n    <div>\n    Fixes #4410\n"))
 

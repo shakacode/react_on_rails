@@ -8,6 +8,7 @@ class PrMergeLedger
       def next_html_block(line, markdown_state)
         active_block = markdown_state.fetch("html_block")
         if active_block
+          return nil if html_block_exited_container?(line, markdown_state, active_block)
           return nil if html_block_closes_on_line?(line, active_block)
 
           return active_block
@@ -17,7 +18,7 @@ class PrMergeLedger
         return nil unless block
         return nil if html_block_closes_on_line?(line, block)
 
-        block
+        html_block_with_container(block, markdown_state)
       end
 
       def html_block_context_for_line(line, markdown_state = nil)

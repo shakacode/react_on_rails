@@ -54,7 +54,14 @@ class PrMergeLedger
       end
 
       def html_block_context_for_scan(line, markdown_state)
-        markdown_state.fetch("html_block") || html_block_context_for_line(line, markdown_state)
+        active_block = markdown_state.fetch("html_block")
+        if active_block
+          return nil if html_block_exited_container?(line, markdown_state, active_block)
+
+          return active_block
+        end
+
+        html_block_context_for_line(line, markdown_state)
       end
 
       def new_html_block?(markdown_state, html_block)
