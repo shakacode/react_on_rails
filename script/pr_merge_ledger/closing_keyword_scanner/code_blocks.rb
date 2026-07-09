@@ -71,14 +71,21 @@ class PrMergeLedger
       def closing_keyword_in_multiline_html_block(line, markdown_state)
         return if markdown_state.fetch("html_block_multiline_reported")
 
-        content, previous_length = append_multiline_scan_content(
+        content, previous_length, candidate_start, appended_text = append_multiline_scan_content(
           markdown_state,
           "html_block_multiline_content",
           line,
           separator: "\n"
         )
 
-        match = closing_keyword_in_updated_multiline_content(content, previous_length)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length, candidate_start)
+        update_multiline_closing_keyword_candidate_start(
+          markdown_state,
+          "html_block_multiline_content",
+          content,
+          candidate_start,
+          appended_text
+        )
         return unless match
 
         markdown_state["html_block_multiline_reported"] = true
@@ -88,19 +95,27 @@ class PrMergeLedger
       def reset_multiline_html_block_state(markdown_state)
         markdown_state["html_block_multiline_content"] = nil
         markdown_state["html_block_multiline_reported"] = false
+        markdown_state["html_block_multiline_content_closing_keyword_candidate_start"] = nil
       end
 
       def closing_keyword_in_multiline_code_block(line, markdown_state)
         return if markdown_state.fetch("code_block_multiline_reported")
 
-        content, previous_length = append_multiline_scan_content(
+        content, previous_length, candidate_start, appended_text = append_multiline_scan_content(
           markdown_state,
           "code_block_multiline_content",
           line,
           separator: "\n"
         )
 
-        match = closing_keyword_in_updated_multiline_content(content, previous_length)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length, candidate_start)
+        update_multiline_closing_keyword_candidate_start(
+          markdown_state,
+          "code_block_multiline_content",
+          content,
+          candidate_start,
+          appended_text
+        )
         return unless match
 
         markdown_state["code_block_multiline_reported"] = true
@@ -110,26 +125,51 @@ class PrMergeLedger
       def reset_multiline_code_block_state(markdown_state)
         markdown_state["code_block_multiline_content"] = nil
         markdown_state["code_block_multiline_reported"] = false
+        markdown_state["code_block_multiline_content_closing_keyword_candidate_start"] = nil
       end
 
       def append_multiline_scan_content(markdown_state, state_key, segment, separator: nil)
         content = markdown_state.fetch(state_key)
         previous_length = content&.length || 0
+        candidate_start = markdown_state.fetch(multiline_closing_keyword_candidate_state_key(state_key), nil)
+        appended_text = content && separator ? "#{separator}#{segment}" : segment.to_s
         content = if content
-                    content << separator.to_s if separator
-                    content << segment.to_s
+                    content << appended_text
                   else
-                    segment.to_s.dup
+                    appended_text.dup
                   end
         markdown_state[state_key] = content
 
-        [content, previous_length]
+        [content, previous_length, candidate_start, appended_text]
       end
 
-      def closing_keyword_in_updated_multiline_content(content, previous_length)
+      def closing_keyword_in_updated_multiline_content(content, previous_length, candidate_start = nil)
         scan_start = [previous_length - CLOSING_KEYWORD_TAIL_OVERLAP_CHARACTERS, 0].max
+        scan_start = [candidate_start, scan_start].compact.min
 
         content[scan_start..].to_s.match(CLOSING_KEYWORD_PATTERN)
+      end
+
+      def update_multiline_closing_keyword_candidate_start(markdown_state, state_key, content, previous_candidate_start,
+                                                           appended_text)
+        candidate_start =
+          if previous_candidate_start && appended_text.match?(/\A\s*\z/)
+            previous_candidate_start
+          else
+            closing_keyword_pending_candidate_start(content)
+          end
+        markdown_state[multiline_closing_keyword_candidate_state_key(state_key)] = candidate_start
+      end
+
+      def closing_keyword_pending_candidate_start(content)
+        suffix_start = [content.length - CLOSING_KEYWORD_TAIL_OVERLAP_CHARACTERS, 0].max
+        suffix = content[suffix_start..].to_s
+        match = suffix.match(CLOSING_KEYWORD_PENDING_PATTERN)
+        match && (suffix_start + match.begin(:keyword))
+      end
+
+      def multiline_closing_keyword_candidate_state_key(state_key)
+        "#{state_key}_closing_keyword_candidate_start"
       end
     end
   end

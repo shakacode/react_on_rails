@@ -10,6 +10,10 @@ class PrMergeLedger
         https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:issues|pull)/\d+
       )
     }ix
+    CLOSING_KEYWORD_PENDING_PATTERN = /
+      (?:\A|[^A-Za-z0-9_])
+      (?<keyword>close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s*
+    \z/ix
     MAX_BODY_LINE_BYTES = 100_000
     CLOSING_KEYWORD_PREFIX_OVERLAP_CHARACTERS = 512
     CLOSING_KEYWORD_TAIL_OVERLAP_CHARACTERS =

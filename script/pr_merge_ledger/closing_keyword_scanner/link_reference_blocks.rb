@@ -28,14 +28,21 @@ class PrMergeLedger
       def closing_keyword_in_multiline_link_reference(line, markdown_state)
         return if markdown_state.fetch("link_reference_multiline_reported")
 
-        content, previous_length = append_multiline_scan_content(
+        content, previous_length, candidate_start, appended_text = append_multiline_scan_content(
           markdown_state,
           "link_reference_multiline_content",
           line,
           separator: "\n"
         )
 
-        match = closing_keyword_in_updated_multiline_content(content, previous_length)
+        match = closing_keyword_in_updated_multiline_content(content, previous_length, candidate_start)
+        update_multiline_closing_keyword_candidate_start(
+          markdown_state,
+          "link_reference_multiline_content",
+          content,
+          candidate_start,
+          appended_text
+        )
         return unless match
 
         markdown_state["link_reference_multiline_reported"] = true
@@ -45,6 +52,7 @@ class PrMergeLedger
       def reset_multiline_link_reference_state(markdown_state)
         markdown_state["link_reference_multiline_content"] = nil
         markdown_state["link_reference_multiline_reported"] = false
+        markdown_state["link_reference_multiline_content_closing_keyword_candidate_start"] = nil
       end
 
       def link_reference_hidden_line?(line, markdown_state, source_line: line)

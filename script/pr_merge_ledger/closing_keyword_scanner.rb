@@ -7,6 +7,7 @@ require_relative "closing_keyword_scanner/code_blocks"
 require_relative "closing_keyword_scanner/fence_blocks"
 require_relative "closing_keyword_scanner/html_blocks"
 require_relative "closing_keyword_scanner/html_block_containers"
+require_relative "closing_keyword_scanner/html_list_blocks"
 require_relative "closing_keyword_scanner/inline_code"
 require_relative "closing_keyword_scanner/inline_code_multiline"
 require_relative "closing_keyword_scanner/line_state"
@@ -25,6 +26,7 @@ class PrMergeLedger
     include FenceBlocks
     include HtmlBlocks
     include HtmlBlockContainers
+    include HtmlListBlocks
     include InlineCode
     include InlineCodeMultiline
     include LineState

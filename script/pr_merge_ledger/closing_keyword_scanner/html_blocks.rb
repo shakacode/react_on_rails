@@ -22,6 +22,11 @@ class PrMergeLedger
       end
 
       def html_block_context_for_line(line, markdown_state = nil)
+        direct_html_block_context_for_line(line, markdown_state) ||
+          list_html_block_context_for_line(line, markdown_state)
+      end
+
+      def direct_html_block_context_for_line(line, markdown_state = nil)
         return { "type" => "comment" } if line.match?(HTML_COMMENT_OPEN_PATTERN)
         return { "type" => "cdata" } if line.match?(HTML_CDATA_OPEN_PATTERN)
         return { "type" => "declaration" } if line.match?(HTML_DECLARATION_OPEN_PATTERN)
@@ -34,9 +39,7 @@ class PrMergeLedger
           return { "type" => tag_type, "tag" => tag_name }
         end
 
-        return { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
-
-        list_html_block_context_for_line(line, markdown_state)
+        { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
       end
 
       def html_type_7_block_boundary_line?(line, markdown_state = nil)
@@ -135,10 +138,6 @@ class PrMergeLedger
         HTML_ATTRIBUTE_SPACES.include?(character)
       end
 
-      def html_attribute_delimiter?(character)
-        html_attribute_space?(character) || character == ">"
-      end
-
       def html_attribute_quote?(character)
         HTML_ATTRIBUTE_QUOTES.include?(character)
       end
@@ -155,44 +154,6 @@ class PrMergeLedger
 
       def html_tag_name_character?(character)
         character&.match?(/[A-Za-z0-9-]/)
-      end
-
-      def list_item_html_block_context_for_line(line, markdown_state)
-        return unless markdown_state
-
-        list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
-        return unless list_match
-        return if list_item_marker_continues_active_paragraph?(line, markdown_state)
-
-        marker_indent = column_after_prefix(list_match[:indent].each_char)
-        content_column = column_after_prefix(line[...list_match.begin(:code)].each_char)
-        return unless list_marker_indent_allowed_for_line?(
-          marker_indent,
-          markdown_state.fetch("list_content_indent"),
-          content_column
-        )
-
-        html_block_context_for_line(list_match[:code], child_list_item_markdown_state(markdown_state))
-      end
-
-      def list_html_block_context_for_line(line, markdown_state)
-        list_item_html_block_context_for_line(line, markdown_state) ||
-          list_indented_html_block_context_for_line(line, markdown_state)
-      end
-
-      def list_indented_html_block_context_for_line(line, markdown_state)
-        return unless markdown_state
-
-        content_indent = markdown_state.fetch("list_content_indent")
-        return unless content_indent
-
-        indentation_columns = leading_indentation_columns(line)
-        return unless indentation_columns.between?(content_indent, content_indent + 3)
-
-        html_block_context_for_line(
-          line_without_indentation_columns(line, content_indent),
-          markdown_state
-        )
       end
 
       def html_block_closes_on_line?(line, html_block)
