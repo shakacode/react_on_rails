@@ -197,6 +197,17 @@ class PrMergeLedgerClosingKeywordInlineTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_unmatched_backtick_run_before_closed_code_span_still_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("Note ``see this and `Fixes #123` yes\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["backticked_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #123/, violation.fetch("message"))
+  end
+
   def test_failed_multiline_inline_code_lookahead_cache_tracks_each_delimiter
     require_relative "pr_merge_ledger/closing_keyword_scanner"
     probe = Class.new { include PrMergeLedger::ClosingKeywordScanner }.new

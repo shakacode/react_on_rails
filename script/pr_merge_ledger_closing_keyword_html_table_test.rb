@@ -189,6 +189,17 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_raw_html_block_does_not_close_on_spaced_raw_text_end_tag
+    output, status = run_fixture(fixture_with_body("<pre>\n</pre >\nFixes #4410\n</pre>\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_raw_text_closing_tag_starts_type_7_html_block
     output, status = run_fixture(fixture_with_body("</script>\nFixes #4410\n"))
 

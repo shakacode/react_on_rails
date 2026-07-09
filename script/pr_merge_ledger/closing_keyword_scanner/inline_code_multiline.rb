@@ -26,7 +26,7 @@ class PrMergeLedger
           append_inline_code_segment(
             context.fetch(:normalized_line),
             context.fetch(:inline_code_flags),
-            line[opening_match.begin(0)..],
+            line[opening_match.begin(0)...opening_match.end(0)],
             in_code: false
           )
         end

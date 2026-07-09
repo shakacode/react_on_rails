@@ -128,6 +128,52 @@ class PrMergeLedger
         markdown_state["code_block_multiline_content_closing_keyword_candidate_start"] = nil
       end
 
+      def soft_wrapped_hidden_block_closing_keyword_match(line, markdown_state)
+        candidate = markdown_state.fetch("visible_closing_keyword_candidate", nil)
+        candidate_match = hidden_block_closing_keyword_match_with_visible_candidate(candidate, line)
+        return candidate_match if candidate_match
+
+        previous_line = markdown_state["inline_code_previous_normalized_line"]
+        return unless previous_line
+        return if inline_code_soft_wrap_boundary?(line)
+
+        combined_line = "#{previous_line}\n#{line}"
+        match = combined_line.match(CLOSING_KEYWORD_PATTERN)
+        return unless match
+
+        current_line_start = previous_line.length + 1
+        match.end(0) > current_line_start ? match : nil
+      end
+
+      def hidden_block_closing_keyword_match_with_visible_candidate(candidate, line)
+        return unless candidate
+
+        combined_line = "#{candidate}\n#{line}"
+        match = combined_line.match(CLOSING_KEYWORD_PATTERN)
+        return unless match
+
+        current_line_start = candidate.length + 1
+        match.end(0) > current_line_start ? match : nil
+      end
+
+      def update_visible_closing_keyword_candidate(markdown_state, line, code_block_line)
+        if code_block_line
+          clear_visible_closing_keyword_candidate(markdown_state) unless hidden_block_syntax_or_blank_line?(line)
+          return
+        end
+
+        candidate_start = closing_keyword_pending_candidate_start(line)
+        markdown_state["visible_closing_keyword_candidate"] = candidate_start && line[candidate_start..].to_s
+      end
+
+      def hidden_block_syntax_or_blank_line?(line)
+        line.strip.empty? || line.match?(FENCED_CODE_BLOCK_PATTERN)
+      end
+
+      def clear_visible_closing_keyword_candidate(markdown_state)
+        markdown_state["visible_closing_keyword_candidate"] = nil
+      end
+
       def append_multiline_scan_content(markdown_state, state_key, segment, separator: nil)
         content = markdown_state.fetch(state_key)
         previous_length = content&.length || 0

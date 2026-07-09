@@ -11,6 +11,7 @@ class PrMergeLedger
         end
 
         block_match = closing_keyword_in_code_block(line, current_line_in_fenced_code, markdown_state)
+        block_match ||= soft_wrapped_hidden_block_closing_keyword_match(line, markdown_state) if code_block_line
         block_match ||= closing_keyword_in_multiline_code_block(line, markdown_state) if code_block_line
         reset_multiline_code_block_state(markdown_state) unless code_block_line
         block_match

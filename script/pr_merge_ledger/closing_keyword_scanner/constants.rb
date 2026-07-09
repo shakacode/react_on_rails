@@ -51,7 +51,7 @@ class PrMergeLedger
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
     HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<closing>/?)(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
-    HTML_RAW_TEXT_BLOCK_CLOSE_PATTERN = %r{</(?:#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})\s*>}i
+    HTML_RAW_TEXT_BLOCK_CLOSE_PATTERN = %r{</(?:#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})>}i
     HTML_ATTRIBUTE_SPACES = [" ", "\t"].freeze
     HTML_ATTRIBUTE_INVALID_CHARACTERS = ["<", "\n"].freeze
     HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze

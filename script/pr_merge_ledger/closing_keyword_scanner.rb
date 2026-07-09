@@ -50,6 +50,7 @@ class PrMergeLedger
         "opening_fence" => nil,
         "inline_code_delimiter" => nil,
         "inline_code_failed_lookahead" => nil,
+        "visible_closing_keyword_candidate" => nil,
         "inline_code_multiline_content" => nil,
         "inline_code_multiline_reported" => false,
         "code_block_multiline_content" => nil,
@@ -123,20 +124,13 @@ class PrMergeLedger
       )
 
       code_block_line = code_block_line_for_state?(markdown_line, current_line_in_fenced_code, markdown_state)
-      block_match = code_block_closing_keyword_match(
+      match_text, inline_match = scan_code_formatted_closing_keyword(
+        markdown_state,
         markdown_line,
-        current_line_in_fenced_code,
         code_block_line,
-        markdown_state
+        current_line_in_fenced_code,
+        index
       )
-      inline_match =
-        if code_block_line
-          reset_inline_code_soft_wrap_state(markdown_state)
-          nil
-        else
-          closing_keyword_in_inline_code(markdown_line, index, markdown_state)
-        end
-      match_text = inline_match || block_match&.[](0)
       update_body_markdown_state_after_scan(markdown_line, current_line_in_fenced_code, markdown_state)
       markdown_state["blockquote_depth"] = effective_blockquote_depth(markdown_state, blockquote_depth)
       update_blockquote_lazy_continuation_state(markdown_state, markdown_line, current_line_in_fenced_code)
@@ -150,6 +144,44 @@ class PrMergeLedger
         pull_request["url"],
         "line" => index + 1
       )
+    end
+
+    def code_formatted_closing_keyword_match_text(markdown_state, markdown_line, code_block_line, inline_match,
+                                                  block_match)
+      match_text = inline_match || block_match&.[](0)
+      if match_text
+        clear_visible_closing_keyword_candidate(markdown_state)
+      else
+        update_visible_closing_keyword_candidate(markdown_state, markdown_line, code_block_line)
+      end
+
+      match_text
+    end
+
+    def scan_code_formatted_closing_keyword(markdown_state, markdown_line, code_block_line, current_line_in_fenced_code,
+                                            index)
+      block_match = code_block_closing_keyword_match(
+        markdown_line,
+        current_line_in_fenced_code,
+        code_block_line,
+        markdown_state
+      )
+      inline_match =
+        if code_block_line
+          reset_inline_code_soft_wrap_state(markdown_state)
+          nil
+        else
+          closing_keyword_in_inline_code(markdown_line, index, markdown_state)
+        end
+      match_text = code_formatted_closing_keyword_match_text(
+        markdown_state,
+        markdown_line,
+        code_block_line,
+        inline_match,
+        block_match
+      )
+
+      [match_text, inline_match]
     end
   end
 end

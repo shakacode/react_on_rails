@@ -104,6 +104,8 @@ class PrMergeLedger
         closing_match = matching_closing_backtick_run(line, opening_match[0], opening_match.end(0))
         unless closing_match
           append_unmatched_or_multiline_inline_code(context, opening_match)
+          return opening_match.end(0) unless context.fetch(:markdown_state).fetch("inline_code_delimiter")
+
           return nil
         end
 
