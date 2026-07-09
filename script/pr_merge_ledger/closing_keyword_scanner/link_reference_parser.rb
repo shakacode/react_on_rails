@@ -24,6 +24,10 @@ class PrMergeLedger
 
           marker_indent = column_after_prefix(list_match[:indent].each_char)
           content_column = column_after_prefix(content_line[...list_match.begin(:code)])
+          return stripped_list_marker ? content_line : nil if list_item_marker_continues_active_paragraph?(
+            content_line,
+            markdown_state
+          )
           return unless list_marker_indent_allowed_for_line?(marker_indent, content_indent, content_column)
 
           content_line = list_match[:code]

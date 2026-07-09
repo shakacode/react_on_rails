@@ -161,6 +161,7 @@ class PrMergeLedger
 
         list_match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
         return unless list_match
+        return if list_item_marker_continues_active_paragraph?(line, markdown_state)
 
         marker_indent = column_after_prefix(list_match[:indent].each_char)
         content_column = column_after_prefix(line[...list_match.begin(:code)].each_char)
@@ -170,7 +171,7 @@ class PrMergeLedger
           content_column
         )
 
-        html_block_context_for_line(list_match[:code], markdown_state)
+        html_block_context_for_line(list_match[:code], child_list_item_markdown_state(markdown_state))
       end
 
       def html_block_closes_on_line?(line, html_block)

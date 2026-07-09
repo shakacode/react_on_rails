@@ -150,6 +150,19 @@ class PrMergeLedger
       def list_item_content_block_boundary_line?(line, markdown_state)
         static_root_block_boundary_line?(line) || link_reference_definition_line?(line, markdown_state)
       end
+
+      def list_item_marker_continues_active_paragraph?(line, markdown_state)
+        boundary_line = line.chomp
+        ordered_list_marker_continues_paragraph?(boundary_line, markdown_state) ||
+          ordered_list_marker_continues_list_paragraph?(boundary_line, markdown_state)
+      end
+
+      def child_list_item_markdown_state(markdown_state)
+        markdown_state.merge(
+          "paragraph_continuation_active" => false,
+          "list_paragraph_continuation_active" => false
+        )
+      end
     end
   end
 end

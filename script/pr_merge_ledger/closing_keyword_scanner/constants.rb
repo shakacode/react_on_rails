@@ -34,9 +34,8 @@ class PrMergeLedger
     HTML_BLOCK_TAG_NAMES = %w[
       address article aside base basefont blockquote body caption center col colgroup dd details dialog dir div dl dt
       fieldset figcaption figure footer form frame frameset h1 h2 h3 h4 h5 h6 head header hr html iframe legend li
-      link main menu menuitem nav noframes ol optgroup option p param pre script search section source style summary
-      table tbody
-      td textarea tfoot th thead title tr track ul
+      link main menu menuitem nav noframes ol optgroup option p param pre script section source style summary table
+      tbody td tfoot th thead title tr track ul
     ].freeze
     HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style].freeze
     HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
@@ -46,7 +45,7 @@ class PrMergeLedger
     HTML_CDATA_OPEN_PATTERN = /\A {0,3}<!\[CDATA\[/
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
-    HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
+    HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}</?(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
     HTML_ATTRIBUTE_SPACES = [" ", "\t"].freeze
     HTML_ATTRIBUTE_INVALID_CHARACTERS = ["<", "\n"].freeze
     HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze

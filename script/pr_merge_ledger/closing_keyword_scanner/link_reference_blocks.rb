@@ -12,7 +12,7 @@ class PrMergeLedger
           return
         end
 
-        if new_link_reference_hidden_block?(link_reference_line, markdown_state)
+        if new_link_reference_hidden_block?(link_reference_line, markdown_state, source_line: line)
           reset_multiline_link_reference_state(markdown_state)
         end
 
@@ -20,9 +20,9 @@ class PrMergeLedger
           closing_keyword_in_multiline_link_reference(link_reference_line, markdown_state)
       end
 
-      def new_link_reference_hidden_block?(line, markdown_state)
+      def new_link_reference_hidden_block?(line, markdown_state, source_line: line)
         markdown_state.fetch("link_reference_title_delimiter").nil? &&
-          link_reference_definition_boundary_line?(line, markdown_state)
+          link_reference_definition_boundary_line?(line, markdown_state, source_line:)
       end
 
       def closing_keyword_in_multiline_link_reference(line, markdown_state)
@@ -58,7 +58,7 @@ class PrMergeLedger
           )
         end
 
-        link_reference_definition_boundary_line?(line, markdown_state) ||
+        link_reference_definition_boundary_line?(line, markdown_state, source_line:) ||
           link_reference_destination_line?(line, markdown_state) ||
           link_reference_title_line?(line, markdown_state)
       end
@@ -79,10 +79,14 @@ class PrMergeLedger
         line[(closing_index + delimiter.length)..].to_s.strip.empty?
       end
 
-      def link_reference_definition_boundary_line?(line, markdown_state)
+      def link_reference_definition_boundary_line?(line, markdown_state, source_line: line)
+        list_item_content_line = list_item_link_reference_content_line(source_line, markdown_state)
+        return link_reference_definition_line?(list_item_content_line, markdown_state) if list_item_content_line
+
         return false if link_reference_definition_interrupts_paragraph?(markdown_state)
 
-        link_reference_definition_line?(link_reference_content_line(line, markdown_state), markdown_state)
+        content_line = list_indented_link_reference_content_line(source_line, markdown_state) || line
+        link_reference_definition_line?(content_line, markdown_state)
       end
 
       def next_link_reference_title_allowed(line, current_line_in_fenced_code, markdown_state)
@@ -95,7 +99,7 @@ class PrMergeLedger
           markdown_state
         )
 
-        if link_reference_definition_boundary_line?(link_reference_line, markdown_state)
+        if link_reference_definition_boundary_line?(link_reference_line, markdown_state, source_line: line)
           return link_reference_definition_with_destination_line?(link_reference_line) &&
                  !link_reference_definition_complete_title?(link_reference_line)
         end
@@ -130,7 +134,7 @@ class PrMergeLedger
         link_reference_line = link_reference_content_line(line, markdown_state)
         return false if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
 
-        link_reference_definition_boundary_line?(link_reference_line, markdown_state) &&
+        link_reference_definition_boundary_line?(link_reference_line, markdown_state, source_line: line) &&
           link_reference_line.match?(LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN)
       end
 
@@ -140,7 +144,7 @@ class PrMergeLedger
         return next_active_link_reference_title_delimiter(link_reference_line, active_delimiter) if active_delimiter
         return nil if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
 
-        if link_reference_definition_boundary_line?(link_reference_line, markdown_state)
+        if link_reference_definition_boundary_line?(link_reference_line, markdown_state, source_line: line)
           return unclosed_link_reference_title_delimiter(link_reference_definition_title_text(link_reference_line))
         end
 
