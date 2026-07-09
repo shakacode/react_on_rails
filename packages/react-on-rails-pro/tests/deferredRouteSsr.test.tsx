@@ -16,7 +16,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import * as React from 'react';
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import type { RailsContext } from 'react-on-rails/types';
 import {
@@ -920,6 +920,70 @@ describe('RSCRoute deferred SSR behavior', () => {
       } finally {
         consoleErrorSpy.mockRestore();
       }
+    }
+  });
+
+  // Regression guard for issue #4535. In the standard auto-bundled config a root is server-rendered
+  // through registerServerComponent -> wrapServerComponentRenderer/server, which unconditionally wraps
+  // it in `<React.Suspense fallback={null}>`. A component that renders its OWN top-level Suspense
+  // therefore emits TWO nested boundaries in the server HTML (the Pro wrapper plus the user's), which
+  // the flagship demo confirms (`<!--$--><!--$--><section>`). The default-provider client path adds one
+  // matching wrapper and the component renders its own Suspense, so the client tree also has two
+  // boundaries; the two must hydrate without a recoverable mismatch. This guards against a
+  // "disambiguate the wrapper" change that skips the client wrapper for such roots (which would drop
+  // the client to one boundary and reintroduce a mismatch against the two-boundary server HTML).
+  it('hydrates a default-provider root that renders its own top-level Suspense without a mismatch (#4535)', async () => {
+    const AppReturningSuspense = () => (
+      <React.Suspense fallback={<span data-testid="user-fallback">loading</span>}>
+        <section data-testid="deferred-root">Deferred content</section>
+      </React.Suspense>
+    );
+
+    // Model wrapServerComponentRenderer/server's unconditional Suspense wrap around the root.
+    const serverHtml = renderToString(
+      <React.Suspense fallback={null}>
+        <AppReturningSuspense />
+      </React.Suspense>,
+    );
+    expect(serverHtml.match(/<!--\$-->/g)).toHaveLength(2);
+
+    const container = document.createElement('div');
+    container.id = 'DefaultProviderSuspenseRoot-react-component-test';
+    container.innerHTML = serverHtml;
+    document.body.appendChild(container);
+
+    // Exercise the real default-provider factory (the production wrapping logic).
+    require('../src/registerDefaultRSCProvider.client.tsx');
+    const { reactElement } = maybeWrapWithDefaultRSCProviderWithStatus(
+      <AppReturningSuspense />,
+      { rscPayloadGenerationUrlPath: '/rsc_payload' } as RailsContext,
+      container.id,
+    );
+
+    const recoverableErrors: string[] = [];
+    let root: Root | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, reactElement, {
+          onRecoverableError: (error) => {
+            recoverableErrors.push(error instanceof Error ? error.message : String(error));
+          },
+        });
+        await Promise.resolve();
+      });
+
+      expect(recoverableErrors).toEqual([]);
+      expect(container.querySelector('[data-testid="deferred-root"]')?.textContent).toBe('Deferred content');
+    } finally {
+      clearDefaultRSCProviderFactory();
+      const mountedRoot = root;
+      if (mountedRoot) {
+        await act(async () => {
+          mountedRoot.unmount();
+          await Promise.resolve();
+        });
+      }
+      container.remove();
     }
   });
 });
