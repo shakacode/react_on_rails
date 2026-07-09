@@ -96,7 +96,7 @@ The bad version hides the comparator and encourages readers to infer that the ar
 
 ## Follow-Up Actions
 
-- Keep this checklist aligned with `.agents/skills/optimize-rsc-performance/SKILL.md`.
+- Keep this checklist aligned with the repo-local `optimize-rsc-performance` agent skill.
 - When a demo page includes PageSpeed links, place the caveat next to the links, not only in a separate doc.
 - When a PR changes fixtures, images, page chrome, or generated HTML, refresh the headline artifact or downgrade older
   artifacts to historical support.

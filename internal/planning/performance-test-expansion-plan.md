@@ -17,7 +17,7 @@ existing Vegeta HTTP/2 Cleartext benchmark rather than duplicating that transpor
 ## Performance Claim Parity Gate
 
 Before quoting benchmark numbers as a public-page speedup, apply the parity gate from
-[`internal/analysis/2026-07-gumroad-pagespeed-parity-cautionary-tale.md`](../analysis/2026-07-gumroad-pagespeed-parity-cautionary-tale.md).
+[`internal/analysis/2026-07-09-gumroad-pagespeed-parity-cautionary-tale.md`](../analysis/2026-07-09-gumroad-pagespeed-parity-cautionary-tale.md).
 
 - Prefer same-fixture A/B evidence for architecture claims: same host, same data, same browser settings, and matched
   control/candidate routes.
