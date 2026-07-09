@@ -19,6 +19,7 @@ describe('configBuilder', () => {
     'RENDERER_PORT',
     'NODE_ENV',
     'RENDERER_PASSWORD',
+    'REACT_ON_RAILS_PRO_LICENSE',
     'RAILS_ENV',
     'REPLAY_SERVER_ASYNC_OPERATION_LOGS',
     'RENDERER_ENABLE_HEALTH_ENDPOINTS',
@@ -62,14 +63,14 @@ describe('configBuilder', () => {
     }) as never);
   }
 
-  function envValuesUsedForRenderedConfig(userConfig: { host?: string }) {
+  function envValuesUsedForRenderedConfig(userConfig: { host?: string; licenseToken?: string }) {
     const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
 
     buildConfig(userConfig);
     logSanitizedConfig();
 
     const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
-    return logPayload['ENV values used for settings (use "RENDERER_" prefix)'] as Record<string, unknown>;
+    return logPayload['ENV values used for settings'] as Record<string, unknown>;
   }
 
   it('marks RENDERER_HOST as env-provided when host is omitted from user config', () => {
@@ -96,12 +97,40 @@ describe('configBuilder', () => {
     logSanitizedConfig();
 
     const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
-    const envValues = logPayload['ENV values used for settings (use "RENDERER_" prefix)'] as Record<
-      string,
-      unknown
-    >;
+    const envValues = logPayload['ENV values used for settings'] as Record<string, unknown>;
 
     expect(envValues.RENDERER_PASSWORD).toBe(false);
+  });
+
+  it('uses REACT_ON_RAILS_PRO_LICENSE when no license token is configured', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+    expect(buildConfig().licenseToken).toBe('env-license-token');
+  });
+
+  it('prefers an explicitly configured license token over ENV', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+    expect(buildConfig({ licenseToken: 'configured-license-token' }).licenseToken).toBe(
+      'configured-license-token',
+    );
+  });
+
+  it('falls back to REACT_ON_RAILS_PRO_LICENSE for a blank configured token', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+    const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+    expect(buildConfig({ licenseToken: '  ' }).licenseToken).toBe('env-license-token');
+  });
+
+  it('does not report the license ENV as used when configuration overrides it', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+
+    const envValues = envValuesUsedForRenderedConfig({ licenseToken: 'configured-license-token' });
+
+    expect(envValues.REACT_ON_RAILS_PRO_LICENSE).toBe(false);
   });
 
   it('keeps shared boolean env parsing backward-compatible for RENDERER_SUPPORT_MODULES=1', () => {
@@ -159,6 +188,26 @@ describe('configBuilder', () => {
     const finalSettings = logPayload['Final renderer settings'] as Record<string, unknown>;
 
     expect(finalSettings.password).toBe('<EMPTY STRING>');
+  });
+
+  it('masks license tokens from every sanitized configuration view', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+    const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
+
+    buildConfig({ licenseToken: 'configured-license-token' });
+    logSanitizedConfig();
+
+    const serializedPayload = JSON.stringify(info.mock.calls[0][0]);
+    expect(serializedPayload).not.toContain('env-license-token');
+    expect(serializedPayload).not.toContain('configured-license-token');
+
+    const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
+    const configuredSettings = logPayload[
+      'Customized values for settings from config object (overrides ENV)'
+    ] as Record<string, unknown>;
+    const finalSettings = logPayload['Final renderer settings'] as Record<string, unknown>;
+    expect(configuredSettings.licenseToken).toBe('<MASKED>');
+    expect(finalSettings.licenseToken).toBe('<MASKED>');
   });
 
   describe('port validation', () => {

@@ -51,11 +51,13 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   before do
     described_class.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
+    ReactOnRailsPro.configuration.license_token = nil
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
   after do
     described_class.reset!
+    ReactOnRailsPro.configuration.license_token = nil
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
@@ -74,6 +76,38 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         described_class.license_status
         expect(described_class).not_to receive(:determine_license_status)
         described_class.license_status
+      end
+    end
+
+    context "with valid license in application configuration" do
+      before do
+        ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "when application configuration and ENV both provide a license" do
+      before do
+        ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "invalid-env-token"
+      end
+
+      it "prefers the explicitly configured license" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "when application configuration is blank" do
+      before do
+        ReactOnRailsPro.configuration.license_token = "  "
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = JWT.encode(valid_payload, test_private_key, "RS256")
+      end
+
+      it "falls back to ENV" do
+        expect(described_class.license_status).to eq(:valid)
       end
     end
 
