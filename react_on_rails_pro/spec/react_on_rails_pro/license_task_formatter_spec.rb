@@ -153,7 +153,7 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
 
         output = capture_stdout { described_class.print_text(result, info) }
         expect(output).to include("MISSING")
-        expect(output).to include("config.license_token or set REACT_ON_RAILS_PRO_LICENSE")
+        expect(output).to include("Set config.license_token or REACT_ON_RAILS_PRO_LICENSE")
         expect(output).not_to include("react_on_rails_pro_license.key")
       end
     end
