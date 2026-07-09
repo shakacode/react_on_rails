@@ -24,8 +24,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [17.0.0.rc.8] - 2026-07-08
-
 #### Breaking Changes
 
 - **[Pro] Rolling-deploy previous-URL config is now `rolling_deploy_previous_urls` (plural) and seeds from multiple endpoints**:
@@ -40,6 +38,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   this is not a break for any stable release. See
   [Promotion deploys need a boot seed](https://reactonrails.com/docs/pro/rolling-deploy-adapters#promotion-deploys-need-a-release-time-boot-seed).
   [PR 4544](https://github.com/shakacode/react_on_rails/pull/4544) by [justin808](https://github.com/justin808).
+
+### [17.0.0.rc.8] - 2026-07-08
+
+#### Breaking Changes
+
 - **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API**:
   Pro apps should use the supported cached helper APIs (`cached_react_component`,
   `cached_react_component_hash`, and related helpers) instead of calling the low-level cache class
