@@ -14,6 +14,20 @@ strategy in `internal/planning/library-benchmarking.md`. Rails HTTP routes, incl
 through `benchmarks/bench.rb` and `benchmarks/k6.ts`. Direct Pro Node Renderer transport coverage should build on the
 existing Vegeta HTTP/2 Cleartext benchmark rather than duplicating that transport setup in k6.
 
+## Performance Claim Parity Gate
+
+Before quoting benchmark numbers as a public-page speedup, apply the parity gate from
+[`internal/analysis/2026-07-gumroad-pagespeed-parity-cautionary-tale.md`](../analysis/2026-07-gumroad-pagespeed-parity-cautionary-tale.md).
+
+- Prefer same-fixture A/B evidence for architecture claims: same host, same data, same browser settings, and matched
+  control/candidate routes.
+- Treat PageSpeed, Lighthouse, WebPageTest, or live external URL comparisons as diagnostic until media, chrome, CDN,
+  cache, and production-service differences are documented.
+- Require screenshot or filmstrip evidence that key images, fonts, page chrome, and above-the-fold content exist on both
+  sides before calling a result a performance win.
+- Keep copy-paste benchmark commands tied to the host that produced the headline artifact, or label them as current-host
+  reruns.
+
 ## Operations Matrix
 
 Start with a small, representative matrix before adding more routes:
