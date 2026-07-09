@@ -42,6 +42,13 @@ RSpec.describe "RSC payload endpoint" do
     expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true), html_chunk_message
   end
 
+  # The concatenated payload bodies ("html") across all RSC chunks. This is the
+  # part that gets served to the Flight client; a corrupted prerender cache
+  # entry serves this as zero bytes.
+  def rsc_payload_bodies
+    parsed_chunks.filter_map { |chunk| chunk["html"] }
+  end
+
   def render_annotated_html_inline_template
     ApplicationController.render(inline: "<p>hello</p>", type: :erb, layout: false, formats: [:html])
   end
@@ -73,5 +80,48 @@ RSpec.describe "RSC payload endpoint" do
     expect(response).to have_http_status(:bad_request)
     expect(response.media_type).to eq("text/plain")
     expect(response.body).to eq("Invalid props JSON")
+  end
+
+  # Regression for https://github.com/shakacode/react_on_rails/issues/4550.
+  #
+  # The test environment uses a :null_store, so prerender caching is a no-op by
+  # default and every request renders fresh. To exercise the cache write/read
+  # cycle that corrupted the payload, swap in a real MemoryStore for these
+  # examples.
+  context "with prerender caching enabled" do
+    let(:memory_cache) { ActiveSupport::Cache::MemoryStore.new }
+
+    around do |example|
+      original_prerender_caching = ReactOnRailsPro.configuration.prerender_caching
+      ReactOnRailsPro.configuration.prerender_caching = true
+      example.run
+    ensure
+      ReactOnRailsPro.configuration.prerender_caching = original_prerender_caching
+    end
+
+    before do
+      memory_cache.clear
+      allow(Rails).to receive(:cache).and_return(memory_cache)
+    end
+
+    it "serves the full payload from cache on the second request, not an empty one" do
+      # First request: cache MISS, rendered fresh and cached.
+      request_rsc_payload
+      expect_valid_rsc_payload_response
+      first_bodies = rsc_payload_bodies
+      expect(first_bodies).not_to be_empty
+      expect(first_bodies.join).not_to be_empty
+
+      # Second request: served from the prerender cache. Before the fix, the
+      # cached chunk had its "html" torn out by the framing consumer, so this
+      # returned a zero-byte payload and the Flight client rejected with
+      # "Connection closed."
+      request_rsc_payload
+      expect_valid_rsc_payload_response
+      second_bodies = rsc_payload_bodies
+
+      expect(second_bodies.join).not_to be_empty
+      expect(second_bodies).to eq(first_bodies)
+    end
   end
 end

@@ -37,6 +37,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC payload prerender cache no longer stores an empty payload**: With
+  `config.prerender_caching = true`, the RSC payload endpoint (`/rsc_payload/:component_name`) served
+  the first visitor a correct payload but every subsequent visitor a zero-byte payload, because the
+  length-prefixed framing consumer destructively removed `"html"` from the chunk Hash that
+  `StreamCache` had buffered by reference and wrote to the cache after the stream completed. The
+  browser's Flight client then rejected the empty response with `"Connection closed."`. The framing
+  consumer now reads `"html"` without mutating the chunk, and `StreamCache` snapshots each chunk
+  before handing it downstream so a mutating consumer can never corrupt the cached entry. Fixes
+  [Issue 4550](https://github.com/shakacode/react_on_rails/issues/4550).
+  [PR 4551](https://github.com/shakacode/react_on_rails/pull/4551) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
