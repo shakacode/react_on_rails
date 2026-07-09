@@ -90,5 +90,22 @@ RSpec.describe ReactOnRailsPro::StreamCache, :caching do
       expect(hit_frames).to eq(miss_frames)
       expect(hit_frames.first).to include("1:I[292]")
     end
+
+    it "keeps serving the full payload across repeated cache hits" do
+      described_class
+        .wrap_and_cache(cache_key, upstream_yielding([original_chunk.dup]))
+        .each_chunk { |chunk| destructive_frame(chunk) }
+
+      # Each fetch_stream performs its own Rails.cache.read, so a destructive
+      # consumer on one hit must not corrupt the payload served to the next one.
+      first_hit = []
+      described_class.fetch_stream(cache_key).each_chunk { |chunk| first_hit << destructive_frame(chunk) }
+
+      second_hit = []
+      described_class.fetch_stream(cache_key).each_chunk { |chunk| second_hit << destructive_frame(chunk) }
+
+      expect(first_hit.first).to include("1:I[292]")
+      expect(second_hit).to eq(first_hit)
+    end
   end
 end
