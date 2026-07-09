@@ -32,6 +32,9 @@ A **rolling-deploy adapter** makes new renderer instances start warm for **every
 
 The built-in HTTP adapter is the simplest way to get there, and it's covered next. If your build can't reach the previous deployment, or you'd rather keep bundles in your own store, you can [write a custom adapter](./rolling-deploy-custom-adapters.md) instead.
 
+> [!NOTE]
+> Pre-seeding runs at **image-build time**, in the environment that builds the image. That is sufficient when the image is built and deployed in the **same** environment (a staging build that will run on staging). If you **promote** an image between environments — build once on staging, then promote that same image to production — build-time seeding alone is not enough. See [Promotion deploys need a boot seed](#promotion-deploys-need-a-release-time-boot-seed).
+
 ## Set up the HTTP adapter
 
 > Introduced as a scaffold in PR [#3379](https://github.com/shakacode/react_on_rails/pull/3379) — part 1 of a multi-PR series. A hard HTTPS gate, streaming download, and additional hardening land in follow-ups; see [Security](#security) below.
@@ -128,6 +131,41 @@ ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
 
 Each bundle hash ships with the companion assets built alongside it — `loadable-stats.json`, plus `react-client-manifest.json` and `react-server-client-manifest.json` when RSC is enabled. They map chunk and component IDs to the exact asset URLs that hash's build produced, so serving a draining hash with the **wrong** build's manifests would break client-side hydration. The HTTP adapter packs each hash's companions into the same tarball, so this stays correct with no work on your part. (Custom adapters must return them explicitly — see [Companion assets](./rolling-deploy-custom-adapters.md#companion-assets).)
 
+## Promotion deploys need a release-time (boot) seed
+
+Pre-seeding runs during `assets:precompile` — at **image-build time**, in the environment that builds the image. That is exactly right when the image is built and deployed in the same environment. It is **not** enough when you **promote** an image between environments (build once on staging, promote that same image to production).
+
+### Why promotion breaks build-time seeding
+
+- The staging build seeds using **staging's** `rolling_deploy_previous_url` and a snapshot of **staging's** then-live bundle.
+- When you later promote that image to production, its renderer cache still holds **staging's** previous bundle — never production's. Production's config never gets a vote, because the seed already happened, at build time, in the staging pipeline.
+
+Even if you point the staging build at production so the image is born prod-ready (see [multi-source seeding](./rolling-deploy-custom-adapters.md#multi-source-seeding)), a build-time snapshot still goes stale across **two pending promotions**:
+
+1. Production is at `P0`. You build image `C1`, then image `C2`, while production is still `P0` — both snapshot `P0`.
+2. Promote `C1`. Production `P0 → C1`; the draining bundle is `P0`, which `C1` seeded. Warm. ✓
+3. Promote `C2`. Production `C1 → C2`; the draining bundle is now **`C1`** — which `C2` never seeded (it snapshotted `P0`). Cold → 410 storm.
+
+The image cannot know, at build time, which bundle will be draining at the later — and sometimes skipped — moment it is promoted.
+
+### The fix: seed at container boot
+
+The one place that always knows production's **actually-live** bundle is the **production renderer container at boot**. Run the standalone seed task from the renderer container's entrypoint, before it reports ready:
+
+```bash
+bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+At boot in production the task reads **production's** config, so `rolling_deploy_previous_url` resolves to production's own live endpoint. Because the renderer comes up **before** new Rails (see [Deploy the renderer before Rails](#deploy-the-renderer-before-rails)), that endpoint is still served by the draining old pods — so it advertises the exact draining bundle the new renderer needs, and the task pulls it.
+
+Keep the build-time seed as well; the two layers are complementary:
+
+- **Build-time seed** — ideally [multi-source](./rolling-deploy-custom-adapters.md#multi-source-seeding) (staging + production) — makes the promoted image born prod-ready and is the **failure floor**: if the boot seed can't reach the live endpoint, the image still holds a recent production bundle, so a miss stays small and rare instead of becoming a full cold storm.
+- **Boot seed** is the **correctness path**: it closes the two-pending-promotions window by resolving the live draining bundle at promotion time.
+
+> [!IMPORTANT]
+> Gate the renderer's readiness on the boot seed **completing, not succeeding**. A failed seed must degrade to the 410 fallback, not wedge the deploy — the task already warns-and-continues on fetch failures, so a completed run is a safe readiness signal whether or not every hash was fetched.
+
 ## Deploy the renderer before Rails
 
 > [!IMPORTANT]
@@ -150,7 +188,9 @@ Make the ordering explicit in your pipeline rather than relying on timing:
 2. Wait until its new revision is **live and healthy** — readiness passing and all new renderer instances up.
 3. Only then deploy/promote the **Rails** workload.
 
-The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. The exact wiring depends on your deploy tooling.
+The invariant to enforce is **renderer-ready-before-Rails-live**: gate the Rails workload's release on the renderer workload's release completing (sequence them as separate steps in your deploy pipeline), and/or tune the renderer's readiness probe and Rails' startup so Rails does not accept traffic until the renderer reports ready. Prefer a readiness gate over a fixed sleep — a fixed delay is either too short (races) or too long (slow deploys), while a readiness signal tracks the actual state. The exact wiring depends on your deploy tooling.
+
+This ordering is also **what makes the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) correct**. The boot seed fetches the draining bundle from the target environment's live endpoint; that endpoint only advertises the draining hash while the old pods are still serving it. If new Rails cut over first, the live endpoint would already advertise the **new** hash and the boot seed would miss the very bundle it needs. Seeding-at-boot and renderer-before-Rails are one design: the boot seed depends on the ordering.
 
 ## Verify your setup with `react_on_rails:doctor`
 
