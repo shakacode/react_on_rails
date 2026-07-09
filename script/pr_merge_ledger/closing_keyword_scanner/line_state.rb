@@ -62,20 +62,8 @@ class PrMergeLedger
       end
 
       def update_body_markdown_state_after_scan(line, current_line_in_fenced_code, markdown_state)
-        markdown_state["list_indented_code_indent"] = next_list_indented_code_indent(line, markdown_state)
-        markdown_state["list_indented_code_allowed"] = next_list_indented_code_allowed(
-          line,
-          current_line_in_fenced_code,
-          markdown_state.fetch("list_content_indent"),
-          markdown_state.fetch("list_indented_code_allowed"),
-          markdown_state
-        )
-        markdown_state["root_indented_code_allowed"] = next_root_indented_code_allowed(
-          line,
-          current_line_in_fenced_code,
-          markdown_state.fetch("root_indented_code_allowed"),
-          markdown_state
-        )
+        clear_exited_html_block_before_paragraph_state(line, markdown_state)
+        update_list_code_state(line, current_line_in_fenced_code, markdown_state)
         markdown_state["setext_heading_candidate_active"] = next_setext_heading_candidate_active(
           line,
           current_line_in_fenced_code,
@@ -99,6 +87,31 @@ class PrMergeLedger
           markdown_state
         )
         markdown_state["html_block"] = next_html_block(line, markdown_state)
+      end
+
+      def update_list_code_state(line, current_line_in_fenced_code, markdown_state)
+        markdown_state["list_indented_code_indent"] = next_list_indented_code_indent(line, markdown_state)
+        markdown_state["list_indented_code_allowed"] = next_list_indented_code_allowed(
+          line,
+          current_line_in_fenced_code,
+          markdown_state.fetch("list_content_indent"),
+          markdown_state.fetch("list_indented_code_allowed"),
+          markdown_state
+        )
+        markdown_state["root_indented_code_allowed"] = next_root_indented_code_allowed(
+          line,
+          current_line_in_fenced_code,
+          markdown_state.fetch("root_indented_code_allowed"),
+          markdown_state
+        )
+      end
+
+      def clear_exited_html_block_before_paragraph_state(line, markdown_state)
+        html_block = markdown_state.fetch("html_block")
+        return unless html_block
+        return unless html_block_exited_container?(line, markdown_state, html_block)
+
+        markdown_state["html_block"] = nil
       end
     end
   end

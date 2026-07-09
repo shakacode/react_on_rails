@@ -338,6 +338,24 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_blockquote_html_block_exit_allows_following_type_7_paragraph
+    output, status = run_fixture(fixture_with_body("> <div>\nIntro\n<ins>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_list_item_html_block_exit_allows_following_type_7_paragraph
+    output, status = run_fixture(fixture_with_body("- <div>\nIntro\n<ins>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_nested_list_continuation_html_block_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- outer\n  - inner\n    <div>\n    Fixes #4410\n"))
 
