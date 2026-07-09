@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.8] - 2026-07-08
+
 #### Breaking Changes
 
 - **[Pro] Removed the undocumented `ReactOnRailsPro::Cache.fetch_react_component` class API**:
@@ -33,6 +35,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   registration, and `expires_at` handling internally. Fixes
   [Issue 4497](https://github.com/shakacode/react_on_rails/issues/4497).
   [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
+  [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **[Pro]** **Deferred RSC route failures now reach app error boundaries**: Rejected deferred RSC route
+  fetches stay observable long enough for React error boundaries to render their fallback, while failed
+  entries release their in-flight cache pin without evicting unrelated healthy payloads under concurrent
+  load. Fixes [Issue 4522](https://github.com/shakacode/react_on_rails/issues/4522).
+  [PR 4529](https://github.com/shakacode/react_on_rails/pull/4529) by
+  [justin808](https://github.com/justin808).
+- **[Pro]** **RSC doctor and version checks resolve Rspack from the configured app dependencies**:
+  RSC artifact diagnostics and startup version checks now resolve `@rspack/core` from the configured
+  client `node_modules` path, avoiding false Rspack verification failures when the app's package root
+  differs from the current process context. Fixes
+  [Issue 4523](https://github.com/shakacode/react_on_rails/issues/4523).
+  [PR 4530](https://github.com/shakacode/react_on_rails/pull/4530) by
   [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
@@ -2795,7 +2813,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...main
+[17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
 [17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
 [17.0.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.5...v17.0.0.rc.6
 [17.0.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.4...v17.0.0.rc.5
