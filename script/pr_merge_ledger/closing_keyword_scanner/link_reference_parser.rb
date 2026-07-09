@@ -58,17 +58,45 @@ class PrMergeLedger
       end
 
       def link_reference_destination_and_title(stripped)
-        return stripped.split(/[ \t]+/, 2) unless stripped.start_with?("<")
+        return raw_link_reference_destination_and_title(stripped) unless stripped.start_with?("<")
 
-        destination_end = stripped.index(">")
+        destination_end = unescaped_delimiter_index(stripped[1..].to_s, ">")
         return unless destination_end
 
+        destination_end += 1
         destination_text = stripped[1...destination_end]
         return if line_has_unescaped_delimiter?(destination_text, "<")
 
         destination = stripped[..destination_end]
         title = stripped[(destination_end + 1)..].to_s.strip
         [destination, title.empty? ? nil : title]
+      end
+
+      def raw_link_reference_destination_and_title(stripped)
+        destination, title = stripped.split(/[ \t]+/, 2)
+        return unless raw_link_reference_destination?(destination)
+
+        [destination, title]
+      end
+
+      def raw_link_reference_destination?(destination)
+        parenthesis_depth = 0
+        destination.to_s.each_char.with_index do |character, index|
+          next unless even_backslash_run_before?(destination, index)
+
+          case character
+          when "("
+            parenthesis_depth += 1
+          when ")"
+            return false if parenthesis_depth.zero?
+
+            parenthesis_depth -= 1
+          when "<", ">"
+            return false
+          end
+        end
+
+        parenthesis_depth.zero?
       end
 
       def link_reference_destination_complete_title?(line)

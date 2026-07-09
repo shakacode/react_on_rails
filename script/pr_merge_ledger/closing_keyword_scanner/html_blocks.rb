@@ -44,11 +44,14 @@ class PrMergeLedger
         return false unless index
 
         index += 1
-        index += 1 if markdown_line[index] == "/"
+        closing_tag = markdown_line[index] == "/"
+        index += 1 if closing_tag
         return false unless ascii_letter?(markdown_line[index])
 
         index += 1
         index += 1 while html_tag_name_character?(markdown_line[index])
+        return closing_html_type_7_tag_close?(markdown_line, index) if closing_tag
+
         html_type_7_attributes_close?(markdown_line, index)
       end
 
@@ -59,6 +62,10 @@ class PrMergeLedger
         return nil unless markdown_line[index] == "<"
 
         index
+      end
+
+      def closing_html_type_7_tag_close?(markdown_line, index)
+        markdown_line[index] == ">" && trailing_html_tag_close?(markdown_line, index)
       end
 
       def html_type_7_attributes_close?(markdown_line, index)

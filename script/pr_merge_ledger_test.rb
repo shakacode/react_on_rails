@@ -860,6 +860,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_link_reference_definition_escaped_closing_angle_destination_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: <my\\>url> \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_list_item_link_reference_definition_same_line_title_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("- [foo]: /url \"Fixes #4410\"\n"))
 
@@ -902,6 +913,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
 
   def test_malformed_angle_link_reference_with_unescaped_angle_allows_visible_closeout
     output, status = run_fixture(fixture_with_body("[foo]: <my <url> \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_malformed_raw_link_reference_with_unbalanced_parenthesis_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: /url( \"Fixes #4410\"\n"))
 
     assert status.success?, output
     data = JSON.parse(output)
@@ -1158,6 +1178,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 2, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_malformed_type_7_closing_tag_with_attributes_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("</ins class=x>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
   end
 
   def test_type_7_html_open_tag_without_closing_angle_does_not_backtrack
