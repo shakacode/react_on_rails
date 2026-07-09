@@ -40,6 +40,7 @@ class PrMergeLedger
 
       def html_type_7_block_boundary_line?(line, markdown_state = nil)
         return false if markdown_state&.fetch("paragraph_continuation_active", false)
+        return false if markdown_state&.fetch("list_paragraph_continuation_active", false)
 
         html_type_7_block_open_line?(line)
       end

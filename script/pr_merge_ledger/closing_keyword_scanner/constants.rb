@@ -35,7 +35,7 @@ class PrMergeLedger
       table tbody
       td textarea tfoot th thead title tr track ul
     ].freeze
-    HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style].freeze
+    HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style textarea].freeze
     HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
     HTML_BLOCK_BOUNDARY_PATTERN =
       %r{\A {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[|</?(?:#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z))}i
