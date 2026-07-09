@@ -50,14 +50,14 @@ The currently-deployed Rails server already has every bundle and companion asset
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
-  config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
-  config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")    # shared secret, ≥ 32 bytes
-  config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]   # base URL of the still-running deployment
+  config.rolling_deploy_adapter       = ReactOnRailsPro::RollingDeployAdapters::Http
+  config.rolling_deploy_token         = ENV.fetch("ROLLING_DEPLOY_TOKEN")     # shared secret, ≥ 32 bytes
+  config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]   # one or more still-running deployments
 end
 ```
 
 - **`rolling_deploy_token`** — the shared bearer token ("password"). Generate one with `SecureRandom.hex(32)` and set the **same** value on both the running server (which authenticates incoming pulls) and the build CI (which sends it). The config validator rejects tokens shorter than 32 bytes.
-- **`rolling_deploy_previous_url`** — the base URL where the previous deployment is reachable **from the build CI**, e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. The adapter appends `/manifest` and `/bundles/:hash`. Leave it unset (or empty) to disable discovery on that build.
+- **`rolling_deploy_previous_urls`** — the base URL(s) where previous deployment(s) are reachable **from the build CI** (or from the renderer at boot), e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. Accepts a single URL string, a comma-separated string, or an Array. The adapter appends `/manifest` and `/bundles/:hash` to each, unions the discovered hashes, and fetches each hash from the first endpoint that has it. Pass more than one to seed from several environments at once (e.g. staging + production — see [Multi-source seeding](./rolling-deploy-custom-adapters.md#multi-source-seeding)). Leave it unset (or empty) to disable discovery on that build.
 - **`rolling_deploy_mount_path`** — the Rails path where the Pro engine auto-mounts the bundle-serving endpoint when the built-in HTTP adapter is configured. Defaults to `/react_on_rails_pro/rolling_deploy`. Set it to a custom path when your previous deployment is reachable elsewhere, or set it to `nil`/blank to opt out of auto-mounting and draw the routes yourself.
 
 ### 2. Server endpoint auto-mount
@@ -125,7 +125,7 @@ ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
 - Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
 
 > [!WARNING]
-> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_urls` entries always use `https://` in production environments.
 
 ### Companion assets are handled automatically
 
@@ -137,7 +137,7 @@ Pre-seeding runs during `assets:precompile` — at **image-build time**, in the 
 
 ### Why promotion breaks build-time seeding
 
-- The staging build seeds using **staging's** `rolling_deploy_previous_url` and a snapshot of **staging's** then-live bundle.
+- The staging build seeds using **staging's** `rolling_deploy_previous_urls` and a snapshot of **staging's** then-live bundle.
 - When you later promote that image to production, its renderer cache still holds **staging's** previous bundle — never production's. Production's config never gets a vote, because the seed already happened, at build time, in the staging pipeline.
 
 Even if you point the staging build at production so the image is born prod-ready (see [multi-source seeding](./rolling-deploy-custom-adapters.md#multi-source-seeding)), a build-time snapshot still goes stale across **two pending promotions**:
@@ -156,7 +156,7 @@ The one place that always knows production's **actually-live** bundle is the **p
 bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
-At boot in production the task reads **production's** config, so `rolling_deploy_previous_url` resolves to production's own live endpoint. Because the renderer comes up **before** new Rails (see [Deploy the renderer before Rails](#deploy-the-renderer-before-rails)), that endpoint is still served by the draining old pods — so it advertises the exact draining bundle the new renderer needs, and the task pulls it.
+At boot in production the task reads **production's** config, so `rolling_deploy_previous_urls` resolves to production's own live endpoint. Because the renderer comes up **before** new Rails (see [Deploy the renderer before Rails](#deploy-the-renderer-before-rails)), that endpoint is still served by the draining old pods — so it advertises the exact draining bundle the new renderer needs, and the task pulls it.
 
 Keep the build-time seed as well; the two layers are complementary:
 

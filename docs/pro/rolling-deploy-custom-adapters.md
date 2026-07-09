@@ -118,56 +118,19 @@ In practice this means a `staging` deploy hits the same artifact store as produc
 
 ## Multi-source seeding
 
-The built-in HTTP adapter seeds from a single `rolling_deploy_previous_url`. When you **promote** an image between environments (build on staging, promote to production), you want the built image to carry bundles from **both** the build environment and the promotion target, so the promoted image is born ready to serve production's draining bundle.
+The built-in HTTP adapter's `rolling_deploy_previous_urls` accepts **more than one** endpoint. When you **promote** an image between environments (build on staging, promote to production), pass both the build environment and the promotion target so the built image carries bundles from **both** — the promoted image is then born ready to serve production's draining bundle:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http
+# a single URL, a comma-separated string, or an Array — all three are accepted:
+config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
+# e.g. ROLLING_DEPLOY_PREVIOUS_URLS="https://staging.example.com/react_on_rails_pro/rolling_deploy,https://app.example.com/react_on_rails_pro/rolling_deploy"
+```
+
+Discovery **unions** the hashes advertised by every endpoint; fetch tries each endpoint **in order** and returns the first that has the requested hash (hashes are content-addressed, so whichever endpoint serves one returns identical bytes). A single unreachable endpoint degrades gracefully — it contributes no hashes but does not abort discovery for the others.
 
 This is the build-time **failure floor**; the correctness path is the [boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed). Use both.
-
-Subclass the built-in adapter to fan discovery and fetch across a list of endpoints. Discovery unions the hashes from every endpoint; fetch tries each endpoint in order and returns the first hit:
-
-```ruby
-# lib/rolling_deploy_http_adapter.rb
-class RollingDeployHttpAdapter < ReactOnRailsPro::RollingDeployAdapters::Http
-  class << self
-    def previous_bundle_hashes
-      previous_urls.flat_map { |url| with_previous_url(url) { super() } }.uniq
-    end
-
-    def fetch(bundle_hash)
-      previous_urls.each do |url|
-        result = with_previous_url(url) { super(bundle_hash) }
-        return result if result
-      end
-      nil
-    end
-
-    private
-
-    def previous_urls
-      Array(ReactOnRailsPro.configuration.rolling_deploy_previous_url)
-        .flat_map { |raw| raw.to_s.split(",") }
-        .map(&:strip).reject(&:empty?).uniq
-    end
-
-    # Swap the single-URL config the parent reads, one endpoint at a time.
-    def with_previous_url(url)
-      config = ReactOnRailsPro.configuration
-      original = config.rolling_deploy_previous_url
-      config.rolling_deploy_previous_url = url
-      yield
-    ensure
-      config.rolling_deploy_previous_url = original
-    end
-  end
-end
-```
-
-Point `rolling_deploy_previous_url` at a comma-separated list (build environment first, promotion target second) during the image build:
-
-```ruby
-config.rolling_deploy_adapter = RollingDeployHttpAdapter
-# e.g. "https://staging.example.com/react_on_rails_pro/rolling_deploy,https://app.example.com/react_on_rails_pro/rolling_deploy"
-config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
-```
 
 ## Edge cases and error handling
 

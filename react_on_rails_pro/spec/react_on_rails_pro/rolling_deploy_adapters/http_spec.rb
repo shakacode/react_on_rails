@@ -54,7 +54,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_token: "token"
       )
     end
@@ -148,7 +148,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_token: "token"
       )
     end
@@ -223,11 +223,11 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     end
   end
 
-  describe "previous_url scheme validation" do
+  describe "previous_urls scheme validation" do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: previous_url,
+        rolling_deploy_previous_urls: previous_url,
         rolling_deploy_token: "token"
       )
     end
@@ -264,7 +264,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_token: "token"
       )
     end
@@ -293,7 +293,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_token: ""
       )
     end
@@ -315,6 +315,78 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
       expect(described_class.fetch("hash123")).to be_nil
       expect(Rails.logger).to have_received(:warn).with(/rolling_deploy_token is not configured/)
+    end
+  end
+
+  describe "multiple previous URLs" do
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_urls: ["https://staging.example.com", "https://prod.example.com"],
+        rolling_deploy_token: "token"
+      )
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+    end
+
+    describe ".previous_bundle_hashes" do
+      it "unions and de-duplicates hashes discovered from every endpoint" do
+        allow(described_class).to receive(:manifest_hashes)
+          .with("https://staging.example.com").and_return(%w[staging shared])
+        allow(described_class).to receive(:manifest_hashes)
+          .with("https://prod.example.com").and_return(%w[prod shared])
+
+        expect(described_class.previous_bundle_hashes).to eq(%w[staging shared prod])
+      end
+
+      it "keeps hashes from healthy endpoints when one endpoint fails" do
+        allow(described_class).to receive(:manifest_hashes)
+          .with("https://staging.example.com").and_return([])
+        allow(described_class).to receive(:manifest_hashes)
+          .with("https://prod.example.com").and_return(%w[prod])
+
+        expect(described_class.previous_bundle_hashes).to eq(%w[prod])
+      end
+    end
+
+    describe ".fetch" do
+      let(:payload) { { bundle: "/tmp/rolling/bundle.js", assets: [] } }
+
+      it "returns the first endpoint that has the hash without querying later endpoints" do
+        allow(described_class).to receive(:fetch_from).and_return(nil)
+        allow(described_class).to receive(:fetch_from)
+          .with("https://staging.example.com", "hash123").and_return(payload)
+
+        expect(described_class.fetch("hash123")).to eq(payload)
+        expect(described_class).not_to have_received(:fetch_from).with("https://prod.example.com", "hash123")
+      end
+
+      it "falls through to the next endpoint when an earlier one misses" do
+        allow(described_class).to receive(:fetch_from)
+          .with("https://staging.example.com", "hash123").and_return(nil)
+        allow(described_class).to receive(:fetch_from)
+          .with("https://prod.example.com", "hash123").and_return(payload)
+
+        expect(described_class.fetch("hash123")).to eq(payload)
+      end
+    end
+
+    describe "comma-separated string form" do
+      let(:config) do
+        instance_double(
+          ReactOnRailsPro::Configuration,
+          rolling_deploy_previous_urls: "https://staging.example.com , https://prod.example.com",
+          rolling_deploy_token: "token"
+        )
+      end
+
+      it "splits, trims, and de-duplicates into a list of base URLs" do
+        expect(described_class.send(:configured_previous_urls))
+          .to eq(["https://staging.example.com", "https://prod.example.com"])
+      end
     end
   end
 

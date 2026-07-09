@@ -24,8 +24,8 @@ fallback**.
 _Avoid_: warmup (means the per-request lazy cache fill, the opposite of this).
 
 **Pre-seed source**:
-The deployment the pre-seed pulls bundles from — resolved from that
-environment's `rolling_deploy_previous_url` (HTTP adapter) at the moment the
+The deployment(s) the pre-seed pulls bundles from — resolved from that
+environment's `rolling_deploy_previous_urls` (HTTP adapter) at the moment the
 seed runs. The source is whatever environment's config is in effect _when and
 where the seed executes_.
 
@@ -41,8 +41,8 @@ environment's _actually-live_ bundle at that moment. Readiness-gated.
 _Avoid_: "runtime seed" (ambiguous with the per-request 410 path).
 
 **Multi-source seed**:
-A build-time seed whose **pre-seed source** is a _list_ of endpoints (e.g. a
-subclassed HTTP adapter reading a comma-separated `ROLLING_DEPLOY_PREVIOUS_URLS`).
+A build-time seed whose **pre-seed source** is a _list_ of endpoints (the
+built-in HTTP adapter's `rolling_deploy_previous_urls` accepts more than one).
 Staging seeds from both staging and production so the promoted image is born
 prod-ready.
 
