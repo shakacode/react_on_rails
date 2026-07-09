@@ -133,6 +133,20 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus('  ')).toBe('valid');
     });
 
+    it('does not reuse an ENV/default status for a later configured token', () => {
+      const validPayload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        org: 'Acme Corp',
+      };
+      const configuredToken = jwt.sign(validPayload, testPrivateKey, { algorithm: 'RS256' });
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+      expect(module.getLicenseStatus()).toBe('missing');
+      expect(module.getLicenseStatus(configuredToken)).toBe('valid');
+    });
+
     it('returns expired for an expired license', () => {
       const expiredPayload = {
         sub: 'test@example.com',
@@ -526,6 +540,25 @@ describe('LicenseValidator', () => {
       });
       expect(module.getLicenseOrganization()).toBeUndefined();
     });
+
+    it('does not reuse ENV organization metadata for a later configured token', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        plan: 'paid',
+      };
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign({ ...payload, org: 'ENV Org' }, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      const configuredToken = jwt.sign({ ...payload, org: 'Configured Org' }, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+      expect(module.getLicenseOrganization()).toBe('ENV Org');
+      expect(module.getLicenseOrganization(configuredToken)).toBe('Configured Org');
+    });
   });
 
   describe('getLicensePlan', () => {
@@ -658,6 +691,25 @@ describe('LicenseValidator', () => {
         algorithm: 'RS256',
       });
       expect(module.getLicensePlan()).toBeUndefined();
+    });
+
+    it('does not reuse ENV plan metadata for a later configured token', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        org: 'Acme Corp',
+      };
+      process.env.REACT_ON_RAILS_PRO_LICENSE = jwt.sign({ ...payload, plan: 'startup' }, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      const configuredToken = jwt.sign({ ...payload, plan: 'paid' }, testPrivateKey, {
+        algorithm: 'RS256',
+      });
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+
+      expect(module.getLicensePlan()).toBe('startup');
+      expect(module.getLicensePlan(configuredToken)).toBe('paid');
     });
   });
 

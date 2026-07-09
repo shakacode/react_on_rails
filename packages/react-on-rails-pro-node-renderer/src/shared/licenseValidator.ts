@@ -68,11 +68,23 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 //   single-process mode validates once in that process. The result is cached for the
 //   lifetime of the process that performs validation.
 //
-// The caching here is deterministic for a stable configured or environment value.
-let cachedLicenseStatus: LicenseStatus | undefined;
-const UNINITIALIZED = Symbol('uninitialized');
-let cachedLicenseOrganization: string | undefined | typeof UNINITIALIZED = UNINITIALIZED;
-let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALIZED;
+// Explicit tokens get distinct cache keys so an earlier ENV/default lookup cannot
+// override later application configuration. The ENV/default path intentionally has
+// one process-lifetime key, preserving the existing reset-required cache semantics.
+const ENV_LICENSE_CACHE_KEY = Symbol('env-license');
+type LicenseCacheKey = string | typeof ENV_LICENSE_CACHE_KEY;
+interface LicenseCacheEntry<T> {
+  key: LicenseCacheKey;
+  value: T;
+}
+
+let cachedLicenseStatus: LicenseCacheEntry<LicenseStatus> | undefined;
+let cachedLicenseOrganization: LicenseCacheEntry<string | undefined> | undefined;
+let cachedLicensePlan: LicenseCacheEntry<ValidPlan | undefined> | undefined;
+
+function licenseCacheKey(configuredLicenseToken?: string): LicenseCacheKey {
+  return configuredLicenseToken?.trim() || ENV_LICENSE_CACHE_KEY;
+}
 
 /**
  * Loads the license string from explicit configuration, then the environment.
@@ -214,12 +226,14 @@ function determineLicenseStatus(licenseToken?: string): LicenseStatus {
  * @returns One of 'valid', 'expired', 'invalid', 'missing'
  */
 export function getLicenseStatus(licenseToken?: string): LicenseStatus {
-  if (cachedLicenseStatus !== undefined) {
-    return cachedLicenseStatus;
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicenseStatus?.key === key) {
+    return cachedLicenseStatus.value;
   }
 
-  cachedLicenseStatus = determineLicenseStatus(licenseToken);
-  return cachedLicenseStatus;
+  const value = determineLicenseStatus(licenseToken);
+  cachedLicenseStatus = { key, value };
+  return value;
 }
 
 /**
@@ -251,12 +265,14 @@ function determineLicenseOrganization(licenseToken?: string): string | undefined
  * @returns The organization name or undefined if not available
  */
 export function getLicenseOrganization(licenseToken?: string): string | undefined {
-  if (cachedLicenseOrganization !== UNINITIALIZED) {
-    return cachedLicenseOrganization;
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicenseOrganization?.key === key) {
+    return cachedLicenseOrganization.value;
   }
 
-  cachedLicenseOrganization = determineLicenseOrganization(licenseToken);
-  return cachedLicenseOrganization;
+  const value = determineLicenseOrganization(licenseToken);
+  cachedLicenseOrganization = { key, value };
+  return value;
 }
 
 /**
@@ -289,12 +305,14 @@ function determineLicensePlan(licenseToken?: string): ValidPlan | undefined {
  * @returns The plan type (e.g., "paid", "startup") or undefined if not available
  */
 export function getLicensePlan(licenseToken?: string): ValidPlan | undefined {
-  if (cachedLicensePlan !== UNINITIALIZED) {
-    return cachedLicensePlan;
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicensePlan?.key === key) {
+    return cachedLicensePlan.value;
   }
 
-  cachedLicensePlan = determineLicensePlan(licenseToken);
-  return cachedLicensePlan;
+  const value = determineLicensePlan(licenseToken);
+  cachedLicensePlan = { key, value };
+  return value;
 }
 
 /**
@@ -302,6 +320,6 @@ export function getLicensePlan(licenseToken?: string): ValidPlan | undefined {
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
-  cachedLicenseOrganization = UNINITIALIZED;
-  cachedLicensePlan = UNINITIALIZED;
+  cachedLicenseOrganization = undefined;
+  cachedLicensePlan = undefined;
 }

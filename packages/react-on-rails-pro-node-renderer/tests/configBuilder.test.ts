@@ -133,6 +133,14 @@ describe('configBuilder', () => {
     expect(envValues.REACT_ON_RAILS_PRO_LICENSE).toBe(false);
   });
 
+  it('reports the effective license ENV as masked', () => {
+    process.env.REACT_ON_RAILS_PRO_LICENSE = 'env-license-token';
+
+    const envValues = envValuesUsedForRenderedConfig({});
+
+    expect(envValues.REACT_ON_RAILS_PRO_LICENSE).toBe('<MASKED>');
+  });
+
   it('keeps shared boolean env parsing backward-compatible for RENDERER_SUPPORT_MODULES=1', () => {
     process.env.NODE_ENV = 'test';
     process.env.RENDERER_SUPPORT_MODULES = '1';
