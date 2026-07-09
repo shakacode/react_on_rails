@@ -108,7 +108,7 @@ module ReactOnRailsPro
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
-    attr_accessor :renderer_url, :renderer_password, :license_token, :tracing,
+    attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
@@ -120,8 +120,16 @@ module ReactOnRailsPro
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
                   :react_server_client_manifest_file
 
-    attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
+    attr_reader :license_token, :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys
+
+    # License metadata is cached after its first lookup. Invalidate that cache when
+    # application configuration changes so an earlier ENV/default lookup cannot win.
+    def license_token=(value)
+      changed = instance_variable_defined?(:@license_token) && @license_token != value
+      @license_token = value
+      ReactOnRailsPro::LicenseValidator.reset! if changed && defined?(ReactOnRailsPro::LicenseValidator)
+    end
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #

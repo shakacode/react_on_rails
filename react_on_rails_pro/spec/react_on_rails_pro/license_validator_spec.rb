@@ -863,6 +863,23 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         expect(info[:expiration]).to be_nil
       end
     end
+
+    context "when a configured token is assigned after missing license information was cached" do
+      it "invalidates every cached license field" do
+        missing_info = described_class.license_info
+        ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
+
+        info = described_class.license_info
+
+        expect(missing_info).to include(org: nil, plan: nil, status: :missing,
+                                        attribution_required: false, expiration: nil)
+        expect(info[:org]).to eq("Acme Corp")
+        expect(info[:plan]).to eq("paid")
+        expect(info[:status]).to eq(:valid)
+        expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_a(Time)
+      end
+    end
   end
 
   describe ".reset!" do
