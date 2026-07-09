@@ -80,7 +80,6 @@ class PrMergeLedger
         loop do
           index += 1 while html_attribute_space?(markdown_line[index])
           return trailing_html_tag_close?(markdown_line, index) if markdown_line[index] == ">"
-          return false unless html_type_7_attribute_content?(markdown_line[index])
 
           index = next_html_type_7_attribute_index(markdown_line, index)
           return false unless index
@@ -88,23 +87,30 @@ class PrMergeLedger
       end
 
       def next_html_type_7_attribute_index(markdown_line, index)
-        while index < markdown_line.length
-          character = markdown_line[index]
-          return index if html_attribute_delimiter?(character)
-          return nil if html_attribute_invalid?(character)
+        return unless html_attribute_name_start?(markdown_line[index])
 
-          index = if html_attribute_quote?(character)
-                    next_quoted_html_attribute_index(markdown_line, index, character)
-                  else
-                    index + 1
-                  end
-          return nil unless index
-        end
+        index += 1
+        index += 1 while html_attribute_name_character?(markdown_line[index])
+        index += 1 while html_attribute_space?(markdown_line[index])
+        return index unless markdown_line[index] == "="
 
+        index += 1
+        index += 1 while html_attribute_space?(markdown_line[index])
+        next_html_attribute_value_index(markdown_line, index)
+      end
+
+      def next_html_attribute_value_index(markdown_line, index)
+        quote = markdown_line[index]
+        return next_quoted_html_attribute_value_index(markdown_line, index, quote) if html_attribute_quote?(quote)
+
+        return unless unquoted_html_attribute_value_character?(markdown_line[index])
+
+        index += 1
+        index += 1 while unquoted_html_attribute_value_character?(markdown_line[index])
         index
       end
 
-      def next_quoted_html_attribute_index(markdown_line, index, quote)
+      def next_quoted_html_attribute_value_index(markdown_line, index, quote)
         closing_index = markdown_line.index(quote, index + 1)
         closing_index && (closing_index + 1)
       end
@@ -113,8 +119,12 @@ class PrMergeLedger
         markdown_line[(index + 1)..].to_s.match?(/\A[ \t]*\z/)
       end
 
-      def html_type_7_attribute_content?(character)
-        character && !html_attribute_delimiter?(character) && !html_attribute_invalid?(character)
+      def html_attribute_name_start?(character)
+        character&.match?(/[A-Za-z_:]/)
+      end
+
+      def html_attribute_name_character?(character)
+        character&.match?(/[A-Za-z0-9_:.-]/)
       end
 
       def html_attribute_space?(character)
@@ -125,12 +135,14 @@ class PrMergeLedger
         html_attribute_space?(character) || character == ">"
       end
 
-      def html_attribute_invalid?(character)
-        HTML_ATTRIBUTE_INVALID_CHARACTERS.include?(character)
-      end
-
       def html_attribute_quote?(character)
         HTML_ATTRIBUTE_QUOTES.include?(character)
+      end
+
+      def unquoted_html_attribute_value_character?(character)
+        character &&
+          !html_attribute_space?(character) &&
+          !HTML_UNQUOTED_ATTRIBUTE_VALUE_INVALID_CHARACTERS.include?(character)
       end
 
       def ascii_letter?(character)

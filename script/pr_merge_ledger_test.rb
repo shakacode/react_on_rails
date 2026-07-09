@@ -1168,17 +1168,8 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
-  def test_textarea_raw_html_block_ends_at_closing_tag_before_plain_closeout
+  def test_textarea_html_block_continues_until_blank_line_after_closing_tag
     output, status = run_fixture(fixture_with_body("<textarea>\n</textarea>\nFixes #4410\n"))
-
-    assert status.success?, output
-    data = JSON.parse(output)
-    assert data.fetch("complete_allowed")
-    assert_empty violation_codes(data)
-  end
-
-  def test_textarea_raw_html_block_blank_line_does_not_end_before_closeout
-    output, status = run_fixture(fixture_with_body("<textarea>\n\nFixes #4410\n</textarea>\n"))
 
     refute status.success?, output
     data = JSON.parse(output)
@@ -1186,6 +1177,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 3, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_textarea_html_block_blank_line_before_closeout_allows_strict_closeout
+    output, status = run_fixture(fixture_with_body("<textarea>\n\nFixes #4410\n</textarea>\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
   end
 
   def test_raw_html_block_blank_line_does_not_end_before_closeout
@@ -1219,6 +1219,24 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 2, violation.fetch("line")
     assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
+  def test_malformed_type_7_html_attribute_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("<ins =>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_malformed_type_7_html_attribute_name_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("<a h*#ref=\"hi\">\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
   end
 
   def test_type_7_html_block_does_not_interrupt_paragraph_before_plain_closeout
