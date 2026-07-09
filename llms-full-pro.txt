@@ -3596,6 +3596,8 @@ Keep the build-time seed as well; the two layers are complementary:
 
 ## Deploy the renderer before Rails
 
+**This ordering requirement applies only when the renderer is a _separate workload_ from Rails** — Option 3 in [Container deployment](../oss/building-features/node-renderer/container-deployment.md#architecture-options). If Rails and the renderer share **one workload** — a single container or sidecar containers (Options 1–2) — they deploy on one atomic lifecycle: there is no cross-workload race and no version drift, and the [boot seed](#promotion-deploys-need-a-release-time-boot-seed) simply runs once at container start before either process serves traffic. The rest of this section is for the **separate-workloads** topology, where Rails and the renderer roll independently and the ordering must be made explicit.
+
 > [!IMPORTANT]
 > During a rolling deploy, the new Node Renderer must be live and cache-warm **before** the new Rails server starts serving traffic. If Rails goes first, the adapter's warm-cache guarantee doesn't hold for that window — you get exactly the 410 storm it's meant to prevent.
 
