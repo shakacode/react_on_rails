@@ -68,7 +68,9 @@ class PrMergeLedger
       end
 
       def normalized_blockquote_markdown_line_and_depth(line, markdown_line, blockquote_depth, context)
+        markdown_state = context.fetch(:markdown_state)
         if context.fetch(:marker_found)
+          markdown_state["current_markdown_start_column"] = context.fetch(:marker_content_column)
           return [
             normalize_blockquote_content_indentation(
               markdown_line,
@@ -80,7 +82,6 @@ class PrMergeLedger
           ]
         end
 
-        markdown_state = context.fetch(:markdown_state)
         if markdown_state.fetch("blockquote_depth").positive? &&
            markdown_state.fetch("blockquote_lazy_continuation_allowed") &&
            blockquote_lazy_continuation_line(line, markdown_state)

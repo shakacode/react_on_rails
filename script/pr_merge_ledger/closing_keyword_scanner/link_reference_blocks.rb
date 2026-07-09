@@ -7,7 +7,7 @@ class PrMergeLedger
 
       def closing_keyword_in_link_reference(line, markdown_state)
         link_reference_line = link_reference_content_line(line, markdown_state)
-        unless link_reference_hidden_line?(link_reference_line, markdown_state)
+        unless link_reference_hidden_line?(link_reference_line, markdown_state, source_line: line)
           reset_multiline_link_reference_state(markdown_state)
           return
         end
@@ -47,18 +47,34 @@ class PrMergeLedger
         markdown_state["link_reference_multiline_reported"] = false
       end
 
-      def link_reference_hidden_line?(line, markdown_state)
+      def link_reference_hidden_line?(line, markdown_state, source_line: line)
         active_title_delimiter = markdown_state.fetch("link_reference_title_delimiter")
-        return active_link_reference_title_hidden_line?(line, active_title_delimiter) if active_title_delimiter
+        if active_title_delimiter
+          return active_link_reference_title_hidden_line?(
+            line,
+            active_title_delimiter,
+            markdown_state,
+            source_line:
+          )
+        end
 
         link_reference_definition_boundary_line?(line, markdown_state) ||
           link_reference_destination_line?(line, markdown_state) ||
           link_reference_title_line?(line, markdown_state)
       end
 
-      def active_link_reference_title_hidden_line?(line, delimiter)
+      def active_link_reference_title_hidden_line?(line, delimiter, markdown_state, source_line:)
+        if active_link_reference_title_boundary_line?(source_line, markdown_state)
+          markdown_state["link_reference_title_delimiter"] = nil
+          return false
+        end
+
         closing_index = unescaped_delimiter_index(line, delimiter)
-        return true unless closing_index
+        unless closing_index
+          closes_later = active_link_reference_title_closes_later?(delimiter, markdown_state)
+          markdown_state["link_reference_title_delimiter"] = nil unless closes_later
+          return closes_later
+        end
 
         line[(closing_index + delimiter.length)..].to_s.strip.empty?
       end

@@ -9,29 +9,17 @@ class PrMergeLedger
         match = line.match(LIST_ITEM_WITH_PADDING_PATTERN)
         return unless match
 
-        marker_end_column = column_after_prefix(line[...match.begin(:padding)])
-        content_column = column_after_prefix(line[...match.begin(:code)])
+        relative_content_column = column_after_prefix(line[...match.begin(:code)])
         marker_indent = column_after_prefix(match[:indent].each_char)
         list_content_indent = markdown_state&.fetch("list_content_indent", nil)
-        return unless list_marker_indent_allowed_for_line?(marker_indent, list_content_indent, content_column)
+        return unless list_marker_indent_allowed_for_line?(marker_indent, list_content_indent, relative_content_column)
 
-        blockquote_depth = markdown_state&.fetch("current_blockquote_depth", 0).to_i
-        tab_indented_code = blockquote_depth.positive? &&
-                            match[:padding].include?("\t") &&
-                            content_column >= marker_end_column + 3
-        return match if tab_indented_code || content_column >= marker_end_column + 5
+        markdown_start_column = markdown_state&.fetch("current_markdown_start_column", 0).to_i
+        marker_end_column = column_after_prefix(line[...match.begin(:padding)], markdown_start_column)
+        content_column = column_after_prefix(line[...match.begin(:code)], markdown_start_column)
+        return match if content_column >= marker_end_column + 5
 
-        same_line_nested_list_marker_indented_code_match(line, match, content_column)
-      end
-
-      def same_line_nested_list_marker_indented_code_match(line, outer_match, outer_content_column)
-        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |nested_match, code_offset,
-                                                                                     marker_end_column,
-                                                                                     content_column|
-          if content_column >= marker_end_column + 5
-            return ListMarkerIndentedCodeMatch.new(nested_match[:code], code_offset)
-          end
-        end
+        same_line_nested_list_marker_indented_code_match(line, match, relative_content_column, markdown_start_column)
       end
 
       def list_blockquote_marker_match(line, markdown_state)
@@ -53,62 +41,6 @@ class PrMergeLedger
         return unless list_marker_indent_allowed_for_line?(marker_indent, list_content_indent, content_column)
 
         same_line_nested_list_blockquote_marker_match(line, list_match, content_column)
-      end
-
-      def same_line_nested_list_blockquote_marker_match(line, outer_match, outer_content_column)
-        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_match, blockquote_line_offset,
-                                                                                     _marker_end_column,
-                                                                                     _content_column|
-          blockquote_match = line.match(SAME_LINE_BLOCKQUOTE_MARKER_PATTERN, blockquote_line_offset)
-          if blockquote_match
-            return ListBlockquoteMarkerMatch.new(
-              blockquote_match.end(0),
-              blockquote_marker_depth(blockquote_match[0])
-            )
-          end
-        end
-      end
-
-      def each_same_line_nested_list_item(line, outer_match, outer_content_column)
-        nested_line_offset = outer_match.begin(:code)
-        nested_line_column = outer_content_column
-        list_content_column = outer_content_column
-
-        loop do
-          nested_match = line.match(SAME_LINE_LIST_ITEM_WITH_PADDING_PATTERN, nested_line_offset)
-          return unless nested_match
-
-          marker_indent = column_after_prefix(
-            line[nested_line_offset...nested_match.begin(:marker)],
-            nested_line_column
-          )
-          marker_end_column = column_after_prefix(
-            line[nested_line_offset...nested_match.begin(:padding)],
-            nested_line_column
-          )
-          content_column = column_after_prefix(line[nested_line_offset...nested_match.begin(:code)], nested_line_column)
-          return unless list_marker_indent_allowed?(marker_indent, list_content_column)
-
-          code_offset = nested_match.begin(:code)
-          result = yield nested_match, code_offset, marker_end_column, content_column
-          return result if result
-
-          nested_line_offset = code_offset
-          nested_line_column = content_column
-          list_content_column = content_column
-        end
-      end
-
-      def same_line_nested_list_content_indent(line, outer_match, outer_content_column)
-        deepest_content_column = nil
-        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_nested_match, _code_offset,
-                                                                                     _marker_end_column,
-                                                                                     content_column|
-          deepest_content_column = content_column
-          nil
-        end
-
-        deepest_content_column
       end
 
       def blockquote_marker_depth(markers)

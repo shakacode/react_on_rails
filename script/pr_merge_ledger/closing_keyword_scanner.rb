@@ -11,8 +11,10 @@ require_relative "closing_keyword_scanner/inline_code_multiline"
 require_relative "closing_keyword_scanner/line_state"
 require_relative "closing_keyword_scanner/link_reference_blocks"
 require_relative "closing_keyword_scanner/link_reference_parser"
+require_relative "closing_keyword_scanner/link_reference_title_lookahead"
 require_relative "closing_keyword_scanner/list_blocks"
 require_relative "closing_keyword_scanner/list_paragraphs"
+require_relative "closing_keyword_scanner/same_line_nested_list_items"
 
 class PrMergeLedger
   module ClosingKeywordScanner
@@ -26,8 +28,10 @@ class PrMergeLedger
     include LineState
     include LinkReferenceBlocks
     include LinkReferenceParser
+    include LinkReferenceTitleLookahead
     include ListBlocks
     include ListParagraphs
+    include SameLineNestedListItems
 
     private
 
@@ -98,6 +102,8 @@ class PrMergeLedger
     end
 
     def code_formatted_closing_keyword_violation(pull_request, line, index, markdown_state)
+      markdown_state["line_index"] = index
+      markdown_state["current_markdown_start_column"] = 0
       markdown_line, blockquote_depth = body_markdown_line_and_depth(line, markdown_state)
       close_blockquote_fence_if_needed(markdown_state, blockquote_depth)
       close_outdented_list_fence_if_needed(markdown_state, markdown_line)

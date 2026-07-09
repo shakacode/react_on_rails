@@ -135,10 +135,8 @@ class PrMergeLedger
       end
 
       def same_line_nested_list_fenced_code_block_match(line, outer_match, outer_content_column)
-        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |_match, fence_line_offset,
-                                                                                     _marker_end_column,
-                                                                                     content_column|
-          fence_match = same_line_nested_list_fence_match(line, fence_line_offset, content_column)
+        each_same_line_nested_list_item(line, outer_match, outer_content_column) do |item|
+          fence_match = same_line_nested_list_fence_match(line, item.code_offset, item.content_column)
           return fence_match if fence_match
         end
       end

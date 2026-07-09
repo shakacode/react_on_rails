@@ -80,6 +80,9 @@ class PrMergeLedger
         loop do
           index += 1 while html_attribute_space?(markdown_line[index])
           return trailing_html_tag_close?(markdown_line, index) if markdown_line[index] == ">"
+          if markdown_line[index] == "/" && markdown_line[index + 1] == ">"
+            return trailing_html_tag_close?(markdown_line, index + 1)
+          end
 
           index = next_html_type_7_attribute_index(markdown_line, index)
           return false unless index
