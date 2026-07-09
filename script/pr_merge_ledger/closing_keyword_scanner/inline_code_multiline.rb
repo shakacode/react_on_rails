@@ -60,15 +60,13 @@ class PrMergeLedger
         cache = markdown_state.fetch("inline_code_failed_lookahead")
         return false unless cache
 
-        cache.fetch(:delimiter) == delimiter &&
-          cache.fetch(:blockquote_depth) == blockquote_depth &&
-          line_index < cache.fetch(:through_line_index)
+        entry = cache.fetch([delimiter, blockquote_depth], nil)
+        entry && line_index < entry.fetch(:through_line_index)
       end
 
       def cache_failed_inline_code_lookahead(markdown_state, delimiter, blockquote_depth, through_line_index)
-        markdown_state["inline_code_failed_lookahead"] = {
-          delimiter:,
-          blockquote_depth:,
+        markdown_state["inline_code_failed_lookahead"] ||= {}
+        markdown_state.fetch("inline_code_failed_lookahead")[[delimiter, blockquote_depth]] = {
           through_line_index:
         }
       end

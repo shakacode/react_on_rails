@@ -6,27 +6,76 @@ class PrMergeLedger
       private
 
       def active_link_reference_title_closes_later?(delimiter, markdown_state)
+        cached_result = cached_active_link_reference_title_lookahead(delimiter, markdown_state)
+        return cached_result unless cached_result.nil?
+
+        result = active_link_reference_title_lookahead_result(delimiter, markdown_state)
+        cache_active_link_reference_title_lookahead(
+          markdown_state,
+          delimiter,
+          result.fetch(:through_line_index),
+          result.fetch(:closes_later)
+        )
+        result.fetch(:closes_later)
+      end
+
+      def active_link_reference_title_lookahead_result(delimiter, markdown_state)
         body_lines = markdown_state.fetch("body_lines")
         line_index = markdown_state.fetch("line_index")
         table_header_candidate_cell_count = nil
-        body_lines[(line_index + 1)..].to_a.each do |line|
+        body_lines[(line_index + 1)..].to_a.each_with_index do |line, offset|
+          lookahead_index = line_index + 1 + offset
           link_reference_line = active_link_reference_title_lookahead_line(line, markdown_state)
-          return false if link_reference_line.strip.empty?
-          return false if active_link_reference_title_boundary_line?(link_reference_line, markdown_state)
+          if link_reference_line.strip.empty? ||
+             active_link_reference_title_boundary_line?(link_reference_line, markdown_state)
+            return { through_line_index: lookahead_index, closes_later: false }
+          end
+
           if active_link_reference_title_table_separator_line?(
             link_reference_line,
             table_header_candidate_cell_count
           )
-            return false
+            return { through_line_index: lookahead_index, closes_later: false }
           end
 
           closing_index = unescaped_delimiter_index(link_reference_line, delimiter)
-          return link_reference_line[(closing_index + delimiter.length)..].to_s.strip.empty? if closing_index
+          if closing_index
+            closes_later = link_reference_line[(closing_index + delimiter.length)..].to_s.strip.empty?
+            return { through_line_index: lookahead_index, closes_later: }
+          end
 
           table_header_candidate_cell_count = active_link_reference_title_table_cell_count(link_reference_line)
         end
 
-        false
+        { through_line_index: body_lines.length, closes_later: false }
+      end
+
+      def cached_active_link_reference_title_lookahead(delimiter, markdown_state)
+        cache = markdown_state.fetch("link_reference_title_lookahead")
+        return unless cache
+
+        line_index = markdown_state.fetch("line_index")
+        return unless cache.fetch(:delimiter) == delimiter
+        return unless cache.fetch(:blockquote_depth) == active_link_reference_title_blockquote_depth(markdown_state)
+        return unless line_index < cache.fetch(:through_line_index)
+
+        cache.fetch(:closes_later)
+      end
+
+      def cache_active_link_reference_title_lookahead(markdown_state, delimiter, through_line_index, closes_later)
+        markdown_state["link_reference_title_lookahead"] = {
+          delimiter:,
+          blockquote_depth: active_link_reference_title_blockquote_depth(markdown_state),
+          through_line_index:,
+          closes_later:
+        }
+      end
+
+      def active_link_reference_title_blockquote_depth(markdown_state)
+        markdown_state.fetch(
+          "current_blockquote_depth",
+          markdown_state.fetch("blockquote_depth")
+        )
       end
 
       def active_link_reference_title_lookahead_line(line, markdown_state)

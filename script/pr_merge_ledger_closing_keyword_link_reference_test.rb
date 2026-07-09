@@ -195,6 +195,39 @@ class PrMergeLedgerClosingKeywordLinkReferenceTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_multiline_link_reference_title_lookahead_cache_reuses_closing_line
+    require_relative "pr_merge_ledger/closing_keyword_scanner"
+    probe = Class.new { include PrMergeLedger::ClosingKeywordScanner }.new
+    body_lines = ["[foo]: /url \"\n", *(["plain prose\n"] * 998), "\"\n"]
+    markdown_state = {
+      "body_lines" => body_lines,
+      "line_index" => 0,
+      "opening_fence" => nil,
+      "current_blockquote_depth" => 0,
+      "blockquote_depth" => 0,
+      "list_content_indent" => nil,
+      "html_block" => nil,
+      "paragraph_continuation_active" => false,
+      "list_paragraph_continuation_active" => false,
+      "setext_heading_candidate_active" => false,
+      "gfm_table_header_candidate_active" => false,
+      "gfm_table_header_candidate_cell_count" => nil,
+      "gfm_table_block_active" => false,
+      "link_reference_destination_allowed" => false,
+      "link_reference_title_allowed" => false,
+      "link_reference_title_delimiter" => "\"",
+      "link_reference_title_lookahead" => nil
+    }
+
+    assert probe.send(:active_link_reference_title_closes_later?, "\"", markdown_state)
+    markdown_state["line_index"] = 500
+
+    assert probe.send(:active_link_reference_title_closes_later?, "\"", markdown_state)
+    cache = markdown_state.fetch("link_reference_title_lookahead")
+    assert_equal 999, cache.fetch(:through_line_index)
+    assert cache.fetch(:closes_later)
+  end
+
   def test_link_reference_multiline_title_type_7_html_line_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("[foo]: /url \"\nFixes #4410\n<ins>\n\"\n"))
 

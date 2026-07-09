@@ -109,6 +109,7 @@ class PrMergeLedger
       end
 
       def update_link_reference_title_state(markdown_state, line, current_line_in_fenced_code)
+        previous_title_delimiter = markdown_state.fetch("link_reference_title_delimiter")
         next_title_delimiter = next_link_reference_title_delimiter(
           line,
           current_line_in_fenced_code,
@@ -128,6 +129,7 @@ class PrMergeLedger
         markdown_state["link_reference_destination_allowed"] = next_destination_allowed
         markdown_state["link_reference_title_allowed"] = next_title_allowed
         markdown_state["link_reference_title_delimiter"] = next_title_delimiter
+        markdown_state["link_reference_title_lookahead"] = nil if previous_title_delimiter != next_title_delimiter
       end
 
       def next_link_reference_destination_allowed(line, current_line_in_fenced_code, markdown_state)

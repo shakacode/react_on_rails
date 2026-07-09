@@ -197,6 +197,35 @@ class PrMergeLedgerClosingKeywordInlineTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_failed_multiline_inline_code_lookahead_cache_tracks_each_delimiter
+    require_relative "pr_merge_ledger/closing_keyword_scanner"
+    probe = Class.new { include PrMergeLedger::ClosingKeywordScanner }.new
+    markdown_state = {
+      "inline_code_failed_lookahead" => nil,
+      "opening_fence" => nil,
+      "html_block" => nil,
+      "list_content_indent" => nil,
+      "paragraph_continuation_active" => false,
+      "list_paragraph_continuation_active" => false,
+      "setext_heading_candidate_active" => false,
+      "gfm_table_header_candidate_active" => false,
+      "gfm_table_header_candidate_cell_count" => nil,
+      "gfm_table_block_active" => false,
+      "link_reference_destination_allowed" => false,
+      "link_reference_title_allowed" => false,
+      "link_reference_title_delimiter" => nil
+    }
+    body_lines = ["`", "``", "plain prose"]
+
+    refute probe.send(:inline_code_delimiter_closes_later?, body_lines, 0, "`", 0, markdown_state)
+    refute probe.send(:inline_code_delimiter_closes_later?, body_lines, 1, "``", 0, markdown_state)
+
+    cache = markdown_state.fetch("inline_code_failed_lookahead")
+    assert cache.key?(["`", 0])
+    assert cache.key?(["``", 0])
+    assert probe.send(:cached_failed_inline_code_lookahead?, markdown_state, 0, "`", 0)
+  end
+
   def test_multiline_inline_code_over_noninterrupting_ordered_marker_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("`Fixes #4410\n2) more text here\nend`\n"))
 

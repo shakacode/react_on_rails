@@ -35,7 +35,7 @@ class PrMergeLedger
 
         return { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
 
-        list_item_html_block_context_for_line(line, markdown_state)
+        list_html_block_context_for_line(line, markdown_state)
       end
 
       def html_type_7_block_boundary_line?(line, markdown_state = nil)
@@ -172,6 +172,26 @@ class PrMergeLedger
         )
 
         html_block_context_for_line(list_match[:code], child_list_item_markdown_state(markdown_state))
+      end
+
+      def list_html_block_context_for_line(line, markdown_state)
+        list_item_html_block_context_for_line(line, markdown_state) ||
+          list_indented_html_block_context_for_line(line, markdown_state)
+      end
+
+      def list_indented_html_block_context_for_line(line, markdown_state)
+        return unless markdown_state
+
+        content_indent = markdown_state.fetch("list_content_indent")
+        return unless content_indent
+
+        indentation_columns = leading_indentation_columns(line)
+        return unless indentation_columns.between?(content_indent, content_indent + 3)
+
+        html_block_context_for_line(
+          line_without_indentation_columns(line, content_indent),
+          markdown_state
+        )
       end
 
       def html_block_closes_on_line?(line, html_block)

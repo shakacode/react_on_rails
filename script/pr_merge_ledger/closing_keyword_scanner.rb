@@ -67,6 +67,7 @@ class PrMergeLedger
         "link_reference_destination_allowed" => false,
         "link_reference_title_allowed" => false,
         "link_reference_title_delimiter" => nil,
+        "link_reference_title_lookahead" => nil,
         "link_reference_multiline_content" => nil,
         "link_reference_multiline_reported" => false,
         "root_indented_code_allowed" => true
