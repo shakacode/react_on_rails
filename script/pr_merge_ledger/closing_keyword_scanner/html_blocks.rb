@@ -33,9 +33,15 @@ class PrMergeLedger
           return { "type" => tag_type, "tag" => tag_name }
         end
 
-        return { "type" => "type7_tag" } if html_type_7_block_open_line?(line)
+        return { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
 
         list_item_html_block_context_for_line(line, markdown_state)
+      end
+
+      def html_type_7_block_boundary_line?(line, markdown_state = nil)
+        return false if markdown_state&.fetch("paragraph_continuation_active", false)
+
+        html_type_7_block_open_line?(line)
       end
 
       def html_type_7_block_open_line?(line)

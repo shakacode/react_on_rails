@@ -78,7 +78,7 @@ class PrMergeLedger
         markdown_state = context.fetch(:markdown_state)
         if markdown_state.fetch("blockquote_depth").positive? &&
            markdown_state.fetch("blockquote_lazy_continuation_allowed") &&
-           blockquote_lazy_continuation_line(line)
+           blockquote_lazy_continuation_line(line, markdown_state)
           return [markdown_line, markdown_state.fetch("blockquote_depth")]
         end
 

@@ -39,6 +39,11 @@ class PrMergeLedger
         return false if ordered_list_marker_continues_paragraph?(boundary_line, markdown_state)
 
         static_root_block_boundary_line?(boundary_line) ||
+          stateful_root_block_boundary_line?(boundary_line, line, markdown_state)
+      end
+
+      def stateful_root_block_boundary_line?(boundary_line, line, markdown_state)
+        html_type_7_block_boundary_line?(boundary_line, markdown_state) ||
           link_reference_definition_boundary_line?(boundary_line, markdown_state) ||
           (markdown_state&.fetch("setext_heading_candidate_active", false) &&
             boundary_line.match?(SETEXT_BOUNDARY_PATTERN)) ||
@@ -73,7 +78,6 @@ class PrMergeLedger
       def static_root_block_boundary_line?(boundary_line)
         boundary_line.match?(ROOT_BLOCK_BOUNDARY_PATTERN) ||
           boundary_line.match?(HTML_BLOCK_BOUNDARY_PATTERN) ||
-          html_type_7_block_open_line?(boundary_line) ||
           boundary_line.match?(THEMATIC_BOUNDARY_PATTERN)
       end
 
