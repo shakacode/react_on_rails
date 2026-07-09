@@ -89,6 +89,16 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
+    context "when the ENV/default source changes after its status was cached" do
+      it "retains the cached status until reset" do
+        expect(described_class.license_status).to eq(:missing)
+
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "invalid-env-token"
+
+        expect(described_class.license_status).to eq(:missing)
+      end
+    end
+
     context "when application configuration and ENV both provide a license" do
       before do
         ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
@@ -865,7 +875,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     end
 
     context "when a configured token is assigned after missing license information was cached" do
-      it "invalidates every cached license field" do
+      it "does not reuse any cached default license field" do
         missing_info = described_class.license_info
         ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
 
@@ -877,6 +887,22 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         expect(info[:plan]).to eq("paid")
         expect(info[:status]).to eq(:valid)
         expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_a(Time)
+      end
+    end
+
+    context "when the effective configuration object changes after missing license information was cached" do
+      it "does not reuse any cached default license field" do
+        described_class.license_info
+        configured = ReactOnRailsPro::Configuration.new(
+          license_token: JWT.encode(valid_payload, test_private_key, "RS256")
+        )
+        allow(ReactOnRailsPro).to receive(:configuration).and_return(configured)
+
+        info = described_class.license_info
+
+        expect(info).to include(org: "Acme Corp", plan: "paid", status: :valid,
+                                attribution_required: false)
         expect(info[:expiration]).to be_a(Time)
       end
     end
