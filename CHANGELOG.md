@@ -44,6 +44,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   mismatches on streamed RSC apps such as the flagship demo. Fixes
   [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
 
+#### Added
+
+- **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
+  license through `config.license_token`, including from Rails credentials, while standalone Node
+  renderers can use the `licenseToken` option. Explicit nonblank configuration takes precedence over
+  `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
+  diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
+  [ihabadham](https://github.com/ihabadham).
+
 ### [17.0.0.rc.7] - 2026-07-06
 
 #### Breaking Changes
