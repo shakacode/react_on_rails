@@ -67,8 +67,18 @@ class PrMergeLedger
       def link_reference_definition_parts(line)
         match = line.match(LINK_REFERENCE_DEFINITION_PATTERN)
         return unless match
+        return unless valid_link_reference_label?(match[:label])
 
         link_reference_destination_parts(match[:tail])
+      end
+
+      def link_reference_definition_label_only_line?(line)
+        match = line.to_s.match(LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN)
+        match && valid_link_reference_label?(match[:label])
+      end
+
+      def valid_link_reference_label?(label)
+        label && label.length <= MAX_LINK_REFERENCE_LABEL_CHARACTERS && label.match?(/\S/)
       end
 
       def link_reference_destination_parts(line)

@@ -137,7 +137,7 @@ class PrMergeLedger
         return false if current_line_in_fenced_code || markdown_state.fetch("opening_fence")
 
         link_reference_definition_boundary_line?(link_reference_line, markdown_state, source_line: line) &&
-          link_reference_line.match?(LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN)
+          link_reference_definition_label_only_line?(link_reference_line)
       end
 
       def next_link_reference_title_delimiter(line, current_line_in_fenced_code, markdown_state)

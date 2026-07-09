@@ -180,6 +180,15 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_raw_html_block_closes_on_any_raw_text_end_tag
+    output, status = run_fixture(fixture_with_body("<script>\n</pre>\nFixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_type_7_html_block_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("<ins>\nFixes #4410\n"))
 

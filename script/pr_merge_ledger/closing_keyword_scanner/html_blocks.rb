@@ -206,7 +206,7 @@ class PrMergeLedger
         when "processing_instruction"
           line.include?("?>")
         when "raw_tag"
-          line.match?(%r{</#{Regexp.escape(html_block.fetch('tag'))}\s*>}i)
+          line.match?(HTML_RAW_TEXT_BLOCK_CLOSE_PATTERN)
         when "tag", "type7_tag"
           line.strip.empty?
         else

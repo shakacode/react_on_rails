@@ -38,6 +38,7 @@ class PrMergeLedger
       tbody td tfoot th thead title tr track ul
     ].freeze
     HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style].freeze
+    HTML_RAW_TEXT_BLOCK_TAG_PATTERN = Regexp.union(HTML_RAW_TEXT_BLOCK_TAG_NAMES)
     HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
     HTML_BLOCK_BOUNDARY_PATTERN =
       %r{\A {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[|</?(?:#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z))}i
@@ -46,14 +47,16 @@ class PrMergeLedger
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
     HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}</?(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
+    HTML_RAW_TEXT_BLOCK_CLOSE_PATTERN = %r{</(?:#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})\s*>}i
     HTML_ATTRIBUTE_SPACES = [" ", "\t"].freeze
     HTML_ATTRIBUTE_INVALID_CHARACTERS = ["<", "\n"].freeze
     HTML_ATTRIBUTE_QUOTES = ["\"", "'"].freeze
     HTML_UNQUOTED_ATTRIBUTE_VALUE_INVALID_CHARACTERS = ["\"", "'", "=", "<", ">", "`", "\n"].freeze
     THEMATIC_BOUNDARY_PATTERN = /\A {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})\z/
     SETEXT_BOUNDARY_PATTERN = /\A {0,3}(?:=+|-+)[ \t]*\z/
-    LINK_REFERENCE_DEFINITION_PATTERN = /\A {0,3}\[[^\]\r\n]+\]:[ \t]*(?<tail>[^\r\n]*)(?:\r?\n)?\z/
-    LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN = /\A {0,3}\[[^\]\r\n]+\]:[ \t]*(?:\r?\n)?\z/
+    MAX_LINK_REFERENCE_LABEL_CHARACTERS = 999
+    LINK_REFERENCE_DEFINITION_PATTERN = /\A {0,3}\[(?<label>[^\]\r\n]+)\]:[ \t]*(?<tail>[^\r\n]*)(?:\r?\n)?\z/
+    LINK_REFERENCE_DEFINITION_LABEL_ONLY_PATTERN = /\A {0,3}\[(?<label>[^\]\r\n]+)\]:[ \t]*(?:\r?\n)?\z/
     LINK_REFERENCE_DESTINATION_LINE_PATTERN = /\A {0,3}\S/
     LINK_REFERENCE_TITLE_DELIMITERS = { "\"" => "\"", "'" => "'", "(" => ")" }.freeze
     TABLE_SEPARATOR_CELL_PATTERN = /\A:?-+:?\z/

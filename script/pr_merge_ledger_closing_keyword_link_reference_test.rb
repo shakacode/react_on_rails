@@ -120,6 +120,33 @@ class PrMergeLedgerClosingKeywordLinkReferenceTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_whitespace_only_link_reference_label_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[   ]: /url \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_whitespace_only_link_reference_label_only_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[   ]:\n/url \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_overlong_link_reference_label_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[#{'a' * 1000}]: /url \"Fixes #4410\"\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
   def test_backslash_heavy_raw_link_reference_destination_blocks_without_backtracking
     backslash_destination = "\\" * 20_000
     output, status = run_fixture(fixture_with_body("[foo]: #{backslash_destination} \"Fixes #4410\"\n"))
