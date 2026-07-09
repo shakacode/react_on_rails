@@ -78,7 +78,10 @@ class PrMergeLedger
           nested_match = line.match(SAME_LINE_LIST_ITEM_WITH_PADDING_PATTERN, nested_line_offset)
           return unless nested_match
 
-          marker_indent = column_after_prefix(line[nested_line_offset...nested_match.begin(0)], nested_line_column)
+          marker_indent = column_after_prefix(
+            line[nested_line_offset...nested_match.begin(:marker)],
+            nested_line_column
+          )
           marker_end_column = column_after_prefix(
             line[nested_line_offset...nested_match.begin(:padding)],
             nested_line_column

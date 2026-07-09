@@ -50,10 +50,19 @@ class PrMergeLedger
       end
 
       def link_reference_hidden_line?(line, markdown_state)
-        markdown_state.fetch("link_reference_title_delimiter") ||
-          link_reference_definition_boundary_line?(line, markdown_state) ||
+        active_title_delimiter = markdown_state.fetch("link_reference_title_delimiter")
+        return active_link_reference_title_hidden_line?(line, active_title_delimiter) if active_title_delimiter
+
+        link_reference_definition_boundary_line?(line, markdown_state) ||
           link_reference_destination_line?(line, markdown_state) ||
           link_reference_title_line?(line, markdown_state)
+      end
+
+      def active_link_reference_title_hidden_line?(line, delimiter)
+        closing_index = unescaped_delimiter_index(line, delimiter)
+        return true unless closing_index
+
+        line[(closing_index + delimiter.length)..].to_s.strip.empty?
       end
 
       def link_reference_definition_boundary_line?(line, markdown_state)

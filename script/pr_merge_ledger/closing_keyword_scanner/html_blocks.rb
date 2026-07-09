@@ -71,6 +71,7 @@ class PrMergeLedger
       end
 
       def closing_html_type_7_tag_close?(markdown_line, index)
+        index += 1 while html_attribute_space?(markdown_line[index])
         markdown_line[index] == ">" && trailing_html_tag_close?(markdown_line, index)
       end
 

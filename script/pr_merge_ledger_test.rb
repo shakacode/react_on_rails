@@ -929,6 +929,18 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_backslash_heavy_raw_link_reference_destination_blocks_without_backtracking
+    backslash_destination = "\\" * 20_000
+    output, status = run_fixture(fixture_with_body("[foo]: #{backslash_destination} \"Fixes #4410\"\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 1, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_link_reference_multiline_title_blank_line_allows_visible_closeout
     output, status = run_fixture(fixture_with_body("[foo]: /url '\n\nFixes #4410\n"))
 
@@ -1002,6 +1014,15 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     violation = ledger(data).fetch("violations").first
     assert_equal 3, violation.fetch("line")
     assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_link_reference_multiline_title_invalid_closer_allows_visible_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: /url '\ntitle' Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
   end
 
   def test_adjacent_link_reference_multiline_titles_each_report_split_closing_keyword
@@ -1196,6 +1217,17 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     data = JSON.parse(output)
     assert data.fetch("complete_allowed")
     assert_empty violation_codes(data)
+  end
+
+  def test_type_7_html_closing_tag_allows_space_before_angle
+    output, status = run_fixture(fixture_with_body("</ins >\nFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
   def test_type_7_html_open_tag_without_closing_angle_does_not_backtrack

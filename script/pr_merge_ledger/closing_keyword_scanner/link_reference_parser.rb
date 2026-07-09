@@ -81,22 +81,32 @@ class PrMergeLedger
 
       def raw_link_reference_destination?(destination)
         parenthesis_depth = 0
-        destination.to_s.each_char.with_index do |character, index|
-          next unless even_backslash_run_before?(destination, index)
+        backslash_run_length = 0
+        destination.to_s.each_char do |character|
+          unescaped_character = backslash_run_length.even?
 
-          case character
-          when "("
-            parenthesis_depth += 1
-          when ")"
-            return false if parenthesis_depth.zero?
-
-            parenthesis_depth -= 1
-          when "<", ">"
-            return false
+          if unescaped_character
+            parenthesis_depth = next_raw_link_reference_parenthesis_depth(character, parenthesis_depth)
+            return false if parenthesis_depth.nil?
           end
+
+          backslash_run_length = character == "\\" ? backslash_run_length + 1 : 0
         end
 
         parenthesis_depth.zero?
+      end
+
+      def next_raw_link_reference_parenthesis_depth(character, parenthesis_depth)
+        case character
+        when "("
+          parenthesis_depth + 1
+        when ")"
+          parenthesis_depth.positive? ? parenthesis_depth - 1 : nil
+        when "<", ">"
+          nil
+        else
+          parenthesis_depth
+        end
       end
 
       def link_reference_destination_complete_title?(line)
@@ -124,25 +134,14 @@ class PrMergeLedger
       end
 
       def unescaped_delimiter_index(text, delimiter)
-        search_start = 0
-        loop do
-          delimiter_index = text.index(delimiter, search_start)
-          return unless delimiter_index
-          return delimiter_index if even_backslash_run_before?(text, delimiter_index)
+        backslash_run_length = 0
+        text.each_char.with_index do |character, index|
+          return index if character == delimiter && backslash_run_length.even?
 
-          search_start = delimiter_index + delimiter.length
-        end
-      end
-
-      def even_backslash_run_before?(text, index)
-        backslash_count = 0
-        cursor = index - 1
-        while cursor >= 0 && text[cursor] == "\\"
-          backslash_count += 1
-          cursor -= 1
+          backslash_run_length = character == "\\" ? backslash_run_length + 1 : 0
         end
 
-        backslash_count.even?
+        nil
       end
     end
   end
