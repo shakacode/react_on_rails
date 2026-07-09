@@ -3017,7 +3017,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...main
+[17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
 [17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
 [17.0.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.5...v17.0.0.rc.6
 [17.0.0.rc.5]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.4...v17.0.0.rc.5
