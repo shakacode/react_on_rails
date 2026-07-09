@@ -117,6 +117,22 @@ describe ReactOnRailsProHelper do
           expect(cache_data.keys).to include(/xyz123/)
         end
 
+        it "uses callable cache keys" do
+          props_calls = 0
+          render_cached = lambda do
+            cached_react_component("App", cache_key: -> { "callable-cache-key" }) do
+              props_calls += 1
+              { a: 1, b: 2 }
+            end
+          end
+
+          render_cached.call
+          render_cached.call
+
+          expect(props_calls).to eq(1)
+          expect(cache_data.keys).to include(%r{/App/callable-cache-key})
+        end
+
         it "doesn't call the block if content is cached" do
           cached_react_component("App", cache_key: "cache-key") do
             { a: 1, b: 2 }
@@ -125,6 +141,38 @@ describe ReactOnRailsProHelper do
           expect do |props|
             cached_react_component("App", cache_key: "cache-key", &props)
           end.not_to yield_control
+        end
+
+        it "skips the cache when if is false" do
+          props_calls = 0
+          render_uncached = lambda do
+            cached_react_component("App", cache_key: "skip-if-false", if: false) do
+              props_calls += 1
+              { a: props_calls }
+            end
+          end
+
+          render_uncached.call
+          render_uncached.call
+
+          expect(props_calls).to eq(2)
+          expect(cache_data.keys).not_to include(%r{/App/skip-if-false})
+        end
+
+        it "skips the cache when unless is true" do
+          props_calls = 0
+          render_uncached = lambda do
+            cached_react_component("App", cache_key: "skip-unless-true", unless: true) do
+              props_calls += 1
+              { a: props_calls }
+            end
+          end
+
+          render_uncached.call
+          render_uncached.call
+
+          expect(props_calls).to eq(2)
+          expect(cache_data.keys).not_to include(%r{/App/skip-unless-true})
         end
 
         context "with cache_tags" do
@@ -180,6 +228,43 @@ describe ReactOnRailsProHelper do
             end.to raise_error(ReactOnRailsPro::Error, /blank tag/)
 
             expect(cache_data.keys).not_to include(%r{/App/invalid-tagged-key})
+          end
+
+          it "converts expires_at before writing tagged entries when the cache store lacks expires_at support" do
+            allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+            allow(Rails.cache).to receive(:fetch).and_call_original
+            expires_at = Time.now + 3600
+
+            cached_react_component("App", cache_key: "expires-at-tagged-key", cache_tags: ["post:42"],
+                                          cache_options: { expires_at: }) do
+              { a: 1 }
+            end
+
+            expect(Rails.cache).to have_received(:fetch) do |_cache_key, cache_options|
+              expect(cache_options).not_to have_key(:expires_at)
+              expect(cache_options[:expires_in]).to be_within(5).of(3600)
+            end
+            expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(1)
+          end
+
+          it "does not cache entries whose expires_at has already passed" do
+            allow(ReactOnRailsPro::Cache).to receive(:cache_supports_expires_at?).and_return(false)
+            props_calls = 0
+
+            render_cached = lambda do
+              cached_react_component("App", cache_key: "expired-expires-at-key", cache_tags: ["post:42"],
+                                            cache_options: { expires_at: Time.now - 60 }) do
+                props_calls += 1
+                { a: 1 }
+              end
+            end
+
+            render_cached.call
+            render_cached.call
+
+            expect(props_calls).to eq(2)
+            expect(cache_data.keys).not_to include(%r{/App/expired-expires-at-key})
+            expect(ReactOnRailsPro.revalidate_tag("post:42")).to eq(0)
           end
         end
 
@@ -293,6 +378,33 @@ describe ReactOnRailsProHelper do
 
           expect(cache_data.keys[0]).to match(%r{#{base_cache_key_with_prerender}/ReactHelmetApp/cache-key})
           expect(cache_data.values[0].value).to match(/div id="ReactHelmetApp-react-component"/)
+        end
+
+        it "adds cache metadata to hash results on cache misses and hits" do
+          cache_key = "hash-cache-metadata"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            "ReactHelmetApp",
+            cache_key:,
+            prerender: true
+          )
+          props_calls = 0
+          allow(self).to receive(:react_component_hash).and_return({ component_html: "<div>rendered component</div>" })
+
+          render_cached = lambda do
+            cached_react_component_hash("ReactHelmetApp", cache_key:) do
+              props_calls += 1
+              { helloWorldData: { name: "Mr. Server Side Rendering" } }
+            end
+          end
+
+          miss_result = render_cached.call
+          hit_result = render_cached.call
+
+          expect(props_calls).to eq(1)
+          expect(miss_result[:RORP_CACHE_KEY]).to eq(expected_cache_key)
+          expect(miss_result[:RORP_CACHE_HIT]).to be(false)
+          expect(hit_result[:RORP_CACHE_KEY]).to eq(expected_cache_key)
+          expect(hit_result[:RORP_CACHE_HIT]).to be(true)
         end
 
         context "with prerender_caching off" do
