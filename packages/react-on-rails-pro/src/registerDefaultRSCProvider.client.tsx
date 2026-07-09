@@ -20,11 +20,21 @@ import { createRSCProvider } from './RSCProvider.tsx';
 import { setDefaultRSCProviderFactory } from './defaultRSCProviderRegistry.ts';
 import { hasLeadingSuspenseBoundary } from './rscHydrationDom.ts';
 
+// A user-authored top-level Suspense root (for example `<Suspense><RSCRoute ssr={false} /></Suspense>`)
+// makes the server DOM legitimately begin with a `<!--$-->` Suspense comment for `reactElement` itself.
+// Because the default RSC provider is registered only on the client, no extra server-streamed wrapper
+// boundary sits above that element, so the client tree already provides the matching boundary. Wrapping
+// it again in `<React.Suspense>` would make the client expect two nested boundaries where the server
+// emitted one, reintroducing a recoverable hydration mismatch. Only the server-streamed wrapper case —
+// where the client root is not itself a top-level Suspense — needs the extra wrapper. See issue #4535.
+const rootElementRendersOwnSuspenseBoundary = (element: React.ReactElement): boolean =>
+  React.isValidElement(element) && element.type === React.Suspense;
+
 if (typeof window !== 'undefined') {
   setDefaultRSCProviderFactory(({ reactElement, railsContext, domNodeId }) => {
-    const shouldMatchStreamedSuspenseBoundary = hasLeadingSuspenseBoundary(
-      document.getElementById(domNodeId),
-    );
+    const shouldMatchStreamedSuspenseBoundary =
+      hasLeadingSuspenseBoundary(document.getElementById(domNodeId)) &&
+      !rootElementRendersOwnSuspenseBoundary(reactElement);
     const RSCProvider = createRSCProvider({
       domNodeId,
       getServerComponent: async (args) => {

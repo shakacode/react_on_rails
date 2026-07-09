@@ -50,6 +50,32 @@ describe('registerDefaultRSCProvider/client hydration parity', () => {
     expect(reactElement.props.children.props.children).toBe(appElement);
   });
 
+  it('does not add a second Suspense wrapper when the root is a user-authored top-level Suspense', () => {
+    const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
+    require('../src/registerDefaultRSCProvider.client.tsx');
+    // A `<Suspense><RSCRoute ssr={false} /></Suspense>` root legitimately makes the server DOM start
+    // with `<!--$-->` for the user element itself, so the client tree already provides the matching
+    // boundary. Adding another wrapper would make the client expect two nested boundaries where the
+    // server emitted one, reintroducing a recoverable hydration mismatch (issue #4535).
+    document.body.innerHTML =
+      '<div id="SuspenseRootApp-react-component-test"><!--$--><section data-testid="suspense-root">Deferred</section><!--/$--></div>';
+
+    const appElement = (
+      <React.Suspense fallback={null}>
+        <section data-testid="suspense-root">Deferred</section>
+      </React.Suspense>
+    );
+    const { reactElement, wrappedByDefaultRSCProvider } = maybeWrapWithDefaultRSCProviderWithStatus(
+      appElement,
+      { rscPayloadGenerationUrlPath: '/rsc_payload' },
+      'SuspenseRootApp-react-component-test',
+    );
+
+    expect(wrappedByDefaultRSCProvider).toBe(true);
+    // The user's own top-level Suspense already matches the single server boundary; no extra wrapper.
+    expect(reactElement.props.children).toBe(appElement);
+  });
+
   it('keeps client-resolved RSC routes aligned with ordinary server HTML', () => {
     const { maybeWrapWithDefaultRSCProviderWithStatus } = require('../src/defaultRSCProviderRegistry.ts');
     require('../src/registerDefaultRSCProvider.client.tsx');
