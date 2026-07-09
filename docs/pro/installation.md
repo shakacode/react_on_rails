@@ -70,7 +70,7 @@ If port 3000 is already in use:
 PORT=3001 bin/dev
 ```
 
-For production deployments, set the license environment variable:
+For production deployments, configure the license token. This environment-variable form remains supported:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -131,13 +131,37 @@ React on Rails Pro uses **ShakaCode Trust-Based Commercial Licensing** to simpli
 
 If no license is configured, the app continues running in unlicensed mode and logs license status instead of blocking startup. In production, that log message is a warning because a paid license is required; in non-production environments, it is informational.
 
-**For production deployments**, set your license token as an environment variable:
+**For production deployments**, provide your license token to Rails through application configuration or the
+environment. Explicit nonblank configuration takes precedence over the environment variable:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+end
+```
+
+Alternatively, set the environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+Blank configured values fall back to `REACT_ON_RAILS_PRO_LICENSE`. Never commit your license token to version control.
+Use Rails credentials, environment variables, or another secure secret manager.
+
+If you run the standalone Node renderer, configure that process separately because Rails configuration does not cross
+the process boundary:
+
+```js
+reactOnRailsProNodeRenderer({
+  // Application-defined secret-manager integration:
+  licenseToken: loadLicenseTokenFromYourSecretManager(),
+});
+```
+
+The Node renderer also falls back to `REACT_ON_RAILS_PRO_LICENSE` when `licenseToken` is blank or omitted. Its
+sanitized configuration logs never include the token value.
 
 ### License Validation Lifecycle
 
@@ -147,7 +171,8 @@ package. There is no network call to ShakaCode during validation.
 License validation happens in these places:
 
 - Rails checks the license after application initialization and logs the result.
-- The standalone node renderer checks the license when the renderer master process starts and logs the result.
+- The standalone node renderer checks the license when the renderer starts and logs the result, including
+  single-process mode (`workersCount: 0`).
 - The browser receives `railsContext.rorPro` as a Pro-installed signal only; it does not validate the license.
 
 A missing, expired, or invalid license does not prevent Rails or the node renderer from starting. In production, license
@@ -172,6 +197,9 @@ Add it to your deploy pipeline as a one-line gate:
 ```
 
 A valid-but-expiring license (within 30 days) still exits 0; the task logs a renewal-required warning. To fail closed on expiring-soon licenses, send renewal emails, run advisory (non-blocking) scheduled checks, or parse the JSON output, see [License CI Integration](./license-ci-integration.md).
+
+The rake task loads the Rails environment, so it honors `config.license_token` and Rails credentials. The workflow
+example uses the environment variable because it is the simplest portable CI setup.
 
 For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 

@@ -29,6 +29,10 @@ available default ENV values if you wire them into your own launch script.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
    In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
    In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
+1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - The paid React on Rails Pro license JWT.
+   Explicit nonblank configuration takes precedence over the environment variable; blank or omitted configuration falls
+   back to the environment. Configure this process separately from Rails when it runs as a standalone service. Token
+   values are masked from sanitized renderer configuration logs.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set. **Recommended for production** — rolling restarts are the primary safety net against memory leaks from application code. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set. Set this high enough so that not all workers are down simultaneously (e.g., if you have 4 workers and set this to 5 minutes, the full restart cycle takes 20 minutes).
 1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. For example, `30` means 30 seconds, not 30 milliseconds. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
@@ -240,6 +244,10 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 const config = {
   // Save bundles to relative "./.node-renderer-bundles" dir of our app root
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
+
+  // Optional alternative to REACT_ON_RAILS_PRO_LICENSE. This application-defined
+  // function can read from any secret provider available to the Node process.
+  // licenseToken: loadLicenseTokenFromYourSecretManager(),
 
   // All other values are the defaults, as described above
 };

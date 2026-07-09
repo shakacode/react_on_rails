@@ -225,7 +225,10 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-For production, configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+For production, configure your license token through `config.license_token` or
+`REACT_ON_RAILS_PRO_LICENSE`. A standalone Node renderer can use its `licenseToken` option or the same environment
+fallback. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md)
+for all options.
 
 **Combining with other options:**
 

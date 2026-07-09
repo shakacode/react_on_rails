@@ -78,11 +78,22 @@ React on Rails Pro works **without a license token** for evaluation, development
 
 ### License Setup
 
-Once you have a paid license, set the environment variable:
+Once you have a paid license, configure it through Rails credentials:
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+end
+```
+
+Or set the environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
+
+A standalone Node renderer cannot read Rails credentials, so pass the same token through its `licenseToken` option or
+environment when you use that deployment mode.
 
 **📖 Detailed setup instructions**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md) for complete configuration guide, team setup, and troubleshooting.
 

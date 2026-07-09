@@ -4,6 +4,11 @@ Detailed examples for integrating the Pro license check into CI/CD pipelines, mo
 
 React on Rails Pro validates licenses **offline** and never crashes — a missing, invalid, or expired license is logged, not raised. That means a CI check is the recommended way to surface license problems before they reach production. The built-in `react_on_rails_pro:verify_license` rake task exits non-zero for missing, invalid, or expired licenses, so most teams only need a one-line CI step (see the [Installation guide](./installation.md#verify-license-compliance)). Everything below is optional polish on top of that.
 
+The rake task loads the Rails environment and therefore honors `config.license_token`, including values read from Rails
+credentials. The examples below use `REACT_ON_RAILS_PRO_LICENSE` because CI secret injection is portable and does not
+require a Rails credentials key. If your app configures the token itself, omit the workflow secret and ensure the CI job
+can decrypt the application credentials.
+
 ## At a glance
 
 | Goal                                                       | Section                                                       |
@@ -169,21 +174,21 @@ namespace :licenses do
 
     case status
     when :valid    then # fall through to expiration window checks
-    when :expired  then abort "React on Rails Pro license is expired. Renew and update REACT_ON_RAILS_PRO_LICENSE."
-    when :missing  then abort "React on Rails Pro license is missing. Set REACT_ON_RAILS_PRO_LICENSE."
+    when :expired  then abort "React on Rails Pro license is expired. Renew and update the configured token."
+    when :missing  then abort "React on Rails Pro license is missing. Configure config.license_token or REACT_ON_RAILS_PRO_LICENSE."
     when :invalid  then abort "React on Rails Pro license is invalid. Verify the full key was copied."
     else
-      abort "React on Rails Pro license status is #{status}. Update REACT_ON_RAILS_PRO_LICENSE."
+      abort "React on Rails Pro license status is #{status}. Update the configured token."
     end
 
     # Defensive: catches the gem reporting :valid while the expiration timestamp is
     # in the past (e.g. just-expired licenses where ceil(-0.04) == 0).
     if days_remaining && days_remaining <= 0
-      abort "React on Rails Pro license is expired (expiration is not in the future). Renew and update REACT_ON_RAILS_PRO_LICENSE."
+      abort "React on Rails Pro license is expired (expiration is not in the future). Renew and update the configured token."
     end
 
     if days_remaining && days_remaining <= threshold_days
-      abort "React on Rails Pro license expires in #{days_remaining} #{day_label}. Renew and update REACT_ON_RAILS_PRO_LICENSE."
+      abort "React on Rails Pro license expires in #{days_remaining} #{day_label}. Renew and update the configured token."
     end
 
     puts "React on Rails Pro license is valid (#{days_remaining} #{day_label} remaining)" if days_remaining

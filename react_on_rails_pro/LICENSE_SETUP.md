@@ -51,7 +51,21 @@ This change allows your application to start even with license issues, giving yo
 
 ## Installation
 
-### Environment Variable (Required)
+### Rails Application Configuration
+
+Rails applications can read the token from Rails credentials or another application-owned secret provider:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+end
+```
+
+Explicit nonblank configuration takes precedence over `REACT_ON_RAILS_PRO_LICENSE`. Blank configured values fall
+through to the environment variable.
+
+### Environment Variable Alternative
 
 Set the `REACT_ON_RAILS_PRO_LICENSE` environment variable:
 
@@ -72,8 +86,23 @@ heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
 # Add to your CI environment variables if needed
 ```
 
-Configure your license token via the `REACT_ON_RAILS_PRO_LICENSE` environment variable.
-Never commit license tokens to version control.
+Never commit license tokens to version control. Use Rails credentials, environment variables, or another secure secret
+manager.
+
+### Standalone Node Renderer Configuration
+
+The standalone Node renderer is a separate process and cannot read Rails credentials. Configure it independently using
+its `licenseToken` option or the same environment-variable fallback:
+
+```js
+reactOnRailsProNodeRenderer({
+  // Application-defined secret-manager integration:
+  licenseToken: loadLicenseTokenFromYourSecretManager(),
+});
+```
+
+Explicit nonblank `licenseToken` configuration takes precedence over `REACT_ON_RAILS_PRO_LICENSE`; blank or omitted
+configuration falls back to the environment. Token values are masked in the renderer's sanitized configuration logs.
 
 ## License Validation and Signals
 
@@ -94,10 +123,12 @@ When no license is present, the application runs in **unlicensed mode**. This is
 
 No license setup is needed for development. Developers can install and use React on Rails Pro immediately.
 
-For production deployments, configure a paid license via the `REACT_ON_RAILS_PRO_LICENSE` environment variable.
+For production deployments, configure a paid license through `config.license_token` or
+`REACT_ON_RAILS_PRO_LICENSE`. Configure a standalone Node renderer separately when you use one.
 
 > Migration note: `config/react_on_rails_pro_license.key` is no longer read.
-> If you used that file previously, move the token to `REACT_ON_RAILS_PRO_LICENSE`.
+> If you used that file previously, move the token to `config.license_token` or
+> `REACT_ON_RAILS_PRO_LICENSE`.
 
 ### For CI/CD
 
@@ -259,7 +290,9 @@ window.railsContext.rorPro;
 
 ### Warning: "No license found"
 
-This is expected behavior in development, test, and CI environments. The application will run in unlicensed mode. For production, ensure the `REACT_ON_RAILS_PRO_LICENSE` environment variable is set.
+This is expected behavior in development, test, and CI environments. The application will run in unlicensed mode. For
+production, ensure the license is available through application configuration or `REACT_ON_RAILS_PRO_LICENSE` in each
+process that validates it.
 
 ### Error: "Invalid license signature"
 
@@ -279,7 +312,7 @@ This is expected behavior in development, test, and CI environments. The applica
 **Solutions:**
 
 1. Contact [support@shakacode.com](mailto:support@shakacode.com) to renew your paid license
-2. Update the `REACT_ON_RAILS_PRO_LICENSE` environment variable with the new token
+2. Update `config.license_token`, the Node renderer's `licenseToken`, or `REACT_ON_RAILS_PRO_LICENSE` with the new token
 
 ### Error: "License plan is not valid for production use"
 
@@ -333,8 +366,8 @@ Need help?
 
 ## Security Best Practices
 
-1. ✅ **Never commit licenses to Git** — Keep license tokens in environment variables or secret managers
-2. ✅ **Use environment variables in production**
+1. ✅ **Never commit licenses to Git** — Keep license tokens in Rails credentials, environment variables, or secret managers
+2. ✅ **Give each validating process access to the token through its own configuration**
 3. ✅ **Use CI secrets for production deployment pipelines**
 4. ✅ **Don't share licenses publicly**
 

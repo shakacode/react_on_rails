@@ -75,7 +75,8 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Fixes**:
 
-- In production, ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
+- In production, ensure `config.license_token` or `REACT_ON_RAILS_PRO_LICENSE` provides the token
+- For a standalone Node renderer, configure `licenseToken` separately or provide the environment variable to that process
 - Run `bundle exec rake react_on_rails_pro:verify_license` to check license status (use `FORMAT=json` for CI/CD)
 - Check that the license key is not expired — use [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
 - Under ShakaCode Trust-Based Commercial Licensing, no token is required for evaluation or non-production use; the app runs in unlicensed mode
