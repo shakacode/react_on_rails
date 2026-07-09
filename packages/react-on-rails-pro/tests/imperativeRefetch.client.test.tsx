@@ -169,9 +169,9 @@ class CapturingErrorBoundary extends React.Component<
   const usingJestFakeTimers = () => jest.isMockFunction(setTimeout);
 
   // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
-  // complete. The eviction uses setTimeout(0), so scheduling a second
-  // setTimeout(0) here guarantees via FIFO macrotask ordering that the eviction
-  // fires before this promise resolves.
+  // complete. The eviction intentionally waits until after React can observe
+  // the rejection and after the in-flight pin release, so this helper waits two
+  // macrotasks.
   const waitForRejectedGetComponentEviction = () => {
     if (usingJestFakeTimers()) {
       throw new Error(
@@ -180,7 +180,9 @@ class CapturingErrorBoundary extends React.Component<
     }
 
     return new Promise<void>((resolve) => {
-      setTimeout(resolve, 0);
+      setTimeout(() => {
+        setTimeout(resolve, 0);
+      }, 0);
     });
   };
 

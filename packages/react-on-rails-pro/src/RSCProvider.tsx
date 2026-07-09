@@ -367,24 +367,31 @@ export const createRSCProvider = ({
         // refetch or reload (#3929). Evict the rejected entry so the next
         // same-key `getComponent` starts a fresh fetch.
         //
-        // Deferred one macrotask (`setTimeout(0)`, not `queueMicrotask`) so
-        // React's Suspense machinery observes the rejection on the cached
-        // promise before the entry is removed; a microtask could interleave
-        // with React's own queue and evict before Suspense reads it. Guarded on
-        // promise identity so a newer same-key promise (a fresh `getComponent`
-        // or a `refetchComponent`) installed during that window is not evicted
-        // by this stale failure. Pins are preserved because the `.finally`
-        // below still owns the matching `unpin` (mirrors the delete +
-        // deferred-unpin handoff in `restoreLastSuccessfulPromise`).
+        // Deferred past the first macrotask (`setTimeout(0)`, not
+        // `queueMicrotask`) so React's Suspense machinery observes the
+        // rejection on the cached promise before the entry is removed; a
+        // microtask could interleave with React's own queue and evict before
+        // Suspense reads it. The extra macrotask also lets the `.finally`
+        // below release the in-flight pin before the key becomes available for
+        // a fresh same-key `getComponent`; otherwise a repeated failing request
+        // can replace the rejected promise with a new pending promise before
+        // the user ErrorBoundary commits its fallback (#4522). Guarded on
+        // promise identity so a newer same-key promise (such as
+        // `refetchComponent`) installed during that window is not evicted by
+        // this stale failure.
         //
         // NOTE: payloads that RESOLVE with an `Error` value are intentionally
         // left cached here; whether those should also retry is a separate
         // `getServerComponent` contract decision tracked apart from #3929.
+        let payloadRejected = false;
         const evictPromiseIfRejected = (error: unknown) => {
+          payloadRejected = true;
           setTimeout(() => {
-            if (fetchRSCPromises.get(key, false) === promise) {
-              fetchRSCPromises.deletePreservingPins(key);
-            }
+            setTimeout(() => {
+              if (fetchRSCPromises.get(key, false) === promise) {
+                fetchRSCPromises.deleteWithoutEvict(key);
+              }
+            }, 0);
           }, 0);
           throw error;
         };
@@ -417,6 +424,14 @@ export const createRSCProvider = ({
           // resolving mounted routes can evict early visible keys before their
           // layout effects get to pin them as mounted.
           setTimeout(() => {
+            if (payloadRejected) {
+              // The rejected entry is already scheduled for deletion in the
+              // next macrotask. Releasing its pin must not reconcile over-cap
+              // eviction against healthy entries during this short grace
+              // window.
+              fetchRSCPromises.unpinWithoutEvict(key);
+              return;
+            }
             fetchRSCPromises.unpin(key);
           }, 0);
         });

@@ -280,9 +280,10 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
           )
         end
 
-        def stub_rsc_rspack_project(root, rsc_enabled:, configuration_error: nil)
+        def stub_rsc_rspack_project(root, rsc_enabled:, configuration_error: nil, node_modules_location: "")
           allow(Rails).to receive(:root).and_return(Pathname.new(root))
-          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location).and_return("")
+          allow(ReactOnRails).to receive_message_chain(:configuration, :node_modules_location)
+            .and_return(node_modules_location)
           allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
           stub_gem_version("17.0.0")
 
@@ -466,8 +467,9 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             expect(Open3).to have_received(:capture3).with(
               "node",
               "-e",
-              "console.log(require.resolve(process.argv[1] + '/package.json'))",
+              ReactOnRails::RscRspackSupport::NODE_PACKAGE_RESOLUTION_SCRIPT,
               "@rspack/core",
+              File.join(root, "node_modules"),
               chdir: root
             )
           end
@@ -677,9 +679,31 @@ module ReactOnRails # rubocop:disable Metrics/ModuleLength
             expect(Open3).to have_received(:capture3).with(
               "node",
               "-e",
-              "console.log(require.resolve(process.argv[1] + '/package.json'))",
+              ReactOnRails::RscRspackSupport::NODE_PACKAGE_RESOLUTION_SCRIPT,
               "@rspack/core",
+              File.join(root, "node_modules"),
               chdir: root
+            )
+          end
+        end
+
+        it "uses the configured client package root to resolve installed Rspack" do
+          Dir.mktmpdir do |root|
+            write_rsc_rspack_project_files(root, assets_bundler: "rspack", rspack_core_version: "latest")
+            client_rspack_package_json = File.join(root, "client/node_modules/@rspack/core/package.json")
+            FileUtils.mkdir_p(File.dirname(client_rspack_package_json))
+            File.write(
+              client_rspack_package_json,
+              JSON.generate("name" => "@rspack/core", "version" => "2.0.8")
+            )
+            stub_rsc_rspack_project(root, rsc_enabled: true, node_modules_location: "client")
+            node_package_version = VersionChecker::NodePackageVersion.new(File.join(root, "package.json"))
+            allow(Rails.logger).to receive(:warn)
+
+            expect { described_class.new(node_package_version).validate_version_and_package_compatibility! }
+              .not_to raise_error
+            expect(Rails.logger).not_to have_received(:warn).with(
+              a_string_including("Could not verify @rspack/core")
             )
           end
         end
