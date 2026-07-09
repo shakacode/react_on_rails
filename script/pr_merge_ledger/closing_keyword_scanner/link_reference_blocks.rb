@@ -7,9 +7,46 @@ class PrMergeLedger
 
       def closing_keyword_in_link_reference(line, markdown_state)
         link_reference_line = link_reference_content_line(line, markdown_state)
-        return unless link_reference_hidden_line?(link_reference_line, markdown_state)
+        unless link_reference_hidden_line?(link_reference_line, markdown_state)
+          reset_multiline_link_reference_state(markdown_state)
+          return
+        end
 
-        link_reference_line.match(CLOSING_KEYWORD_PATTERN)
+        if new_link_reference_hidden_block?(link_reference_line, markdown_state)
+          reset_multiline_link_reference_state(markdown_state)
+        end
+
+        link_reference_line.match(CLOSING_KEYWORD_PATTERN) ||
+          closing_keyword_in_multiline_link_reference(link_reference_line, markdown_state)
+      end
+
+      def new_link_reference_hidden_block?(line, markdown_state)
+        markdown_state.fetch("link_reference_title_delimiter").nil? &&
+          link_reference_definition_boundary_line?(line, markdown_state)
+      end
+
+      def closing_keyword_in_multiline_link_reference(line, markdown_state)
+        return if markdown_state.fetch("link_reference_multiline_reported")
+
+        content = markdown_state.fetch("link_reference_multiline_content")
+        content = if content
+                    content << "\n"
+                    content << line.to_s
+                  else
+                    line.to_s.dup
+                  end
+        markdown_state["link_reference_multiline_content"] = content
+
+        match = content.match(CLOSING_KEYWORD_PATTERN)
+        return unless match
+
+        markdown_state["link_reference_multiline_reported"] = true
+        match
+      end
+
+      def reset_multiline_link_reference_state(markdown_state)
+        markdown_state["link_reference_multiline_content"] = nil
+        markdown_state["link_reference_multiline_reported"] = false
       end
 
       def link_reference_hidden_line?(line, markdown_state)

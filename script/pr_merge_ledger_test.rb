@@ -973,6 +973,31 @@ class PrMergeLedgerClosingKeywordTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_link_reference_definition_multiline_title_split_blocks_strict_closeout
+    output, status = run_fixture(fixture_with_body("[foo]: /url '\nFixes\n#4410\n'\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 3, violation.fetch("line")
+    assert_match(/Fixes\s+#4410/, violation.fetch("message"))
+  end
+
+  def test_adjacent_link_reference_multiline_titles_each_report_split_closing_keyword
+    output, status = run_fixture(
+      fixture_with_body("[foo]: /url '\nFixes\n#4410\n'\n\n[bar]: /url '\nResolves\n#4411\n'\n")
+    )
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal %w[code_formatted_closing_keyword code_formatted_closing_keyword], violation_codes(data)
+    violations = ledger(data).fetch("violations")
+    assert_equal([3, 8], violations.map { |violation| violation.fetch("line") })
+    assert_match(/Fixes\s+#4410/, violations[0].fetch("message"))
+    assert_match(/Resolves\s+#4411/, violations[1].fetch("message"))
+  end
+
   def test_link_reference_definition_does_not_interrupt_paragraph_before_indented_closeout
     output, status = run_fixture(fixture_with_body("Intro\n[foo]: /url\n    Fixes #4410\n"))
 
