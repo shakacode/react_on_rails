@@ -33,12 +33,22 @@ class PrMergeLedger
         return { "type" => "processing_instruction" } if line.match?(HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN)
 
         tag_match = line.match(HTML_BLOCK_TAG_OPEN_PATTERN)
-        if tag_match
-          tag_name = tag_match[:tag].downcase
-          tag_type = HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name) ? "raw_tag" : "tag"
-          return { "type" => tag_type, "tag" => tag_name }
+        return html_block_tag_context(line, markdown_state, tag_match) if tag_match
+
+        { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
+      end
+
+      def html_block_tag_context(line, markdown_state, tag_match)
+        tag_name = tag_match[:tag].downcase
+        if tag_match[:closing] == "/" && HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name)
+          return raw_text_closing_tag_context(line, markdown_state)
         end
 
+        tag_type = HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name) ? "raw_tag" : "tag"
+        { "type" => tag_type, "tag" => tag_name }
+      end
+
+      def raw_text_closing_tag_context(line, markdown_state)
         { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
       end
 

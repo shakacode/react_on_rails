@@ -189,6 +189,17 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_empty violation_codes(data)
   end
 
+  def test_raw_text_closing_tag_starts_type_7_html_block
+    output, status = run_fixture(fixture_with_body("</script>\nFixes #4410\n"))
+
+    refute status.success?, output
+    data = JSON.parse(output)
+    assert_equal ["code_formatted_closing_keyword"], violation_codes(data)
+    violation = ledger(data).fetch("violations").first
+    assert_equal 2, violation.fetch("line")
+    assert_match(/Fixes #4410/, violation.fetch("message"))
+  end
+
   def test_type_7_html_block_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("<ins>\nFixes #4410\n"))
 
