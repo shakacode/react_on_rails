@@ -99,9 +99,11 @@ Hints) are missing or late: promotion of streamed stylesheet **preload** tags to
 render-blocking links; inference of stylesheet links from client-chunk names in the raw
 Flight text (fed by a `loadable-stats.json` chunk→CSS map); and **Suspense-reveal
 deferral** — holding React's reveal script back briefly so an inferred link can flush
-first. These layers are heuristic: they are inactive in production-mode builds (numeric
-chunk ids defeat the chunk-name inference) and the deferral protects only a short
-window per payload stream.
+first. These layers are heuristic and dev/test-only in practice: in production-mode
+builds numeric chunk ids defeat the chunk-name inference (and its deferral), and
+id-based CSS filenames defeat preload promotion — so a default production build is
+protected by Stylesheet Hints alone. The deferral protects only a short window per
+payload stream.
 _This is the precise referent of the July 2026 review's "multiple batches": the layered
 fallbacks, contrasted with the reviewer's abandoned single-module "loader" (which is the
 same idea as Stylesheet Hints — attach CSS to the boundary and let the reveal block on

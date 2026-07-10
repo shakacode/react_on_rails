@@ -5,9 +5,16 @@ Boundary: no source changes before the 17.0 final release. Every finding below i
 proposed-only.
 
 Code verified against: `packages/react-on-rails-pro/src/injectRSCPayload.ts` on `main`
-(92b29df93), `react-on-rails-rsc@19.2.1-rc.0` (the 17.0 RC pin — dist inspected from the
-published npm tarball) and `19.2.0-rc.1` (installed in the dummy app), and
-`shakapacker@10.3.0` (published tarball).
+(92b29df93), `react-on-rails-rsc@19.2.1-rc.0` (the 17.0 RC pin, which the dummy app also
+pins — dist inspected from the published npm tarball) and `19.2.0-rc.1` (published
+tarball for the 19.2.0 line; also found as a stale install in one long-lived checkout),
+and `shakapacker@10.3.0` (published tarball).
+
+**Verification status:** Step 1 of the verification procedure was executed 2026-07-09 on
+the dummy app (Rspack 2.0.5, `react-on-rails-rsc@19.2.1-rc.0`, `NODE_ENV=production`) —
+see the addendum at the end of this document. B1 (manifest `css` arrays) **passed** on
+the supported config; B2 confirmed numeric chunk ids; the observed CSS asset naming
+(`css/4092-98880bc1.css`) additionally proved L2 production-dead (see F1).
 
 ## How the pipeline actually layers (corrected model)
 
@@ -16,7 +23,7 @@ The FOUC prevention is **four layers**, not one pipeline. Ordered by primacy:
 | #   | Layer                                                                                                                                                                                                                                                                                                                                                                     | Input                                                    | Where                                                                                                                                                                       |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | L1  | **Manifest-CSS stylesheet hints** — `preinit(href, { as: 'style', precedence: 'rsc-css' })` fired during the Flight render for every client reference whose manifest entry has a `css` array. React itself then emits the `<link rel="stylesheet" data-precedence="rsc-css">` and gates the Suspense reveal (`$RR` / `completeBoundaryWithStyles`) until the sheet loads. | `css` arrays in `react-client-manifest.json`             | `react-on-rails-rsc` `dist/flight-stylesheet-hints.js`, wired into every render by `buildServerRenderer` (`dist/server.node.js`), consumed via `manifestLoaderServer.ts:17` |
-| L2  | **Preload-tag promotion** — Fizz-emitted `<link rel="preload" as="style">` tags whose href matches `/css/clientN-*.css` are rewritten in the stream to render-blocking `rel="stylesheet" data-precedence="rsc-css"`.                                                                                                                                                      | Fizz HTML output (itself downstream of L1 hints)         | `injectRSCPayload.ts:1522` (`applyStreamedStylesheetPreloadGating`), href filter at `:115`                                                                                  |
+| L2  | **Preload-tag promotion** — Fizz-emitted `<link rel="preload" as="style">` tags whose href matches `/css/clientN-*.css` are rewritten in the stream to render-blocking `rel="stylesheet" data-precedence="rsc-css"`. Dev/test-only in practice: production CSS filenames are id-based and never match (F1(b)).                                                            | Fizz HTML output (itself downstream of L1 hints)         | `injectRSCPayload.ts:1522` (`applyStreamedStylesheetPreloadGating`), href filter at `:115`                                                                                  |
 | L3  | **Flight chunk-name inference** — raw Flight text is regex-scanned for `"clientN","js/clientN-*.chunk.js"` pairs; matches are looked up in a chunk→CSS map built from `loadable-stats.json` and injected as `data-precedence="rsc-css"` links ahead of the HTML in each flush.                                                                                            | `loadable-stats.json` copied next to the renderer bundle | `injectRSCPayload.ts:116` (regex), `:262` (map load), `:387` (tag emission)                                                                                                 |
 | L4  | **Suspense-reveal deferral** — while L3 inference is "pending" for any payload stream, HTML containing React's `$RC(` reveal script is split and the reveal held back so an L3 link can flush first. Pending state clears on the **first** stylesheet found per stream, on stream end, or after a **100 ms** timeout.                                                     | L3's map being non-empty                                 | `injectRSCPayload.ts:1716` (`shouldDeferRevealHtml`), `:122` (timeout), `:1961-1978`, `:2007-2009`                                                                          |
 
@@ -32,40 +39,56 @@ the variant the July review correctly called out as flicker-prone).
 
 ## Findings (ranked)
 
-### F1 — HIGH (correctness, both bundlers): L3+L4 are silently dead in every production build
+### F1 — HIGH (correctness, both bundlers): the fallback layers (L2, L3, L4) are all silently dead in every production build
 
-`RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET` (`injectRSCPayload.ts:116`)
-requires a **quoted string** chunk id: `"client1","js/client1-….chunk.js"`. Both manifest
-plugins emit `chunks.push(chunk.id, file)` (webpack `RSCWebpackPlugin.js:396`; rspack
-`plugin.js` `getGroupAssets`), and nothing in Shakapacker 10 (`environments/base.js`,
+Two independent causes, each sufficient on its own:
+
+**(a) Numeric chunk ids kill L3+L4.** `RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET`
+(`injectRSCPayload.ts:116`) requires a **quoted string** chunk id:
+`"client1","js/client1-….chunk.js"`. Both manifest plugins emit
+`chunks.push(chunk.id, file)` (webpack `RSCWebpackPlugin.js:396`; rspack `plugin.js`
+`getGroupAssets`), and nothing in Shakapacker 10 (`environments/base.js`,
 `optimization/{webpack,rspack}.js` — verified: no `chunkIds` key), the dummy configs, or
 the generators sets `optimization.chunkIds`. So:
 
 - `NODE_ENV=development`/`test` (mode `development`) → default `chunkIds: 'named'` → ids
   are `"client1"` strings → regex matches → L3/L4 active.
 - `NODE_ENV=production` (mode `production`) → default `chunkIds: 'deterministic'` → ids
-  are **unquoted numbers** (`[431,"js/client1-….chunk.js"]`) → regex never matches →
-  L3 injects nothing and L4 never defers. No warning, no log.
+  are **unquoted numbers** (`[4092,"js/client1-….chunk.js"]` — observed in the 2026-07-09
+  run) → regex never matches → L3 injects nothing and L4 never defers. No warning, no
+  log.
 
-The FOUC e2e gate (`rsc_fouc.spec.ts`, including the Rspack job in
+**(b) Id-based CSS filenames kill L2 (and L3's href source).** Shakapacker sets
+`chunkFilename: css/[id][hash].css` for **both** bundlers (`plugins/webpack.js:40`,
+`plugins/rspack.js:51`), so async-chunk CSS is emitted as e.g. `css/4092-98880bc1.css`
+in production (observed) and only takes the `css/client1-….css` shape in dev/test where
+ids are names. L2's href filter `RSC_CLIENT_CHUNK_STYLESHEET_PATH`
+(`injectRSCPayload.ts:115`) matches only the dev-shaped name, so preload promotion can
+never fire on a default production build either. (An app that customizes
+`chunkFilename` to `css/[name]…` would re-enable L2 — that is the only production
+configuration in which any fallback layer is live.)
+
+Net: **in a default production build, L1 is the only active FOUC layer, under both
+bundlers.** The FOUC e2e gate (`rsc_fouc.spec.ts`, including the Rspack job in
 `pro-integration-tests.yml`) builds with `RAILS_ENV=test`/`NODE_ENV=test`, i.e. named
 ids — **the production posture is never exercised by any gate.** The unit-test Flight
-fixtures (`injectRSCPayload.test.ts:489`)
-hard-code the dev-mode `"client1"` shape.
+fixtures (`injectRSCPayload.test.ts:489`) hard-code the dev-mode `"client1"` shape.
 
-Impact: contained where L1 works (webpack with `react-on-rails-rsc ≥ 19.0.5-rc.6`,
-concrete `publicPath`), because React's own reveal gating takes over. Where L1 is also
-broken (see F2) there is **no FOUC protection at all in production**, and the flash is
-deterministic on a cold cache.
+Impact: contained where L1 works — verified 2026-07-09 for the supported Rspack config
+(19.2.1-rc.0, concrete publicPath: `css` arrays present), and expected for webpack with
+`react-on-rails-rsc ≥ 19.0.5-rc.6` — because React's own reveal gating takes over.
+Where L1 is also broken (see F2) there is **no FOUC protection at all in production**
+(L2 has no preload tags to promote without L1's hints, and could not match their hrefs
+anyway per (b)), and the flash is deterministic on a cold cache.
 
 ### F2 — HIGH (correctness, Rspack): manifest `css` arrays have three silent-omission conditions
 
 In `react-on-rails-rsc` (`dist/react-server-dom-rspack/plugin.js`, 19.2.1-rc.0):
 
-1. **Version:** `css` collection does not exist in the 19.2.0 line at all (the dummy
-   currently has `19.2.0-rc.1` installed — zero CSS code in its rspack plugin). Only
-   `19.2.1-rc.0`+ collects CSS under Rspack. Apps on the 19.2.0 line get no `css`
-   arrays → L1 dead.
+1. **Version:** `css` collection does not exist in the published 19.2.0 line at all
+   (verified against the `19.2.0-rc.1` tarball — zero CSS code in its rspack plugin).
+   Only `19.2.1-rc.0`+ collects CSS under Rspack. The repo dummy pins `19.2.1-rc.0`;
+   any app still on a 19.2.0 package gets no `css` arrays → L1 dead.
 2. **`output.publicPath` is `'auto'` or a function** → `cssPrefix === null` →
    `getChunkCss` returns `[]` and `directCssDepFiles` returns `[]` for every module.
    There _is_ a compilation warning, but the build succeeds and the manifest looks valid.
@@ -77,8 +100,9 @@ In `react-on-rails-rsc` (`dist/react-server-dom-rspack/plugin.js`, 19.2.1-rc.0):
    a shared group can silently drop it.
 
 Combined with F1: an Rspack production app on 19.2.0, or with `publicPath: 'auto'`, has
-all four layers inactive. This — not a subtle race — is the most likely identity of "the
-Rspack FOUC gap" the docs describe, and it is invisible until a cold-cache visit.
+no active FOUC layer — L1 loses its input, and the fallback layers are production-dead
+per F1(a)/(b). This — not a subtle race — is the most likely identity of "the Rspack
+FOUC gap" the docs describe, and it is invisible until a cold-cache visit.
 
 ### F3 — MEDIUM (rare flicker): the L4 deferral window is heuristic and evaporates early
 
@@ -140,10 +164,11 @@ Exactly the class of risk the July review flagged:
 - The `destination.flush()` signal (`:1904-1926`) is
   an internal convention; the code documents this and has a `setTimeout(0)` fallback —
   acceptable, but it is another per-major-version re-verification item.
-- L2/L3's filename regexes (`:115-116`) hard-code
-  Shakapacker's default `css/[name]-[hash].css` / `js/[name]-[hash].chunk.js` layout and
-  the `client[index]` chunkName default. Custom `output.chunkFilename`, a different CSS
-  dir, or a custom `chunkName` plugin option silently disables both layers.
+- L2/L3's filename regexes (`:115-116`) hard-code a `css/clientN-*.css` /
+  `js/clientN-*.chunk.js` layout and the `client[index]` chunkName default. Per F1(b),
+  Shakapacker's actual CSS `chunkFilename` is `css/[id][hash].css`, which only takes
+  that shape in dev/test; custom `chunkFilename`, a different CSS dir, or a custom
+  `chunkName` plugin option silently disables the layers in dev/test too.
 
 ### F7 — Complexity assessment (the "accreted complexity" question, answered honestly)
 
@@ -204,6 +229,31 @@ in **production-mode** builds:
    renderer staging, rolling-deploy checks) once L3 is gone — it has no other consumer
    in the RSC path.
 5. **Fix the two doc claims in F5** (can be done now — docs-only).
-6. **Keep, as-is:** the three-buffer flush ordering (init scripts → stylesheets → HTML →
-   payloads) and the `flush()`-signal design — they are streaming-correctness concerns
-   independent of CSS, are well-commented, and have test coverage.
+6. **Keep, as-is:** the multi-buffer flush ordering (initialization scripts →
+   stylesheets → HTML → payload scripts → payload marks) and the `flush()`-signal
+   design — they are streaming-correctness concerns independent of CSS, are
+   well-commented, and have test coverage.
+
+## Addendum — verification Step 1 results (2026-07-09)
+
+Executed on the Pro dummy app: `SHAKAPACKER_ASSETS_BUNDLER=rspack`
+`RAILS_ENV=production NODE_ENV=production`, Rspack 2.0.5,
+`react-on-rails-rsc@19.2.1-rc.0`, `bin/shakapacker-precompile-hook` +
+`CLIENT_BUNDLE_ONLY=true bin/shakapacker`.
+
+Observed in `public/webpack/production/react-client-manifest.json`:
+
+- **B1 PASS (supported config):** the FOUC probe client reference carries
+  `css: ["/webpack/production/css/4092-98880bc1.css"]` — concrete publicPath-prefixed
+  href; 2 of 10 client references have `css` arrays (the two that import CSS Modules).
+- **B2 numeric, as predicted:** `chunks: [4092, "js/client1-daa4837bf751aaff.chunk.js"]`
+  — unquoted numeric id alongside a name-shaped JS filename, confirming F1(a).
+- **CSS asset naming id-based, new evidence:** `css/4092-98880bc1.css` (not
+  `css/client1-…css`), confirming F1(b): L2 cannot match production CSS hrefs.
+- `loadable-stats.json` was emitted next to the manifest.
+
+Conclusion for the 17.0 gate: on the supported Rspack production config, the primary
+layer (L1) has healthy input, so no deterministic FOUC is predicted there. Runtime
+confirmation of the streamed `$RR` gating (procedure Step 2) remains open. The
+deterministic-FOUC rows remain predicted for 19.2.0-line packages and
+`publicPath: 'auto'`/function builds.

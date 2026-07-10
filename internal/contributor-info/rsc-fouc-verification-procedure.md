@@ -31,33 +31,51 @@ RAILS_ENV=production NODE_ENV=production bin/shakapacker           # production 
 RAILS_ENV=test NODE_ENV=test bin/shakapacker                        # CI posture
 ```
 
-Then inspect the client manifest (in `public/<output>/`):
+Then inspect the client manifest. It lives in the Shakapacker output directory — in the
+dummy app that is `public/webpack/<RAILS_ENV>/` (so `public/webpack/production/` for a
+production build); in a typical generated app it is `public/packs/`. Point `jq` at the
+directory for the env you just built, not a glob — a glob can silently pick up a stale
+manifest from another env:
 
 ```bash
 jq '.filePathToModuleMetadata | to_entries[]
     | select(.key | test("FoucProbe|<YourClientComponent>"))
     | {key, chunks: .value.chunks, css: .value.css}' \
-  public/*/react-client-manifest.json
+  public/webpack/production/react-client-manifest.json
 ```
 
 Record two booleans:
 
 - **B1 (L1 input present):** does the entry have a non-empty `css` array with resolvable
-  hrefs? Missing/empty ⇒ L1 (preinit hints) is dead for this build.
+  hrefs? Missing/empty ⇒ L1 (preinit hints) is dead for this build. Note: on Rspack,
+  `19.2.1-rc.0`+ with a concrete `publicPath` is necessary but **not sufficient** —
+  native CSS handling (module type `css` instead of `css/mini-extract`) or split-chunks
+  configs that move CSS outside the reference's chunk group can still leave `css`
+  missing (finding F2). Record the extraction mechanism and splitChunks posture along
+  with the boolean.
 - **B2 (named ids):** are the even-indexed elements of `chunks` quoted strings like
-  `"client1"`? Numbers ⇒ L3/L4 are dead for this build (finding F1).
+  `"client1"`? Numbers ⇒ L3/L4 are dead for this build (finding F1(a)). Also note the
+  **CSS filename shape** in the `css` hrefs: `css/<number>-<hash>.css` ⇒ L2 is dead too
+  (finding F1(b)); `css/clientN-<hash>.css` ⇒ L2 can match.
 
-Also check the sidecar:
+Also check the sidecar, `loadable-stats.json`. It is emitted into the same Shakapacker
+output directory as the manifest; at runtime the renderer reads the copy staged **next
+to the server bundle** in the node renderer's bundle directory (staged by
+`assets_to_copy`/`PrepareNodeRenderBundles`; in the dummy see
+`config/initializers/react_on_rails_pro.rb`). Check the staged copy if the renderer is
+running, the build-output copy otherwise:
 
 ```bash
 jq '.assetsByChunkName | with_entries(select(.key | test("^client[0-9]+$")))' \
-  <renderer bundle dir>/loadable-stats.json
+  public/webpack/production/loadable-stats.json
 ```
 
 Empty/missing, or `clientN` entries without `.css` assets ⇒ L3/L4 dead regardless of B2.
 
-Expected per the findings: production ⇒ B2 = numeric on both bundlers;
-Rspack + 19.2.0-line or `publicPath: 'auto'` ⇒ B1 = missing.
+Expected per the findings: production ⇒ B2 = numeric + id-based CSS filenames on both
+bundlers (only L1 live); Rspack + 19.2.0-line or `publicPath: 'auto'` ⇒ B1 = missing.
+Observed 2026-07-09 (dummy, Rspack 2.0.5, rsc 19.2.1-rc.0, production): B1 present,
+B2 numeric, CSS id-named — see the findings-register addendum.
 
 ## Step 2 — Read the raw stream (no browser yet)
 
@@ -71,12 +89,25 @@ grep -o '\$R[CR]' /tmp/stream.html | sort | uniq -c
 
 Interpretation table:
 
-| Observation                                                                                                    | Meaning                                                                                                        |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `<link … data-precedence="rsc-css">` appears **before** the boundary's reveal script, and the reveal is `$RR(` | L1 healthy: React emitted the sheet and gates the reveal itself. FOUC not expected.                            |
-| Links present, reveal is plain `$RC(`                                                                          | L1 dead, L3 injected the links; check they precede the reveal in byte order. Protection is Pro's, not React's. |
-| **No** `rsc-css` links anywhere, reveal is plain `$RC(`                                                        | All layers dead ⇒ FOUC predicted deterministically on a cold cache. Go to Step 3 to see it.                    |
-| `<link rel="preload" as="style" …clientN….css>` never promoted to `rel="stylesheet"`                           | L2 regression (or non-default asset paths breaking the `/css/clientN-*.css` filter).                           |
+| Observation                                                                                                    | Meaning                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<link … data-precedence="rsc-css">` appears **before** the boundary's reveal script, and the reveal is `$RR(` | L1 healthy: React emitted the sheet and gates the reveal itself. FOUC not expected.                                                                                                      |
+| Links present, reveal is plain `$RC(`                                                                          | A fallback layer produced the links — L2 or L3, not React. Attribute before concluding (see below); check the links precede the reveal in byte order.                                    |
+| **No** `rsc-css` links anywhere, reveal is plain `$RC(`                                                        | All layers dead ⇒ FOUC predicted deterministically on a cold cache. Go to Step 3 to see it.                                                                                              |
+| `<link rel="preload" as="style" …clientN….css>` never promoted to `rel="stylesheet"`                           | L2 regression **only if** the href actually matches `/css/clientN-*.css` (dev/test naming). Production id-named hrefs are expected to stay unpromoted — that is F1(b), not a regression. |
+
+Attributing a `data-precedence` link to L2 vs L3 (they coexist with `$RC(`):
+
+- **L3-injected** links have the exact minimal shape
+  `<link rel="stylesheet" href="…" data-precedence="rsc-css">` (no `crossorigin`, no
+  other attributes) and no earlier `rel="preload"` tag for the same href in the stream.
+  In a production build, L3 links are impossible (F1(a)) — any link you see there is L1
+  or L2.
+- **L2-promoted** links retain the original preload tag's other attributes (e.g.
+  `crossorigin`, query strings) with `rel` rewritten; the href matches the
+  `css/clientN-*.css` shape.
+- Definitive discriminator when in doubt: temporarily move `loadable-stats.json` out of
+  the renderer bundle directory and re-request — links that disappear were L3.
 
 Byte-order check for a specific boundary:
 
@@ -94,15 +125,22 @@ the CSS latency instead of hoping:
 1. Open the page in Chrome DevTools → Network → **Disable cache** (mandatory — a disk
    cache hit hides the bug forever after the first visit, which is why one-time
    sightings happen).
-2. Add a network-request block or use "Slow 3G", or better: right-click the
-   `clientN-*.css` request → "Block request URL", load, observe, then unblock. With the
-   sheet blocked:
-   - **Correct behavior:** the probe component stays hidden/suspended (React holds the
-     reveal) or the whole boundary stays on its fallback.
-   - **FOUC confirmed:** the probe's DOM appears **unstyled** (default colors/fonts)
-     while the CSS is blocked. `getComputedStyle` sentinel: the dummy probe sets a CSS
-     custom property (`--rsc-fouc-probe-sentinel: loaded`) only via the stylesheet, so
-     `sentinel !== 'loaded'` while visible = flash.
+2. Add a network-request block or use "Slow 3G", or better: right-click the boundary's
+   CSS request (`css/clientN-*.css` in dev/test, `css/<id>-*.css` in production) →
+   "Block request URL", load, observe, then unblock. Expected behavior while the sheet
+   is blocked depends on which layer Step 2 showed active:
+   - **L1 active (`$RR` reveals):** the probe stays hidden/suspended — React's
+     `completeBoundaryWithStyles` holds the reveal until the sheet loads.
+   - **L2/L3 links + `$RC` reveals (dev/test only):** the probe should also stay
+     hidden, but by a different mechanism — the parser delays execution of the `$RC(`
+     script behind the pending stylesheet that precedes it. The Suspense-contract
+     guarantee is weaker here (it depends on link-before-script byte order in the
+     stream, which is what Step 2's byte-order check verifies), so treat a flash under
+     this mode as an ordering failure of the fallback layers, not of React.
+   - **FOUC confirmed (either mode):** the probe's DOM appears **unstyled** (default
+     colors/fonts) while the CSS is blocked. `getComputedStyle` sentinel: the dummy
+     probe sets a CSS custom property (`--rsc-fouc-probe-sentinel: loaded`) only via the
+     stylesheet, so `sentinel !== 'loaded'` while visible = flash.
 3. Playwright equivalent (what `rsc_fouc.spec.ts` automates): route-intercept the target
    CSS, delay its fulfillment ~2 s, assert the probe is never
    visible-with-default-styles during the window. To run the existing spec against a
@@ -111,8 +149,11 @@ the CSS latency instead of hoping:
 
 ## Step 4 — The rare dev/test-mode race (only if Steps 1–3 came out healthy)
 
-This targets finding F3 (100 ms deferral window). Only meaningful when B1 is false and
-B2 is named (i.e., L3/L4 are the active protection — dev/test builds).
+This targets finding F3 (100 ms deferral window). Only meaningful when **all three**
+hold: B1 is false, B2 is named (dev/test build), **and** the Step 1 sidecar check showed
+a non-empty `loadable-stats.json` with `.css` assets under `clientN` keys — L4 never
+arms when the chunk→CSS map is empty, so a missing/empty/CSS-less sidecar makes this
+test meaningless (any flash then is the all-layers-dead case, not a timing race).
 
 1. Make the Server Component slow: add `sleep 0.5` (or a slow query) to the async props
    for the RSC page so the first client-reference Flight row arrives well after 100 ms.
@@ -128,13 +169,13 @@ B2 is named (i.e., L3/L4 are the active protection — dev/test builds).
 
 For the release decision, the matrix that matters:
 
-| Build                                                 | B1 (`css` arrays)  | Predicted                         | Observed |
-| ----------------------------------------------------- | ------------------ | --------------------------------- | -------- |
-| webpack, production                                   | expected present   | no FOUC (React gates)             |          |
-| rspack ≥ 19.2.1-rc.0, concrete publicPath, production | expected present   | no FOUC                           |          |
-| rspack 19.2.0-line, production                        | absent             | **deterministic cold-cache FOUC** |          |
-| rspack, `publicPath: 'auto'`, production              | absent             | **deterministic cold-cache FOUC** |          |
-| either bundler, dev/test, slow server component       | n/a (L3/L4 active) | rare timing FOUC (F3)             |          |
+| Build                                                 | B1 (`css` arrays)  | Predicted                         | Observed                                                               |
+| ----------------------------------------------------- | ------------------ | --------------------------------- | ---------------------------------------------------------------------- |
+| webpack, production                                   | expected present   | no FOUC (React gates)             |                                                                        |
+| rspack ≥ 19.2.1-rc.0, concrete publicPath, production | expected present   | no FOUC                           | Step 1 2026-07-09: B1 present, B2 numeric, CSS id-named (Step 2+ open) |
+| rspack 19.2.0-line, production                        | absent             | **deterministic cold-cache FOUC** |                                                                        |
+| rspack, `publicPath: 'auto'`, production              | absent             | **deterministic cold-cache FOUC** |                                                                        |
+| either bundler, dev/test, slow server component       | n/a (L3/L4 active) | rare timing FOUC (F3)             |                                                                        |
 
 If the two "deterministic" rows reproduce, the one-time sighting is explained without
 any further race-hunting: first cold visit flashes, browser cache hides every
