@@ -28,6 +28,7 @@ import {
   type RSCPayloadFailure,
 } from '../src/RSCPayloadRetry.ts';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
+import { RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProviderCache.ts';
 import RSCRoute from '../src/RSCRoute.tsx';
 import { flushMacrotasks } from './testUtils';
 
@@ -477,6 +478,15 @@ describe('RSCProvider bounded payload retry (#187)', () => {
       await flushMacrotasks();
     });
 
+    // Inside the window the retained rejection is still replayed: the stale
+    // success neither cleared the failure record nor dropped the cached promise.
+    await act(async () => {
+      const replayed = rscApi.getComponent('Card', { id: 1 });
+      replayed.catch(() => undefined);
+      await Promise.resolve();
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(callsBeforeStaleSuccess);
+
     // The retry window must still elapse, letting a later render try again.
     currentTime += RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS;
     await act(async () => {
@@ -485,6 +495,71 @@ describe('RSCProvider bounded payload retry (#187)', () => {
       await Promise.resolve();
     });
     expect(getServerComponent.mock.calls.length).toBeGreaterThan(callsBeforeStaleSuccess);
+  });
+
+  it('reconciles the cache cap after a wave of terminal failures', async () => {
+    // Every load must be IN FLIGHT before any settles: while a key is pinned it
+    // cannot be an eviction victim, so `setPinned`'s own reconciliation cannot
+    // hold the cap. Releasing those pins is the only chance to reconcile, and a
+    // terminal rejection leaves its promise cached — so the release must evict.
+    const rejects: Array<(e: unknown) => void> = [];
+    const getServerComponent = jest.fn((_args: GetServerComponentArgs) => {
+      let reject!: (e: unknown) => void;
+      const promise = new Promise<React.ReactNode>((_res, rej) => {
+        reject = rej;
+      });
+      promise.catch(() => undefined);
+      rejects.push(reject);
+      return promise;
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await act(async () => {
+      render(
+        <RSCProvider>
+          <Probe />
+        </RSCProvider>,
+      );
+    });
+
+    const abort = new Error('The operation was aborted.');
+    abort.name = 'AbortError';
+    const overCap = RSC_PAYLOAD_CACHE_MAX_ENTRIES + 5;
+
+    const pending: Array<Promise<React.ReactNode>> = [];
+    await act(async () => {
+      for (let id = 0; id < overCap; id += 1) {
+        const load = rscApi.getComponent('Card', { id });
+        load.catch(() => undefined);
+        pending.push(load);
+      }
+      await Promise.resolve();
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(overCap);
+
+    // Aborts are never retried, so every key retains its rejected promise.
+    await act(async () => {
+      rejects.forEach((reject) => reject(abort));
+      await Promise.allSettled(pending);
+      await flushMacrotasks();
+      await flushMacrotasks();
+    });
+
+    // The cap was reconciled as the pins released: the coldest retained
+    // rejections were evicted, so the oldest key starts a fresh fetch. Without
+    // reconciliation it would still be cached and replay its rejection.
+    await act(async () => {
+      const refetched = rscApi.getComponent('Card', { id: 0 });
+      refetched.catch(() => undefined);
+      await Promise.resolve();
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(overCap + 1);
   });
 
   it('allows a fresh attempt once the retry window elapses (#3929)', async () => {

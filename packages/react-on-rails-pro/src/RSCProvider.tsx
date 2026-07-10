@@ -178,7 +178,10 @@ export const createRSCProvider = ({
     // Per-key failed-attempt bookkeeping for the bounded payload retry. Cleared
     // on success, on refetch, and when the key leaves the promise cache, so it
     // can never outlive the entry it describes.
-    const payloadFailuresRef = useRef<Map<string, RSCPayloadFailure>>(new Map());
+    const payloadFailuresRef = useRef<Map<string, RSCPayloadFailure> | null>(null);
+    if (!payloadFailuresRef.current) {
+      payloadFailuresRef.current = new Map<string, RSCPayloadFailure>();
+    }
     const payloadFailures = payloadFailuresRef.current;
 
     const fetchRSCPromisesRef = useRef<BoundedLRU<Promise<ReactNode>> | null>(null);
@@ -426,9 +429,11 @@ export const createRSCProvider = ({
         // NOTE: payloads that RESOLVE with an `Error` value are intentionally
         // left cached here; whether those should also retry is a separate
         // `getServerComponent` contract decision tracked apart from #3929.
-        let payloadRejected = false;
+        // True only when this promise's rejection removed its own cache entry so
+        // that React's retry render starts the next attempt. It selects the
+        // unpin flavour in `.finally()` below.
+        let retryEntryRemoved = false;
         const handlePayloadRejection = (error: unknown) => {
-          payloadRejected = true;
           // A newer same-key promise (one installed by `refetchComponent`, say)
           // already owns the cache entry. This rejection is stale: it must
           // neither evict the newer promise nor spend the key's retry budget.
@@ -442,6 +447,7 @@ export const createRSCProvider = ({
             Date.now(),
           );
           if (shouldRetry) {
+            retryEntryRemoved = true;
             fetchRSCPromises.deletePreservingPins(key);
           }
           throw error;
@@ -475,16 +481,21 @@ export const createRSCProvider = ({
           // resolving mounted routes can evict early visible keys before their
           // layout effects get to pin them as mounted.
           setTimeout(() => {
-            if (payloadRejected) {
-              // A retryable rejection already removed its entry (pins
-              // preserved), and a terminal one must keep its rejected promise
-              // cached until a retry render reads it. Either way, releasing
-              // this pin must not reconcile over-cap eviction: against healthy
-              // entries for the former, against the retained rejection for the
-              // latter. Later inserts reconcile the cap normally.
+            if (retryEntryRemoved) {
+              // This rejection already removed its own entry (pins preserved),
+              // so there is nothing here to reconcile against; releasing the pin
+              // must not evict healthy entries during the retry handoff.
               fetchRSCPromises.unpinWithoutEvict(key);
               return;
             }
+            // Everything else — a success, and a terminal rejection whose
+            // promise stays cached for the retry render to read — leaves a live
+            // entry behind, so the cap must be reconciled here. `unpin` promotes
+            // the just-settled key to MRU and protects it from being its own
+            // eviction victim, so a retained rejection survives long enough for
+            // `use()` to throw. Without this, a wave of terminal failures would
+            // hold the cache over `RSC_PAYLOAD_CACHE_MAX_ENTRIES` until some
+            // unrelated insert happened to reconcile it.
             fetchRSCPromises.unpin(key);
           }, 0);
         });

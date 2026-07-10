@@ -48,6 +48,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   retried. The retained rejection is dropped after a short window so a recovered backend is not
   locked out. Fixes
   [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
+  [PR 4562](https://github.com/shakacode/react_on_rails/pull/4562) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
