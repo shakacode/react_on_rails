@@ -29556,9 +29556,12 @@ sidecar and scoped-loading design work is tracked in
 ## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
 
 This section documents the current RSC stylesheet injection behavior so you know what to expect in
-the page source — it is not an open defect. It applies to React 19+ installations; earlier React
-versions do not support the `data-precedence` stylesheet groups used for this hoisting and
-render-blocking behavior.
+the page source — it is not an open defect. The render-blocking gate itself is plain browser
+behavior (a pending `<link rel="stylesheet">` holds later inline scripts) and does not depend on
+React 19. The `data-precedence` attribute matters for what happens around the gate: React 19+
+deduplicates and adopts these stylesheet groups client-side and orders them within `<head>`;
+earlier React versions do not support `data-precedence` groups, so the dedup, adoption, and
+cascade-order behavior described below applies to React 19+ installations.
 
 For RSC pages, React on Rails Pro injects
 `<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
