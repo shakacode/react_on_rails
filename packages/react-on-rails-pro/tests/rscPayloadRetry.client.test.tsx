@@ -21,8 +21,8 @@ import '@testing-library/jest-dom';
 import {
   isFailureRetryWindowElapsed,
   isRetryableRSCPayloadError,
+  pruneAbandonedPayloadFailures,
   recordPayloadFailure,
-  RSC_PAYLOAD_FAILURE_MAX_ENTRIES,
   RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS,
   RSC_PAYLOAD_MAX_FETCH_ATTEMPTS,
   type RSCPayloadFailure,
@@ -130,50 +130,85 @@ describe('recordPayloadFailure', () => {
 
   it('retries while attempts remain, then marks the failure terminal', () => {
     expect(recordPayloadFailure(failures, key, true, 1_000)).toEqual({ shouldRetry: true, attempts: 1 });
-    expect(failures.get(key)).toEqual({ attempts: 1, terminalAt: null });
+    expect(failures.get(key)).toEqual({ attempts: 1, terminalAt: null, updatedAt: 1_000 });
 
     expect(recordPayloadFailure(failures, key, true, 2_000)).toEqual({
       shouldRetry: false,
       attempts: RSC_PAYLOAD_MAX_FETCH_ATTEMPTS,
     });
-    expect(failures.get(key)).toEqual({ attempts: RSC_PAYLOAD_MAX_FETCH_ATTEMPTS, terminalAt: 2_000 });
+    expect(failures.get(key)).toEqual({
+      attempts: RSC_PAYLOAD_MAX_FETCH_ATTEMPTS,
+      terminalAt: 2_000,
+      updatedAt: 2_000,
+    });
   });
 
   it('never retries an error classified as non-retryable', () => {
     expect(recordPayloadFailure(failures, key, false, 1_000)).toEqual({ shouldRetry: false, attempts: 1 });
-    expect(failures.get(key)).toEqual({ attempts: 1, terminalAt: 1_000 });
+    expect(failures.get(key)).toEqual({ attempts: 1, terminalAt: 1_000, updatedAt: 1_000 });
   });
 
-  it('bounds the map so abandoned single-attempt failures cannot accumulate', () => {
-    for (let i = 0; i < RSC_PAYLOAD_FAILURE_MAX_ENTRIES + 10; i += 1) {
+  it('does not reset the budget of a key that is actively retrying, however many keys fail at once', () => {
+    // A size cap would evict the oldest record here, handing an in-flight retry
+    // a fresh `attempts: 1` on its next render and reinstating the request loop.
+    const wave = 200;
+    for (let i = 0; i < wave; i += 1) {
       recordPayloadFailure(failures, `Card:{"id":${i}}`, true, 1_000);
     }
 
-    expect(failures.size).toBe(RSC_PAYLOAD_FAILURE_MAX_ENTRIES);
-    // The oldest keys are dropped; the newest are kept.
-    expect(failures.has('Card:{"id":0}')).toBe(false);
-    expect(failures.has(`Card:{"id":${RSC_PAYLOAD_FAILURE_MAX_ENTRIES + 9}}`)).toBe(true);
+    expect(failures.size).toBe(wave);
+    // Every key's second failure is terminal: none of them got a reset.
+    for (let i = 0; i < wave; i += 1) {
+      expect(recordPayloadFailure(failures, `Card:{"id":${i}}`, true, 1_100).shouldRetry).toBe(false);
+    }
   });
 
-  it('keeps a re-recorded key from being evicted as the oldest entry', () => {
+  it('prunes a mid-retry record whose next attempt never arrived', () => {
+    recordPayloadFailure(failures, 'Abandoned:{}', true, 1_000);
+    expect(failures.get('Abandoned:{}')?.terminalAt).toBeNull();
+
+    // Recording any key past the window prunes the abandoned one.
+    recordPayloadFailure(failures, 'Other:{}', true, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS);
+
+    expect(failures.has('Abandoned:{}')).toBe(false);
+  });
+
+  it('keeps a terminal record past the window so the cache read can expire it', () => {
+    // Exhaust the budget: the second failure is terminal.
     recordPayloadFailure(failures, key, true, 1_000);
-    for (let i = 0; i < RSC_PAYLOAD_FAILURE_MAX_ENTRIES - 1; i += 1) {
-      recordPayloadFailure(failures, `Other:{"id":${i}}`, true, 1_000);
-    }
+    recordPayloadFailure(failures, key, true, 1_000);
+    expect(failures.get(key)?.terminalAt).toBe(1_000);
 
-    // Re-recording `key` refreshes its position, so the next insert evicts a
-    // different entry and `key` keeps its attempt count.
-    expect(recordPayloadFailure(failures, key, true, 2_000).attempts).toBe(2);
-    recordPayloadFailure(failures, 'Newest:{}', true, 3_000);
+    recordPayloadFailure(failures, 'Other:{}', true, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS * 10);
 
-    expect(failures.size).toBe(RSC_PAYLOAD_FAILURE_MAX_ENTRIES);
-    expect(failures.get(key)).toEqual({ attempts: 2, terminalAt: 2_000 });
+    // Still present: only `getComponent`'s cache read may discard it, because
+    // that is where the retained rejection is dropped alongside it.
+    expect(failures.get(key)?.terminalAt).toBe(1_000);
+  });
+
+  it('refreshes updatedAt so a key that keeps retrying is never pruned', () => {
+    recordPayloadFailure(failures, key, true, 1_000);
+    // A later attempt refreshes the record rather than letting it age out.
+    pruneAbandonedPayloadFailures(failures, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS - 1);
+    expect(failures.get(key)?.updatedAt).toBe(1_000);
+  });
+
+  it('prunes only mid-retry records, not terminal ones', () => {
+    recordPayloadFailure(failures, 'MidRetry:{}', true, 1_000);
+    recordPayloadFailure(failures, 'Terminal:{}', false, 1_000);
+
+    pruneAbandonedPayloadFailures(failures, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS);
+
+    expect(failures.has('MidRetry:{}')).toBe(false);
+    expect(failures.has('Terminal:{}')).toBe(true);
   });
 });
 
 describe('isFailureRetryWindowElapsed', () => {
   it('is false while retries remain (no terminal timestamp yet)', () => {
-    expect(isFailureRetryWindowElapsed({ attempts: 1, terminalAt: null }, 10_000)).toBe(false);
+    expect(isFailureRetryWindowElapsed({ attempts: 1, terminalAt: null, updatedAt: 1_000 }, 10_000)).toBe(
+      false,
+    );
   });
 
   it('is false for an unknown key', () => {
@@ -181,7 +216,11 @@ describe('isFailureRetryWindowElapsed', () => {
   });
 
   it('is false inside the window and true once it elapses', () => {
-    const failure: RSCPayloadFailure = { attempts: RSC_PAYLOAD_MAX_FETCH_ATTEMPTS, terminalAt: 1_000 };
+    const failure: RSCPayloadFailure = {
+      attempts: RSC_PAYLOAD_MAX_FETCH_ATTEMPTS,
+      terminalAt: 1_000,
+      updatedAt: 1_000,
+    };
 
     expect(isFailureRetryWindowElapsed(failure, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS - 1)).toBe(false);
     expect(isFailureRetryWindowElapsed(failure, 1_000 + RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS)).toBe(true);

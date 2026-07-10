@@ -53,22 +53,18 @@ export const RSC_PAYLOAD_MAX_FETCH_ATTEMPTS = 2;
 export const RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS = 5_000;
 
 /**
- * Cap on the failure bookkeeping map.
+ * Per-key failure bookkeeping.
  *
- * Most entries are removed when their key succeeds, is refetched, or is evicted
- * from the promise cache. One case has no such trigger: a key whose first
- * attempt rejects and is never asked for again (the route unmounted before
- * React's retry render). Bounding the map keeps those from accumulating over a
- * long-lived session. Dropping the oldest entry only costs the forgotten key a
- * fresh retry budget, which is still bounded by
- * `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS`.
+ * `terminalAt` is null while retries remain (the key is mid-retry: its promise
+ * was evicted and React's retry render is expected to start the next attempt).
+ * It is set once the failure has been surfaced and its rejection retained.
+ * `updatedAt` timestamps the most recent attempt, and is what expires an
+ * abandoned mid-retry record.
  */
-export const RSC_PAYLOAD_FAILURE_MAX_ENTRIES = 50;
-
-/** Per-key failure bookkeeping. `terminalAt` is null while retries remain. */
 export type RSCPayloadFailure = {
   attempts: number;
   terminalAt: number | null;
+  updatedAt: number;
 };
 
 const MAX_CAUSE_DEPTH = 5;
@@ -123,6 +119,40 @@ export const isRetryableRSCPayloadError = (error: unknown): boolean => {
 };
 
 /**
+ * Drops mid-retry records whose next attempt never arrived.
+ *
+ * A record is removed by success, by `refetchComponent`, and by eviction from
+ * the promise cache. One case has no such trigger: a key whose attempt rejects
+ * and is never asked for again, because the route unmounted before React's
+ * retry render. Those records are dropped once they are older than the retry
+ * window — by then no attempt is in flight, so a fresh budget is correct.
+ *
+ * Only mid-retry records (`terminalAt === null`) expire this way. A terminal
+ * record must outlive the window: it is what tells the cache read that the
+ * retained rejection may now be discarded, and it is removed there.
+ *
+ * This is deliberately an age rule and not a size cap. A size cap would evict
+ * the record of a key that is *actively* retrying whenever enough distinct keys
+ * fail at once, resetting its `attempts` to 1 on the next render — which
+ * reinstates the unbounded request loop this module exists to prevent. The map
+ * is bounded instead by construction: terminal records are bounded by the
+ * promise cache (`RSC_PAYLOAD_CACHE_MAX_ENTRIES`, cleared on eviction), and
+ * mid-retry records are bounded by the distinct keys that failed within the
+ * last `RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS` — each of which can issue at most
+ * `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS` requests in that window.
+ */
+export const pruneAbandonedPayloadFailures = (
+  failures: Map<string, RSCPayloadFailure>,
+  now: number,
+): void => {
+  for (const [key, failure] of failures) {
+    if (failure.terminalAt === null && now - failure.updatedAt >= RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS) {
+      failures.delete(key);
+    }
+  }
+};
+
+/**
  * Decides what happens to a key after one failed attempt.
  *
  * `shouldRetry` true → the caller evicts the rejected promise so React's retry
@@ -138,21 +168,12 @@ export const recordPayloadFailure = (
   errorIsRetryable: boolean,
   now: number,
 ): { shouldRetry: boolean; attempts: number } => {
+  pruneAbandonedPayloadFailures(failures, now);
+
   const attempts = (failures.get(key)?.attempts ?? 0) + 1;
   const shouldRetry = attempts < RSC_PAYLOAD_MAX_FETCH_ATTEMPTS && errorIsRetryable;
 
-  // Delete before set so a re-recorded key moves to the end of the insertion
-  // order and is not the next candidate for the size-bound eviction below.
-  failures.delete(key);
-  failures.set(key, { attempts, terminalAt: shouldRetry ? null : now });
-
-  while (failures.size > RSC_PAYLOAD_FAILURE_MAX_ENTRIES) {
-    const oldestKey = failures.keys().next().value;
-    if (oldestKey === undefined) {
-      break;
-    }
-    failures.delete(oldestKey);
-  }
+  failures.set(key, { attempts, terminalAt: shouldRetry ? null : now, updatedAt: now });
 
   return { shouldRetry, attempts };
 };
