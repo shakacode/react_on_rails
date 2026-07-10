@@ -367,9 +367,15 @@ export const createRSCProvider = ({
           (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) > 0;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
-            payloadFailures.delete(key);
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
+              // Only the promise that still owns the cache entry may clear the
+              // failure record. A stale success (an older same-key promise
+              // resolving after a newer one recorded a terminal failure) would
+              // otherwise drop that failure's `terminalAt`, leaving the retained
+              // rejection cached with no timestamp — so its retry window would
+              // never elapse and the route would stay wedged on the error.
+              payloadFailures.delete(key);
               // Delete the entire count: once this replacement wins the cache
               // identity check and notifies routes, same-key `getComponent`
               // replacements cannot have piled up because later callers reuse

@@ -347,6 +347,107 @@ describe('RSCProvider bounded payload retry (#187)', () => {
     });
   });
 
+  it("a stale success does not clear a newer terminal failure's retry window", async () => {
+    const deferreds: Array<{
+      resolve: (v: React.ReactNode) => void;
+      reject: (e: unknown) => void;
+      promise: Promise<React.ReactNode>;
+    }> = [];
+    const getServerComponent = jest.fn((_args: GetServerComponentArgs) => {
+      let resolve!: (v: React.ReactNode) => void;
+      let reject!: (e: unknown) => void;
+      const promise = new Promise<React.ReactNode>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      promise.catch(() => undefined);
+      deferreds.push({ resolve, reject, promise });
+      return promise;
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+    await act(async () => {
+      render(
+        <RSCProvider>
+          <Probe />
+        </RSCProvider>,
+      );
+    });
+
+    // d0: an initial load that stays in flight for the whole test.
+    let stale!: Promise<React.ReactNode>;
+    await act(async () => {
+      stale = rscApi.getComponent('Card', { id: 1 });
+      await Promise.resolve();
+    });
+    stale.catch(() => undefined);
+    expect(deferreds).toHaveLength(1);
+
+    // d1: a refetch takes ownership of the key, leaving d0 stale but pending.
+    // `recoverOnError` frees the cache entry when the refetch fails with no
+    // last-successful payload to restore.
+    let refetched!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetched = rscApi.refetchComponent('Card', { id: 1 }, true);
+      refetched.catch(() => undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(deferreds).toHaveLength(2);
+
+    // The refetch fails with no last-successful payload to restore, which frees
+    // the cache entry for fresh initial loads.
+    await act(async () => {
+      deferreds[1].reject(new Error('refetch failed'));
+      await expect(refetched).rejects.toThrow('refetch failed');
+      await flushMacrotasks();
+      await flushMacrotasks();
+    });
+
+    // Two fresh attempts exhaust the budget and retain a terminal rejection.
+    for (let attempt = 0; attempt < RSC_PAYLOAD_MAX_FETCH_ATTEMPTS; attempt += 1) {
+      const before = deferreds.length;
+      let failing!: Promise<React.ReactNode>;
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        failing = rscApi.getComponent('Card', { id: 1 });
+        failing.catch(() => undefined);
+        await Promise.resolve();
+      });
+      expect(deferreds).toHaveLength(before + 1);
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => {
+        deferreds[deferreds.length - 1].reject(new Error('backend down'));
+        await expect(failing).rejects.toThrow('backend down');
+        await flushMacrotasks();
+      });
+    }
+    const callsBeforeStaleSuccess = getServerComponent.mock.calls.length;
+
+    // d0 finally resolves. It no longer owns the key, so it must not clear the
+    // terminal failure that the newer promise recorded.
+    await act(async () => {
+      deferreds[0].resolve(<div>stale</div>);
+      await stale;
+      await flushMacrotasks();
+    });
+
+    // The retry window must still elapse, letting a later render try again.
+    currentTime += RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS;
+    await act(async () => {
+      const retried = rscApi.getComponent('Card', { id: 1 });
+      retried.catch(() => undefined);
+      await Promise.resolve();
+    });
+    expect(getServerComponent.mock.calls.length).toBeGreaterThan(callsBeforeStaleSuccess);
+  });
+
   it('allows a fresh attempt once the retry window elapses (#3929)', async () => {
     const getServerComponent = jest.fn((_args: GetServerComponentArgs) =>
       Promise.reject(new Error('backend down')),
