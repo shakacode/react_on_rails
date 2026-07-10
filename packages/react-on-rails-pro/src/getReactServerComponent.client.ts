@@ -72,6 +72,9 @@ const replayConsole = (consoleReplayScript: string, nonce?: string) => {
   }
 };
 
+const buildRSCPayloadHttpError = (message: string, status: number) =>
+  Object.assign(new Error(message), { name: 'RSCPayloadHttpError', status });
+
 /**
  * Parses a length-prefixed RSC fetch response stream.
  *
@@ -98,8 +101,9 @@ const createFromFetch = async (
     const statusDescription = response.statusText
       ? `${response.status} ${response.statusText}`
       : `${response.status}`;
-    throw new Error(
+    throw buildRSCPayloadHttpError(
       `RSC payload request for component "${componentName}" from ${sourceDescription} failed with HTTP ${statusDescription}.`,
+      response.status,
     );
   }
 

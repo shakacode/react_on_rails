@@ -75,6 +75,35 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
 const rejectWithError = <T,>(error: unknown): Promise<T> =>
   Promise.reject(error instanceof Error ? error : new Error(String(error)));
 
+const RSC_PAYLOAD_FAILURE_RETENTION_MS = 5_000;
+const MAX_ERROR_CAUSE_DEPTH = 5;
+
+const isRetryableRSCPayloadError = (error: unknown): boolean => {
+  try {
+    let current = error;
+    for (let depth = 0; depth < MAX_ERROR_CAUSE_DEPTH && current != null; depth += 1) {
+      if (
+        typeof current === 'object' &&
+        'name' in current &&
+        (current as { name?: unknown }).name === 'AbortError'
+      ) {
+        return false;
+      }
+      if (!(current instanceof Error)) break;
+
+      const { status } = current as { status?: unknown };
+      if (typeof status === 'number') {
+        return status >= 500 || status === 408 || status === 429;
+      }
+      current = (current as { cause?: unknown }).cause;
+    }
+  } catch {
+    return false;
+  }
+
+  return true;
+};
+
 /**
  * Creates a provider context for React Server Components.
  *
@@ -101,6 +130,8 @@ export const createRSCProvider = ({
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
   domNodeId?: string;
 }) => {
+  const isBrowserRuntime = typeof window !== 'undefined';
+
   return ({ children }: { children: ReactNode }) => {
     // Companion bookkeeping keyed by the same RSC payload key as the promise
     // cache. These are dropped in lockstep when a key is evicted from the LRU so
@@ -309,12 +340,14 @@ export const createRSCProvider = ({
           return cached;
         }
 
-        // Pin the key for the duration of the initial in-flight load so that
-        // a burst of 50+ other keys loading before this one settles cannot
-        // evict it. Without this pin, `markSuccessfulPromise`'s `peek` guard
+        // Pin the key for the logical load. Browser failures keep this pin
+        // through their retention window so LRU pressure cannot reopen the request
+        // budget before React consumes the rejection. Without the initial pin,
+        // `markSuccessfulPromise`'s `peek` guard
         // would see a stale (evicted) entry and skip recording last-successful,
         // leaving `recoverOnError` with nothing to restore after a failed
-        // refetch. Unpinned in `.finally()` once the initial fetch settles.
+        // refetch. Successful loads release the pin after settling; terminal
+        // browser failures retain it through the window below.
         //
         // `setPinned` inserts and pins atomically (pin registered before
         // eviction): when 51+ initial loads start before any settle, a plain
@@ -359,82 +392,69 @@ export const createRSCProvider = ({
           }
           return payload;
         };
-        // When the underlying fetch REJECTS (as opposed to resolving with an
-        // `Error` value), the single-argument `.then` below would leave the
-        // rejected promise cached under `key`, so every later same-key
-        // `getComponent` returns that same rejection and a transient
-        // renderer/network/deploy failure stays wedged until an explicit
-        // refetch or reload (#3929). Evict the rejected entry so the next
-        // same-key `getComponent` starts a fresh fetch.
-        //
-        // Deferred past the first macrotask (`setTimeout(0)`, not
-        // `queueMicrotask`) so React's Suspense machinery observes the
-        // rejection on the cached promise before the entry is removed; a
-        // microtask could interleave with React's own queue and evict before
-        // Suspense reads it. The extra macrotask also lets the `.finally`
-        // below release the in-flight pin before the key becomes available for
-        // a fresh same-key `getComponent`; otherwise a repeated failing request
-        // can replace the rejected promise with a new pending promise before
-        // the user ErrorBoundary commits its fallback (#4522). Guarded on
-        // promise identity so a newer same-key promise (such as
-        // `refetchComponent`) installed during that window is not evicted by
-        // this stale failure.
-        //
-        // NOTE: payloads that RESOLVE with an `Error` value are intentionally
-        // left cached here; whether those should also retry is a separate
-        // `getServerComponent` contract decision tracked apart from #3929.
-        let payloadRejected = false;
-        const evictPromiseIfRejected = (error: unknown) => {
-          payloadRejected = true;
-          setTimeout(() => {
-            setTimeout(() => {
-              if (fetchRSCPromises.get(key, false) === promise) {
-                fetchRSCPromises.deleteWithoutEvict(key);
-              }
-            }, 0);
-          }, 0);
-          throw error;
+        const fetchPayload = (enforceRefetch = false): Promise<ReactNode> => {
+          try {
+            return getServerComponent(
+              enforceRefetch
+                ? { componentName, componentProps, enforceRefetch: true }
+                : { componentName, componentProps },
+            );
+          } catch (error) {
+            return rejectWithError(error);
+          }
         };
-        let serverComponentPromise: Promise<ReactNode>;
+
+        let firstAttempt: Promise<ReactNode>;
         const preferEmbeddedPayload = hasEmbeddedRSCPayload(componentName, componentProps, domNodeId);
         const prefetchedServerComponentPromise = preferEmbeddedPayload
           ? undefined
           : consumePrefetchedServerComponent(key, providerCacheIdentityRef.current);
         if (prefetchedServerComponentPromise) {
-          serverComponentPromise = prefetchedServerComponentPromise;
+          firstAttempt = prefetchedServerComponentPromise;
         } else {
-          try {
-            serverComponentPromise = getServerComponent({ componentName, componentProps });
-          } catch (error) {
-            // A synchronous producer throw behaves exactly like an immediately
-            // rejected fetch: the rejection flows through the standard
-            // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
-            // settles the evicted-success latch and evicts the cached rejection.
-            serverComponentPromise = rejectWithError(error);
-          }
+          firstAttempt = fetchPayload();
         }
 
-        promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {
-          if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
-            evictedSuccessfulPayloadKeys.set(key, true);
-          }
-          // Defer the initial-load pin release so a route whose promise just
-          // resolved can commit and install its mounted retain before over-cap
-          // reconciliation runs. Without this handoff, 51+ simultaneously
-          // resolving mounted routes can evict early visible keys before their
-          // layout effects get to pin them as mounted.
-          setTimeout(() => {
-            if (payloadRejected) {
-              // The rejected entry is already scheduled for deletion in the
-              // next macrotask. Releasing its pin must not reconcile over-cap
-              // eviction against healthy entries during this short grace
-              // window.
-              fetchRSCPromises.unpinWithoutEvict(key);
-              return;
+        let terminalFailureRetained = false;
+        // React sees one cached promise for the entire logical load. A browser
+        // retry happens inside that promise instead of depending on a retry
+        // render to create another request.
+        promise = firstAttempt
+          .catch((error: unknown) => {
+            if (
+              fetchRSCPromises.get(key, false) !== promise ||
+              !isBrowserRuntime ||
+              !isRetryableRSCPayloadError(error)
+            ) {
+              throw error;
             }
-            fetchRSCPromises.unpin(key);
-          }, 0);
-        });
+            return fetchPayload(true);
+          })
+          .then(markPayloadIfSuccessful, (error: unknown) => {
+            if (isBrowserRuntime && fetchRSCPromises.get(key, false) === promise) {
+              terminalFailureRetained = true;
+            }
+            throw error;
+          })
+          .finally(() => {
+            if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
+              evictedSuccessfulPayloadKeys.set(key, true);
+            }
+            // Successful and stale loads release their initial pin after the
+            // route can install its mounted retain. A terminal browser failure
+            // keeps the same rejected promise pinned until its retention ends.
+            setTimeout(
+              () => {
+                if (terminalFailureRetained && fetchRSCPromises.get(key, false) === promise) {
+                  fetchRSCPromises.deletePreservingPins(key);
+                  fetchRSCPromises.unpinWithoutEvict(key);
+                  return;
+                }
+                fetchRSCPromises.unpin(key);
+              },
+              terminalFailureRetained ? RSC_PAYLOAD_FAILURE_RETENTION_MS : 0,
+            );
+          });
         fetchRSCPromises.setPinned(key, promise);
         if (notifyRoutesOnSuccess) {
           // Incremented only after setPinned succeeds; the catch block above can

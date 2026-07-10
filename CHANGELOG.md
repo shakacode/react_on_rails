@@ -37,6 +37,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC payload failures use a bounded browser retry**: `RSCProvider` now replaces the
+  existing timer-ordered rejected-promise eviction with one cached promise that retries a transient network,
+  server, or malformed-payload failure once. The final rejection remains available long enough for
+  React to surface it instead of repeatedly replacing it with a new pending request; 4xx responses
+  and cancellations are not retried, and a forced retry bypasses a failed embedded payload. A later
+  lookup can start a fresh bounded load after the short rejection-retention window. Fixes
+  [PR 4550](https://github.com/shakacode/react_on_rails/pull/4550).
+
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
