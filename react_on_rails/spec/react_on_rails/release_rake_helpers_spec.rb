@@ -355,6 +355,15 @@ RSpec.describe "release.rake helper methods" do
         )
         .and_return(["", success_status, false])
 
+      expected_notice = Regexp.new(
+        [
+          "fresh dispatch can therefore block for up to about 60 minutes total",
+          "RELEASE_CI_STATUS_OVERRIDE=true",
+          "ShakaPerf release gate passed"
+        ].join(".*"),
+        Regexp::IGNORECASE | Regexp::MULTILINE
+      )
+
       expect do
         run_shakaperf_release_gate!(
           monorepo_root:,
@@ -363,9 +372,7 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to output(
-        /This release task will wait up to 50 minutes.*RELEASE_CI_STATUS_OVERRIDE=true.*ShakaPerf release gate passed/m
-      ).to_stdout
+      end.to output(expected_notice).to_stdout
       expect(self).to have_received(:capture_gh_output)
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,

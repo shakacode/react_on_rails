@@ -404,7 +404,9 @@ def shakaperf_release_gate_run_url(repo_slug:, run:)
 end
 
 def print_shakaperf_release_gate_notice(ref:, head_sha:)
+  start_timeout_minutes = SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS / 60
   watch_timeout_minutes = SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS / 60
+  fresh_dispatch_timeout_minutes = start_timeout_minutes + watch_timeout_minutes
 
   puts <<~NOTICE
 
@@ -413,7 +415,9 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
     If no reusable run exists, it dispatches a new workflow run and blocks until it passes.
     Warm-cache waits usually take a few minutes.
     The workflow can run up to #{SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES} minutes.
-    This release task will wait up to #{watch_timeout_minutes} minutes.
+    Fresh dispatches can take up to #{start_timeout_minutes} minutes to appear before watching starts.
+    Once a run is found, this release task will watch it for up to #{watch_timeout_minutes} minutes.
+    A fresh dispatch can therefore block for up to about #{fresh_dispatch_timeout_minutes} minutes total.
     To skip only for an urgent release where ShakaPerf is known-unrelated:
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
       # or pass override_ci_status as the 4th positional argument:
