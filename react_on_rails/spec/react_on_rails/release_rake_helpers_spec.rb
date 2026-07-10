@@ -409,20 +409,6 @@ RSpec.describe "release.rake helper methods" do
       end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
     end
 
-    it "aborts instead of reporting a completed non-success run as already passed" do
-      failed_run = run.merge(
-        "status" => "completed",
-        "conclusion" => "failure"
-      )
-
-      expect do
-        handle_reusable_shakaperf_release_gate_run!(repo_slug:, run: failed_run, head_sha:)
-      end.to raise_error(
-        SystemExit,
-        /Refusing to reuse completed ShakaPerf release gate run 123456 with conclusion failure/
-      )
-    end
-
     it "watches an in-progress gate run for the same head SHA without dispatching another run" do
       in_progress_run = run.merge(
         "databaseId" => 321_654,
@@ -451,22 +437,26 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/watching it instead.*ShakaPerf release gate passed/m).to_stdout
     end
 
-    it "does not reuse an older successful gate run when the latest same-SHA run failed" do
+    it "does not reuse a successful run when a rerun updated a same-SHA failure more recently" do
       failed_run = run.merge(
         "databaseId" => 222_222,
         "status" => "completed",
         "conclusion" => "failure",
-        "createdAt" => "2026-07-10T21:30:00Z"
+        "attempt" => 2,
+        "createdAt" => "2026-07-10T21:00:00Z",
+        "updatedAt" => "2026-07-10T21:45:00Z"
       )
-      older_successful_run = run.merge(
+      earlier_updated_successful_run = run.merge(
         "databaseId" => 111_111,
         "status" => "completed",
         "conclusion" => "success",
-        "createdAt" => "2026-07-10T21:00:00Z"
+        "attempt" => 1,
+        "createdAt" => "2026-07-10T21:30:00Z",
+        "updatedAt" => "2026-07-10T21:35:00Z"
       )
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
-        .and_return([failed_run, older_successful_run])
+        .and_return([failed_run, earlier_updated_successful_run])
       allow(self).to receive(:capture_gh_output)
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
@@ -498,7 +488,7 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to output(/ShakaPerf release gate passed/).to_stdout
+      end.to output(/dispatching a fresh gate run.*ShakaPerf release gate passed/m).to_stdout
       expect(self).to have_received(:capture_gh_output)
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,

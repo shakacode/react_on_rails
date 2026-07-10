@@ -322,7 +322,7 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--branch", ref,
     "--event", "workflow_dispatch",
-    "--json", "createdAt,databaseId,headSha,status,conclusion,url",
+    "--json", "attempt,createdAt,databaseId,headSha,status,conclusion,updatedAt,url",
     "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
   )
 
@@ -377,31 +377,26 @@ def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_ru
   )
 end
 
-def reusable_shakaperf_release_gate_run?(run, head_sha)
-  return false unless run["headSha"] == head_sha
-
-  status = run["status"].to_s
-  return run["conclusion"].to_s == "success" if status == "completed"
-
-  %w[queued in_progress requested waiting pending].include?(status)
+def active_shakaperf_release_gate_run?(run)
+  %w[queued in_progress requested waiting pending].include?(run["status"].to_s)
 end
 
-def find_reusable_shakaperf_release_gate_run(runs, head_sha)
-  latest_same_sha_run = runs.select { |run| run["headSha"] == head_sha }
-                            .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
-  return unless latest_same_sha_run
-
-  reusable_shakaperf_release_gate_run?(latest_same_sha_run, head_sha) ? latest_same_sha_run : nil
+def find_latest_shakaperf_release_gate_run(runs, head_sha)
+  runs.select { |run| run["headSha"] == head_sha }
+      .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
 end
 
 def shakaperf_release_gate_run_sort_key(run)
-  created_at = begin
-    Time.iso8601(run["createdAt"]).to_i
-  rescue ArgumentError, TypeError
-    0
-  end
+  updated_at = shakaperf_release_gate_run_timestamp(run, "updatedAt")
+  created_at = shakaperf_release_gate_run_timestamp(run, "createdAt")
 
-  [created_at, run["databaseId"].to_i]
+  [updated_at, run["attempt"].to_i, created_at, run["databaseId"].to_i]
+end
+
+def shakaperf_release_gate_run_timestamp(run, field_name)
+  Time.iso8601(run[field_name]).to_i
+rescue ArgumentError, TypeError
+  0
 end
 
 def shakaperf_release_gate_run_url(repo_slug:, run:)
@@ -460,23 +455,24 @@ def watch_shakaperf_release_gate_run!(repo_slug:, run:)
   )
 end
 
-def handle_reusable_shakaperf_release_gate_run!(repo_slug:, run:, head_sha:)
+def handle_existing_shakaperf_release_gate_run!(repo_slug:, run:, head_sha:)
   return false unless run
 
   run_id = run.fetch("databaseId").to_s
   run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
   if run["status"].to_s == "completed"
     conclusion = run["conclusion"].to_s
-    unless conclusion == "success"
-      handle_shakaperf_release_gate_violation!(
-        message: "❌ Refusing to reuse completed ShakaPerf release gate run #{run_id} " \
-                 "with conclusion #{conclusion.empty? ? 'unknown' : conclusion}.\n\nRun: #{run_url}"
-      )
+    if conclusion == "success"
+      puts "✓ ShakaPerf release gate already passed: #{run_url}"
+      return true
     end
 
-    puts "✓ ShakaPerf release gate already passed: #{run_url}"
-    return true
+    puts "Latest ShakaPerf release gate run #{run_id} completed with conclusion " \
+         "#{conclusion.empty? ? 'unknown' : conclusion}; dispatching a fresh gate run: #{run_url}"
+    return false
   end
+
+  return false unless active_shakaperf_release_gate_run?(run)
 
   puts "Found an existing ShakaPerf release gate run for #{head_sha[0, 8]}; watching it instead: #{run_url}"
   watch_shakaperf_release_gate_run!(repo_slug:, run:)
@@ -499,8 +495,8 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
   print_shakaperf_release_gate_notice(ref:, head_sha:)
 
   existing_runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
-  reusable_run = find_reusable_shakaperf_release_gate_run(existing_runs, head_sha)
-  return if handle_reusable_shakaperf_release_gate_run!(repo_slug:, run: reusable_run, head_sha:)
+  existing_run = find_latest_shakaperf_release_gate_run(existing_runs, head_sha)
+  return if handle_existing_shakaperf_release_gate_run!(repo_slug:, run: existing_run, head_sha:)
 
   existing_run_ids = existing_runs.map do |run|
     run["databaseId"].to_s
