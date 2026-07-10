@@ -31571,7 +31571,7 @@ _The image above demonstrates the dramatic performance improvement:_
 ### Script Loading Strategy Migration
 
 - If you were previously using `defer_generated_component_packs: true`, use `generated_component_packs_loading_strategy: :defer` instead
-- If you were previously using `defer_generated_component_packs: false`, remove the setting. It was a no-op; set `generated_component_packs_loading_strategy: :sync` only if you need synchronous loading.
+- If you were previously using `defer_generated_component_packs: false`, remove the setting only if you accept the post-upgrade default. `false` was a no-op, so record the app's pre-upgrade effective strategy and set `generated_component_packs_loading_strategy` explicitly to preserve it.
 - For optimal performance with Shakapacker ≥ 8.2.0, consider using `generated_component_packs_loading_strategy: :async`
 
 ### ESM-only package
