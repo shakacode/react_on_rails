@@ -363,7 +363,9 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to output(/ShakaPerf release gate passed/).to_stdout
+      end.to output(
+        /This release task will wait up to 50 minutes.*RELEASE_CI_STATUS_OVERRIDE=true.*ShakaPerf release gate passed/m
+      ).to_stdout
       expect(self).to have_received(:capture_gh_output)
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
@@ -383,6 +385,56 @@ RSpec.describe "release.rake helper methods" do
           "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
         )
+    end
+
+    it "reuses an already successful gate run for the same head SHA without dispatching another run" do
+      successful_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "success"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([successful_run])
+      expect(self).not_to receive(:capture_gh_output)
+      expect(self).not_to receive(:capture_gh_output_with_timeout)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
+    end
+
+    it "watches an in-progress gate run for the same head SHA without dispatching another run" do
+      in_progress_run = run.merge(
+        "databaseId" => 321_654,
+        "status" => "in_progress",
+        "conclusion" => ""
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([in_progress_run])
+      expect(self).not_to receive(:capture_gh_output)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "321654", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["", success_status, false])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/watching it instead.*ShakaPerf release gate passed/m).to_stdout
     end
 
     it "skips dispatching when the CI status override is enabled" do

@@ -45,6 +45,7 @@ SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
+SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES = 45
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
 # CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
@@ -375,9 +376,55 @@ def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, ignored_ru
   )
 end
 
+def reusable_shakaperf_release_gate_run?(run, head_sha)
+  return false unless run["headSha"] == head_sha
+
+  status = run["status"].to_s
+  return run["conclusion"].to_s == "success" if status == "completed"
+
+  %w[queued in_progress requested waiting pending].include?(status)
+end
+
+def find_reusable_shakaperf_release_gate_run(runs, head_sha)
+  runs.find { |run| reusable_shakaperf_release_gate_run?(run, head_sha) }
+end
+
+def shakaperf_release_gate_run_url(repo_slug:, run:)
+  run["url"] || "https://github.com/#{repo_slug}/actions/runs/#{run.fetch('databaseId')}"
+end
+
+def print_shakaperf_release_gate_notice(ref:, head_sha:)
+  watch_timeout_minutes = SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS / 60
+
+  puts <<~NOTICE
+
+    Running ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing...
+    This dispatches the GitHub Actions ShakaPerf Release Gates workflow and blocks until it passes.
+    Warm-cache runs usually take a few minutes.
+    The workflow can run up to #{SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES} minutes.
+    This release task will wait up to #{watch_timeout_minutes} minutes.
+    To skip only for an urgent release where ShakaPerf is known-unrelated:
+      RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
+      # or pass override_ci_status as the 4th positional argument:
+      bundle exec rake "release[VERSION,false,false,true]"
+  NOTICE
+end
+
+def dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:)
+  output, status = capture_gh_output(
+    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
+  )
+
+  return if status.success?
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Unable to dispatch ShakaPerf release gate workflow.\n\n#{output}"
+  )
+end
+
 def watch_shakaperf_release_gate_run!(repo_slug:, run:)
   run_id = run.fetch("databaseId").to_s
-  run_url = run["url"] || "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
 
   output, status, timed_out = capture_gh_output_with_timeout(
     "run", "watch", run_id, "--repo", repo_slug, "--exit-status",
@@ -397,6 +444,21 @@ def watch_shakaperf_release_gate_run!(repo_slug:, run:)
   )
 end
 
+def handle_reusable_shakaperf_release_gate_run!(repo_slug:, run:, head_sha:)
+  return false unless run
+
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  if run["status"] == "completed"
+    puts "✓ ShakaPerf release gate already passed: #{run_url}"
+    return true
+  end
+
+  puts "Found an existing ShakaPerf release gate run for #{head_sha[0, 8]}; watching it instead: #{run_url}"
+  watch_shakaperf_release_gate_run!(repo_slug:, run:)
+  puts "✓ ShakaPerf release gate passed: #{run_url}"
+  true
+end
+
 def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:, dry_run:)
   if dry_run
     puts "⚠️ DRY RUN: Would run ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before publishing."
@@ -409,20 +471,17 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
   end
 
   repo_slug = github_repo_slug(monorepo_root)
-  puts "\nRunning ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing..."
-  existing_run_ids = fetch_shakaperf_release_gate_runs(repo_slug:, ref:).map do |run|
+  print_shakaperf_release_gate_notice(ref:, head_sha:)
+
+  existing_runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
+  reusable_run = find_reusable_shakaperf_release_gate_run(existing_runs, head_sha)
+  return if handle_reusable_shakaperf_release_gate_run!(repo_slug:, run: reusable_run, head_sha:)
+
+  existing_run_ids = existing_runs.map do |run|
     run["databaseId"].to_s
   end
   dispatch_started_at = shakaperf_release_gate_dispatch_started_at
-  output, status = capture_gh_output(
-    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
-  )
-
-  unless status.success?
-    handle_shakaperf_release_gate_violation!(
-      message: "❌ Unable to dispatch ShakaPerf release gate workflow.\n\n#{output}"
-    )
-  end
+  dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:)
 
   run = wait_for_shakaperf_release_gate_run!(
     repo_slug:,
