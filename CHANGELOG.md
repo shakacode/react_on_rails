@@ -37,6 +37,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **A failing RSC payload no longer loops forever**: `RSCProvider.getComponent` runs during
+  render, and React's answer to a rejected promise it suspended on is a retry render. Evicting the
+  rejected promise on every rejection therefore made each retry render miss the cache and start
+  another fetch, so a deterministically failing payload produced hundreds of requests per second,
+  and no `ErrorBoundary` ever saw the error because a fresh pending promise replaced the rejection
+  before `use()` could read it. A payload fetch is now retried at most once (two attempts total);
+  after that the rejection is retained so the retry render reads it, `use()` throws, and the failure
+  is shown on the page through `RSCRouteErrorBoundary`. Aborted requests and 4xx responses are never
+  retried. The retained rejection is dropped after a short window so a recovered backend is not
+  locked out. Fixes
+  [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
+
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in

@@ -29,6 +29,7 @@ import {
   isRSCRouteSSRFalseBailoutError,
   RSCRouteSSRFalseBailoutError,
 } from '../src/RSCRouteSSRFalseBailoutError.ts';
+import { RSC_PAYLOAD_MAX_FETCH_ATTEMPTS } from '../src/RSCPayloadRetry.ts';
 import RSCRoute from '../src/RSCRoute.tsx';
 import { isServerComponentFetchError, ServerComponentFetchError } from '../src/ServerComponentFetchError.ts';
 import { flushMacrotasks } from './testUtils.ts';
@@ -437,9 +438,13 @@ describe('RSCRoute deferred SSR behavior', () => {
       rejectPayload = reject;
     });
     let requestCount = 0;
+    // Every attempt inside the retry budget must fail before the rejection is
+    // surfaced to the ErrorBoundary; the manual refetch then recovers.
     const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
       requestCount += 1;
-      return requestCount === 1 ? payloadPromise : Promise.resolve(<div>Recovered deferred route</div>);
+      return requestCount <= RSC_PAYLOAD_MAX_FETCH_ATTEMPTS
+        ? payloadPromise
+        : Promise.resolve(<div>Recovered deferred route</div>);
     });
     const RSCProvider = createRSCProvider({ getServerComponent });
     const container = document.createElement('div');
@@ -485,8 +490,10 @@ describe('RSCRoute deferred SSR behavior', () => {
         await Promise.resolve();
       });
 
-      expect(getServerComponent).toHaveBeenCalledTimes(2);
-      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+      // One call per exhausted retry attempt, then one for the manual refetch.
+      const refetchCallIndex = RSC_PAYLOAD_MAX_FETCH_ATTEMPTS + 1;
+      expect(getServerComponent).toHaveBeenCalledTimes(refetchCallIndex);
+      expect(getServerComponent).toHaveBeenNthCalledWith(refetchCallIndex, {
         componentName: 'DeferredRoute',
         componentProps: { id: 1 },
         enforceRefetch: true,
@@ -523,7 +530,9 @@ describe('RSCRoute deferred SSR behavior', () => {
       }
 
       simulatedErrorFetchCount += 1;
-      return simulatedErrorFetchCount === 1
+      // Exhaust the retry budget so the rejection becomes terminal and reaches
+      // the ErrorBoundary; anything beyond it must never be requested.
+      return simulatedErrorFetchCount <= RSC_PAYLOAD_MAX_FETCH_ATTEMPTS
         ? failingPayloadPromise
         : new Promise<React.ReactNode>(() => undefined);
     });
@@ -669,7 +678,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     let requestCount = 0;
     const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
       requestCount += 1;
-      return requestCount === 1
+      return requestCount <= RSC_PAYLOAD_MAX_FETCH_ATTEMPTS
         ? payloadPromise
         : Promise.resolve(<div>Recovered default-provider route</div>);
     });
@@ -718,8 +727,10 @@ describe('RSCRoute deferred SSR behavior', () => {
         await Promise.resolve();
       });
 
-      expect(getServerComponent).toHaveBeenCalledTimes(2);
-      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+      // One call per exhausted retry attempt, then one for the manual refetch.
+      const refetchCallIndex = RSC_PAYLOAD_MAX_FETCH_ATTEMPTS + 1;
+      expect(getServerComponent).toHaveBeenCalledTimes(refetchCallIndex);
+      expect(getServerComponent).toHaveBeenNthCalledWith(refetchCallIndex, {
         componentName: 'DeferredRoute',
         componentProps: { id: 1 },
         enforceRefetch: true,
@@ -830,9 +841,9 @@ describe('RSCRoute deferred SSR behavior', () => {
         );
         await Promise.resolve();
         await Promise.resolve();
-        // The provider evicts synchronously-rejected payload promises after
-        // React can observe the rejection and the in-flight pin releases; flush
-        // both timers so no eviction timer leaks past unmount.
+        // The provider retries a rejected payload up to the attempt cap, then
+        // retains the rejection. Flush the deferred pin-release timers so
+        // nothing leaks past unmount.
         await flushMacrotasks();
         await flushMacrotasks();
       });
@@ -845,7 +856,9 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(capturedError.serverComponentName).toBe('SyncThrowRoute');
       expect(capturedError.serverComponentProps).toEqual({ id: 7 });
       expect(capturedError.originalError).toBe(syncError);
-      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      // A synchronous producer throw is retried like any other rejection and
+      // bounded by the same cap before it is surfaced.
+      expect(getServerComponent).toHaveBeenCalledTimes(RSC_PAYLOAD_MAX_FETCH_ATTEMPTS);
     } finally {
       const mountedRoot = root;
       try {

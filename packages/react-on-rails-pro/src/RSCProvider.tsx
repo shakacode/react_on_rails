@@ -28,6 +28,12 @@ import {
 } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import {
+  isFailureRetryWindowElapsed,
+  isRetryableRSCPayloadError,
+  recordPayloadFailure,
+  type RSCPayloadFailure,
+} from './RSCPayloadRetry.ts';
+import {
   BoundedLRU,
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
@@ -169,6 +175,12 @@ export const createRSCProvider = ({
     // the state setters, and `startTransition` are stable for this provider's
     // lifetime. So there is no stale-closure risk from not recreating `onEvict`
     // on re-renders.
+    // Per-key failed-attempt bookkeeping for the bounded payload retry. Cleared
+    // on success, on refetch, and when the key leaves the promise cache, so it
+    // can never outlive the entry it describes.
+    const payloadFailuresRef = useRef<Map<string, RSCPayloadFailure>>(new Map());
+    const payloadFailures = payloadFailuresRef.current;
+
     const fetchRSCPromisesRef = useRef<BoundedLRU<Promise<ReactNode>> | null>(null);
     if (!fetchRSCPromisesRef.current) {
       fetchRSCPromisesRef.current = new BoundedLRU<Promise<ReactNode>>(
@@ -177,6 +189,7 @@ export const createRSCProvider = ({
           if (evictedKey in lastSuccessfulRSCPromisesRef.current) {
             evictedSuccessfulPayloadKeys.set(evictedKey, true);
           }
+          payloadFailures.delete(evictedKey);
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete lastSuccessfulRSCPromisesRef.current[evictedKey];
           // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -306,7 +319,15 @@ export const createRSCProvider = ({
         }
         const cached = fetchRSCPromises.get(key);
         if (cached !== undefined) {
-          return cached;
+          // A surfaced failure keeps its rejected promise cached so repeated
+          // retry renders re-read the rejection instead of re-fetching. Once the
+          // retry window elapses, drop it so a later render can try again after
+          // the backend has had time to recover (#3929).
+          if (!isFailureRetryWindowElapsed(payloadFailures.get(key), Date.now())) {
+            return cached;
+          }
+          payloadFailures.delete(key);
+          fetchRSCPromises.deleteWithoutEvict(key);
         }
 
         // Pin the key for the duration of the initial in-flight load so that
@@ -346,6 +367,7 @@ export const createRSCProvider = ({
           (inFlightEvictedSuccessfulPayloadCounts.get(key) ?? 0) > 0;
         const markPayloadIfSuccessful = (payload: ReactNode) => {
           if (!(payload instanceof Error)) {
+            payloadFailures.delete(key);
             payloadSucceeded = markSuccessfulPromise(key, promise, notifyRoutesOnSuccess);
             if (payloadSucceeded) {
               // Delete the entire count: once this replacement wins the cache
@@ -360,39 +382,53 @@ export const createRSCProvider = ({
           return payload;
         };
         // When the underlying fetch REJECTS (as opposed to resolving with an
-        // `Error` value), the single-argument `.then` below would leave the
-        // rejected promise cached under `key`, so every later same-key
-        // `getComponent` returns that same rejection and a transient
-        // renderer/network/deploy failure stays wedged until an explicit
-        // refetch or reload (#3929). Evict the rejected entry so the next
-        // same-key `getComponent` starts a fresh fetch.
+        // `Error` value), what happens to the cached promise decides whether a
+        // failing route retries, wedges, or loops.
         //
-        // Deferred past the first macrotask (`setTimeout(0)`, not
-        // `queueMicrotask`) so React's Suspense machinery observes the
-        // rejection on the cached promise before the entry is removed; a
-        // microtask could interleave with React's own queue and evict before
-        // Suspense reads it. The extra macrotask also lets the `.finally`
-        // below release the in-flight pin before the key becomes available for
-        // a fresh same-key `getComponent`; otherwise a repeated failing request
-        // can replace the rejected promise with a new pending promise before
-        // the user ErrorBoundary commits its fallback (#4522). Guarded on
-        // promise identity so a newer same-key promise (such as
-        // `refetchComponent`) installed during that window is not evicted by
-        // this stale failure.
+        // Evicting the rejection unconditionally lets the next same-key
+        // `getComponent` start a fresh fetch, which is what a transient
+        // renderer/network/deploy failure needs (#3929). But `getComponent` is
+        // called during render, and React's response to a rejected promise it
+        // suspended on IS a retry render. So an unconditional eviction makes
+        // every retry render miss the cache and start another fetch: a
+        // deterministically failing payload loops forever, at render speed,
+        // and `use()` never reads the rejection because a fresh pending promise
+        // has already replaced it — so no ErrorBoundary ever sees the error
+        // (#4522).
+        //
+        // Bound it instead. Each key gets `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS`
+        // attempts. While attempts remain, the rejection is evicted
+        // synchronously so React's retry render starts the next one. On the
+        // final attempt — or immediately for an error no retry could fix, such
+        // as an abort or a 4xx — the rejected promise is RETAINED, so the retry
+        // render reads it, `use()` throws, and the failure reaches the page
+        // through `RSCRouteErrorBoundary`. The retained rejection is dropped
+        // once the retry window elapses (see the cache read above), so a
+        // recovered backend is not locked out.
+        //
+        // Evicting synchronously rather than after a macrotask is deliberate:
+        // the attempt cap, not a timer race with React's scheduler, is what
+        // terminates the loop. The `.finally()` below still owns the matching
+        // unpin, so `deletePreservingPins` is used here.
         //
         // NOTE: payloads that RESOLVE with an `Error` value are intentionally
         // left cached here; whether those should also retry is a separate
         // `getServerComponent` contract decision tracked apart from #3929.
         let payloadRejected = false;
-        const evictPromiseIfRejected = (error: unknown) => {
+        const handlePayloadRejection = (error: unknown) => {
           payloadRejected = true;
-          setTimeout(() => {
-            setTimeout(() => {
-              if (fetchRSCPromises.get(key, false) === promise) {
-                fetchRSCPromises.deleteWithoutEvict(key);
-              }
-            }, 0);
-          }, 0);
+          const { shouldRetry } = recordPayloadFailure(
+            payloadFailures,
+            key,
+            isRetryableRSCPayloadError(error),
+            Date.now(),
+          );
+          // Guarded on promise identity so a newer same-key promise (such as
+          // one installed by `refetchComponent`) is never evicted by this
+          // stale failure.
+          if (shouldRetry && fetchRSCPromises.get(key, false) === promise) {
+            fetchRSCPromises.deletePreservingPins(key);
+          }
           throw error;
         };
         let serverComponentPromise: Promise<ReactNode>;
@@ -408,13 +444,13 @@ export const createRSCProvider = ({
           } catch (error) {
             // A synchronous producer throw behaves exactly like an immediately
             // rejected fetch: the rejection flows through the standard
-            // `evictPromiseIfRejected` + `.finally()` bookkeeping below, which
-            // settles the evicted-success latch and evicts the cached rejection.
+            // `handlePayloadRejection` + `.finally()` bookkeeping below, which
+            // settles the evicted-success latch and applies the retry cap.
             serverComponentPromise = rejectWithError(error);
           }
         }
 
-        promise = serverComponentPromise.then(markPayloadIfSuccessful, evictPromiseIfRejected).finally(() => {
+        promise = serverComponentPromise.then(markPayloadIfSuccessful, handlePayloadRejection).finally(() => {
           if (notifyRoutesOnSuccess && !payloadSucceeded && releaseInFlightEvictedSuccessLatch()) {
             evictedSuccessfulPayloadKeys.set(key, true);
           }
@@ -425,10 +461,12 @@ export const createRSCProvider = ({
           // layout effects get to pin them as mounted.
           setTimeout(() => {
             if (payloadRejected) {
-              // The rejected entry is already scheduled for deletion in the
-              // next macrotask. Releasing its pin must not reconcile over-cap
-              // eviction against healthy entries during this short grace
-              // window.
+              // A retryable rejection already removed its entry (pins
+              // preserved), and a terminal one must keep its rejected promise
+              // cached until a retry render reads it. Either way, releasing
+              // this pin must not reconcile over-cap eviction: against healthy
+              // entries for the former, against the retained rejection for the
+              // latter. Later inserts reconcile the cap normally.
               fetchRSCPromises.unpinWithoutEvict(key);
               return;
             }
@@ -451,6 +489,7 @@ export const createRSCProvider = ({
         fetchRSCPromises,
         inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
+        payloadFailures,
       ],
     );
 
@@ -462,6 +501,9 @@ export const createRSCProvider = ({
         } catch (error) {
           return rejectWithError<ReactNode>(error);
         }
+        // An explicit refetch is a fresh start: forget any earlier failed
+        // attempts so this request gets the full retry budget.
+        payloadFailures.delete(key);
         refetchVersionsRef.current[key] = (refetchVersionsRef.current[key] ?? 0) + 1;
         let promise!: Promise<ReactNode>;
         const restoreLastSuccessfulPromise = () => {
@@ -553,6 +595,7 @@ export const createRSCProvider = ({
         fetchRSCPromises,
         inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
+        payloadFailures,
         scheduleAbsentKeyVersionCleanup,
         startTransition,
       ],
