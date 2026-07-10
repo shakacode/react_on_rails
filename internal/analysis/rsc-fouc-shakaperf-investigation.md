@@ -218,8 +218,17 @@ Good unit-test targets after that:
 
 ## Follow-ups
 
-1. Prove the hichee branch with ShakaPerf.
-2. Recheck `react_on_rails#3577` after the upstream package fix is released/pinned.
-3. Decide whether the downstream bridge in `react_on_rails#3587` should stay, shrink to Rails asset integration, or be removed after upstream package adoption.
-4. Add unit tests after the target integration path is settled.
+Status as of 2026-07-09 — items 2–4 are resolved history (see the status note at the top):
+
+1. Prove the hichee branch with ShakaPerf. **Still open.**
+2. ~~Recheck `react_on_rails#3577` after the upstream package fix is released/pinned.~~ **Resolved:**
+   [#3577](https://github.com/shakacode/react_on_rails/pull/3577) merged; the rollout has since moved
+   to the coordinated `react-on-rails-rsc` 19.2.x line.
+3. ~~Decide whether the downstream bridge in `react_on_rails#3587` should stay, shrink to Rails asset
+   integration, or be removed after upstream package adoption.~~ **Resolved:** the
+   [#3587](https://github.com/shakacode/react_on_rails/pull/3587) `ror-rsc` tree-wrapping bridge was
+   removed; the current design is the `preinit` hint layer plus the `injectRSCPayload` stream
+   transform (see status note).
+4. ~~Add unit tests after the target integration path is settled.~~ **Resolved:** unit tests for the
+   settled path exist at `packages/react-on-rails-pro/tests/injectRSCPayload.test.ts`.
 5. If we want ShakaPerf to produce a first-visible screenshot without blocking JS, add/request a first-visible capture hook or capture mode. Filed as [shakaperf#55](https://github.com/shakacode/shakaperf/issues/55) (2026-07-09).
