@@ -4,10 +4,24 @@ Purpose: confirm or deny, on a real app or the Pro dummy app, the code-derived F
 conditions in [rsc-css-fouc-findings.md](./rsc-css-fouc-findings.md). Every step is
 observation-only; no framework code changes are required. Expected time: ~1–2 hours.
 
-The one-sentence theory to confirm: **FOUC occurs exactly when a client component's CSS
-`css` array is missing from `react-client-manifest.json` (layer L1 dead) AND the build
-is production-mode (numeric chunk ids kill layers L3/L4) — plus a rare timing variant in
-dev/test builds when a boundary's Flight data arrives after the 100 ms deferral window.**
+> [!IMPORTANT]
+> **Executed 2026-07-09 — verdict: FAIL on the supported production config.** Steps 1–3
+> were run on the dummy app (Rspack 2.0.5, rsc 19.2.1-rc.0, production mode): the
+> streamed reveal carried only a non-blocking preload and an ungated `$RC(`, and the
+> probe rendered visibly unstyled for ~3.9 s with CSS delayed 4 s. See the addendum in
+> [rsc-css-fouc-findings.md](./rsc-css-fouc-findings.md). The original theory below
+> understated the failure: a healthy `css` array does **not** gate the streamed reveal —
+> post-shell hints emit preloads only, and every stream-level gating layer is
+> production-dead. The procedure remains valid for re-verifying after a fix and for
+> classifying other apps' builds.
+
+The refined theory this procedure tests: **the server-streamed reveal is CSS-gated only
+when a `data-precedence="rsc-css"` stylesheet link lands before the boundary's reveal
+script in the byte stream. In default production builds none of the layers that emit
+such links can fire (numeric chunk ids kill inference/deferral; id-based CSS filenames
+kill preload promotion), so streamed FOUC occurs whenever chunk-CSS latency exceeds the
+parse window — regardless of manifest `css`-array health. Dev/test builds are gated but
+have a rare timing variant when Flight data lags the 100 ms deferral window.**
 
 ## Step 0 — Fix the test surface
 
@@ -89,12 +103,13 @@ grep -o '\$R[CR]' /tmp/stream.html | sort | uniq -c
 
 Interpretation table:
 
-| Observation                                                                                                    | Meaning                                                                                                                                                                                  |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<link … data-precedence="rsc-css">` appears **before** the boundary's reveal script, and the reveal is `$RR(` | L1 healthy: React emitted the sheet and gates the reveal itself. FOUC not expected.                                                                                                      |
-| Links present, reveal is plain `$RC(`                                                                          | A fallback layer produced the links — L2 or L3, not React. Attribute before concluding (see below); check the links precede the reveal in byte order.                                    |
-| **No** `rsc-css` links anywhere, reveal is plain `$RC(`                                                        | All layers dead ⇒ FOUC predicted deterministically on a cold cache. Go to Step 3 to see it.                                                                                              |
-| `<link rel="preload" as="style" …clientN….css>` never promoted to `rel="stylesheet"`                           | L2 regression **only if** the href actually matches `/css/clientN-*.css` (dev/test naming). Production id-named hrefs are expected to stay unpromoted — that is F1(b), not a regression. |
+| Observation                                                                                    | Meaning                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<link … data-precedence="rsc-css">` appears **before** the boundary's reveal script           | Streamed reveal is gated (browser blocks the following inline script on the pending sheet). Observed only in dev/test builds; do not expect `$RR(` for hint-replayed styles — the 2026-07-09 production capture showed hints yield preloads, not React-gated reveals. |
+| `<link rel="preload" as="style">` for the boundary CSS, no `rsc-css` link, plain `$RC(` reveal | **Ungated reveal — the confirmed production defect.** FOUC occurs whenever CSS latency exceeds the parse window (verified visibly, Step 3).                                                                                                                           |
+| Links present, reveal is plain `$RC(`                                                          | A fallback layer produced the links — L2 or L3, not React. Attribute before concluding (see below); check the links precede the reveal in byte order.                                                                                                                 |
+| **No** `rsc-css` links anywhere, reveal is plain `$RC(`                                        | All layers dead ⇒ FOUC predicted deterministically on a cold cache. Go to Step 3 to see it.                                                                                                                                                                           |
+| `<link rel="preload" as="style" …clientN….css>` never promoted to `rel="stylesheet"`           | L2 regression **only if** the href actually matches `/css/clientN-*.css` (dev/test naming). Production id-named hrefs are expected to stay unpromoted — that is F1(b), not a regression.                                                                              |
 
 Attributing a `data-precedence` link to L2 vs L3 (they coexist with `$RC(`):
 
@@ -169,13 +184,13 @@ test meaningless (any flash then is the all-layers-dead case, not a timing race)
 
 For the release decision, the matrix that matters:
 
-| Build                                                 | B1 (`css` arrays)  | Predicted                         | Observed                                                               |
-| ----------------------------------------------------- | ------------------ | --------------------------------- | ---------------------------------------------------------------------- |
-| webpack, production                                   | expected present   | no FOUC (React gates)             |                                                                        |
-| rspack ≥ 19.2.1-rc.0, concrete publicPath, production | expected present   | no FOUC                           | Step 1 2026-07-09: B1 present, B2 numeric, CSS id-named (Step 2+ open) |
-| rspack 19.2.0-line, production                        | absent             | **deterministic cold-cache FOUC** |                                                                        |
-| rspack, `publicPath: 'auto'`, production              | absent             | **deterministic cold-cache FOUC** |                                                                        |
-| either bundler, dev/test, slow server component       | n/a (L3/L4 active) | rare timing FOUC (F3)             |                                                                        |
+| Build                                                 | B1 (`css` arrays)  | Predicted                         | Observed                                                                                                          |
+| ----------------------------------------------------- | ------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| webpack, production                                   | expected present   | ~~no FOUC~~ ungated reveal        | Step 1 2026-07-09: identical posture (numeric id, id-named CSS) — same defect expected                            |
+| rspack ≥ 19.2.1-rc.0, concrete publicPath, production | expected present   | ~~no FOUC~~ ungated reveal        | **FAIL 2026-07-09**: Steps 1–3 — preload-only stream, ungated $RC, ~3.9 s visible unstyled probe with CSS delayed |
+| rspack 19.2.0-line, production                        | absent             | **deterministic cold-cache FOUC** |                                                                                                                   |
+| rspack, `publicPath: 'auto'`, production              | absent             | **deterministic cold-cache FOUC** |                                                                                                                   |
+| either bundler, dev/test, slow server component       | n/a (L3/L4 active) | rare timing FOUC (F3)             |                                                                                                                   |
 
 If the two "deterministic" rows reproduce, the one-time sighting is explained without
 any further race-hunting: first cold visit flashes, browser cache hides every

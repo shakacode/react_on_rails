@@ -10,26 +10,39 @@ pins — dist inspected from the published npm tarball) and `19.2.0-rc.1` (publi
 tarball for the 19.2.0 line; also found as a stale install in one long-lived checkout),
 and `shakapacker@10.3.0` (published tarball).
 
-**Verification status:** Step 1 of the verification procedure was executed 2026-07-09 on
-the dummy app (Rspack 2.0.5, `react-on-rails-rsc@19.2.1-rc.0`, `NODE_ENV=production`) —
-see the addendum at the end of this document. B1 (manifest `css` arrays) **passed** on
-the supported config; B2 confirmed numeric chunk ids; the observed CSS asset naming
-(`css/4092-98880bc1.css`) additionally proved L2 production-dead (see F1).
+**Verification status (supersedes analysis-only claims below where they differ):**
+Steps 1–3 of the verification procedure were executed 2026-07-09 on the dummy app
+(Rspack 2.0.5, `react-on-rails-rsc@19.2.1-rc.0`, `NODE_ENV=production`) — see the
+addendum. Outcome: **visible FOUC confirmed on the supported production config**
+(~3.9 s of unstyled visible content with the chunk CSS delayed 4 s). B1 (manifest `css`
+arrays) passed, but this register's original claim that L1 gates the server-streamed
+reveal via `$RR` was **wrong**: a post-shell stylesheet hint yields only a non-blocking
+`<link rel="preload">` in the Fizz stream, and React's precedence commit-blocking
+applies to the browser-side hydration/replay path, not to the streamed `$RC` reveal
+(independently documented in the concurrently merged first-principles doc, PR #4555).
+Streamed-reveal gating is provided **only** by the fallback layers L2/L3/L4 — all
+production-dead per F1. Webpack production shows the identical posture (numeric id
+`1719`, id-named `css/1719-565193e9.css`, `css` arrays present), so the gap is
+bundler-independent.
 
 ## How the pipeline actually layers (corrected model)
 
 The FOUC prevention is **four layers**, not one pipeline. Ordered by primacy:
 
-| #   | Layer                                                                                                                                                                                                                                                                                                                                                                     | Input                                                    | Where                                                                                                                                                                       |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L1  | **Manifest-CSS stylesheet hints** — `preinit(href, { as: 'style', precedence: 'rsc-css' })` fired during the Flight render for every client reference whose manifest entry has a `css` array. React itself then emits the `<link rel="stylesheet" data-precedence="rsc-css">` and gates the Suspense reveal (`$RR` / `completeBoundaryWithStyles`) until the sheet loads. | `css` arrays in `react-client-manifest.json`             | `react-on-rails-rsc` `dist/flight-stylesheet-hints.js`, wired into every render by `buildServerRenderer` (`dist/server.node.js`), consumed via `manifestLoaderServer.ts:17` |
-| L2  | **Preload-tag promotion** — Fizz-emitted `<link rel="preload" as="style">` tags whose href matches `/css/clientN-*.css` are rewritten in the stream to render-blocking `rel="stylesheet" data-precedence="rsc-css"`. Dev/test-only in practice: production CSS filenames are id-based and never match (F1(b)).                                                            | Fizz HTML output (itself downstream of L1 hints)         | `injectRSCPayload.ts:1522` (`applyStreamedStylesheetPreloadGating`), href filter at `:115`                                                                                  |
-| L3  | **Flight chunk-name inference** — raw Flight text is regex-scanned for `"clientN","js/clientN-*.chunk.js"` pairs; matches are looked up in a chunk→CSS map built from `loadable-stats.json` and injected as `data-precedence="rsc-css"` links ahead of the HTML in each flush.                                                                                            | `loadable-stats.json` copied next to the renderer bundle | `injectRSCPayload.ts:116` (regex), `:262` (map load), `:387` (tag emission)                                                                                                 |
-| L4  | **Suspense-reveal deferral** — while L3 inference is "pending" for any payload stream, HTML containing React's `$RC(` reveal script is split and the reveal held back so an L3 link can flush first. Pending state clears on the **first** stylesheet found per stream, on stream end, or after a **100 ms** timeout.                                                     | L3's map being non-empty                                 | `injectRSCPayload.ts:1716` (`shouldDeferRevealHtml`), `:122` (timeout), `:1961-1978`, `:2007-2009`                                                                          |
+| #   | Layer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Input                                                    | Where                                                                                                                                                                       |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1  | **Manifest-CSS stylesheet hints** — `preinit(href, { as: 'style', precedence: 'rsc-css' })` fired during the Flight render for every client reference whose manifest entry has a `css` array. Server-side effect (verified): a hint that reaches Fizz **before shell flush** becomes a blocking head link; a **post-shell** hint yields only a non-blocking `<link rel="preload">` (rule confirmed in the 2026-07-09 stream capture). React's precedence commit-blocking gates the browser-side hydration/replay path, **not** the streamed `$RC` reveal. | `css` arrays in `react-client-manifest.json`             | `react-on-rails-rsc` `dist/flight-stylesheet-hints.js`, wired into every render by `buildServerRenderer` (`dist/server.node.js`), consumed via `manifestLoaderServer.ts:17` |
+| L2  | **Preload-tag promotion** — Fizz-emitted `<link rel="preload" as="style">` tags whose href matches `/css/clientN-*.css` are rewritten in the stream to render-blocking `rel="stylesheet" data-precedence="rsc-css"`. Dev/test-only in practice: production CSS filenames are id-based and never match (F1(b)).                                                                                                                                                                                                                                            | Fizz HTML output (itself downstream of L1 hints)         | `injectRSCPayload.ts:1522` (`applyStreamedStylesheetPreloadGating`), href filter at `:115`                                                                                  |
+| L3  | **Flight chunk-name inference** — raw Flight text is regex-scanned for `"clientN","js/clientN-*.chunk.js"` pairs; matches are looked up in a chunk→CSS map built from `loadable-stats.json` and injected as `data-precedence="rsc-css"` links ahead of the HTML in each flush.                                                                                                                                                                                                                                                                            | `loadable-stats.json` copied next to the renderer bundle | `injectRSCPayload.ts:116` (regex), `:262` (map load), `:387` (tag emission)                                                                                                 |
+| L4  | **Suspense-reveal deferral** — while L3 inference is "pending" for any payload stream, HTML containing React's `$RC(` reveal script is split and the reveal held back so an L3 link can flush first. Pending state clears on the **first** stylesheet found per stream, on stream end, or after a **100 ms** timeout.                                                                                                                                                                                                                                     | L3's map being non-empty                                 | `injectRSCPayload.ts:1716` (`shouldDeferRevealHtml`), `:122` (timeout), `:1961-1978`, `:2007-2009`                                                                          |
 
-L1 is the real mechanism (it is what Next.js-style RSC CSS does). L2–L4 are
-compensations that only matter when L1's input (`css` arrays) is missing or late.
-When L1 works, React's own `$RR` gating makes L2–L4 redundant for correctness.
+L1 is the root input and the browser-side (hydration) gating; **but for the
+server-streamed reveal it only produces preloads once the shell has flushed** — so the
+streamed reveal is CSS-gated exclusively by L2/L3/L4 (link-before-`$RC` byte order plus
+the browser rule that a pending stylesheet blocks a following inline script). The
+original version of this register claimed React's `$RR` gating covers the streamed
+reveal when L1 is healthy; the 2026-07-09 runtime check disproved that — a healthy-L1
+production stream carries a bare preload and an ungated `$RC`.
 
 **Correction to Stage 1:** the earlier claim "the framework calls no `preinit`" is
 **wrong**. The framework's primary mechanism _is_ `preinit` — but `preinit`
@@ -74,12 +87,17 @@ bundlers.** The FOUC e2e gate (`rsc_fouc.spec.ts`, including the Rspack job in
 ids — **the production posture is never exercised by any gate.** The unit-test Flight
 fixtures (`injectRSCPayload.test.ts:489`) hard-code the dev-mode `"client1"` shape.
 
-Impact: contained where L1 works — verified 2026-07-09 for the supported Rspack config
-(19.2.1-rc.0, concrete publicPath: `css` arrays present), and expected for webpack with
-`react-on-rails-rsc ≥ 19.0.5-rc.6` — because React's own reveal gating takes over.
-Where L1 is also broken (see F2) there is **no FOUC protection at all in production**
-(L2 has no preload tags to promote without L1's hints, and could not match their hrefs
-anyway per (b)), and the flash is deterministic on a cold cache.
+Impact — **corrected by the 2026-07-09 runtime check, which raised severity**: the
+original analysis assumed React's own reveal gating covers a healthy-L1 build; it does
+not (post-shell hints emit only preloads; precedence commit-blocking is
+hydration-side). So with L2/L3/L4 all production-dead, **the server-streamed reveal is
+never CSS-gated in a default production build — even on the supported config with
+healthy `css` arrays — under both bundlers.** Confirmed visibly: with the chunk CSS
+delayed 4 s, the FOUC probe was visible and unstyled for ~3.9 s (Steps 2–3 addendum).
+The preload's head start is the only mitigation, which is why the flash is rare in the
+wild (it needs CSS latency to exceed the stream-parse window) and why the browser disk
+cache hides it on every revisit. Where L1's input is also broken (see F2), the preload
+disappears too and the flash needs no latency at all.
 
 ### F2 — HIGH (correctness, Rspack): manifest `css` arrays have three silent-omission conditions
 
@@ -120,12 +138,12 @@ Three code facts (`injectRSCPayload.ts:122`, `:1961-1978`, `:2007-2009`):
   stylesheet link once the deferral window is gone.
 
 An async Server Component that takes >100 ms to produce its first client-reference row
-(any real DB query) exits the protected window by design. **This is the only mechanism
-found that is consistent with "reproduced exactly once, conditions unknown" in a
-dev/test-mode build** — it needs jitter to line up, and L4 only matters at all when L1
-is absent. (In a production build, F1/F2 make the flash deterministic-on-cold-cache
-instead, which also matches a one-time sighting: the second visit serves the CSS from
-disk cache and the flash disappears.)
+(any real DB query) exits the protected window by design. This is the dev/test-mode
+flicker mechanism — it needs jitter to line up. (In a production build, F1 makes the
+streamed reveal unconditionally ungated instead — confirmed visibly on 2026-07-09 — so
+the production flash needs only cold-cache CSS latency, which equally matches a
+one-time sighting: the second visit serves the CSS from disk cache and the flash
+disappears.)
 
 ### F4 — MEDIUM (ops): loadable-stats load-state caching creates silent unprotected windows
 
@@ -179,25 +197,25 @@ to let L2/L4 safely splice tags into someone else's HTML stream. That scanner is
 individually well-built, but it exists **only because the design point is "re-parse
 React's output"** rather than "tell React about the CSS up front" (L1).
 
-Verdict:
+Verdict — **revised after the 2026-07-09 runtime check**:
 
-- **Essential:** L1 (manifest `css` arrays → `preinit` with precedence). This is the
-  smallest correct design; it is also what the reviewer's "one loader, ~100 lines"
-  intuition maps onto — his loader and L1 are the same idea (attach CSS to the boundary
-  and let the reveal block on it), and L1 is the React-native version of it.
-- **Compensatory, removable in principle:** L2, L3, L4 — plus `loadable-stats.json`
-  generation/shipping (`@loadable/webpack-plugin` in client configs,
-  `renderer_cache_helpers.rb:27` staging), the
-  chunk→CSS map loader, and ~2/3 of the scanner. They only add safety where L1's input
-  is missing — and per F1 the two layers that need the scanner most are already inert in
-  production, which is strong evidence they are not load-bearing for real deployments
-  on webpack.
-- **The single highest-value simplification:** close L1's input gaps (F2) and verify L1
-  under production builds of both bundlers — then delete L3+L4 (and reassess L2). That
-  removes the loadable-stats sidecar, the 100 ms heuristic, the `$RC` scraping, and the
-  reveal-splitting logic in one move, and shrinks the FOUC surface from four layers in
-  ~8 modules to one layer whose behavior is owned by React and covered by React's own
-  semver contract.
+- **Essential:** L1's input (manifest `css` arrays → `preinit` with precedence) — it
+  drives the preload head start, the hydration-side gating, and any future streamed
+  gating. It is also what the reviewer's "one loader, ~100 lines" intuition maps onto.
+  However, L1 alone **cannot** gate the server-streamed reveal (post-shell hints are
+  preload-only), so "keep only L1, delete the rest" — the original recommendation here —
+  **does not survive the evidence**: some stream-level mechanism that puts a blocking
+  link ahead of the reveal script is required.
+- **One stream-level gating mechanism is needed; four are present and the wrong one is
+  load-bearing.** The correct simplification target: a single, manifest-driven
+  promotion/injection (e.g. promote any streamed `as="style"` preload whose href is in
+  the manifest `css` union — filename-agnostic, id-agnostic, works in production) that
+  replaces the filename-regex promotion (L2), the loadable-stats inference (L3), and
+  most of the deferral heuristic (L4).
+- **Removable outright once that lands:** the loadable-stats sidecar and its
+  generation/shipping (`@loadable/webpack-plugin`, `renderer_cache_helpers.rb:27`
+  staging), the Flight-text regex, the 100 ms timeout, and roughly 2/3 of the
+  streaming-HTML scanner.
 
 Spread today (~8 modules): `injectRSCPayload.ts`, `RSCRequestTracker.ts` (tee),
 `streamServerRenderedReactComponent.ts`, `rscDomMarkers.ts`,
@@ -212,48 +230,77 @@ Gate each step on the verification procedure
 ([rsc-fouc-verification-procedure.md](./rsc-fouc-verification-procedure.md)) passing
 in **production-mode** builds:
 
-1. **Make L1 unconditionally healthy (prereq for everything).** Fix/verify Rspack `css`
-   arrays on the 19.2.1 line for: concrete vs `auto` publicPath (fail loudly, not
-   warn-and-omit), native-CSS vs `CssExtractRspackPlugin` extraction, split-chunks
-   groups. Add a production-mode (deterministic-ids) FOUC gate to CI — the current gate
-   only ever tests dev-mode builds.
+0. **(Moved ahead of the release, per the 2026-07-09 confirmation.)** Fix the
+   production streamed-reveal gating gap — the confirmed visible FOUC on the supported
+   config. Candidate fixes, in order of preference: (a) manifest-driven preload
+   promotion in `injectRSCPayload` — promote any streamed `as="style"` preload whose
+   href appears in the manifest `css` union (filename/id-agnostic, fixes both bundlers,
+   one function); (b) config-level: name-based CSS `chunkFilename` in generated configs
+   so the existing filter matches (no Pro-src change, but every existing app must edit
+   config). Decision owner: maintainer (this is a source change during the freeze).
+1. **Make L1 input unconditionally healthy.** Fix/verify Rspack `css` arrays on the
+   19.2.1 line for: concrete vs `auto` publicPath (fail loudly, not warn-and-omit),
+   native-CSS vs `CssExtractRspackPlugin` extraction, split-chunks groups. Add a
+   production-mode (deterministic-ids) FOUC gate to CI — the current gate only ever
+   tests dev-mode builds and would have caught this.
 2. **Delete L3 + L4** (Flight regex inference, loadable-stats map, 100 ms deferral,
-   `$RC` reveal-splitting) once (1) is green. This is the single change that most
-   reduces fragility: it removes the only pieces with silent env-dependent no-op
-   behavior (F1, F4), the React-internals `$RC` coupling (F6), and the majority of the
-   2,160-line file.
-3. **Reassess L2** (preload promotion): keep only if a real case exists where Fizz emits
-   a preload-but-not-stylesheet for boundary CSS with precedence hints active; otherwise
-   delete, which also removes most of the remaining HTML scanner.
+   `$RC` reveal-splitting) once (0)+(1) are green — the manifest-driven promotion
+   subsumes them. Removes the silent env-dependent no-op behavior (F1, F4), the
+   React-internals `$RC` coupling for deferral (F6), and the majority of the 2,160-line
+   file.
+3. **Converge L2 into the manifest-driven promotion** from (0) — one gating mechanism,
+   no filename regexes.
 4. **Drop the `loadable-stats.json` sidecar end-to-end** (LoadablePlugin config,
    renderer staging, rolling-deploy checks) once L3 is gone — it has no other consumer
    in the RSC path.
-5. **Fix the two doc claims in F5** (can be done now — docs-only).
+5. **Fix the doc claims in F5** (docs-only) — plus align `css-and-styling.md`'s
+   "silently does nothing" table with the fact that the disabling conditions are the
+   production **defaults**, not edge configs.
 6. **Keep, as-is:** the multi-buffer flush ordering (initialization scripts →
    stylesheets → HTML → payload scripts → payload marks) and the `flush()`-signal
    design — they are streaming-correctness concerns independent of CSS, are
    well-commented, and have test coverage.
 
-## Addendum — verification Step 1 results (2026-07-09)
+## Addendum — verification Steps 1–3 results (2026-07-09)
 
 Executed on the Pro dummy app: `SHAKAPACKER_ASSETS_BUNDLER=rspack`
 `RAILS_ENV=production NODE_ENV=production`, Rspack 2.0.5,
-`react-on-rails-rsc@19.2.1-rc.0`, `bin/shakapacker-precompile-hook` +
-`CLIENT_BUNDLE_ONLY=true bin/shakapacker`.
+`react-on-rails-rsc@19.2.1-rc.0`, `bin/shakapacker-precompile-hook` + all three
+bundles, node renderer + Puma running in production mode.
 
-Observed in `public/webpack/production/react-client-manifest.json`:
+**Step 1 — build classification** (`public/webpack/production/react-client-manifest.json`):
 
 - **B1 PASS (supported config):** the FOUC probe client reference carries
   `css: ["/webpack/production/css/4092-98880bc1.css"]` — concrete publicPath-prefixed
   href; 2 of 10 client references have `css` arrays (the two that import CSS Modules).
 - **B2 numeric, as predicted:** `chunks: [4092, "js/client1-daa4837bf751aaff.chunk.js"]`
   — unquoted numeric id alongside a name-shaped JS filename, confirming F1(a).
-- **CSS asset naming id-based, new evidence:** `css/4092-98880bc1.css` (not
-  `css/client1-…css`), confirming F1(b): L2 cannot match production CSS hrefs.
+- **CSS asset naming id-based:** `css/4092-98880bc1.css` (not `css/client1-…css`),
+  confirming F1(b): L2 cannot match production CSS hrefs.
 - `loadable-stats.json` was emitted next to the manifest.
+- **Webpack production identical** (client build): `chunks: [1719,
+"js/client1-c871ec18eab390c01cad.chunk.js"]`, `css: ["/webpack/production/css/1719-565193e9.css"]`.
 
-Conclusion for the 17.0 gate: on the supported Rspack production config, the primary
-layer (L1) has healthy input, so no deterministic FOUC is predicted there. Runtime
-confirmation of the streamed `$RR` gating (procedure Step 2) remains open. The
-deterministic-FOUC rows remain predicted for 19.2.0-line packages and
-`publicPath: 'auto'`/function builds.
+**Step 2 — stream capture** (`curl -sN /rsc_fouc_probe`, 13,805 bytes):
+
+- Zero `data-precedence="rsc-css"` links in the whole stream.
+- The probe's CSS appears exactly once, as `<link rel="preload" as="style"
+href="/webpack/production/css/4092-98880bc1.css"/>` — non-blocking.
+- Byte order around the boundary: payload script → **preload** → async chunk `<script>`
+  → `<div hidden id="…S:0">` (probe markup) → `$RC` definition + call. One `$RC(`, zero
+  `$RR(` — the reveal is ungated; nothing between the preload and the reveal blocks.
+
+**Step 3 — visible-flash confirmation** (Playwright, chunk CSS delayed 4 s, cache
+disabled): the probe was **visible and unstyled from t≈299 ms to t≈4181 ms**
+(transparent background, sentinel custom property unset — 51 consecutive samples), then
+fully styled at t≈4258 ms when the delayed CSS applied. Control note: hard-**aborting**
+the CSS instead of delaying it fails the async chunk load itself (the bundler runtime
+couples chunk CSS to chunk JS), which masks the flash behind a
+`ServerComponentFetchError` — use a delay, not an abort, when reproducing.
+
+**Conclusion for the 17.0 gate: FAIL on the supported config.** The server-streamed
+reveal is not CSS-gated in a default production build under either bundler; the visible
+flash reproduces deterministically whenever chunk-CSS latency exceeds the parse window.
+The 19.2.0-line / `publicPath: 'auto'` rows are strictly worse (no preload head start
+at all). Fix options are listed as item 0 of the simplification priorities; the
+decision is the maintainer's (source freeze until 17.0 final).

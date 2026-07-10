@@ -50,11 +50,13 @@ The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider 
 
 ## CSS & FOUC
 
-_Verified against the code (July 2026): the FOUC-prevention mechanism is manifest-driven
-`preinit` **with a `precedence` option** — render-blocking per Suspense boundary — plus
-stream-level fallback layers. An earlier provisional note claimed the framework calls no
-`preinit`; that was wrong. What the framework avoids is `preinit`/`preload` **without**
-precedence, which is non-blocking and flicker-prone._
+_Verified against the code and a production runtime capture (July 2026): manifest-driven
+`preinit` **with a `precedence` option** supplies the CSS knowledge, but on the
+server-streamed path it yields a blocking link only pre-shell — post-shell it emits a
+non-blocking preload, and the streamed reveal is gated solely by the stream-level layers
+placing a stylesheet link ahead of the reveal script. An earlier provisional note
+claimed the framework calls no `preinit`; that was wrong. What the framework avoids is
+`preinit`/`preload` **without** precedence, which is non-blocking and flicker-prone._
 
 **FOUC (Flash of Unstyled Content)**:
 The interval in which streamed DOM paints with zero styling before its stylesheet
@@ -78,9 +80,11 @@ string.
 **Stylesheet Hint**:
 The `preinit(href, { as: 'style', precedence: 'rsc-css' })` call the framework fires
 during the Flight render for each rendered client reference with Manifest CSS. React
-carries the hint through the payload, emits the `<link rel="stylesheet"
-data-precedence="rsc-css">`, and **blocks that boundary's reveal until the sheet loads**.
-When hints work, React itself prevents FOUC; the framework adds no scraping.
+carries the hint through the payload. Verified effect: a blocking head link if the hint
+reaches Fizz **before shell flush**; only a non-blocking `<link rel="preload">` after
+it; and commit-blocking on the **browser-side** hydration/replay path. It does **not**
+gate the server-streamed `$RC` reveal — that gating exists only when a stream-level
+layer places a stylesheet link ahead of the reveal script.
 
 **Streamed (per-boundary) CSS**:
 Stylesheets for components that arrive later in the stream, emitted as
@@ -94,16 +98,17 @@ Hints and by the fallback-injected links. React hoists the bucket to the end of
 critical CSS.
 
 **FOUC fallback layers**:
-The stream-level compensations that act only when Manifest CSS (and therefore Stylesheet
-Hints) are missing or late: promotion of streamed stylesheet **preload** tags to
-render-blocking links; inference of stylesheet links from client-chunk names in the raw
-Flight text (fed by a `loadable-stats.json` chunk→CSS map); and **Suspense-reveal
-deferral** — holding React's reveal script back briefly so an inferred link can flush
-first. These layers are heuristic and dev/test-only in practice: in production-mode
-builds numeric chunk ids defeat the chunk-name inference (and its deferral), and
-id-based CSS filenames defeat preload promotion — so a default production build is
-protected by Stylesheet Hints alone. The deferral protects only a short window per
-payload stream.
+The stream-level mechanisms that gate the streamed reveal: promotion of streamed
+stylesheet **preload** tags to render-blocking links; inference of stylesheet links
+from client-chunk names in the raw Flight text (fed by a `loadable-stats.json`
+chunk→CSS map); and **Suspense-reveal deferral** — holding React's reveal script back
+briefly so an inferred link can flush first. "Fallback" is historical naming: for the
+server-streamed reveal they are the **only** gating. They are also dev/test-only in
+practice — in production-mode builds numeric chunk ids defeat the chunk-name inference
+(and its deferral), and id-based CSS filenames defeat preload promotion — so a default
+production build's streamed reveal is **ungated** (confirmed visibly, July 2026), with
+only the hint-driven preload's head start as mitigation. The deferral protects only a
+short window per payload stream.
 _This is the precise referent of the July 2026 review's "multiple batches": the layered
 fallbacks, contrasted with the reviewer's abandoned single-module "loader" (which is the
 same idea as Stylesheet Hints — attach CSS to the boundary and let the reveal block on
@@ -117,8 +122,9 @@ _Avoid_: client-only component
 
 ### CSS & FOUC relationships
 
-- Manifest CSS ⇒ Stylesheet Hints ⇒ React-owned reveal blocking. The fallback layers are
-  redundant whenever this chain is healthy; they carry the page only when it is broken.
+- Manifest CSS ⇒ Stylesheet Hints ⇒ preload head start + browser-side hydration
+  gating. Streamed-reveal gating additionally requires a FOUC fallback layer to fire; a
+  healthy manifest alone does not prevent streamed FOUC (confirmed July 2026).
 - Dev HMR builds inline CSS into JS, so neither FOUC nor its prevention is observable in
   HMR — absence of flicker in dev proves nothing about production.
 - See `docs/adr/0002-rsc-css-data-precedence-over-preinit.md` for why per-boundary

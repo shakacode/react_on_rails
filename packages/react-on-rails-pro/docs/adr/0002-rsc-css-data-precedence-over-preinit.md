@@ -4,12 +4,16 @@ Status: accepted (documented retroactively 2026-07-09 from the July 2026 CSS/FOU
 research pass; the decision itself shipped across the 17.0 RC line)
 
 Streamed RSC pages deliver each client component's extracted CSS as a
-`<link rel="stylesheet" data-precedence="rsc-css">` tied to that component's Suspense
-boundary, driven by per-client-reference `css` arrays in `react-client-manifest.json`
-and `preinit(href, { as: 'style', precedence: 'rsc-css' })` calls during the Flight
-render. React then blocks **that boundary's reveal** — and only that boundary's — until
-the sheet loads. Stream-level fallbacks (preload-tag promotion, Flight chunk-name
-inference, reveal deferral) exist for builds where the manifest `css` input is missing.
+`<link rel="stylesheet" data-precedence="rsc-css">` placed **ahead of that component's
+Suspense reveal script in the byte stream**, driven by per-client-reference `css` arrays
+in `react-client-manifest.json` and `preinit(href, { as: 'style', precedence:
+'rsc-css' })` calls during the Flight render. The reveal blocking is per-boundary — a
+pending stylesheet blocks only the inline reveal script that follows it — so first paint
+and other boundaries never wait. Two mechanisms cooperate: React's own gating covers the
+pre-shell head links and the browser-side hydration/replay path, while stream-level
+transforms (preload-tag promotion, Flight chunk-name inference, reveal deferral) supply
+the link-before-reveal ordering for post-shell boundaries, where Fizz emits only a
+non-blocking preload for a replayed hint (verified July 2026).
 
 ## Why
 
@@ -27,12 +31,16 @@ Three designs were genuinely on the table; each fails a different requirement:
   rendering is false). Rejected as the primary mechanism; preload tags appear in the
   stream only as hint residue and are _promoted_ to blocking links by the fallback
   layer.
-- **`data-precedence` stylesheets bound to the boundary (chosen):** React 19's resource
-  system treats a precedence-tagged stylesheet as a blocking dependency of the Suspense
-  boundary that referenced it (`completeBoundaryWithStyles`). First paint depends only
-  on shell CSS; each streamed section reveals exactly when _its_ CSS is ready. This is
-  also the Next.js App Router shape, so it tracks the design React's own team keeps
-  working.
+- **`data-precedence` stylesheets bound to the boundary (chosen):** a precedence-tagged
+  stylesheet link placed before the boundary's reveal script blocks exactly that
+  boundary — via React's resource gating where React owns the link (pre-shell head
+  links, browser-side replay) and via the browser's pending-stylesheet script-blocking
+  rule for stream-inserted links. First paint depends only on shell CSS; each streamed
+  section reveals exactly when _its_ CSS is ready. This is also the Next.js App Router
+  shape, so it tracks the design React's own team keeps working. Caveat verified July
+  2026: React does not gate the server-streamed reveal for post-shell hint-replayed
+  styles — the stream-level transforms are load-bearing there, and the filename-keyed
+  variants are inert in default production builds (see the findings register).
 
 The "Fizz-scraping" part of the implementation — regex-detecting reveal scripts and
 splicing links into the HTML stream — is **not** part of this decision's ideal state.
