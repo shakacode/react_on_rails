@@ -6680,16 +6680,13 @@ to measure the end-to-end performance impact of RSC changes with a paired A/B co
   blindly linking every client manifest entry. The links can still include any CSS bundled into those
   referenced chunks, so broad client boundaries or shared chunks can make more CSS render-blocking than
   a single component appears to need.
-- The streamed reveal gate is **fail-open**: if Flight data lags a boundary reveal by more than
-  100ms, the reveal flushes without waiting for stylesheet inference. A rare, brief FOUC under heavy
-  server delay is expected behavior, not a configuration error. See
+- The streamed reveal gate is **fail-open** (100ms budget) — see
   [When the FOUC pipeline silently does nothing](#when-the-fouc-pipeline-silently-does-nothing).
-- The same stylesheet href can legitimately appear twice in the stream (once promoted from a React
-  preload, once injected from stats inference). The duplicate costs no extra network fetch and is
-  deduplicated when links are moved to `<head>` at hydration.
-- The reveal-deferral mechanism reads React's inline `$RC(` reveal scripts from the HTML stream.
-  Configurations that remove inline Fizz scripts (React's external runtime option) silently disable
-  it. Re-verify streamed-CSS behavior on every React upgrade, including minor versions.
+- The same stylesheet href can legitimately appear twice in the stream — see
+  [two paths, one bucket](#where-the-late-css-comes-from-two-paths-one-bucket).
+- The reveal-deferral mechanism reads React's inline `$RC(` scripts — see
+  [Coupling to React internals](#coupling-to-react-internals-what-breaks-where) and re-verify on
+  every React upgrade, including minors.
 - Older `react-client-manifest.json` files without `css` arrays (pre `react-on-rails-rsc@19.0.5-rc.6`)
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
 - For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links. Verify
