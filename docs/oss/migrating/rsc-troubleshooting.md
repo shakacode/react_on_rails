@@ -418,9 +418,13 @@ render-blocking behavior.
 
 For RSC pages, React on Rails Pro injects
 `<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
-in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: React
-delays committing the streamed content until the referenced stylesheets are ready, which prevents a
-flash of unstyled content (FOUC) as the tree streams in.
+in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: the
+streaming pipeline places each link in the byte stream ahead of React's inline boundary-reveal
+script, and the browser's stylesheet-blocks-scripts rule holds that script until the CSS has
+loaded, which prevents a flash of unstyled content (FOUC) as the tree streams in. (The gate is
+stream ordering plus browser behavior — React itself does not delay streamed reveals for this CSS.
+See [How CSS reaches the browser](../../pro/react-server-components/css-and-styling.md#how-css-reaches-the-browser)
+for the full mechanism.)
 
 ### Per-reference broadcast multiplication (fixed in the 19.2 line)
 

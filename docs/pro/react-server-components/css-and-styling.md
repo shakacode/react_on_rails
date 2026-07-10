@@ -22,41 +22,150 @@ Status: entries marked with specific verification notes below. See the [full com
 
 ## How CSS reaches the browser
 
-CSS can reach the browser through two paths. Understanding both is essential for avoiding
-Flash of Unstyled Content (FOUC).
+This section explains the whole system from first principles, assuming you know the traditional SSR
+model but have never looked inside RSC streaming. It is grounded in the actual implementation
+(file and function references are given so you can verify against the source).
 
-### Path 1: Rails layout stylesheet tags
+### Three browser rules everything is built on
 
-The standard React on Rails path. Global CSS, Tailwind utilities, and design tokens are imported from the
-client pack and loaded via `stylesheet_pack_tag` in the Rails layout `<head>`:
+The entire FOUC story — in both traditional SSR and streamed RSC — reduces to three rules of
+browser behavior:
 
-```erb
-<%= stylesheet_pack_tag "client-bundle", media: "all" %>
+1. **A parser-created `<link rel="stylesheet">` in `<head>` is render-blocking.** The browser
+   paints nothing until every head stylesheet has loaded. This is why traditional SSR has no FOUC:
+   put all the CSS in `<head>`, and the first paint is styled by construction.
+2. **A stylesheet link in the `<body>` does not block paint of content parsed before it — but
+   while it is loading, the browser will not execute any later parser-inserted `<script>`**
+   (the HTML spec's "a style sheet that is blocking scripts" rule). Chromium additionally delays
+   painting content that appears _after_ an in-body stylesheet link.
+3. **`<link rel="preload" as="style">` only downloads.** A preload never applies styles and never
+   blocks anything.
+
+Rule 1 protects the initial shell. Rule 2 is the load-bearing mechanism for everything streamed
+after the shell: React on Rails Pro's streamed-CSS gating works by placing a real stylesheet
+`<link>` in the byte stream _before_ React's inline reveal script, so the reveal script cannot run
+until the CSS has loaded. It is a browser-spec mechanism, not a React feature.
+
+### What is in `<head>` at first paint
+
+The Rails layout owns `<head>`. The node renderer (the process that streams React HTML) never
+writes into it. The head CSS set at first paint is:
+
+- **Layout stylesheet tags** — whatever `stylesheet_pack_tag` links your layout declares (global
+  CSS, Tailwind, design tokens).
+- **Auto-appended generated component packs** — for every `stream_react_component` /
+  `react_component` call with `auto_load_bundle`, React on Rails calls
+  `append_stylesheet_pack_tag("generated/<ComponentName>")`
+  (`react_on_rails/lib/react_on_rails/helper.rb`, `load_pack_for_generated_component`), and the
+  layout's argless `<%= stylesheet_pack_tag %>` renders those links in `<head>`. This is the CSS
+  extracted for each component's _entry_ chunk — the synchronously imported client CSS of each
+  streamed root.
+
+Rails renders the entire layout (head included) as the **first streamed chunk**
+(`react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb`,
+`stream_view_containing_react_components`). By rule 1, that head CSS — and only that CSS — blocks
+first paint.
+
+What is deliberately **not** in `<head>` at first paint: CSS for code-split client components
+deeper in the RSC tree (the `clientN` chunks). Putting the whole page's CSS in `<head>` would make
+first paint wait for below-the-fold styling — the exact tradeoff streaming exists to avoid. That
+late CSS is delivered mid-stream instead, which is what the rest of this section is about.
+
+### What blocks first paint — and what does not
+
+| Blocks first paint                                            | Does NOT block first paint                                        |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `<head>` stylesheet links (layout + appended generated packs) | `rsc-css` stylesheet links streamed into the body for boundaries  |
+| Synchronous head scripts (standard browser behavior)          | RSC payload `<script>` tags (inline data pushes)                  |
+| —                                                             | `defer`/`async` JavaScript bundles                                |
+| —                                                             | The Flight (RSC payload) stream itself                            |
+| —                                                             | Suspense boundary content still streaming (fallbacks paint first) |
+
+### Timeline of a streamed RSC response
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant R as Rails<br/>(stream.rb)
+    participant I as injectRSCPayload<br/>(node renderer)
+    participant Z as React Fizz<br/>(HTML render)
+    participant F as React Flight<br/>(RSC render)
+
+    B->>R: GET /page (uncached)
+    R-->>B: Chunk 1 — layout shell: head with app CSS links
+    Note over B: Rule 1: head stylesheets are render-blocking.<br/>Nothing paints until they load.
+    R->>I: stream_react_component → node renderer
+    F-->>I: Flight payload chunks<br/>(client refs + preinit CSS hint rows)
+    F-->>Z: same payload consumed for SSR<br/>(hints replay into Fizz)
+    Z-->>I: shell HTML (Suspense fallbacks included)
+    I-->>B: [payload init scripts][inferred rsc-css links][shell HTML][payload scripts]
+    Note over B: FIRST PAINT: shell + fallbacks,<br/>styled by head CSS.
+    loop each Suspense boundary that finishes on the server
+        F-->>I: Flight chunk referencing clientN chunks
+        Note over I: Path B: map clientN → CSS hrefs<br/>via loadable-stats.json
+        Z-->>I: hidden boundary HTML + inline $RC( reveal script<br/>(+ link rel=preload for late hint CSS)
+        Note over I: Path A: promote preload links to stylesheets.<br/>Defer $RC HTML until inference resolves (≤100ms).
+        I-->>B: [rsc-css link tags][hidden HTML][$RC( script][payload scripts]
+        Note over B: Rule 2: the pending rsc-css stylesheet blocks<br/>the inline $RC script → boundary reveals<br/>only after its CSS has loaded.
+        B->>B: $RC( swaps fallback → styled content
+    end
+    B->>B: Hydration: prepareRSCHydrationRoot moves rsc-css links to head<br/>and waitForGeneratedComponentStylesheets gates the React render
 ```
 
-This works for all rendering modes because Rails always renders the layout HTML around the component.
+Key point for readers coming from SSR: the reveal of each streamed boundary is **not** gated by
+React knowing about CSS. React's own CSS-aware reveal path (`$RR` / `completeBoundaryWithStyles`)
+only engages for `<link precedence="...">` elements rendered _inside_ a boundary, which the
+framework's automatic pipeline never does. The gate is byte ordering plus browser rule 2.
 
-### Path 2: RSC client-chunk stylesheet injection
+### Where the late CSS comes from: two paths, one bucket
 
-For CSS imported by `'use client'` components inside an RSC tree, React on Rails Pro has a dedicated
-FOUC prevention pipeline:
+CSS for a `'use client'` component inside the RSC tree is known to the framework in two independent
+ways, and both converge on the same `data-precedence="rsc-css"` link format:
 
-1. **Build time:** The RSC manifest identifies client references, while the client build records emitted
-   `clientN` chunk assets in `loadable-stats.json`. React on Rails Pro uses those stats to map each
-   RSC client chunk name to its extracted CSS files.
+```mermaid
+flowchart TB
+    M["react-client-manifest.json<br/>client reference → css: [hrefs]<br/>(built by RSCWebpackPlugin)"]
+    LS["loadable-stats.json<br/>assetsByChunkName: clientN → assets<br/>(client build output, copied next to the renderer bundle)"]
 
-2. **Render time:** When the node renderer streams Flight data, `injectRSCPayload` scans the current
-   payload for the client chunk names referenced by rendered client references. It injects only CSS
-   hrefs for those chunk names, deduplicating hrefs across the stream.
+    subgraph A["Path A — preload-tag promotion"]
+        A1["Flight render reads client reference metadata →<br/>manifest Proxy fires preinit(href, precedence: 'rsc-css')<br/>(react-on-rails-rsc flight-stylesheet-hints.ts)"]
+        A2["Hint row rides inside the Flight payload;<br/>replays into the live Fizz request during SSR"]
+        A3["Fizz AFTER shell flush: emits only<br/>link rel=preload as=style (non-blocking, rule 3)"]
+        A4["injectRSCPayload rewrites the streamed tag:<br/>rel=preload → rel=stylesheet + data-precedence=rsc-css<br/>(applyStreamedStylesheetPreloadGating / promoteStylesheetPreloadTag)"]
+        A1 --> A2 --> A3 --> A4
+    end
 
-3. **Stream injection:** `injectRSCPayload` emits
-   `<link rel="stylesheet" href="..." data-precedence="rsc-css">` elements before the streamed reveal
-   HTML that needs those client chunks.
+    subgraph BP["Path B — Flight-chunk inference"]
+        B1["injectRSCPayload regex-scans raw Flight bytes for<br/>&quot;clientN&quot;,&quot;js/clientN-hash.chunk.js&quot; pairs"]
+        B2["Maps chunk name → CSS hrefs via loadable-stats.json<br/>(loadRSCClientChunkStylesheetHrefsByChunkName)"]
+        B3["Injects link rel=stylesheet data-precedence=rsc-css<br/>flushed BEFORE the boundary HTML;<br/>defers $RC reveal HTML until inference resolves (≤100ms)"]
+        B1 --> B2 --> B3
+    end
 
-4. **Browser behavior:** React 19 hoists `<link rel="stylesheet" data-precedence="...">` elements
-   into `<head>`, deduplicates them across the RSC stream, and blocks tree commit until the
-   stylesheets load. This prevents the styled Client Component from painting before its CSS is
-   available.
+    M --> A1
+    LS --> B2
+    A4 --> C["link rel=stylesheet data-precedence=rsc-css<br/>ahead of the $RC( reveal script in the byte stream"]
+    B3 --> C
+    C --> G["Browser rule 2: pending stylesheet blocks the inline<br/>$RC script → boundary reveals styled"]
+    G --> H["Hydration: prepareRSCHydrationRoot moves rsc-css links<br/>into head, deduped by href + precedence"]
+```
+
+Why two paths exist:
+
+- **Path A alone is racy.** It can only promote a preload tag that Fizz already wrote, which
+  requires the Flight hint to have replayed into the Fizz request before that HTML flushed. If the
+  Flight stream lags the HTML stream, the boundary's `$RC` script can flush with no preceding link.
+- **Path B closes the race** by deriving CSS directly from the same Flight bytes the transform is
+  embedding into the page, and by holding back the reveal HTML until the inference has had a chance
+  to emit links — with a **100ms fail-open timeout** (`RSC_CLIENT_STYLESHEET_INFERENCE_TIMEOUT_MS`
+  in `injectRSCPayload.ts`). Fail-open means: if Flight data lags more than 100ms behind a reveal,
+  the reveal flushes ungated. A brief FOUC under heavy server delay is a designed-in tail risk, not
+  a bug in your app.
+- **Both paths routinely fire for the same stylesheet.** Path B's dedup set is not consulted by
+  Path A, so the stream can carry two `rsc-css` links for one href. This is benign — one network
+  fetch (HTTP cache), and the hydration fixup dedupes by href + precedence — but you may notice it
+  when reading page source.
 
 > [!NOTE]
 > RSC CSS collection is request/chunk driven, not a blanket scan of every client reference in the
@@ -65,14 +174,123 @@ FOUC prevention pipeline:
 > referenced by a page do not drag unrelated CSS into the render-blocking `rsc-css` group.
 
 > [!CAUTION]
-> These stylesheet links are render-blocking. Broad `'use client'` entry points that import
-> page-specific global CSS can make unrelated RSC pages wait on that CSS even when they do not
-> visually need it. Prefer thin client wrappers, CSS Modules, Tailwind utilities, or layout-level
-> global CSS for styles that are truly shared across pages.
+> These stylesheet links are render-blocking for the streamed content that follows them. Broad
+> `'use client'` entry points that import page-specific global CSS can make unrelated RSC pages wait
+> on that CSS even when they do not visually need it. Prefer thin client wrappers, CSS Modules,
+> Tailwind utilities, or layout-level global CSS for styles that are truly shared across pages.
 >
-> Contaminated global CSS can also win source-order ties if React hoists the RSC stylesheet links
-> after earlier Rails layout styles. Avoid bare element selectors in component stylesheets; if app
-> globals must override framework CSS, make that specificity explicit in the app's global stylesheet.
+> Contaminated global CSS can also win source-order ties because the `rsc-css` links end up after
+> earlier Rails layout styles in `<head>`. Avoid bare element selectors in component stylesheets; if
+> app globals must override framework CSS, make that specificity explicit in the app's global
+> stylesheet.
+
+### Module map: everything that touches CSS during RSC streaming
+
+```mermaid
+flowchart LR
+    subgraph BT["Build time"]
+        RWP["RSCWebpackPlugin<br/>(react-on-rails-rsc)"] --> RCM["react-client-manifest.json<br/>css array per client reference"]
+        CWB["Client webpack/rspack build"] --> LST["loadable-stats.json<br/>assetsByChunkName"]
+        CWB --> SMF["Shakapacker manifest.json"]
+    end
+
+    subgraph RB["Rails (Ruby)"]
+        HLP["helper.rb<br/>load_pack_for_generated_component"] -->|"append_stylesheet_pack_tag"| HED["Layout head CSS links<br/>(first streamed chunk)"]
+        PRH["pro_helper.rb<br/>generated_stylesheet_hrefs_json"] -->|"data-generated-stylesheet-hrefs"| SPT["Component spec script tag"]
+        STR["stream.rb<br/>stream_view_containing_react_components"] --> HED
+    end
+
+    subgraph NR["Node renderer (TypeScript)"]
+        WSH["flight-stylesheet-hints.ts<br/>withStylesheetHints Proxy → preinit"] --> FLP["Flight payload<br/>(data + CSS hint rows)"]
+        FLP --> FIZ["react-dom Fizz SSR<br/>preamble styles / late preloads / $RC scripts"]
+        FIZ --> INJ["injectRSCPayload.ts<br/>promotion + inference + reveal deferral"]
+        FLP --> INJ
+    end
+
+    subgraph BR["Browser (TypeScript)"]
+        CSR["ClientSideRenderer.ts<br/>waitForGeneratedComponentStylesheets"]
+        PHR["rscHydrationDom.ts<br/>prepareRSCHydrationRoot"]
+        GRC["getReactServerComponent.client.ts<br/>payload replay → preinit inserts head links"]
+    end
+
+    SMF --> HLP
+    SMF --> PRH
+    RCM --> WSH
+    LST -->|"chunk name → CSS hrefs"| INJ
+    INJ -->|"rsc-css links + HTML + payload scripts"| PHR
+    SPT -->|"hrefs to await before hydration"| CSR
+    INJ -->|"embedded Flight payload"| GRC
+```
+
+Data handoffs to know by name:
+
+| Data                                    | Producer                                                  | Consumer                                                   |
+| --------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------- |
+| `css` arrays in the RSC client manifest | `RSCWebpackPlugin` (react-on-rails-rsc)                   | `withStylesheetHints` Proxy → `preinit` hint rows          |
+| `loadable-stats.json`                   | Client build (must be copied next to the renderer bundle) | `injectRSCPayload` chunk-name → CSS map (Path B)           |
+| `data-precedence="rsc-css"` links       | `injectRSCPayload` (both paths)                           | Browser rule 2 gating; `prepareRSCHydrationRoot` head move |
+| `data-generated-stylesheet-hrefs`       | `pro_helper.rb` (requires `auto_load_bundle`)             | `waitForGeneratedComponentStylesheets` pre-hydration wait  |
+| Embedded Flight payload scripts         | `injectRSCPayload`                                        | `getReactServerComponent.client.ts` hydration replay       |
+
+### What makes a streamed component wait for its own CSS
+
+To answer it in one place, because it is the most commonly misunderstood part:
+
+1. `injectRSCPayload` guarantees a parser-created `<link rel="stylesheet" data-precedence="rsc-css">`
+   appears in the byte stream **before** the boundary's inline `$RC(` reveal script (via Path A
+   promotion in place, and/or Path B injection plus reveal deferral).
+2. Browser rule 2 does the rest: the pending stylesheet blocks execution of the inline script, so
+   the hidden boundary HTML is not swapped in until the CSS has loaded.
+3. After the swap, at hydration time, `prepareRSCHydrationRoot` moves those links into `<head>`
+   (so React's hydration does not see unexpected nodes in the component container), and
+   `waitForGeneratedComponentStylesheets` additionally waits (up to 10s) for the component's
+   generated-pack stylesheets before the React render begins — this protects the client-render
+   path (`prerender: false`), where React would otherwise insert DOM before head CSS finished
+   loading.
+
+React's own commit-blocking for precedence stylesheets applies only on the browser-side payload
+replay path (client-inserted styles during hydration/navigation), not to the server-streamed reveal.
+
+### When the FOUC pipeline silently does nothing
+
+Each of these conditions disables part or all of the streamed-CSS gating **without any error**.
+The page still works — CSS eventually arrives via the browser-side payload replay after hydration —
+but the streamed reveal is no longer gated, so a styled-late flash becomes possible:
+
+| Condition                                                                                          | What is disabled                                                                                   |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `loadable-stats.json` missing/unreadable next to the renderer bundle (retries 100ms → 30s backoff) | Path B entirely, including reveal deferral; Path A still runs                                      |
+| Chunk names not matching `client<N>` (custom `chunkName` option, or numeric webpack `chunkIds`)    | Path B (Flight regex never matches); Path A href check fails too if the CSS filename shape changes |
+| CSS output filenames not matching `css/clientN-*.css`                                              | Path A promotion (href filter rejects the preload)                                                 |
+| Flight data lagging a reveal by more than 100ms                                                    | Reveal deferral for that flush (fail-open by design)                                               |
+| Rspack builds omitting CSS assets from the stats consumed by `injectRSCPayload`                    | Path B (empty chunk→CSS map) — see Known limitations                                               |
+| `auto_load_bundle` off (or non-Pro)                                                                | `data-generated-stylesheet-hrefs` + the pre-hydration stylesheet wait                              |
+| React configured with the external Fizz runtime (no inline `$RC(` scripts)                         | Reveal-split detection — deferral silently never fires                                             |
+
+If you are debugging a flicker, check these in order; the first two are by far the most common.
+
+### Coupling to React internals (what breaks where)
+
+The streamed-CSS gating reads React's Fizz output as text. These are the assumptions, all in
+`packages/react-on-rails-pro/src/injectRSCPayload.ts` unless noted:
+
+- **`$RC(` reveal-script literal** (`REACT_SUSPENSE_REVEAL_SCRIPT`) — assumes Fizz inlines a
+  completion script calling `$RC("...")`. The reveal implementation already changed shape within
+  React 19 (19.2 batches reveals through `$RB`/`$RV`), but the literal survived. React's external
+  Fizz runtime option would remove inline scripts entirely and silently disable reveal deferral.
+- **Hidden boundary markup** (`findReactSuspenseRevealSplitIndex`) — assumes completed segments
+  arrive as `<div hidden id="...">`. Non-`div` segment containers (table contexts) fall back to
+  splitting at the script tag — degraded, not broken.
+- **Flight wire format** (`RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET`) — assumes client-reference
+  metadata serializes as adjacent `"clientN","js/clientN-<hash>.chunk.js"` string pairs in the
+  payload text. This is React's internal wire protocol plus the bundler's naming convention.
+- **`destination.flush()` signal** — an internal Fizz convention used for chunk timing; a
+  `setTimeout(0)` fallback means failure degrades to coarser chunking, not breakage.
+- **`data-precedence` attribute mechanics** — the precedence _feature_ is documented React 19 API;
+  the attribute name and hydration adoption mechanics are implementation details, matched in
+  `rscDomMarkers.ts` / `rscHydrationDom.ts`.
+
+Re-verify these against Fizz output on every React upgrade, including minors.
 
 ### What this means for different CSS approaches
 
@@ -623,8 +841,9 @@ names are available when the stylesheet tags are emitted:
 ### RSC pages
 
 For pages rendered by `stream_react_component`, CSS for `'use client'` references is handled by the
-Pro RSC renderer via the manifest pipeline. Keep the Rails stylesheet tags anyway for global CSS and
-non-RSC components.
+streamed-CSS pipeline described in [How CSS reaches the browser](#how-css-reaches-the-browser).
+Keep the Rails stylesheet tags anyway: they carry global CSS, the generated entry-pack CSS that
+styles the shell at first paint, and CSS for non-RSC components.
 
 ## Verifying CSS in production builds
 
@@ -824,6 +1043,16 @@ to measure the end-to-end performance impact of RSC changes with a paired A/B co
   blindly linking every client manifest entry. The links can still include any CSS bundled into those
   referenced chunks, so broad client boundaries or shared chunks can make more CSS render-blocking than
   a single component appears to need.
+- The streamed reveal gate is **fail-open**: if Flight data lags a boundary reveal by more than
+  100ms, the reveal flushes without waiting for stylesheet inference. A rare, brief FOUC under heavy
+  server delay is expected behavior, not a configuration error. See
+  [When the FOUC pipeline silently does nothing](#when-the-fouc-pipeline-silently-does-nothing).
+- The same stylesheet href can legitimately appear twice in the stream (once promoted from a React
+  preload, once injected from stats inference). The duplicate costs no extra network fetch and is
+  deduplicated when links are moved to `<head>` at hydration.
+- The reveal-deferral mechanism reads React's inline `$RC(` reveal scripts from the HTML stream.
+  Configurations that remove inline Fizz scripts (React's external runtime option) silently disable
+  it. Re-verify streamed-CSS behavior on every React upgrade, including minor versions.
 - Older `react-client-manifest.json` files without `css` arrays (pre `react-on-rails-rsc@19.0.5-rc.6`)
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
 - For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links. Verify
