@@ -25,6 +25,25 @@ A failed prefetch removes its own Prefetch Store entry, so the subsequent render
 **Adoption**:
 The act of a `RSCProvider` copying a Prefetch Store entry into its own Provider Cache on the first `getComponent` call for that key. Adoption is one-time per Provider Cache: if that provider later evicts the key, the next `getComponent` call fetches fresh data instead of re-adopting the old prefetch.
 
+**Preload Promotion** (RSC CSS "Path A"):
+The stream transform rewriting React's late-streamed `<link rel="preload" as="style">` tags for client-chunk CSS into parser-created `<link rel="stylesheet" data-precedence="rsc-css">` tags, so the following Suspense reveal script must wait for the CSS to load.
+_Avoid_: preinit path (the transform never calls `preinit`)
+
+**Flight-Chunk Inference** (RSC CSS "Path B"):
+Deriving client-chunk stylesheet hrefs by scanning embedded RSC Payload text for chunk references and mapping them through `loadable-stats.json`, then emitting stylesheet tags ahead of the HTML in the same flush. Only active when `loadable-stats.json` is readable.
+
+**Reveal Deferral**:
+Holding back streamed HTML from a Suspense boundary's hidden content + reveal script while any RSC Payload stream has not yet resolved Flight-Chunk Inference for its stylesheets.
+
+**Inference Fail-Open**:
+The per-stream 100ms budget after which Reveal Deferral gives up and flushes reveal HTML ungated. FOUC under slow Flight delivery is an accepted tail risk, not a bug in itself.
+
+**rsc-css Precedence**:
+The single stylesheet precedence bucket (`data-precedence="rsc-css"`) shared by both CSS paths and by the `preinit` hints in `react-on-rails-rsc`; the marker client code uses to recognize framework-managed stylesheets.
+
+**Hydration Root Fixup**:
+The pre-hydration client step that removes embedded payload scripts from the component root and moves leading rsc-css stylesheets and async chunk scripts into `document.head`, deduping against existing head resources.
+
 ## Relationships
 
 - Each root component wrapped by `wrapServerComponentRenderer/client` gets its own **RSCProvider**, hence its own **Provider Cache**.

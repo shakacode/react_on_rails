@@ -176,10 +176,11 @@ Why two paths exist:
   when reading page source.
 
 > [!NOTE]
-> RSC CSS collection is request/chunk driven, not a blanket scan of every client reference in the
-> manifest. The injected CSS can still be broader than a single component when a rendered client chunk
-> contains shared, vendor, or page-specific global CSS. Keep client boundaries thin so the chunks
-> referenced by a page do not drag unrelated CSS into the render-blocking `rsc-css` group.
+> RSC CSS collection is request driven — only the client references actually rendered by a request
+> emit stylesheet hints, not every client reference in the manifest. The emitted CSS can still be
+> broader than a single component when a rendered client reference's chunk contains shared, vendor,
+> or page-specific global CSS. Keep client boundaries thin so the references rendered by a page do
+> not drag unrelated CSS into the render-blocking `rsc-css` group.
 
 > [!CAUTION]
 > These stylesheet links are render-blocking for the streamed content that follows them. Broad

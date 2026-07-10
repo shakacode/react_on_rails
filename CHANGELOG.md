@@ -35,6 +35,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
   [justin808](https://github.com/justin808).
 
+#### Known Limitations
+
+- **[Pro] Late-revealed RSC components can flash unstyled on cold caches**: RSC stylesheet delivery
+  protects components whose CSS is known before the first HTML flush. Suspense boundaries that
+  resolve after the first flush currently receive only a CSS preload during streaming, with the
+  stylesheet applied at hydration — a brief flash of unstyled content is possible on cold caches.
+  This is not a regression from any 17.0.0 RC. Documented in
+  `docs/pro/react-server-components/css-and-styling.md`; decision record in
+  `packages/react-on-rails-pro/docs/adr/0001-ship-17-0-0-with-fouc-known-limitation.md`; fix planned
+  for a 17.0.x patch. By [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
