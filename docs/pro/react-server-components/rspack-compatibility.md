@@ -120,6 +120,33 @@ To test RSC with Rspack in your project:
    endorsed the `react-server-dom-webpack` runtime with Rspack. The native
    `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
 
+## CSS / FOUC Status
+
+The [CSS and Styling guide](./css-and-styling.md) documents the streamed-CSS (FOUC
+prevention) pipeline in full. The Rspack-specific facts, verified against
+`react-on-rails-rsc@19.2.1-rc.0` and a production dummy build (2026-07-09):
+
+- **Manifest `css` arrays require the 19.2.1+ line.** The `RSCRspackPlugin` in the
+  19.2.0 packages has no CSS collection at all. Without `css` arrays there are no
+  stylesheet hints — no preload head start and no browser-side gating.
+- **`output.publicPath` must be a concrete string.** With `'auto'` or a function, CSS
+  files are omitted from the manifest (the build emits a compilation warning but
+  succeeds).
+- **CSS must be extracted via `CssExtractRspackPlugin`** (`css/mini-extract` module
+  type). Rspack's native CSS support (`experiments.css`) is not seen by the plugin's
+  CSS-dependency recovery; split-chunks configs that move CSS outside the client
+  reference's chunk group can also drop entries.
+- **Default production builds do not gate the streamed reveal** — this is
+  bundler-independent, not Rspack-specific: numeric chunk ids and id-named CSS files
+  disable the stream-level gating layers, so a streamed component can paint unstyled
+  until its CSS applies. See
+  [production builds are the primary silent-no-op case](./css-and-styling.md#known-limitations)
+  for details and status.
+
+The end-to-end FOUC e2e gate currently runs only against dev-mode (`NODE_ENV=test`)
+builds; production-posture coverage is tracked in
+[issue #4557](https://github.com/shakacode/react_on_rails/issues/4557).
+
 ## Related Resources
 
 - [Issue #3488: Rspack RSC path to production-ready (native RSCRspackPlugin)](https://github.com/shakacode/react_on_rails/issues/3488)

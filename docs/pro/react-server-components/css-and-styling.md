@@ -263,7 +263,11 @@ replay path (client-inserted styles during hydration/navigation), not to the ser
 
 Each of these conditions disables part or all of the streamed-CSS gating **without any error**.
 The page still works — CSS eventually arrives via the browser-side payload replay after hydration —
-but the streamed reveal is no longer gated, so a styled-late flash becomes possible:
+but the streamed reveal is no longer gated, so a styled-late flash becomes possible. Two of these
+conditions are not edge cases but the **defaults of every production build** (numeric chunk ids
+from `chunkIds: 'deterministic'`, and id-based CSS filenames from Shakapacker's
+`chunkFilename: 'css/[id][hash].css'`) — verified against a production dummy build on 2026-07-09,
+where the streamed reveal was confirmed ungated under both bundlers:
 
 | Condition                                                                                          | What is disabled                                                                                   |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -1062,12 +1066,21 @@ to measure the end-to-end performance impact of RSC changes with a paired A/B co
   cannot produce RSC stylesheet links. Rebuild all three bundles after upgrading.
 - For client-side RSC navigation (`RSCRoute`), the RSC payload still needs stylesheet links. Verify
   this path separately for route-heavy apps.
-- **Rspack FOUC gap:** The `RSCRspackPlugin` emits the same manifest schema as the webpack plugin
-  for component references, but at the time of writing, Rspack builds can omit CSS assets for RSC
-  client chunks from the stats consumed by `injectRSCPayload`. When that map is empty, the FOUC
-  prevention pipeline is silently inactive. CSS for `'use client'` components still works via the
-  Rails layout `stylesheet_pack_tag`, but without client-chunk stylesheet injection. See
-  [Rspack compatibility](./rspack-compatibility.md) for details.
+- **Production builds are the primary silent-no-op case (both bundlers, verified 2026-07-09):**
+  in a default `NODE_ENV=production` build, chunk ids are numeric (`optimization.chunkIds:
+'deterministic'`) and extracted chunk CSS is id-named (`css/[id]-[hash].css`), so Path B's
+  Flight regex and Path A's href filter both fail — the streamed reveal is not CSS-gated, and only
+  the hint-driven preload's head start mitigates the flash. Note that CSS split into async
+  `clientN` chunks is **not** covered by the Rails layout `stylesheet_pack_tag` (layout pack tags
+  emit only the entrypoint's initial-chunk CSS); until it is fixed, the styles for such components
+  apply at hydration time. The dev/test posture (`chunkIds: 'named'`), which is what CI exercises,
+  is not affected.
+- **Rspack manifest `css` omission:** the `RSCRspackPlugin` collects `css` arrays only on the
+  `react-on-rails-rsc` 19.2.1+ line, and omits them (with only a compile warning) when
+  `output.publicPath` is `'auto'` or a function, or when CSS is extracted by something other than
+  `CssExtractRspackPlugin` (`css/mini-extract` module type). Without `css` arrays there are no
+  stylesheet hints and no preload head start at all. See
+  [Rspack compatibility](./rspack-compatibility.md#css--fouc-status).
 - **Rspack CSS Module class name divergence:** When using Rspack with CSS Modules, avoid
   `[contenthash]` in `localIdentName`. Rspack client and server builds may produce different
   content hashes for the same file, causing SSR class name mismatches. Use a stable `getLocalIdent`
