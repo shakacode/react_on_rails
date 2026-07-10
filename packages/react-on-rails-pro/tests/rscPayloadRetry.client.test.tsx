@@ -22,6 +22,7 @@ import {
   isFailureRetryWindowElapsed,
   isRetryableRSCPayloadError,
   recordPayloadFailure,
+  RSC_PAYLOAD_FAILURE_MAX_ENTRIES,
   RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS,
   RSC_PAYLOAD_MAX_FETCH_ATTEMPTS,
   type RSCPayloadFailure,
@@ -142,6 +143,32 @@ describe('recordPayloadFailure', () => {
     expect(recordPayloadFailure(failures, key, false, 1_000)).toEqual({ shouldRetry: false, attempts: 1 });
     expect(failures.get(key)).toEqual({ attempts: 1, terminalAt: 1_000 });
   });
+
+  it('bounds the map so abandoned single-attempt failures cannot accumulate', () => {
+    for (let i = 0; i < RSC_PAYLOAD_FAILURE_MAX_ENTRIES + 10; i += 1) {
+      recordPayloadFailure(failures, `Card:{"id":${i}}`, true, 1_000);
+    }
+
+    expect(failures.size).toBe(RSC_PAYLOAD_FAILURE_MAX_ENTRIES);
+    // The oldest keys are dropped; the newest are kept.
+    expect(failures.has('Card:{"id":0}')).toBe(false);
+    expect(failures.has(`Card:{"id":${RSC_PAYLOAD_FAILURE_MAX_ENTRIES + 9}}`)).toBe(true);
+  });
+
+  it('keeps a re-recorded key from being evicted as the oldest entry', () => {
+    recordPayloadFailure(failures, key, true, 1_000);
+    for (let i = 0; i < RSC_PAYLOAD_FAILURE_MAX_ENTRIES - 1; i += 1) {
+      recordPayloadFailure(failures, `Other:{"id":${i}}`, true, 1_000);
+    }
+
+    // Re-recording `key` refreshes its position, so the next insert evicts a
+    // different entry and `key` keeps its attempt count.
+    expect(recordPayloadFailure(failures, key, true, 2_000).attempts).toBe(2);
+    recordPayloadFailure(failures, 'Newest:{}', true, 3_000);
+
+    expect(failures.size).toBe(RSC_PAYLOAD_FAILURE_MAX_ENTRIES);
+    expect(failures.get(key)).toEqual({ attempts: 2, terminalAt: 2_000 });
+  });
 });
 
 describe('isFailureRetryWindowElapsed', () => {
@@ -249,6 +276,75 @@ describe('RSCProvider bounded payload retry (#187)', () => {
 
     await waitFor(() => expect(screen.getByTestId('boundary')).toBeInTheDocument());
     expect(getServerComponent).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stale rejection does not evict the promise that replaced it', async () => {
+    const deferreds: Array<{ reject: (e: unknown) => void; promise: Promise<React.ReactNode> }> = [];
+    const getServerComponent = jest.fn((_args: GetServerComponentArgs) => {
+      let reject!: (e: unknown) => void;
+      const promise = new Promise<React.ReactNode>((_res, rej) => {
+        reject = rej;
+      });
+      // Nothing awaits these directly; keep Node from flagging them.
+      promise.catch(() => undefined);
+      deferreds.push({ reject, promise });
+      return promise;
+    });
+    const RSCProvider = createRSCProvider({ getServerComponent });
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    let rscApi!: ReturnType<typeof useRSC>;
+    const Probe = () => {
+      rscApi = useRSC();
+      return null;
+    };
+
+    await act(async () => {
+      render(
+        <RSCProvider>
+          <Probe />
+        </RSCProvider>,
+      );
+    });
+
+    // Start an initial load, then let a refetch take ownership of the key
+    // before the initial promise rejects.
+    let initial!: Promise<React.ReactNode>;
+    await act(async () => {
+      initial = rscApi.getComponent('Card', { id: 1 });
+      await Promise.resolve();
+    });
+    initial.catch(() => undefined);
+
+    let refetched!: Promise<React.ReactNode>;
+    await act(async () => {
+      refetched = rscApi.refetchComponent('Card', { id: 1 });
+      await Promise.resolve();
+    });
+    refetched.catch(() => undefined);
+
+    // The stale initial load rejects last.
+    await act(async () => {
+      deferreds[0].reject(new Error('stale rejection'));
+      await expect(initial).rejects.toThrow('stale rejection');
+      await flushMacrotasks();
+    });
+
+    // The refetch's promise still owns the key, so `getComponent` returns it
+    // rather than evicting it and starting another fetch. (The retry cap
+    // governs `getComponent`; `refetchComponent` keeps its own recover/restore
+    // semantics.)
+    await act(async () => {
+      expect(rscApi.getComponent('Card', { id: 1 })).toBe(refetched);
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(2);
+
+    // Settle the refetch so nothing is left pending at teardown.
+    await act(async () => {
+      deferreds[1].reject(new Error('refetch failed'));
+      await expect(refetched).rejects.toThrow('refetch failed');
+      await flushMacrotasks();
+    });
   });
 
   it('allows a fresh attempt once the retry window elapses (#3929)', async () => {

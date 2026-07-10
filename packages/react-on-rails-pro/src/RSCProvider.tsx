@@ -417,16 +417,19 @@ export const createRSCProvider = ({
         let payloadRejected = false;
         const handlePayloadRejection = (error: unknown) => {
           payloadRejected = true;
+          // A newer same-key promise (one installed by `refetchComponent`, say)
+          // already owns the cache entry. This rejection is stale: it must
+          // neither evict the newer promise nor spend the key's retry budget.
+          if (fetchRSCPromises.get(key, false) !== promise) {
+            throw error;
+          }
           const { shouldRetry } = recordPayloadFailure(
             payloadFailures,
             key,
             isRetryableRSCPayloadError(error),
             Date.now(),
           );
-          // Guarded on promise identity so a newer same-key promise (such as
-          // one installed by `refetchComponent`) is never evicted by this
-          // stale failure.
-          if (shouldRetry && fetchRSCPromises.get(key, false) === promise) {
+          if (shouldRetry) {
             fetchRSCPromises.deletePreservingPins(key);
           }
           throw error;
