@@ -53,55 +53,35 @@ module ReactOnRailsPro
     # See: https://bugs.ruby-lang.org/issues/20875
     LICENSE_MUTEX = Mutex.new
 
+    # Explicit tokens receive distinct cache keys so later application configuration
+    # cannot reuse ENV/default metadata. The ENV/default path intentionally retains
+    # one process-lifetime key and the existing reset-required semantics.
+    ENV_LICENSE_CACHE_KEY = Object.new.freeze
+
     class << self
       # Returns the current license status (never raises, never logs)
       # Thread-safe: uses Mutex to prevent race conditions during initialization
       # @return [Symbol] One of :valid, :expired, :invalid, :missing
       def license_status
-        return @license_status if defined?(@license_status)
-
-        LICENSE_MUTEX.synchronize do
-          # Double-check pattern: another thread may have set it while we waited
-          return @license_status if defined?(@license_status)
-
-          @license_status = determine_license_status
-        end
+        fetch_cached_license_value(:@license_status) { determine_license_status }
       end
 
       # Returns the license expiration time if available
       # @return [Time, nil] The expiration time or nil if not available
       def license_expiration
-        return @license_expiration if defined?(@license_expiration)
-
-        LICENSE_MUTEX.synchronize do
-          return @license_expiration if defined?(@license_expiration)
-
-          @license_expiration = determine_license_expiration
-        end
+        fetch_cached_license_value(:@license_expiration) { determine_license_expiration }
       end
 
       # Returns the organization name from the license if available
       # @return [String, nil] The organization name or nil if not available
       def license_organization
-        return @license_organization if defined?(@license_organization)
-
-        LICENSE_MUTEX.synchronize do
-          return @license_organization if defined?(@license_organization)
-
-          @license_organization = determine_license_organization
-        end
+        fetch_cached_license_value(:@license_organization) { determine_license_organization }
       end
 
       # Returns the license plan type if available
       # @return [String, nil] The plan type (e.g., "paid", "startup") or nil if not available
       def license_plan
-        return @license_plan if defined?(@license_plan)
-
-        LICENSE_MUTEX.synchronize do
-          return @license_plan if defined?(@license_plan)
-
-          @license_plan = determine_license_plan
-        end
+        fetch_cached_license_value(:@license_plan) { determine_license_plan }
       end
 
       # Returns whether attribution is required for this license
@@ -111,13 +91,7 @@ module ReactOnRailsPro
       # - nonprofit, education: Attribution optional (default: no)
       # @return [Boolean] True if attribution is required
       def attribution_required?
-        return @attribution_required if defined?(@attribution_required)
-
-        LICENSE_MUTEX.synchronize do
-          return @attribution_required if defined?(@attribution_required)
-
-          @attribution_required = determine_attribution_required
-        end
+        fetch_cached_license_value(:@attribution_required) { determine_attribution_required }
       end
 
       # Returns license information for use in helpers and components
@@ -144,6 +118,30 @@ module ReactOnRailsPro
       end
 
       private
+
+      def fetch_cached_license_value(cache_variable)
+        key = license_cache_key
+        if instance_variable_defined?(cache_variable)
+          cached = instance_variable_get(cache_variable)
+          return cached[:value] if cached[:key] == key
+        end
+
+        LICENSE_MUTEX.synchronize do
+          key = license_cache_key
+          if instance_variable_defined?(cache_variable)
+            cached = instance_variable_get(cache_variable)
+            return cached[:value] if cached[:key] == key
+          end
+
+          value = yield
+          instance_variable_set(cache_variable, { key:, value: }.freeze)
+          value
+        end
+      end
+
+      def license_cache_key
+        ReactOnRailsPro.configuration.license_token&.strip.presence || ENV_LICENSE_CACHE_KEY
+      end
 
       # Determines the license status by loading, decoding, and validating
       # @return [Symbol] The license status
@@ -247,10 +245,12 @@ module ReactOnRailsPro
         ATTRIBUTION_REQUIRED_PLANS.include?(plan.strip)
       end
 
-      # Loads license string from environment variable
+      # Loads the license string from explicit configuration, then the environment.
+      # Blank configured values fall through to preserve the environment-variable default.
       # @return [String, nil] License string or nil if not found
       def load_license_string
-        ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)&.strip.presence
+        configured_token = ReactOnRailsPro.configuration.license_token&.strip.presence
+        configured_token || ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)&.strip.presence
       end
 
       # Decodes and verifies the JWT license

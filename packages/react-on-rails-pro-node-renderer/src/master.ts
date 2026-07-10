@@ -25,7 +25,7 @@ import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.js';
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
-import { getLicenseStatus } from './shared/licenseValidator.js';
+import logLicenseStatus from './shared/logLicenseStatus.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 import { SHUTDOWN_WORKER_ACK_MESSAGE, SHUTDOWN_WORKER_MESSAGE } from './shared/utils.js';
@@ -63,28 +63,9 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   // This is memoized after the wrapper path runs, but still protects direct `./master` entrypoint users.
   runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
-  // Check license status on startup and log appropriately
-  // Use warn in production, info in non-production (matches Ruby behavior)
-  // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
-  // with Ruby's Rails.env.production? check
-  const status = getLicenseStatus();
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
-  const logLicenseIssue = isProduction ? log.warn.bind(log) : log.info.bind(log);
-
-  if (status === 'valid') {
-    log.info('[React on Rails Pro] License validated successfully.');
-  } else if (status === 'missing') {
-    logLicenseIssue('[React on Rails Pro] No license found. Get a license at https://pro.reactonrails.com/');
-  } else if (status === 'expired') {
-    logLicenseIssue(
-      '[React on Rails Pro] License has expired. Renew your license at https://pro.reactonrails.com/',
-    );
-  } else {
-    logLicenseIssue('[React on Rails Pro] Invalid license. Get a license at https://pro.reactonrails.com/');
-  }
-
   // Store config in app state. From now it can be loaded by any module using getConfig():
   const config = buildConfig(runningConfig);
+  logLicenseStatus(config.licenseToken);
   const {
     workersCount,
     allWorkersRestartInterval,

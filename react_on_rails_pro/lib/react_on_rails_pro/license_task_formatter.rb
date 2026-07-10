@@ -54,7 +54,7 @@ module ReactOnRailsPro
       return unless status == :missing
 
       puts ""
-      puts "No license found. Set REACT_ON_RAILS_PRO_LICENSE"
+      puts "No license found. Set config.license_token or REACT_ON_RAILS_PRO_LICENSE"
     end
 
     def print_details(result, info)
