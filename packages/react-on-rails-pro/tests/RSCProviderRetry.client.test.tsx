@@ -75,17 +75,6 @@ const mountProvider = async (
   return api;
 };
 
-const createProviderWithoutWindow = (getServerComponent: Producer) => {
-  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: undefined });
-  try {
-    return createRSCProvider({ getServerComponent });
-  } finally {
-    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
-    else Reflect.deleteProperty(globalThis, 'window');
-  }
-};
-
 describe('RSCProvider rejected payload handling', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -221,6 +210,60 @@ describe('RSCProvider rejected payload handling', () => {
     });
   });
 
+  it.each(['resolves', 'rejects'] as const)(
+    'keeps an explicit refetch when the stale automatic retry %s',
+    async (staleOutcome) => {
+      const firstAttempt = deferred<React.ReactNode>();
+      const automaticRetry = deferred<React.ReactNode>();
+      const explicitRefetch = deferred<React.ReactNode>();
+      const getServerComponent = jest
+        .fn<Promise<React.ReactNode>, [Request]>()
+        .mockReturnValueOnce(firstAttempt.promise)
+        .mockReturnValueOnce(automaticRetry.promise)
+        .mockReturnValueOnce(explicitRefetch.promise);
+      const api = await mountProvider(getServerComponent);
+      const initialPromise = api.getComponent('Card', { id: 1 });
+      const initialOutcome = initialPromise.then(
+        (value) => ({ status: 'resolved', value }),
+        (error: unknown) => ({ error, status: 'rejected' }),
+      );
+
+      firstAttempt.reject(new Error('first attempt failed'));
+      await waitFor(() => expect(getServerComponent).toHaveBeenCalledTimes(2));
+
+      const refetchPromise = api.refetchComponent('Card', { id: 1 });
+      await waitFor(() => expect(getServerComponent).toHaveBeenCalledTimes(3));
+      expect(api.getComponent('Card', { id: 1 })).toBe(refetchPromise);
+
+      if (staleOutcome === 'resolves') automaticRetry.resolve('stale success');
+      else automaticRetry.reject(new Error('stale retry failure'));
+      await initialOutcome;
+
+      expect(api.getComponent('Card', { id: 1 })).toBe(refetchPromise);
+      explicitRefetch.resolve('fresh explicit payload');
+      await expect(refetchPromise).resolves.toBe('fresh explicit payload');
+      expect(api.getComponent('Card', { id: 1 })).toBe(refetchPromise);
+    },
+  );
+
+  it('restores a successful automatic retry after a later recoverable refetch fails', async () => {
+    const retryPayload = 'payload recovered by automatic retry';
+    const refetchError = new Error('later refetch failed');
+    const getServerComponent = jest
+      .fn<Promise<React.ReactNode>, [Request]>()
+      .mockRejectedValueOnce(new Error('initial failure'))
+      .mockResolvedValueOnce(retryPayload)
+      .mockRejectedValueOnce(refetchError);
+    const api = await mountProvider(getServerComponent);
+    const recoveredPromise = api.getComponent('Card', { id: 1 });
+
+    await expect(recoveredPromise).resolves.toBe(retryPayload);
+    await expect(api.refetchComponent('Card', { id: 1 }, true)).rejects.toBe(refetchError);
+
+    expect(api.getComponent('Card', { id: 1 })).toBe(recoveredPromise);
+    await expect(recoveredPromise).resolves.toBe(retryPayload);
+  });
+
   it('protects terminal failures beyond the ordinary LRU capacity', async () => {
     const getServerComponent = jest
       .fn<Promise<React.ReactNode>, [Request]>()
@@ -274,10 +317,10 @@ describe('RSCProvider rejected payload handling', () => {
     await expect(replacementPromise).resolves.toBe('healthy payload 0');
   });
 
-  it('does not apply browser retry behavior when the provider is created on the server', async () => {
+  it('does not retry when the server policy is explicit, even if window exists', async () => {
     const error = new Error('server producer failed');
     const getServerComponent = jest.fn<Promise<React.ReactNode>, [Request]>().mockRejectedValue(error);
-    const Provider = createProviderWithoutWindow(getServerComponent);
+    const Provider = createRSCProvider({ getServerComponent, retryRejectedPayloads: false });
     const api = await mountProvider(getServerComponent, Provider);
     const promise = api.getComponent('Card', { id: 1 });
 

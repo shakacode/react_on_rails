@@ -115,8 +115,11 @@ const isRetryableRSCPayloadError = (error: unknown): boolean => {
  * This factory function accepts an environment-specific getServerComponent implementation,
  * allowing it to work correctly in both client and server environments.
  *
- * @param railsContext - Context for the current request
  * @param getServerComponent - Environment-specific function for fetching server components
+ * @param domNodeId - Optional root id used to locate embedded browser payloads
+ * @param retryRejectedPayloads - Whether to perform and retain the bounded rejected-payload retry.
+ * Official wrappers pass this explicitly; the environment check is only a compatibility fallback
+ * for direct callers of this internal factory.
  * @returns A provider component that wraps children with RSC context
  *
  * @important This is an internal function. End users should not use this directly.
@@ -126,12 +129,12 @@ const isRetryableRSCPayloadError = (error: unknown): boolean => {
 export const createRSCProvider = ({
   getServerComponent,
   domNodeId,
+  retryRejectedPayloads = typeof window !== 'undefined',
 }: {
   getServerComponent: (props: ClientGetReactServerComponentProps) => Promise<ReactNode>;
   domNodeId?: string;
+  retryRejectedPayloads?: boolean;
 }) => {
-  const isBrowserRuntime = typeof window !== 'undefined';
-
   return ({ children }: { children: ReactNode }) => {
     // Companion bookkeeping keyed by the same RSC payload key as the promise
     // cache. These are dropped in lockstep when a key is evicted from the LRU so
@@ -423,7 +426,7 @@ export const createRSCProvider = ({
           .catch((error: unknown) => {
             if (
               fetchRSCPromises.get(key, false) !== promise ||
-              !isBrowserRuntime ||
+              !retryRejectedPayloads ||
               !isRetryableRSCPayloadError(error)
             ) {
               throw error;
@@ -431,7 +434,7 @@ export const createRSCProvider = ({
             return fetchPayload(true);
           })
           .then(markPayloadIfSuccessful, (error: unknown) => {
-            if (isBrowserRuntime && fetchRSCPromises.get(key, false) === promise) {
+            if (retryRejectedPayloads && fetchRSCPromises.get(key, false) === promise) {
               terminalFailureRetained = true;
             }
             throw error;
