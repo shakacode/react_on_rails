@@ -5710,13 +5710,21 @@ late CSS is delivered mid-stream instead, which is what the rest of this section
 
 ### What blocks first paint — and what does not
 
-| Blocks first paint                                            | Does NOT block first paint                                        |
-| ------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `<head>` stylesheet links (layout + appended generated packs) | `rsc-css` stylesheet links streamed into the body for boundaries  |
-| Synchronous head scripts (standard browser behavior)          | RSC payload `<script>` tags (inline data pushes)                  |
-| —                                                             | `defer`/`async` JavaScript bundles                                |
-| —                                                             | The Flight (RSC payload) stream itself                            |
-| —                                                             | Suspense boundary content still streaming (fallbacks paint first) |
+| Blocks first paint                                            | Does NOT block first paint                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `<head>` stylesheet links (layout + appended generated packs) | `rsc-css` stylesheet links streamed into the body for later boundaries\* |
+| Synchronous head scripts (standard browser behavior)          | RSC payload `<script>` tags (inline data pushes)                         |
+| —                                                             | `defer`/`async` JavaScript bundles                                       |
+| —                                                             | The Flight (RSC payload) stream itself                                   |
+| —                                                             | Suspense boundary content still streaming (fallbacks paint first)        |
+
+\* One qualification: when Flight data arrives before the first HTML flush, the streaming pipeline
+writes inferred `rsc-css` links **ahead of the shell markup** in the first component chunk (flush
+order is payload-init scripts → stylesheet links → HTML). Because Chromium delays painting content
+that follows an in-body pending stylesheet, those early links can delay the first visible paint of
+the shell/fallbacks until that CSS loads. This is the intended trade — that CSS belongs to client
+components rendered in the shell itself, so painting the shell before it would be a FOUC — but it
+means "does not block first paint" is guaranteed only for links emitted after the shell chunk.
 
 ### Timeline of a streamed RSC response
 
