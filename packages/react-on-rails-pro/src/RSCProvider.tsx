@@ -327,7 +327,13 @@ export const createRSCProvider = ({
             return cached;
           }
           payloadFailures.delete(key);
-          fetchRSCPromises.deleteWithoutEvict(key);
+          // Preserve pins rather than wiping them: this caller does not own the
+          // unpin for a retain a mounted route may still hold. Wiping would let
+          // that retain's later `unpin` decrement the pin `setPinned` is about
+          // to take for the replacement promise, leaving it evictable while
+          // still in flight. The terminal entry's own in-flight pin was already
+          // released by the `.finally()` below, so nothing is leaked here.
+          fetchRSCPromises.deletePreservingPins(key);
         }
 
         // Pin the key for the duration of the initial in-flight load so that
