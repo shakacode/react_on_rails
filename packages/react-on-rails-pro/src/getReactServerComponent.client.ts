@@ -17,6 +17,7 @@ import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext } from 'react-on-rails/types';
 import { createEmbeddedPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
+import { buildRSCPayloadHttpError } from './getReactServerComponentErrors.ts';
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 import {
@@ -95,12 +96,14 @@ const createFromFetch = async (
 ) => {
   const response = await fetchPromise;
   if (!response.ok) {
-    const statusDescription = response.statusText
-      ? `${response.status} ${response.statusText}`
-      : `${response.status}`;
-    throw new Error(
-      `RSC payload request for component "${componentName}" from ${sourceDescription} failed with HTTP ${statusDescription}.`,
-    );
+    // Carries a numeric `status` so the retry policy classifies 4xx as
+    // deterministic without parsing this message.
+    throw buildRSCPayloadHttpError({
+      componentName,
+      sourceDescription,
+      status: response.status,
+      statusText: response.statusText,
+    });
   }
 
   const { body } = response;

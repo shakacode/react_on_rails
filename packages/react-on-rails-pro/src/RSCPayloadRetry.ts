@@ -30,6 +30,8 @@
  * `RSCRouteErrorBoundary` surfaces the failure on the page.
  */
 
+import { RSC_PAYLOAD_HTTP_STATUS_MESSAGE_PATTERN } from './getReactServerComponentErrors.ts';
+
 /**
  * Total fetch attempts for one cache key before the rejection is surfaced.
  * One initial attempt plus one retry: enough to ride out a single transient
@@ -49,8 +51,38 @@ export const RSC_PAYLOAD_MAX_FETCH_ATTEMPTS = 2;
  * unmounted the route into its ErrorBoundary, no render is scheduled during the
  * window; the worst case if an application boundary retries on a timer is
  * `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS` requests per window, not per render.
+ *
+ * The same window expires an abandoned mid-retry record (see
+ * `pruneAbandonedPayloadFailures`).
  */
 export const RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS = 5_000;
+
+/**
+ * What the caller must do with a rejected payload promise.
+ *
+ * - `retry`: attempts remain. Evict the rejection so React's retry render starts
+ *   the next attempt.
+ * - `surface`: no attempt could help. Retain the rejection so the retry render
+ *   reads it, `use()` throws, and the error reaches the page.
+ * - `discard`: the request was cancelled by the caller, so it says nothing about
+ *   whether the key can load. Evict the rejection and forget the key entirely,
+ *   letting the next `getComponent` start fresh.
+ */
+export type RSCPayloadFailureOutcome = 'retry' | 'surface' | 'discard';
+
+/**
+ * Why a payload fetch failed, in the only three flavours the retry policy cares
+ * about.
+ *
+ * - `cancelled`: an `AbortError`. The caller aborted (route unmount, fast
+ *   navigation). Retrying is wrong, but so is remembering it: a later request
+ *   for the same key must not inherit a failure the app itself caused.
+ * - `deterministic`: the server gave a definitive answer (a 4xx). A second
+ *   identical request returns the same thing, so surface it now.
+ * - `transient`: everything else — network failures, timeouts, 5xx, malformed
+ *   payloads. A retry could plausibly succeed, bounded by the attempt cap.
+ */
+export type RSCPayloadErrorKind = 'cancelled' | 'deterministic' | 'transient';
 
 /**
  * Per-key failure bookkeeping.
@@ -58,20 +90,23 @@ export const RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS = 5_000;
  * `terminalAt` is null while retries remain (the key is mid-retry: its promise
  * was evicted and React's retry render is expected to start the next attempt).
  * It is set once the failure has been surfaced and its rejection retained.
- * `updatedAt` timestamps the most recent attempt, and is what expires an
- * abandoned mid-retry record.
+ *
+ * `attemptInFlight` is true from the moment a retry attempt begins until it
+ * settles. A record with an attempt in flight is never pruned, however long that
+ * attempt takes — otherwise a slow failure would come back to a forgotten key,
+ * count as attempt 1 again, and never reach the cap.
+ *
+ * `updatedAt` timestamps the last state change, and is what expires a mid-retry
+ * record whose retry render never arrived.
  */
 export type RSCPayloadFailure = {
   attempts: number;
   terminalAt: number | null;
+  attemptInFlight: boolean;
   updatedAt: number;
 };
 
 const MAX_CAUSE_DEPTH = 5;
-
-// `failed with HTTP 503 Service Unavailable.` — the shape thrown by
-// `fetchRSC` in getReactServerComponent.client.ts for a non-OK response.
-const HTTP_STATUS_PATTERN = /failed with HTTP (\d{3})/;
 
 // Duck type instead of `instanceof DOMException`: cross-realm AbortErrors have
 // the correct name but fail instanceof checks across realm boundaries. Mirrors
@@ -85,97 +120,161 @@ const isAbortError = (error: unknown): boolean =>
 const isRetryableHttpStatus = (status: number): boolean => status >= 500 || status === 408 || status === 429;
 
 /**
- * Whether a failed payload fetch is worth attempting again.
+ * Reads the HTTP status a payload fetch failed with, if it failed with one.
  *
- * Retrying is only useful when a second identical request could plausibly
- * succeed. A cancelled request must never be retried, and a 4xx response is a
- * deterministic answer from the server. Everything else — network failures,
- * timeouts, 5xx, malformed payloads — is treated as retryable and bounded by
- * `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS`.
- *
- * `fetchRSC` wraps the original failure and attaches it as `cause`, so the
- * status is read by walking the cause chain rather than the top-level message.
+ * `fetchRSC` sets a numeric `status` on the error it throws for a non-OK
+ * response, and wraps that error as the `cause` of the one callers see. The
+ * message pattern is a fallback for errors produced before `status` existed, and
+ * is shared with the thrower so the two cannot drift apart silently.
  */
-export const isRetryableRSCPayloadError = (error: unknown): boolean => {
+const readHttpStatus = (error: Error): number | undefined => {
+  const { status } = error as { status?: unknown };
+  if (typeof status === 'number') {
+    return status;
+  }
+  const matched = RSC_PAYLOAD_HTTP_STATUS_MESSAGE_PATTERN.exec(error.message)?.[1];
+  return matched === undefined ? undefined : Number(matched);
+};
+
+/**
+ * Classifies a failed payload fetch by walking the `cause` chain that `fetchRSC`
+ * builds when it wraps the original failure.
+ */
+export const classifyRSCPayloadError = (error: unknown): RSCPayloadErrorKind => {
   let current: unknown = error;
 
   for (let depth = 0; depth < MAX_CAUSE_DEPTH && current != null; depth += 1) {
     if (isAbortError(current)) {
-      return false;
+      return 'cancelled';
     }
 
-    if (current instanceof Error) {
-      const status = HTTP_STATUS_PATTERN.exec(current.message)?.[1];
-      if (status !== undefined) {
-        return isRetryableHttpStatus(Number(status));
-      }
-      current = (current as { cause?: unknown }).cause;
-    } else {
+    if (!(current instanceof Error)) {
       break;
     }
+
+    const status = readHttpStatus(current);
+    if (status !== undefined) {
+      return isRetryableHttpStatus(status) ? 'transient' : 'deterministic';
+    }
+
+    current = (current as { cause?: unknown }).cause;
   }
 
-  return true;
+  return 'transient';
 };
+
+/**
+ * Whether a failed payload fetch is worth attempting again. Retained as the
+ * predicate form of `classifyRSCPayloadError` for callers that only need a
+ * yes/no.
+ */
+export const isRetryableRSCPayloadError = (error: unknown): boolean =>
+  classifyRSCPayloadError(error) === 'transient';
 
 /**
  * Drops mid-retry records whose next attempt never arrived.
  *
- * A record is removed by success, by `refetchComponent`, and by eviction from
- * the promise cache. One case has no such trigger: a key whose attempt rejects
- * and is never asked for again, because the route unmounted before React's
- * retry render. Those records are dropped once they are older than the retry
- * window — by then no attempt is in flight, so a fresh budget is correct.
+ * A record is removed by success, by `refetchComponent`, by cancellation, and by
+ * eviction from the promise cache. One case has no such trigger: a key whose
+ * attempt rejects and is never asked for again, because the route unmounted
+ * before React's retry render. Those records are dropped once they are older
+ * than the retry window — by then no attempt is in flight, so a fresh budget is
+ * correct.
  *
- * Only mid-retry records (`terminalAt === null`) expire this way. A terminal
- * record must outlive the window: it is what tells the cache read that the
- * retained rejection may now be discarded, and it is removed there.
+ * Three kinds of record are deliberately never pruned here:
+ *
+ * - Records with an attempt in flight. A slow failure must still count against
+ *   the cap when it finally rejects, however long it takes.
+ * - `exceptKey`, the key currently being recorded. Its own record must survive
+ *   long enough to be read, or a slow rejection would restart its budget.
+ * - Terminal records, which must outlive the window: they are what tells the
+ *   cache read that the retained rejection may now be discarded, and they are
+ *   removed there.
  *
  * This is deliberately an age rule and not a size cap. A size cap would evict
  * the record of a key that is *actively* retrying whenever enough distinct keys
  * fail at once, resetting its `attempts` to 1 on the next render — which
- * reinstates the unbounded request loop this module exists to prevent. The map
- * is bounded instead by construction: terminal records are bounded by the
- * promise cache (`RSC_PAYLOAD_CACHE_MAX_ENTRIES`, cleared on eviction), and
- * mid-retry records are bounded by the distinct keys that failed within the
- * last `RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS` — each of which can issue at most
- * `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS` requests in that window.
+ * reinstates the unbounded request loop this module exists to prevent.
+ *
+ * Terminal records are bounded by the promise cache (`RSC_PAYLOAD_CACHE_MAX_ENTRIES`,
+ * cleared on eviction). Mid-retry records are bounded by the distinct keys that
+ * failed within the last `RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS`, each of which can
+ * issue at most `RSC_PAYLOAD_MAX_FETCH_ATTEMPTS` requests in that window. The map
+ * is kept in least-recently-updated order, so this scan stops at the first record
+ * still inside the window rather than walking the whole map on every rejection.
  */
 export const pruneAbandonedPayloadFailures = (
   failures: Map<string, RSCPayloadFailure>,
   now: number,
+  exceptKey?: string,
 ): void => {
   for (const [key, failure] of failures) {
-    if (failure.terminalAt === null && now - failure.updatedAt >= RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS) {
+    if (now - failure.updatedAt < RSC_PAYLOAD_FAILURE_RETRY_AFTER_MS) {
+      // Insertion order is least-recently-updated first, so nothing after this
+      // record can be expired.
+      return;
+    }
+    if (failure.terminalAt === null && !failure.attemptInFlight && key !== exceptKey) {
       failures.delete(key);
     }
   }
 };
 
 /**
- * Decides what happens to a key after one failed attempt.
- *
- * `shouldRetry` true → the caller evicts the rejected promise so React's retry
- * render starts the next attempt. False → the caller keeps the rejected promise
- * cached so `use()` throws and the error reaches the page.
- *
- * `errorIsRetryable` is supplied by the caller so the attempt bookkeeping stays
- * independent of how retryability is classified.
+ * Marks a retry attempt as started, protecting the record from pruning until it
+ * settles. No-ops for a key with no failure history, which is every first
+ * attempt.
+ */
+export const markPayloadAttemptStarted = (
+  failures: Map<string, RSCPayloadFailure>,
+  key: string,
+  now: number,
+): void => {
+  const failure = failures.get(key);
+  if (!failure) {
+    return;
+  }
+  // Re-insert so the map stays in least-recently-updated order.
+  failures.delete(key);
+  failures.set(key, { ...failure, attemptInFlight: true, updatedAt: now });
+};
+
+/**
+ * Records one failed attempt and decides what the caller must do with the
+ * rejected promise. See `RSCPayloadFailureOutcome`.
  */
 export const recordPayloadFailure = (
   failures: Map<string, RSCPayloadFailure>,
   key: string,
-  errorIsRetryable: boolean,
+  kind: RSCPayloadErrorKind,
   now: number,
-): { shouldRetry: boolean; attempts: number } => {
-  pruneAbandonedPayloadFailures(failures, now);
+): { outcome: RSCPayloadFailureOutcome; attempts: number } => {
+  // Read this key's history before pruning, and shield it from the sweep: a
+  // rejection that took longer than the retry window must still count against
+  // the budget it belongs to.
+  const previous = failures.get(key);
+  pruneAbandonedPayloadFailures(failures, now, key);
 
-  const attempts = (failures.get(key)?.attempts ?? 0) + 1;
-  const shouldRetry = attempts < RSC_PAYLOAD_MAX_FETCH_ATTEMPTS && errorIsRetryable;
+  if (kind === 'cancelled') {
+    // The app aborted this request. Forget the key so a later render is not
+    // punished for a failure it caused.
+    failures.delete(key);
+    return { outcome: 'discard', attempts: previous?.attempts ?? 0 };
+  }
 
-  failures.set(key, { attempts, terminalAt: shouldRetry ? null : now, updatedAt: now });
+  const attempts = (previous?.attempts ?? 0) + 1;
+  const outcome: RSCPayloadFailureOutcome =
+    kind === 'transient' && attempts < RSC_PAYLOAD_MAX_FETCH_ATTEMPTS ? 'retry' : 'surface';
 
-  return { shouldRetry, attempts };
+  failures.delete(key);
+  failures.set(key, {
+    attempts,
+    terminalAt: outcome === 'retry' ? null : now,
+    attemptInFlight: false,
+    updatedAt: now,
+  });
+
+  return { outcome, attempts };
 };
 
 /**

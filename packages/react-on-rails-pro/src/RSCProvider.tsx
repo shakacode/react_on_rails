@@ -28,8 +28,9 @@ import {
 } from 'react';
 import type { ClientGetReactServerComponentProps } from './getReactServerComponent.client.ts';
 import {
+  classifyRSCPayloadError,
   isFailureRetryWindowElapsed,
-  isRetryableRSCPayloadError,
+  markPayloadAttemptStarted,
   recordPayloadFailure,
   type RSCPayloadFailure,
 } from './RSCPayloadRetry.ts';
@@ -357,6 +358,11 @@ export const createRSCProvider = ({
         // promise)` for the identity check — a self-referential pattern that
         // needs `let` (mirrors `refetchComponent`, which defines its
         // `restoreLastSuccessfulPromise` closure before assigning `promise`).
+        // Protect this key's failure record from the abandoned-record sweep for as
+        // long as its attempt is in flight; a slow rejection must still count
+        // against the budget it belongs to. No-ops on a first attempt.
+        markPayloadAttemptStarted(payloadFailures, key, Date.now());
+
         let promise!: Promise<ReactNode>;
         let payloadSucceeded = false;
         const releaseInFlightEvictedSuccessLatch = () => {
@@ -440,13 +446,17 @@ export const createRSCProvider = ({
           if (fetchRSCPromises.get(key, false) !== promise) {
             throw error;
           }
-          const { shouldRetry } = recordPayloadFailure(
+          const { outcome } = recordPayloadFailure(
             payloadFailures,
             key,
-            isRetryableRSCPayloadError(error),
+            classifyRSCPayloadError(error),
             Date.now(),
           );
-          if (shouldRetry) {
+          // `retry` hands the next attempt to React's retry render; `discard`
+          // means the app aborted this request, so the key must be free to load
+          // again immediately. Both remove the rejection. `surface` retains it so
+          // the retry render reads it and the error reaches the page.
+          if (outcome !== 'surface') {
             retryEntryRemoved = true;
             fetchRSCPromises.deletePreservingPins(key);
           }
