@@ -19359,7 +19359,7 @@ Uncommonly used options:
 <%= react_on_rails_preload_links("HelloWorld", "comments_list") %>
 ```
 
-Use `react_on_rails_preload_links` in a layout or view `<head>` when you know which auto-bundled React components the page will render. The helper resolves each component to its generated Shakapacker pack (`generated/ComponentName`) and emits preload link tags for the manifest assets. Pass component names as PascalCase, camelCase, or snake_case strings; hyphenated names are rejected because they cannot be normalized reliably.
+Use `react_on_rails_preload_links` in a layout or view `<head>` when you know which auto-bundled React components the page will render. The helper requires Shakapacker 7.0+ with `nested_entries: true`, resolves each component to its generated Shakapacker pack (`generated/ComponentName`), and emits preload link tags for the manifest assets. Pass component names as PascalCase, camelCase, or snake_case strings; hyphenated names are rejected because they cannot be normalized reliably.
 
 For JavaScript chunks, plain script assets render as `<link rel="preload" as="script">`. Module assets render as `<link rel="modulepreload">` when the manifest marks the asset as a module or the emitted file has an `.mjs` extension. CSS chunks render as `<link rel="preload" as="style">`. Component packs without CSS assets simply skip the stylesheet preload.
 
@@ -31571,7 +31571,7 @@ _The image above demonstrates the dramatic performance improvement:_
 ### Script Loading Strategy Migration
 
 - If you were previously using `defer_generated_component_packs: true`, use `generated_component_packs_loading_strategy: :defer` instead
-- If you were previously using `defer_generated_component_packs: false`, use `generated_component_packs_loading_strategy: :sync` instead
+- If you were previously using `defer_generated_component_packs: false`, remove the setting. It was a no-op; set `generated_component_packs_loading_strategy: :sync` only if you need synchronous loading.
 - For optimal performance with Shakapacker ≥ 8.2.0, consider using `generated_component_packs_loading_strategy: :async`
 
 ### ESM-only package

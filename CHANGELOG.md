@@ -1310,7 +1310,7 @@ See [Release Notes](docs/oss/upgrading/release-notes/16.0.0.md) for complete mig
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-  - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+  - `defer_generated_component_packs: false` → remove the setting (it was a no-op); set `generated_component_packs_loading_strategy: :sync` only if you need synchronous loading
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
 
 - **`force_load` renamed to `immediate_hydration`** for API clarity
