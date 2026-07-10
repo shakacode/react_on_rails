@@ -92,6 +92,9 @@ export interface Config {
   // The password expected to receive from the **Rails client** to authenticate rendering requests.
   // In development/test it is optional; in other environments the renderer refuses to start without it.
   password: string | undefined;
+  // React on Rails Pro license JWT. Explicit configuration takes precedence over
+  // REACT_ON_RAILS_PRO_LICENSE; blank configuration falls back to the environment.
+  licenseToken: string | undefined;
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
   // Time in minutes between restarting all workers
@@ -258,6 +261,8 @@ const defaultConfig: Config = {
   // No default for password, means no auth
   password: env.RENDERER_PASSWORD,
 
+  licenseToken: env.REACT_ON_RAILS_PRO_LICENSE?.trim() || undefined,
+
   allWorkersRestartInterval: env.RENDERER_ALL_WORKERS_RESTART_INTERVAL
     ? parseInt(env.RENDERER_ALL_WORKERS_RESTART_INTERVAL, 10)
     : undefined,
@@ -299,6 +304,8 @@ function envValuesUsed() {
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
     // Explicit password overrides, including empty strings, intentionally suppress the env-derived value here.
     RENDERER_PASSWORD: userConfig.password === undefined && env.RENDERER_PASSWORD && '<MASKED>',
+    REACT_ON_RAILS_PRO_LICENSE:
+      !userConfig.licenseToken?.trim() && env.REACT_ON_RAILS_PRO_LICENSE && '<MASKED>',
     RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
     RENDERER_STUB_TIMERS: !('stubTimers' in userConfig) && env.RENDERER_STUB_TIMERS,
     RENDERER_ALL_WORKERS_RESTART_INTERVAL:
@@ -319,11 +326,18 @@ function envValuesUsed() {
 
 function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: string) {
   let sanitizedPassword = defaultValue;
+  let sanitizedLicenseToken = defaultValue;
 
   if (aConfig?.password === '') {
     sanitizedPassword = '<EMPTY STRING>';
   } else if (aConfig?.password) {
     sanitizedPassword = '<MASKED>';
+  }
+
+  if (aConfig?.licenseToken === '') {
+    sanitizedLicenseToken = '<EMPTY STRING>';
+  } else if (aConfig?.licenseToken) {
+    sanitizedLicenseToken = '<MASKED>';
   }
 
   return aConfig && Object.keys(aConfig).length > 0
@@ -332,6 +346,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
         // Distinguish explicit empty-string overrides from truly missing passwords in diagnostics.
         // Empty strings still flow through as explicit overrides and fail validation in production-like envs.
         password: sanitizedPassword,
+        licenseToken: sanitizedLicenseToken,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
@@ -347,7 +362,7 @@ export function logSanitizedConfig() {
       defaultConfig,
       '<NOT PROVIDED AT MODULE LOAD>',
     ),
-    'ENV values used for settings (use "RENDERER_" prefix)': envValuesUsed(),
+    'ENV values used for settings': envValuesUsed(),
     'Customized values for settings from config object (overrides ENV)': sanitizedSettings(userConfig),
     'Final renderer settings': sanitizedSettings(config, '<NOT PROVIDED>'),
   });
@@ -424,6 +439,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   const runtimeDefaultConfig = {
     ...defaultConfig,
     password: env.RENDERER_PASSWORD,
+    licenseToken: env.REACT_ON_RAILS_PRO_LICENSE?.trim() || undefined,
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
     enableHealthEndpoints: truthyHealthEndpointFlag(env.RENDERER_ENABLE_HEALTH_ENDPOINTS),
@@ -432,6 +448,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   if (explicitUndefinedPassword) {
     config.password = runtimeDefaultConfig.password;
   }
+  config.licenseToken = userConfig.licenseToken?.trim() || runtimeDefaultConfig.licenseToken;
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {

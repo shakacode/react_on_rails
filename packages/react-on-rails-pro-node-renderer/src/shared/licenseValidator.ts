@@ -57,32 +57,44 @@ export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 // Unlike Ruby's Mutex-based approach for concurrent access, JavaScript is single-threaded
 // for user code execution. However, when using Node.js clusters or worker threads:
 //
-// - **Cluster mode**: Each worker process has its own memory space. The cached values
-//   are computed independently per worker, which is safe and correct. No shared state
-//   issues arise because workers don't share memory for JavaScript objects.
+// - **Cluster mode**: Each process has its own memory space. Renderer startup validation
+//   runs in the master process before workers are forked, so workers do not duplicate it.
+//   Direct API calls made inside a worker use that worker's independent module cache.
 //
 // - **Worker threads**: Each worker thread has its own module instance and memory.
 //   Like cluster mode, there's no shared state between threads for these cached values.
 //
-// - **React on Rails Pro Node Renderer**: The node renderer spawns worker processes
-//   (not threads), so each worker maintains its own cached license state. This is
-//   intentional - license validation happens once per worker on first access, and
-//   the result is cached for the lifetime of that worker process.
+// - **React on Rails Pro Node Renderer**: Cluster mode validates once in the master;
+//   single-process mode validates once in that process. The result is cached for the
+//   lifetime of the process that performs validation.
 //
-// The caching here is deterministic - given the same environment variable value, every
-// worker will compute the same cached values. Redundant computation across workers
-// is acceptable since license validation is infrequent (once per worker startup).
-let cachedLicenseStatus: LicenseStatus | undefined;
-const UNINITIALIZED = Symbol('uninitialized');
-let cachedLicenseOrganization: string | undefined | typeof UNINITIALIZED = UNINITIALIZED;
-let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALIZED;
+// Explicit tokens get distinct cache keys so an earlier ENV/default lookup cannot
+// override later application configuration. The ENV/default path intentionally has
+// one process-lifetime key, preserving the existing reset-required cache semantics.
+const ENV_LICENSE_CACHE_KEY = Symbol('env-license');
+type LicenseCacheKey = string | typeof ENV_LICENSE_CACHE_KEY;
+interface LicenseCacheEntry<T> {
+  key: LicenseCacheKey;
+  value: T;
+}
+
+let cachedLicenseStatus: LicenseCacheEntry<LicenseStatus> | undefined;
+let cachedLicenseOrganization: LicenseCacheEntry<string | undefined> | undefined;
+let cachedLicensePlan: LicenseCacheEntry<ValidPlan | undefined> | undefined;
+
+function licenseCacheKey(configuredLicenseToken?: string): LicenseCacheKey {
+  return configuredLicenseToken?.trim() || ENV_LICENSE_CACHE_KEY;
+}
 
 /**
- * Loads the license string from environment variable.
+ * Loads the license string from explicit configuration, then the environment.
  * @returns License string or undefined if not found
  * @private
  */
-function loadLicenseString(): string | undefined {
+function loadLicenseString(configuredLicenseToken?: string): string | undefined {
+  const configuredLicense = configuredLicenseToken?.trim();
+  if (configuredLicense) return configuredLicense;
+
   const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE?.trim();
   // `|| undefined` converts an empty/whitespace-only env var to undefined,
   // so it is reported as 'missing' rather than 'invalid'.
@@ -173,9 +185,9 @@ function checkExpiration(license: LicenseData): LicenseStatus {
  * @returns The license status
  * @private
  */
-function determineLicenseStatus(): LicenseStatus {
+function determineLicenseStatus(licenseToken?: string): LicenseStatus {
   // Step 1: Load license string
-  const licenseString = loadLicenseString();
+  const licenseString = loadLicenseString(licenseToken);
   if (!licenseString) {
     return 'missing';
   }
@@ -213,13 +225,15 @@ function determineLicenseStatus(): LicenseStatus {
  *
  * @returns One of 'valid', 'expired', 'invalid', 'missing'
  */
-export function getLicenseStatus(): LicenseStatus {
-  if (cachedLicenseStatus !== undefined) {
-    return cachedLicenseStatus;
+export function getLicenseStatus(licenseToken?: string): LicenseStatus {
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicenseStatus?.key === key) {
+    return cachedLicenseStatus.value;
   }
 
-  cachedLicenseStatus = determineLicenseStatus();
-  return cachedLicenseStatus;
+  const value = determineLicenseStatus(licenseToken);
+  cachedLicenseStatus = { key, value };
+  return value;
 }
 
 /**
@@ -227,8 +241,8 @@ export function getLicenseStatus(): LicenseStatus {
  * @returns The organization name or undefined if not available
  * @private
  */
-function determineLicenseOrganization(): string | undefined {
-  const licenseString = loadLicenseString();
+function determineLicenseOrganization(licenseToken?: string): string | undefined {
+  const licenseString = loadLicenseString(licenseToken);
   if (!licenseString) {
     return undefined;
   }
@@ -250,13 +264,15 @@ function determineLicenseOrganization(): string | undefined {
  * Returns the organization name from the license if available.
  * @returns The organization name or undefined if not available
  */
-export function getLicenseOrganization(): string | undefined {
-  if (cachedLicenseOrganization !== UNINITIALIZED) {
-    return cachedLicenseOrganization;
+export function getLicenseOrganization(licenseToken?: string): string | undefined {
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicenseOrganization?.key === key) {
+    return cachedLicenseOrganization.value;
   }
 
-  cachedLicenseOrganization = determineLicenseOrganization();
-  return cachedLicenseOrganization;
+  const value = determineLicenseOrganization(licenseToken);
+  cachedLicenseOrganization = { key, value };
+  return value;
 }
 
 /**
@@ -265,8 +281,8 @@ export function getLicenseOrganization(): string | undefined {
  * @returns The plan type or undefined if not available/invalid
  * @private
  */
-function determineLicensePlan(): ValidPlan | undefined {
-  const licenseString = loadLicenseString();
+function determineLicensePlan(licenseToken?: string): ValidPlan | undefined {
+  const licenseString = loadLicenseString(licenseToken);
   if (!licenseString) {
     return undefined;
   }
@@ -288,13 +304,15 @@ function determineLicensePlan(): ValidPlan | undefined {
  * Returns the license plan type if available.
  * @returns The plan type (e.g., "paid", "startup") or undefined if not available
  */
-export function getLicensePlan(): ValidPlan | undefined {
-  if (cachedLicensePlan !== UNINITIALIZED) {
-    return cachedLicensePlan;
+export function getLicensePlan(licenseToken?: string): ValidPlan | undefined {
+  const key = licenseCacheKey(licenseToken);
+  if (cachedLicensePlan?.key === key) {
+    return cachedLicensePlan.value;
   }
 
-  cachedLicensePlan = determineLicensePlan();
-  return cachedLicensePlan;
+  const value = determineLicensePlan(licenseToken);
+  cachedLicensePlan = { key, value };
+  return value;
 }
 
 /**
@@ -302,6 +320,6 @@ export function getLicensePlan(): ValidPlan | undefined {
  */
 export function reset(): void {
   cachedLicenseStatus = undefined;
-  cachedLicenseOrganization = UNINITIALIZED;
-  cachedLicensePlan = UNINITIALIZED;
+  cachedLicenseOrganization = undefined;
+  cachedLicensePlan = undefined;
 }

@@ -32,6 +32,7 @@ module ReactOnRailsPro
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT,
       renderer_http_keep_alive_timeout: Configuration::DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT,
       renderer_password: nil,
+      license_token: nil,
       tracing: Configuration::DEFAULT_TRACING,
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
@@ -107,7 +108,7 @@ module ReactOnRailsPro
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
-    attr_accessor :renderer_url, :renderer_password, :tracing,
+    attr_accessor :renderer_url, :renderer_password, :license_token, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
@@ -194,7 +195,8 @@ module ReactOnRailsPro
       @renderer_http_keep_alive_timeout = value
     end
 
-    def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
+    def initialize(renderer_url: nil, renderer_password: nil, license_token: nil, # rubocop:disable Metrics/AbcSize
+                   server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
                    renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
@@ -214,6 +216,7 @@ module ReactOnRailsPro
                    cache_tag_index_max_keys: DEFAULT_CACHE_TAG_INDEX_MAX_KEYS)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
+      self.license_token = license_token
       self.server_renderer = server_renderer
       self.renderer_use_fallback_exec_js = renderer_use_fallback_exec_js
       self.prerender_caching = prerender_caching

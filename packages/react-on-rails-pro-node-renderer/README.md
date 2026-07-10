@@ -103,10 +103,16 @@ All options can be set via the config object or environment variables. Config ob
 | `supportModules`                       | `RENDERER_SUPPORT_MODULES`                          | `false`                     | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.)                            |
 | `workersCount`                         | `RENDERER_WORKERS_COUNT`                            | CPU count - 1               | Number of worker processes. Legacy `NODE_RENDERER_CONCURRENCY` is still supported in generated templates. |
 | `password`                             | `RENDERER_PASSWORD`                                 | (none)                      | Shared secret for Rails authentication                                                                    |
+| `licenseToken`                         | `REACT_ON_RAILS_PRO_LICENSE`                        | (none)                      | Paid React on Rails Pro license JWT                                                                       |
 | `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                           |
 | `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                                    |
 | `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                                       |
 | `fastifyServerOptions`                 | —                                                   | `{}`                        | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory)            |
+
+The renderer runs in a separate process and cannot read Rails credentials. Pass `licenseToken` from a secret provider
+available to Node, or provide `REACT_ON_RAILS_PRO_LICENSE` to that process. Explicit nonblank configuration takes
+precedence; a blank or omitted `licenseToken` falls back to the environment variable. Sanitized configuration logs mask
+the token value.
 
 ## Advanced: Custom Fastify Configuration
 

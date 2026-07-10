@@ -19,6 +19,12 @@ The below example is a typical production setup, using the separate `NodeRendere
 
 ```ruby
 ReactOnRailsPro.configure do |config|
+  # Paid production license JWT. Explicit nonblank configuration takes precedence over
+  # REACT_ON_RAILS_PRO_LICENSE; blank values fall back to that environment variable.
+  # A standalone Node renderer must receive the same token through its own `licenseToken`
+  # configuration or environment.
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+
   # If true, then capture timing of React on Rails Pro calls including server rendering and
   # component rendering.
   # Default for `tracing` is false.

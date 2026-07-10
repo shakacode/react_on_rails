@@ -159,7 +159,7 @@ function setupMasterRunHarness({
     ...config,
   }));
   const mockLogSanitizedConfig = jest.fn();
-  const mockGetLicenseStatus = jest.fn(() => 'valid');
+  const mockLogLicenseStatus = jest.fn(() => operations.push('license'));
   const mockRunRscPeerCompatibilityCheck = jest.fn();
   const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
   const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((callback, delay) => {
@@ -202,9 +202,9 @@ function setupMasterRunHarness({
     buildConfig: mockBuildConfig,
     logSanitizedConfig: mockLogSanitizedConfig,
   }));
-  jest.doMock('../src/shared/licenseValidator', () => ({
+  jest.doMock('../src/shared/logLicenseStatus', () => ({
     __esModule: true,
-    getLicenseStatus: mockGetLicenseStatus,
+    default: mockLogLicenseStatus,
   }));
   jest.doMock('../src/shared/runRscPeerCompatibilityCheck.js', () => ({
     __esModule: true,
@@ -243,6 +243,7 @@ function setupMasterRunHarness({
     mockCluster,
     mockErrorReporterMessage,
     mockLog,
+    mockLogLicenseStatus,
     mockRunRscPeerCompatibilityCheck,
     mockRestartWorkers: restartWorkers,
     setIntervalSpy,
@@ -290,6 +291,13 @@ describe('master startup failure handling via masterRun wiring', () => {
     expect(harness.mockRunRscPeerCompatibilityCheck).toHaveBeenCalledWith({
       proVersion: expect.any(String),
     });
+  });
+
+  it('passes the resolved config token to license validation before forking workers', () => {
+    const harness = setupMasterRunHarness({ config: { licenseToken: 'configured-license-token' } });
+
+    expect(harness.mockLogLicenseStatus).toHaveBeenCalledWith('configured-license-token');
+    expect(harness.operations.indexOf('license')).toBeLessThan(harness.operations.indexOf('fork'));
   });
 
   it.each([

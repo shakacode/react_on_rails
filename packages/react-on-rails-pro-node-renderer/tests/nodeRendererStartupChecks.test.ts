@@ -22,6 +22,7 @@ describe('ReactOnRailsProNodeRenderer startup checks', () => {
   it('runs the RSC peer compatibility check on wrapper startup', async () => {
     const runRscPeerCompatibilityCheck = jest.fn();
     const buildConfig = jest.fn(() => ({ workersCount: 0 }));
+    const logLicenseStatus = jest.fn();
     const ready = jest.fn(async () => undefined);
     const worker = jest.fn(() => ({ ready }));
 
@@ -45,6 +46,10 @@ describe('ReactOnRailsProNodeRenderer startup checks', () => {
         warn: jest.fn(),
       },
     }));
+    jest.doMock('../src/shared/logLicenseStatus.js', () => ({
+      __esModule: true,
+      default: logLicenseStatus,
+    }));
     jest.doMock('../src/worker.js', () => ({
       __esModule: true,
       default: worker,
@@ -65,6 +70,43 @@ describe('ReactOnRailsProNodeRenderer startup checks', () => {
       proVersion: expect.any(String),
     });
     expect(worker).toHaveBeenCalledWith({ workersCount: 0 });
+    expect(logLicenseStatus).toHaveBeenCalledWith(undefined);
     expect(ready).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the configured license token to single-process startup validation', async () => {
+    const logLicenseStatus = jest.fn();
+    const buildConfig = jest.fn(() => ({ workersCount: 0, licenseToken: 'configured-license-token' }));
+    const ready = jest.fn(async () => undefined);
+
+    jest.doMock('cluster', () => ({
+      __esModule: true,
+      default: { isWorker: false },
+    }));
+    jest.doMock('../src/shared/runRscPeerCompatibilityCheck.js', () => ({
+      __esModule: true,
+      runRscPeerCompatibilityCheck: jest.fn(),
+    }));
+    jest.doMock('../src/shared/configBuilder.js', () => ({
+      __esModule: true,
+      buildConfig,
+    }));
+    jest.doMock('../src/shared/log.js', () => ({
+      __esModule: true,
+      default: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+    }));
+    jest.doMock('../src/shared/logLicenseStatus.js', () => ({
+      __esModule: true,
+      default: logLicenseStatus,
+    }));
+    jest.doMock('../src/worker.js', () => ({
+      __esModule: true,
+      default: jest.fn(() => ({ ready })),
+    }));
+
+    const { reactOnRailsProNodeRenderer } = jest.requireActual('../src/ReactOnRailsProNodeRenderer');
+    await reactOnRailsProNodeRenderer({ workersCount: 0, licenseToken: 'configured-license-token' });
+
+    expect(logLicenseStatus).toHaveBeenCalledWith('configured-license-token');
   });
 });

@@ -6,9 +6,10 @@ run with disposable resources.
 
 ## License Tokens
 
-Do not expose `REACT_ON_RAILS_PRO_LICENSE` to fork pull request review-app builds or runtime by default. React on Rails
-Pro supports evaluation, development, test, CI/CD, and staging without a license token. Review apps should use that
-license-free path unless there is a deliberate reason to test a production-license path.
+Do not expose a production license token to fork pull request review-app builds or runtime by default, whether it comes
+from `REACT_ON_RAILS_PRO_LICENSE`, Rails credentials, or the Node renderer's `licenseToken` configuration. React on
+Rails Pro supports evaluation, development, test, CI/CD, and staging without a license token. Review apps should use
+that license-free path unless there is a deliberate reason to test a production-license path.
 
 If a review app must validate license behavior:
 
