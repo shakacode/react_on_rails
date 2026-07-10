@@ -45,6 +45,7 @@ SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
 SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
+# Keep in sync with timeout-minutes in .github/workflows/shakaperf-release-gates.yml.
 SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES = 45
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
@@ -386,7 +387,21 @@ def reusable_shakaperf_release_gate_run?(run, head_sha)
 end
 
 def find_reusable_shakaperf_release_gate_run(runs, head_sha)
-  runs.find { |run| reusable_shakaperf_release_gate_run?(run, head_sha) }
+  latest_same_sha_run = runs.select { |run| run["headSha"] == head_sha }
+                            .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
+  return unless latest_same_sha_run
+
+  reusable_shakaperf_release_gate_run?(latest_same_sha_run, head_sha) ? latest_same_sha_run : nil
+end
+
+def shakaperf_release_gate_run_sort_key(run)
+  created_at = begin
+    Time.iso8601(run["createdAt"]).to_i
+  rescue ArgumentError, TypeError
+    0
+  end
+
+  [created_at, run["databaseId"].to_i]
 end
 
 def shakaperf_release_gate_run_url(repo_slug:, run:)
@@ -399,8 +414,9 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
   puts <<~NOTICE
 
     Running ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing...
-    This dispatches the GitHub Actions ShakaPerf Release Gates workflow and blocks until it passes.
-    Warm-cache runs usually take a few minutes.
+    This checks for an existing matching GitHub Actions ShakaPerf Release Gates run.
+    If no reusable run exists, it dispatches a new workflow run and blocks until it passes.
+    Warm-cache waits usually take a few minutes.
     The workflow can run up to #{SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES} minutes.
     This release task will wait up to #{watch_timeout_minutes} minutes.
     To skip only for an urgent release where ShakaPerf is known-unrelated:

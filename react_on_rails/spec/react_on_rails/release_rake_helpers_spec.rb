@@ -437,6 +437,62 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/watching it instead.*ShakaPerf release gate passed/m).to_stdout
     end
 
+    it "does not reuse an older successful gate run when the latest same-SHA run failed" do
+      failed_run = run.merge(
+        "databaseId" => 222_222,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-10T21:30:00Z"
+      )
+      older_successful_run = run.merge(
+        "databaseId" => 111_111,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-10T21:00:00Z"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([failed_run, older_successful_run])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+        .and_return(["", success_status])
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
+        .with(
+          repo_slug:,
+          ref: "release-branch",
+          head_sha:,
+          ignored_run_ids: %w[222222 111111],
+          earliest_created_at: kind_of(Time)
+        )
+        .and_return(run)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["", success_status, false])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/ShakaPerf release gate passed/).to_stdout
+      expect(self).to have_received(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+    end
+
     it "skips dispatching when the CI status override is enabled" do
       expect(self).not_to receive(:capture_gh_output)
 
