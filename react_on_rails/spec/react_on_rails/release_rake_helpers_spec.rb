@@ -409,6 +409,20 @@ RSpec.describe "release.rake helper methods" do
       end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
     end
 
+    it "aborts instead of reporting a completed non-success run as already passed" do
+      failed_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "failure"
+      )
+
+      expect do
+        handle_reusable_shakaperf_release_gate_run!(repo_slug:, run: failed_run, head_sha:)
+      end.to raise_error(
+        SystemExit,
+        /Refusing to reuse completed ShakaPerf release gate run 123456 with conclusion failure/
+      )
+    end
+
     it "watches an in-progress gate run for the same head SHA without dispatching another run" do
       in_progress_run = run.merge(
         "databaseId" => 321_654,

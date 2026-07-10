@@ -463,8 +463,17 @@ end
 def handle_reusable_shakaperf_release_gate_run!(repo_slug:, run:, head_sha:)
   return false unless run
 
+  run_id = run.fetch("databaseId").to_s
   run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
-  if run["status"] == "completed"
+  if run["status"].to_s == "completed"
+    conclusion = run["conclusion"].to_s
+    unless conclusion == "success"
+      handle_shakaperf_release_gate_violation!(
+        message: "❌ Refusing to reuse completed ShakaPerf release gate run #{run_id} " \
+                 "with conclusion #{conclusion.empty? ? 'unknown' : conclusion}.\n\nRun: #{run_url}"
+      )
+    end
+
     puts "✓ ShakaPerf release gate already passed: #{run_url}"
     return true
   end
