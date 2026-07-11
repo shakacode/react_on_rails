@@ -46,7 +46,6 @@ export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) 
       `Node.js version ${process.versions.node} is not supported by Fastify ${fastifyVersion}.
 Please either use Node.js v20 or higher or downgrade Fastify by setting the following resolutions in your package.json:
 {
-  "@fastify/formbody": "^7.4.0",
   "@fastify/multipart": "^8.3.1",
   "fastify": "^4.29.0",
 }`,

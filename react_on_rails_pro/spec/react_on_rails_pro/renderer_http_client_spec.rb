@@ -300,22 +300,6 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
   end
 
   describe ".build_form_body" do
-    it "uses url-encoded form data when no uploaded files are present" do
-      headers, body = described_class.build_form_body(
-        {
-          "password" => "secret",
-          "targetBundles" => %w[server rsc],
-          "renderingRequest" => "console.log('Hello, world!');"
-        }
-      )
-
-      expect(headers).to eq([["content-type", "application/x-www-form-urlencoded"]])
-      expect(body).to include("password=secret")
-      expect(body).to include("targetBundles%5B%5D=server")
-      expect(body).to include("targetBundles%5B%5D=rsc")
-      expect(body).to include("renderingRequest=console.log")
-    end
-
     it "uses multipart form data when uploaded files are present" do
       Tempfile.create(["react-on-rails-pro", ".js"]) do |file|
         form = {
@@ -334,6 +318,37 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
         )
         expect(body.join).to include('name="bundle_server"; filename="server.js"')
       end
+    end
+  end
+
+  describe "raw request bodies" do
+    it "passes custom headers and the body through without encoding" do
+      client = described_class.new(
+        origin: "http://localhost:3800",
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1
+      )
+      raw = { headers: [["content-type", "application/example"]], body: "const value = '✓';" }
+
+      expect(client.send(:request_body, form: nil, json: nil, raw:)).to eq([raw[:headers], raw[:body]])
+    ensure
+      client&.close
+    end
+
+    it "rejects ambiguous body encodings" do
+      client = described_class.new(
+        origin: "http://localhost:3800",
+        pool_size: 1,
+        connect_timeout: 1,
+        read_timeout: 1
+      )
+
+      expect do
+        client.send(:request_body, form: { "key" => "value" }, json: nil, raw: { headers: [], body: "raw" })
+      end.to raise_error(ArgumentError, /only one request body encoding/)
+    ensure
+      client&.close
     end
   end
 

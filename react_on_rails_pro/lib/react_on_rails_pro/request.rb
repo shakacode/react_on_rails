@@ -22,6 +22,9 @@ require_relative "async_props_emitter"
 
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
+    RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
+    RAW_RENDER_HEADER_PREFIX = "x-react-on-rails-pro-"
+
     class UploadAssetsWaiter
       def initialize
         if Fiber.scheduler
@@ -91,7 +94,7 @@ module ReactOnRailsPro
         artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading requested assets") if send_bundle
         request_path = send_bundle ? retarget_render_path(path, artifacts, bundle_role) : path
         form = form_with_code(js_code, send_bundle, artifacts:)
-        perform_request(request_path, form:)
+        perform_render_request(request_path, js_code, form:, send_bundle:)
       end
 
       def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false, artifacts: nil)
@@ -109,7 +112,7 @@ module ReactOnRailsPro
           request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
           form = form_with_code(js_code, false, artifacts: request_artifacts, rsc_stream_observability:)
-          perform_request(request_path, form:, stream: true)
+          perform_render_request(request_path, js_code, form:, send_bundle: false, stream: true)
         end
       end
 
@@ -320,6 +323,43 @@ module ReactOnRailsPro
         form["rscStreamObservability"] = true if rsc_stream_observability
         populate_form_with_bundle_and_assets(form, check_bundle: false, artifacts:) if send_bundle
         form
+      end
+
+      def perform_render_request(path, js_code, form:, send_bundle:, stream: false)
+        if send_bundle
+          perform_request(path, form:, stream:)
+        else
+          perform_request(path, raw: raw_render_request(js_code, form), stream:)
+        end
+      end
+
+      def raw_render_request(js_code, form)
+        metadata = form.except("renderingRequest")
+        headers = [
+          ["content-type", RAW_RENDER_CONTENT_TYPE],
+          ["#{RAW_RENDER_HEADER_PREFIX}protocol-version", metadata.delete("protocolVersion").to_s],
+          ["#{RAW_RENDER_HEADER_PREFIX}gem-version", metadata.delete("gemVersion").to_s],
+          ["#{RAW_RENDER_HEADER_PREFIX}rails-env", metadata.delete("railsEnv").to_s],
+          [
+            "#{RAW_RENDER_HEADER_PREFIX}dependency-bundle-timestamps",
+            JSON.generate(Array(metadata.delete("dependencyBundleTimestamps")))
+          ]
+        ]
+        password = metadata.delete("password")
+        headers << ["authorization", "Bearer #{sanitize_raw_render_header(password)}"] if password
+        if metadata.key?("rscStreamObservability")
+          observability = metadata.delete("rscStreamObservability").to_s
+          headers << ["#{RAW_RENDER_HEADER_PREFIX}rsc-stream-observability", observability]
+        end
+        raise ArgumentError, "Unsupported raw render metadata: #{metadata.keys.join(', ')}" unless metadata.empty?
+
+        { headers:, body: js_code }
+      end
+
+      def sanitize_raw_render_header(value)
+        value.to_s.tap do |header_value|
+          raise ArgumentError, "Renderer metadata headers cannot contain newlines" if header_value.match?(/[\r\n]/)
+        end
       end
 
       def populate_form_with_bundle_and_assets(form, check_bundle:, artifacts: nil, assets_to_copy: nil)

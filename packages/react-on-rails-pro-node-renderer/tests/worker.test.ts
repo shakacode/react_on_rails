@@ -214,6 +214,48 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
   });
 
+  test('POST raw render request normalizes headers and executes the JavaScript body verbatim', async () => {
+    await createVmBundleForTest();
+    const app = createWorker({ password: 'my_password' });
+    const renderingRequest = "ReactOnRails.dummy // quotes: '\"' and unicode: ✓";
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        authorization: 'Bearer my_password',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-gem-version': gemVersion,
+        'x-react-on-rails-pro-rails-env': railsEnv,
+        'x-react-on-rails-pro-dependency-bundle-timestamps': JSON.stringify([String(BUNDLE_TIMESTAMP)]),
+        'x-react-on-rails-pro-rsc-stream-observability': 'false',
+      })
+      .payload(renderingRequest)
+      .end();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toBe('{"html":"Dummy Object"}');
+  });
+
+  test('POST raw render request rejects malformed dependency metadata', async () => {
+    const app = createWorker();
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({
+        'content-type': 'application/vnd.react-on-rails.render-request+javascript',
+        'x-react-on-rails-pro-protocol-version': protocolVersion,
+        'x-react-on-rails-pro-dependency-bundle-timestamps': 'not-json',
+      })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('expected a JSON array');
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is missing', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),

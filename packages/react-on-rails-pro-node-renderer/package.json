@@ -36,7 +36,6 @@
     "lib/**/*.d.ts"
   ],
   "dependencies": {
-    "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
     "fastify": "^5.8.5",
     "fs-extra": "^11.2.0",
