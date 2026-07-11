@@ -593,6 +593,27 @@ describe ReactOnRailsProHelper do
     end
   end
 
+  describe "#internal_rsc_payload_react_component" do
+    it "frames the payload without removing html from the input chunk" do
+      input_chunk = { "hasErrors" => false, "html" => "payload" }
+      upstream_stream = Struct.new(:input) do
+        def each_chunk
+          yield input
+        end
+      end.new(input_chunk)
+      json_stream = ReactOnRailsPro::StreamDecorator.new(upstream_stream)
+      render_options = instance_double(ReactOnRails::ReactComponent::RenderOptions)
+
+      allow(self).to receive(:create_render_options).and_return(render_options)
+      allow(self).to receive(:server_rendered_react_component).with(render_options).and_return(json_stream)
+
+      framed_stream = send(:internal_rsc_payload_react_component, "RscEchoProps")
+
+      expect(framed_stream.each_chunk.to_a).to eq(["{\"hasErrors\":false}\t00000007\npayload"])
+      expect(input_chunk).to include("html" => "payload")
+    end
+  end
+
   describe "html_streaming_react_component" do
     include StreamingTestHelpers
 
