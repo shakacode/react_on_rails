@@ -38,10 +38,18 @@ module ReactOnRailsPro
     # Configuration (see docs/pro/rolling-deploy-adapters.md):
     #
     #   ReactOnRailsPro.configure do |config|
-    #     config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
-    #     config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")
-    #     config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]
+    #     config.rolling_deploy_adapter       = ReactOnRailsPro::RollingDeployAdapters::Http
+    #     config.rolling_deploy_token         = ENV.fetch("ROLLING_DEPLOY_TOKEN")
+    #     config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
     #   end
+    #
+    # `rolling_deploy_previous_urls` accepts a single URL string, a comma-
+    # separated string, or an Array of URL strings. Discovery unions the bundle
+    # hashes advertised by every endpoint; fetch tries each endpoint in order and
+    # returns the first that has the requested hash. Seeding from more than one
+    # endpoint (e.g. staging + production) lets an image built in one environment
+    # and promoted to another carry the promotion target's draining bundle. See
+    # docs/pro/rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed.
     #
     # Error contract matches the rolling_deploy_adapter protocol: every
     # exception is caught and reported as a warning so a failed seed degrades
@@ -81,19 +89,59 @@ module ReactOnRailsPro
 
       class << self
         def previous_bundle_hashes
-          base = configured_previous_url
-          return [] if base.nil?
+          bases = configured_previous_urls
+          return [] if bases.empty?
 
           if token_missing?
             return warn_and_return("rolling_deploy_token is not configured; skipping manifest fetch",
                                    [])
           end
 
-          response = http_get(
-            URI("#{base}/manifest"),
-            read_timeout: MANIFEST_READ_TIMEOUT_SECONDS
-          )
-          return warn_and_return("manifest returned HTTP #{response.code}", []) unless response.is_a?(Net::HTTPSuccess)
+          # Union across every configured endpoint. A single endpoint failing
+          # (down, 404, malformed manifest) yields [] for that base and does not
+          # abort discovery for the others — the point of multiple endpoints is
+          # resilience, so one unreachable source must not blank the rest.
+          bases.flat_map { |base| manifest_hashes(base) }.uniq
+        end
+
+        def fetch(bundle_hash)
+          return nil if hash_invalid?(bundle_hash)
+
+          bases = configured_previous_urls
+          return nil if bases.empty?
+
+          if token_missing?
+            return warn_and_return("rolling_deploy_token is not configured; skipping fetch(#{bundle_hash.inspect})",
+                                   nil)
+          end
+
+          # Try each endpoint in order; return the first that has the hash. A
+          # given hash is content-addressed, so whichever endpoint serves it
+          # returns identical bytes — first hit wins.
+          bases.each do |base|
+            payload = fetch_from(base, bundle_hash)
+            return payload if payload
+          end
+          nil
+        end
+
+        # Intentional no-op. The running Rails server IS the artifact store —
+        # bundle + companion assets are already on local disk where the
+        # mountable BundlesController will serve them on the next deploy's
+        # build CI. Documented in docs/pro/rolling-deploy-adapters.md.
+        def upload(_bundle_hash, bundle:, assets:)
+          # See class doc above.
+        end
+
+        private
+
+        # One endpoint's manifest hashes, or [] on any failure so a single bad
+        # endpoint cannot abort discovery across the others.
+        def manifest_hashes(base)
+          response = http_get(URI("#{base}/manifest"), read_timeout: MANIFEST_READ_TIMEOUT_SECONDS)
+          unless response.is_a?(Net::HTTPSuccess)
+            return warn_and_return("manifest at #{base} returned HTTP #{response.code}", [])
+          end
 
           parsed = JSON.parse(response.body)
           # Filter manifest hashes through SAFE_HASH_PATTERN before returning
@@ -107,19 +155,13 @@ module ReactOnRailsPro
             .reject(&:empty?)
             .grep(ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN)
         rescue StandardError => e
-          warn_and_return("previous_bundle_hashes failed: #{e.class}: #{e.message}", [])
+          warn_and_return("previous_bundle_hashes for #{base} failed: #{e.class}: #{e.message}", [])
         end
 
-        def fetch(bundle_hash)
-          base = configured_previous_url
-          return nil if base.nil?
-          return nil if hash_invalid?(bundle_hash)
-
-          if token_missing?
-            return warn_and_return("rolling_deploy_token is not configured; skipping fetch(#{bundle_hash.inspect})",
-                                   nil)
-          end
-
+        # Fetch one hash from one endpoint. Returns the payload Hash or nil.
+        # Owns the temp dir lifecycle so a failed attempt cleans up before the
+        # caller tries the next endpoint into the same (hash-keyed) directory.
+        def fetch_from(base, bundle_hash)
           dir = bundle_dir(bundle_hash)
           FileUtils.mkdir_p(dir)
 
@@ -131,36 +173,37 @@ module ReactOnRailsPro
           result
         rescue StandardError => e
           cleanup_and_return(dir, nil) if dir
-          warn_and_return("fetch(#{bundle_hash.inspect}) failed: #{e.class}: #{e.message}", nil)
+          warn_and_return("fetch(#{bundle_hash.inspect}) from #{base} failed: #{e.class}: #{e.message}", nil)
         end
 
-        # Intentional no-op. The running Rails server IS the artifact store —
-        # bundle + companion assets are already on local disk where the
-        # mountable BundlesController will serve them on the next deploy's
-        # build CI. Documented in docs/pro/rolling-deploy-adapters.md.
-        def upload(_bundle_hash, bundle:, assets:)
-          # See class doc above.
+        # Normalize the configured previous URL(s) into a de-duplicated list of
+        # scheme-validated base URLs. Accepts a single string, a comma-separated
+        # string, or an Array (whose entries may themselves be comma-separated —
+        # convenient for `ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]`).
+        def configured_previous_urls
+          raw = ReactOnRailsPro.configuration.rolling_deploy_previous_urls
+          Array(raw)
+            .flat_map { |entry| entry.to_s.split(",") }
+            .map(&:strip)
+            .reject(&:empty?)
+            .uniq
+            .filter_map { |url| normalize_previous_url(url) }
         end
 
-        private
-
-        def configured_previous_url
-          url = ReactOnRailsPro.configuration.rolling_deploy_previous_url.to_s.strip
-          return nil if url.empty?
-
+        def normalize_previous_url(url)
           uri = URI.parse(url.chomp("/"))
           unless %w[http https].include?(uri.scheme)
             Rails.logger.warn(
-              "#{LOG_PREFIX} rolling_deploy_previous_url has unsupported scheme " \
-              "#{uri.scheme.inspect}; expected http or https. Skipping discovery."
+              "#{LOG_PREFIX} rolling_deploy_previous_urls entry #{url.inspect} has unsupported scheme " \
+              "#{uri.scheme.inspect}; expected http or https. Skipping this entry."
             )
             return nil
           end
           uri.to_s
         rescue URI::InvalidURIError => e
           Rails.logger.warn(
-            "#{LOG_PREFIX} rolling_deploy_previous_url is not a valid URI: #{e.message}. " \
-            "Skipping discovery."
+            "#{LOG_PREFIX} rolling_deploy_previous_urls entry #{url.inspect} is not a valid URI: " \
+            "#{e.message}. Skipping this entry."
           )
           nil
         end
@@ -330,7 +373,7 @@ module ReactOnRailsPro
         # by surfacing the cleartext-token risk in build CI logs.
         #
         # Loopback hosts are intentionally exempt so developers running a
-        # local Rails server for `rolling_deploy_previous_url` during
+        # local Rails server for `rolling_deploy_previous_urls` during
         # development don't see noise on every build CI rehearsal — the
         # token never leaves the host in that case.
         LOOPBACK_HOST_PATTERN = /\A(localhost|127(?:\.\d{1,3}){3}|::1|\[::1\])\z/

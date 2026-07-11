@@ -24,6 +24,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Breaking Changes
+
+- **[Pro] Rolling-deploy previous-URL config is now `rolling_deploy_previous_urls` (plural) and seeds from multiple endpoints**:
+  `config.rolling_deploy_previous_url` is renamed to `config.rolling_deploy_previous_urls`, and the built-in HTTP
+  adapter now accepts a single URL string, a comma-separated string, or an Array. Discovery unions the bundle hashes
+  advertised by every endpoint, and fetch tries each endpoint in order, returning the first that has the requested hash.
+  Seeding from more than one endpoint (e.g. staging + production) lets an image built in one environment and promoted to
+  another carry the promotion target's draining bundle — the previous single-URL config could only seed the build
+  environment, so a promoted production image never held production's draining bundle. Rename any
+  `config.rolling_deploy_previous_url = ...` to `config.rolling_deploy_previous_urls = ...` (and the
+  `ROLLING_DEPLOY_PREVIOUS_URL` build arg to `ROLLING_DEPLOY_PREVIOUS_URLS`). Introduced during the 17.0.0 RC cycle, so
+  this is not a break for any stable release. See
+  [Promotion deploys need a boot seed](https://reactonrails.com/docs/pro/rolling-deploy-adapters#promotion-deploys-need-a-release-time-boot-seed).
+  [PR 4544](https://github.com/shakacode/react_on_rails/pull/4544) by [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.8] - 2026-07-08
 
 #### Breaking Changes
