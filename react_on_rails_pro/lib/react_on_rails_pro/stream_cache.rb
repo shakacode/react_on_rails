@@ -65,7 +65,14 @@ module ReactOnRailsPro
 
         buffered_chunks = []
         @upstream_stream.each_chunk do |chunk|
-          buffered_chunks << chunk
+          # Snapshot the chunk before handing it downstream. A downstream consumer
+          # receives the same object we buffer here, and this buffered array is
+          # persisted to Rails.cache after the stream completes. If a consumer
+          # mutates its chunk (e.g. deleting a key while framing), an un-duped
+          # buffer would persist that mutation and serve a corrupted cache entry.
+          # A shallow dup keeps the cached copy intact regardless of the consumer.
+          # See https://github.com/shakacode/react_on_rails/issues/4550.
+          buffered_chunks << chunk.dup
           yield(chunk)
         end
         Rails.cache.write(@cache_key, buffered_chunks, @cache_options || {})
