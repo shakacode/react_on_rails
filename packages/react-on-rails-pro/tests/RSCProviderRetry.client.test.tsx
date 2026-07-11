@@ -212,6 +212,27 @@ describe('RSCProvider rejected payload handling', () => {
     });
   });
 
+  it('cleans refetch bookkeeping when a terminal replacement expires', async () => {
+    const refetchError = new Error('explicit refetch failed');
+    const replacementError = new Error('replacement failed');
+    const getServerComponent = jest
+      .fn<Promise<React.ReactNode>, [Request]>()
+      .mockRejectedValueOnce(refetchError)
+      .mockRejectedValue(replacementError);
+    const api = await mountProvider(getServerComponent);
+
+    await expect(api.refetchComponent('Card', { id: 1 }, true)).rejects.toBe(refetchError);
+    expect(api.getRefetchVersion('Card', { id: 1 })).toBe(1);
+
+    await expect(api.getComponent('Card', { id: 1 })).rejects.toBe(replacementError);
+    act(() => jest.advanceTimersByTime(0));
+    expect(api.getRefetchVersion('Card', { id: 1 })).toBe(1);
+
+    act(() => jest.advanceTimersByTime(RSC_PAYLOAD_FAILURE_RETENTION_MS));
+    act(() => jest.runOnlyPendingTimers());
+    expect(api.getRefetchVersion('Card', { id: 1 })).toBe(0);
+  });
+
   it.each(['resolves', 'rejects'] as const)(
     'keeps an explicit refetch when the stale automatic retry %s',
     async (staleOutcome) => {

@@ -451,6 +451,7 @@ export const createRSCProvider = ({
                 if (terminalFailureRetained && fetchRSCPromises.get(key, false) === promise) {
                   fetchRSCPromises.deletePreservingPins(key);
                   fetchRSCPromises.unpinWithoutEvict(key);
+                  scheduleAbsentKeyVersionCleanup(key);
                   return;
                 }
                 fetchRSCPromises.unpin(key);
@@ -474,6 +475,7 @@ export const createRSCProvider = ({
         fetchRSCPromises,
         inFlightEvictedSuccessfulPayloadCounts,
         markSuccessfulPromise,
+        scheduleAbsentKeyVersionCleanup,
       ],
     );
 
