@@ -26,7 +26,6 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
-import { setManifestFileNames } from './cache/manifestLoader.ts';
 import { getRSCClientManifestStylesheetHrefs } from './cache/manifestLoaderServer.ts';
 import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
@@ -166,8 +165,7 @@ const streamRenderReactComponent = (
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
-  const { reactClientManifestFileName, reactServerClientManifestFileName } = railsContext;
-  setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
+  const { reactClientManifestFileName } = railsContext;
   // Manifest-backed promotion is additive. If a build does not ship the manifest,
   // preserve the existing filename-regex fallback in injectRSCPayload.
   const rscClientManifestStylesheetHrefsPromise = Promise.resolve()
