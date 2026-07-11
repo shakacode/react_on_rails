@@ -91,26 +91,37 @@ describe('getRSCClientManifestStylesheetHrefs', () => {
       .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/first.css'))
       .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/second.css'));
 
-    setManifestFileNames('first-client-manifest.json', 'first-server-client-manifest.json');
-    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+    await expect(getRSCClientManifestStylesheetHrefs('first-client-manifest.json')).resolves.toEqual(
       new Set(['/webpack/test/css/first.css']),
     );
 
-    setManifestFileNames('second-client-manifest.json', 'second-server-client-manifest.json');
-    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+    await expect(getRSCClientManifestStylesheetHrefs('second-client-manifest.json')).resolves.toEqual(
       new Set(['/webpack/test/css/second.css']),
     );
     expect(mockedLoadJsonFile).toHaveBeenNthCalledWith(2, 'second-client-manifest.json');
+  });
+
+  it('uses an explicit request manifest filename after the global filename changes', async () => {
+    mockedLoadJsonFile.mockResolvedValueOnce(
+      manifestWithStylesheet('/webpack/test/css/request-manifest.css'),
+    );
+    setManifestFileNames('other-client-manifest.json', 'other-server-client-manifest.json');
+
+    await expect(getRSCClientManifestStylesheetHrefs('request-client-manifest.json')).resolves.toEqual(
+      new Set(['/webpack/test/css/request-manifest.css']),
+    );
+    expect(mockedLoadJsonFile).toHaveBeenCalledWith('request-client-manifest.json');
   });
 
   it('retries a rejected manifest load for the same filename', async () => {
     mockedLoadJsonFile
       .mockRejectedValueOnce(new Error('temporary manifest read failure'))
       .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/retried.css'));
-    setManifestFileNames('retry-client-manifest.json', 'retry-server-client-manifest.json');
 
-    await expect(getRSCClientManifestStylesheetHrefs()).rejects.toThrow('temporary manifest read failure');
-    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+    await expect(getRSCClientManifestStylesheetHrefs('retry-client-manifest.json')).rejects.toThrow(
+      'temporary manifest read failure',
+    );
+    await expect(getRSCClientManifestStylesheetHrefs('retry-client-manifest.json')).resolves.toEqual(
       new Set(['/webpack/test/css/retried.css']),
     );
     expect(mockedLoadJsonFile).toHaveBeenCalledTimes(2);

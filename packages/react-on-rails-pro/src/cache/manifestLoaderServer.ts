@@ -81,8 +81,7 @@ export function getServerRenderer(): Promise<ServerRenderer> {
   return serverRendererPromise;
 }
 
-export function getRSCClientManifestStylesheetHrefs(): Promise<ReadonlySet<string>> {
-  const clientManifest = requireClientManifestFileName();
+export function getRSCClientManifestStylesheetHrefs(clientManifest: string): Promise<ReadonlySet<string>> {
   const cachedPromise = rscClientManifestStylesheetHrefsPromises.get(clientManifest);
   if (cachedPromise) return cachedPromise;
 

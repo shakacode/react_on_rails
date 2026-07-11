@@ -171,7 +171,7 @@ const streamRenderReactComponent = (
   // Manifest-backed promotion is additive. If a build does not ship the manifest,
   // preserve the existing filename-regex fallback in injectRSCPayload.
   const rscClientManifestStylesheetHrefsPromise = Promise.resolve()
-    .then(() => getRSCClientManifestStylesheetHrefs())
+    .then(() => getRSCClientManifestStylesheetHrefs(reactClientManifestFileName))
     .catch(() => new Set<string>());
 
   Promise.resolve(reactRenderingResult)

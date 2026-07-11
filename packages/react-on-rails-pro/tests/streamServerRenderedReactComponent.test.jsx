@@ -89,6 +89,13 @@ const ManifestStylesheetPreload = () => (
   </main>
 );
 
+const LegacyStylesheetPreload = () => (
+  <main>
+    <link rel="preload" as="style" href="/webpack/test/css/client1-46072b81.css?body=1" />
+    <p>Legacy-named RSC CSS</p>
+  </main>
+);
+
 const RSCBailoutStreamingShell = () => (
   <main>
     <h1>Shell before skipped route</h1>
@@ -1023,7 +1030,31 @@ describe('streamServerRenderedReactComponent', () => {
     expect(html).toContain(
       '<link rel="stylesheet" href="https://cdn.example.com/webpack/test/css/4092-98880bc1.css?body=1" data-precedence="rsc-css"/>',
     );
-    expect(getRSCClientManifestStylesheetHrefs).toHaveBeenCalledTimes(1);
+    expect(getRSCClientManifestStylesheetHrefs).toHaveBeenCalledWith(
+      testingRailsContext.reactClientManifestFileName,
+    );
+  });
+
+  it('completes with legacy stylesheet promotion when the manifest lookup rejects', async () => {
+    getRSCClientManifestStylesheetHrefs.mockRejectedValueOnce(new Error('manifest unavailable'));
+    ReactOnRails.register({ LegacyStylesheetPreload });
+
+    const renderResult = streamServerRenderedReactComponent({
+      name: 'LegacyStylesheetPreload',
+      domNodeId: 'legacyStylesheetDomId',
+      trace: false,
+      props: {},
+      throwJsErrors: false,
+      railsContext: testingRailsContext,
+    });
+    const { chunks, errors } = await collectStreamResult(renderResult);
+    const html = chunks.map((chunk) => chunk.html).join('');
+
+    expect(errors).toHaveLength(0);
+    expect(html).toContain(
+      '<link rel="stylesheet" href="/webpack/test/css/client1-46072b81.css?body=1" data-precedence="rsc-css"/>',
+    );
+    expect(html).not.toContain('rel="preload" as="style"');
   });
 
   it("passes Rails' CSP nonce to React's streaming bootstrap options", async () => {
