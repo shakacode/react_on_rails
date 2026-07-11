@@ -40,6 +40,9 @@
  */
 export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
 
+/** How long a terminal browser rejection remains protected from render-driven reloads. */
+export const RSC_PAYLOAD_FAILURE_RETENTION_MS = 5_000;
+
 /**
  * Evicted-success markers need a wider window than the primary payload cache:
  * primary-cache churn can evict many successful keys before a mounted route asks

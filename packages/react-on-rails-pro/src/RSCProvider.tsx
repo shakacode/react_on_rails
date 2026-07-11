@@ -31,6 +31,7 @@ import {
   BoundedLRU,
   RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES,
   RSC_PAYLOAD_CACHE_MAX_ENTRIES,
+  RSC_PAYLOAD_FAILURE_RETENTION_MS,
 } from './RSCProviderCache.ts';
 import { consumePrefetchedServerComponent } from './RSCPrefetchStore.ts';
 import { createRSCPayloadKey, hasEmbeddedRSCPayload } from './utils.ts';
@@ -75,7 +76,6 @@ const dropVersionStateKey = (prev: Record<string, number>, key: string) => {
 const rejectWithError = <T,>(error: unknown): Promise<T> =>
   Promise.reject(error instanceof Error ? error : new Error(String(error)));
 
-const RSC_PAYLOAD_FAILURE_RETENTION_MS = 5_000;
 const MAX_ERROR_CAUSE_DEPTH = 5;
 
 const isRetryableRSCPayloadError = (error: unknown): boolean => {
@@ -89,12 +89,12 @@ const isRetryableRSCPayloadError = (error: unknown): boolean => {
       ) {
         return false;
       }
-      if (!(current instanceof Error)) break;
-
       const { status } = current as { status?: unknown };
       if (typeof status === 'number') {
         return status >= 500 || status === 408 || status === 429;
       }
+      if (!(current instanceof Error)) break;
+
       current = (current as { cause?: unknown }).cause;
     }
   } catch {

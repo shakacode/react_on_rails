@@ -16,7 +16,7 @@
 import * as React from 'react';
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
-import { RSC_PAYLOAD_CACHE_MAX_ENTRIES } from '../src/RSCProviderCache.ts';
+import { RSC_PAYLOAD_CACHE_MAX_ENTRIES, RSC_PAYLOAD_FAILURE_RETENTION_MS } from '../src/RSCProviderCache.ts';
 import { resetRSCPrefetchStoreForTesting, setPrefetchedServerComponent } from '../src/RSCPrefetchStore.ts';
 import { createRSCPayloadKey } from '../src/utils.ts';
 
@@ -28,8 +28,6 @@ type Request = {
 
 type Producer = (request: Request) => Promise<React.ReactNode>;
 type ProviderAPI = ReturnType<typeof useRSC>;
-
-const TERMINAL_FAILURE_RETENTION_MS = 5_000;
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -45,6 +43,9 @@ const createStatusError = (status: number) => {
   const cause = Object.assign(new Error(`HTTP ${status}`), { status });
   return Object.assign(new Error(`request failed with ${status}`), { cause });
 };
+
+const createPlainStatusCauseError = (status: number) =>
+  Object.assign(new Error(`request failed with ${status}`), { cause: { status } });
 
 const createAbortError = () => {
   const error = new Error('cancelled');
@@ -135,7 +136,7 @@ describe('RSCProvider rejected payload handling', () => {
     await expect(immediateLookup).rejects.toBe(error);
     expect(getServerComponent).toHaveBeenCalledTimes(2);
 
-    act(() => jest.advanceTimersByTime(TERMINAL_FAILURE_RETENTION_MS));
+    act(() => jest.advanceTimersByTime(RSC_PAYLOAD_FAILURE_RETENTION_MS));
 
     const laterLookup = api.getComponent('Card', { id: 1 });
     expect(laterLookup).not.toBe(terminalPromise);
@@ -146,6 +147,7 @@ describe('RSCProvider rejected payload handling', () => {
   it.each([
     ['HTTP 400', createStatusError(400), 1],
     ['HTTP 404', createStatusError(404), 1],
+    ['HTTP 404 with a plain-object cause', createPlainStatusCauseError(404), 1],
     ['HTTP 408', createStatusError(408), 2],
     ['HTTP 429', createStatusError(429), 2],
     ['HTTP 503', createStatusError(503), 2],
@@ -200,7 +202,7 @@ describe('RSCProvider rejected payload handling', () => {
     await Promise.resolve();
     expect(getServerComponent).toHaveBeenCalledTimes(3);
 
-    act(() => jest.advanceTimersByTime(TERMINAL_FAILURE_RETENTION_MS));
+    act(() => jest.advanceTimersByTime(RSC_PAYLOAD_FAILURE_RETENTION_MS));
     expect(api.getComponent('Card', { id: 1 })).toBe(refetchPromise);
     expect(getServerComponent).toHaveBeenCalledTimes(3);
 
@@ -283,7 +285,7 @@ describe('RSCProvider rejected payload handling', () => {
     expect(api.getComponent('Card', { id: 0 })).toBe(oldestPromise);
     expect(getServerComponent).toHaveBeenCalledTimes(keyCount * 2);
 
-    act(() => jest.advanceTimersByTime(TERMINAL_FAILURE_RETENTION_MS));
+    act(() => jest.advanceTimersByTime(RSC_PAYLOAD_FAILURE_RETENTION_MS));
     await expect(api.getComponent('Card', { id: 0 })).rejects.toThrow('persistent failure');
     expect(getServerComponent).toHaveBeenCalledTimes(keyCount * 2 + 2);
   });
@@ -299,7 +301,7 @@ describe('RSCProvider rejected payload handling', () => {
     const api = await mountProvider(getServerComponent);
 
     await expect(api.getComponent('Card', { id: 0 })).rejects.toBe(error);
-    act(() => jest.advanceTimersByTime(TERMINAL_FAILURE_RETENTION_MS));
+    act(() => jest.advanceTimersByTime(RSC_PAYLOAD_FAILURE_RETENTION_MS));
 
     backendHealthy = true;
     const recoveredPromise = api.getComponent('Card', { id: 0 });
