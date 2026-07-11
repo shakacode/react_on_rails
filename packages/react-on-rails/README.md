@@ -107,7 +107,7 @@ rails generate react_on_rails:install
 
 - [Getting Started](https://reactonrails.com/docs/getting-started/quick-start/)
 - [Installation Guide](https://reactonrails.com/docs/getting-started/existing-rails-app/)
-- [API Reference](https://reactonrails.com/docs/api-reference/)
+- [JavaScript API](https://reactonrails.com/docs/api-reference/javascript-api/)
 - [Configuration](https://reactonrails.com/docs/configuration/)
 
 ## License
