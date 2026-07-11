@@ -52,6 +52,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   preloads listed in the React client manifest, preventing a flash of unstyled content when
   production chunk CSS uses numeric IDs and id-named files. Fixes
   [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
+  [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
