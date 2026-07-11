@@ -120,6 +120,7 @@ const wrapServerComponentRenderer = (
     const RSCProvider = createRSCProvider({
       getServerComponent: getReactServerComponent(domNodeId, railsContext),
       domNodeId,
+      retryRejectedPayloads: true,
     });
 
     if (shouldPrepareRSCHydrationRoot(railsContext)) {

@@ -91,6 +91,7 @@ const wrapServerComponentRenderer = (
 
     const RSCProvider = createRSCProvider({
       getServerComponent: getReactServerComponent(railsContext),
+      retryRejectedPayloads: false,
     });
 
     return () => (

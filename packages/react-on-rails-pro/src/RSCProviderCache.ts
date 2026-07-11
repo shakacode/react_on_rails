@@ -21,8 +21,14 @@
  * along with all of its companion bookkeeping (last-successful promise and
  * refetch version). The common case — a small, stable set of routes — never
  * hits the cap, so cache hits, refetch, and recoverOnError restore are
- * unaffected. This cap is intentionally not configurable through
- * `createRSCProvider` today. See
+ * unaffected.
+ *
+ * The cap is soft while entries are pinned. Besides in-flight and mounted
+ * payloads, a terminal browser rejection stays pinned for its short retention
+ * window so LRU pressure cannot erase its retry limit and reopen a request
+ * loop. A high-cardinality outage can therefore keep more than 50 failures
+ * briefly; each is removed and unpinned when that window ends. This cap is
+ * intentionally not configurable through `createRSCProvider` today. See
  * https://github.com/shakacode/react_on_rails/issues/3564.
  *
  * NOTE: the per-key `useSyncExternalStore` subscription/fan-out optimization
@@ -33,6 +39,9 @@
  * need to tune the cap for unusually high-cardinality RSC routes.
  */
 export const RSC_PAYLOAD_CACHE_MAX_ENTRIES = 50;
+
+/** How long a terminal browser rejection remains protected from render-driven reloads. */
+export const RSC_PAYLOAD_FAILURE_RETENTION_MS = 5_000;
 
 /**
  * Evicted-success markers need a wider window than the primary payload cache:
@@ -67,13 +76,17 @@ export const RSC_EVICTED_SUCCESS_MARKER_MAX_ENTRIES = RSC_PAYLOAD_CACHE_MAX_ENTR
  * 3. Mounted `<RSCRoute>` entries retain their payload keys so provider-wide
  *    refreshes do not make visible routes miss and refetch just because the
  *    provider cache contains more mounted routes than the soft cap.
+ * 4. Terminal browser failures retain their rejected promise briefly so cache
+ *    pressure cannot give the same failing key a fresh request budget before
+ *    React consumes the rejection.
  *
  * Inserting an in-flight promise uses `setPinned`, which pins BEFORE running
  * eviction so the just-inserted key can never be chosen as the eviction victim
  * even when every other key is already pinned (a pure `set` then `pin` would
  * let `evictIfNeeded` drop the new unpinned key first). When every key is
- * pinned the map is allowed to temporarily exceed `maxEntries`; the matching
- * `unpin` reconciles it.
+ * pinned the map is allowed to temporarily exceed `maxEntries`; matching
+ * releases reconcile it, while terminal failures remove themselves at the end
+ * of their retention window.
  *
  * No external LRU dependency exists for this synchronous provider cache (the
  * repo's `InMemoryLRUCacheHandler` is an async `CacheHandler` tied to
