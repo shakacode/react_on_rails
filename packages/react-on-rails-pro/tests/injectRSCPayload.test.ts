@@ -484,6 +484,32 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('rel="preload" as="style"');
   });
 
+  it('promotes only manifest-listed production RSC stylesheet preloads', async () => {
+    const flightData =
+      '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",[4092,"js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +
+      '0:["$","$L2",null,{},null]\n';
+    const mockRSC = createMockRSCStream([flightData]);
+    const manifestStylesheetHref = '/webpack/test/css/4092-98880bc1.css';
+    const unrelatedPreload =
+      '<link rel="preload" as="style" href="https://cdn.example.com/assets/next-route-theme.css">';
+    const mockHTML = createMockHTMLStream([
+      `<link rel="preload" as="style" href="https://cdn.example.com${manifestStylesheetHref}?body=1">${unrelatedPreload}`,
+    ]);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      rscClientManifestStylesheetHrefs: new Set([manifestStylesheetHref]),
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      `<link rel="stylesheet" href="https://cdn.example.com${manifestStylesheetHref}?body=1" data-precedence="rsc-css">`,
+    );
+    expect(resultStr.split(manifestStylesheetHref)).toHaveLength(2);
+    expect(resultStr).toContain(unrelatedPreload);
+    expect(resultStr).toContain(expectedPayloadPushScript(flightData));
+  });
+
   it('injects inferred RSC client chunk stylesheets before streamed reveal HTML', async () => {
     const flightData =
       '2:I["./client/app/components/FoucProbe/RscFoucProbeClient.jsx",["client1","js/client1-570df890c7aa791c.chunk.js"],"default"]\n' +

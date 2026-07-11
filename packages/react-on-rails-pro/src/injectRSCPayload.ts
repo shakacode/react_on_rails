@@ -235,17 +235,27 @@ function getQuotedAttribute(tag: string, attributeName: string) {
   return attributeMatch?.[2];
 }
 
-function isRSCClientChunkStylesheetHref(href: string) {
+function normalizeStylesheetHref(href: string) {
   try {
-    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(new URL(href, 'http://react-on-rails.local').pathname);
+    return new URL(href, 'http://react-on-rails.local').pathname;
   } catch {
-    return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(href.split(/[?#]/, 1)[0]);
+    return href.split(/[?#]/, 1)[0];
   }
 }
 
-function shouldPromoteStylesheetPreloadTag(linkTag: string) {
+function isRSCClientChunkStylesheetHref(href: string) {
+  return RSC_CLIENT_CHUNK_STYLESHEET_PATH.test(normalizeStylesheetHref(href));
+}
+
+function shouldPromoteStylesheetPreloadTag(
+  linkTag: string,
+  rscClientManifestStylesheetHrefs: ReadonlySet<string>,
+) {
   const href = getQuotedAttribute(linkTag, 'href');
-  return href ? isRSCClientChunkStylesheetHref(href) : false;
+  return href
+    ? rscClientManifestStylesheetHrefs.has(normalizeStylesheetHref(href)) ||
+        isRSCClientChunkStylesheetHref(href)
+    : false;
 }
 
 function assetHref(assetPath: string, publicPath?: string) {
@@ -1523,6 +1533,7 @@ function findIncompleteUTF8TailStartIndex(buffer: Buffer) {
 function applyStreamedStylesheetPreloadGating(
   html: Buffer,
   incompleteHtmlTailMode: IncompleteHtmlTailMode,
+  rscClientManifestStylesheetHrefs: ReadonlySet<string>,
   retainedTailScanState?: RetainedIncompleteHtmlTailScanState,
 ) {
   let stringSafeHtmlBuffer = html;
@@ -1562,7 +1573,9 @@ function applyStreamedStylesheetPreloadGating(
   const gatedHtml = completeHtml.replace(
     /<link\b(?=[^>]*\brel=(["'])(?:(?!\1).)*\bpreload\b(?:(?!\1).)*\1)(?=[^>]*\bas=(["'])style\2)(?=[^>]*\bhref=(["'])(?:(?!\3).)+\3)[^>]*\/?>/gi,
     (linkTag) =>
-      shouldPromoteStylesheetPreloadTag(linkTag) ? promoteStylesheetPreloadTag(linkTag) : linkTag,
+      shouldPromoteStylesheetPreloadTag(linkTag, rscClientManifestStylesheetHrefs)
+        ? promoteStylesheetPreloadTag(linkTag)
+        : linkTag,
   );
   const completeHtmlByteLength = Buffer.byteLength(completeHtml, 'utf8');
   const completeHtmlBuffer =
@@ -1581,6 +1594,7 @@ function applyStreamedStylesheetPreloadGating(
 }
 
 type InjectRSCPayloadOptions = {
+  rscClientManifestStylesheetHrefs?: ReadonlySet<string>;
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
 };
@@ -1619,6 +1633,7 @@ export default function injectRSCPayload(
   options: InjectRSCPayloadOptions = {},
 ) {
   const {
+    rscClientManifestStylesheetHrefs = new Set<string>(),
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
   } = options;
@@ -1713,7 +1728,12 @@ export default function injectRSCPayload(
       gatedHtmlBuffer,
       incompleteHtmlTailBuffer,
       incompleteHtmlTailScanState: nextRetainedHtmlTailScanState,
-    } = applyStreamedStylesheetPreloadGating(htmlBuffer, incompleteHtmlTailMode, retainedHtmlTailScanState);
+    } = applyStreamedStylesheetPreloadGating(
+      htmlBuffer,
+      incompleteHtmlTailMode,
+      rscClientManifestStylesheetHrefs,
+      retainedHtmlTailScanState,
+    );
     const shouldDeferRevealHtml =
       rscPromise &&
       shouldInferRSCClientStylesheets &&

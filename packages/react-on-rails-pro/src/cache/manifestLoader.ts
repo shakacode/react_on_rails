@@ -14,13 +14,15 @@
  */
 
 import type { BundleManifest } from 'react-on-rails-rsc';
-import { buildClientRenderer } from 'react-on-rails-rsc/client.node';
+import type { buildClientRenderer as buildClientRendererType } from 'react-on-rails-rsc/client.node';
 import loadJsonFile from '../loadJsonFile.ts';
+
+type ClientRenderer = ReturnType<typeof buildClientRendererType>;
 
 let clientManifestFileName: string | undefined;
 let serverClientManifestFileName: string | undefined;
 
-let clientRendererPromise: Promise<ReturnType<typeof buildClientRenderer>> | undefined;
+let clientRendererPromise: Promise<ClientRenderer> | undefined;
 
 export function setManifestFileNames(clientManifest: string, serverClientManifest: string): void {
   clientManifestFileName = clientManifest;
@@ -31,7 +33,7 @@ export function getClientManifestFileName(): string | undefined {
   return clientManifestFileName;
 }
 
-export function getClientRenderer(): Promise<ReturnType<typeof buildClientRenderer>> {
+export function getClientRenderer(): Promise<ClientRenderer> {
   if (!clientRendererPromise) {
     if (!clientManifestFileName || !serverClientManifestFileName) {
       throw new Error(
@@ -44,8 +46,9 @@ export function getClientRenderer(): Promise<ReturnType<typeof buildClientRender
     clientRendererPromise = Promise.all([
       loadJsonFile<BundleManifest>(serverFile),
       loadJsonFile<BundleManifest>(clientFile),
+      import('react-on-rails-rsc/client.node'),
     ])
-      .then(([reactServerManifest, reactClientManifest]) =>
+      .then(([reactServerManifest, reactClientManifest, { buildClientRenderer }]) =>
         buildClientRenderer(reactClientManifest, reactServerManifest),
       )
       .catch((err: unknown) => {
