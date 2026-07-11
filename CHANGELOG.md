@@ -196,6 +196,8 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   for `renderer_http_pool_size` was corrected to clarify it is a per-client limit — total warm renderer
   connections scale with the number of live Puma request threads, not with that value alone. Fixes
   [Issue 4571](https://github.com/shakacode/react_on_rails/issues/4571).
+  [PR 4575](https://github.com/shakacode/react_on_rails/pull/4575) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
