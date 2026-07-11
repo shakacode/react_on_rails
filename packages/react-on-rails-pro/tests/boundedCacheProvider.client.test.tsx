@@ -972,7 +972,7 @@ describe('RSCRoute successful-version error reset', () => {
     });
   });
 
-  it('h2. rejected over-cap initial load does not evict a healthy settled entry before deferred deletion', async () => {
+  it('h2. retained over-cap rejection does not evict a healthy settled entry', async () => {
     process.env.NODE_ENV = 'production';
 
     type PendingEntry = Deferred & { args: GetServerComponentArgs; settled: boolean };
@@ -1034,11 +1034,21 @@ describe('RSCRoute successful-version error reset', () => {
     void started[1].promise.catch(() => undefined);
     await act(async () => {
       started[1].deferred.reject(new Error('boom 1'));
-      await expect(started[1].promise).rejects.toThrow('boom 1');
-      // First macrotask: rejected-promise deletion is scheduled, and the
-      // failed load releases its pin. The actual cache delete is still one
-      // macrotask away so React can observe the rejection.
-      await flushMacrotasks();
+    });
+    await waitFor(() =>
+      expect(
+        pending.some(
+          (entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === 1,
+        ),
+      ).toBe(true),
+    );
+    const retryForId1 = [...pending]
+      .reverse()
+      .find((entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === 1);
+    if (!retryForId1) throw new Error('Expected forced retry for id 1');
+    await act(async () => {
+      retryForId1.reject(new Error('retry boom 1'));
+      await expect(started[1].promise).rejects.toThrow('retry boom 1');
     });
 
     await act(async () => {
@@ -1448,6 +1458,10 @@ describe('RSCRoute successful-version error reset', () => {
       await act(async () => {
         started.deferred.resolve(payload);
         await started.promise;
+        // Make each settled entry evictable before starting the next load;
+        // otherwise timer scheduling can change whether marker churn reaches
+        // the intended bounded-cache state.
+        await flushMacrotasks();
       });
     };
 
@@ -1494,7 +1508,7 @@ describe('RSCRoute successful-version error reset', () => {
     expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
   });
 
-  it('o. synchronous replacement throws restore the evicted-success marker for a later replacement', async () => {
+  it('o. synchronous replacement throws recover inside the same logical load', async () => {
     process.env.NODE_ENV = 'production';
 
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
@@ -1550,23 +1564,32 @@ describe('RSCRoute successful-version error reset', () => {
     }
 
     syncThrowIds.add(0);
+    let replacementPromise!: Promise<React.ReactNode>;
     await act(async () => {
-      await expect(rscApi.getComponent('Card', { id: 0 })).rejects.toThrow('sync boom 0');
-      // The cached rejection is evicted after the Suspense-observation and
-      // unpin macrotasks; flush both so the next same-key load starts fresh
-      // instead of reusing the rejected promise.
-      await flushMacrotasks();
-      await flushMacrotasks();
+      replacementPromise = rscApi.getComponent('Card', { id: 0 });
     });
-
-    const replacement = await startLoad(0);
-    await resolveLoad(replacement, <span>replacement 0</span>);
+    await waitFor(() =>
+      expect(
+        pending.some(
+          (entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === 0,
+        ),
+      ).toBe(true),
+    );
+    const retry = [...pending]
+      .reverse()
+      .find((entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === 0);
+    if (!retry) throw new Error('Expected forced retry for synchronous replacement failure');
+    await act(async () => {
+      retry.resolve(<span>replacement 0</span>);
+      await replacementPromise;
+    });
 
     const key = createRSCPayloadKey('Card', { id: 0 });
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
+    expect(fetchCount(0)).toBe(3);
   });
 
-  it('p. rejected replacement loads evict their promise and restore the evicted-success marker', async () => {
+  it('p. terminal replacement failures preserve the marker for explicit recovery', async () => {
     type PendingEntry = Deferred & { args: GetServerComponentArgs };
     const pending: PendingEntry[] = [];
     getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
@@ -1611,12 +1634,24 @@ describe('RSCRoute successful-version error reset', () => {
       void started.promise.catch(() => undefined);
       await act(async () => {
         started.deferred.reject(new Error(message));
-        await expect(started.promise).rejects.toThrow(message);
-        // evictPromiseIfRejected keeps the rejected promise through the first
-        // macrotask so React can commit the user ErrorBoundary fallback; wait
-        // for the second macrotask before asserting the slot is free.
-        await flushMacrotasks();
-        await flushMacrotasks();
+      });
+      const id = (started.deferred.args.componentProps as { id: number }).id;
+      await waitFor(() =>
+        expect(
+          pending.some(
+            (entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === id,
+          ),
+        ).toBe(true),
+      );
+      const retry = [...pending]
+        .reverse()
+        .find(
+          (entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === id,
+        );
+      if (!retry) throw new Error(`Expected forced retry for id ${id}`);
+      await act(async () => {
+        retry.reject(new Error(`${message} retry`));
+        await expect(started.promise).rejects.toThrow(`${message} retry`);
       });
     };
 
@@ -1647,12 +1682,22 @@ describe('RSCRoute successful-version error reset', () => {
 
     await rejectLoad(failedReplacement, 'replacement boom 0');
 
-    expect(fetchCount(0)).toBe(2);
+    expect(fetchCount(0)).toBe(3);
     expect(rscApi.successfulVersions[key] ?? 0).toBe(0);
 
-    const retryReplacement = await startLoad(0);
-    expect(fetchCount(0)).toBe(3);
-    await resolveLoad(retryReplacement, <span>replacement after rejection</span>);
+    let explicitRefetch!: Promise<React.ReactNode>;
+    await act(async () => {
+      explicitRefetch = rscApi.refetchComponent('Card', { id: 0 });
+    });
+    const recovery = [...pending]
+      .reverse()
+      .find((entry) => entry.args.enforceRefetch && (entry.args.componentProps as { id: number }).id === 0);
+    if (!recovery) throw new Error('Expected explicit recovery request for id 0');
+    expect(fetchCount(0)).toBe(4);
+    await act(async () => {
+      recovery.resolve(<span>replacement after rejection</span>);
+      await explicitRefetch;
+    });
 
     await waitFor(() => expect(rscApi.successfulVersions[key]).toBeGreaterThan(0));
   });

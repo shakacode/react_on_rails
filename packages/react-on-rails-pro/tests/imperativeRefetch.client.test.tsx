@@ -21,7 +21,7 @@ import '@testing-library/jest-dom';
 
 import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import RSCRoute, { type RSCRouteHandle, useCurrentRSCRoute } from '../src/RSCRoute.tsx';
-import { getNodeVersion } from './testUtils';
+import { flushMacrotasks, getNodeVersion } from './testUtils';
 
 type GetServerComponentArgs = {
   componentName: string;
@@ -166,26 +166,6 @@ class CapturingErrorBoundary extends React.Component<
     return pending;
   };
 
-  const usingJestFakeTimers = () => jest.isMockFunction(setTimeout);
-
-  // Waits for the deferred eviction scheduled by evictPromiseIfRejected to
-  // complete. The eviction intentionally waits until after React can observe
-  // the rejection and after the in-flight pin release, so this helper waits two
-  // macrotasks.
-  const waitForRejectedGetComponentEviction = () => {
-    if (usingJestFakeTimers()) {
-      throw new Error(
-        'waitForRejectedGetComponentEviction requires real timers; advance fake timers explicitly',
-      );
-    }
-
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        setTimeout(resolve, 0);
-      }, 0);
-    });
-  };
-
   /**
    * Wrap the initial render in an act() so React drains microtasks queued by
    * `use(promise)` and we observe a settled tree on return. Without this,
@@ -302,31 +282,27 @@ class CapturingErrorBoundary extends React.Component<
     expect(getServerComponent).toHaveBeenCalledTimes(1);
   });
 
-  it('0b. getComponent evicts rejected promises so the same key can retry', async () => {
+  it('0b. getComponent retries a transient rejection inside the same cached promise', async () => {
     const transientError = new Error('transient RSC fetch failed');
     const recoveredPayload = <div data-testid="recovered-card">Recovered card</div>;
     setupSequencedFetcher([rejectWith(transientError), recoveredPayload]);
     const probeRef = await renderRSCProbe();
+    const promise = probeRef.current!.getComponent('UserCard', { id: 1 });
 
     await act(async () => {
-      await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).rejects.toThrow(
-        'transient RSC fetch failed',
-      );
-      // FIFO timer ordering keeps this wait behind the deferred eviction timer,
-      // so the immediate retry below starts from an empty cache entry.
-      await waitForRejectedGetComponentEviction();
-    });
-
-    expect(getServerComponent).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      await expect(probeRef.current!.getComponent('UserCard', { id: 1 })).resolves.toBe(recoveredPayload);
+      await expect(promise).resolves.toBe(recoveredPayload);
     });
 
     expect(getServerComponent).toHaveBeenCalledTimes(2);
+    expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+      componentName: 'UserCard',
+      componentProps: { id: 1 },
+      enforceRefetch: true,
+    });
 
     const cachedPromise = probeRef.current!.getComponent('UserCard', { id: 1 });
 
+    expect(cachedPromise).toBe(promise);
     await expect(cachedPromise).resolves.toBe(recoveredPayload);
     expect(getServerComponent).toHaveBeenCalledTimes(2);
   });
@@ -350,12 +326,9 @@ class CapturingErrorBoundary extends React.Component<
     await act(async () => {
       pending[0].reject(staleError);
       await expect(initialPromise).rejects.toThrow('stale initial RSC fetch failed');
-      // Let the stale rejection's deferred eviction actually run before we
-      // assert below: without this flush the cache check races ahead of
-      // evictPromiseIfRejected's setTimeout(0), so the test would still pass
-      // even if the identity guard were missing and the eviction deleted the
-      // newer refetch promise.
-      await waitForRejectedGetComponentEviction();
+      // Let the stale operation release its initial pin before asserting that
+      // it did not disturb the newer explicit refetch.
+      await flushMacrotasks();
     });
 
     await act(async () => {
