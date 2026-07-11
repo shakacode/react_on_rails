@@ -16,7 +16,7 @@
 import { checkRscPeerCompatibility } from '../src/shared/checkRscPeerCompatibility';
 import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
 
-const { minimumVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
+const { minimumPrereleaseVersion, minimumVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
 type MutableRscSupport = {
   minimumVersion: string;
   minimumPrereleaseVersion?: string;
@@ -85,11 +85,13 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('returns ok for the coordinated RC floor prerelease', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.0', reactVersion: '19.2.7' }).level).toBe('ok');
+    expect(
+      checkRscPeerCompatibility({ rscVersion: minimumPrereleaseVersion, reactVersion: '19.2.7' }).level,
+    ).toBe('ok');
   });
 
   it('returns ok for a prerelease newer than the coordinated RC floor', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.1', reactVersion: '19.2.7' }).level).toBe('ok');
+    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.2', reactVersion: '19.2.7' }).level).toBe('ok');
   });
 
   it('returns ok for a hyphenated prerelease newer than the coordinated RC floor', () => {
@@ -100,14 +102,14 @@ describe('checkRscPeerCompatibility', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-beta.0', reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('19.2.1-beta.0');
-    expect(r.message).toContain('19.2.1-rc.0');
+    expect(r.message).toContain(minimumPrereleaseVersion);
   });
 
   it('errors for future prereleases outside the coordinated RC floor tuple', () => {
     const r = checkRscPeerCompatibility({ rscVersion: '19.2.2-alpha.0', reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('19.2.2-alpha.0');
-    expect(r.message).toContain('19.2.1-rc.0');
+    expect(r.message).toContain(minimumPrereleaseVersion);
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
@@ -161,7 +163,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React 19.0 is paired with the React 19.2 RSC package line', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.0', reactVersion: '19.0.4' });
+    const r = checkRscPeerCompatibility({ rscVersion: minimumPrereleaseVersion, reactVersion: '19.0.4' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.0.4');

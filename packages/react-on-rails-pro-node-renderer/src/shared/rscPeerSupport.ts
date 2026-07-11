@@ -24,7 +24,7 @@
 // 19.2.1 package is published without accepting older prereleases on the same
 // tuple. When it is set, keep its core tuple equal to `minimumVersion`.
 export const RSC_PEER_SUPPORT = {
-  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.2.1-rc.0', supportedMajor: 19 },
+  reactOnRailsRsc: { minimumVersion: '19.2.1', minimumPrereleaseVersion: '19.2.1-rc.1', supportedMajor: 19 },
   react: {
     supportedMajor: 19,
     supportedRanges: [

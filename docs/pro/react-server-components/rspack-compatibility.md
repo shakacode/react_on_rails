@@ -12,7 +12,7 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the `react-on-rails-rsc` 19.2.1 package line (`19.2.1-rc.0` during the React on Rails Pro 17 RC soak).
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the `react-on-rails-rsc` 19.2.1 package line (`19.2.1-rc.1` during the React on Rails Pro 17 RC soak).
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
@@ -24,7 +24,7 @@ now target the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
 line.
 
 During the React on Rails Pro 17 release-candidate soak, the generator pins
-`react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not
+`react-on-rails-rsc@19.2.1-rc.1` because the stable `19.2.1` package is not
 published yet. For the 17.0 final release, use a stable `react-on-rails-rsc`
 19.2.x package with patch >= 19.2.1. Keep React, React DOM, and
 `react-on-rails-rsc` upgraded as a coordinated set.
