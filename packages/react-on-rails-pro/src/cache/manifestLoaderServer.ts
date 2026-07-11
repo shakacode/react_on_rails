@@ -14,15 +14,38 @@
  */
 
 import type { BundleManifest } from 'react-on-rails-rsc';
-import { buildServerRenderer } from 'react-on-rails-rsc/server.node';
+import type { buildServerRenderer as buildServerRendererType } from 'react-on-rails-rsc/server.node';
 import loadJsonFile from '../loadJsonFile.ts';
 import { getClientManifestFileName } from './manifestLoader.ts';
 
-let serverRendererPromise: Promise<ReturnType<typeof buildServerRenderer>> | undefined;
+type ServerRenderer = ReturnType<typeof buildServerRendererType>;
 
-// eslint-disable-next-line import/prefer-default-export -- named export for consistency with manifestLoader
-export function getServerRenderer(): Promise<ReturnType<typeof buildServerRenderer>> {
-  if (!serverRendererPromise) {
+let reactClientManifestPromise: Promise<BundleManifest> | undefined;
+let serverRendererPromise: Promise<ServerRenderer> | undefined;
+let rscClientManifestStylesheetHrefsPromise: Promise<ReadonlySet<string>> | undefined;
+
+function normalizeStylesheetHref(href: string) {
+  try {
+    return new URL(href, 'http://react-on-rails.local').pathname;
+  } catch {
+    return href.split(/[?#]/, 1)[0];
+  }
+}
+
+export function collectRSCClientManifestStylesheetHrefs(
+  reactClientManifest: BundleManifest,
+): ReadonlySet<string> {
+  const stylesheetHrefs = new Set<string>();
+
+  Object.values(reactClientManifest.filePathToModuleMetadata).forEach(({ css = [] }) => {
+    css.forEach((href) => stylesheetHrefs.add(normalizeStylesheetHref(href)));
+  });
+
+  return stylesheetHrefs;
+}
+
+function getReactClientManifest(): Promise<BundleManifest> {
+  if (!reactClientManifestPromise) {
     const clientManifest = getClientManifestFileName();
     if (!clientManifest) {
       throw new Error(
@@ -30,12 +53,34 @@ export function getServerRenderer(): Promise<ReturnType<typeof buildServerRender
           'This is done automatically during the first RSC render request.',
       );
     }
-    serverRendererPromise = loadJsonFile<BundleManifest>(clientManifest)
-      .then((reactClientManifest) => buildServerRenderer(reactClientManifest))
+    reactClientManifestPromise = loadJsonFile<BundleManifest>(clientManifest).catch((err: unknown) => {
+      reactClientManifestPromise = undefined;
+      throw err;
+    });
+  }
+  return reactClientManifestPromise;
+}
+
+export function getServerRenderer(): Promise<ServerRenderer> {
+  if (!serverRendererPromise) {
+    serverRendererPromise = Promise.all([getReactClientManifest(), import('react-on-rails-rsc/server.node')])
+      .then(([reactClientManifest, { buildServerRenderer }]) => buildServerRenderer(reactClientManifest))
       .catch((err: unknown) => {
         serverRendererPromise = undefined;
         throw err;
       });
   }
   return serverRendererPromise;
+}
+
+export function getRSCClientManifestStylesheetHrefs(): Promise<ReadonlySet<string>> {
+  if (!rscClientManifestStylesheetHrefsPromise) {
+    rscClientManifestStylesheetHrefsPromise = getReactClientManifest()
+      .then(collectRSCClientManifestStylesheetHrefs)
+      .catch((err: unknown) => {
+        rscClientManifestStylesheetHrefsPromise = undefined;
+        throw err;
+      });
+  }
+  return rscClientManifestStylesheetHrefsPromise;
 }

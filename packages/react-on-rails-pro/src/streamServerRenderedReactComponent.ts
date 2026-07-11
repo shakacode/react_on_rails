@@ -26,6 +26,8 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
+import { setManifestFileNames } from './cache/manifestLoader.ts';
+import { getRSCClientManifestStylesheetHrefs } from './cache/manifestLoaderServer.ts';
 import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
   streamServerRenderedComponent,
@@ -164,6 +166,14 @@ const streamRenderReactComponent = (
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
+  const { reactClientManifestFileName, reactServerClientManifestFileName } = railsContext;
+  setManifestFileNames(reactClientManifestFileName, reactServerClientManifestFileName);
+  // Manifest-backed promotion is additive. If a build does not ship the manifest,
+  // preserve the existing filename-regex fallback in injectRSCPayload.
+  const rscClientManifestStylesheetHrefsPromise = Promise.resolve()
+    .then(() => getRSCClientManifestStylesheetHrefs())
+    .catch(() => new Set<string>());
+
   Promise.resolve(reactRenderingResult)
     .then((reactRenderedElement) => {
       if (typeof reactRenderedElement === 'string') {
@@ -211,15 +221,22 @@ const streamRenderReactComponent = (
         },
         onShellReady() {
           renderState.isShellReady = true;
-          pipeToTransform(
-            injectRSCPayload(
-              renderingStream,
-              streamingTrackers.rscRequestTracker,
-              domNodeId,
-              railsContext.cspNonce,
-              { rscStreamObservability: railsContext.rscStreamObservability },
-            ),
-          );
+          void rscClientManifestStylesheetHrefsPromise.then((rscClientManifestStylesheetHrefs) => {
+            if (isConsumerAborted()) return;
+
+            pipeToTransform(
+              injectRSCPayload(
+                renderingStream,
+                streamingTrackers.rscRequestTracker,
+                domNodeId,
+                railsContext.cspNonce,
+                {
+                  rscClientManifestStylesheetHrefs,
+                  rscStreamObservability: railsContext.rscStreamObservability,
+                },
+              ),
+            );
+          });
         },
         onError(e) {
           const error = convertToError(e);

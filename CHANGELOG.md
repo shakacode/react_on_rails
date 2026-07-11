@@ -48,6 +48,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
   [ihabadham](https://github.com/ihabadham).
 
+- **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
+  preloads listed in the React client manifest, preventing a flash of unstyled content when
+  production chunk CSS uses numeric IDs and id-named files. Fixes
+  [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
+
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
