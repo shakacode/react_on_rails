@@ -162,7 +162,7 @@ module ReactOnRails
       RSC_REACT_VERSION_RANGE = "~19.2.7"
       # Pinned to the 19.2.1 release candidate, which carries the coordinated React 19.2.7 RSC
       # peer floor required by the React on Rails Pro 17 runtime check.
-      RSC_PACKAGE_VERSION_PIN = "19.2.1-rc.0"
+      RSC_PACKAGE_VERSION_PIN = "19.2.1-rc.1"
 
       private
 

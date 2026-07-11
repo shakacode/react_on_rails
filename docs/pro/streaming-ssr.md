@@ -95,7 +95,7 @@ Ensure you're using the coordinated React 19.2.x line in your `package.json`:
 }
 ```
 
-> Note: React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7`. Keep these versions coordinated with a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1` (or `19.2.1-rc.0` during the 17.0 RC soak).
+> Note: React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7`. Keep these versions coordinated with a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1` (or `19.2.1-rc.1` during the 17.0 RC soak).
 
 ### 2. Prepare Your React Components
 

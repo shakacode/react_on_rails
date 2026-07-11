@@ -26,16 +26,16 @@ bundle add react_on_rails_pro --version="= VERSION"
 Also, install React 19.2.x, React DOM 19.2.x, and the `react-on-rails-rsc` release currently used by the generator:
 
 ```bash
-yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
-# npm install react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
-# pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
-# bun add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
+yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.1
+# npm install react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.1
+# pnpm add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.1
+# bun add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.1
 ```
 
 > [!NOTE]
 > React on Rails Pro 17 RSC requires React 19.2.x with patch >= 19.2.7. React 19.0.x is no longer a supported Pro RSC runtime line in v17. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 >
-> During the React on Rails Pro 17 release-candidate soak, the generator pins `react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not published yet. For the 17.0 final release, use a stable `react-on-rails-rsc` 19.2.x package with patch >= 19.2.1. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
+> During the React on Rails Pro 17 release-candidate soak, the generator pins `react-on-rails-rsc@19.2.1-rc.1` because the stable `19.2.1` package is not published yet. For the 17.0 final release, use a stable `react-on-rails-rsc` 19.2.x package with patch >= 19.2.1. Keep React, React DOM, and `react-on-rails-rsc` upgraded as a coordinated set.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
