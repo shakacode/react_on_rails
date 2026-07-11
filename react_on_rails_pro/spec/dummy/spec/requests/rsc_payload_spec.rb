@@ -102,6 +102,8 @@ RSpec.describe "RSC payload endpoint" do
     before do
       memory_cache.clear
       allow(Rails).to receive(:cache).and_return(memory_cache)
+      allow(SecureRandom).to receive(:base64).with(16).and_return("fixed-csp-nonce")
+      allow(ReactOnRailsPro::StreamCache).to receive(:wrap_and_cache).and_call_original
     end
 
     it "serves the full payload from cache on the second request, not an empty one" do
@@ -122,6 +124,7 @@ RSpec.describe "RSC payload endpoint" do
 
       expect(second_bodies.join).not_to be_empty
       expect(second_bodies).to eq(first_bodies)
+      expect(ReactOnRailsPro::StreamCache).to have_received(:wrap_and_cache).once
     end
   end
 end
