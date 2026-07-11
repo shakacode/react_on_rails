@@ -27,7 +27,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "normalizes plural arrays, inherits the mount for bare origins, preserves explicit paths, and deduplicates" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [
           "https://first.example.com",
           "https://second.example.com/custom/",
@@ -46,7 +45,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "accepts a comma-delimited plural string" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: "https://first.example.com, https://second.example.com/path",
         rolling_deploy_mount_path: "/rolling"
       )
@@ -61,7 +59,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "preserves literal commas inside a single URL path" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: "https://example.com/releases,blue",
         rolling_deploy_mount_path: "/rolling"
       )
@@ -73,7 +70,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "still isolates and rejects unsupported schemes in a comma-delimited string" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: "https://valid.example.com/rolling,file:///etc/passwd",
         rolling_deploy_mount_path: "/rolling"
       )
@@ -86,7 +82,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "collapses repeated slashes in inherited mounts and explicit paths" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [
           "https://first.example.com",
           "https://second.example.com//custom///nested//"
@@ -104,7 +99,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "normalizes explicit and inherited root paths before endpoint suffixes are appended" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [
           "https://explicit-root.example.com/",
           "https://inherited-root.example.com"
@@ -126,7 +120,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "preserves an explicit root path instead of replacing it with the configured mount" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://root.example.com/",
+        rolling_deploy_previous_urls: "https://root.example.com/",
         rolling_deploy_mount_path: "/rolling"
       )
       allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
@@ -137,7 +131,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "rejects unsafe URL components and a bare origin when the mount path is blank" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [
           "https://user:pass@example.com/path",
           "https://example.com/path?query=1",
@@ -156,7 +149,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     it "skips one URL with an invalid inherited path without discarding later explicit URLs" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [
           "https://invalid-inherited.example.com",
           "https://valid-explicit.example.com/rolling"
@@ -178,7 +170,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [first, second],
         rolling_deploy_mount_path: "/rolling",
         rolling_deploy_token: "token"
@@ -251,7 +242,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
@@ -348,7 +339,6 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: nil,
         rolling_deploy_previous_urls: [first, second],
         rolling_deploy_mount_path: "/rolling",
         rolling_deploy_token: "token"
@@ -474,7 +464,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
@@ -564,7 +554,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: previous_url,
+        rolling_deploy_previous_urls: previous_url,
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
@@ -602,7 +592,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
@@ -632,7 +622,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
-        rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_previous_urls: "https://example.com",
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: ""
       )

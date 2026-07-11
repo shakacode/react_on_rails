@@ -113,6 +113,27 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 
 In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging` → `staging` rolling deploy needs the previous staging hash seeded, and a `staging` → `production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
 
+> [!NOTE]
+> This section is about the **upload** (publish) side. Promotion has a second, independent gap on the **seed** side: an image built on staging seeds staging's previous bundle, not production's — and with the built-in HTTP adapter (`upload` is a no-op) there is no shared store to paper over it. See [Promotion deploys need a boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed) and [Multi-source seeding](#multi-source-seeding) below.
+
+## Multi-source seeding
+
+The built-in HTTP adapter's `rolling_deploy_previous_urls` accepts **more than one** endpoint. When you **promote** an image between environments (build on staging, promote to production), pass both the build environment and the promotion target so the built image carries bundles from **both** — the promoted image is then born ready to serve production's draining bundle:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+config.rolling_deploy_adapter = ReactOnRailsPro::RollingDeployAdapters::Http
+# a single URL, a comma-separated string, or an Array — all three are accepted:
+config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"]
+# e.g. ROLLING_DEPLOY_PREVIOUS_URLS="https://staging.example.com/react_on_rails_pro/rolling_deploy,https://app.example.com/react_on_rails_pro/rolling_deploy"
+```
+
+Discovery collects hashes from every reachable endpoint, with provenance checks. A hash advertised by only one endpoint is eligible. If more than one endpoint advertises a legacy/protocol-v1 hash, the adapter omits it because it cannot prove which payload is authoritative. A duplicated v2 artifact ID remains eligible only when every advertising endpoint reports the v2 manifest protocol; each downloaded payload is recomputed and rejected when it does not match the requested ID.
+
+For an eligible hash, fetch tries its allowed origins in configured order. A missing, failed, or rejected payload lets the adapter try the next allowed origin within its overall deadline; it uses the first response that passes the applicable identity check. A single unreachable endpoint therefore does not abort discovery or prevent another eligible source from seeding the bundle.
+
+This is the build-time **failure floor**; the correctness path is the [boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed). Use both.
+
 ## Edge cases and error handling
 
 | Scenario                                                                | Behavior                                                                                                                                                        |

@@ -39,7 +39,6 @@ module ReactOnRailsPro
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
       rolling_deploy_adapter: Configuration::DEFAULT_ROLLING_DEPLOY_ADAPTER,
       rolling_deploy_token: Configuration::DEFAULT_ROLLING_DEPLOY_TOKEN,
-      rolling_deploy_previous_url: Configuration::DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL,
       rolling_deploy_previous_urls: Configuration::DEFAULT_ROLLING_DEPLOY_PREVIOUS_URLS,
       rolling_deploy_mount_path: Configuration::DEFAULT_ROLLING_DEPLOY_MOUNT_PATH,
       ssr_timeout: Configuration::DEFAULT_SSR_TIMEOUT,
@@ -82,11 +81,6 @@ module ReactOnRailsPro
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
     DEFAULT_ROLLING_DEPLOY_ADAPTER = nil
     DEFAULT_ROLLING_DEPLOY_TOKEN = nil
-    # Two knobs, both default-unset: `*_URL` is the original single-origin form
-    # (kept for backward compatibility); `*_URLS` is the newer ordered-multi-origin
-    # form. Configure only one — the plural reader falls back to the singular and
-    # setup rejects setting both. See `rolling_deploy_previous_urls` below.
-    DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL = nil
     DEFAULT_ROLLING_DEPLOY_PREVIOUS_URLS = nil
     DEFAULT_ROLLING_DEPLOY_MOUNT_PATH = "/react_on_rails_pro/rolling_deploy"
     # Minimum bearer-token length when using the built-in HTTP rolling-deploy adapter.
@@ -121,7 +115,7 @@ module ReactOnRailsPro
                   :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
                   :remote_bundle_cache_adapter, :rolling_deploy_adapter,
-                  :rolling_deploy_token, :rolling_deploy_previous_url, :rolling_deploy_mount_path,
+                  :rolling_deploy_token, :rolling_deploy_previous_urls, :rolling_deploy_mount_path,
                   :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
@@ -131,15 +125,6 @@ module ReactOnRailsPro
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
                 :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
                 :rsc_payload_authorizer
-
-    attr_writer :rolling_deploy_previous_urls
-
-    # The plural setting is preferred for new deployments. Falling back to the
-    # singular value keeps both constructor and configure-block callers
-    # backward compatible while setup rejects ambiguous use of both knobs.
-    def rolling_deploy_previous_urls
-      @rolling_deploy_previous_urls.nil? ? rolling_deploy_previous_url : @rolling_deploy_previous_urls
-    end
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -234,8 +219,7 @@ module ReactOnRailsPro
                    tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
-                   rolling_deploy_token: nil, rolling_deploy_previous_url: nil,
-                   rolling_deploy_previous_urls: nil,
+                   rolling_deploy_token: nil, rolling_deploy_previous_urls: nil,
                    rolling_deploy_mount_path: nil,
                    ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
@@ -264,7 +248,6 @@ module ReactOnRailsPro
       self.remote_bundle_cache_adapter = remote_bundle_cache_adapter
       self.rolling_deploy_adapter = rolling_deploy_adapter
       self.rolling_deploy_token = rolling_deploy_token
-      self.rolling_deploy_previous_url = rolling_deploy_previous_url
       self.rolling_deploy_previous_urls = rolling_deploy_previous_urls
       # Constructor nil/blank means "use the default"; configure-block assignment
       # can still set nil/blank later to opt out of the engine auto-mount.
@@ -292,7 +275,6 @@ module ReactOnRailsPro
       validate_url
       validate_remote_bundle_cache_adapter
       validate_rolling_deploy_adapter
-      validate_rolling_deploy_previous_urls
       validate_rolling_deploy_http_adapter_config
       setup_renderer_password
       validate_renderer_password_for_production
@@ -499,13 +481,6 @@ module ReactOnRailsPro
             "#{ROLLING_DEPLOY_TOKEN_MIN_LENGTH} bytes (got #{token.bytesize}). " \
             "Generate a stronger token with SecureRandom.hex(32). " \
             "See docs/pro/rolling-deploy-adapters.md."
-    end
-
-    def validate_rolling_deploy_previous_urls
-      return unless rolling_deploy_previous_url.present? && @rolling_deploy_previous_urls.present?
-
-      raise ReactOnRailsPro::Error,
-            "Do not configure both rolling_deploy_previous_url and rolling_deploy_previous_urls; choose one."
     end
 
     def validate_rolling_deploy_upload_signature
