@@ -45,6 +45,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   and official server rendering does not perform the browser retry. A later browser lookup may try
   again after a short retention window. Fixes
   [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
+  [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
+  [ihabadham](https://github.com/ihabadham).
 
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
