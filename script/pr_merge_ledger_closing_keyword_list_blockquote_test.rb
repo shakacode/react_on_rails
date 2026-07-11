@@ -1,0 +1,4 @@
+# frozen_string_literal: true
+
+require_relative "pr_merge_ledger_closing_keyword_blockquote_test"
+require_relative "pr_merge_ledger_closing_keyword_list_blocks_test"

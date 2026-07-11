@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+
+require_relative "pr_merge_ledger_closing_keyword_inline_test"
+require_relative "pr_merge_ledger_closing_keyword_code_blocks_test"
+require_relative "pr_merge_ledger_closing_keyword_link_reference_test"
+require_relative "pr_merge_ledger_closing_keyword_html_table_test"
+require_relative "pr_merge_ledger_closing_keyword_list_blockquote_test"
+require_relative "pr_merge_ledger_closing_keyword_plain_text_test"

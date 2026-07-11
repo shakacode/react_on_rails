@@ -12,8 +12,12 @@ require "time"
 # JSON.parse raises on the first multibyte sequence.
 Encoding.default_external = Encoding::UTF_8
 
+require_relative "pr_merge_ledger/closing_keyword_scanner"
+
 # rubocop:disable Metrics/ClassLength
 class PrMergeLedger
+  include ClosingKeywordScanner
+
   SCHEMA_VERSION = "pr-merge-ledger/v1"
   UNKNOWN = "UNKNOWN"
   # Keep the schema URI on main until a versioned schema hosting policy exists.
@@ -35,6 +39,7 @@ class PrMergeLedger
   }.freeze
   UNKNOWN_VIOLATION_CODES = [
     [/\Aci_readiness/, "unknown_ci_readiness"],
+    [/\Apr\.body_code_formatted_closing_keyword_scan/, "unknown_pr_body_closing_keyword_scan"],
     [/\Apriority_finding_dispositions\.body_scan/, "unknown_priority_finding_body_scan"],
     [/\Apriority_finding_dispositions/, "unknown_priority_finding_disposition"],
     [/\Achangelog_classification/, "unknown_changelog_classification"],
@@ -48,6 +53,8 @@ class PrMergeLedger
   BLOCKING_REVIEW_DECISION_STATES = BLOCKING_REVIEW_DECISION_VIOLATIONS.keys.freeze
   KNOWN_REVIEW_DECISION_STATES = (NON_BLOCKING_REVIEW_DECISION_STATES + BLOCKING_REVIEW_DECISION_STATES).freeze
   INTERNAL_REVIEW_DECISION_RAW_KEY = "review_decision_raw"
+  INTERNAL_PULL_REQUEST_BODY_KEY = "body_text"
+  DEFAULT_BRANCH = "main"
   FINDING_REVIEW_STATES = %w[APPROVED CHANGES_REQUESTED COMMENTED].freeze
   LOCKFILE_BASENAMES = %w[
     Gemfile.lock
@@ -699,7 +706,7 @@ class PrMergeLedger
     lockfile = lockfile_diff(files)
 
     ledger = {
-      "pr" => pull_request.except(INTERNAL_REVIEW_DECISION_RAW_KEY),
+      "pr" => pull_request.except(INTERNAL_REVIEW_DECISION_RAW_KEY, INTERNAL_PULL_REQUEST_BODY_KEY),
       "unresolved_current_head_review_threads" => {
         "status" => "known",
         "count" => unresolved_threads.length,
@@ -790,6 +797,8 @@ class PrMergeLedger
       "merged_at" => raw_pr["mergedAt"],
       # Internal-only diagnostic source for unknown_fields; stripped before output.
       INTERNAL_REVIEW_DECISION_RAW_KEY => raw_review_decision(raw_pr),
+      # Internal-only body scan input; stripped before output so reports do not duplicate PR prose.
+      INTERNAL_PULL_REQUEST_BODY_KEY => raw_pr["body"].to_s,
       "review_decision" => normalize_review_decision(raw_pr)
     }
   end
@@ -1832,6 +1841,15 @@ class PrMergeLedger
       unknowns << unknown_field(pull_request, "pr.head_sha", "GitHub headRefOid is UNKNOWN")
     end
 
+    if pull_request_body_exceeds_closing_keyword_scan_limit?(pull_request)
+      unknowns << unknown_field(
+        pull_request,
+        "pr.body_code_formatted_closing_keyword_scan",
+        "PR body exceeded the code-formatted closing keyword scan limit",
+        pull_request["url"]
+      )
+    end
+
     unknowns
   end
 
@@ -1853,6 +1871,7 @@ class PrMergeLedger
       *changes_requested_violations(pull_request, gate_context.fetch(:changes_requested)),
       *unresolved_thread_violations(pull_request, gate_context.fetch(:unresolved_threads)),
       *ci_readiness_violations(pull_request, gate_context.fetch(:ci_readiness)),
+      *code_formatted_closing_keyword_violations(pull_request),
       *unknown_field_violations(pull_request, gate_context.fetch(:unknown_fields))
     ].compact
   end
@@ -2329,6 +2348,7 @@ class PrMergeLedger
               headRefOid
               mergedAt
               reviewDecision
+              body
               files(first:100, after:$endCursor) {
                 nodes { path }
                 pageInfo { hasNextPage endCursor }
