@@ -48,6 +48,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
   [ihabadham](https://github.com/ihabadham).
 
+- **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
+  preloads listed in the React client manifest, preventing a flash of unstyled content when
+  production chunk CSS uses numeric IDs and id-named files. Fixes
+  [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
+  [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **RSC payload prerender cache no longer stores an empty payload**: With
   `config.prerender_caching = true`, the RSC payload endpoint (`/rsc_payload/:component_name`) served
   the first visitor a correct payload but every subsequent visitor a zero-byte payload, because the
