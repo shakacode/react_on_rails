@@ -35,11 +35,13 @@ need for additional handling at every other layer.
 2. Records CSS in `react-client-manifest.json`:
    ```json
    {
-     "client/components/Button.tsx": {
-       "id": "client0",
-       "chunks": ["js/client0-abc123.chunk.js"],
-       "css": ["css/client0-abc123.css"],
-       "name": "*"
+     "filePathToModuleMetadata": {
+       "client/components/Button.tsx": {
+         "id": "client0",
+         "chunks": ["js/client0-abc123.chunk.js"],
+         "css": ["css/client0-abc123.css"],
+         "name": "*"
+       }
      }
    }
    ```
@@ -81,7 +83,7 @@ need for additional handling at every other layer.
 
 4. Coordinates 5 buffer types in specific flush order:
 
-   ```
+   ```text
    1. RSC initialization scripts
    2. CSS stylesheet links  ← CSS injected here, BEFORE HTML
    3. HTML content
@@ -160,6 +162,7 @@ need for additional handling at every other layer.
 # Lines 50-58
 def generated_stylesheet_hrefs_json(render_options)
   return unless ReactOnRails::Utils.react_on_rails_pro?
+  return unless render_options.auto_load_bundle  # Only applies when auto_load_bundle is enabled
   pack_name = "generated/#{render_options.react_component_name}"
   sources = preload_sources_for_stylesheet_pack(pack_name)
   hrefs = unique_preload_sources_by_href(sources).map { |source| source.fetch(:href) }
@@ -168,6 +171,8 @@ end
 ```
 
 **Why it exists:** The client-side hydration code needs to know which stylesheets to wait for.
+
+**Note:** This mechanism only applies when `auto_load_bundle` is enabled, which limits how broadly FOUC prevention gaps (Bugs 1/2) affect applications not using this option.
 
 ---
 
@@ -180,7 +185,12 @@ end
 <%= stylesheet_pack_tag "client-bundle", media: "all" %>
 ```
 
-**Why it exists:** Server component CSS is stripped from the RSC bundle, so global styles must load via the Rails layout.
+**Why it exists:** Global styles shared across the application must be loaded via the Rails layout.
+
+**Important distinction:** This location handles **global CSS only**. It does not address the separate
+issue of CSS imported directly by Server Components (see [#4049](https://github.com/shakacode/react_on_rails/issues/4049)).
+Server-Component-imported CSS requires different handling—manifest discovery, build-artifact emission,
+and network delivery—which is outside the scope of Rails layout tags.
 
 ---
 
@@ -243,22 +253,26 @@ content insertion) have no FOUC prevention.
 
 ---
 
-### Bug 3: rspack Missing CSS Field
+### Bug 3: rspack CSS Field Conditional Omission
 
-**Severity:** High  
-**Status:** Documented but unfixed
+**Severity:** High (in affected configurations)  
+**Status:** Partially addressed in recent versions
 
-**Description:** The rspack manifest never carries the `css` field, so `withStylesheetHints` preinit
-is a no-op for all rspack users.
+**Description:** In certain rspack configurations or older versions, the manifest may not carry the
+`css` field, causing `withStylesheetHints` preinit to be a no-op.
 
-**Steps to reproduce:**
+**Note:** This issue has been addressed in `react-on-rails-rsc` 19.2.1-rc.0 and later for supported
+Pro/RSC configurations. The Rspack production dummy app on that version produces manifest `css`
+arrays correctly. This bug applies to older versions or specific Rspack/publicPath setups.
 
-1. Use rspack instead of webpack for the RSC build
+**Steps to reproduce (in affected configurations):**
+
+1. Use rspack with an older version of `react-on-rails-rsc` or specific publicPath settings
 2. Render any RSC page with client components that import CSS
 3. Check the `react-client-manifest.json`: no `css` arrays present
-4. Observe: FOUC on all Suspense-deferred client components
+4. Observe: FOUC on Suspense-deferred client components
 
-**Root cause:** `RSCRspackPlugin` does not implement CSS field population.
+**Root cause:** `RSCRspackPlugin` CSS field population depends on version and configuration.
 
 ---
 
@@ -312,28 +326,34 @@ const RSC_CLIENT_CHUNK_NAME_WITH_JS_ASSET = /"((?:client)\d+)"\s*,\s*"js\/client
 
 ---
 
-### Bug 6: Silent Failure with Missing loadable-stats.json
+### Bug 6: Silent Retry in injectRSCPayload.ts with Missing loadable-stats.json
 
 **Severity:** Medium  
 **Status:** Known limitation
 
-**Description:** When `loadable-stats.json` is missing, CSS inference is disabled with no warning.
+**Description:** When `loadable-stats.json` is missing in the Node renderer environment,
+`injectRSCPayload.ts` retries with exponential backoff but does not log a warning during
+the retry window.
+
+**Note:** The Ruby-side rolling-deploy staging path does warn when appropriate and suppresses
+warnings for builds where the file is legitimately absent. This bug specifically affects the
+`injectRSCPayload.ts` retry path in the Node renderer.
 
 **Steps to reproduce:**
 
 1. Deploy without copying `loadable-stats.json` to the renderer bundle directory
-2. Render RSC pages
-3. Observe: No warning logged, CSS inference disabled for 30+ seconds with exponential backoff
-4. All pages have FOUC during this window
+2. Render RSC pages during the retry window
+3. Observe: The `injectRSCPayload.ts` retry path logs no warning
+4. Pages have FOUC until the file appears or retry cap is reached
 
 **Root cause:**
 
 ```typescript
 // injectRSCPayload.ts:296-316
-// ENOENT errors are caught and trigger retry with no warning
+// ENOENT errors are caught and trigger retry without warning
 catch (error) {
   const retryDelayMs = Math.min(previousRetryDelayMs * 2, LOADABLE_STATS_MAX_READ_RETRY_DELAY_MS);
-  // ...no warning logged for common ENOENT case
+  // ...retry scheduled but no warning logged for common ENOENT case
 }
 ```
 
@@ -349,7 +369,7 @@ catch (error) {
 **Steps to reproduce:**
 
 1. Create structure:
-   ```
+   ```text
    ClientComponent.tsx → helpers.js → helpers.css
    ```
 2. Configure splitChunks to move `helpers.js` to a shared chunk
