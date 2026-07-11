@@ -46,7 +46,12 @@ jest.mock('../src/cache/manifestLoaderServer.ts', () => ({
   getRSCClientManifestStylesheetHrefs: jest.fn().mockResolvedValue(new Set()),
 }));
 
+jest.mock('../src/cache/manifestLoader.ts', () => ({
+  setManifestFileNames: jest.fn(),
+}));
+
 const { getRSCClientManifestStylesheetHrefs } = jest.requireMock('../src/cache/manifestLoaderServer.ts');
+const { setManifestFileNames } = jest.requireMock('../src/cache/manifestLoader.ts');
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -258,6 +263,7 @@ describe('streamServerRenderedReactComponent', () => {
     ComponentRegistry.clear();
     renderToPipeableStream.mockClear();
     getRSCClientManifestStylesheetHrefs.mockReset().mockResolvedValue(new Set());
+    setManifestFileNames.mockReset();
   });
 
   // Parses a length-prefixed stream chunk: metadata\tcontent_len\ncontent
@@ -1009,6 +1015,15 @@ describe('streamServerRenderedReactComponent', () => {
     expect(chunks[1].consoleReplayScript).toBe('');
     expect(chunks[1].hasErrors).toBe(false);
     expect(chunks[1].isShellReady).toBe(true);
+  });
+
+  it('does not mutate global manifest filenames during a streamed render', async () => {
+    const { renderResult } = setupStreamTest();
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(setManifestFileNames).not.toHaveBeenCalled();
   });
 
   it('passes manifest stylesheet hrefs to streamed preload promotion', async () => {
