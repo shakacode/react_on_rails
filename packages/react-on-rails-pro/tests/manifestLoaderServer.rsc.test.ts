@@ -18,7 +18,32 @@
  */
 
 import type { BundleManifest } from 'react-on-rails-rsc';
-import { collectRSCClientManifestStylesheetHrefs } from '../src/cache/manifestLoaderServer.ts';
+import { setManifestFileNames } from '../src/cache/manifestLoader.ts';
+import {
+  collectRSCClientManifestStylesheetHrefs,
+  getRSCClientManifestStylesheetHrefs,
+} from '../src/cache/manifestLoaderServer.ts';
+import loadJsonFile from '../src/loadJsonFile.ts';
+
+jest.mock('../src/loadJsonFile.ts', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
+const mockedLoadJsonFile = jest.mocked(loadJsonFile);
+
+const manifestWithStylesheet = (href: string) =>
+  ({
+    moduleLoading: { prefix: '/webpack/test/', crossOrigin: null },
+    filePathToModuleMetadata: {
+      'file:///app/client.tsx': {
+        id: 'client',
+        chunks: [],
+        css: [href],
+        name: '*',
+      },
+    },
+  }) as unknown as BundleManifest;
 
 describe('collectRSCClientManifestStylesheetHrefs', () => {
   it('normalizes and deduplicates the union of production manifest CSS arrays', () => {
@@ -53,5 +78,41 @@ describe('collectRSCClientManifestStylesheetHrefs', () => {
         '/webpack/test/css/7310-aabbccdd.css',
       ]),
     );
+  });
+});
+
+describe('getRSCClientManifestStylesheetHrefs', () => {
+  beforeEach(() => {
+    mockedLoadJsonFile.mockReset();
+  });
+
+  it('reloads stylesheet hrefs when the client manifest filename changes', async () => {
+    mockedLoadJsonFile
+      .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/first.css'))
+      .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/second.css'));
+
+    setManifestFileNames('first-client-manifest.json', 'first-server-client-manifest.json');
+    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+      new Set(['/webpack/test/css/first.css']),
+    );
+
+    setManifestFileNames('second-client-manifest.json', 'second-server-client-manifest.json');
+    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+      new Set(['/webpack/test/css/second.css']),
+    );
+    expect(mockedLoadJsonFile).toHaveBeenNthCalledWith(2, 'second-client-manifest.json');
+  });
+
+  it('retries a rejected manifest load for the same filename', async () => {
+    mockedLoadJsonFile
+      .mockRejectedValueOnce(new Error('temporary manifest read failure'))
+      .mockResolvedValueOnce(manifestWithStylesheet('/webpack/test/css/retried.css'));
+    setManifestFileNames('retry-client-manifest.json', 'retry-server-client-manifest.json');
+
+    await expect(getRSCClientManifestStylesheetHrefs()).rejects.toThrow('temporary manifest read failure');
+    await expect(getRSCClientManifestStylesheetHrefs()).resolves.toEqual(
+      new Set(['/webpack/test/css/retried.css']),
+    );
+    expect(mockedLoadJsonFile).toHaveBeenCalledTimes(2);
   });
 });

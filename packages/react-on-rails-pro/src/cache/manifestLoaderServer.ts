@@ -20,9 +20,9 @@ import { getClientManifestFileName } from './manifestLoader.ts';
 
 type ServerRenderer = ReturnType<typeof buildServerRendererType>;
 
-let reactClientManifestPromise: Promise<BundleManifest> | undefined;
+const reactClientManifestPromises = new Map<string, Promise<BundleManifest>>();
 let serverRendererPromise: Promise<ServerRenderer> | undefined;
-let rscClientManifestStylesheetHrefsPromise: Promise<ReadonlySet<string>> | undefined;
+const rscClientManifestStylesheetHrefsPromises = new Map<string, Promise<ReadonlySet<string>>>();
 
 function normalizeStylesheetHref(href: string) {
   try {
@@ -44,21 +44,29 @@ export function collectRSCClientManifestStylesheetHrefs(
   return stylesheetHrefs;
 }
 
-function getReactClientManifest(): Promise<BundleManifest> {
-  if (!reactClientManifestPromise) {
-    const clientManifest = getClientManifestFileName();
-    if (!clientManifest) {
-      throw new Error(
-        'Manifest file names not set. Ensure setManifestFileNames() is called before getServerRenderer(). ' +
-          'This is done automatically during the first RSC render request.',
-      );
-    }
-    reactClientManifestPromise = loadJsonFile<BundleManifest>(clientManifest).catch((err: unknown) => {
-      reactClientManifestPromise = undefined;
-      throw err;
-    });
+function requireClientManifestFileName(): string {
+  const clientManifest = getClientManifestFileName();
+  if (!clientManifest) {
+    throw new Error(
+      'Manifest file names not set. Ensure setManifestFileNames() is called before getServerRenderer(). ' +
+        'This is done automatically during the first RSC render request.',
+    );
   }
-  return reactClientManifestPromise;
+  return clientManifest;
+}
+
+function getReactClientManifest(clientManifest = requireClientManifestFileName()): Promise<BundleManifest> {
+  const cachedPromise = reactClientManifestPromises.get(clientManifest);
+  if (cachedPromise) return cachedPromise;
+
+  const promise = loadJsonFile<BundleManifest>(clientManifest);
+  reactClientManifestPromises.set(clientManifest, promise);
+  void promise.catch(() => {
+    if (reactClientManifestPromises.get(clientManifest) === promise) {
+      reactClientManifestPromises.delete(clientManifest);
+    }
+  });
+  return promise;
 }
 
 export function getServerRenderer(): Promise<ServerRenderer> {
@@ -74,13 +82,16 @@ export function getServerRenderer(): Promise<ServerRenderer> {
 }
 
 export function getRSCClientManifestStylesheetHrefs(): Promise<ReadonlySet<string>> {
-  if (!rscClientManifestStylesheetHrefsPromise) {
-    rscClientManifestStylesheetHrefsPromise = getReactClientManifest()
-      .then(collectRSCClientManifestStylesheetHrefs)
-      .catch((err: unknown) => {
-        rscClientManifestStylesheetHrefsPromise = undefined;
-        throw err;
-      });
-  }
-  return rscClientManifestStylesheetHrefsPromise;
+  const clientManifest = requireClientManifestFileName();
+  const cachedPromise = rscClientManifestStylesheetHrefsPromises.get(clientManifest);
+  if (cachedPromise) return cachedPromise;
+
+  const promise = getReactClientManifest(clientManifest).then(collectRSCClientManifestStylesheetHrefs);
+  rscClientManifestStylesheetHrefsPromises.set(clientManifest, promise);
+  void promise.catch(() => {
+    if (rscClientManifestStylesheetHrefsPromises.get(clientManifest) === promise) {
+      rscClientManifestStylesheetHrefsPromises.delete(clientManifest);
+    }
+  });
+  return promise;
 }
