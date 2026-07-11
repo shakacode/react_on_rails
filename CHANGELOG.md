@@ -39,6 +39,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Promotion deploys need a boot seed](https://reactonrails.com/docs/pro/rolling-deploy-adapters#promotion-deploys-need-a-release-time-boot-seed).
   [PR 4544](https://github.com/shakacode/react_on_rails/pull/4544) by [justin808](https://github.com/justin808).
 
+#### Fixed
+
+- **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
+  preloads listed in the React client manifest, preventing a flash of unstyled content when
+  production chunk CSS uses numeric IDs and id-named files. Fixes
+  [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
+  [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
+  [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.8] - 2026-07-08
 
 #### Breaking Changes
@@ -66,12 +75,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   differs from the current process context. Fixes
   [Issue 4523](https://github.com/shakacode/react_on_rails/issues/4523).
   [PR 4530](https://github.com/shakacode/react_on_rails/pull/4530) by
-  [justin808](https://github.com/justin808).
-- **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
-  preloads listed in the React client manifest, preventing a flash of unstyled content when
-  production chunk CSS uses numeric IDs and id-named files. Fixes
-  [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
-  [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
   [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
