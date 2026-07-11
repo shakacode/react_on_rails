@@ -6,9 +6,10 @@ require_relative "bencher_perf_url"
 
 # Parses the report emitted by `bencher run --format json` (Bencher CLI v0.6.8;
 # shape verified stable through current main). Exposes what benchmark reporting
-# needs: active regression alerts, and per benchmark+measure t-test prediction
-# intervals so the summary table can flag values that moved significantly vs
-# baseline in EITHER direction.
+# needs: active regression alerts, and per benchmark+measure boundary intervals
+# (percentage limits for the CI relative comparison, t-test prediction intervals
+# for the local statistical trend runs) so the summary table can flag values that
+# moved significantly vs baseline in EITHER direction.
 #
 # The report shape is not a documented stability contract, so accesses are guarded:
 # anything that decides a regression or the table structure raises FormatError (fail
@@ -52,7 +53,8 @@ class BencherReport # rubocop:disable Metrics/ClassLength
     end
 
     # Bencher configures a threshold on one side only, so the opposite limit is the
-    # mirror of the present one about baseline (the t-test interval is symmetric).
+    # mirror of the present one about baseline (both threshold tests we use are
+    # symmetric — see #mirror).
     def effective_lower
       lower_limit || mirror(upper_limit)
     end
@@ -61,10 +63,12 @@ class BencherReport # rubocop:disable Metrics/ClassLength
       upper_limit || mirror(lower_limit)
     end
 
-    # Bencher's t-test prediction interval is symmetric about the baseline by
-    # construction, so the unconfigured side is the configured side mirrored across
-    # baseline: a limit at distance d from baseline maps to baseline ∓ d. (Verified
-    # for the pinned CLI; re-confirm when bumping the pin.)
+    # Both threshold tests we use produce limits symmetric about the baseline by
+    # construction — the t-test's prediction interval, and the percentage test's
+    # baseline*(1±p) limits both sit at the same distance d from baseline — so the
+    # unconfigured side is the configured side mirrored across baseline: a limit at
+    # distance d maps to baseline ∓ d. (Verified for the pinned CLI; re-confirm when
+    # bumping the pin.)
     def mirror(limit)
       return nil if limit.nil?
 

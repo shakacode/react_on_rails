@@ -8,7 +8,11 @@ require_relative "../lib/bencher_runner"
 RSpec.describe BencherRunner do
   subject(:runner) { described_class.new(benchmark_json: "bench.json", report_json: "report.json") }
 
-  def capture_run_command(branch: "my-branch", start_point_args: [])
+  def runner_for(mode)
+    described_class.new(benchmark_json: "bench.json", report_json: "report.json", mode:)
+  end
+
+  def capture_run_command(branch: "my-branch", start_point_args: [], runner: self.runner)
     status = instance_double(Process::Status, exitstatus: 0)
     report_json = JSON.generate("results" => [], "alerts" => [])
     captured_args = nil
@@ -81,8 +85,44 @@ RSpec.describe BencherRunner do
       )
     end
 
-    it "passes the tuned maximum sample size to Bencher thresholds" do
-      expect(capture_run_command.each_cons(2)).to include(["--threshold-max-sample-size", "64"])
+    it "uses the t-test with the tuned maximum sample size by default (statistical trend mode)" do
+      args = capture_run_command
+
+      expect(args.each_cons(2)).to include(["--threshold-test", "t_test"])
+      expect(args.each_cons(2)).to include(["--threshold-max-sample-size", "64"])
+      expect(args).to include("--err")
+    end
+
+    it "omits thresholds and --err for a relative baseline run (it must never gate the job)" do
+      args = capture_run_command(runner: runner_for(:relative_baseline), start_point_args: ["--start-point-reset"])
+
+      expect(args).not_to include("--err")
+      expect(args).not_to include("--threshold-measure")
+      expect(args).not_to include("--thresholds-reset")
+      expect(args).to include("--start-point-reset")
+    end
+
+    it "compares a relative head run with percentage thresholds and resets stale threshold models" do
+      args = capture_run_command(runner: runner_for(:relative_head))
+
+      expect(args).to include("--err", "--thresholds-reset")
+      expect(args.each_cons(2)).to include(["--threshold-test", "percentage"])
+      expect(args.each_cons(2)).not_to include(["--threshold-test", "t_test"])
+      # A percentage boundary is computed from the baseline directly; the sample-size
+      # cap only applies to the t-test's history window.
+      expect(args).not_to include("--threshold-max-sample-size")
+      expect(parse_thresholds(args)).to eq(
+        [
+          { measure: "rps", lower: "0.25", upper: "_" },
+          { measure: "p50_latency", lower: "_", upper: "0.25" },
+          { measure: "failed_pct", lower: "_", upper: "0.25" }
+        ]
+      )
+    end
+
+    it "rejects unknown modes at construction time" do
+      expect { described_class.new(benchmark_json: "b.json", report_json: "r.json", mode: :nope) }
+        .to raise_error(ArgumentError, /unknown mode :nope/)
     end
   end
 

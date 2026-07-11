@@ -172,8 +172,9 @@ ruby benchmarks/run-local-benchmark-comparison.rb core \
 
 The script reuses the CI building blocks (no duplicated benchmark logic): per-suite config
 from `generate_matrix.rb`, the dummy app's `bin/prod*` for the build + server, `bench.rb` for
-the measurement, and `lib/bencher_runner.rb` for the upload (same tuned thresholds, with the
-testbed overridden via `BENCHER_TESTBED`). It reports under the **checked-out git ref** (branch
+the measurement, and `lib/bencher_runner.rb` for the upload (in its default statistical mode:
+tuned t-test thresholds against this testbed's own history — unlike CI, which runs a relative
+base-vs-head comparison per run — with the testbed overridden via `BENCHER_TESTBED`). It reports under the **checked-out git ref** (branch
 name, or tag/SHA when detached) unless `--branch` overrides it: a nightly `main` run feeds the
 dedicated main trend, while an RC tag or feature branch forms its own series instead of
 polluting that baseline.

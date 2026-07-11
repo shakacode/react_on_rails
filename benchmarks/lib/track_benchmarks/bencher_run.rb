@@ -23,23 +23,5 @@ module TrackBenchmarks
       Github.notice("Bencher reported only stale active alert(s); no current boundary-backed regression remains.")
       0
     end
-
-    # A missing start-point baseline (operational, not a regression): retrying without
-    # the start-point hash falls back to the latest baseline. The no-regression guard is
-    # load-bearing — a real regression must not be silently re-run against a different
-    # baseline. The stderr match detects the operational error, not an alert.
-    def retry_without_start_point_hash?(stderr, exit_code, report)
-      exit_code != 0 &&
-        stderr.match?(/Head Version.*not found/) &&
-        !Summary.regression?(report)
-    end
-
-    def without_start_point_hash(start_point_args)
-      retry_args = start_point_args.dup
-      if (hash_arg_index = retry_args.index("--start-point-hash"))
-        retry_args.slice!(hash_arg_index, 2)
-      end
-      retry_args
-    end
   end
 end

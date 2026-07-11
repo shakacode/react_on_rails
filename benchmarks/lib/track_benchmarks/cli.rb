@@ -10,10 +10,13 @@ module TrackBenchmarks
     end
 
     def run
-      branch, start_point_args = BranchArgs.branch_and_start_point_args(env:)
-      bencher_result = BencherRun.run_bencher!(bencher_runner, branch, start_point_args)
-      bencher_exit_code, report = retry_without_start_point_hash(branch, start_point_args, bencher_result)
-      bencher_exit_code = BencherRun.normalized_exit_code(bencher_exit_code, report)
+      plan = BranchArgs.run_plan(env:)
+      run_baseline(plan)
+      head_result = BencherRun.run_bencher!(
+        head_runner, plan.head_branch, BranchArgs.head_start_point_args(plan.baseline_branch)
+      )
+      report = head_result.report
+      bencher_exit_code = BencherRun.normalized_exit_code(head_result.exit_code, report)
 
       # Build the Markdown summary table once; the same body feeds the job summary, the
       # PR comment, and the candidate/confirmation hand-offs.
@@ -37,32 +40,41 @@ module TrackBenchmarks
 
     attr_reader :suite_name, :report_marker, :env
 
-    def bencher_runner
-      @bencher_runner ||= BencherRunner.new(benchmark_json: Config::BENCHMARK_JSON, report_json: Config::REPORT_JSON)
+    # Records the base ref's results (measured moments ago on THIS runner) as the
+    # comparison baseline: a fresh series on a throwaway per-run branch. The baseline
+    # run configures no thresholds, so it can never alert — any non-zero exit is an
+    # operational failure (auth/API/network/CLI) and aborts before the head run could
+    # submit a comparison against a baseline that was never recorded.
+    def run_baseline(plan)
+      result = BencherRun.run_bencher!(
+        baseline_runner, plan.baseline_branch, BranchArgs.baseline_start_point_args
+      )
+      return if result.exit_code.zero?
+
+      warn "::error::Bencher baseline upload for #{suite_name} failed (exit #{result.exit_code}); " \
+           "cannot run the relative comparison without a same-runner baseline. Check the logs above."
+      exit result.exit_code
+    end
+
+    def baseline_runner
+      @baseline_runner ||= BencherRunner.new(
+        benchmark_json: Config::BASELINE_BENCHMARK_JSON,
+        report_json: Config::BASELINE_REPORT_JSON,
+        mode: :relative_baseline
+      )
+    end
+
+    def head_runner
+      @head_runner ||= BencherRunner.new(
+        benchmark_json: Config::BENCHMARK_JSON,
+        report_json: Config::REPORT_JSON,
+        mode: :relative_head
+      )
     end
 
     def pr_report_poster
       # Keep this behind replace_pr_comments so non-PR runs never require PR env vars.
       @pr_report_poster ||= PrReportPoster.from_env(suite_name:, marker: report_marker)
-    end
-
-    def retry_without_start_point_hash(branch, start_point_args, bencher_result)
-      stderr = bencher_result.stderr
-      bencher_exit_code = bencher_result.exit_code
-      report = bencher_result.report
-      unless BencherRun.retry_without_start_point_hash?(stderr, bencher_exit_code, report)
-        return [bencher_exit_code, report]
-      end
-
-      retry_args = BencherRun.without_start_point_hash(start_point_args)
-      puts "Start-point hash not found in Bencher; retrying without --start-point-hash"
-      Github.warning("Start-point hash not found in Bencher; falling back to latest baseline for comparison")
-      # The retry's stderr is unused: regression classification reads the JSON report,
-      # and this path only triggers when the first run had no regression.
-      retry_result = BencherRun.run_bencher!(bencher_runner, branch, retry_args)
-      # Intentionally leave retry_result.stderr unused here. BencherRunner#run has
-      # already emitted it; only the exit code and parsed report affect the outcome.
-      [retry_result.exit_code, retry_result.report]
     end
 
     def post_pull_request_report(report, report_markdown)

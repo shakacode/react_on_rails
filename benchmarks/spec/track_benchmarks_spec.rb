@@ -8,10 +8,9 @@ require_relative "../lib/bmf_helpers"
 
 # track_benchmarks.rb runs its tracking flow only under `if __FILE__ == $PROGRAM_NAME`,
 # so requiring it just loads the helpers. These pin the classification that decides
-# whether a Bencher run is a real regression vs a missing-baseline retry — now read
-# from the JSON report's alerts[] rather than by grepping stderr. The two are
-# mutually exclusive by design: an alert must never trigger a start-point-hash retry,
-# or a real regression would be silently re-measured against the wrong baseline.
+# whether a Bencher run is a real regression — read from the JSON report's alerts[]
+# rather than by grepping stderr — and the branch targeting of the relative
+# continuous benchmarking runs.
 RSpec.describe "track_benchmarks" do
   include BenchmarkEnvHelper
 
@@ -109,27 +108,6 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
-  describe "#retry_without_start_point_hash?" do
-    it "is true when the start-point head version is missing and there is no regression" do
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report_without_alert)).to be(true)
-    end
-
-    it "is true when the head version is missing and no report was produced" do
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, nil)).to be(true)
-    end
-
-    it "is false when the report has an active alert (must not retry a real regression)" do
-      report = report_with_alert
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 1, report)).to be(false)
-      expect(regression?(report)).to be(true)
-    end
-
-    it "is false on success and for unrelated non-zero failures" do
-      expect(retry_without_start_point_hash?("Head Version abc123 not found", 0, report_without_alert)).to be(false)
-      expect(retry_without_start_point_hash?("some other error", 1, report_without_alert)).to be(false)
-    end
-  end
-
   describe "#replace_pr_comments" do
     it "does not require CI event env outside pull requests" do
       with_env("GITHUB_EVENT_NAME" => nil) do
@@ -205,18 +183,18 @@ RSpec.describe "track_benchmarks" do
       end
     end
 
-    describe "#branch_and_start_point_args" do
-      it "targets a throwaway branch and re-tests against main without polluting its series" do
+    describe "#run_plan" do
+      it "targets throwaway branches for both runs so main's series is never polluted" do
         ENV["BENCHMARK_MODE"] = "confirm"
         ENV["GITHUB_RUN_ID"] = "777"
         ENV["BENCHMARK_SUITE_NAME"] = "Core"
 
-        branch, start_point_args = branch_and_start_point_args
-        expect(branch).to eq("confirm-main-777-core")
-        expect(branch).not_to eq("main")
-        expect(start_point_args).to eq(
-          %w[--start-point main --start-point-clone-thresholds --start-point-reset]
-        )
+        plan = run_plan
+        expect(plan.head_branch).to eq("confirm-main-777-core")
+        expect(plan.head_branch).not_to eq("main")
+        # The confirmation's baseline must also never collide with the initial run's
+        # baseline branch within the same workflow run.
+        expect(plan.baseline_branch).to eq("confirm-base-777-core")
       end
     end
 
@@ -457,6 +435,17 @@ RSpec.describe "track_benchmarks" do
 
     it "are all emitted by BmfCollector (so no threshold is a silent no-op)" do
       expect(emitted).to include(*BencherRunner::THRESHOLDS.map(&:first))
+    end
+
+    # The CI relative comparison (RELATIVE_THRESHOLDS, percentage) and the local
+    # statistical trend runs (THRESHOLDS, t-test) must track the same measures with the
+    # same regression directions — only the boundary math differs. This keeps every
+    # THRESHOLDS-based invariant below (BmfCollector emission, summary-table columns)
+    # authoritative for the relative set too.
+    it "use the same measures and directions for relative (CI) and statistical (local) tracking" do
+      pairs = ->(thresholds) { thresholds.map { |measure, direction, _boundary| [measure, direction] } }
+
+      expect(pairs.call(BencherRunner::RELATIVE_THRESHOLDS)).to eq(pairs.call(BencherRunner::THRESHOLDS))
     end
 
     it "exclude p90_latency, which BmfCollector emits boundary-less (recorded but never alerted)" do

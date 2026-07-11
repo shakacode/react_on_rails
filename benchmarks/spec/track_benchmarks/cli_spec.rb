@@ -7,38 +7,79 @@ RSpec.describe TrackBenchmarks::Cli do
   include BenchmarkEnvHelper
 
   describe "#run" do
-    it "passes injected env through benchmark orchestration gates" do
-      env = { "GITHUB_EVENT_NAME" => "push", "GITHUB_REF" => "refs/heads/main" }
-      cli = described_class.new(suite_name: "Core", report_marker: "core", env:)
-      runner = instance_double(BencherRunner)
-      report = instance_double(BencherReport)
-      result_type = Struct.new(:stderr, :exit_code, :report, keyword_init: true)
-      result = result_type.new(stderr: "", exit_code: 1, report:)
+    let(:result_type) { Struct.new(:stderr, :exit_code, :report, keyword_init: true) }
 
+    def stub_runners(baseline_runner, head_runner)
+      allow(BencherRunner).to receive(:new).with(
+        benchmark_json: TrackBenchmarks::Config::BASELINE_BENCHMARK_JSON,
+        report_json: TrackBenchmarks::Config::BASELINE_REPORT_JSON,
+        mode: :relative_baseline
+      ).and_return(baseline_runner)
       allow(BencherRunner).to receive(:new).with(
         benchmark_json: TrackBenchmarks::Config::BENCHMARK_JSON,
-        report_json: TrackBenchmarks::Config::REPORT_JSON
-      ).and_return(runner)
-      allow(TrackBenchmarks::BranchArgs).to receive(:branch_and_start_point_args).with(env:).and_return(["main", []])
-      allow(TrackBenchmarks::BencherRun).to receive(:run_bencher!).with(runner, "main", []).and_return(result)
-      allow(TrackBenchmarks::BencherRun).to receive(:retry_without_start_point_hash?)
-        .with("", 1, report)
-        .and_return(false)
+        report_json: TrackBenchmarks::Config::REPORT_JSON,
+        mode: :relative_head
+      ).and_return(head_runner)
+    end
+
+    it "submits the baseline then the head comparison and passes env through orchestration gates" do
+      env = {
+        "GITHUB_EVENT_NAME" => "push",
+        "GITHUB_REF" => "refs/heads/main",
+        "GITHUB_RUN_ID" => "42",
+        "BENCHMARK_SUITE_NAME" => "Core"
+      }
+      cli = described_class.new(suite_name: "Core", report_marker: "core", env:)
+      baseline_runner = instance_double(BencherRunner)
+      head_runner = instance_double(BencherRunner)
+      report = instance_double(BencherReport)
+      baseline_result = result_type.new(stderr: "", exit_code: 0, report: nil)
+      head_result = result_type.new(stderr: "", exit_code: 1, report:)
+
+      stub_runners(baseline_runner, head_runner)
+      allow(TrackBenchmarks::BencherRun).to receive(:run_bencher!)
+        .with(baseline_runner, "base-42-core", ["--start-point-reset"])
+        .and_return(baseline_result)
+      allow(TrackBenchmarks::BencherRun).to receive(:run_bencher!)
+        .with(head_runner, "main", %w[--start-point base-42-core --start-point-reset])
+        .and_return(head_result)
       allow(TrackBenchmarks::BencherRun).to receive(:normalized_exit_code).with(1, report).and_return(1)
       allow(TrackBenchmarks::Summary).to receive(:rendered_report)
         .with(report, "Core", TrackBenchmarks::Config::DISPLAY_JSON)
         .and_return("summary")
       expect(TrackBenchmarks::Summary).to receive(:post_report_to_summary).with("summary", "Core")
-      allow(TrackBenchmarks::BranchArgs).to receive(:confirmation_mode?).with(env:).and_return(false)
       allow(TrackBenchmarks::RegressionPayloads).to receive(:main_push?).with(env:).and_return(true)
       expect(TrackBenchmarks::RegressionPayloads).to receive(:report_main_push_candidate)
         .with(report, "summary", 1, "Core")
 
       cli.run
 
-      expect(TrackBenchmarks::BranchArgs).to have_received(:branch_and_start_point_args).with(env:)
-      expect(TrackBenchmarks::BranchArgs).to have_received(:confirmation_mode?).with(env:)
+      expect(TrackBenchmarks::BencherRun).to have_received(:run_bencher!).twice
       expect(TrackBenchmarks::RegressionPayloads).to have_received(:main_push?).with(env:)
+    end
+
+    it "aborts before the head comparison when the baseline upload fails" do
+      env = {
+        "GITHUB_EVENT_NAME" => "push",
+        "GITHUB_REF" => "refs/heads/main",
+        "GITHUB_RUN_ID" => "42",
+        "BENCHMARK_SUITE_NAME" => "Core"
+      }
+      cli = described_class.new(suite_name: "Core", report_marker: "core", env:)
+      baseline_runner = instance_double(BencherRunner)
+      head_runner = instance_double(BencherRunner)
+      baseline_result = result_type.new(stderr: "auth failed", exit_code: 2, report: nil)
+
+      stub_runners(baseline_runner, head_runner)
+      allow(TrackBenchmarks::BencherRun).to receive(:run_bencher!)
+        .with(baseline_runner, "base-42-core", ["--start-point-reset"])
+        .and_return(baseline_result)
+
+      expected_output = output(/::error::Bencher baseline upload for Core failed \(exit 2\)/).to_stderr
+      expected_exit = raise_error(SystemExit) { |error| expect(error.status).to eq(2) }
+      expect { cli.run }.to expected_output.and(expected_exit)
+
+      expect(TrackBenchmarks::BencherRun).to have_received(:run_bencher!).once
     end
   end
 
