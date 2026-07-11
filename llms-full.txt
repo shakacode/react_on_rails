@@ -15596,6 +15596,10 @@ available default ENV values if you wire them into your own launch script.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
    In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
    In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
+1. **licenseToken** (default: `env.REACT_ON_RAILS_PRO_LICENSE`) - The paid React on Rails Pro license JWT.
+   Explicit nonblank configuration takes precedence over the environment variable; blank or omitted configuration falls
+   back to the environment. Configure this process separately from Rails when it runs as a standalone service. Token
+   values are masked from sanitized renderer configuration logs.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set. **Recommended for production** — rolling restarts are the primary safety net against memory leaks from application code. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set. Set this high enough so that not all workers are down simultaneously (e.g., if you have 4 workers and set this to 5 minutes, the full restart cycle takes 20 minutes).
 1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. For example, `30` means 30 seconds, not 30 milliseconds. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
@@ -15807,6 +15811,10 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 const config = {
   // Save bundles to relative "./.node-renderer-bundles" dir of our app root
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
+
+  // Optional alternative to REACT_ON_RAILS_PRO_LICENSE. This application-defined
+  // function can read from any secret provider available to the Node process.
+  // licenseToken: loadLicenseTokenFromYourSecretManager(),
 
   // All other values are the defaults, as described above
 };
@@ -19028,6 +19036,12 @@ The below example is a typical production setup, using the separate `NodeRendere
 
 ```ruby
 ReactOnRailsPro.configure do |config|
+  # Paid production license JWT. Explicit nonblank configuration takes precedence over
+  # REACT_ON_RAILS_PRO_LICENSE; blank values fall back to that environment variable.
+  # A standalone Node renderer must receive the same token through its own `licenseToken`
+  # configuration or environment.
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+
   # If true, then capture timing of React on Rails Pro calls including server rendering and
   # component rendering.
   # Default for `tracing` is false.
@@ -19359,7 +19373,7 @@ Uncommonly used options:
 <%= react_on_rails_preload_links("HelloWorld", "comments_list") %>
 ```
 
-Use `react_on_rails_preload_links` in a layout or view `<head>` when you know which auto-bundled React components the page will render. The helper resolves each component to its generated Shakapacker pack (`generated/ComponentName`) and emits preload link tags for the manifest assets. Pass component names as PascalCase, camelCase, or snake_case strings; hyphenated names are rejected because they cannot be normalized reliably.
+Use `react_on_rails_preload_links` in a layout or view `<head>` when you know which auto-bundled React components the page will render. The helper requires Shakapacker 7.0+ with `nested_entries: true`, resolves each component to its generated Shakapacker pack (`generated/ComponentName`), and emits preload link tags for the manifest assets. Pass component names as PascalCase, camelCase, or snake_case strings; hyphenated names are rejected because they cannot be normalized reliably.
 
 For JavaScript chunks, plain script assets render as `<link rel="preload" as="script">`. Module assets render as `<link rel="modulepreload">` when the manifest marks the asset as a module or the emitted file has an `.mjs` extension. CSS chunks render as `<link rel="preload" as="style">`. Component packs without CSS assets simply skip the stylesheet preload.
 
@@ -20319,7 +20333,10 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-For production, configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+For production, configure your license token through `config.license_token` or
+`REACT_ON_RAILS_PRO_LICENSE`. A standalone Node renderer can use its `licenseToken` option or the same environment
+fallback. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md)
+for all options.
 
 **Combining with other options:**
 
@@ -29556,15 +29573,22 @@ sidecar and scoped-loading design work is tracked in
 ## RSC Stylesheet Injection: Render-Blocking Links and Cascade Order
 
 This section documents the current RSC stylesheet injection behavior so you know what to expect in
-the page source — it is not an open defect. It applies to React 19+ installations; earlier React
-versions do not support the `data-precedence` stylesheet groups used for this hoisting and
-render-blocking behavior.
+the page source — it is not an open defect. The render-blocking gate itself is plain browser
+behavior (a pending `<link rel="stylesheet">` holds later inline scripts) and does not depend on
+React 19. The `data-precedence` attribute matters for what happens around the gate: React 19+
+deduplicates and adopts these stylesheet groups client-side and orders them within `<head>`;
+earlier React versions do not support `data-precedence` groups, so the dedup, adoption, and
+cascade-order behavior described below applies to React 19+ installations.
 
 For RSC pages, React on Rails Pro injects
 `<link rel="stylesheet" data-precedence="rsc-css">` tags for CSS hrefs whose client chunk names appear
-in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: React
-delays committing the streamed content until the referenced stylesheets are ready, which prevents a
-flash of unstyled content (FOUC) as the tree streams in.
+in the current Flight payload. These links are **render-blocking** for the streamed RSC tree: the
+streaming pipeline places each link in the byte stream ahead of React's inline boundary-reveal
+script, and the browser's stylesheet-blocks-scripts rule holds that script until the CSS has
+loaded, which prevents a flash of unstyled content (FOUC) as the tree streams in. (The gate is
+stream ordering plus browser behavior — React itself does not delay streamed reveals for this CSS.
+See [How CSS reaches the browser](../../pro/react-server-components/css-and-styling.md#how-css-reaches-the-browser)
+for the full mechanism.)
 
 ### Per-reference broadcast multiplication (fixed in the 19.2 line)
 
@@ -31564,7 +31588,7 @@ _The image above demonstrates the dramatic performance improvement:_
 ### Script Loading Strategy Migration
 
 - If you were previously using `defer_generated_component_packs: true`, use `generated_component_packs_loading_strategy: :defer` instead
-- If you were previously using `defer_generated_component_packs: false`, use `generated_component_packs_loading_strategy: :sync` instead
+- If you were previously using `defer_generated_component_packs: false`, remove the setting only if you accept the post-upgrade default. `false` was a no-op, so record the app's pre-upgrade effective strategy and set `generated_component_packs_loading_strategy` explicitly to preserve it.
 - For optimal performance with Shakapacker ≥ 8.2.0, consider using `generated_component_packs_loading_strategy: :async`
 
 ### ESM-only package

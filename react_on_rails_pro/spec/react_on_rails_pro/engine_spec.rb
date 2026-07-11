@@ -35,12 +35,14 @@ RSpec.describe ReactOnRailsPro::Engine do
   before do
     ReactOnRailsPro::LicenseValidator.reset!
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
+    ReactOnRailsPro.configuration.license_token = nil
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
     allow(Rails).to receive(:logger).and_return(mock_logger)
   end
 
   after do
     ReactOnRailsPro::LicenseValidator.reset!
+    ReactOnRailsPro.configuration.license_token = nil
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
@@ -129,6 +131,17 @@ RSpec.describe ReactOnRailsPro::Engine do
 
         it "does not log a warning" do
           expect(mock_logger).not_to receive(:warn)
+          described_class.log_license_status
+        end
+      end
+
+      context "with valid license in application configuration" do
+        before do
+          ReactOnRailsPro.configuration.license_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        end
+
+        it "logs success info" do
+          expect(mock_logger).to receive(:info).with(/License validated successfully/)
           described_class.log_license_status
         end
       end

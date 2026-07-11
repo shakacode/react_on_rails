@@ -355,6 +355,15 @@ RSpec.describe "release.rake helper methods" do
         )
         .and_return(["", success_status, false])
 
+      expected_notice = Regexp.new(
+        [
+          "fresh dispatch can therefore block for up to about 60 minutes total",
+          "RELEASE_CI_STATUS_OVERRIDE=true",
+          "ShakaPerf release gate passed"
+        ].join(".*"),
+        Regexp::IGNORECASE | Regexp::MULTILINE
+      )
+
       expect do
         run_shakaperf_release_gate!(
           monorepo_root:,
@@ -363,7 +372,7 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to output(/ShakaPerf release gate passed/).to_stdout
+      end.to output(expected_notice).to_stdout
       expect(self).to have_received(:capture_gh_output)
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
@@ -382,6 +391,116 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+    end
+
+    it "reuses an already successful gate run for the same head SHA without dispatching another run" do
+      successful_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "success"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([successful_run])
+      expect(self).not_to receive(:capture_gh_output)
+      expect(self).not_to receive(:capture_gh_output_with_timeout)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
+    end
+
+    it "watches an in-progress gate run for the same head SHA without dispatching another run" do
+      in_progress_run = run.merge(
+        "databaseId" => 321_654,
+        "status" => "in_progress",
+        "conclusion" => ""
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([in_progress_run])
+      expect(self).not_to receive(:capture_gh_output)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "321654", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["", success_status, false])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/watching it instead.*ShakaPerf release gate passed/m).to_stdout
+    end
+
+    it "does not reuse a successful run when a rerun updated a same-SHA failure more recently" do
+      failed_run = run.merge(
+        "databaseId" => 222_222,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "attempt" => 2,
+        "createdAt" => "2026-07-10T21:00:00Z",
+        "updatedAt" => "2026-07-10T21:45:00Z"
+      )
+      earlier_updated_successful_run = run.merge(
+        "databaseId" => 111_111,
+        "status" => "completed",
+        "conclusion" => "success",
+        "attempt" => 1,
+        "createdAt" => "2026-07-10T21:30:00Z",
+        "updatedAt" => "2026-07-10T21:35:00Z"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([failed_run, earlier_updated_successful_run])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
+        )
+        .and_return(["", success_status])
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
+        .with(
+          repo_slug:,
+          ref: "release-branch",
+          head_sha:,
+          ignored_run_ids: %w[222222 111111],
+          earliest_created_at: kind_of(Time)
+        )
+        .and_return(run)
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .with(
+          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+        )
+        .and_return(["", success_status, false])
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/dispatching a fresh gate run.*ShakaPerf release gate passed/m).to_stdout
+      expect(self).to have_received(:capture_gh_output)
+        .with(
+          "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+          "--repo", repo_slug,
+          "--ref", "release-branch"
         )
     end
 

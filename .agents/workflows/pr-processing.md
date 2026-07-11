@@ -86,7 +86,7 @@ For adversarial pre-merge or post-merge PR review, use the installed/shared `$ad
 5. Self-review before every push or PR-ready signal.
 6. Run local validation based on changed areas.
 7. Run the pre-push AI review and simplify gate when the change is non-trivial or high-risk.
-8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps. Every PR body must include a self-contained why/rationale summary; link issues as supporting context, but do not require reviewers to open an issue to understand why the PR exists.
+8. Update the PR body, issue, or one concise PR comment with exact verification evidence, churn notes, and remaining gaps. Every PR body must include a self-contained why/rationale summary; link issues as supporting context, but do not require reviewers to open an issue to understand why the PR exists. Closing keywords that should auto-close issues must be plain prose, such as `Fixes #NNNN`, not inline code, fenced code, or indented code text that GitHub will not interpret as an auto-close reference.
 9. Only then request review, hosted CI, or merge readiness.
 
 ## Initial GitHub Commands
@@ -1420,6 +1420,7 @@ Also verify:
 - No AI reviewer finding remains untriaged as a confirmed blocker; do not wait for AI approval objects or positive AI issue comments as special gates.
 - No requested adversarial review has unresolved `BLOCKING` or `DISCUSS` findings.
 - Required checks are green, or the user has explicitly accepted an auditable waiver for hosted CI.
+- PR body closing keywords that should auto-close issues are plain prose. The merge ledger blocks inline-code, fenced-code, and indented-code closing keywords because GitHub does not treat code-formatted `Fixes #NNNN` text as an auto-close reference.
 - The PR body or latest agent comment includes exact local validation commands and results.
 - The merge ledger has no `UNKNOWN` fields and reports `complete_allowed: true`.
 

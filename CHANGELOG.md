@@ -37,6 +37,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
+  keeps one cached Promise for a logical payload load and retries a transient network, server, or
+  malformed-payload failure once within it. If the retry also fails, React receives the final
+  rejection instead of repeatedly starting new requests. The retry bypasses failed embedded
+  payloads and fetches fresh data; 4xx responses and cancellations are not automatically retried,
+  and official server rendering does not perform the browser retry. A later browser lookup may try
+  again after a short retention window. Fixes
+  [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
+  [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **[Pro]** **RSC payload prerender cache no longer stores an empty payload**: With
   `config.prerender_caching = true`, the RSC payload endpoint (`/rsc_payload/:component_name`) served
   the first visitor a correct payload but every subsequent visitor a zero-byte payload, because the
@@ -48,12 +59,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [Issue 4550](https://github.com/shakacode/react_on_rails/issues/4550).
   [PR 4551](https://github.com/shakacode/react_on_rails/pull/4551) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
   RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
   the same null Suspense boundary used by the server stream. This prevents recoverable hydration
   mismatches on streamed RSC apps such as the flagship demo. Fixes
   [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
+
+#### Added
+
+- **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
+  license through `config.license_token`, including from Rails credentials, while standalone Node
+  renderers can use the `licenseToken` option. Explicit nonblank configuration takes precedence over
+  `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
+  diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
+  [ihabadham](https://github.com/ihabadham).
 
 ### [17.0.0.rc.7] - 2026-07-06
 
@@ -1321,7 +1342,7 @@ See [Release Notes](docs/oss/upgrading/release-notes/16.0.0.md) for complete mig
 - **`defer_generated_component_packs` deprecated** → use `generated_component_packs_loading_strategy`
 - Migration:
   - `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
-  - `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
+  - `defer_generated_component_packs: false` → remove the setting only if you accept the post-upgrade default. `false` was a no-op, so record the app's pre-upgrade effective strategy and set `generated_component_packs_loading_strategy` explicitly to preserve it.
   - Recommended: `generated_component_packs_loading_strategy: :async` for best performance
 
 - **`force_load` renamed to `immediate_hydration`** for API clarity

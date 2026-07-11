@@ -17,6 +17,7 @@ import cluster from 'cluster';
 import fastifyPackageJson from 'fastify/package.json';
 import { Config, buildConfig } from './shared/configBuilder.js';
 import log from './shared/log.js';
+import logLicenseStatus from './shared/logLicenseStatus.js';
 import packageJson from './shared/packageJson.js';
 import { runRscPeerCompatibilityCheck } from './shared/runRscPeerCompatibilityCheck.js';
 import { majorVersion } from './shared/utils.js';
@@ -59,7 +60,8 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
     );
   }
 
-  const { workersCount } = buildConfig(config);
+  const resolvedConfig = buildConfig(config);
+  const { workersCount } = resolvedConfig;
   /* eslint-disable global-require,@typescript-eslint/no-require-imports --
    * Using normal `import` fails before the check above.
    */
@@ -67,6 +69,7 @@ and for "@fastify/..." dependencies in your package.json. Consider removing them
   if (isSingleProcessMode || cluster.isWorker) {
     if (isSingleProcessMode) {
       log.info('Running renderer in single process mode (workersCount: 0)');
+      logLicenseStatus(resolvedConfig.licenseToken);
     }
 
     const worker = require('./worker.js') as typeof import('./worker.js');

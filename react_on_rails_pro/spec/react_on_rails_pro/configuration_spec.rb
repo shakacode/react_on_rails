@@ -21,6 +21,20 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       ReactOnRailsPro.instance_variable_set(:@configuration, nil)
     end
 
+    describe ".license_token" do
+      it "defaults to nil" do
+        expect(ReactOnRailsPro.configuration.license_token).to be_nil
+      end
+
+      it "accepts a token from application configuration" do
+        ReactOnRailsPro.configure do |config|
+          config.license_token = "configured-license-token"
+        end
+
+        expect(ReactOnRailsPro.configuration.license_token).to eq("configured-license-token")
+      end
+    end
+
     describe ".assets_to_copy" do
       it "stays an array if array provided" do
         value = %w[a b]

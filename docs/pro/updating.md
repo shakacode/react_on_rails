@@ -350,7 +350,15 @@ A license token is **optional** for non-production environments:
 
 If no license is configured, Pro keeps running in unlicensed mode and logs license status instead of blocking your app. In production, that log message is a warning because a paid license is required.
 
-Configure your React on Rails Pro license token as an environment variable:
+Configure the token through Rails credentials or another application-owned secret provider:
+
+```ruby
+ReactOnRailsPro.configure do |config|
+  config.license_token = Rails.application.credentials.dig(:react_on_rails_pro, :license_token)
+end
+```
+
+Alternatively, set the environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -358,9 +366,12 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 > **Migration note (legacy key-file setup):**
 > `config/react_on_rails_pro_license.key` is no longer read by React on Rails Pro.
-> If you previously used that file, move the token into `REACT_ON_RAILS_PRO_LICENSE`.
+> If you previously used that file, move the token into `config.license_token` or
+> `REACT_ON_RAILS_PRO_LICENSE`.
 
-⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
+Explicit nonblank configuration takes precedence over the environment variable; blank configuration falls back to it.
+Never commit your license token to version control. Configure a standalone Node renderer separately through its
+`licenseToken` option or environment because it cannot read Rails credentials.
 
 **Where to get your license token:** Visit [Pro pricing and sign up](https://pro.reactonrails.com/) or contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 
@@ -528,7 +539,8 @@ The Pro package re-exports everything from core, so you don't need both.
 
 #### "License validation failed" (production)
 
-- Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set in production.
+- Ensure `config.license_token` or `REACT_ON_RAILS_PRO_LICENSE` provides the token in production.
+- If using the standalone Node renderer, ensure its `licenseToken` option or environment provides the same token.
 - Verify the token string is correct (no extra spaces or quotes).
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you need a new token.
 

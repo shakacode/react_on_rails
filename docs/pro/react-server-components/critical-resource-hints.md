@@ -61,12 +61,18 @@ user input, query parameters, or other request-derived values directly to these 
 
 Use hints only for resources that are genuinely needed for the first viewport or early interaction:
 
-- Use `preinit` with `as: 'style'` for critical CSS that should participate in React's stylesheet precedence and
-  streamed boundary reveal behavior. Pass `precedence: 'rsc-css'` when authored critical CSS should
+- Use `preinit` with `as: 'style'` for critical CSS that should participate in React's stylesheet
+  precedence groups. Pass `precedence: 'rsc-css'` when authored critical CSS should
   join the same bucket React on Rails Pro uses for automatically discovered client-reference CSS. Use
   a different explicit `precedence` only when authored critical CSS must be ordered separately, and
   avoid doing that for an `href` that automatic client-reference CSS discovery also emits because
   React dedupes stylesheet preinit hints by URL.
+  Timing caveat: a style `preinit` is emitted as a real stylesheet link only when it reaches the
+  HTML render **before the shell flushes**. After the shell, Fizz emits it as a non-blocking
+  `<link rel="preload">`, and a `preinit` hint never makes a streamed Suspense boundary wait for
+  that CSS — boundary-reveal gating for automatically discovered client-reference CSS is done by
+  the Pro streaming pipeline, not by `preinit`. See
+  [How CSS reaches the browser](./css-and-styling.md#how-css-reaches-the-browser).
 - Use `preload` with `as: 'style'` when you only need to start downloading a stylesheet early.
 - Use `preload` with `as: 'font'` for fonts used by the LCP text. Include the real production font
   URL, `type`, and `crossOrigin` when the font request needs it.

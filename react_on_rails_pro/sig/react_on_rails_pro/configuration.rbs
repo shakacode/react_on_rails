@@ -57,6 +57,7 @@ module ReactOnRailsPro
 
     attr_accessor renderer_url: String?
     attr_accessor renderer_password: String?
+    attr_accessor license_token: String?
     attr_accessor tracing: bool?
     attr_accessor server_renderer: String?
     attr_accessor renderer_use_fallback_exec_js: bool?
@@ -92,6 +93,7 @@ module ReactOnRailsPro
     def initialize: (
       ?renderer_url: String?,
       ?renderer_password: String?,
+      ?license_token: String?,
       ?server_renderer: String?,
       ?renderer_use_fallback_exec_js: bool?,
       ?prerender_caching: bool?,
