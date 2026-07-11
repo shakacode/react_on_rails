@@ -35,22 +35,30 @@ class PrMergeLedger
     ORDERED_ROOT_LIST_ITEM_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)][ \t]+/
     ORDERED_ROOT_LIST_MARKER_OR_EMPTY_PATTERN = /\A {0,3}(?<start>\d{1,9})[.)](?:[ \t]+|[ \t]*\z)/
     ROOT_BLOCK_BOUNDARY_PATTERN = /\A {0,3}(?:\#{1,6}(?:\s|\z)|>|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/
-    HTML_BLOCK_TAG_NAMES = %w[
+    HTML_TYPE_6_BLOCK_TAG_NAMES = %w[
       address article aside base basefont blockquote body caption center col colgroup dd details dialog dir div dl dt
       fieldset figcaption figure footer form frame frameset h1 h2 h3 h4 h5 h6 head header hr html iframe legend li
-      link main menu menuitem nav noframes ol optgroup option p param pre script section source style summary table
+      link main menu menuitem nav noframes ol optgroup option p param section source summary table
       tbody td tfoot th thead title tr track ul
     ].freeze
     HTML_RAW_TEXT_BLOCK_TAG_NAMES = %w[pre script style].freeze
     HTML_RAW_TEXT_BLOCK_TAG_PATTERN = Regexp.union(HTML_RAW_TEXT_BLOCK_TAG_NAMES)
-    HTML_BLOCK_TAG_PATTERN = Regexp.union(HTML_BLOCK_TAG_NAMES)
-    HTML_BLOCK_BOUNDARY_PATTERN =
-      %r{\A {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[|</?(?:#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z))}i
+    HTML_TYPE_6_BLOCK_TAG_PATTERN = Regexp.union(HTML_TYPE_6_BLOCK_TAG_NAMES)
+    HTML_RAW_TEXT_BLOCK_OPEN_PATTERN =
+      /\A {0,3}<(?<tag>#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})(?:[\s>]|\z)/i
+    HTML_TYPE_6_BLOCK_TAG_OPEN_PATTERN =
+      %r{\A {0,3}<(?<closing>/?)(?<tag>#{HTML_TYPE_6_BLOCK_TAG_PATTERN})(?:\s|/?>|\z)}i
+    HTML_BLOCK_BOUNDARY_PATTERN = %r{
+      \A[ ]{0,3}(?:
+        <!-- | <\? | <![A-Z] | <!\[CDATA\[ |
+        <(?:#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})(?:[\s>]|\z) |
+        </?(?:#{HTML_TYPE_6_BLOCK_TAG_PATTERN})(?:\s|/?>|\z)
+      )
+    }ix
     HTML_COMMENT_OPEN_PATTERN = /\A {0,3}<!--/
     HTML_CDATA_OPEN_PATTERN = /\A {0,3}<!\[CDATA\[/
     HTML_DECLARATION_OPEN_PATTERN = /\A {0,3}<![A-Z]/
     HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN = /\A {0,3}<\?/
-    HTML_BLOCK_TAG_OPEN_PATTERN = %r{\A {0,3}<(?<closing>/?)(?<tag>#{HTML_BLOCK_TAG_PATTERN})(?:[\s>/]|\z)}i
     HTML_RAW_TEXT_BLOCK_CLOSE_PATTERN = %r{</(?:#{HTML_RAW_TEXT_BLOCK_TAG_PATTERN})>}i
     HTML_ATTRIBUTE_SPACES = [" ", "\t"].freeze
     HTML_ATTRIBUTE_INVALID_CHARACTERS = ["<", "\n"].freeze

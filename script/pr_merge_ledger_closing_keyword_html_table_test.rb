@@ -211,6 +211,31 @@ class PrMergeLedgerClosingKeywordHtmlTableTest < Minitest::Test
     assert_match(/Fixes #4410/, violation.fetch("message"))
   end
 
+  def test_raw_text_closing_tag_does_not_interrupt_paragraph_before_indented_closeout
+    output, status = run_fixture(fixture_with_body("Intro\n</script>\n    Fixes #4410\n"))
+
+    assert status.success?, output
+    data = JSON.parse(output)
+    assert data.fetch("complete_allowed")
+    assert_empty violation_codes(data)
+  end
+
+  def test_slash_suffixed_raw_text_tag_does_not_hide_plain_closeout
+    bodies = [
+      "<script/>\nFixes #4410\n",
+      "Intro\n<script/>\n    Fixes #4410\n"
+    ]
+
+    bodies.each do |body|
+      output, status = run_fixture(fixture_with_body(body))
+
+      assert status.success?, output
+      data = JSON.parse(output)
+      assert data.fetch("complete_allowed")
+      assert_empty violation_codes(data)
+    end
+  end
+
   def test_type_7_html_block_closing_keyword_blocks_strict_closeout
     output, status = run_fixture(fixture_with_body("<ins>\nFixes #4410\n"))
 

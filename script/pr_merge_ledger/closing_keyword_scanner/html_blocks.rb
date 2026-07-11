@@ -32,23 +32,12 @@ class PrMergeLedger
         return { "type" => "declaration" } if line.match?(HTML_DECLARATION_OPEN_PATTERN)
         return { "type" => "processing_instruction" } if line.match?(HTML_PROCESSING_INSTRUCTION_OPEN_PATTERN)
 
-        tag_match = line.match(HTML_BLOCK_TAG_OPEN_PATTERN)
-        return html_block_tag_context(line, markdown_state, tag_match) if tag_match
+        raw_text_match = line.match(HTML_RAW_TEXT_BLOCK_OPEN_PATTERN)
+        return { "type" => "raw_tag", "tag" => raw_text_match[:tag].downcase } if raw_text_match
 
-        { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
-      end
+        type_6_match = line.match(HTML_TYPE_6_BLOCK_TAG_OPEN_PATTERN)
+        return { "type" => "tag", "tag" => type_6_match[:tag].downcase } if type_6_match
 
-      def html_block_tag_context(line, markdown_state, tag_match)
-        tag_name = tag_match[:tag].downcase
-        if tag_match[:closing] == "/" && HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name)
-          return raw_text_closing_tag_context(line, markdown_state)
-        end
-
-        tag_type = HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(tag_name) ? "raw_tag" : "tag"
-        { "type" => tag_type, "tag" => tag_name }
-      end
-
-      def raw_text_closing_tag_context(line, markdown_state)
         { "type" => "type7_tag" } if html_type_7_block_boundary_line?(line, markdown_state)
       end
 
@@ -69,9 +58,11 @@ class PrMergeLedger
         index += 1 if closing_tag
         return false unless ascii_letter?(markdown_line[index])
 
+        tag_name_start = index
         index += 1
         index += 1 while html_tag_name_character?(markdown_line[index])
         return closing_html_type_7_tag_close?(markdown_line, index) if closing_tag
+        return false if HTML_RAW_TEXT_BLOCK_TAG_NAMES.include?(markdown_line[tag_name_start...index].downcase)
 
         html_type_7_attributes_close?(markdown_line, index)
       end
