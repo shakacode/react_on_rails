@@ -30,6 +30,8 @@ module ReactOnRailsPro
 
     CONNECTION_ERRORS: Array[Class]
 
+    STALE_KEEPALIVE_RETRY_ERRORS: Array[Class]
+
     SCHEDULER_CLIENTS_KEY: Symbol
 
     class ConnectTimeoutWrapper

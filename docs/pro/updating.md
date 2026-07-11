@@ -404,15 +404,24 @@ Before upgrading:
 - Treat `config.renderer_http_pool_timeout` as the TCP connect timeout. After the socket connects, individual reads
   are bounded by `ssr_timeout`.
 - Treat `config.renderer_http_pool_size` as the per-client async-http connection-pool limit, not as the old
-  process-wide persistent pool size. With a long-lived `Fiber.scheduler` (for example Falcon or Puma configured with an
-  async scheduler), the client is reused across renderer requests within that scheduler and the setting bounds
-  concurrent async-http connections for streamed renders sharing one client. HTTP/2 may multiplex multiple request
-  streams over those pooled connections. Under standard Puma streaming, `Sync {}` creates a per-request scheduler and
-  cleans up the client when that streaming response ends, so reuse does not persist across consecutive Rails requests.
-  Setting it to `nil` keeps the default connection limit; it does not make the async-http client unlimited.
-- Expect renderer connection drops to surface immediately as `ReactOnRailsPro::Error`/connection failures. HTTPX
-  previously performed one implicit transport retry for some connection drops; the async-http adapter uses
-  `retries: 0` and leaves retry policy to the existing bundle-upload retry loop and caller behavior.
+  process-wide persistent pool size, and not as a global cap on renderer connections. With a long-lived
+  `Fiber.scheduler` (for example Falcon or Puma configured with an async scheduler), the client is reused across
+  renderer requests within that scheduler and the setting bounds concurrent async-http connections for renders sharing
+  one client. HTTP/2 may multiplex multiple request streams over those pooled connections. Under standard Puma,
+  non-streaming requests reuse one persistent client per Puma request thread (keeping a renderer connection warm across
+  requests on that thread), while streaming requests use a request-scoped client that `Sync {}` cleans up when the
+  streamed response ends. Because the limit is per client, total warm renderer connections scale with the number of live
+  Puma request threads (workers × threads); size your renderer worker pool and replicas accordingly. Setting it to `nil`
+  keeps the default connection limit; it does not make the async-http client unlimited.
+- Expect renderer connection drops to surface as `ReactOnRailsPro::Error`/connection failures. HTTPX previously
+  performed one implicit transport retry for some connection drops; the async-http adapter uses `retries: 0` and leaves
+  retry policy to the existing bundle-upload/request retry loop and caller behavior. The one exception is the persistent
+  per-thread client used for non-streaming requests under standard Puma: once it has succeeded at least once, it
+  transparently reconnects and retries a request with a replay-safe body (a render/JSON or empty body) a single time if
+  it reuses a keep-alive connection that was idle-closed, so a stale warm socket does not surface as a render failure.
+  Non-replayable bodies (multipart asset uploads), reachability failures (connection refused, host unreachable,
+  timeouts), HTTP/2 stream resets, and first-contact failures are not retried by this reconnect path; they continue to
+  flow to the existing request retry loop (`renderer_request_retry_limit`).
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
