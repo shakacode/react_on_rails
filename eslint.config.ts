@@ -68,6 +68,8 @@ const config = defineConfig([
     '**/public/packs*/',
     '**/gen-examples/',
     '**/bundle/',
+    // Self-contained benchmark with its own pinned toolchain and checks.
+    'benchmarks/rspack-vite-dx/',
     // dependencies
     '**/node_modules/',
     // fixtures
