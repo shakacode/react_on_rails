@@ -251,7 +251,8 @@ module ReactOnRailsPro
 
         form_data["targetBundles"] = target_bundles
 
-        response = perform_request("/asset-exists?filename=#{filename}", json: form_data)
+        encoded_filename = URI.encode_www_form_component(filename)
+        response = perform_request("/asset-exists?filename=#{encoded_filename}", json: form_data)
         JSON.parse(response.body)["exists"] == true
       end
 

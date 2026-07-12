@@ -5,7 +5,7 @@ require "rainbow"
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
-    MAX_ERROR_SNIPPET_TO_LOG = 1000
+    REDACTED_VALUE = "[REDACTED]"
     # TODO: Consider remove providing original `err` as already have access to `self.cause`
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
@@ -15,8 +15,8 @@ module ReactOnRails
                    js_code: nil, console_messages: nil)
       @component_name = component_name
       @err = err
-      @props = props
-      @js_code = js_code
+      @props = redacted_value(props)
+      @js_code = redacted_value(js_code)
       @console_messages = console_messages
 
       backtrace, message = calc_message(component_name, console_messages, err, js_code, props)
@@ -68,11 +68,11 @@ module ReactOnRails
 
       # Add props information
       message << Rainbow("Props:").blue.bright << "\n"
-      message << "#{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
+      message << "#{redacted_value(props)}\n\n"
 
       # Add code snippet
       message << Rainbow("JavaScript Code:").blue.bright << "\n"
-      message << "#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
+      message << "#{redacted_value(js_code)}\n\n"
 
       if console_messages && console_messages.strip.present?
         message << Rainbow("Console Output:").magenta.bright << "\n"
@@ -88,6 +88,10 @@ module ReactOnRails
 
       [backtrace, message]
       # rubocop:enable Metrics/AbcSize
+    end
+
+    def redacted_value(value)
+      value.nil? ? nil : REDACTED_VALUE
     end
 
     # Formats `err.backtrace` for display, or returns nil when there are no frames.
