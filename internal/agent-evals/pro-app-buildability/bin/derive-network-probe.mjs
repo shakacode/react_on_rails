@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { normalizeCommand } from './normalize-command.mjs';
 
 const [eventsPath, outputPath] = process.argv.slice(2);
 if (!eventsPath || !outputPath) {
@@ -16,7 +17,7 @@ const commands = events
   .filter((event) => event?.type === 'item.completed' && event?.item?.type === 'command_execution')
   .map((event, index) => ({
     id: `command-${index + 1}`,
-    command: String(event.item.command ?? ''),
+    command: normalizeCommand(event.item.command),
     exit_code: Number.isInteger(event.item.exit_code) ? event.item.exit_code : null,
   }));
 

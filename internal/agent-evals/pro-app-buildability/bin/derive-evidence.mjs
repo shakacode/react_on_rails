@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { normalizeCommand } from './normalize-command.mjs';
 
 const [eventsPath, workspace, outputDir, reportPath] = process.argv.slice(2);
 if (!eventsPath || !workspace || !outputDir || !reportPath) {
@@ -44,7 +45,7 @@ for (const event of events) {
   const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT);
   commands.push({
     id: `command-${commands.length + 1}`,
-    command: sanitize(item.command ?? 'UNKNOWN'),
+    command: sanitize(normalizeCommand(item.command) || 'UNKNOWN'),
     exit_code: Number.isInteger(item.exit_code) ? item.exit_code : null,
     status: String(item.status ?? 'unknown'),
     output: output.value,

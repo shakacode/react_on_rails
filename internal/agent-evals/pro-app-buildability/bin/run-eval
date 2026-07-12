@@ -55,6 +55,7 @@ workspace="$(resolve_future_path "$workspace")"
 output="$(resolve_future_path "$output")"
 case "$workspace/" in "$output/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
 case "$output/" in "$workspace/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
+case "$workspace/" in "$root/"*) echo "workspace must be outside the repository" >&2; exit 65 ;; esac
 [[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
   echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
   exit 65
