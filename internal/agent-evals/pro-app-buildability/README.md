@@ -16,7 +16,8 @@ artifacts satisfy the rubric.
   `CODEX_AUTH_FILE`; the runner copies it into a mode-`0600` private temporary
   home and removes that home unconditionally
 
-Install the pinned Draft 2020-12 validator without joining the root workspace:
+Install the pinned Draft 2020-12 validator and evidence formatter without
+joining the root workspace:
 
 ```bash
 pnpm --dir internal/agent-evals/pro-app-buildability install \

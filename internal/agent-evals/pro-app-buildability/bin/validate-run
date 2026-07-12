@@ -9,7 +9,7 @@ eval_dir="$root/internal/agent-evals/pro-app-buildability"
 for command in jq node rg shasum; do
   command -v "$command" >/dev/null || { echo "missing required command: $command" >&2; exit 69; }
 done
-[[ -d "$eval_dir/node_modules/ajv" && -d "$eval_dir/node_modules/ajv-formats" ]] || {
+[[ -d "$eval_dir/node_modules/ajv" && -d "$eval_dir/node_modules/ajv-formats" && -d "$eval_dir/node_modules/prettier" ]] || {
   echo "install pinned validator dependencies: pnpm --dir $eval_dir install --frozen-lockfile --ignore-workspace" >&2
   exit 69
 }

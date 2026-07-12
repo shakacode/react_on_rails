@@ -189,6 +189,7 @@ jq -n \
 checksum_files="$private_dir/checksum-files"
 (cd "$output" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##') \
   >"$checksum_files"
+"${minimal_env[@]}" node "$eval_dir/node_modules/prettier/bin/prettier.cjs" --write "$output"/*.json >/dev/null
 (cd "$output" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
 
 echo "recorded run: $output"

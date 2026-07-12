@@ -1,6 +1,0 @@
-{
-  "stderr_line_count": 2,
-  "excerpt": "2026-07-12T12:19:55.997779Z ERROR codex_core::tools::router: error=write_stdin failed: stdin is closed for this session; rerun exec_command with tty=true to keep stdin open\n2026-07-12T12:19:56.028337Z ERROR codex_core::tools::router: error=write_stdin failed: stdin is closed for this session; rerun exec_command with tty=true to keep stdin open",
-  "excerpt_truncated": false,
-  "raw_persisted": false
-}
