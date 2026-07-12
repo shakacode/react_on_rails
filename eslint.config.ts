@@ -188,6 +188,14 @@ const config = defineConfig([
     },
   },
   {
+    files: ['internal/agent-evals/pro-app-buildability/bin/validate-json.mjs'],
+    rules: {
+      // This eval installs its pinned schema validators from its isolated package,
+      // so root-only CI cannot resolve them even though the replay setup can.
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
     files: ['**/*.server.ts', '**/*.server.tsx'],
     plugins: {
       'react-on-rails': {
