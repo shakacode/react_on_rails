@@ -1,4 +1,5 @@
-import marker from './message';
+// eslint-disable-next-line import/extensions
+import marker from './message.js';
 
 function render(value) {
   document.getElementById('root').textContent = value;
@@ -7,7 +8,8 @@ function render(value) {
 render(marker);
 
 if (module.hot) {
-  module.hot.accept('./message', () => {
-    import('./message').then((next) => render(next.default));
+  module.hot.accept('./message.js', () => {
+    // eslint-disable-next-line import/extensions
+    import('./message.js').then((next) => render(next.default));
   });
 }
