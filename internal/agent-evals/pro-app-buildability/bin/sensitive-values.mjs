@@ -9,7 +9,7 @@ const bearerToken = /bearer\s+[a-z0-9._~+/=-]{12,}/gi;
 const nonSecretValues = new Set(['auto', 'false', 'file', 'keyring', 'none', 'null', 'true', 'unknown']);
 const looksLikeCredentialValue = (value) => {
   const candidate = String(value).trim();
-  if (!candidate || candidate === '[REDACTED]' || candidate.startsWith('[') || candidate.startsWith('{')) {
+  if (!candidate || candidate === '[REDACTED]') {
     return false;
   }
   return !nonSecretValues.has(candidate.toLowerCase());

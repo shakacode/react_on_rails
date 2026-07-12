@@ -41,6 +41,8 @@ printf '%s\n' \
   "password: 'p@ss,word'" \
   'SECRET_KEY_BASE="abc\"def,ghi"' \
   'AWS_SECRET_ACCESS_KEY=abc,def' \
+  'api_key: ["array-secret-value-123"]' \
+  'credential: {"value":"object-secret-value-456"}' \
   'credential_store:"file"' \
   '-----BEGIN PRIVATE KEY-----' 'complete-key-material' '-----END PRIVATE KEY-----' \
   '-----BEGIN OPENSSH PRIVATE KEY-----' 'truncated-key-material' >"$tmp/parity-unsafe"
@@ -52,7 +54,7 @@ node --input-type=module -e \
    process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
   "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
 cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
-if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|array-secret-value-123|object-secret-value-456|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
   "$tmp/parity-perl-safe"; then
   echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
   exit 1

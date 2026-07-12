@@ -11,7 +11,7 @@ sub sensitive_name {
 sub credential_value {
   my ($value) = @_;
   $value =~ s/^\s+|\s+$//g;
-  return 0 if !length($value) || $value eq '[REDACTED]' || $value =~ /^[\[{]/;
+  return 0 if !length($value) || $value eq '[REDACTED]';
   return $value !~ /^(?:auto|false|file|keyring|none|null|true|unknown)$/i;
 }
 
