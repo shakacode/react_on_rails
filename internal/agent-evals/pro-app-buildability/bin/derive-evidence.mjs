@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ARTIFACT_LIMITS, readBoundedEvents } from './evidence-limits.mjs';
+import { redactLocalPaths } from './local-paths.mjs';
 import { normalizeCommand } from './normalize-command.mjs';
 import { redactSensitiveValues } from './sensitive-values.mjs';
 
@@ -14,20 +15,7 @@ if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
 
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
-const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const exactLocalRootPatterns = [workspace, outputDir].map(
-  (root) => new RegExp(`(?<![A-Za-z0-9._-])${escapeRegExp(root)}(?=$|[/\\s"',;:)\\]}])`, 'g'),
-);
-const sanitize = (value) =>
-  redactSensitiveValues(
-    exactLocalRootPatterns
-      .reduce((safe, pattern) => safe.replaceAll(pattern, '<LOCAL_PATH>'), String(value))
-      .replaceAll(/(?<![A-Za-z0-9._-])\/(?:Users|home)\/[^/\s"']+(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
-      .replaceAll(/(?<![A-Za-z0-9._-])\/root(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
-      .replaceAll(/(?<![A-Za-z0-9._-])\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
-      .replaceAll(/(?<![A-Za-z0-9._-])\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
-      .replaceAll(/(?<![A-Za-z0-9._-])\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>'),
-  );
+const sanitize = (value) => redactSensitiveValues(redactLocalPaths(value, [workspace, outputDir]));
 
 const truncate = (value, limit) => {
   const safe = sanitize(value);

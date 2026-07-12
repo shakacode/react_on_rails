@@ -55,11 +55,15 @@ listed_files="$(awk '{print $2}' "$run_dir/SHA256SUMS" | LC_ALL=C sort)"
 [[ "$actual_files" == "$listed_files" ]] || { echo "SHA256SUMS coverage mismatch" >&2; exit 1; }
 (cd "$run_dir" && shasum -a 256 -c SHA256SUMS)
 
-if rg --pcre2 -n '(?<![A-Za-z0-9._-])/(?:Users|home)/[^/\s"'\'']+(?:/[^\s"'\'']*)?|(?<![A-Za-z0-9._-])/root(?:/[^\s"'\'']*)?|(?<![A-Za-z0-9._-])/(?:private/tmp|tmp|var/folders)/[^\s"'\'']+' \
-  "$run_dir"; then
+set +e
+node "$eval_dir/bin/scan-local-paths.mjs" "$run_dir"
+local_path_scan_exit=$?
+set -e
+if [[ "$local_path_scan_exit" == 0 ]]; then
   echo "local absolute path found" >&2
   exit 1
 fi
+[[ "$local_path_scan_exit" == 1 ]] || { echo "local-path scan failed" >&2; exit 1; }
 set +e
 "$eval_dir/bin/scan-sensitive-artifacts" "$run_dir"
 sensitive_scan_exit=$?
