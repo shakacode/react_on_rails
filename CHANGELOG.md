@@ -89,7 +89,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain
   the open-source-only default. Explicit `--pro`, `--no-pro`, `--rsc`, `--no-rsc`, and `--standard-only`
   choices skip the prompt. The doctor and post-install guidance now show the Pro upgrade path when Pro is
-  off. Fixes [Issue 4604](https://github.com/shakacode/react_on_rails/issues/4604) by
+  off. Fixes [Issue 4604](https://github.com/shakacode/react_on_rails/issues/4604) in
+  [PR 4615](https://github.com/shakacode/react_on_rails/pull/4615) by
   [justin808](https://github.com/justin808).
 
 - **Agent-legible doctor contract**: `bin/rails react_on_rails:doctor FORMAT=json` now includes stable
