@@ -74,6 +74,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   mismatches on streamed RSC apps such as the flagship demo. Fixes
   [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Healthy incremental streams no longer log premature close-hook timeout warnings**: The
+  Pro Node renderer now suppresses the short close-hook timeout warning while an incremental response
+  is still open and finishing normally, while preserving the diagnostic when the close hook remains
+  stalled after the response finishes. Fixes
+  [Issue 4524](https://github.com/shakacode/react_on_rails/issues/4524).
+  [PR 4531](https://github.com/shakacode/react_on_rails/pull/4531) by
+  [justin808](https://github.com/justin808).
+
 #### Added
 
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
