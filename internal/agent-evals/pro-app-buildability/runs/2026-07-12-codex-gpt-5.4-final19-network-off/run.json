@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final18-network-off",
-  "started_at": "2026-07-12T15:39:24Z",
-  "finished_at": "2026-07-12T15:39:43Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final19-network-off",
+  "started_at": "2026-07-12T15:47:16Z",
+  "finished_at": "2026-07-12T15:47:38Z",
   "repository": {
-    "revision": "266fed04cdfeaef2e5a2c8079dff6518dd98920c",
+    "revision": "57b8e8d3f3fb5bc0553bdc1c0e05eec7e4d058e7",
     "dirty": false
   },
   "definition": {
@@ -21,7 +21,7 @@
       },
       {
         "path": "bin/derive-evidence.mjs",
-        "sha256": "1a9f6f12c09bd412abee50b96e8a4b8787cd48c479e9084d2e50d270be7ffd4b",
+        "sha256": "a296f84f314acd884e7c8ce4a7e7128d4cc544b12a62fab58cffe95a28bfedec",
         "executable": true
       },
       {
@@ -32,6 +32,11 @@
       {
         "path": "bin/evidence-limits.mjs",
         "sha256": "529ad4f7e284ecbd1a21c040b0e7dc4da20badbfcb01ac5ed8ff544fef618a8b",
+        "executable": false
+      },
+      {
+        "path": "bin/local-paths.mjs",
+        "sha256": "0c2c004faff9f2fc11c0f7e73b15e666216581568c1129b0383667ab11728aff",
         "executable": false
       },
       {
@@ -51,8 +56,13 @@
       },
       {
         "path": "bin/sanitize-events.pl",
-        "sha256": "a621704c31616b7751a2cf77740db1dfc876661e5cc97c53cf49faa7475b557b",
+        "sha256": "2da37cdc3e03661b0e9353be36788c7c0590d1ca23689fdc3f6567ea267a875f",
         "executable": true
+      },
+      {
+        "path": "bin/scan-local-paths.mjs",
+        "sha256": "5ddc0e5a083c9ad1487014ade004c6bc290ddee33457ee0b7be017cf760055bc",
+        "executable": false
       },
       {
         "path": "bin/scan-sensitive-artifacts",
@@ -76,7 +86,7 @@
       },
       {
         "path": "bin/validate-run",
-        "sha256": "c68fc1483418c0d8380d68d6314506503aabb984893eedbe721f7697dc9a1877",
+        "sha256": "6bc8105f805ae37b5a1abfa1257b02ff5995f2b53935ebdadd3047cd2e7266df",
         "executable": true
       },
       {
