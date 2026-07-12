@@ -24,10 +24,14 @@ done
 
 node "$eval_dir/bin/validate-json.mjs" "$run_dir"
 
+recorded_revision="$(jq -r .repository.revision "$run_dir/run.json")"
 while IFS=$'\t' read -r relative expected; do
-  [[ -f "$eval_dir/$relative" ]] || { echo "missing recorded harness input: $relative" >&2; exit 1; }
-  actual="$(shasum -a 256 "$eval_dir/$relative" | awk '{print $1}')"
-  [[ "$expected" == "$actual" ]] || { echo "harness input hash mismatch: $relative" >&2; exit 1; }
+  current=""
+  [[ -f "$eval_dir/$relative" ]] && current="$(shasum -a 256 "$eval_dir/$relative" | awk '{print $1}')"
+  if [[ "$expected" == "$current" ]]; then continue; fi
+  recorded="$(git -C "$root" show "$recorded_revision:internal/agent-evals/pro-app-buildability/$relative" 2>/dev/null | \
+    shasum -a 256 | awk '{print $1}')"
+  [[ "$expected" == "$recorded" ]] || { echo "harness input hash mismatch: $relative" >&2; exit 1; }
 done < <(jq -r '.definition.inputs[] | [.path,.sha256] | @tsv' "$run_dir/run.json")
 
 actual_files="$(cd "$run_dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##')"

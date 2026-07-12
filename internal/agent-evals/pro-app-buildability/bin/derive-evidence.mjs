@@ -202,7 +202,7 @@ const items = [
 ];
 
 const overall =
-  report.status === 'blocked'
+  report.status !== 'completed'
     ? 'incomplete'
     : items.every((item) => item.status === 'pass')
       ? 'pass'
