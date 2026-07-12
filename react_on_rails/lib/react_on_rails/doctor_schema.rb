@@ -78,7 +78,9 @@ module ReactOnRails
     module_function
 
     def metadata(check_id)
-      CHECK_METADATA.fetch(check_id)
+      CHECK_METADATA.fetch(check_id) do
+        raise ArgumentError, "Missing DoctorSchema::CHECK_METADATA entry for check id #{check_id.inspect}"
+      end
     end
 
     def docs_url(check_id)

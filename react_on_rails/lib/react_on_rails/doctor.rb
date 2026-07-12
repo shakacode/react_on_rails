@@ -325,7 +325,7 @@ module ReactOnRails
         status:,
         severity:,
         message:,
-        fix_command: status == "pass" ? nil : metadata[:fix_command],
+        fix_command: nil,
         docs_url: DoctorSchema.docs_url(result[:id]),
         remediation: build_remediation(result[:id], severity, message, metadata, status),
         details: messages.map { |detail| { level: detail[:type].to_s, content: detail[:content] } }
@@ -344,8 +344,6 @@ module ReactOnRails
         "Expected end state: #{expected_end_state}",
         "Re-run `bin/rails react_on_rails:doctor FORMAT=json` and confirm this check reports `pass`."
       ]
-      prompt_lines.insert(3, "Suggested command: `#{metadata[:fix_command]}`.") if metadata[:fix_command]
-
       { prompt: prompt_lines.join("\n"), files:, expected_end_state: }
     end
 

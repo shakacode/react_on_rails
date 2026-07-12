@@ -90,6 +90,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   and self-contained remediation prompts. The versioned schema, deterministic ordering, and exit-code
   behavior are documented for CI and coding-agent integrations. Fixes
   [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).
+  [PR 4611](https://github.com/shakacode/react_on_rails/pull/4611) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
   license through `config.license_token`, including from Rails credentials, while standalone Node

@@ -163,6 +163,14 @@ RSpec.describe ReactOnRails::Doctor do
       expect(ReactOnRails::DoctorSchema.summarize_statuses(%w[warn warn])).to eq(pass: 0, warn: 2, fail: 0)
     end
 
+    it "reports a descriptive error when check metadata drifts from check sections" do
+      expect { ReactOnRails::DoctorSchema.metadata("new_check_without_metadata") }
+        .to raise_error(
+          ArgumentError,
+          'Missing DoctorSchema::CHECK_METADATA entry for check id "new_check_without_metadata"'
+        )
+    end
+
     it "rejects reports that omit a required check field" do
       stub_check_sections(json_doctor)
       report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
