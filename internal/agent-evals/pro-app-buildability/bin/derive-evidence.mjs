@@ -153,10 +153,28 @@ const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
   /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
 );
-const fullSuiteTest = (invocation) =>
-  /^(?:(?:bundle exec )?rspec|(?:bin\/rails|bundle exec rails|bundle exec rake|rake) test|(?:npm|pnpm) (?:run )?test|jest|playwright)(?:\s+--[^\s]+(?:=[^\s]+)?)*$/i.test(
-    invocation,
+const fullSuitePrefixes = [
+  ['rspec'],
+  ['bundle', 'exec', 'rspec'],
+  ['bin/rails', 'test'],
+  ['bundle', 'exec', 'rails', 'test'],
+  ['bundle', 'exec', 'rake', 'test'],
+  ['rake', 'test'],
+  ['npm', 'test'],
+  ['npm', 'run', 'test'],
+  ['pnpm', 'test'],
+  ['pnpm', 'run', 'test'],
+  ['jest'],
+  ['playwright'],
+];
+const fullSuiteTest = (invocation) => {
+  const tokens = invocation.trim().split(/\s+/);
+  return fullSuitePrefixes.some(
+    (prefix) =>
+      prefix.every((token, index) => tokens[index]?.toLowerCase() === token) &&
+      tokens.slice(prefix.length).every((token) => token.startsWith('-')),
   );
+};
 const testCommandsFor = (matchedArtifacts) =>
   testCommands.filter((command) => {
     const invocation = unwrapShellCommand(command.command);
