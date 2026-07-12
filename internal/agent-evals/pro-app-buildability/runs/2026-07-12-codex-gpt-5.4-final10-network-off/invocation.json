@@ -8,7 +8,8 @@
   "ignore_rules": true,
   "strict_config": true,
   "multi_agent": false,
-  "sandbox_network_access": true,
+  "sandbox_network_access": false,
+  "isolated_host_attestation": false,
   "capability_probe": {
     "npm": "npm view create-react-on-rails-app version --json",
     "rubygems": "gem search --remote --exact '^rails$'"

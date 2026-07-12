@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "limits": {
+    "max_file_bytes": 65536,
+    "max_files": 256,
+    "max_total_bytes": 2097152,
+    "max_visited_entries": 5000,
+    "max_depth": 64,
+    "visited_entries": 1,
+    "selected_files": 0,
+    "included_files": 0,
+    "included_bytes": 0,
+    "omitted_files": 0,
+    "exceeded": false,
+    "reasons": []
+  },
+  "artifacts": []
+}
