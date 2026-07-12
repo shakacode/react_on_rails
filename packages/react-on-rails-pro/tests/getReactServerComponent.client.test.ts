@@ -13,8 +13,11 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import * as React from 'react';
+import { act, cleanup, render } from '@testing-library/react';
 import { enableFetchMocks } from 'jest-fetch-mock';
 import type { RailsContext } from 'react-on-rails/types';
+import { createRSCProvider, useRSC } from '../src/RSCProvider.tsx';
 import { RSC_STREAM_DIAGNOSTIC_ERROR_NAME } from '../src/rscDiagnostics.ts';
 import { createWebResponseFromText } from './testUtils.ts';
 
@@ -102,15 +105,18 @@ describe('fetchRSC HTTP responses', () => {
       }),
     );
 
-    await expect(
-      fetchRSC({
-        componentName: 'MissingPanel',
-        componentProps,
-        rscPayloadGenerationUrlPath: '/rsc_payload',
-      }),
-    ).rejects.toThrow(
+    const request = fetchRSC({
+      componentName: 'MissingPanel',
+      componentProps,
+      rscPayloadGenerationUrlPath: '/rsc_payload',
+    });
+
+    await expect(request).rejects.toThrow(
       'Failed to fetch RSC payload for component "MissingPanel" from "/rsc_payload/MissingPanel" (props redacted): RSC payload request for component "MissingPanel" from "/rsc_payload/MissingPanel" (props redacted) failed with HTTP 404 Not Found.',
     );
+    await expect(request).rejects.toMatchObject({
+      cause: expect.objectContaining({ name: 'RSCPayloadHttpError', status: 404 }),
+    });
     expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
     expect(createFromReadableStream).not.toHaveBeenCalled();
   });
@@ -767,11 +773,53 @@ describe('prefetchServerComponent client API', () => {
 
 describe('getReactServerComponent preloaded payload replay', () => {
   afterEach(() => {
+    cleanup();
     delete window.REACT_ON_RAILS_RSC_PAYLOADS;
     delete window.REACT_ON_RAILS_RSC_ERRORS;
     fetchMock.mockReset();
     jest.dontMock('react-on-rails-rsc/client.browser');
     jest.resetModules();
+  });
+
+  it('bypasses a malformed embedded payload with one forced HTTP retry', async () => {
+    const embeddedError = new Error('malformed embedded Flight payload');
+    const createFromReadableStream = jest
+      .fn()
+      .mockRejectedValueOnce(embeddedError)
+      .mockResolvedValueOnce('fresh HTTP payload');
+    const { default: getReactServerComponent } = await loadClientModule(createFromReadableStream);
+    const { createEmbeddedPayloadKey } = await import('../src/utils.ts');
+    const domNodeId = 'rsc-root';
+    const componentName = 'EmbeddedPanel';
+    const componentProps = { id: 1 };
+    const fetchUrl = `/rsc_payload/EmbeddedPanel?${new URLSearchParams({
+      props: JSON.stringify(componentProps),
+    })}`;
+    window.REACT_ON_RAILS_RSC_PAYLOADS = {
+      [createEmbeddedPayloadKey(componentName, componentProps, domNodeId)]: ['malformed Flight'],
+    };
+    fetchMock.mockResolvedValue(createWebResponseFromText(toLengthPrefixedRecord('fresh payload')));
+
+    const getServerComponent = getReactServerComponent(domNodeId, {
+      rscPayloadGenerationUrlPath: '/rsc_payload',
+    } as RailsContext);
+    const Provider = createRSCProvider({ getServerComponent, domNodeId });
+    let api: ReturnType<typeof useRSC> | undefined;
+    const Capture = () => {
+      api = useRSC();
+      return null;
+    };
+
+    await act(async () => {
+      render(React.createElement(Provider, null, React.createElement(Capture)));
+      await Promise.resolve();
+    });
+    if (!api) throw new Error('RSC provider API was not captured');
+
+    await expect(api.getComponent(componentName, componentProps)).resolves.toBe('fresh HTTP payload');
+    expect(createFromReadableStream).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(fetchUrl);
   });
 
   it('retains late streamed chunks so the same preloaded payload can be replayed after cache eviction', async () => {

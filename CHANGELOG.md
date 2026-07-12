@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.9] - 2026-07-11
+
 #### Breaking Changes
 
 - **[Pro] Rolling-deploy previous-URL config is now `rolling_deploy_previous_urls` (plural) and seeds from multiple endpoints**:
@@ -44,14 +46,33 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **RSC scaffolding now installs the published `react-on-rails-rsc@19.2.1-rc.1`**:
   The Pro generator, compatibility checks, workspace overrides, dummy app, and RSC documentation now use the
   published RC.1 build with the coordinated React 19.2.7 peer floor. [PR 4587](https://github.com/shakacode/react_on_rails/pull/4587) by [justin808](https://github.com/justin808).
+- **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
+  keeps one cached Promise for a logical payload load and retries a transient network, server, or
+  malformed-payload failure once within it. If the retry also fails, React receives the final
+  rejection instead of repeatedly starting new requests. The retry bypasses failed embedded
+  payloads and fetches fresh data; 4xx responses and cancellations are not automatically retried,
+  and official server rendering does not perform the browser retry. A later browser lookup may try
+  again after a short retention window. Fixes
+  [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
+  [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
+  [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
   preloads listed in the React client manifest, preventing a flash of unstyled content when
   production chunk CSS uses numeric IDs and id-named files. Fixes
   [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
   [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
   [justin808](https://github.com/justin808).
-
-### [17.0.0.rc.9] - 2026-07-11
+- **[Pro]** **RSC payload prerender cache no longer stores an empty payload**: With
+  `config.prerender_caching = true`, the RSC payload endpoint (`/rsc_payload/:component_name`) served
+  the first visitor a correct payload but every subsequent visitor a zero-byte payload, because the
+  length-prefixed framing consumer destructively removed `"html"` from the chunk Hash that
+  `StreamCache` had buffered by reference and wrote to the cache after the stream completed. The
+  browser's Flight client then rejected the empty response with `"Connection closed."`. The framing
+  consumer now reads `"html"` without mutating the chunk, and `StreamCache` snapshots each chunk
+  before handing it downstream so a mutating consumer can never corrupt the cached entry. Fixes
+  [Issue 4550](https://github.com/shakacode/react_on_rails/issues/4550).
+  [PR 4551](https://github.com/shakacode/react_on_rails/pull/4551) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [17.0.0.rc.8] - 2026-07-08
 
