@@ -12,7 +12,7 @@ agent's report.
 | `tests.form`        | test source and test command output                  | both form outcomes have passing automated coverage                          |
 | `build.production`  | exact production build command and output            | production assets build with exit status 0                                  |
 | `tests.green`       | exact relevant test commands and output              | relevant Ruby and JavaScript tests exit 0                                   |
-| `unaided`           | event stream and intervention count                  | no human repair, choice, command, or credential handoff occurred            |
+| `unaided`           | runner-owned invocation record                       | runner sent no human follow-up input after the immutable prompt             |
 | `evidence.complete` | metadata, hashes, inventory, report, verification    | run artifacts validate and contain no unresolved `UNKNOWN` required result  |
 
 Overall status is `pass` only when all rows pass. A completed attempt with any

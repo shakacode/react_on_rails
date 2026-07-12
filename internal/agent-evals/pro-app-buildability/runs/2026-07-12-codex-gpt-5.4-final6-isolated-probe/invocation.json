@@ -13,7 +13,9 @@
     "npm": "npm view create-react-on-rails-app version --json",
     "rubygems": "gem search --remote --exact ^rails$"
   },
-  "credential_store": "keyring",
+  "credential_store": "file",
+  "auth_material_available": false,
+  "human_followups_sent": 0,
   "shell_environment_policy": {
     "inherit": "none",
     "allowlist": ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SHELL", "CODEX_EVAL"]

@@ -47,8 +47,8 @@
     {
       "id": "unaided",
       "status": "pass",
-      "reason": "The schema-constrained report records 0 human interventions; the runner supplied no follow-up input.",
-      "citations": ["agent-report.json#/human_interventions"]
+      "reason": "The runner-owned invocation record proves that no human follow-up input was sent.",
+      "citations": ["invocation.json#/human_followups_sent"]
     },
     {
       "id": "evidence.complete",

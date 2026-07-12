@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final5-keyring-probe",
-  "started_at": "2026-07-12T13:37:33Z",
-  "finished_at": "2026-07-12T13:37:53Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final6-isolated-probe",
+  "started_at": "2026-07-12T13:58:24Z",
+  "finished_at": "2026-07-12T13:58:45Z",
   "repository": {
-    "revision": "737a7610fb22d001beafa05746316cf1760e6856",
+    "revision": "43948f5ab16505296fd8b46832da76d465cb1aab",
     "dirty": false
   },
   "definition": {
@@ -21,17 +21,17 @@
       },
       {
         "path": "bin/derive-evidence.mjs",
-        "sha256": "0eb0acd98e351a579965ffb81c37d57f89c19821e375058d5530e109e60d642c",
+        "sha256": "7ce53ace92e99cb30659820c54470a8f2614d2972fba43843dca7f7a98342131",
         "executable": true
       },
       {
         "path": "bin/derive-network-probe.mjs",
-        "sha256": "7606ff91b18548b8c2ab21f7d7be267ee3b4b19eff47f5107a899877d14b5f3f",
+        "sha256": "f60092915fdac12c6695307d28cc821a949dd803f9062defd65269f5e3758c9e",
         "executable": true
       },
       {
         "path": "bin/normalize-command.mjs",
-        "sha256": "5304100280dd9f46e5e36b5b02cdbe34fa17dba9a9f3d8a6148cb01da7a28580",
+        "sha256": "f0c2f9abddbdd50c2d74cfa23fe30e08e9c56d90eccdfc772d9ec53090cb0e52",
         "executable": false
       },
       {
@@ -41,13 +41,23 @@
       },
       {
         "path": "bin/run-eval",
-        "sha256": "3ff497321c4ac7b4bda2fc6eeff814697ece4a1cd86342c381ea07e37d2ccfeb",
+        "sha256": "e134ddbac044ab9af594e47bc3a5786dfd674c81c0ff4f64a53e359917e641cf",
         "executable": true
       },
       {
         "path": "bin/sanitize-events.pl",
-        "sha256": "e7e3837766dd67c91d8bbd015f9a294823e67eaf0cf357eb2050865210285da2",
+        "sha256": "d7eab4dd75085ce484eda776328faa51a176e12183687309d695fa3ff3d35ee1",
         "executable": true
+      },
+      {
+        "path": "bin/scan-sensitive-artifacts",
+        "sha256": "f82063f429020ff6386e8e765cc32be404548f01552c94ab5de11d42e6f9b2d6",
+        "executable": true
+      },
+      {
+        "path": "bin/sensitive-values.mjs",
+        "sha256": "218b4eb84ba9f65273c468c1795934ef563129c4138d50d61cdfe79e6c86ad7b",
+        "executable": false
       },
       {
         "path": "bin/validate-json.mjs",
@@ -56,12 +66,12 @@
       },
       {
         "path": "bin/validate-network-probe.mjs",
-        "sha256": "75639d0947230da54ada73613df71b0b28ebbfe31e7b060a1dea93af709531c6",
+        "sha256": "13a9b706513218cdddfa2c0fbf91f96357267830a7574b6155336a46bc7a50f3",
         "executable": true
       },
       {
         "path": "bin/validate-run",
-        "sha256": "d6d2d9c3afe2ebb915af2039c31e3c5e4ab490de11755ad16bceb2d618de36dd",
+        "sha256": "2609245bfcc30f58c079661cbe4a514bc5693861c25a97c68f6de56811857507",
         "executable": true
       },
       {
@@ -91,7 +101,7 @@
       },
       {
         "path": "schemas/run.schema.json",
-        "sha256": "4cd6e8cb675d47eb2e6e486230cc063e4ed5073618c5ad798133aad9f5b162af",
+        "sha256": "abe48099f0623f4cb8246c98006c706e6a1156abf60c6fe740d20df9de543494",
         "executable": false
       },
       {
@@ -116,7 +126,7 @@
       },
       {
         "path": "rubric.md",
-        "sha256": "17a30b047e5b5c2ffd2cc26aa6bd76df78e07559f6e79f7b26e651f5496b8456",
+        "sha256": "a27bef599ccfc5891dd6a4e104d4bbb73a4cdbdf56201d569119084ae9cfedb8",
         "executable": false
       },
       {
@@ -145,7 +155,8 @@
     "umask": "077",
     "process_environment": "env -i",
     "shell_environment_inherit": "none",
-    "credential_store": "keyring",
+    "credential_store": "file",
+    "auth_material_available": false,
     "stripped_sensitive_names": [
       "AGENT_COORD_API_TOKEN",
       "GOOGLE_APPLICATION_CREDENTIALS",
