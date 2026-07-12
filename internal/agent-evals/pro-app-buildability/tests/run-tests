@@ -9,17 +9,31 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
+  'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
+  'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' \
   '/tmp/private/place' '/private/tmp/agent-cache' \
   '-----BEGIN PRIVATE KEY-----' 'line-one' 'line-two' '-----END PRIVATE KEY-----' >"$tmp/unsafe"
 EVAL_PRIVATE_DIR="$tmp" perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unsafe" >"$tmp/safe"
 rg -q '\[REDACTED\]' "$tmp/safe"
 rg -q '<LOCAL_PATH>' "$tmp/safe"
-if rg -q 'super-sensitive-value|multi-word-secret|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' \
+if rg -q 'super-sensitive-value|multi-word-secret|base-secret-value-123|aws-secret-value-456|aws-access-key-01234|stripe-secret-value-789|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' \
   "$tmp/safe"; then
   echo "sanitizer negative test failed" >&2
   exit 1
 fi
 test "$(rg -o '\[REDACTED\]' "$tmp/safe" | wc -l | tr -d ' ')" -ge 2
+printf '%s\n' 'SECRET_KEY_BASE=base-secret-value-123' \
+  'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
+  'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  'STRIPE_SECRET_KEY=x' \
+  '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' >"$tmp/sensitive-names-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/sensitive-names-unsafe" >"$tmp/sensitive-names-safe"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-unsafe" >/dev/null
+if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-safe" >/dev/null; then
+  echo "final sensitive-artifact scan rejected sanitized output" >&2
+  exit 1
+fi
 
 rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
@@ -27,8 +41,14 @@ rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
 rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
 rg -q 'sandbox_workspace_write.network_access=true' "$eval_dir/bin/run-eval"
-rg -q 'cli_auth_credentials_store=.?keyring' "$eval_dir/bin/run-eval"
+rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
+rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
+rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
+if rg -q 'host_home|CODEX_EVAL_HOME|CODEX_AUTH_FILE' "$eval_dir/bin/run-eval"; then
+  echo "runner must not expose host home or credential paths to Codex" >&2
+  exit 1
+fi
 if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
   echo "runner must not copy authentication into the sandbox filesystem" >&2
   exit 1
@@ -142,6 +162,14 @@ test "$(jq -r '.npm.status' "$tmp/argv-probe.json")" = pass
 test "$(jq -r '.rubygems.status' "$tmp/argv-probe.json")" = pass
 test "$(jq -r '.overall' "$tmp/argv-probe.json")" = pass
 
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc '\''npm view create-react-on-rails-app version --json'\''","exit_code":0}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc \"gem search --remote --exact '\''^rails$'\''\"","exit_code":0}}' \
+  >"$tmp/linux-shell-probe-events.jsonl"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/linux-shell-probe-events.jsonl" \
+  "$tmp/linux-shell-probe.json"
+test "$(jq -r '.overall' "$tmp/linux-shell-probe.json")" = pass
+
 mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails assets:precompile --help","exit_code":0,"status":"completed","aggregated_output":"Usage: assets:precompile [options] - assets compiled successfully"}}' \
@@ -150,8 +178,20 @@ printf '%s\n' \
 mkdir "$tmp/evidence-workspace/eval_app"
 printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/evidence-workspace/eval_app/Gemfile"
 printf '%s\n' '{"dependencies":{"react-on-rails-pro":"1.0.0"}}' >"$tmp/evidence-workspace/eval_app/package.json"
-printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}' \
+printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":99,"blockers":[]}' \
   >"$tmp/fixture-report.json"
+printf '%s\n' '{"human_followups_sent":0}' >"$tmp/fixture-invocation.json"
+printf '%s\n' '{}' >"$tmp/missing-followup-invocation.json"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"printenv","exit_code":0,"status":"completed","aggregated_output":"SECRET_KEY_BASE=base-secret-value-123\nAWS_SECRET_ACCESS_KEY=aws-secret-value-456\nSTRIPE_SECRET_KEY=stripe-secret-value-789"}}' \
+  >"$tmp/secret-events.jsonl"
+mkdir "$tmp/secret-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/secret-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/secret-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+if rg -q 'base-secret-value-123|aws-secret-value-456|stripe-secret-value-789' "$tmp/secret-output"; then
+  echo "JavaScript evidence sanitizer leaked compound secret names" >&2
+  exit 1
+fi
 adversarial_command="jest --$(printf '!=! --%.0s' {1..4000})"
 jq -cn --arg command "$adversarial_command" \
   '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"1 test passed"}}' \
@@ -163,16 +203,29 @@ else
   test_timeout=gtimeout
 fi
 "$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/adversarial-events.jsonl" \
-  "$tmp/evidence-workspace" "$tmp/adversarial-output" "$tmp/fixture-report.json"
+  "$tmp/evidence-workspace" "$tmp/adversarial-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 mkdir "$tmp/argv-evidence-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/argv-probe-events.jsonl" \
-  "$tmp/evidence-workspace" "$tmp/argv-evidence-output" "$tmp/fixture-report.json"
+  "$tmp/evidence-workspace" "$tmp/argv-evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 node "$eval_dir/bin/validate-network-probe.mjs" \
   "$tmp/argv-probe.json" "$tmp/argv-evidence-output/command-evidence.json"
+mkdir "$tmp/linux-shell-evidence-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/linux-shell-probe-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/linux-shell-evidence-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/linux-shell-probe.json" "$tmp/linux-shell-evidence-output/command-evidence.json"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
-  "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json"
+  "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+test "$(jq -r '.items[] | select(.id == "unaided") | .status' "$tmp/evidence-output/rubric-results.json")" = pass
+mkdir "$tmp/missing-followup-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/missing-followup-output" "$tmp/fixture-report.json" \
+  "$tmp/missing-followup-invocation.json"
+test "$(jq -r '.items[] | select(.id == "unaided") | .status' \
+  "$tmp/missing-followup-output/rubric-results.json")" = unknown
 
 mkdir -p "$tmp/correlation-workspace/eval_app/app/components" \
   "$tmp/correlation-workspace/eval_app/app/models" \
@@ -193,7 +246,7 @@ printf '%s\n' \
   >"$tmp/unrelated-test-events.jsonl"
 mkdir "$tmp/correlation-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/unrelated-test-events.jsonl" \
-  "$tmp/correlation-workspace" "$tmp/correlation-output" "$tmp/fixture-report.json"
+  "$tmp/correlation-workspace" "$tmp/correlation-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 for row in rsc.route form.validation tests.page tests.form; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/correlation-output/rubric-results.json")" = unknown
@@ -212,7 +265,8 @@ for selector_command in "${selector_commands[@]}"; do
     >"$tmp/selector-events-$selector_index.jsonl"
   mkdir "$tmp/selector-output-$selector_index"
   node "$eval_dir/bin/derive-evidence.mjs" "$tmp/selector-events-$selector_index.jsonl" \
-    "$tmp/correlation-workspace" "$tmp/selector-output-$selector_index" "$tmp/fixture-report.json"
+    "$tmp/correlation-workspace" "$tmp/selector-output-$selector_index" "$tmp/fixture-report.json" \
+    "$tmp/fixture-invocation.json"
   for row in rsc.route form.validation tests.page tests.form; do
     test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
       "$tmp/selector-output-$selector_index/rubric-results.json")" = unknown
@@ -224,7 +278,7 @@ jq -cn \
   >"$tmp/full-suite-events.jsonl"
 mkdir "$tmp/full-suite-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
-  "$tmp/correlation-workspace" "$tmp/full-suite-output" "$tmp/fixture-report.json"
+  "$tmp/correlation-workspace" "$tmp/full-suite-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
 for row in rsc.route form.validation tests.page tests.form; do
   test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
     "$tmp/full-suite-output/rubric-results.json")" = pass

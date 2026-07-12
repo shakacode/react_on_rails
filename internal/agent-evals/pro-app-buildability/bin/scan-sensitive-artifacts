@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import { containsSensitiveValues } from './sensitive-values.mjs';
+
+const target = process.argv[2];
+if (!target || !fs.existsSync(target)) {
+  console.error(`usage: ${process.argv[1]} PATH`);
+  process.exit(64);
+}
+
+const files = [];
+const collect = (entry) => {
+  const stat = fs.statSync(entry);
+  if (stat.isDirectory()) {
+    for (const child of fs.readdirSync(entry)) collect(path.join(entry, child));
+  } else if (stat.isFile()) {
+    files.push(entry);
+  }
+};
+collect(target);
+
+for (const file of files) {
+  if (containsSensitiveValues(fs.readFileSync(file, 'utf8'))) {
+    console.log(file);
+    process.exit(0);
+  }
+}
+process.exit(1);

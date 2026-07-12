@@ -13,9 +13,11 @@ $content =~ s{/Users/[^\s"']+}{<LOCAL_PATH>}g;
 $content =~ s{/private/tmp(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
 $content =~ s{/tmp/[^\s"']+}{<LOCAL_PATH>}g;
 $content =~ s{/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
-$content =~ s/(authorization["'=: ]+)[^,"'\n]+/$1\[REDACTED\]/ig;
-$content =~ s/(cookie["'=: ]+)[^,"'\n]+/$1\[REDACTED\]/ig;
-$content =~ s/(password["'=: ]+)[^,"'\n]+/$1\[REDACTED\]/ig;
-$content =~ s/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^,"'\n]+/$1\[REDACTED\]/ig;
+$content =~ s{([a-z0-9_-]+)(["']?\s*[:=]\s*["']?)([^,"'\n]+)}{
+  my ($name, $separator, $value) = ($1, $2, $3);
+  my $sensitive = $name =~ /^(?:authorization|cookie)$/i ||
+    $name =~ /(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|private[_-]?key|license[_-]?key)/i;
+  $sensitive ? "$name$separator\[REDACTED\]" : "$name$separator$value";
+}ige;
 $content =~ s/(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/$1\[REDACTED\]$2/igs;
 print $content;

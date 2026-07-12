@@ -3,29 +3,24 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeCommand } from './normalize-command.mjs';
+import { redactSensitiveValues } from './sensitive-values.mjs';
 
-const [eventsPath, workspace, outputDir, reportPath] = process.argv.slice(2);
-if (!eventsPath || !workspace || !outputDir || !reportPath) {
-  console.error('usage: derive-evidence.mjs EVENTS WORKSPACE OUTPUT REPORT');
+const [eventsPath, workspace, outputDir, reportPath, invocationPath] = process.argv.slice(2);
+if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
+  console.error('usage: derive-evidence.mjs EVENTS WORKSPACE OUTPUT REPORT INVOCATION');
   process.exit(64);
 }
 
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
 const sanitize = (value) =>
-  String(value)
-    .replaceAll(/\/Users\/[^\s"']+/g, '<LOCAL_PATH>')
-    .replaceAll(/\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
-    .replaceAll(/\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
-    .replaceAll(/\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>')
-    .replaceAll(/(authorization["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
-    .replaceAll(/(cookie["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
-    .replaceAll(/(password["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
-    .replaceAll(/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
-    .replaceAll(
-      /(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/gis,
-      '$1[REDACTED]$2',
-    );
+  redactSensitiveValues(
+    String(value)
+      .replaceAll(/\/Users\/[^\s"']+/g, '<LOCAL_PATH>')
+      .replaceAll(/\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
+      .replaceAll(/\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
+      .replaceAll(/\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>'),
+  );
 
 const truncate = (value, limit) => {
   const safe = sanitize(value);
@@ -93,6 +88,7 @@ artifacts.sort((left, right) => left.path.localeCompare(right.path));
 const artifactEvidence = { schema_version: '1.0', artifacts };
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+const invocation = JSON.parse(fs.readFileSync(invocationPath, 'utf8'));
 const successfulCommands = commands.filter((command) => command.exit_code === 0);
 const successfulOutcome = (commandPattern, outputPattern) =>
   successfulCommands.filter(
@@ -103,7 +99,7 @@ const matchingArtifacts = (pathPattern, contentPattern) =>
 const artifactCitations = (matched) => matched.map((artifact) => `artifact-evidence.json#${artifact.path}`);
 const commandCitations = (matched) => matched.map((command) => `command-evidence.json#${command.id}`);
 const unwrapShellCommand = (command) => {
-  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
+  const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
   return (match?.[2] ?? command).trim();
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
@@ -274,9 +270,12 @@ const outcomeRows = [
   },
   {
     id: 'unaided',
-    status: report.human_interventions === 0 ? 'pass' : 'fail',
-    reason: `The schema-constrained report records ${report.human_interventions} human interventions; the runner supplied no follow-up input.`,
-    citations: ['agent-report.json#/human_interventions'],
+    status: invocation.human_followups_sent === 0 ? 'pass' : 'unknown',
+    reason:
+      invocation.human_followups_sent === 0
+        ? 'The runner-owned invocation record proves that no human follow-up input was sent.'
+        : 'Runner-owned evidence does not prove that the attempt was unaided.',
+    citations: invocation.human_followups_sent === 0 ? ['invocation.json#/human_followups_sent'] : [],
   },
 ];
 

@@ -84,6 +84,7 @@
         "process_environment",
         "shell_environment_inherit",
         "credential_store",
+        "auth_material_available",
         "stripped_sensitive_names",
         "raw_cleanup",
         "auth_material_persisted"
@@ -92,7 +93,8 @@
         "umask": { "const": "077" },
         "process_environment": { "const": "env -i" },
         "shell_environment_inherit": { "const": "none" },
-        "credential_store": { "const": "keyring" },
+        "credential_store": { "const": "file" },
+        "auth_material_available": { "const": false },
         "stripped_sensitive_names": {
           "type": "array",
           "items": { "type": "string" },

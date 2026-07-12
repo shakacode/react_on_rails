@@ -12,21 +12,6 @@ artifacts satisfy the rubric.
 - network access to RubyGems, npm, and GitHub
 - enough disk space for a new Rails application and its dependencies
 - an empty, disposable workspace outside this repository
-- a dedicated `CODEX_EVAL_HOME` directory whose Codex login uses the OS keyring;
-  the runner rejects file-backed `auth.json` credentials because a
-  network-enabled agent sandbox must not be able to read authentication material
-
-Create the dedicated home once and sign in using keyring storage:
-
-```bash
-mkdir -m 700 ~/.codex-eval
-CODEX_HOME="$HOME/.codex-eval" codex login -c 'cli_auth_credentials_store="keyring"'
-export CODEX_EVAL_HOME="$HOME/.codex-eval"
-```
-
-If that login is absent or unavailable, the agent process fails inside the
-bounded capability turn. The runner records an `incomplete` result and does not
-start scaffolding; it never falls back to file-backed credentials.
 
 Install the pinned Draft 2020-12 validator and evidence formatter without
 joining the root workspace:
@@ -67,11 +52,18 @@ must be disjoint. Before invoking Codex, the runner requires GNU `timeout` and
 checks npm and RubyGems from the same minimal environment used for the run.
 Codex is ephemeral, ignores user configuration/rules, disables multi-agent
 work, uses the workspace-write sandbox, and receives an explicit model and
-timeout. Both the Codex process and its shell tools start from `env -i`. The
-outer process receives the host `HOME` only so the OS can locate its keyring;
-tool environment inheritance is `none`, and model-launched shells receive only
-`PATH`, a private empty `HOME`, a private `TMPDIR`, locale, shell, and
-`CODEX_EVAL`.
+timeout. Both the Codex process and its shell tools start from `env -i` with
+private empty `HOME` and `CODEX_HOME` directories inside the temporary run
+directory. Tool environment inheritance is `none`, with only `PATH`, private
+`HOME` and `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
+
+The configured file credential store is inside that empty disposable
+`CODEX_HOME`; no credential is copied, inherited, or mounted into the
+network-enabled process. Until a separately reviewed credential broker or
+stronger execution boundary exists, an authenticated capability turn is
+intentionally unsupported: Codex records an authentication-blocked `incomplete`
+run and scaffolding does not start. This is a known evidence result, not a
+supported onboarding claim.
 
 Workspace-write network access is enabled explicitly with the supported
 `sandbox_workspace_write.network_access=true` Codex configuration. Before any
@@ -81,9 +73,9 @@ commands in `network-probe-prompt.md`. The runner derives
 nonzero exit fail closed: the run is recorded as `incomplete` and scaffold work
 does not start.
 
-Raw events and stderr live only under a mode-`0700` temporary directory.
-Authentication remains in the OS keyring and is never copied into the
-network-enabled sandbox's filesystem. `umask 077` applies throughout, and
+Raw events and stderr live only under a mode-`0700` temporary directory. No
+authentication material is made available to the network-enabled process.
+`umask 077` applies throughout, and
 `EXIT`/`INT`/`TERM` traps delete the directory. Sensitive parent environment
 variable names are recorded as stripped; their values are neither read nor
 passed to the agent.

@@ -11,7 +11,7 @@ const probe = JSON.parse(fs.readFileSync(probePath, 'utf8'));
 const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
 const commands = new Map(evidence.commands.map((command) => [command.id, command]));
 const unwrapShellCommand = (command) => {
-  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
+  const match = command.match(/^\/(?:usr\/)?bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
   return (match?.[2] ?? command).trim();
 };
 const requiredCommand = {

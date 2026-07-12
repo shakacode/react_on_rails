@@ -45,9 +45,7 @@ if rg -n '/Users/|/tmp/|/private/tmp|/var/folders/' "$run_dir"; then
   echo "local absolute path found" >&2
   exit 1
 fi
-if rg -n --pcre2 --ignore-case \
-  "(bearer[[:space:]]+[a-z0-9._-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|token|secret|password|license[_-]?key)[\"'=: ]+[A-Za-z0-9_./+=-]{12,})" \
-  "$run_dir"; then
+if "$eval_dir/bin/scan-sensitive-artifacts" "$run_dir"; then
   echo "possible unredacted credential found" >&2
   exit 1
 fi

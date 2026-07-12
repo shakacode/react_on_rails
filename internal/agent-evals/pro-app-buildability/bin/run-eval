@@ -73,26 +73,9 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-mkdir -m 700 "$private_dir/runner-home" "$private_dir/agent-home" "$private_dir/tmp"
-
-codex_eval_home="${CODEX_EVAL_HOME:-}"
-[[ "$codex_eval_home" = /* && -d "$codex_eval_home" && ! -L "$codex_eval_home" ]] || {
-  echo "CODEX_EVAL_HOME must name an existing absolute non-symlink directory" >&2
-  exit 69
-}
-codex_eval_home="$(cd "$codex_eval_home" && pwd -P)"
-[[ ! -e "$codex_eval_home/auth.json" ]] || {
-  echo "file-backed Codex auth is forbidden; configure CODEX_EVAL_HOME with keyring credentials" >&2
-  exit 69
-}
-host_home="${HOME:-}"
-[[ "$host_home" = /* && -d "$host_home" ]] || {
-  echo "host HOME must name an existing absolute directory for OS keyring access" >&2
-  exit 69
-}
+mkdir -m 700 "$private_dir/runner-home" "$private_dir/agent-home" "$private_dir/codex-home" "$private_dir/tmp"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
-codex_env=(env -i "PATH=$safe_path" "HOME=$host_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
 for command_name in codex curl env git jq node npm perl pnpm realpath ruby shasum "$timeout_name"; do
   expected_executable="$(realpath "$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
     "$eval_dir/bin/build-safe-path" --resolve "$command_name")")"
@@ -153,7 +136,7 @@ done
 shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
 codex_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --sandbox workspace-write --model "$model")
 codex_args+=(-c 'features.multi_agent=false' -c 'sandbox_workspace_write.network_access=true')
-codex_args+=(-c 'cli_auth_credentials_store="keyring"')
+codex_args+=(-c 'cli_auth_credentials_store="file"')
 codex_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
 codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
 
@@ -161,7 +144,7 @@ jq -n --arg model "$model" --argjson timeout "$timeout_seconds" \
   '{command:"codex exec",model:$model,timeout_seconds:$timeout,sandbox:"workspace-write",ephemeral:true,
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,sandbox_network_access:true,
     capability_probe:{npm:"npm view create-react-on-rails-app version --json",rubygems:"gem search --remote --exact ^rails$"},
-    credential_store:"keyring",
+    credential_store:"file",auth_material_available:false,human_followups_sent:0,
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
   >"$output/invocation.json"
 
@@ -172,7 +155,7 @@ raw_probe_stderr="$private_dir/probe-stderr.log"
 safe_probe_events="$private_dir/probe-events.safe.jsonl"
 safe_probe_stderr="$private_dir/probe-stderr.safe.log"
 set +e
-"$timeout_command" "$probe_timeout_seconds" "${codex_env[@]}" "CODEX_HOME=$codex_eval_home" \
+"$timeout_command" "$probe_timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
   codex "${codex_args[@]}" <"$eval_dir/network-probe-prompt.md" >"$raw_probe_events" 2>"$raw_probe_stderr"
 probe_exit=$?
 set -e
@@ -196,7 +179,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result"; then
   safe_scaffold_events="$private_dir/scaffold-events.safe.jsonl"
   safe_scaffold_stderr="$private_dir/scaffold-stderr.safe.log"
   set +e
-  "$timeout_command" "$timeout_seconds" "${codex_env[@]}" "CODEX_HOME=$codex_eval_home" \
+  "$timeout_command" "$timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
     codex "${codex_args[@]}" <"$eval_dir/prompt.md" >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
   runner_exit=$?
   set -e
@@ -224,7 +207,8 @@ fi
 TMPDIR="$private_dir/tmp" "$eval_dir/bin/build-runner-diagnostics" \
   "$safe_stderr" "$output/runner-diagnostics.json"
 
-node "$eval_dir/bin/derive-evidence.mjs" "$safe_events" "$workspace" "$output" "$output/agent-report.json"
+node "$eval_dir/bin/derive-evidence.mjs" "$safe_events" "$workspace" "$output" \
+  "$output/agent-report.json" "$output/invocation.json"
 git -C "$workspace" status --short --untracked-files=normal >"$output/workspace-status.txt"
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -245,7 +229,7 @@ jq -n \
     agent:{name:"codex",version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
     environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
     security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
-      credential_store:"keyring",stripped_sensitive_names:$stripped,
+      credential_store:"file",auth_material_available:false,stripped_sensitive_names:$stripped,
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
     runner:{timeout_command:$timeout_command,requested_timeout_seconds:$timeout,effective_timeout_seconds:$timeout,
