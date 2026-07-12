@@ -25,13 +25,36 @@ rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
 rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
 rg -q 'sandbox_workspace_write.network_access=true' "$eval_dir/bin/run-eval"
-rg -Fq 'if [[ "$probe_exit" == 0 && "$probe_result" == pass ]]; then' "$eval_dir/bin/run-eval"
+"$eval_dir/bin/probe-allows-scaffold" 0 pass
+if "$eval_dir/bin/probe-allows-scaffold" 1 pass; then
+  echo "nonzero probe exit incorrectly allows scaffold" >&2
+  exit 1
+fi
 
 mkdir "$tmp/user-bin"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/user-bin/user-tool"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/user-bin/node"
 chmod +x "$tmp/user-bin/user-tool"
-resolved_path="$(PATH="$tmp/user-bin:/usr/bin:/bin" "$eval_dir/bin/build-safe-path" user-tool sh)"
+chmod +x "$tmp/user-bin/node"
+test_path="$tmp/user-bin:/opt/homebrew/bin:/usr/bin:/bin"
+resolved_path="$(SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_path" \
+  "$eval_dir/bin/build-safe-path" user-tool node sh)"
 env -i PATH="$resolved_path" /bin/sh -c 'command -v user-tool >/dev/null'
+test "$(realpath "$(env -i PATH="$resolved_path" /bin/sh -c 'command -v node')")" = \
+  "$(realpath "$tmp/user-bin/node")"
+
+mkdir "$tmp/world-writable-bin"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/world-writable-bin/unsafe-tool"
+chmod +x "$tmp/world-writable-bin/unsafe-tool"
+chmod 777 "$tmp/world-writable-bin"
+unsafe_path="$tmp/world-writable-bin:/usr/bin:/bin"
+if SAFE_PATH_SOURCE="$unsafe_path" BASH_ENV=/dev/null PATH="$unsafe_path" \
+  "$eval_dir/bin/build-safe-path" unsafe-tool \
+  2>"$tmp/unsafe-path-error"; then
+  echo "world-writable command directory was retained" >&2
+  exit 1
+fi
+rg -q 'world-writable' "$tmp/unsafe-path-error"
 
 mkdir "$tmp/real-workspace"
 ln -s "$tmp/real-workspace" "$tmp/workspace-link"
@@ -53,6 +76,18 @@ if node "$eval_dir/bin/validate-network-probe.mjs" \
   exit 1
 fi
 rg -q 'contradicts' "$tmp/probe-error"
+
+printf '%s\n' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"npm":{"attempts":[{"command_id":"command-1","exit_code":0}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"fail"}' \
+  >"$tmp/wrong-command-probe.json"
+printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view unrelated-package version --json","exit_code":0,"status":"completed","output":"1.0.0","output_truncated":false}]}' \
+  >"$tmp/wrong-command-evidence.json"
+if node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/wrong-command-probe.json" "$tmp/wrong-command-evidence.json" 2>"$tmp/wrong-command-error"; then
+  echo "wrong probe command text was accepted" >&2
+  exit 1
+fi
+rg -q 'exact required probe' "$tmp/wrong-command-error"
 
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"npm view create-react-on-rails-app version --json","exit_code":1}}' \

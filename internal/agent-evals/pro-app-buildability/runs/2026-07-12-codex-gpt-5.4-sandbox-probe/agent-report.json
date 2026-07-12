@@ -1,9 +1,0 @@
-{
-  "status": "blocked",
-  "summary": "In-sandbox npm/RubyGems capability probe failed; scaffold was not started",
-  "commands": [],
-  "checks": [],
-  "friction": ["In-sandbox npm/RubyGems capability probe failed; scaffold was not started"],
-  "human_interventions": 0,
-  "blockers": ["In-sandbox npm/RubyGems capability probe failed; scaffold was not started"]
-}

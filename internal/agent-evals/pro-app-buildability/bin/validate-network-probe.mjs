@@ -10,6 +10,14 @@ if (!probePath || !evidencePath) {
 const probe = JSON.parse(fs.readFileSync(probePath, 'utf8'));
 const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
 const commands = new Map(evidence.commands.map((command) => [command.id, command]));
+const unwrapShellCommand = (command) => {
+  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc ['"]([\s\S]*)['"]$/);
+  return (match?.[1] ?? command).trim();
+};
+const requiredCommand = {
+  npm: 'npm view create-react-on-rails-app version --json',
+  rubygems: "gem search --remote --exact '^rails$'",
+};
 let valid = true;
 
 for (const tool of ['npm', 'rubygems']) {
@@ -24,6 +32,9 @@ for (const tool of ['npm', 'rubygems']) {
     const command = commands.get(attempt.command_id);
     if (!command || command.exit_code !== attempt.exit_code) {
       console.error(`${tool}: referenced command evidence is missing or has a different exit code`);
+      valid = false;
+    } else if (unwrapShellCommand(command.command) !== requiredCommand[tool]) {
+      console.error(`${tool}: referenced command text is not the exact required probe`);
       valid = false;
     }
   }

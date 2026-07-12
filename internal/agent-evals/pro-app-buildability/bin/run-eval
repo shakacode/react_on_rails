@@ -37,8 +37,8 @@ else
   echo "GNU timeout or gtimeout is required; refusing an unbounded run" >&2
   exit 69
 fi
-safe_path="$("$eval_dir/bin/build-safe-path" \
-  codex curl env git jq node npm pnpm ruby shasum "$timeout_name")"
+safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null "$eval_dir/bin/build-safe-path" \
+  codex curl env git jq node npm pnpm realpath ruby shasum "$timeout_name")"
 
 resolve_future_path() {
   local requested="$1"
@@ -79,11 +79,17 @@ auth_source="${CODEX_AUTH_FILE:-${HOME:-}/.codex/auth.json}"
 install -m 600 "$auth_source" "$private_dir/codex-home/auth.json"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
-for command_name in codex curl env git jq node npm pnpm ruby shasum "$timeout_name"; do
+for command_name in codex curl env git jq node npm pnpm realpath ruby shasum "$timeout_name"; do
+  expected_executable="$(realpath "$(command -v "$command_name")")"
   # The positional parameter expands inside the stripped child shell.
   # shellcheck disable=SC2016
-  "${minimal_env[@]}" /bin/sh -c 'command -v "$1" >/dev/null' sh "$command_name" || {
+  runtime_executable="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$command_name")" || {
     echo "required command unavailable in stripped runtime: $command_name" >&2
+    exit 69
+  }
+  runtime_executable="$(realpath "$runtime_executable")"
+  [[ "$runtime_executable" == "$expected_executable" ]] || {
+    echo "stripped runtime resolves a different executable: $command_name" >&2
     exit 69
   }
 done
@@ -166,7 +172,7 @@ scaffold_invoked=false
 runner_exit="$probe_exit"
 timed_out=false
 [[ "$probe_exit" == 124 ]] && timed_out=true
-if [[ "$probe_exit" == 0 && "$probe_result" == pass ]]; then
+if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result"; then
   scaffold_invoked=true
   raw_scaffold_events="$private_dir/scaffold-events.jsonl"
   raw_scaffold_stderr="$private_dir/scaffold-stderr.log"

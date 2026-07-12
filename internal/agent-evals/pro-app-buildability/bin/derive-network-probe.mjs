@@ -20,12 +20,16 @@ const commands = events
     exit_code: Number.isInteger(event.item.exit_code) ? event.item.exit_code : null,
   }));
 
-const probeAttempts = (pattern) =>
+const unwrapShellCommand = (command) => {
+  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc ['"]([\s\S]*)['"]$/);
+  return (match?.[1] ?? command).trim();
+};
+const probeAttempts = (requiredCommand) =>
   commands
-    .filter((command) => pattern.test(command.command))
+    .filter((command) => unwrapShellCommand(command.command) === requiredCommand)
     .map(({ id: command_id, exit_code }) => ({ command_id, exit_code }));
-const npmAttempts = probeAttempts(/npm view create-react-on-rails-app version --json/);
-const rubygemsAttempts = probeAttempts(/gem search --remote --exact ['"]?\^rails\$['"]?/);
+const npmAttempts = probeAttempts('npm view create-react-on-rails-app version --json');
+const rubygemsAttempts = probeAttempts("gem search --remote --exact '^rails$'");
 const probeStatus = (attempts) =>
   attempts.length > 0 && attempts.every((attempt) => attempt.exit_code === 0) ? 'pass' : 'fail';
 const npmStatus = probeStatus(npmAttempts);

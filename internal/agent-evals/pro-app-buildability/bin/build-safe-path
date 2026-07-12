@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-safe_path="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+source_path="${SAFE_PATH_SOURCE:-${PATH:-}}"
+required_directories=()
 for command_name in "$@"; do
-  resolved="$(command -v "$command_name" 2>/dev/null || true)"
+  resolved="$(PATH="$source_path" command -v "$command_name" 2>/dev/null || true)"
   [[ "$resolved" = /* && -x "$resolved" ]] || { echo "missing required command: $command_name" >&2; exit 69; }
-  directory="$(cd "$(dirname "$resolved")" && pwd -P)"
+  required_directories+=("$(cd "$(dirname "$resolved")" && pwd -P)")
+done
+
+safe_path=""
+append_safe_directory() {
+  local directory="$1"
+  local mode
+  [[ -d "$directory" ]] || return
+  directory="$(cd "$directory" && pwd -P)"
   mode="$(stat -f '%Lp' "$directory" 2>/dev/null || stat -c '%a' "$directory")"
   case "${mode: -1}" in 2|3|6|7) echo "refusing world-writable command directory: $directory" >&2; exit 69 ;; esac
-  case ":$safe_path:" in *":$directory:"*) ;; *) safe_path="$safe_path:$directory" ;; esac
+  case ":$safe_path:" in *":$directory:"*) ;; *) safe_path="${safe_path:+$safe_path:}$directory" ;; esac
+}
+
+IFS=: read -r -a caller_path_entries <<<"$source_path"
+for entry in "${caller_path_entries[@]}"; do
+  [[ -d "$entry" ]] || continue
+  canonical_entry="$(cd "$entry" && pwd -P)"
+  for required_directory in "${required_directories[@]}"; do
+    if [[ "$canonical_entry" == "$required_directory" ]]; then
+      append_safe_directory "$canonical_entry"
+      break
+    fi
+  done
+done
+for default_directory in /opt/homebrew/bin /usr/local/bin /usr/bin /bin /usr/sbin /sbin; do
+  append_safe_directory "$default_directory"
 done
 printf '%s\n' "$safe_path"
