@@ -126,29 +126,8 @@ module ReactOnRails
     # a machine-readable report (see JSON_SCHEMA_VERSION below).
     OUTPUT_FORMATS = %i[text json].freeze
 
-    # Version of the machine-readable doctor report schema (FORMAT=json).
-    # Bump ONLY on breaking changes to the shape below. Schema (v1):
-    #
-    #   {
-    #     "schema_version": 1,
-    #     "ror_version": "<ReactOnRails::VERSION>",
-    #     "status": "pass" | "warn" | "fail",          // worst check status
-    #     "checks": [
-    #       {
-    #         "id": "<stable snake_case id from CHECK_SECTIONS>",
-    #         "title": "<human section title>",
-    #         "status": "pass" | "warn" | "fail",
-    #         "severity": "info" | "warning" | "error",
-    #         "message": "<most severe message content, or null>",
-    #         "fix_command": "<safe mechanical command, or null>",
-    #         "docs_url": "<check-specific documentation URL>",
-    #         "remediation": { "prompt": "...", "files": ["..."], "expected_end_state": "..." } | null,
-    #         "details": [ { "level": "success|warning|error|info", "content": "..." } ]
-    #       }
-    #     ],
-    #     "summary": { "pass": <count>, "warn": <count>, "fail": <count> }
-    #   }
-    #
+    # DoctorSchema is the canonical machine-readable report contract; bump its
+    # version only for breaking changes.
     # No timestamp is included so output is deterministic for a given app state.
     # Exit code semantics match text mode: 1 if any check fails, else 0.
     JSON_SCHEMA_VERSION = DoctorSchema::VERSION
@@ -329,11 +308,7 @@ module ReactOnRails
         ror_version: ReactOnRails::VERSION,
         status: DoctorSchema.overall_status(statuses),
         checks:,
-        summary: {
-          pass: statuses.count("pass"),
-          warn: statuses.count("warn"),
-          fail: statuses.count("fail")
-        }
+        summary: DoctorSchema.summarize_statuses(statuses)
       }
     end
 
@@ -1972,14 +1947,7 @@ module ReactOnRails
     end
 
     def diagnosis_exit_code
-      status = if checker.errors?
-                 :fail
-               elsif checker.warnings?
-                 :warn
-               else
-                 :pass
-               end
-      DoctorSchema::EXIT_CODES.fetch(status)
+      DoctorSchema::EXIT_CODES.fetch(checker.errors? ? :fail : :pass)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

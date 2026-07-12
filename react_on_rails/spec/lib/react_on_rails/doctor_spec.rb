@@ -155,13 +155,12 @@ RSpec.describe ReactOnRails::Doctor do
       report = run_and_parse_json(json_doctor)
 
       symbolized_report = JSON.parse(JSON.generate(report), symbolize_names: true)
-      symbolized_report[:checks].each do |check|
-        check[:id] = check[:id].to_s
-        check[:status] = check[:status].to_s
-        check[:severity] = check[:severity].to_s
-      end
 
       expect { ReactOnRails::DoctorSchema.validate!(symbolized_report) }.not_to raise_error
+    end
+
+    it "summarizes statuses with zero counts for absent statuses" do
+      expect(ReactOnRails::DoctorSchema.summarize_statuses(%w[warn warn])).to eq(pass: 0, warn: 2, fail: 0)
     end
 
     it "rejects reports that omit a required check field" do

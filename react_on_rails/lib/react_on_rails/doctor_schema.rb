@@ -9,9 +9,9 @@ module ReactOnRails
   # new version.
   module DoctorSchema
     VERSION = 1
-    STATUSES = %w[pass warn fail].freeze
-    SEVERITIES = %w[info warning error].freeze
     STATUS_SEVERITIES = { "pass" => "info", "warn" => "warning", "fail" => "error" }.freeze
+    STATUSES = STATUS_SEVERITIES.keys.freeze
+    SEVERITIES = STATUS_SEVERITIES.values.uniq.freeze
     DETAIL_LEVELS = %w[success warning error info].freeze
     EXIT_CODES = { pass: 0, warn: 0, fail: 1 }.freeze
     DOCS_URL = "https://reactonrails.com/docs/api-reference/doctor"
@@ -79,6 +79,11 @@ module ReactOnRails
 
     def docs_url(check_id)
       "#{DOCS_URL}#check-id-#{check_id.tr('_', '-')}"
+    end
+
+    def summarize_statuses(statuses)
+      counts = statuses.tally
+      STATUSES.to_h { |status| [status.to_sym, counts.fetch(status, 0)] }
     end
 
     # Runtime validation keeps the emitted payload aligned with the documented
@@ -150,7 +155,7 @@ module ReactOnRails
              "summary values must be non-negative integers")
 
       statuses = report[:checks].map { |check| check[:status] }
-      expected_summary = { pass: statuses.count("pass"), warn: statuses.count("warn"), fail: statuses.count("fail") }
+      expected_summary = summarize_statuses(statuses)
       assert(summary == expected_summary, "summary does not match checks")
       assert(report[:status] == overall_status(statuses), "report status does not match checks")
     end
