@@ -1,23 +1,9 @@
 # frozen_string_literal: true
 
-# Shared contract for the benchmark regression hand-off across the three jobs in the
-# confirmation pipeline (see .github/workflows/benchmark.yml and benchmark-suite.yml):
-#
-#   1. track_benchmarks.rb (initial run, main push)
-#      On a Bencher alert it writes a CANDIDATE payload (CANDIDATE_FILENAME) and exits
-#      0 — the alert is non-fatal until confirmed. The candidate carries the structured
-#      ALERTS (benchmark+measure pairs) so the rerun can match the SAME pairs.
-#   2. plan_confirmation.rb (gate job)
-#      Reads every candidate, drops the ones whose only regressed benchmarks are
-#      IGNORED_REGRESSION_BENCHMARKS, and emits a matrix of just the alerting
-#      suite/shard(s) to rerun on fresh runners.
-#   3. track_benchmarks.rb (confirmation run, BENCHMARK_MODE=confirm)
-#      Reruns the suite/shard against main's baseline WITHOUT polluting main's series,
-#      intersects this run's alerts with the candidate's, and writes a CONFIRMED payload
-#      (CONFIRMED_FILENAME) only when the SAME benchmark+measure pair(s) re-alert.
-#   4. report_regressions.rb (report job)
-#      Files/updates the single performance-regression issue from CONFIRMED payloads,
-#      showing the first-run and confirmation summaries side by side.
+# Shared payload contract for regression hand-offs. Hosted automatic regression
+# confirmation/reporting is intentionally disabled; these shapes remain covered so a
+# future dedicated-runner confirmation path can reuse the same candidate/confirmed
+# payloads without re-inventing the alert matching contract.
 module RegressionReport
   module_function
 
@@ -50,10 +36,9 @@ module RegressionReport
   # Benchmarks whose regressions must NOT open an issue, by the exact benchmark name
   # Bencher reports (the leading-slash name shown in the summary table, matched against
   # REGRESSED_BENCHMARKS in each suite's payload). Entries here are TEMPORARY
-  # suppressions: plan_confirmation.rb short-circuits a candidate whose only regressed
-  # benchmarks are listed here BEFORE a confirmation rerun (no fresh runner, no issue).
-  # Empty means every confirmed regression is reported. Any entry added here must have a
-  # tracking issue stating the revert criteria.
+  # suppressions for any future confirmation/reporting path. Empty means no benchmark is
+  # suppressed. Any entry added here must have a tracking issue stating the revert
+  # criteria.
   IGNORED_REGRESSION_BENCHMARKS = [].freeze
 
   # Build a structured alert hash for the ALERTS payload key.

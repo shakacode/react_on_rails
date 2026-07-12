@@ -429,9 +429,8 @@ RSpec.describe "track_benchmarks" do
     end
   end
 
-  # On a main regression the rendered table feeds the report-regressions hand-off. If
-  # the display sidecar was missing/corrupt the table is empty, and an empty-bodied
-  # issue is useless — the hand-off must substitute a run-URL pointer instead.
+  # On a regression hand-off the rendered table is the evidence. If the display sidecar
+  # was missing/corrupt the table is empty, so substitute a run-URL pointer instead.
   describe "#regression_handoff_summary" do
     it "returns the rendered table unchanged when it is non-empty" do
       expect(regression_handoff_summary("### Summary\n| a |")).to eq("### Summary\n| a |")

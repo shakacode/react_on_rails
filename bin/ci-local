@@ -64,6 +64,7 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 ROOT_GEMFILE="$ROOT_DIR/Gemfile"
 OSS_GEMFILE="$ROOT_DIR/react_on_rails/Gemfile"
 PRO_GEMFILE="$ROOT_DIR/react_on_rails_pro/Gemfile"
+PRO_DUMMY_GEMFILE="$ROOT_DIR/react_on_rails_pro/spec/dummy/Gemfile"
 cd "$ROOT_DIR"
 
 detect_base_ref() {
@@ -290,6 +291,25 @@ ensure_pro_dependencies() {
   PRO_DEPS_READY=true
 }
 
+ensure_pro_dummy_test_bundles() {
+  if [ ! -d "react_on_rails_pro/spec/dummy" ]; then
+    return 0
+  fi
+
+  if ! (cd react_on_rails_pro/spec/dummy && bundle_command "$PRO_DUMMY_GEMFILE" bundle check >/dev/null 2>&1); then
+    echo -e "${YELLOW}Installing React on Rails Pro dummy Ruby dependencies...${NC}"
+    if ! (cd react_on_rails_pro/spec/dummy && bundle_command "$PRO_DUMMY_GEMFILE" bundle install); then
+      echo -e "${RED}✗ React on Rails Pro dummy dependency installation failed, skipping Pro dummy bundle setup${NC}"
+      FAILED_JOBS+=("React on Rails Pro Dummy Dependency Install")
+      return 0
+    fi
+  fi
+
+  run_job "React on Rails Pro Dummy Packs" \
+    "cd react_on_rails_pro/spec/dummy && bundle_command \"$PRO_DUMMY_GEMFILE\" bundle exec rake react_on_rails:generate_packs"
+  run_job "React on Rails Pro Dummy Test Bundles" "cd react_on_rails_pro/spec/dummy && pnpm run build:test"
+}
+
 ensure_oss_dependencies() {
   if [ "$OSS_DEPS_READY" = true ]; then
     return 0
@@ -334,7 +354,9 @@ fi
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then
-  run_job "RuboCop" "bundle_command \"$ROOT_GEMFILE\" bundle exec rubocop"
+  run_job "RuboCop" "cd react_on_rails && bundle_command \"$ROOT_GEMFILE\" bundle exec rubocop"
+  run_job "Benchmark RuboCop" "bundle_command \"$ROOT_GEMFILE\" bundle exec rubocop benchmarks"
+  run_job "React on Rails Package Build" "pnpm --filter react-on-rails run build"
   run_job "ESLint" "pnpm run eslint --report-unused-disable-directives"
   run_job "Prettier Check" "pnpm start format.listDifferent"
   run_job "TypeScript Type Check" "pnpm run type-check"
@@ -342,7 +364,12 @@ fi
 
 # Run JS unit tests
 if [ "$RUN_JS" = true ]; then
-  run_job "JS Unit Tests" "pnpm test"
+  run_job "Package Build" "pnpm run build"
+  ensure_pro_dummy_test_bundles
+  run_job "React on Rails JS Unit Tests" "pnpm --filter react-on-rails test"
+  run_job "React on Rails Pro JS Unit Tests" "pnpm --filter react-on-rails-pro test"
+  run_job "Create React on Rails App JS Unit Tests" "pnpm --filter create-react-on-rails-app test"
+  run_job "React on Rails Pro Node Renderer JS Tests" "pnpm --filter react-on-rails-pro-node-renderer run ci"
 fi
 
 # Run Ruby gem tests

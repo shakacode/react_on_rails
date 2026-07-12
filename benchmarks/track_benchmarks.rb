@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "lib/track_benchmarks"
+require_relative "lib/bencher_token"
 
 BENCHMARK_JSON = TrackBenchmarks::Config::BENCHMARK_JSON
 REPORT_JSON = TrackBenchmarks::Config::REPORT_JSON
@@ -151,7 +152,16 @@ if __FILE__ == $PROGRAM_NAME
 
   SUITE_NAME = env!("BENCHMARK_SUITE_NAME")
   REPORT_MARKER = env!("BENCHER_REPORT_MARKER")
-  env!("BENCHER_API_TOKEN")
+  begin
+    BencherToken.apply_upload_env!(
+      ENV,
+      api_key: ENV.fetch("BENCHER_API_KEY", nil),
+      api_token: ENV.fetch("BENCHER_API_TOKEN", nil)
+    )
+  rescue BencherToken::InvalidToken => e
+    warn e.message
+    exit 1
+  end
 
   TrackBenchmarks::Cli.new(suite_name: SUITE_NAME, report_marker: REPORT_MARKER).run
 end

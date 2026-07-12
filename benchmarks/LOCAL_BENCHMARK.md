@@ -39,8 +39,9 @@ On the dedicated machine:
   machine this is automatic (the script sets `MISE_RUBY_VERSION`); otherwise make that Ruby
   the active one before running.
 - The [`bencher`](https://bencher.dev/docs/explanation/bencher-run/) CLI on `PATH`.
-- `BENCHER_API_TOKEN` exported (for uploads). For the `pro` suite, also
-  `REACT_ON_RAILS_PRO_LICENSE`.
+- `BENCHER_API_KEY` exported (for uploads). This can be a project-scoped
+  `bencher_run_...` key for this project or a user-scoped `bencher_user_...` key. For Pro
+  suites, also `REACT_ON_RAILS_PRO_LICENSE`.
 - Create the `m1-bench` testbed in the
   [`react-on-rails-t8a9ncxo`](https://bencher.dev/perf/react-on-rails-t8a9ncxo) Bencher
   project (or let the first upload create it). Its baseline is independent from the shared
@@ -51,14 +52,18 @@ On the dedicated machine:
 
 ```bash
 # Full run of the core suite, upload to the m1-bench testbed:
-BENCHER_API_TOKEN=… ruby benchmarks/run-local-benchmark.rb core
+BENCHER_API_KEY=… ruby benchmarks/run-local-benchmark.rb core
 
 # Validate locally without touching Bencher:
 ruby benchmarks/run-local-benchmark.rb core --no-upload
 
-# Pro suite, fail (exit 1) if a regression is flagged — useful as a release-candidate gate:
-BENCHER_API_TOKEN=… REACT_ON_RAILS_PRO_LICENSE=… \
+# Pro Rails suite, fail (exit 1) if a regression is flagged — useful as a release-candidate gate:
+BENCHER_API_KEY=… REACT_ON_RAILS_PRO_LICENSE=… \
   ruby benchmarks/run-local-benchmark.rb pro --fail-on-alert
+
+# Pro Node Renderer suite on the same dedicated testbed:
+BENCHER_API_KEY=… REACT_ON_RAILS_PRO_LICENSE=… \
+  ruby benchmarks/run-local-benchmark.rb pro-node-renderer --fail-on-alert
 
 # Re-run against an already-built app (skip the build/setup steps):
 ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
@@ -66,6 +71,59 @@ ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
 
 Options: `--testbed NAME` (default `m1-bench`), `--branch NAME`, `--[no-]upload`,
 `--fail-on-alert`, `--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
+
+## Quiet A/B comparisons
+
+For release-candidate comparisons, do not trust a single `main` vs RC pass. Use the A/B
+orchestrator so the machine is quiet before each run and each ref gets both early and late
+positions in the sequence:
+
+```bash
+ruby benchmarks/run-local-benchmark-comparison.rb core \
+  --a-ref v17.0.0.rc.5 --a-name rc5 \
+  --b-ref origin/main --b-name main \
+  --repetitions 5 \
+  --no-upload
+```
+
+The comparison runner:
+
+- creates temporary detached worktrees for both refs;
+- installs the current local benchmark harness/reporting shim into those worktrees, so older RC
+  tags can be measured without committing benchmark tooling into the tag;
+- waits for a quiet machine window before each run (by default six consecutive samples, ten
+  seconds apart, under the load/CPU thresholds shown in `--help`);
+- alternates order by repetition (`A,B`, then `B,A`, then `A,B`, ...), reducing bias from
+  warm caches, thermal drift, or background activity;
+- writes per-run artifacts plus `comparison_summary.json` and `comparison_summary.md` under
+  `bench_results/local_comparison/<timestamp>/`.
+
+Comparison mode defaults to `--no-upload` because exploratory repeats can still be discarded.
+When the machine was truly idle and the local summary is credible, add `--upload` to post every
+repeat to the dedicated Bencher testbed. If a run becomes contaminated because you used the
+machine during the benchmark, discard that artifact directory and rerun. For non-`main`
+scenarios, the first upload still resets from `main` to clone thresholds, but later repetitions
+append to the same Bencher branch/version so the comparison keeps all repeated samples.
+
+Useful knobs:
+
+```bash
+# Print the plan only.
+ruby benchmarks/run-local-benchmark-comparison.rb core \
+  --a-ref v17.0.0.rc.5 --a-name rc5 \
+  --b-ref origin/main --b-name main \
+  --repetitions 3 \
+  --dry-run
+
+# Be stricter and wait up to 12 hours for a quiet window before each run.
+ruby benchmarks/run-local-benchmark-comparison.rb core \
+  --a-ref v17.0.0.rc.5 --a-name rc5 \
+  --b-ref origin/main --b-name main \
+  --repetitions 5 \
+  --quiet-load-per-core 0.15 \
+  --quiet-cpu-percent 12 \
+  --quiet-timeout 43200
+```
 
 The script reuses the CI building blocks (no duplicated benchmark logic): per-suite config
 from `generate_matrix.rb`, the dummy app's `bin/prod*` for the build + server, `bench.rb` for
@@ -75,9 +133,9 @@ name, or tag/SHA when detached) unless `--branch` overrides it: a nightly `main`
 dedicated main trend, while an RC tag or feature branch forms its own series instead of
 polluting that baseline.
 
-**Supported suites:** `core`, `pro` (rails + k6). The `pro-node-renderer` suite needs extra
-steps (renderer cache pre-seed, a separate server + vegeta target) and is deferred — run it
-in CI for now.
+**Supported suites:** `core`, `pro` (Rails + k6), and `pro-node-renderer` (node renderer +
+Vegeta). Run all three separately for a full benchmark pass; the Pro suites require
+`REACT_ON_RAILS_PRO_LICENSE`.
 
 ## Scheduling (nightly trend + RC)
 
@@ -95,7 +153,7 @@ running core nightly at 03:00:
     <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
     <key>WorkingDirectory</key><string>/path/to/react_on_rails</string>
     <key>EnvironmentVariables</key>
-    <dict><key>BENCHER_API_TOKEN</key><string>…</string></dict>
+    <dict><key>BENCHER_API_KEY</key><string>…</string></dict>
     <key>ProgramArguments</key>
     <array>
       <string>/bin/bash</string><string>-lc</string>
