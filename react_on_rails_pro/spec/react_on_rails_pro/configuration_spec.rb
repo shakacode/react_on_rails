@@ -820,6 +820,33 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe "RSC configuration options" do
+      it "leaves the RSC payload authorizer unset by default" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.rsc_payload_authorizer).to be_nil
+      end
+
+      it "accepts a callable RSC payload authorizer" do
+        authorizer = ->(_controller, _component_name) { true }
+
+        ReactOnRailsPro.configure do |config|
+          config.rsc_payload_authorizer = authorizer
+        end
+
+        expect(ReactOnRailsPro.configuration.rsc_payload_authorizer).to be(authorizer)
+      end
+
+      it "rejects a non-callable RSC payload authorizer" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rsc_payload_authorizer = "authenticated"
+          end
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /config\.rsc_payload_authorizer must be nil or respond to #call/
+        )
+      end
+
       it "has default values for RSC bundle and manifest files" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
 

@@ -222,6 +222,49 @@ Every item below maps to a configuration option or behavior verified in this rep
 
 ## React Server Components advisory posture (Pro)
 
+### Secure the RSC payload endpoint
+
+The endpoint is opt-in: React on Rails Pro does not mount it unless your routes call `rsc_payload_route`.
+The RSC generator adds that route when you opt into RSC. Once mounted, treat it as a public API: the URL
+contains a client-controlled component name and the `props` query parameter is also untrusted. Do not use
+either value as proof that a user may read a record, tenant, or internal component.
+
+Configure an authorizer to check the Rails session and restrict independently renderable components. The
+callback runs before props JSON is parsed or rendering starts. Returning `false` or `nil` responds with
+`403 Forbidden`; leaving the option unset preserves the existing allow-all behavior.
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+allowed_rsc_components = %w[AccountPage DashboardPage].freeze
+
+ReactOnRailsPro.configure do |config|
+  config.rsc_payload_authorizer = lambda do |controller, component_name|
+    controller.session[:user_id].present? && allowed_rsc_components.include?(component_name)
+  end
+end
+```
+
+For policy libraries or application-wide controller filters, route to an app-owned controller instead:
+
+```ruby
+# app/controllers/rsc_payload_controller.rb
+class RscPayloadController < ApplicationController
+  include ReactOnRailsPro::RSCPayloadRenderer
+
+  before_action :authenticate_user!
+end
+
+# config/routes.rb
+rsc_payload_route controller: "rsc_payload"
+```
+
+The shipped default payload controller inherits from `ActionController::Base`, not your
+`ApplicationController`, so your application's filters do not apply to it automatically. Whichever seam
+you use, derive identity and permissions from the session and database. Never authorize from RSC props;
+the browser can alter them before every payload request.
+
+### Track upstream RSC advisories
+
 RSC support in React on Rails Pro is built directly on React's Flight packages: the
 `react-on-rails-rsc` package wraps React's `react-server-dom-webpack`. Vulnerabilities in those upstream
 packages therefore apply to this stack, and the project's response is enforced in code:

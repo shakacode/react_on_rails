@@ -51,6 +51,7 @@ module ReactOnRailsPro
       raise_non_shell_server_rendering_errors: Configuration::DEFAULT_RAISE_NON_SHELL_SERVER_RENDERING_ERRORS,
       enable_rsc_support: Configuration::DEFAULT_ENABLE_RSC_SUPPORT,
       rsc_payload_generation_url_path: Configuration::DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH,
+      rsc_payload_authorizer: nil,
       rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
       react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
@@ -121,7 +122,8 @@ module ReactOnRailsPro
                   :react_server_client_manifest_file
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
-                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys
+                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
+                :rsc_payload_authorizer
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -195,6 +197,14 @@ module ReactOnRailsPro
       @renderer_http_keep_alive_timeout = value
     end
 
+    def rsc_payload_authorizer=(value)
+      unless value.nil? || value.respond_to?(:call)
+        raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
+      end
+
+      @rsc_payload_authorizer = value
+    end
+
     def initialize(renderer_url: nil, renderer_password: nil, license_token: nil, # rubocop:disable Metrics/AbcSize
                    server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -208,7 +218,7 @@ module ReactOnRailsPro
                    ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
-                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
+                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil, rsc_payload_authorizer: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil,
                    react_server_client_manifest_file: nil,
                    concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
@@ -245,6 +255,7 @@ module ReactOnRailsPro
       self.raise_non_shell_server_rendering_errors = raise_non_shell_server_rendering_errors
       self.enable_rsc_support = enable_rsc_support
       self.rsc_payload_generation_url_path = rsc_payload_generation_url_path
+      self.rsc_payload_authorizer = rsc_payload_authorizer
       self.rsc_bundle_js_file = rsc_bundle_js_file
       self.react_client_manifest_file = react_client_manifest_file
       self.react_server_client_manifest_file = react_server_client_manifest_file
