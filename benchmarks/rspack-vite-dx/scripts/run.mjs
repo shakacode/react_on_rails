@@ -22,6 +22,19 @@ const sampleCount = Number(readArgument('--samples') ?? 5);
 const output = path.resolve(root, readArgument('--output') ?? 'results/latest.json');
 const tools = ['rspack', 'vite'];
 const maxLogTailCharacters = 8_000;
+const httpProbeTimeoutMs = 1_000;
+const signalExitCodes = { SIGINT: 130, SIGTERM: 143 };
+
+let activeStop;
+let browser;
+let cleanupPromise;
+let signalShutdownPromise;
+
+for (const signal of Object.keys(signalExitCodes)) {
+  process.on(signal, () => {
+    void shutdownFromSignal(signal);
+  });
+}
 
 if (!Number.isInteger(sampleCount) || sampleCount < 5) {
   throw new Error('--samples must be an integer of at least 5');
@@ -33,7 +46,6 @@ if (!environment.harness_git_clean) {
 }
 
 await prepareControlWorkspaces(root);
-let browser;
 const raw = {
   schema_version: 1,
   created_at: new Date().toISOString(),
@@ -74,7 +86,7 @@ try {
     const session = await startControl(tool);
     try {
       raw.raw_samples_ms.hmr[tool] = await measureHmr(session.page, session.messagePath, tool, sampleCount);
-      raw.overlay[tool] = await inspectOverlay(session.page, session.messagePath, tool);
+      raw.overlay[tool] = await inspectOverlay(session.page, session.messagePath, tool, session.runNonce);
       raw.controls[tool] = {
         command: commandFor(tool, '<PORT>').join(' '),
         measured_port: session.port,
@@ -86,11 +98,7 @@ try {
     raw.zero_config[tool] = await inspectConfigSurface(tool);
   }
 } finally {
-  try {
-    await browser?.close();
-  } finally {
-    await removeControlWorkspaces(root);
-  }
+  await cleanupRunner();
 }
 
 raw.summary = buildSummary(raw.raw_samples_ms);
@@ -130,11 +138,37 @@ async function startControl(tool) {
   child.stdout.on('data', captureLogTail);
   child.stderr.on('data', captureLogTail);
 
+  let page;
+  let stopPromise;
+  const stop = async () => {
+    stopPromise ??= (async () => {
+      try {
+        try {
+          await page?.close();
+        } catch (error) {
+          if (!signalShutdownPromise) throw error;
+        }
+      } finally {
+        try {
+          await stopProcess(child, port);
+        } finally {
+          await workspace.remove();
+        }
+      }
+    })();
+    try {
+      await stopPromise;
+    } finally {
+      if (activeStop === stop) activeStop = undefined;
+    }
+  };
+  activeStop = stop;
+
   try {
     const url = `http://127.0.0.1:${port}`;
     await waitForHttp(url, child, () => logTail, tool);
     const coldStartMs = rounded(performance.now() - startedAt);
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.goto(`${url}/?benchmark_nonce=${encodeURIComponent(runNonce)}`, {
       waitUntil: 'domcontentloaded',
     });
@@ -145,24 +179,10 @@ async function startControl(tool) {
       messagePath,
       port,
       runNonce,
-      async stop() {
-        try {
-          await page.close();
-        } finally {
-          try {
-            await stopProcess(child, port);
-          } finally {
-            await workspace.remove();
-          }
-        }
-      },
+      stop,
     };
   } catch (error) {
-    try {
-      await stopProcess(child, port);
-    } finally {
-      await workspace.remove();
-    }
+    await stop();
     throw new Error(`${tool} failed to start: ${error.message}\n${logTail}`);
   }
 }
@@ -179,7 +199,7 @@ async function measureHmr(page, messagePath, tool, count) {
   return samples;
 }
 
-async function inspectOverlay(page, messagePath, tool) {
+async function inspectOverlay(page, messagePath, tool, runNonce) {
   await writeFile(messagePath, 'export default ;\n');
   const selectors = tool === 'vite' ? ['vite-error-overlay'] : ['#rspack-dev-server-client-overlay'];
 
@@ -204,8 +224,9 @@ async function inspectOverlay(page, messagePath, tool) {
       .locator(matchedSelector)
       .evaluate((element) => (element.shadowRoot?.textContent ?? '').slice(0, 500));
   }
-  await writeMarker(messagePath, 'ready');
-  await page.locator('#root').filter({ hasText: 'ready' }).waitFor({ timeout: 15_000 });
+  const recoveryMarker = `${tool}-overlay-restored-${runNonce}-${Date.now()}`;
+  await writeMarker(messagePath, recoveryMarker);
+  await page.locator('#root').filter({ hasText: recoveryMarker }).waitFor({ timeout: 15_000 });
 
   return {
     compile_error_overlay_attached: matchedSelector !== null,
@@ -245,7 +266,10 @@ async function waitForHttp(url, child, readLogTail, tool) {
       throw new Error(`process exited ${child.exitCode}; ${readLogTail().slice(-1000)}`);
     }
     try {
-      const response = await fetch(url);
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(Math.min(httpProbeTimeoutMs, remainingMs)),
+      });
       if (response.ok) {
         assertExactlyOneEntry(await response.text(), tool);
         return;
@@ -257,6 +281,35 @@ async function waitForHttp(url, child, readLogTail, tool) {
     await delay(10);
   }
   throw new Error(`timed out waiting for ${url}`);
+}
+
+async function cleanupRunner() {
+  cleanupPromise ??= (async () => {
+    try {
+      await activeStop?.();
+    } finally {
+      try {
+        await browser?.close();
+      } finally {
+        await removeControlWorkspaces(root);
+      }
+    }
+  })();
+  return cleanupPromise;
+}
+
+async function shutdownFromSignal(signal) {
+  signalShutdownPromise ??= (async () => {
+    process.exitCode = signalExitCodes[signal];
+    try {
+      await cleanupRunner();
+    } catch (error) {
+      console.error(`benchmark cleanup failed after ${signal}:`, error);
+      process.exitCode = 1;
+    }
+    process.exit();
+  })();
+  return signalShutdownPromise;
 }
 
 async function stopProcess(child, port) {
