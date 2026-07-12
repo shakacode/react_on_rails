@@ -20506,7 +20506,7 @@ Example failure (content shortened):
   "status": "warn",
   "severity": "warning",
   "message": "Missing React on Rails initializer",
-  "fix_command": "bin/rails generate react_on_rails:install",
+  "fix_command": null,
   "docs_url": "https://reactonrails.com/docs/api-reference/doctor#check-id-key-configuration-files",
   "remediation": {
     "prompt": "Fix React on Rails doctor check `key_configuration_files`...",

@@ -173,6 +173,51 @@ RSpec.describe ReactOnRails::Doctor do
         .to raise_error(ArgumentError, /check missing keys: severity/)
     end
 
+    it "rejects inconsistent report semantics and duplicate check IDs" do
+      stub_check_sections(json_doctor)
+      report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
+
+      mutations = {
+        "status severity mismatch" => [
+          ->(value) { value[:checks].first[:severity] = "error" }, /severity does not match/
+        ],
+        "overall status mismatch" => [->(value) { value[:status] = "warn" }, /report status does not match/],
+        "summary mismatch" => [->(value) { value[:summary][:pass] -= 1 }, /summary does not match/],
+        "duplicate check ID" => [->(value) { value[:checks][1][:id] = value[:checks][0][:id] }, /ids must be unique/],
+        "non-string version" => [->(value) { value[:ror_version] = 17 }, /ror_version must be a string/],
+        "non-string title" => [->(value) { value[:checks].first[:title] = nil }, /invalid title/]
+      }
+
+      aggregate_failures do
+        mutations.each do |name, (mutation, error_pattern)|
+          mutated_report = Marshal.load(Marshal.dump(report))
+          mutation.call(mutated_report)
+          expect { ReactOnRails::DoctorSchema.validate!(mutated_report) }
+            .to raise_error(ArgumentError, error_pattern), name
+        end
+      end
+    end
+
+    it "rejects malformed nested detail fields" do
+      stub_check_sections(json_doctor, "environment_prerequisites" => [{ type: :info, content: "Checking" }])
+      report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
+
+      mutations = {
+        "missing content" => [->(detail) { detail.delete(:content) }, /detail.*missing keys: content/],
+        "unknown level" => [->(detail) { detail[:level] = "critical" }, /invalid detail level/],
+        "non-string content" => [->(detail) { detail[:content] = nil }, /invalid detail content/]
+      }
+
+      aggregate_failures do
+        mutations.each do |name, (mutation, error_pattern)|
+          mutated_report = Marshal.load(Marshal.dump(report))
+          mutation.call(mutated_report[:checks].first[:details].first)
+          expect { ReactOnRails::DoctorSchema.validate!(mutated_report) }
+            .to raise_error(ArgumentError, error_pattern), name
+        end
+      end
+    end
+
     it "emits one entry per check section with stable snake_case ids" do
       stub_check_sections(json_doctor)
       report = run_and_parse_json(json_doctor)
@@ -271,7 +316,7 @@ RSpec.describe ReactOnRails::Doctor do
       expect(check["details"].length).to eq(2)
     end
 
-    it "includes a fix command only for non-passing checks with a safe mechanical repair" do
+    it "does not attach section-wide fix commands to unrelated failures" do
       stub_check_sections(
         json_doctor,
         "react_on_rails_packages" => [{ type: :error, content: "Shakapacker is not configured" }],
@@ -279,9 +324,8 @@ RSpec.describe ReactOnRails::Doctor do
       )
       checks = run_and_parse_json(json_doctor)["checks"].to_h { |check| [check["id"], check] }
 
-      expect(checks["react_on_rails_packages"]["fix_command"]).to eq("bin/rails shakapacker:install")
-      expect(checks["key_configuration_files"]["fix_command"])
-        .to eq("bin/rails generate react_on_rails:install")
+      expect(checks["react_on_rails_packages"]["fix_command"]).to be_nil
+      expect(checks["key_configuration_files"]["fix_command"]).to be_nil
       expect(checks["environment_prerequisites"]["fix_command"]).to be_nil
     end
 
