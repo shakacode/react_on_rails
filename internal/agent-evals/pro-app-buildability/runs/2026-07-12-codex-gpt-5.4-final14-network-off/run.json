@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final13-network-off",
-  "started_at": "2026-07-12T15:17:17Z",
-  "finished_at": "2026-07-12T15:17:37Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final14-network-off",
+  "started_at": "2026-07-12T15:19:53Z",
+  "finished_at": "2026-07-12T15:20:14Z",
   "repository": {
-    "revision": "8147150c6d8cd57d9ccd4bb5855a52a47e3c7ab1",
+    "revision": "cf589729993c329b20fd8b66fa1f7e8cd02e284e",
     "dirty": false
   },
   "definition": {
@@ -51,7 +51,7 @@
       },
       {
         "path": "bin/sanitize-events.pl",
-        "sha256": "710d5328c975dbe3af6ead586406fb4a30a89c157625ad0a63c9e6fd499d0fbe",
+        "sha256": "c880640ee418594e19ff09d81bfb0a8e8078070fbd4590cb61ca2b323b68ca31",
         "executable": true
       },
       {
@@ -61,7 +61,7 @@
       },
       {
         "path": "bin/sensitive-values.mjs",
-        "sha256": "c36315fb6164540226b4c0d1bc0e12006b2a37076ee19c6ca1d9047f371de915",
+        "sha256": "b13aa0f00618254da04037178429dc5ec7b57e3e18ecbbdf0a8261aa4e6d83c6",
         "executable": false
       },
       {
