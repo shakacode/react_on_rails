@@ -16,8 +16,50 @@ const looksLikeCredentialValue = (value) => {
 };
 const shouldRedact = (name, value) => sensitiveName.test(name) && looksLikeCredentialValue(value);
 
+const structuredValueEnd = (value, start) => {
+  const stack = [value[start] === '{' ? '}' : ']'];
+  let quote = null;
+  let escaped = false;
+  for (let index = start + 1; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote !== null) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = null;
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === '{' || character === '[') {
+      stack.push(character === '{' ? '}' : ']');
+    } else if (character === '}' || character === ']') {
+      if (character !== stack.at(-1)) return value.length;
+      stack.pop();
+      if (stack.length === 0) return index + 1;
+    }
+  }
+  return value.length;
+};
+
+const redactStructuredSensitiveValues = (value) => {
+  const input = String(value);
+  const pattern = /([a-z0-9_-]+)(["']?\s*[:=]\s*)([[{])/gi;
+  let output = '';
+  let cursor = 0;
+  while (true) {
+    const match = pattern.exec(input);
+    if (match === null) break;
+    if (sensitiveName.test(match[1])) {
+      const start = match.index + match[0].length - 1;
+      const end = structuredValueEnd(input, start);
+      output += `${input.slice(cursor, start)}[REDACTED]`;
+      cursor = end;
+      pattern.lastIndex = end;
+    }
+  }
+  return output + input.slice(cursor);
+};
+
 export const redactSensitiveValues = (value) =>
-  String(value)
+  redactStructuredSensitiveValues(value)
     .replace(quotedNamedValue, (match, name, separator, quote, quotedValue) =>
       shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match,
     )

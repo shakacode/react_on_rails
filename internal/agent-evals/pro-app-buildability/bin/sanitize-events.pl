@@ -17,6 +17,49 @@ sub credential_value {
   return $value !~ /^(?:auto|false|file|keyring|none|null|true|unknown)$/i;
 }
 
+sub structured_value_end {
+  my ($value, $start) = @_;
+  my @stack = (substr($value, $start, 1) eq '{' ? '}' : ']');
+  my $quote = '';
+  my $escaped = 0;
+  for (my $index = $start + 1; $index < length($value); $index++) {
+    my $character = substr($value, $index, 1);
+    if (length($quote)) {
+      if ($escaped) {
+        $escaped = 0;
+      } elsif ($character eq '\\') {
+        $escaped = 1;
+      } elsif ($character eq $quote) {
+        $quote = '';
+      }
+    } elsif ($character eq '"' || $character eq "'") {
+      $quote = $character;
+    } elsif ($character eq '{' || $character eq '[') {
+      push @stack, $character eq '{' ? '}' : ']';
+    } elsif ($character eq '}' || $character eq ']') {
+      return length($value) if !@stack || $character ne $stack[-1];
+      pop @stack;
+      return $index + 1 unless @stack;
+    }
+  }
+  return length($value);
+}
+
+sub redact_structured_sensitive_values {
+  my ($value) = @_;
+  my $output = '';
+  my $cursor = 0;
+  while ($value =~ /([a-z0-9_-]+)(["']?\s*[:=]\s*)([\[{])/ig) {
+    next unless sensitive_name($1);
+    my $start = $+[0] - 1;
+    my $end = structured_value_end($value, $start);
+    $output .= substr($value, $cursor, $start - $cursor) . '[REDACTED]';
+    $cursor = $end;
+    pos($value) = $end;
+  }
+  return $output . substr($value, $cursor);
+}
+
 @ARGV <= 1 or die "usage: sanitize-events.pl [INPUT]\n";
 my $input;
 if (@ARGV) {
@@ -40,6 +83,8 @@ while (1) {
   $content .= $chunk;
 }
 close $input if @ARGV;
+
+$content = redact_structured_sensitive_values($content);
 
 for my $variable (qw(EVAL_PRIVATE_DIR EVAL_WORKSPACE EVAL_OUTPUT)) {
   my $value = $ENV{$variable};

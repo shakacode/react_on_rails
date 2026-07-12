@@ -43,6 +43,15 @@ printf '%s\n' \
   'AWS_SECRET_ACCESS_KEY=abc,def' \
   'api_key: ["array-secret-value-123"]' \
   'credential: {"value":"object-secret-value-456"}' \
+  'api_key: {' \
+  '  "value": "multiline-object-secret-789",' \
+  '  "nested": [{"value":"nested-object-secret"}],' \
+  '  "closing": "quoted }] delimiters"' \
+  '}' \
+  'credentials: [' \
+  '  {"value":"multiline-array-secret-012"},' \
+  '  ["nested-array-secret"]' \
+  ']' \
   'credential_store:"file"' \
   '-----BEGIN PRIVATE KEY-----' 'complete-key-material' '-----END PRIVATE KEY-----' \
   '-----BEGIN OPENSSH PRIVATE KEY-----' 'truncated-key-material' >"$tmp/parity-unsafe"
@@ -54,9 +63,27 @@ node --input-type=module -e \
    process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
   "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
 cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
-if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|array-secret-value-123|object-secret-value-456|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
   "$tmp/parity-perl-safe"; then
   echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
+  exit 1
+fi
+
+printf '%s\n' 'api_key: [' '{"value":"unclosed-structured-secret"}' \
+  >"$tmp/unclosed-structured-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unclosed-structured-unsafe" \
+  >"$tmp/unclosed-structured-perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/unclosed-structured-unsafe" \
+  >"$tmp/unclosed-structured-js-safe"
+cmp "$tmp/unclosed-structured-perl-safe" "$tmp/unclosed-structured-js-safe"
+test "$(cat "$tmp/unclosed-structured-perl-safe")" = 'api_key: [REDACTED]'
+if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/unclosed-structured-perl-safe" >/dev/null; then
+  echo "final scanner rejected fail-closed unclosed structured redaction" >&2
   exit 1
 fi
 rg -q 'credential_store:"file"' "$tmp/parity-perl-safe"
