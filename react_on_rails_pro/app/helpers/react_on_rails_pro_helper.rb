@@ -1260,8 +1260,14 @@ module ReactOnRailsProHelper
     render_options = create_render_options(react_component_name, options)
     json_stream = server_rendered_react_component(render_options)
     json_stream.transform do |chunk|
-      html = chunk.delete("html") || ""
-      metadata = chunk.to_json
+      # Read `html` without removing it. This chunk may be owned by StreamCache,
+      # which buffers a reference to it and writes it to Rails.cache after the
+      # stream completes. Mutating it here (e.g. `chunk.delete("html")`) would
+      # tear the payload out of the buffered Hash, so prerender caching would
+      # persist an empty payload and every cache hit would serve zero bytes.
+      # See https://github.com/shakacode/react_on_rails/issues/4550.
+      html = chunk["html"] || ""
+      metadata = chunk.except("html").to_json
       content_bytes = html.bytesize.to_s(16).rjust(8, "0")
       "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end
