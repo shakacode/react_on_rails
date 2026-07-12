@@ -50,6 +50,7 @@ Rails.application.routes.draw do
   get "manual_render_test" => "pages#manual_render_test"
   get "root_error_callbacks" => "pages#root_error_callbacks"
   get "hydration_scheduling" => "pages#hydration_scheduling"
+  # Streaming hydration demo (issue #4385): independent section hydration with hydrate_on scheduling.
   get "streaming_hydration_demo" => "pages#streaming_hydration_demo"
 
   # EXPERIMENTAL View Transitions demo (issue #3888). Inert by default: the

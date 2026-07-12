@@ -67,7 +67,7 @@ type StreamingHydrationDemoProps = {
   section: 'header' | 'hero' | 'main' | 'sidebar' | 'footer';
 };
 
-const sectionConfig: Record<string, Omit<SectionProps, 'testId'>> = {
+const sectionConfig: Record<StreamingHydrationDemoProps['section'], Omit<SectionProps, 'testId'>> = {
   header: {
     name: 'Header Section',
     description: 'Navigation and branding. First to hydrate.',
@@ -97,10 +97,5 @@ const sectionConfig: Record<string, Omit<SectionProps, 'testId'>> = {
 
 export default function StreamingHydrationDemo({ section }: StreamingHydrationDemoProps) {
   const config = sectionConfig[section];
-
-  if (!config) {
-    return <div>Unknown section: {section}</div>;
-  }
-
   return <Section testId={`streaming-${section}`} {...config} />;
 }
