@@ -96,26 +96,53 @@ class BencherReport # rubocop:disable Metrics/ClassLength
     @tracked_measures = tracked_measures&.map { |measure| normalize(measure) }
     @boundaries = index_boundaries(raw)
     @alerts, @filtered_alerts = parse_alerts(raw).partition { |alert| current_regression_alert?(alert) }
+    @unconfirmed_alerts = []
+    @unconfirmed_pairs = Set.new
     # Per-benchmark perf links are informational (they only decide whether a name links
     # out), so they live in a separate, fully-lenient builder — a missing field yields an
     # unlinked name, never a FormatError that would fail the job over a cosmetic link.
     @perf_urls = BencherPerfUrl.new(raw)
   end
 
-  attr_reader :alerts
+  attr_reader :alerts, :unconfirmed_alerts
 
   def regression? = !@alerts.empty?
 
   def filtered_alert? = !@filtered_alerts.empty?
+
+  def unconfirmed_alert? = !@unconfirmed_alerts.empty?
+
+  # Sample-level confirmation for relative runs (#4580). Each side's per-sample raw
+  # values (Hash: benchmark name -> measure name -> numeric array, from the bench
+  # scripts' display sidecars) act as built-in reruns of the comparison: a
+  # benchmark+measure whose base and head sample RANGES OVERLAP did not reproduce its
+  # change across every rerun, so its boundary crossing is downgraded — #significance
+  # reports :unconfirmed (the table renders ⚠️ instead of 🔴/🟢) and its active alerts
+  # move out of #alerts (so #regression? and the candidate hand-off skip it; the
+  # caller normalizes Bencher's --err exit via BencherRun.normalized_exit_code).
+  # Disjoint ranges mean every head sample sits past every base sample — the change
+  # reproduced in all samples — so the alert stands. Pairs without >= 2 numeric
+  # samples on both sides keep today's single-sample behavior (fail open).
+  def apply_sample_confirmation!(head_samples:, base_samples:)
+    @unconfirmed_pairs = unconfirmed_pairs(head_samples, base_samples)
+    unconfirmed, @alerts = @alerts.partition { |alert| unconfirmed_alert_pair?(alert) }
+    @unconfirmed_alerts += unconfirmed
+    self
+  end
 
   # Boundary for a benchmark+measure, or nil if absent from the report.
   def boundary(benchmark_name, measure_key)
     @boundaries.dig(benchmark_name, normalize(measure_key))
   end
 
-  # :regression | :improvement | nil for benchmark+measure given its direction.
+  # :regression | :improvement | :unconfirmed | nil for benchmark+measure given its
+  # direction. :unconfirmed means the value crossed its boundary but the change did
+  # not reproduce across repeated samples (see #apply_sample_confirmation!).
   def significance(benchmark_name, measure_key, direction)
-    boundary(benchmark_name, measure_key)&.significance(direction)
+    verdict = boundary(benchmark_name, measure_key)&.significance(direction)
+    return :unconfirmed if verdict && @unconfirmed_pairs.include?([benchmark_name, normalize(measure_key)])
+
+    verdict
   end
 
   # The Bencher perf-plot URL for one benchmark (all its measures), or nil when the
@@ -223,6 +250,46 @@ class BencherReport # rubocop:disable Metrics/ClassLength
   # rubocop:enable Metrics/CyclomaticComplexity
 
   def threshold_side?(boundary, direction) = direction == :lower ? boundary.lower_limit : boundary.upper_limit
+
+  # The benchmark+measure pairs whose base and head sample ranges overlap — the
+  # change did not reproduce across every repeated sample. Only pairs with >= 2
+  # numeric samples on BOTH sides can be classified; everything else is left
+  # confirmed (fail open to single-sample behavior).
+  def unconfirmed_pairs(head_samples, base_samples)
+    pairs = Set.new
+    head_samples.each do |name, head_measures|
+      base_measures = base_samples[name]
+      next unless head_measures.is_a?(Hash) && base_measures.is_a?(Hash)
+
+      overlapping_measures(head_measures, base_measures).each { |measure| pairs << [name, measure] }
+    end
+    pairs
+  end
+
+  # Normalized measure keys whose head and base sample ranges overlap.
+  def overlapping_measures(head_measures, base_measures)
+    base_by_key = base_measures.transform_keys { |measure| normalize(measure) }
+    head_measures.filter_map do |measure, head_values|
+      base_values = base_by_key[normalize(measure)]
+      next unless comparable_samples?(head_values) && comparable_samples?(base_values)
+      next if head_values.max < base_values.min || head_values.min > base_values.max
+
+      normalize(measure)
+    end
+  end
+
+  def comparable_samples?(values)
+    values.is_a?(Array) && values.length >= 2 && values.all?(Numeric)
+  end
+
+  # An alert is downgradable only when it names a benchmark+measure that sample
+  # confirmation classified as unconfirmed. Alerts missing either field can't be
+  # matched to sample data, so they stay confirmed (fail open).
+  def unconfirmed_alert_pair?(alert)
+    return false unless alert.benchmark && alert.measure
+
+    @unconfirmed_pairs.include?([alert.benchmark, normalize(alert.measure)])
+  end
 
   # An active alert on a measure the caller does not track (an orphaned server-side
   # threshold). Only applies when tracked_measures was given; a measure-less alert can't be

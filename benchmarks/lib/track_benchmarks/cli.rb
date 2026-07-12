@@ -16,6 +16,10 @@ module TrackBenchmarks
         head_runner, plan.head_branch, BranchArgs.head_start_point_args(plan.baseline_branch)
       )
       report = head_result.report
+      # Sample confirmation must run before anything consumes the report: it can
+      # downgrade alerts, which changes the summary highlighting, regression
+      # detection, the candidate hand-off, and the normalized exit code below.
+      apply_sample_confirmation(report)
       bencher_exit_code = BencherRun.normalized_exit_code(head_result.exit_code, report)
 
       # Build the Markdown summary table once; the same body feeds the job summary, the
@@ -39,6 +43,28 @@ module TrackBenchmarks
     private
 
     attr_reader :suite_name, :report_marker, :env
+
+    # Join both phases' per-sample values (display sidecars) and let the report
+    # downgrade boundary crossings that did not reproduce across samples (#4580).
+    # Either sidecar missing sample data (single-sample runs, failed routes, older
+    # base refs whose bench scripts predate sampling) skips confirmation entirely —
+    # fail open to single-sample behavior.
+    def apply_sample_confirmation(report)
+      return unless report
+
+      head_samples = Summary.samples_by_name(Config::DISPLAY_JSON)
+      base_samples = Summary.samples_by_name(Config::BASELINE_DISPLAY_JSON)
+      return if head_samples.empty? || base_samples.empty?
+
+      report.apply_sample_confirmation!(head_samples:, base_samples:)
+      return unless report.unconfirmed_alert?
+
+      names = report.unconfirmed_alerts.map { |alert| "#{alert.benchmark} (#{alert.measure})" }.uniq
+      Github.notice(
+        "Sample confirmation downgraded #{report.unconfirmed_alerts.length} Bencher alert(s) whose " \
+        "base/head samples overlap: #{names.join(', ')}"
+      )
+    end
 
     # Records the base ref's results (measured moments ago on THIS runner) as the
     # comparison baseline: a fresh series on a throwaway per-run branch. The baseline

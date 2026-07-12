@@ -34,7 +34,11 @@ class BmfCollector
   # @param status [String, nil] Status string like "200=100,5xx=2"
   # @param p90 [Numeric, nil] 90th percentile latency in ms (sent to Bencher
   #   boundary-less via to_bmf, and retained for the display sidecar so the table shows it)
-  def add(name:, rps:, p50:, status:, p90: nil)
+  # @param samples [Hash, nil] Per-sample raw values keyed by Bencher measure name
+  #   (e.g. {"rps" => [529.1, 533.0, 505.2]}) when the bench script ran repeated
+  #   samples. Display-sidecar only (never part of the BMF payload): the relative
+  #   comparison uses it to require a flagged change to reproduce across samples.
+  def add(name:, rps:, p50:, status:, p90: nil, samples: nil)
     # Keep every row, including failures (rps "FAILED"/"MISSING"): the display sidecar
     # must still show a failed route/test rather than dropping it silently. The
     # numeric-rps filter lives in #to_bmf so only valid measures reach Bencher.
@@ -44,7 +48,8 @@ class BmfCollector
       p50: p50.is_a?(Numeric) ? p50 : nil,
       p90: p90.is_a?(Numeric) ? p90 : nil,
       status:,
-      failed_pct: calculate_failed_percentage(status)
+      failed_pct: calculate_failed_percentage(status),
+      samples: samples.is_a?(Hash) && !samples.empty? ? samples : nil
     }
   end
 
@@ -120,7 +125,12 @@ class BmfCollector
   # Status — issue #3601 item 4), so nothing reads it (it is still a tracked BMF measure).
   def display_rows
     @results.map do |r|
-      { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }
+      row = { "name" => r[:name], "rps" => r[:rps], "p50" => r[:p50], "p90" => r[:p90], "status" => r[:status] }
+      # Only multi-sample runs carry per-sample values; the key is absent otherwise so
+      # single-sample consumers (and the sample-confirmation join) can treat "no key"
+      # as "no repeated samples".
+      row["samples"] = r[:samples] if r[:samples]
+      row
     end
   end
 

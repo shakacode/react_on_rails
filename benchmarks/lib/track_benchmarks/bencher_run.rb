@@ -18,9 +18,13 @@ module TrackBenchmarks
     end
 
     def normalized_exit_code(exit_code, report)
-      return exit_code unless exit_code != 0 && report&.filtered_alert? && !Summary.regression?(report)
+      return exit_code if exit_code.zero? || report.nil? || Summary.regression?(report)
+      return exit_code unless report.filtered_alert? || report.unconfirmed_alert?
 
-      Github.notice("Bencher reported only stale active alert(s); no current boundary-backed regression remains.")
+      Github.notice(
+        "Bencher alert(s) were all stale or unconfirmed across samples; " \
+        "no current boundary-backed regression remains."
+      )
       0
     end
   end

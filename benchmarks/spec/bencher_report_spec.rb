@@ -404,6 +404,94 @@ RSpec.describe BencherReport do
   # measures comma-lists, then report=). These fields are NOT part of the documented
   # contract, so extraction is lenient: any missing piece yields nil and the caller
   # renders the benchmark name unlinked rather than failing the job.
+  # Sample confirmation (#4580): repeated per-route samples act as built-in reruns.
+  # Overlapping base/head sample ranges downgrade a boundary crossing (alerts move
+  # out of #alerts; #significance reports :unconfirmed); disjoint ranges confirm it.
+  describe "#apply_sample_confirmation!" do
+    def alerting_report
+      described_class.parse(
+        report_json(
+          results: [[rps_regression_result]],
+          alerts: [alert(benchmark: "/foo: Core", measure_slug: "rps", limit: "lower")]
+        )
+      )
+    end
+
+    def confirmed(report, head:, base:)
+      report.apply_sample_confirmation!(
+        head_samples: { "/foo: Core" => { "rps" => head } },
+        base_samples: { "/foo: Core" => { "rps" => base } }
+      )
+    end
+
+    it "keeps a change whose sample ranges are disjoint (reproduced in every sample)" do
+      report = confirmed(alerting_report, head: [80.0, 82.0, 79.0], base: [100.0, 98.0, 101.0])
+
+      expect(report.regression?).to be(true)
+      expect(report.unconfirmed_alert?).to be(false)
+      expect(report.significance("/foo: Core", "rps", :lower)).to eq(:regression)
+    end
+
+    it "downgrades a change whose sample ranges overlap (did not reproduce)" do
+      report = confirmed(alerting_report, head: [80.0, 99.5, 79.0], base: [99.0, 98.0, 101.0])
+
+      expect(report.regression?).to be(false)
+      expect(report.unconfirmed_alert?).to be(true)
+      expect(report.unconfirmed_alerts.first.benchmark).to eq("/foo: Core")
+      expect(report.significance("/foo: Core", "rps", :lower)).to eq(:unconfirmed)
+    end
+
+    it "downgrades an unreproduced improvement flag too" do
+      report = described_class.parse(
+        report_json(results: [[rps_regression_result(value: 115.0)]])
+      )
+      confirmed(report, head: [115.0, 99.0, 116.0], base: [100.0, 98.0, 101.0])
+
+      expect(report.significance("/foo: Core", "rps", :lower)).to eq(:unconfirmed)
+    end
+
+    it "matches sample measure keys across slug/name normalization" do
+      report = alerting_report
+      report.apply_sample_confirmation!(
+        head_samples: { "/foo: Core" => { "RPS" => [80.0, 99.5] } },
+        base_samples: { "/foo: Core" => { "rps" => [99.0, 101.0] } }
+      )
+
+      expect(report.unconfirmed_alert?).to be(true)
+    end
+
+    it "fails open when either side lacks two numeric samples" do
+      [
+        { head: [80.0], base: [100.0, 101.0] },              # too few head samples
+        { head: [80.0, "x"], base: [100.0, 101.0] },         # non-numeric head sample
+        { head: [80.0, 99.5], base: nil },                   # base measure missing
+        {}                                                   # no sample data at all
+      ].each do |scenario|
+        report = alerting_report
+        if scenario.any?
+          report.apply_sample_confirmation!(
+            head_samples: { "/foo: Core" => { "rps" => scenario[:head] }.compact },
+            base_samples: { "/foo: Core" => { "rps" => scenario[:base] }.compact }
+          )
+        else
+          report.apply_sample_confirmation!(head_samples: {}, base_samples: {})
+        end
+
+        expect(report.regression?).to be(true), "expected fail-open for #{scenario.inspect}"
+        expect(report.significance("/foo: Core", "rps", :lower)).to eq(:regression)
+      end
+    end
+
+    it "leaves boundary-only significance untouched for pairs without an alert" do
+      # p90 has no alert (boundary-less in production) — confirmation only consults
+      # sample data for flags that fire; a non-flagged measure stays nil/unchanged.
+      report = described_class.parse(report_json(results: [[rps_regression_result(value: 95.0)]]))
+      confirmed(report, head: [95.0, 96.0], base: [100.0, 99.0])
+
+      expect(report.significance("/foo: Core", "rps", :lower)).to be_nil
+    end
+  end
+
   describe "#perf_url" do
     def bench(name:, uuid:, measure_uuids:)
       measures = measure_uuids.each_with_index.map do |muuid, i|

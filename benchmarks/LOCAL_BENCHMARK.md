@@ -117,6 +117,13 @@ ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
 Options: `--testbed NAME` (default `m1-bench`), `--branch NAME`, `--[no-]upload`,
 `--fail-on-alert`, `--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
 
+Local runs keep bench.rb's single-sample default (one 30s k6 run per route);
+`BENCHMARK_SAMPLES=3` opts into CI's repeated-sample mode (medians per route,
+12s per sample unless `--duration` overrides). Note: k6 now opens a fresh
+connection per request (`noConnectionReuse`, #4580) — absolute RPS/latency
+stepped once when that landed, so a t-test alert straddling that commit on a
+local trend series is expected; the series re-baselines within a few runs.
+
 ## Quiet A/B comparisons
 
 For release-candidate comparisons, do not trust a single `main` vs RC pass. Use the A/B

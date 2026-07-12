@@ -376,9 +376,46 @@ RSpec.describe "track_benchmarks" do
 
       exit_code = nil
       expect { exit_code = normalized_bencher_exit_code(1, report) }
-        .to output(/::notice::Bencher reported only stale active alert/).to_stdout
+        .to output(/::notice::Bencher alert\(s\) were all stale or unconfirmed across samples/).to_stdout
 
       expect(exit_code).to eq(0)
+    end
+
+    it "normalizes an alert exit to success when every active alert is unconfirmed across samples" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [[result("/x", [rps_measure(value: 80.0)])]],
+          "alerts" => [active_alert]
+        )
+      )
+      # Overlapping base/head sample ranges: the median crossed the boundary but the
+      # change did not reproduce, so sample confirmation downgrades the alert.
+      report.apply_sample_confirmation!(
+        head_samples: { "/x" => { "rps" => [80.0, 99.0, 78.0] } },
+        base_samples: { "/x" => { "rps" => [100.0, 98.0, 102.0] } }
+      )
+
+      exit_code = nil
+      expect { exit_code = normalized_bencher_exit_code(1, report) }
+        .to output(/::notice::Bencher alert\(s\) were all stale or unconfirmed across samples/).to_stdout
+
+      expect(exit_code).to eq(0)
+    end
+
+    it "keeps the alert exit when a confirmed regression remains" do
+      report = BencherReport.parse(
+        JSON.generate(
+          "results" => [[result("/x", [rps_measure(value: 80.0)])]],
+          "alerts" => [active_alert]
+        )
+      )
+      # Disjoint ranges (every head sample below every base sample): confirmed.
+      report.apply_sample_confirmation!(
+        head_samples: { "/x" => { "rps" => [80.0, 82.0, 78.0] } },
+        base_samples: { "/x" => { "rps" => [100.0, 98.0, 102.0] } }
+      )
+
+      expect(normalized_bencher_exit_code(1, report)).to eq(1)
     end
   end
 

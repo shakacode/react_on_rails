@@ -9,9 +9,16 @@ description: >
   shared GitHub-hosted runners (#4071).
 
   Assumes the job already ran the ref-independent setup: Bencher CLI, k6/vegeta,
-  Ruby + foreman, pnpm, Node, and the "Configure benchmark commands" step (SERVER_CMD /
-  BENCH_CMD / WEB_CONCURRENCY). Everything ref-dependent happens here, per phase:
-  checkout + clean, JS install/build, gems, packs, assets, DB seed, server, benchmark.
+  Ruby + foreman, pnpm, Node, the "Configure benchmark commands" step (SERVER_CMD /
+  BENCH_CMD / WEB_CONCURRENCY), and the "Stash head benchmark harness" step.
+  Everything ref-dependent happens here, per phase: checkout + clean, JS
+  install/build, gems, packs, assets, DB seed, server, benchmark.
+
+  The bench script runs from harness-dir (the HEAD ref's stashed benchmarks/), NOT
+  from the phase's checkout: the harness is the measuring instrument, and both
+  phases must be measured with the same one or a harness change would masquerade
+  as a base-vs-head performance delta. App-side inputs still come from the phase's
+  checkout.
 
   Invariant for callers: invoke this action only while the HEAD ref is checked out
   (restore it between invocations). GitHub resolves `uses: ./...` from the workspace at
@@ -48,7 +55,15 @@ inputs:
     description: Whether to generate file-system based entrypoints (matrix row generate_packs).
     required: true
   benchmark-script:
-    description: The bench script to execute (matrix row benchmark_script).
+    description: >-
+      The bench script to execute (matrix row benchmark_script), as a benchmarks/-
+      prefixed repo path; resolved inside harness-dir, never the phase's checkout.
+    required: true
+  harness-dir:
+    description: >-
+      Directory holding the HEAD ref's stashed benchmarks/ tree (outside the
+      workspace). Both phases execute the bench script from here so one instrument
+      measures both refs.
     required: true
   benchmark-timeout-minutes:
     description: Timeout for the benchmark execution (matrix row benchmark_timeout_minutes).
@@ -263,20 +278,34 @@ runs:
       env:
         BENCHMARK_SCRIPT_INPUT: ${{ inputs.benchmark-script }}
         BENCHMARK_TIMEOUT_MINUTES: ${{ inputs.benchmark-timeout-minutes }}
+        HARNESS_DIR: ${{ inputs.harness-dir }}
         PRO_ENV_INPUT: ${{ inputs.pro-env }}
         SUITE_NAME_INPUT: ${{ inputs.suite-name }}
       run: |
         set -e
         echo "🏃 Running $SUITE_NAME_INPUT benchmark suite..."
 
+        # Run the HEAD ref's copy of the bench script (see harness-dir input): the
+        # phase's checked-out benchmarks/ tree is never executed, so both phases
+        # are measured with one instrument.
+        if [ "${BENCHMARK_SCRIPT_INPUT#benchmarks/}" = "$BENCHMARK_SCRIPT_INPUT" ]; then
+          echo "::error::benchmark-script '$BENCHMARK_SCRIPT_INPUT' is not under benchmarks/; cannot resolve it in the stashed harness"
+          exit 1
+        fi
+        harness_script="$HARNESS_DIR/${BENCHMARK_SCRIPT_INPUT#benchmarks/}"
+        if [ ! -f "$harness_script" ]; then
+          echo "::error::Stashed harness script $harness_script not found; did the 'Stash head benchmark harness' step run?"
+          exit 1
+        fi
+
         # `timeout` replaces the step-level timeout-minutes the pre-composite workflow
         # used (composite action steps don't support timeout-minutes).
         if [ "$PRO_ENV_INPUT" = "true" ]; then
-          if ! PRO=true timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$BENCHMARK_SCRIPT_INPUT"; then
+          if ! PRO=true timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$harness_script"; then
             echo "❌ ERROR: Benchmark execution failed"
             exit 1
           fi
-        elif ! timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$BENCHMARK_SCRIPT_INPUT"; then
+        elif ! timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$harness_script"; then
           echo "❌ ERROR: Benchmark execution failed"
           exit 1
         fi

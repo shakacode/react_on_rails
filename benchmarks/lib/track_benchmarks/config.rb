@@ -12,6 +12,9 @@ module TrackBenchmarks
     # the workspace (the head phase git-cleans it) and points this env var there.
     BASELINE_BENCHMARK_JSON = ENV.fetch("BENCHMARK_BASELINE_JSON", "bench_results_base/benchmark.json")
     BASELINE_REPORT_JSON = ENV.fetch("BENCHER_BASELINE_REPORT_JSON", "bench_results_base/bencher_report.json")
+    # The base phase's display sidecar. Its per-sample raw values pair with the head
+    # sidecar's for sample confirmation (BencherReport#apply_sample_confirmation!).
+    BASELINE_DISPLAY_JSON = ENV.fetch("BENCHMARK_BASELINE_DISPLAY_JSON", "bench_results_base/benchmark_display.json")
     # Written by the bench scripts (BmfCollector#write_display_json); carries the
     # summary-table columns Bencher never sees (p90, raw Status), keyed by the same
     # canonical name as the report so the join is exact.

@@ -59,6 +59,17 @@ const scenarios: Record<string, Scenario> =
 export const options: Options = {
   // "Highly recommended" in https://grafana.com/docs/k6/latest/using-k6/k6-options/reference/#discard-response-bodies
   discardResponseBodies: true,
+  // Open a fresh connection per request instead of per-VU keep-alive. A keep-alive
+  // connection is pinned to whichever Puma worker process accepted it, and Linux's
+  // LIFO accept-queue wakeup skews reconnect placement, so the per-worker connection
+  // split drifts randomly within a run (splits as bad as 9/1/0 observed) — each run
+  // lands in a different queueing "mode". Measured on a CI-topology testbed (4 cores,
+  // k6 pinned to 1, Puma 3 workers x 3 threads on 3): run-to-run spread dropped from
+  // ~38% (RPS) / ~36% (p50) to ~9% with per-request connections (#4580). Loopback
+  // connect cost is negligible next to the 5-300ms request times, k6 excludes it from
+  // http_req_duration, and net.ipv4.tcp_tw_reuse=2 recycles TIME_WAIT ports on
+  // loopback (verified at 7.7k conn/s, 12x the busiest route).
+  noConnectionReuse: true,
   scenarios,
   // Disable default thresholds to avoid noise in output
   thresholds: {},
