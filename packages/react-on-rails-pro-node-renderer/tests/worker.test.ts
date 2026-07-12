@@ -451,7 +451,7 @@ describe('worker', () => {
     },
   );
 
-  test('rejects unauthenticated multipart uploads before creating an upload directory', async () => {
+  test('rejects a wrong multipart password before creating an upload directory', async () => {
     const app = createWorker({
       password: 'password',
     });
@@ -460,6 +460,7 @@ describe('worker', () => {
     form.append('protocolVersion', protocolVersion);
     form.append('railsEnv', railsEnv);
     form.append('renderingRequest', 'ReactOnRails.dummy');
+    form.append('password', 'wrong');
     form.append('bundle', Buffer.from('untrusted bundle'), {
       contentType: 'text/javascript',
       filename: 'bundle.js',
@@ -704,6 +705,29 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets accepts a correct password that follows the first file part', async () => {
+    const bundleHash = 'file-first-password';
+    const app = createWorker({
+      password: 'my_password',
+    });
+    const form = new FormData();
+    form.append(`bundle_${bundleHash}`, fs.readFileSync(getFixtureBundle()), {
+      contentType: 'text/javascript',
+      filename: 'bundle.js',
+    });
+    form.append('gemVersion', gemVersion);
+    form.append('protocolVersion', protocolVersion);
+    form.append('railsEnv', railsEnv);
+    form.append('password', 'my_password');
+
+    const res = await app.inject().post('/upload-assets').payload(form).headers(form.getHeaders()).end();
+
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`))).toBe(
+      true,
+    );
   });
 
   test('post /upload-assets rejects multipart requests with too many files', async () => {

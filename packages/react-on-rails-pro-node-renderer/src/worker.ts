@@ -566,11 +566,14 @@ export default function run(config: Partial<Config>) {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
       }
 
-      const authResult = authenticate({ password: multipartPassword(part) });
-      if (authResult) {
-        this.uploadAuthenticationError = authResult;
-        discardMultipartFile(part);
-        return;
+      const password = multipartPassword(part);
+      if (password !== undefined) {
+        const authResult = authenticate({ password });
+        if (authResult) {
+          this.uploadAuthenticationError = authResult;
+          discardMultipartFile(part);
+          return;
+        }
       }
 
       if (this.uploadAssetValidationError) {
