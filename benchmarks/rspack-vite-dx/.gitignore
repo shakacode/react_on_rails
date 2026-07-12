@@ -1,4 +1,5 @@
 node_modules/
+.tmp-controls/
 controls/*/dist/
 controls/*/node_modules/
 results/*.json

@@ -1,3 +1,7 @@
+import { isDeepStrictEqual } from 'node:util';
+
+const METRICS = ['cold_start', 'hmr'];
+
 export function summarize(samples) {
   if (samples.length === 0) throw new Error('cannot summarize an empty sample set');
 
@@ -57,6 +61,3 @@ export function verifySummary(result) {
 function round(value) {
   return Math.round(value * 10) / 10;
 }
-import { isDeepStrictEqual } from 'node:util';
-
-const METRICS = ['cold_start', 'hmr'];

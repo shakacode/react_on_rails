@@ -8,6 +8,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { format as formatOutput } from 'prettier';
+import {
+  createControlWorkspace,
+  prepareControlWorkspaces,
+  removeControlWorkspaces,
+} from './control-workspace.mjs';
 import { assertExactlyOneEntry } from './html.mjs';
 import { buildSummary } from './stats.mjs';
 
@@ -27,6 +32,7 @@ if (!environment.harness_git_clean) {
   throw new Error('benchmark must start from a clean committed harness');
 }
 
+await prepareControlWorkspaces(root);
 const browser = await chromium.launch({ headless: true });
 const raw = {
   schema_version: 1,
@@ -42,6 +48,8 @@ const raw = {
     noise_band: 'maximum observed min-to-max spread of either control; conservative, local-machine only',
     stale_server_control:
       'ephemeral port preflight plus a unique compiled marker for every server process; shutdown awaits process exit and port closure',
+    control_mutation:
+      'source writes occur only in an ignored per-run copy; tracked control files are never mutated',
   },
   raw_samples_ms: {
     cold_start: { rspack: [], vite: [] },
@@ -64,8 +72,8 @@ try {
   for (const tool of tools) {
     const session = await startControl(tool);
     try {
-      raw.raw_samples_ms.hmr[tool] = await measureHmr(session.page, tool, sampleCount);
-      raw.overlay[tool] = await inspectOverlay(session.page, tool);
+      raw.raw_samples_ms.hmr[tool] = await measureHmr(session.page, session.messagePath, tool, sampleCount);
+      raw.overlay[tool] = await inspectOverlay(session.page, session.messagePath, tool);
       raw.controls[tool] = {
         command: commandFor(tool, '<PORT>').join(' '),
         measured_port: session.port,
@@ -77,8 +85,11 @@ try {
     raw.zero_config[tool] = await inspectConfigSurface(tool);
   }
 } finally {
-  await browser.close();
-  await restoreMarkers();
+  try {
+    await browser.close();
+  } finally {
+    await removeControlWorkspaces(root);
+  }
 }
 
 raw.summary = buildSummary(raw.raw_samples_ms);
@@ -89,13 +100,20 @@ console.log(`Wrote ${path.relative(root, output)}`);
 console.log(JSON.stringify(raw.summary, null, 2));
 
 async function startControl(tool) {
-  const controlDirectory = path.join(root, 'controls', tool);
-  const port = await reserveEphemeralPort();
-  await assertPortAvailable(port);
   const runNonce = `${tool}-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const workspace = await createControlWorkspace(root, tool, runNonce);
+  const { controlDirectory, messagePath } = workspace;
   const readyMarker = `ready-${runNonce}`;
-  await writeMarker(tool, readyMarker);
-  await clearToolCaches(tool, controlDirectory);
+  let port;
+  try {
+    port = await reserveEphemeralPort();
+    await assertPortAvailable(port);
+    await writeMarker(messagePath, readyMarker);
+    await clearToolCaches(tool, controlDirectory);
+  } catch (error) {
+    await workspace.remove();
+    throw error;
+  }
   let logTail = '';
   const captureLogTail = (chunk) => {
     logTail = `${logTail}${chunk}`.slice(-maxLogTailCharacters);
@@ -123,33 +141,44 @@ async function startControl(tool) {
     return {
       coldStartMs,
       page,
+      messagePath,
       port,
       runNonce,
       async stop() {
-        await page.close();
-        await stopProcess(child, port);
+        try {
+          await page.close();
+        } finally {
+          try {
+            await stopProcess(child, port);
+          } finally {
+            await workspace.remove();
+          }
+        }
       },
     };
   } catch (error) {
-    await stopProcess(child, port);
+    try {
+      await stopProcess(child, port);
+    } finally {
+      await workspace.remove();
+    }
     throw new Error(`${tool} failed to start: ${error.message}\n${logTail}`);
   }
 }
 
-async function measureHmr(page, tool, count) {
+async function measureHmr(page, messagePath, tool, count) {
   const samples = [];
   for (let iteration = 0; iteration < count; iteration += 1) {
     const marker = `${tool}-hmr-${iteration}-${Date.now()}`;
     const startedAt = performance.now();
-    await writeMarker(tool, marker);
+    await writeMarker(messagePath, marker);
     await page.locator('#root').filter({ hasText: marker }).waitFor({ timeout: 15_000 });
     samples.push(rounded(performance.now() - startedAt));
   }
   return samples;
 }
 
-async function inspectOverlay(page, tool) {
-  const messagePath = messagePathFor(tool);
+async function inspectOverlay(page, messagePath, tool) {
   await writeFile(messagePath, 'export default ;\n');
   const selectors = tool === 'vite' ? ['vite-error-overlay'] : ['#rspack-dev-server-client-overlay'];
 
@@ -174,7 +203,7 @@ async function inspectOverlay(page, tool) {
       .locator(matchedSelector)
       .evaluate((element) => (element.shadowRoot?.textContent ?? '').slice(0, 500));
   }
-  await writeMarker(tool, 'ready');
+  await writeMarker(messagePath, 'ready');
   await page.locator('#root').filter({ hasText: 'ready' }).waitFor({ timeout: 15_000 });
 
   return {
@@ -334,16 +363,8 @@ function run(command, arguments_) {
   return result.status === 0 ? result.stdout.trim() : `UNKNOWN (${result.stderr.trim()})`;
 }
 
-async function writeMarker(tool, marker) {
-  await writeFile(messagePathFor(tool), `export default ${JSON.stringify(marker)};\n`);
-}
-
-function messagePathFor(tool) {
-  return path.join(root, 'controls', tool, 'src', 'message.js');
-}
-
-async function restoreMarkers() {
-  await Promise.all(tools.map((tool) => writeFile(messagePathFor(tool), "export default 'ready';\n")));
+async function writeMarker(messagePath, marker) {
+  await writeFile(messagePath, `export default ${JSON.stringify(marker)};\n`);
 }
 
 function readArgument(name) {
