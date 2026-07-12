@@ -469,6 +469,23 @@ describe ReactOnRailsPro::Request do
         )
       end.to raise_error(ArgumentError, /cannot contain newlines/)
     end
+
+    it "rejects header injection through non-password metadata" do
+      expect do
+        described_class.send(
+          :raw_render_request,
+          "ReactOnRails.dummy",
+          {
+            "renderingRequest" => "ReactOnRails.dummy",
+            "protocolVersion" => "2.0.0",
+            "gemVersion" => "16.0.0",
+            "password" => "secret",
+            "railsEnv" => "test\r\ninjected: true",
+            "dependencyBundleTimestamps" => []
+          }
+        )
+      end.to raise_error(ArgumentError, /cannot contain newlines/)
+    end
   end
 
   describe ".render_code" do

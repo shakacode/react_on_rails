@@ -285,6 +285,16 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
 
 #### Changed
 
+- **[Pro] Render requests now send raw JavaScript bodies to the Node renderer**: Non-bundle render
+  requests use a raw `application/vnd.react-on-rails.render-request+javascript` body with metadata in
+  `X-React-On-Rails-Pro-*` headers instead of `application/x-www-form-urlencoded`, removing
+  URL-encoding overhead on large rendering payloads. The renderer still accepts the legacy form
+  encoding, so a not-yet-upgraded gem keeps working against an upgraded renderer during rolling
+  deploys; deploy the Node renderer before or together with the gem upgrade, since an older renderer
+  rejects the new content type. Fixes
+  [Issue 3584](https://github.com/shakacode/react_on_rails/issues/3584).
+  [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
+  [alexeyr-ci2](https://github.com/alexeyr-ci2).
 - **[Pro]** **RSC scaffolding now installs stable `react-on-rails-rsc@19.2.1`**: The Pro package,
   node renderer, generator, dummy app, workspace overrides, and compatibility checks now use the stable
   package and reject prereleases below the stable peer floor. This keeps React on Rails Pro 17 on the

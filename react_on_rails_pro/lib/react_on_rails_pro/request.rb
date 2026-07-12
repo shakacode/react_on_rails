@@ -333,22 +333,27 @@ module ReactOnRailsPro
         end
       end
 
+      # The field list here must stay in sync with common_form_data / form_with_code and
+      # the Node renderer's normalizeRawRenderRequest (node renderer's worker.ts); an
+      # unmapped field raises ArgumentError below. Every value is sanitized because these
+      # body fields become raw HTTP header values.
       def raw_render_request(js_code, form)
         metadata = form.except("renderingRequest")
         headers = [
           ["content-type", RAW_RENDER_CONTENT_TYPE],
-          ["#{RAW_RENDER_HEADER_PREFIX}protocol-version", metadata.delete("protocolVersion").to_s],
-          ["#{RAW_RENDER_HEADER_PREFIX}gem-version", metadata.delete("gemVersion").to_s],
-          ["#{RAW_RENDER_HEADER_PREFIX}rails-env", metadata.delete("railsEnv").to_s],
+          ["#{RAW_RENDER_HEADER_PREFIX}protocol-version",
+           sanitize_raw_render_header(metadata.delete("protocolVersion"))],
+          ["#{RAW_RENDER_HEADER_PREFIX}gem-version", sanitize_raw_render_header(metadata.delete("gemVersion"))],
+          ["#{RAW_RENDER_HEADER_PREFIX}rails-env", sanitize_raw_render_header(metadata.delete("railsEnv"))],
           [
             "#{RAW_RENDER_HEADER_PREFIX}dependency-bundle-timestamps",
-            JSON.generate(Array(metadata.delete("dependencyBundleTimestamps")))
+            sanitize_raw_render_header(JSON.generate(Array(metadata.delete("dependencyBundleTimestamps"))))
           ]
         ]
         password = metadata.delete("password")
         headers << ["authorization", "Bearer #{sanitize_raw_render_header(password)}"] if password
         if metadata.key?("rscStreamObservability")
-          observability = metadata.delete("rscStreamObservability").to_s
+          observability = sanitize_raw_render_header(metadata.delete("rscStreamObservability"))
           headers << ["#{RAW_RENDER_HEADER_PREFIX}rsc-stream-observability", observability]
         end
         raise ArgumentError, "Unsupported raw render metadata: #{metadata.keys.join(', ')}" unless metadata.empty?
