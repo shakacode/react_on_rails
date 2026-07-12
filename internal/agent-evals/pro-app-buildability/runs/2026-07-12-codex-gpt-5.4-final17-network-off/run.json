@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final15-network-off",
-  "started_at": "2026-07-12T15:27:06Z",
-  "finished_at": "2026-07-12T15:27:27Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final17-network-off",
+  "started_at": "2026-07-12T15:31:41Z",
+  "finished_at": "2026-07-12T15:32:00Z",
   "repository": {
-    "revision": "cfcc2e55d4aff5a9c3e374d5594f7250d0d05031",
+    "revision": "f60afdaff38cbaaba13b84aaf313b70e455f2a66",
     "dirty": false
   },
   "definition": {
@@ -56,7 +56,7 @@
       },
       {
         "path": "bin/scan-sensitive-artifacts",
-        "sha256": "f82063f429020ff6386e8e765cc32be404548f01552c94ab5de11d42e6f9b2d6",
+        "sha256": "5309657997a4a73f5599f50a3477b6c758cd785fb4dc7e8d36d75347190da344",
         "executable": true
       },
       {
@@ -76,7 +76,7 @@
       },
       {
         "path": "bin/validate-run",
-        "sha256": "9247cb2400a180fff9647507cd820795b87e568117c0481bcfe7355fc16e1f2d",
+        "sha256": "f5a390525557a7f4b2c0a003db7e37d1a6b03780bc2d41b2afd9f4d845f4d381",
         "executable": true
       },
       {
