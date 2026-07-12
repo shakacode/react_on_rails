@@ -1,0 +1,4 @@
+node_modules/
+controls/*/dist/
+controls/*/node_modules/
+results/latest.json

@@ -1,0 +1,25 @@
+{
+  "name": "react-on-rails-rspack-vite-dx-benchmark",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "benchmark": "node scripts/run.mjs",
+    "check": "prettier --check . --ignore-path .prettierignore && node --test scripts/*.test.mjs && node scripts/report.mjs --check",
+    "format": "prettier --write . --ignore-path .prettierignore"
+  },
+  "devDependencies": {
+    "@rspack/cli": "2.1.3",
+    "@rspack/core": "2.1.3",
+    "@rspack/dev-server": "2.1.0",
+    "@vitejs/plugin-react": "6.0.3",
+    "playwright": "1.61.1",
+    "prettier": "3.9.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vite": "8.1.4"
+  }
+}

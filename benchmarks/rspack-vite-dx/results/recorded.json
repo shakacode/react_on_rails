@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-12T11:45:35.234Z",
+  "controls": {
+    "rspack": {
+      "command": "pnpm exec rspack serve --config rspack.config.mjs --port 4311",
+      "port": 4311
+    },
+    "vite": {
+      "command": "pnpm exec vite --host 127.0.0.1 --port 4312 --strictPort",
+      "port": 4312
+    }
+  },
+  "environment": {
+    "git_head": "dec0a06b2a17bf54cd317b797dabd6c2b9e391bb",
+    "operating_system": "Darwin 25.5.0 arm64",
+    "cpu": "Apple M5 Max",
+    "logical_cpu_count": 18,
+    "memory_bytes": 137438953472,
+    "node": "v22.12.0",
+    "pnpm": "10.33.4",
+    "rspack": "rspack/2.1.3 darwin-arm64 node-v22.12.0",
+    "vite": "vite/8.1.4 darwin-arm64 node-v22.12.0"
+  },
+  "methodology": {
+    "sample_count": 5,
+    "order": "alternating; Rspack first on odd iterations and Vite first on even iterations",
+    "cold_start": "process spawn to first successful HTTP response; caches removed before each start",
+    "hmr": "source write to browser-observed React DOM update over the live dev-server connection",
+    "overlay": "browser DOM inspection after introducing a JavaScript syntax error, then restoration",
+    "noise_band": "maximum observed min-to-max spread of either control; conservative, local-machine only"
+  },
+  "raw_samples_ms": {
+    "cold_start": {
+      "rspack": [321.1, 273.7, 268.8, 276.1, 276.4],
+      "vite": [288.8, 295, 264.6, 307.2, 260]
+    },
+    "hmr": {
+      "rspack": [28.6, 78.3, 23.2, 76.5, 77.2],
+      "vite": [76.4, 75.8, 179.6, 23.9, 177.7]
+    }
+  },
+  "overlay": {
+    "rspack": {
+      "compile_error_overlay_attached": false,
+      "matched_selector": null,
+      "overlay_text_excerpt": null,
+      "click_to_editor_verified": false,
+      "click_to_editor_note": "Not asserted: editor protocol registration and overlay link behavior vary by host setup."
+    },
+    "vite": {
+      "compile_error_overlay_attached": true,
+      "matched_selector": "vite-error-overlay",
+      "overlay_text_excerpt": "[plugin:vite:oxc] Transform failed with 1 error:\n\n[PARSE_ERROR] Unexpected token\n   ╭─[ src/message.js:1:16 ]\n   │\n 1 │ export default ;\n   │                ┬  \n   │                ╰── \n───╯<benchmark-root>/controls/vite/src/message.js    at transformWithOxc (file://<benchmark-root>/node_modules/.pnpm/vite@8.1.4/node_modules/vite/dist/node/chunks/node.js:4",
+      "click_to_editor_verified": false,
+      "click_to_editor_note": "Not asserted: editor protocol registration and overlay link behavior vary by host setup."
+    }
+  },
+  "zero_config": {
+    "rspack": {
+      "config_file": "controls/rspack/rspack.config.mjs",
+      "nonblank_noncomment_lines": 12,
+      "bytes": 302
+    },
+    "vite": {
+      "config_file": "controls/vite/vite.config.mjs",
+      "nonblank_noncomment_lines": 5,
+      "bytes": 136
+    }
+  },
+  "summary": {
+    "cold_start": {
+      "rspack": {
+        "samples": 5,
+        "median_ms": 276.1,
+        "min_ms": 268.8,
+        "max_ms": 321.1,
+        "spread_ms": 52.3,
+        "spread_percent_of_median": 18.9
+      },
+      "vite": {
+        "samples": 5,
+        "median_ms": 288.8,
+        "min_ms": 260,
+        "max_ms": 307.2,
+        "spread_ms": 47.2,
+        "spread_percent_of_median": 16.3
+      },
+      "vite_relative_to_rspack": "wash"
+    },
+    "hmr": {
+      "rspack": {
+        "samples": 5,
+        "median_ms": 76.5,
+        "min_ms": 23.2,
+        "max_ms": 78.3,
+        "spread_ms": 55.1,
+        "spread_percent_of_median": 72
+      },
+      "vite": {
+        "samples": 5,
+        "median_ms": 76.4,
+        "min_ms": 23.9,
+        "max_ms": 179.6,
+        "spread_ms": 155.7,
+        "spread_percent_of_median": 203.8
+      },
+      "vite_relative_to_rspack": "ambiguous"
+    }
+  }
+}

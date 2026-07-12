@@ -22,6 +22,7 @@ updates:
   - package-ecosystem: "npm"
     directories:
       - "/"
+      - "/benchmarks/rspack-vite-dx"
       - "/react_on_rails/spec/dummy"
       - "/react_on_rails_pro/spec/dummy"
     schedule:
