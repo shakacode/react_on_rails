@@ -14,14 +14,15 @@ let valid = true;
 
 for (const tool of ['npm', 'rubygems']) {
   const result = probe[tool];
-  const shouldPass = result.command_id !== null && result.exit_code === 0;
+  const shouldPass =
+    result.attempts.length > 0 && result.attempts.every((attempt) => attempt.exit_code === 0);
   if ((result.status === 'pass') !== shouldPass) {
-    console.error(`${tool}: status contradicts command id or exit code`);
+    console.error(`${tool}: status contradicts complete attempt evidence`);
     valid = false;
   }
-  if (result.command_id !== null) {
-    const command = commands.get(result.command_id);
-    if (!command || command.exit_code !== result.exit_code) {
+  for (const attempt of result.attempts) {
+    const command = commands.get(attempt.command_id);
+    if (!command || command.exit_code !== attempt.exit_code) {
       console.error(`${tool}: referenced command evidence is missing or has a different exit code`);
       valid = false;
     }

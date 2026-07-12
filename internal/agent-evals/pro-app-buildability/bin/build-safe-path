@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+safe_path="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+for command_name in "$@"; do
+  resolved="$(command -v "$command_name" 2>/dev/null || true)"
+  [[ "$resolved" = /* && -x "$resolved" ]] || { echo "missing required command: $command_name" >&2; exit 69; }
+  directory="$(cd "$(dirname "$resolved")" && pwd -P)"
+  mode="$(stat -f '%Lp' "$directory" 2>/dev/null || stat -c '%a' "$directory")"
+  case "${mode: -1}" in 2|3|6|7) echo "refusing world-writable command directory: $directory" >&2; exit 69 ;; esac
+  case ":$safe_path:" in *":$directory:"*) ;; *) safe_path="$safe_path:$directory" ;; esac
+done
+printf '%s\n' "$safe_path"

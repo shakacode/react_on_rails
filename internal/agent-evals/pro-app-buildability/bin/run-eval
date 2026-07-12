@@ -27,20 +27,18 @@ done
   exit 64
 }
 
-for command in codex curl env git jq node npm pnpm ruby shasum; do
-  command -v "$command" >/dev/null || { echo "missing required command: $command" >&2; exit 69; }
-done
+root="$(git rev-parse --show-toplevel)"
+eval_dir="$root/internal/agent-evals/pro-app-buildability"
 if command -v timeout >/dev/null; then
-  timeout_command="$(command -v timeout)"
+  timeout_name=timeout
 elif command -v gtimeout >/dev/null; then
-  timeout_command="$(command -v gtimeout)"
+  timeout_name=gtimeout
 else
   echo "GNU timeout or gtimeout is required; refusing an unbounded run" >&2
   exit 69
 fi
-
-root="$(git rev-parse --show-toplevel)"
-eval_dir="$root/internal/agent-evals/pro-app-buildability"
+safe_path="$("$eval_dir/bin/build-safe-path" \
+  codex curl env git jq node npm pnpm ruby shasum "$timeout_name")"
 
 resolve_future_path() {
   local requested="$1"
@@ -80,8 +78,18 @@ auth_source="${CODEX_AUTH_FILE:-${HOME:-}/.codex/auth.json}"
 [[ -f "$auth_source" ]] || { echo "Codex auth file unavailable: set CODEX_AUTH_FILE" >&2; exit 69; }
 install -m 600 "$auth_source" "$private_dir/codex-home/auth.json"
 
-safe_path="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
+for command_name in codex curl env git jq node npm pnpm ruby shasum "$timeout_name"; do
+  # The positional parameter expands inside the stripped child shell.
+  # shellcheck disable=SC2016
+  "${minimal_env[@]}" /bin/sh -c 'command -v "$1" >/dev/null' sh "$command_name" || {
+    echo "required command unavailable in stripped runtime: $command_name" >&2
+    exit 69
+  }
+done
+# The positional parameter expands inside the stripped child shell.
+# shellcheck disable=SC2016
+timeout_command="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$timeout_name")"
 network_json='[]'
 for endpoint in https://registry.npmjs.org/ https://rubygems.org/; do
   if "${minimal_env[@]}" curl --fail --silent --show-error --head --max-time 10 "$endpoint" >/dev/null; then
@@ -158,7 +166,7 @@ scaffold_invoked=false
 runner_exit="$probe_exit"
 timed_out=false
 [[ "$probe_exit" == 124 ]] && timed_out=true
-if [[ "$probe_result" == pass ]]; then
+if [[ "$probe_exit" == 0 && "$probe_result" == pass ]]; then
   scaffold_invoked=true
   raw_scaffold_events="$private_dir/scaffold-events.jsonl"
   raw_scaffold_stderr="$private_dir/scaffold-stderr.log"

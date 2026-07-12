@@ -20,22 +20,21 @@ const commands = events
     exit_code: Number.isInteger(event.item.exit_code) ? event.item.exit_code : null,
   }));
 
-const findProbe = (pattern) => commands.find((command) => pattern.test(command.command));
-const npm = findProbe(/npm view create-react-on-rails-app version --json/);
-const rubygems = findProbe(/gem search --remote --exact ['"]?\^rails\$['"]?/);
+const probeAttempts = (pattern) =>
+  commands
+    .filter((command) => pattern.test(command.command))
+    .map(({ id: command_id, exit_code }) => ({ command_id, exit_code }));
+const npmAttempts = probeAttempts(/npm view create-react-on-rails-app version --json/);
+const rubygemsAttempts = probeAttempts(/gem search --remote --exact ['"]?\^rails\$['"]?/);
+const probeStatus = (attempts) =>
+  attempts.length > 0 && attempts.every((attempt) => attempt.exit_code === 0) ? 'pass' : 'fail';
+const npmStatus = probeStatus(npmAttempts);
+const rubygemsStatus = probeStatus(rubygemsAttempts);
 const result = {
   schema_version: '1.0',
   sandbox_network_access: true,
-  npm: {
-    command_id: npm?.id ?? null,
-    exit_code: npm?.exit_code ?? null,
-    status: npm?.exit_code === 0 ? 'pass' : 'fail',
-  },
-  rubygems: {
-    command_id: rubygems?.id ?? null,
-    exit_code: rubygems?.exit_code ?? null,
-    status: rubygems?.exit_code === 0 ? 'pass' : 'fail',
-  },
-  overall: npm?.exit_code === 0 && rubygems?.exit_code === 0 ? 'pass' : 'fail',
+  npm: { attempts: npmAttempts, status: npmStatus },
+  rubygems: { attempts: rubygemsAttempts, status: rubygemsStatus },
+  overall: npmStatus === 'pass' && rubygemsStatus === 'pass' ? 'pass' : 'fail',
 };
 fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });

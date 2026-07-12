@@ -2,13 +2,11 @@
   "schema_version": "1.0",
   "sandbox_network_access": true,
   "npm": {
-    "command_id": null,
-    "exit_code": null,
+    "attempts": [],
     "status": "fail"
   },
   "rubygems": {
-    "command_id": null,
-    "exit_code": null,
+    "attempts": [],
     "status": "fail"
   },
   "overall": "fail"

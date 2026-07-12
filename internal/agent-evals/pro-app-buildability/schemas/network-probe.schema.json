@@ -14,10 +14,20 @@
     "probe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["command_id", "exit_code", "status"],
+      "required": ["attempts", "status"],
       "properties": {
-        "command_id": { "type": ["string", "null"] },
-        "exit_code": { "type": ["integer", "null"] },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command_id", "exit_code"],
+            "properties": {
+              "command_id": { "type": "string" },
+              "exit_code": { "type": ["integer", "null"] }
+            }
+          }
+        },
         "status": { "enum": ["pass", "fail"] }
       }
     }
