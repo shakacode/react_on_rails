@@ -1,0 +1,139 @@
+{
+  "schema_version": "2.0",
+  "run_id": "2026-07-12-codex-gpt-5.4-attempt",
+  "started_at": "2026-07-12T12:16:20Z",
+  "finished_at": "2026-07-12T12:20:24Z",
+  "repository": {
+    "revision": "edb1a3e5190c339703bed1fadb39dd796a15a0c7",
+    "dirty": false
+  },
+  "definition": {
+    "inputs": [
+      {
+        "path": "bin/derive-evidence.mjs",
+        "sha256": "174fce4aaa32148148105759f98234447aa7c5f33b00b5246e735690a6a80133",
+        "executable": true
+      },
+      {
+        "path": "bin/run-eval",
+        "sha256": "06835d57e72ed20397d950db9e24dd8103c481056bf384149da9ef8ed2b4e1fe",
+        "executable": true
+      },
+      {
+        "path": "bin/sanitize-events.pl",
+        "sha256": "4960f85b4220c4d8ca0b8c138bec1828337fe11f4de24d48a097c4167c6260e0",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-json.mjs",
+        "sha256": "fe5ba3700516f33ca6f992d494c7fc03737a24972c74bc04657e7208fba3f743",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-run",
+        "sha256": "15f8560eed145b43a6a69da5877c50c8bacf88ef95f329e518a598ba0b8436f7",
+        "executable": true
+      },
+      {
+        "path": "schemas/agent-report.schema.json",
+        "sha256": "8f3aec5f85373f49716abaca4a65cfee461cbfcec320c51111a88de70ed47e98",
+        "executable": false
+      },
+      {
+        "path": "schemas/artifact-evidence.schema.json",
+        "sha256": "2aca92f30398620465d5af52aa1ff6190e967a607428d2ffdc54526498c950ed",
+        "executable": false
+      },
+      {
+        "path": "schemas/command-evidence.schema.json",
+        "sha256": "b6a29cd690f366c1df4cfabb0e2af43974c6d04f9a319c5184f75b3644fbc55c",
+        "executable": false
+      },
+      {
+        "path": "schemas/rubric-results.schema.json",
+        "sha256": "9d5ab41df683ed1d5267b89f032bd86f5fd5c6568e99f65b2305dfbb3eacf16e",
+        "executable": false
+      },
+      {
+        "path": "schemas/run.schema.json",
+        "sha256": "cbb39aef844e971b5db183f855f550f04979f7cf192c83b65166cf0de9a40178",
+        "executable": false
+      },
+      {
+        "path": "package.json",
+        "sha256": "76dad3b8917534bbc6b522f3d3d52999aa4abc3f0c18bd3ba7b820a27ff8f804",
+        "executable": false
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha256": "5fb3eee190fd435a74961d4515162680f7c8e93d2f1f4e51587efa03c40b3638",
+        "executable": false
+      },
+      {
+        "path": "prompt.md",
+        "sha256": "7f6216f958babbdf7a9afcc34a8e5e2f3912af69bc4da14dcb9b571edd88d6ca",
+        "executable": false
+      },
+      {
+        "path": "rubric.md",
+        "sha256": "17a30b047e5b5c2ffd2cc26aa6bd76df78e07559f6e79f7b26e651f5496b8456",
+        "executable": false
+      },
+      {
+        "path": "scenario.md",
+        "sha256": "e50d391e1e57cbc8969473ab35f947ae9362db4cd4b8040fd358bcd62d25a588",
+        "executable": false
+      }
+    ]
+  },
+  "agent": {
+    "name": "codex",
+    "version": "codex-cli 0.136.0",
+    "model": "gpt-5.4",
+    "invoked": true
+  },
+  "environment": {
+    "os": "Darwin 25.5.0 arm64",
+    "ruby": "ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +PRISM [arm64-darwin23]",
+    "node": "v22.12.0",
+    "npm": "10.9.0",
+    "pnpm": "10.33.4",
+    "git": "git version 2.54.0"
+  },
+  "security": {
+    "umask": "077",
+    "process_environment": "env -i",
+    "shell_environment_inherit": "none",
+    "stripped_sensitive_names": [
+      "AGENT_COORD_API_TOKEN",
+      "GOOGLE_APPLICATION_CREDENTIALS",
+      "HC_DATA_API_TOKEN",
+      "SSH_AUTH_SOCK"
+    ],
+    "raw_cleanup": "EXIT/INT/TERM",
+    "auth_material_persisted": false
+  },
+  "network_preflight": [
+    {
+      "endpoint": "https://registry.npmjs.org/",
+      "status": "pass"
+    },
+    {
+      "endpoint": "https://rubygems.org/",
+      "status": "pass"
+    }
+  ],
+  "runner": {
+    "timeout_command": "/opt/homebrew/bin/timeout",
+    "requested_timeout_seconds": 900,
+    "effective_timeout_seconds": 900,
+    "exit_code": 0,
+    "timed_out": false,
+    "config_artifact": "invocation.json"
+  },
+  "result": {
+    "classification": "incomplete",
+    "reason": "Machine-derived rubric result: incomplete; see rubric-results.json",
+    "tutorial_claims_supported": false
+  }
+}
