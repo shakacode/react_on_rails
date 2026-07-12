@@ -14,13 +14,19 @@ if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
 
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const exactLocalRootPatterns = [workspace, outputDir].map(
+  (root) => new RegExp(`(?<![A-Za-z0-9._-])${escapeRegExp(root)}(?=$|[/\\s"',;:)\\]}])`, 'g'),
+);
 const sanitize = (value) =>
   redactSensitiveValues(
-    String(value)
-      .replaceAll(/\/Users\/[^\s"']+/g, '<LOCAL_PATH>')
-      .replaceAll(/\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
-      .replaceAll(/\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
-      .replaceAll(/\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>'),
+    exactLocalRootPatterns
+      .reduce((safe, pattern) => safe.replaceAll(pattern, '<LOCAL_PATH>'), String(value))
+      .replaceAll(/(?<![A-Za-z0-9._-])\/(?:Users|home)\/[^/\s"']+(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
+      .replaceAll(/(?<![A-Za-z0-9._-])\/root(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
+      .replaceAll(/(?<![A-Za-z0-9._-])\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
+      .replaceAll(/(?<![A-Za-z0-9._-])\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
+      .replaceAll(/(?<![A-Za-z0-9._-])\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>'),
   );
 
 const truncate = (value, limit) => {

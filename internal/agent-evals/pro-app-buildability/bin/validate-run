@@ -55,7 +55,8 @@ listed_files="$(awk '{print $2}' "$run_dir/SHA256SUMS" | LC_ALL=C sort)"
 [[ "$actual_files" == "$listed_files" ]] || { echo "SHA256SUMS coverage mismatch" >&2; exit 1; }
 (cd "$run_dir" && shasum -a 256 -c SHA256SUMS)
 
-if rg -n '/Users/|/tmp/|/private/tmp|/var/folders/' "$run_dir"; then
+if rg --pcre2 -n '(?<![A-Za-z0-9._-])/(?:Users|home)/[^/\s"'\'']+(?:/[^\s"'\'']*)?|(?<![A-Za-z0-9._-])/root(?:/[^\s"'\'']*)?|(?<![A-Za-z0-9._-])/(?:private/tmp|tmp|var/folders)/[^\s"'\'']+' \
+  "$run_dir"; then
   echo "local absolute path found" >&2
   exit 1
 fi

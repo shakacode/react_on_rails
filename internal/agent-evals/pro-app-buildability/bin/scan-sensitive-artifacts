@@ -5,8 +5,8 @@ import { containsSensitiveValues } from './sensitive-values.mjs';
 
 const target = process.argv[2];
 if (!target || !fs.existsSync(target)) {
-  console.error(`usage: ${process.argv[1]} PATH`);
-  process.exit(64);
+  console.error(`sensitive-artifact scan failed: target does not exist: ${target ?? 'MISSING'}`);
+  process.exit(2);
 }
 
 const MAX_VISITED_ENTRIES = 5_000;

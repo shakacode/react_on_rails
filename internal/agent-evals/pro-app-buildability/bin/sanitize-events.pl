@@ -89,12 +89,14 @@ $content = redact_structured_sensitive_values($content);
 
 for my $variable (qw(EVAL_PRIVATE_DIR EVAL_WORKSPACE EVAL_OUTPUT)) {
   my $value = $ENV{$variable};
-  $content =~ s/\Q$value\E/<LOCAL_PATH>/g if defined $value && length $value;
+  $content =~ s/(?<![A-Za-z0-9._-])\Q$value\E(?=$|[\/\s"',;:)\]}])/<LOCAL_PATH>/g
+    if defined $value && length $value;
 }
-$content =~ s{/Users/[^\s"']+}{<LOCAL_PATH>}g;
-$content =~ s{/private/tmp(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
-$content =~ s{/tmp/[^\s"']+}{<LOCAL_PATH>}g;
-$content =~ s{/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
+$content =~ s{(?<![A-Za-z0-9._-])/(?:Users|home)/[^/\s"']+(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
+$content =~ s{(?<![A-Za-z0-9._-])/root(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
+$content =~ s{(?<![A-Za-z0-9._-])/private/tmp(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
+$content =~ s{(?<![A-Za-z0-9._-])/tmp/[^\s"']+}{<LOCAL_PATH>}g;
+$content =~ s{(?<![A-Za-z0-9._-])/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
 $content =~ s{([a-z0-9_-]+)(["']?\s*[:=]\s*)(["'])((?:\\.|(?!\3)[^\n])*)\3}{
   my ($name, $separator, $quote, $value) = ($1, $2, $3, $4);
   sensitive_name($name) && credential_value($value)
