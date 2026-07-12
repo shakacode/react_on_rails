@@ -229,6 +229,31 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('react-on-rails:rsc:payload');
   });
 
+  // SECURITY REGRESSION GUARD (see the `rsc-guardrails` skill, invariant 1).
+  // An RSC flight chunk carries user-generated content (usernames, comments, props). It is
+  // embedded verbatim into an inline <script> via JSON.stringify + escapeScript. If escapeScript
+  // ever stops neutralizing `</script` and `<!--`, a payload value could break out of the script
+  // context and inject arbitrary HTML/JS. Do not weaken this without understanding the breakout.
+  it('escapes </script> and <!-- in RSC payload chunks so user content cannot break out of the inline script', async () => {
+    const userControlledFlightChunk = '0:{"comment":"</script><script>alert(document.cookie)</script><!--"}';
+    const mockRSC = createMockRSCStream([userControlledFlightChunk]);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    // The unescaped (JSON.stringify-only) serialization must never be emitted — that is the breakout.
+    expect(resultStr).not.toContain(expectedPayloadPushScript(userControlledFlightChunk));
+    // No live </script> breakout from payload content survives to the browser's HTML parser.
+    expect(resultStr).not.toContain('</script><script>alert(document.cookie)</script>');
+    // Closing-tag and comment-open sequences are backslash-neutralized instead (</\script, <\!--).
+    expect(resultStr).toContain('</\\script');
+    expect(resultStr).toContain('<\\!--');
+    // The data is preserved (inert inside the JS string literal), not dropped.
+    expect(resultStr).toContain('alert(document.cookie)');
+  });
+
   it('emits opt-in browser performance marks for RSC payload bytes and flush timing', async () => {
     const flightData = '{"test": "data"}';
     const mockRSC = createMockRSCStream([flightData]);

@@ -28,6 +28,10 @@
           {
             "type": "command",
             "command": "bin/claude-hooks/autofix-file"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-guardrails-check.sh"
           }
         ]
       }
