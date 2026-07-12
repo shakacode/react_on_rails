@@ -67,9 +67,11 @@ must be disjoint. Before invoking Codex, the runner requires GNU `timeout` and
 checks npm and RubyGems from the same minimal environment used for the run.
 Codex is ephemeral, ignores user configuration/rules, disables multi-agent
 work, uses the workspace-write sandbox, and receives an explicit model and
-timeout. Both the Codex process and its shell tools start from `env -i`; tool
-environment inheritance is `none` with only `PATH`, a private empty `HOME`, a
-private `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
+timeout. Both the Codex process and its shell tools start from `env -i`. The
+outer process receives the host `HOME` only so the OS can locate its keyring;
+tool environment inheritance is `none`, and model-launched shells receive only
+`PATH`, a private empty `HOME`, a private `TMPDIR`, locale, shell, and
+`CODEX_EVAL`.
 
 Workspace-write network access is enabled explicitly with the supported
 `sandbox_workspace_write.network_access=true` Codex configuration. Before any

@@ -84,8 +84,14 @@ codex_eval_home="$(cd "$codex_eval_home" && pwd -P)"
   echo "file-backed Codex auth is forbidden; configure CODEX_EVAL_HOME with keyring credentials" >&2
   exit 69
 }
+host_home="${HOME:-}"
+[[ "$host_home" = /* && -d "$host_home" ]] || {
+  echo "host HOME must name an existing absolute directory for OS keyring access" >&2
+  exit 69
+}
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
+codex_env=(env -i "PATH=$safe_path" "HOME=$host_home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
 for command_name in codex curl env git jq node npm perl pnpm realpath ruby shasum "$timeout_name"; do
   expected_executable="$(realpath "$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
     "$eval_dir/bin/build-safe-path" --resolve "$command_name")")"
@@ -165,7 +171,7 @@ raw_probe_stderr="$private_dir/probe-stderr.log"
 safe_probe_events="$private_dir/probe-events.safe.jsonl"
 safe_probe_stderr="$private_dir/probe-stderr.safe.log"
 set +e
-"$timeout_command" "$probe_timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$codex_eval_home" \
+"$timeout_command" "$probe_timeout_seconds" "${codex_env[@]}" "CODEX_HOME=$codex_eval_home" \
   codex "${codex_args[@]}" <"$eval_dir/network-probe-prompt.md" >"$raw_probe_events" 2>"$raw_probe_stderr"
 probe_exit=$?
 set -e
@@ -189,7 +195,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result"; then
   safe_scaffold_events="$private_dir/scaffold-events.safe.jsonl"
   safe_scaffold_stderr="$private_dir/scaffold-stderr.safe.log"
   set +e
-  "$timeout_command" "$timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$codex_eval_home" \
+  "$timeout_command" "$timeout_seconds" "${codex_env[@]}" "CODEX_HOME=$codex_eval_home" \
     codex "${codex_args[@]}" <"$eval_dir/prompt.md" >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
   runner_exit=$?
   set -e
