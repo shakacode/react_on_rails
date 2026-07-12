@@ -4553,6 +4553,31 @@ describe InstallGenerator, type: :generator do
       )
     end
 
+    specify "recovery_install_command preserves a declined interactive Pro selection" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "n")
+      allow(install_generator).to receive(:say)
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:recovery_install_command)).to eq(
+        "rails generate react_on_rails:install --standard-only"
+      )
+    end
+
+    {
+      { pro: false } => "--no-pro",
+      { rsc: false } => "--no-rsc",
+      { standard_only: true } => "--standard-only"
+    }.each do |product_options, expected_flag|
+      specify "recovery_install_command preserves #{product_options.inspect}" do
+        install_generator = install_generator_fixture(product_options)
+
+        expect(install_generator.send(:recovery_install_command)).to eq(
+          "rails generate react_on_rails:install #{expected_flag}"
+        )
+      end
+    end
+
     specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
       install_generator = install_generator_fixture(webpack: true)
 

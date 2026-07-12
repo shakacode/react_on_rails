@@ -909,6 +909,10 @@ module ReactOnRails
       def product_stack_install_flag
         return "--rsc" if use_rsc?
         return "--pro" if use_pro?
+        return "--standard-only" if options.standard_only?
+        return "--no-rsc" if options.key?(:rsc)
+        return "--no-pro" if options.key?(:pro)
+        return "--standard-only" if defined?(@interactive_pro_selection)
 
         nil
       end
