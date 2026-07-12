@@ -2,6 +2,8 @@
 use strict;
 use warnings;
 
+my $MAX_INPUT_BYTES = 1_048_576;
+
 sub sensitive_name {
   my ($name) = @_;
   return $name =~ /^(?:authorization|cookie)$/i ||
@@ -15,8 +17,29 @@ sub credential_value {
   return $value !~ /^(?:auto|false|file|keyring|none|null|true|unknown)$/i;
 }
 
-local $/;
-my $content = <>;
+@ARGV <= 1 or die "usage: sanitize-events.pl [INPUT]\n";
+my $input;
+if (@ARGV) {
+  open $input, '<', $ARGV[0] or die "cannot open $ARGV[0]: $!\n";
+} else {
+  $input = *STDIN;
+}
+binmode $input;
+
+my $content = '';
+while (1) {
+  my $remaining = $MAX_INPUT_BYTES - length($content);
+  my $chunk = '';
+  my $read = read $input, $chunk, $remaining < 65_536 ? $remaining + 1 : 65_536;
+  defined $read or die "cannot read sanitizer input: $!\n";
+  last if $read == 0;
+  if ($read > $remaining) {
+    print STDERR "sanitizer input exceeds $MAX_INPUT_BYTES-byte limit\n";
+    exit 65;
+  }
+  $content .= $chunk;
+}
+close $input if @ARGV;
 
 for my $variable (qw(EVAL_PRIVATE_DIR EVAL_WORKSPACE EVAL_OUTPUT)) {
   my $value = $ENV{$variable};

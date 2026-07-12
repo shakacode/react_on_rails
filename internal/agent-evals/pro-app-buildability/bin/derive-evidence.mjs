@@ -76,53 +76,60 @@ function walk(directory, depth = 0) {
     stopWalk = true;
     return;
   }
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    artifactLimits.visited_entries += 1;
-    if (artifactLimits.visited_entries > ARTIFACT_LIMITS.max_visited_entries) {
-      exceedArtifactLimit('visited_entries');
-      stopWalk = true;
-      return;
-    }
-    if (!entry.isSymbolicLink() && !excludedDirectories.has(entry.name)) {
-      const absolute = path.join(directory, entry.name);
-      if (entry.isDirectory()) {
-        walk(absolute, depth + 1);
-      } else if (entry.isFile()) {
-        const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
-        const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
-        const selected =
-          selectedBasenames.has(entry.name) ||
-          (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
-        if (selected) {
-          artifactLimits.selected_files += 1;
-          if (artifactLimits.selected_files > ARTIFACT_LIMITS.max_files) {
-            exceedArtifactLimit('selected_files', true);
-            stopWalk = true;
-            return;
-          }
-          const fileSize = fs.statSync(absolute).size;
-          if (fileSize > ARTIFACT_LIMITS.max_file_bytes) {
-            exceedArtifactLimit('file_bytes', true);
-          } else if (artifactLimits.included_bytes + fileSize > ARTIFACT_LIMITS.max_total_bytes) {
-            exceedArtifactLimit('total_bytes', true);
-            stopWalk = true;
-            return;
-          } else {
-            const content = fs.readFileSync(absolute);
-            const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
-            artifacts.push({
-              path: relative,
-              sha256: crypto.createHash('sha256').update(content).digest('hex'),
-              size: fileSize,
-              excerpt: excerpt.value,
-              excerpt_truncated: excerpt.truncated,
-            });
-            artifactLimits.included_files += 1;
-            artifactLimits.included_bytes += fileSize;
+  const entries = fs.opendirSync(directory);
+  try {
+    while (!stopWalk) {
+      const entry = entries.readSync();
+      if (entry === null) break;
+      artifactLimits.visited_entries += 1;
+      if (artifactLimits.visited_entries > ARTIFACT_LIMITS.max_visited_entries) {
+        exceedArtifactLimit('visited_entries');
+        stopWalk = true;
+        return;
+      }
+      if (!entry.isSymbolicLink() && !excludedDirectories.has(entry.name)) {
+        const absolute = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          walk(absolute, depth + 1);
+        } else if (entry.isFile()) {
+          const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
+          const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
+          const selected =
+            selectedBasenames.has(entry.name) ||
+            (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
+          if (selected) {
+            artifactLimits.selected_files += 1;
+            if (artifactLimits.selected_files > ARTIFACT_LIMITS.max_files) {
+              exceedArtifactLimit('selected_files', true);
+              stopWalk = true;
+              return;
+            }
+            const fileSize = fs.statSync(absolute).size;
+            if (fileSize > ARTIFACT_LIMITS.max_file_bytes) {
+              exceedArtifactLimit('file_bytes', true);
+            } else if (artifactLimits.included_bytes + fileSize > ARTIFACT_LIMITS.max_total_bytes) {
+              exceedArtifactLimit('total_bytes', true);
+              stopWalk = true;
+              return;
+            } else {
+              const content = fs.readFileSync(absolute);
+              const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
+              artifacts.push({
+                path: relative,
+                sha256: crypto.createHash('sha256').update(content).digest('hex'),
+                size: fileSize,
+                excerpt: excerpt.value,
+                excerpt_truncated: excerpt.truncated,
+              });
+              artifactLimits.included_files += 1;
+              artifactLimits.included_bytes += fileSize;
+            }
           }
         }
       }
     }
+  } finally {
+    entries.closeSync();
   }
 }
 walk(workspace);

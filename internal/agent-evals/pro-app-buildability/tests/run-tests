@@ -66,6 +66,15 @@ if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; 
   exit 1
 fi
 
+head -c 1048577 /dev/zero >"$tmp/oversized-raw-events"
+if perl "$eval_dir/bin/sanitize-events.pl" "$tmp/oversized-raw-events" \
+  >"$tmp/oversized-raw-events.safe" 2>"$tmp/oversized-raw-events.stderr"; then
+  echo "oversized raw event stream was not rejected" >&2
+  exit 1
+fi
+test ! -s "$tmp/oversized-raw-events.safe"
+rg -q 'exceeds 1048576-byte limit' "$tmp/oversized-raw-events.stderr"
+
 rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
@@ -315,6 +324,20 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
 test "$(jq -r '.limits.reasons | index("selected_files") != null' \
   "$tmp/many-files-output/artifact-evidence.json")" = true
 test "$(jq -r '.overall' "$tmp/many-files-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/huge-directory-workspace/unselected" "$tmp/huge-directory-output"
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); const directory = process.argv[1];
+   for (let index = 0; index <= 5000; index += 1) fs.closeSync(fs.openSync(`${directory}/entry-${index}`, "w"));' \
+  "$tmp/huge-directory-workspace/unselected"
+"$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/huge-directory-workspace" "$tmp/huge-directory-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("visited_entries") != null' \
+  "$tmp/huge-directory-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/huge-directory-output/rubric-results.json")" = incomplete
 
 mkdir -p "$tmp/total-bytes-workspace/eval_app/app/components" "$tmp/total-bytes-output"
 yes 'export default null' | head -c 65000 >"$tmp/artifact-payload" || true
