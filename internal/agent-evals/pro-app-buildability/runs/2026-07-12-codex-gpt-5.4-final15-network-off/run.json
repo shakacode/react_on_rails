@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final14-network-off",
-  "started_at": "2026-07-12T15:19:53Z",
-  "finished_at": "2026-07-12T15:20:14Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final15-network-off",
+  "started_at": "2026-07-12T15:27:06Z",
+  "finished_at": "2026-07-12T15:27:27Z",
   "repository": {
-    "revision": "cf589729993c329b20fd8b66fa1f7e8cd02e284e",
+    "revision": "cfcc2e55d4aff5a9c3e374d5594f7250d0d05031",
     "dirty": false
   },
   "definition": {
@@ -46,7 +46,7 @@
       },
       {
         "path": "bin/run-eval",
-        "sha256": "45f0e8ee49f20016963c5d6f42b88d8460601b6211bf77c2b2eba00749e6d675",
+        "sha256": "a966a3abfb49aed3a9239b778ba34b44e16305689e952b06b5bda98cfe812685",
         "executable": true
       },
       {
@@ -76,7 +76,7 @@
       },
       {
         "path": "bin/validate-run",
-        "sha256": "2609245bfcc30f58c079661cbe4a514bc5693861c25a97c68f6de56811857507",
+        "sha256": "9247cb2400a180fff9647507cd820795b87e568117c0481bcfe7355fc16e1f2d",
         "executable": true
       },
       {
@@ -96,7 +96,7 @@
       },
       {
         "path": "schemas/invocation.schema.json",
-        "sha256": "8f5f49bae291d0c633f2b00c58517bd60820ed1112d7d12184fd3ba1e9d4c711",
+        "sha256": "c3fbb2631e37f86a6200bbe5d0550b68a99b68fccf734fc63cee766fefa46ede",
         "executable": false
       },
       {
@@ -111,7 +111,7 @@
       },
       {
         "path": "schemas/run.schema.json",
-        "sha256": "37585c2c5c86279ebda548def831641ba8aeff388ca72cc7209e39fb845c994c",
+        "sha256": "9616c9718eb201070fb7d72811e3d8ca24f5e23b07d6e07c6cf50fe39c77a1ba",
         "executable": false
       },
       {
@@ -183,9 +183,9 @@
   ],
   "runner": {
     "timeout_command": "/opt/homebrew/bin/timeout",
-    "requested_timeout_seconds": 900,
-    "effective_timeout_seconds": 900,
+    "scaffold_timeout_seconds": 900,
     "probe_timeout_seconds": 120,
+    "maximum_agent_call_wall_clock_seconds": 1020,
     "sandbox_network_access": false,
     "isolated_host_attestation": false,
     "network_probe_artifact": "sandbox-network-probe.json",

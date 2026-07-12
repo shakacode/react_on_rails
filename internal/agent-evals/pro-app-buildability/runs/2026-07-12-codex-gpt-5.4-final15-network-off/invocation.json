@@ -1,7 +1,9 @@
 {
   "command": "codex exec",
   "model": "gpt-5.4",
-  "timeout_seconds": 900,
+  "scaffold_timeout_seconds": 900,
+  "probe_timeout_seconds": 120,
+  "maximum_agent_call_wall_clock_seconds": 1020,
   "sandbox": "workspace-write",
   "ephemeral": true,
   "ignore_user_config": true,
