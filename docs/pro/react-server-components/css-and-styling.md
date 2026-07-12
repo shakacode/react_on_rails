@@ -269,15 +269,15 @@ chunk ids from `chunkIds: 'deterministic'`, and id-named extracted CSS like
 `css/[id]-[hash].css`) — verified against a production dummy build on 2026-07-09, where the
 streamed reveal was confirmed ungated under both bundlers:
 
-| Condition                                                                                          | What is disabled                                                                                   |
-| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `loadable-stats.json` missing/unreadable next to the renderer bundle (retries 100ms → 30s backoff) | Path B entirely, including reveal deferral; Path A still runs                                      |
-| Chunk names not matching `client<N>` (custom `chunkName` option, or numeric webpack `chunkIds`)    | Path B (Flight regex never matches); Path A href check fails too if the CSS filename shape changes |
-| CSS output filenames not matching `css/clientN-*.css`                                              | Path A promotion (href filter rejects the preload)                                                 |
-| Flight data lagging a reveal by more than 100ms                                                    | Reveal deferral for that flush (fail-open by design)                                               |
-| Rspack builds omitting CSS assets from the stats consumed by `injectRSCPayload`                    | Path B (empty chunk→CSS map) — see Known limitations                                               |
-| `auto_load_bundle` off (or non-Pro)                                                                | `data-generated-stylesheet-hrefs` + the pre-hydration stylesheet wait                              |
-| React configured with the external Fizz runtime (no inline `$RC(` scripts)                         | Reveal-split detection — deferral silently never fires                                             |
+| Condition                                                                                          | What is disabled                                                                             |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `loadable-stats.json` missing/unreadable next to the renderer bundle (retries 100ms → 30s backoff) | Path B entirely, including reveal deferral; Path A still runs                                |
+| Chunk names not matching `client<N>` (custom `chunkName` option, or numeric webpack `chunkIds`)    | Path B (Flight regex never matches); Path A then depends on manifest-backed preload matching |
+| CSS output filenames not matching `css/clientN-*.css`                                              | Path A's `clientN` filename fallback (manifest-listed preloads can still promote)            |
+| Flight data lagging a reveal by more than 100ms                                                    | Reveal deferral for that flush (fail-open by design)                                         |
+| Rspack builds omitting CSS assets from the stats consumed by `injectRSCPayload`                    | Path B (empty chunk→CSS map) — see Known limitations                                         |
+| `auto_load_bundle` off (or non-Pro)                                                                | `data-generated-stylesheet-hrefs` + the pre-hydration stylesheet wait                        |
+| React configured with the external Fizz runtime (no inline `$RC(` scripts)                         | Reveal-split detection — deferral silently never fires                                       |
 
 If you are debugging a flicker, check these in order; the first two are by far the most common.
 
@@ -1069,12 +1069,15 @@ to measure the end-to-end performance impact of RSC changes with a paired A/B co
 - **Production builds are the primary silent-no-op case (both bundlers, verified 2026-07-09):**
   in a default `NODE_ENV=production` build, chunk ids are numeric (`optimization.chunkIds:
 'deterministic'`) and extracted chunk CSS is id-named (`css/[id]-[hash].css`), so Path B's
-  Flight regex and Path A's href filter both fail — the streamed reveal is not CSS-gated, and only
-  the hint-driven preload's head start mitigates the flash. Note that CSS split into async
+  Flight regex is disabled. Path A's old `css/clientN-*.css` filename fallback is disabled too, so
+  streamed reveal gating then depends on the preload href matching
+  `rscClientManifestStylesheetHrefs` and arriving before the reveal. The reviewed production dummy
+  capture under both bundlers still emitted only a non-blocking preload, so the reveal was ungated
+  and only the hint-driven preload's head start mitigated the flash. Note that CSS split into async
   `clientN` chunks is **not** covered by the Rails layout `stylesheet_pack_tag` (layout pack tags
-  emit only the entrypoint's initial-chunk CSS); until it is fixed, the styles for such components
-  apply at hydration time. The dev/test posture (`chunkIds: 'named'`), which is what CI exercises,
-  is not affected.
+  emit only the entrypoint's initial-chunk CSS); until this gap is closed, the styles for such
+  components apply at hydration time. The dev/test posture (`chunkIds: 'named'`), which is what CI
+  exercises, is not affected.
 - **Rspack manifest `css` omission:** the `RSCRspackPlugin` collects `css` arrays only on the
   `react-on-rails-rsc` 19.2.1+ line, and omits them (with only a compile warning) when
   `output.publicPath` is `'auto'` or a function, or when CSS is extracted by something other than

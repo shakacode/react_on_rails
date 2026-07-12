@@ -136,10 +136,12 @@ prevention) pipeline in full. The Rspack-specific facts, verified against
   type). Rspack's native CSS support (`experiments.css`) is not seen by the plugin's
   CSS-dependency recovery; split-chunks configs that move CSS outside the client
   reference's chunk group can also drop entries.
-- **Default production builds do not gate the streamed reveal** — this is
-  bundler-independent, not Rspack-specific: numeric chunk ids and id-named CSS files
-  disable the stream-level gating layers, so a streamed component can paint unstyled
-  until its CSS applies. See
+- **The reviewed default production builds still left the streamed reveal ungated** —
+  this is bundler-independent, not Rspack-specific: numeric chunk ids disable Path B,
+  while Path A then depends on a manifest-listed preload href that arrives before the
+  reveal. The 2026-07-09 production dummy capture under both bundlers still emitted only
+  a non-blocking preload, so a streamed component can paint unstyled until its CSS
+  applies. See
   [production builds are the primary silent-no-op case](./css-and-styling.md#known-limitations)
   for details and status.
 
