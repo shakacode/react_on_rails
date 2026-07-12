@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro",
-  "version": "17.0.0-rc.8",
+  "version": "17.0.0-rc.9",
   "description": "React on Rails Pro package with React Server Components support",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",

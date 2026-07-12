@@ -14,6 +14,6 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 module ReactOnRailsPro
-  VERSION = "17.0.0.rc.8"
+  VERSION = "17.0.0.rc.9"
   PROTOCOL_VERSION = "2.0.0"
 end
