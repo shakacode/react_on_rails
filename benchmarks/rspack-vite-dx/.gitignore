@@ -1,4 +1,6 @@
 node_modules/
 controls/*/dist/
 controls/*/node_modules/
-results/latest.json
+results/*.json
+!results/recorded.json
+RESULTS.local.md

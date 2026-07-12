@@ -16,6 +16,7 @@ const root = path.resolve(scriptDirectory, '..');
 const sampleCount = Number(readArgument('--samples') ?? 5);
 const output = path.resolve(root, readArgument('--output') ?? 'results/latest.json');
 const tools = ['rspack', 'vite'];
+const maxLogTailCharacters = 8_000;
 
 if (!Number.isInteger(sampleCount) || sampleCount < 5) {
   throw new Error('--samples must be an integer of at least 5');
@@ -52,7 +53,7 @@ const raw = {
 
 try {
   for (let iteration = 0; iteration < sampleCount; iteration += 1) {
-    const order = iteration % 2 === 0 ? ['rspack', 'vite'] : ['vite', 'rspack'];
+    const order = iteration % 2 === 0 ? tools : [...tools].reverse();
     for (const tool of order) {
       const session = await startControl(tool);
       raw.raw_samples_ms.cold_start[tool].push(session.coldStartMs);
@@ -95,7 +96,10 @@ async function startControl(tool) {
   const readyMarker = `ready-${runNonce}`;
   await writeMarker(tool, readyMarker);
   await clearToolCaches(tool, controlDirectory);
-  const logs = [];
+  let logTail = '';
+  const captureLogTail = (chunk) => {
+    logTail = `${logTail}${chunk}`.slice(-maxLogTailCharacters);
+  };
   const command = commandFor(tool, port);
   const startedAt = performance.now();
   const child = spawn(command[0], command.slice(1), {
@@ -104,12 +108,12 @@ async function startControl(tool) {
     env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  child.stdout.on('data', (chunk) => logs.push(chunk.toString()));
-  child.stderr.on('data', (chunk) => logs.push(chunk.toString()));
+  child.stdout.on('data', captureLogTail);
+  child.stderr.on('data', captureLogTail);
 
   try {
     const url = `http://127.0.0.1:${port}`;
-    await waitForHttp(url, child, logs, tool);
+    await waitForHttp(url, child, () => logTail, tool);
     const coldStartMs = rounded(performance.now() - startedAt);
     const page = await browser.newPage();
     await page.goto(`${url}/?benchmark_nonce=${encodeURIComponent(runNonce)}`, {
@@ -128,7 +132,7 @@ async function startControl(tool) {
     };
   } catch (error) {
     await stopProcess(child, port);
-    throw new Error(`${tool} failed to start: ${error.message}\n${logs.join('').slice(-4000)}`);
+    throw new Error(`${tool} failed to start: ${error.message}\n${logTail}`);
   }
 }
 
@@ -147,10 +151,7 @@ async function measureHmr(page, tool, count) {
 async function inspectOverlay(page, tool) {
   const messagePath = messagePathFor(tool);
   await writeFile(messagePath, 'export default ;\n');
-  const selectors =
-    tool === 'vite'
-      ? ['vite-error-overlay']
-      : ['#rspack-dev-server-client-overlay', 'iframe#rspack-dev-server-client-overlay'];
+  const selectors = tool === 'vite' ? ['vite-error-overlay'] : ['#rspack-dev-server-client-overlay'];
 
   let matchedSelector = null;
   for (const selector of selectors) {
@@ -207,11 +208,11 @@ async function clearToolCaches(tool, controlDirectory) {
   await Promise.all(paths.map((candidate) => rm(candidate, { recursive: true, force: true })));
 }
 
-async function waitForHttp(url, child, logs, tool) {
+async function waitForHttp(url, child, readLogTail, tool) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`process exited ${child.exitCode}; ${logs.join('').slice(-1000)}`);
+      throw new Error(`process exited ${child.exitCode}; ${readLogTail().slice(-1000)}`);
     }
     try {
       const response = await fetch(url);
@@ -313,12 +314,13 @@ function commandFor(tool, port) {
 function captureEnvironment() {
   const gitStatus = spawnSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' });
   if (gitStatus.status !== 0) throw new Error(`git status failed: ${gitStatus.stderr.trim()}`);
+  const cpus = os.cpus();
   return {
     harness_git_head: run('git', ['rev-parse', 'HEAD']),
     harness_git_clean: gitStatus.stdout.trim() === '',
     operating_system: `${os.type()} ${os.release()} ${os.arch()}`,
-    cpu: os.cpus()[0]?.model ?? 'UNKNOWN',
-    logical_cpu_count: os.cpus().length,
+    cpu: cpus[0]?.model ?? 'UNKNOWN',
+    logical_cpu_count: cpus.length,
     memory_bytes: os.totalmem(),
     node: process.version,
     pnpm: run('pnpm', ['--version']),
