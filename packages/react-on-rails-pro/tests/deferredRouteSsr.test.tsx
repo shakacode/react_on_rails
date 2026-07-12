@@ -439,7 +439,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     let requestCount = 0;
     const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
       requestCount += 1;
-      return requestCount === 1 ? payloadPromise : Promise.resolve(<div>Recovered deferred route</div>);
+      return requestCount <= 2 ? payloadPromise : Promise.resolve(<div>Recovered deferred route</div>);
     });
     const RSCProvider = createRSCProvider({ getServerComponent });
     const container = document.createElement('div');
@@ -485,8 +485,8 @@ describe('RSCRoute deferred SSR behavior', () => {
         await Promise.resolve();
       });
 
-      expect(getServerComponent).toHaveBeenCalledTimes(2);
-      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+      expect(getServerComponent).toHaveBeenCalledTimes(3);
+      expect(getServerComponent).toHaveBeenNthCalledWith(3, {
         componentName: 'DeferredRoute',
         componentProps: { id: 1 },
         enforceRefetch: true,
@@ -523,7 +523,7 @@ describe('RSCRoute deferred SSR behavior', () => {
       }
 
       simulatedErrorFetchCount += 1;
-      return simulatedErrorFetchCount === 1
+      return simulatedErrorFetchCount <= 2
         ? failingPayloadPromise
         : new Promise<React.ReactNode>(() => undefined);
     });
@@ -585,6 +585,13 @@ describe('RSCRoute deferred SSR behavior', () => {
         await Promise.resolve();
         await flushMacrotasks();
         await Promise.resolve();
+      });
+
+      expect(getServerComponent).toHaveBeenCalledTimes(3);
+      expect(getServerComponent).toHaveBeenNthCalledWith(3, {
+        componentName: 'DeferredRoute',
+        componentProps: { simulateError: true },
+        enforceRefetch: true,
       });
 
       expect(container.querySelector('[data-testid="rsc-error-fallback"]')?.textContent).toBe(
@@ -669,7 +676,7 @@ describe('RSCRoute deferred SSR behavior', () => {
     let requestCount = 0;
     const getServerComponent = jest.fn((): Promise<React.ReactNode> => {
       requestCount += 1;
-      return requestCount === 1
+      return requestCount <= 2
         ? payloadPromise
         : Promise.resolve(<div>Recovered default-provider route</div>);
     });
@@ -718,8 +725,8 @@ describe('RSCRoute deferred SSR behavior', () => {
         await Promise.resolve();
       });
 
-      expect(getServerComponent).toHaveBeenCalledTimes(2);
-      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+      expect(getServerComponent).toHaveBeenCalledTimes(3);
+      expect(getServerComponent).toHaveBeenNthCalledWith(3, {
         componentName: 'DeferredRoute',
         componentProps: { id: 1 },
         enforceRefetch: true,
@@ -830,11 +837,6 @@ describe('RSCRoute deferred SSR behavior', () => {
         );
         await Promise.resolve();
         await Promise.resolve();
-        // The provider evicts synchronously-rejected payload promises after
-        // React can observe the rejection and the in-flight pin releases; flush
-        // both timers so no eviction timer leaks past unmount.
-        await flushMacrotasks();
-        await flushMacrotasks();
       });
 
       expect(isServerComponentFetchError(capturedError)).toBe(true);
@@ -845,7 +847,12 @@ describe('RSCRoute deferred SSR behavior', () => {
       expect(capturedError.serverComponentName).toBe('SyncThrowRoute');
       expect(capturedError.serverComponentProps).toEqual({ id: 7 });
       expect(capturedError.originalError).toBe(syncError);
-      expect(getServerComponent).toHaveBeenCalledTimes(1);
+      expect(getServerComponent).toHaveBeenCalledTimes(2);
+      expect(getServerComponent).toHaveBeenNthCalledWith(2, {
+        componentName: 'SyncThrowRoute',
+        componentProps: { id: 7 },
+        enforceRefetch: true,
+      });
     } finally {
       const mountedRoot = root;
       try {
