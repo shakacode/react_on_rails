@@ -16,13 +16,10 @@ const looksLikeCredentialValue = (value) => {
 };
 const shouldRedact = (name, value) => sensitiveName.test(name) && looksLikeCredentialValue(value);
 
-const decodeUrlName = (value) => {
-  try {
-    return decodeURIComponent(String(value).replaceAll('+', ' '));
-  } catch {
-    return String(value);
-  }
-};
+const decodeUrlName = (value) =>
+  String(value)
+    .replaceAll('+', ' ')
+    .replaceAll(/%([0-9a-f]{2})/gi, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
 
 const redactUrlParameters = (value) =>
   String(value)

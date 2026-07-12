@@ -90,6 +90,10 @@ printf '%s\n' \
   'https://example.com/path#token=fragment-secret-012&section=ok' \
   'https://example.com/path?%61pi%5Fkey=encoded-query-secret-345' \
   'https://example.com/path#RAILS%5FMASTER%5FKEY=encoded-fragment-secret-678' \
+  'https://example.com/path?%74oken%ZZ=malformed-query-secret-901&page=2' \
+  'https://example.com/path#%54%4fKEN%zz=malformed-fragment-secret-234&section=ok' \
+  'https://example.com/path?api%5fkey=lowercase-hex-secret-567' \
+  'https://example.com/path#RAILS%5FMASTER%5fKEY=encoded-delimiter-secret-890' \
   'https://home/runner/guide?page=2#section' \
   'api_key: ["array-secret-value-123"]' \
   'credential: {"value":"object-secret-value-456"}' \
@@ -113,7 +117,7 @@ node --input-type=module -e \
    process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
   "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
 cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
-if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|rails-master-parity-secret|s3cr3t-credential|query-secret-value-123|query-api-secret-456|query-rails-secret-789|fragment-secret-012|encoded-query-secret-345|encoded-fragment-secret-678|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|rails-master-parity-secret|s3cr3t-credential|query-secret-value-123|query-api-secret-456|query-rails-secret-789|fragment-secret-012|encoded-query-secret-345|encoded-fragment-secret-678|malformed-query-secret-901|malformed-fragment-secret-234|lowercase-hex-secret-567|encoded-delimiter-secret-890|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
   "$tmp/parity-perl-safe"; then
   echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
   exit 1
@@ -122,6 +126,10 @@ rg -Fq 'https://alice:[REDACTED]@example.com/private' "$tmp/parity-perl-safe"
 rg -Fq 'https://example.com/path?token=[REDACTED]&page=2' "$tmp/parity-perl-safe"
 rg -Fq 'https://example.com/path?%61pi%5Fkey=[REDACTED]' "$tmp/parity-perl-safe"
 rg -Fq 'https://example.com/path#RAILS%5FMASTER%5FKEY=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?%74oken%ZZ=[REDACTED]&page=2' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path#%54%4fKEN%zz=[REDACTED]&section=ok' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?api%5fkey=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path#RAILS%5FMASTER%5fKEY=[REDACTED]' "$tmp/parity-perl-safe"
 rg -Fq 'https://home/runner/guide?page=2#section' "$tmp/parity-perl-safe"
 
 printf '%s\n' 'api_key: [' '{"value":"unclosed-structured-secret"}' \
