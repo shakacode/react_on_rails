@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "sandbox_network_access": true,
+  "npm": {
+    "command_id": null,
+    "exit_code": null,
+    "status": "fail"
+  },
+  "rubygems": {
+    "command_id": null,
+    "exit_code": null,
+    "status": "fail"
+  },
+  "overall": "fail"
+}
