@@ -15,7 +15,7 @@ const events = fs
 const commands = events
   .filter((event) => event?.type === 'item.completed' && event?.item?.type === 'command_execution')
   .map((event, index) => ({
-    id: `probe-command-${index + 1}`,
+    id: `command-${index + 1}`,
     command: String(event.item.command ?? ''),
     exit_code: Number.isInteger(event.item.exit_code) ? event.item.exit_code : null,
   }));

@@ -35,4 +35,25 @@ if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
 fi
 rg -q 'symlink inputs are forbidden' "$tmp/symlink-error"
 
+printf '%s\n' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"npm":{"command_id":"command-1","exit_code":1,"status":"pass"},"rubygems":{"command_id":null,"exit_code":null,"status":"fail"},"overall":"pass"}' \
+  >"$tmp/contradictory-probe.json"
+printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view","exit_code":1,"status":"failed","output":"","output_truncated":false}]}' \
+  >"$tmp/probe-commands.json"
+if node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/contradictory-probe.json" "$tmp/probe-commands.json" 2>"$tmp/probe-error"; then
+  echo "contradictory network probe negative test failed" >&2
+  exit 1
+fi
+rg -q 'contradicts' "$tmp/probe-error"
+
+mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
+printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution","command":"bundle exec webpack --version","exit_code":0,"status":"completed","aggregated_output":"webpack compiled successfully"}}' \
+  >"$tmp/generic-build-events.jsonl"
+printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}' \
+  >"$tmp/fixture-report.json"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json"
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+
 echo "focused harness tests passed"

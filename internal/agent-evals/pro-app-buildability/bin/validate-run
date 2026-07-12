@@ -23,6 +23,8 @@ for forbidden in events.unredacted.jsonl events.redacted.jsonl runner.stderr aut
 done
 
 node "$eval_dir/bin/validate-json.mjs" "$run_dir"
+node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$run_dir/sandbox-network-probe.json" "$run_dir/command-evidence.json"
 
 recorded_revision="$(jq -r .repository.revision "$run_dir/run.json")"
 while IFS=$'\t' read -r relative expected; do

@@ -68,7 +68,7 @@ function walk(directory) {
       continue;
     }
     if (!entry.isFile()) continue;
-    const relative = path.relative(workspace, absolute).split(path.sep).join('/');
+    const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
     const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
     if (
       !selectedBasenames.has(entry.name) &&
@@ -124,25 +124,33 @@ const formTests = matchingArtifacts(
   /(?:spec|test)\/.*(?:form|request|system).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
   /invalid[\s\S]*valid|valid[\s\S]*invalid/i,
 );
-const buildCommands = successful(
-  /assets:precompile|shakapacker|webpack|rspack|vite|npm run build|pnpm (?:run )?build/i,
+const buildCommands = successfulOutcome(
+  /(?:^|\s)(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)(?:\s|$)/i,
+  /compiled|compilation|built|assets?|success|webpack|rspack/i,
 );
 const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
   /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
 );
 
-const items = [
+const installProPassed =
+  rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0;
+const rscRoutePassed = rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0;
+const formValidationPassed =
+  validationModels.length > 0 &&
+  validationControllers.length > 0 &&
+  formTests.length > 0 &&
+  testCommands.length > 0;
+const pageTestsPassed = pageTests.length > 0 && testCommands.length > 0;
+const formTestsPassed = formTests.length > 0 && testCommands.length > 0;
+
+const outcomeRows = [
   {
     id: 'install.pro',
-    status:
-      rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0
-        ? 'pass'
-        : 'unknown',
-    reason:
-      rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0
-        ? 'The public scaffold command exited 0 and captured Ruby/JavaScript manifests contain exact Pro dependencies.'
-        : 'A successful public scaffold plus exact Ruby and JavaScript Pro manifest entries are not all evidenced.',
+    status: installProPassed ? 'pass' : 'unknown',
+    reason: installProPassed
+      ? 'The public scaffold command exited 0 and captured Ruby/JavaScript manifests contain exact Pro dependencies.'
+      : 'A successful public scaffold plus exact Ruby and JavaScript Pro manifest entries are not all evidenced.',
     citations: [
       ...artifactCitations(rubyProManifests),
       ...artifactCitations(jsProManifests),
@@ -151,11 +159,10 @@ const items = [
   },
   {
     id: 'rsc.route',
-    status: rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
-    reason:
-      rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0
-        ? 'An RSC-specific route and source are paired with successful test output.'
-        : 'RSC-specific route, source, and successful test output are not all evidenced.',
+    status: rscRoutePassed ? 'pass' : 'unknown',
+    reason: rscRoutePassed
+      ? 'An RSC-specific route and source are paired with successful test output.'
+      : 'RSC-specific route, source, and successful test output are not all evidenced.',
     citations: [
       ...artifactCitations(rscRoutes),
       ...artifactCitations(rscSources),
@@ -164,20 +171,10 @@ const items = [
   },
   {
     id: 'form.validation',
-    status:
-      validationModels.length > 0 &&
-      validationControllers.length > 0 &&
-      formTests.length > 0 &&
-      testCommands.length > 0
-        ? 'pass'
-        : 'unknown',
-    reason:
-      validationModels.length > 0 &&
-      validationControllers.length > 0 &&
-      formTests.length > 0 &&
-      testCommands.length > 0
-        ? 'Model validation, invalid-response controller behavior, both-outcome tests, and successful test output are evidenced.'
-        : 'Server validation, invalid-response behavior, both-outcome tests, and successful output are not all evidenced.',
+    status: formValidationPassed ? 'pass' : 'unknown',
+    reason: formValidationPassed
+      ? 'Model validation, invalid-response controller behavior, both-outcome tests, and successful test output are evidenced.'
+      : 'Server validation, invalid-response behavior, both-outcome tests, and successful output are not all evidenced.',
     citations: [
       ...artifactCitations(validationModels),
       ...artifactCitations(validationControllers),
@@ -187,20 +184,18 @@ const items = [
   },
   {
     id: 'tests.page',
-    status: pageTests.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
-    reason:
-      pageTests.length > 0 && testCommands.length > 0
-        ? 'A page/RSC-specific test is paired with successful test output.'
-        : 'No passing page/RSC test is independently proven.',
+    status: pageTestsPassed ? 'pass' : 'unknown',
+    reason: pageTestsPassed
+      ? 'A page/RSC-specific test is paired with successful test output.'
+      : 'No passing page/RSC test is independently proven.',
     citations: [...artifactCitations(pageTests), ...commandCitations(testCommands)],
   },
   {
     id: 'tests.form',
-    status: formTests.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
-    reason:
-      formTests.length > 0 && testCommands.length > 0
-        ? 'A test containing both invalid and valid outcomes is paired with successful test output.'
-        : 'Passing coverage of both form outcomes is not independently proven.',
+    status: formTestsPassed ? 'pass' : 'unknown',
+    reason: formTestsPassed
+      ? 'A test containing both invalid and valid outcomes is paired with successful test output.'
+      : 'Passing coverage of both form outcomes is not independently proven.',
     citations: [...artifactCitations(formTests), ...commandCitations(testCommands)],
   },
   {
@@ -227,31 +222,24 @@ const items = [
     reason: `The schema-constrained report records ${report.human_interventions} human interventions; the runner supplied no follow-up input.`,
     citations: ['agent-report.json#/human_interventions'],
   },
-  {
-    id: 'evidence.complete',
-    status: 'unknown',
-    reason: 'Computed after all required outcome rows.',
-    citations: [],
-  },
 ];
 
-const outcomeRows = items.slice(0, -1);
-const evidenceComplete = items.at(-1);
-if (outcomeRows.every((item) => item.status === 'pass')) {
-  evidenceComplete.status = 'pass';
-  evidenceComplete.reason = 'Every required outcome row has passing, cited evidence.';
-  evidenceComplete.citations = ['command-evidence.json', 'artifact-evidence.json', 'SHA256SUMS'];
-} else {
-  evidenceComplete.reason =
-    'At least one required outcome row is not proven; evidence completeness remains UNKNOWN.';
-}
-
-const overall =
-  report.status !== 'completed'
-    ? 'incomplete'
-    : items.every((item) => item.status === 'pass')
-      ? 'pass'
-      : 'fail';
+const outcomesComplete = outcomeRows.every((item) => item.status === 'pass');
+const completionRow = outcomesComplete
+  ? {
+      id: 'evidence.complete',
+      status: 'pass',
+      reason: 'Every required outcome row has passing, cited evidence.',
+      citations: ['command-evidence.json', 'artifact-evidence.json', 'SHA256SUMS'],
+    }
+  : {
+      id: 'evidence.complete',
+      status: 'unknown',
+      reason: 'At least one required outcome row is not proven; evidence completeness remains UNKNOWN.',
+      citations: [],
+    };
+const items = [...outcomeRows, completionRow];
+const overall = outcomesComplete ? 'pass' : report.status === 'completed' ? 'fail' : 'incomplete';
 const rubricResults = { schema_version: '1.0', overall, items };
 
 fs.writeFileSync(
