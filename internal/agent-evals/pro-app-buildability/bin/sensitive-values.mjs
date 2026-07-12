@@ -16,6 +16,54 @@ const looksLikeCredentialValue = (value) => {
 };
 const shouldRedact = (name, value) => sensitiveName.test(name) && looksLikeCredentialValue(value);
 
+const decodeUrlName = (value) => {
+  try {
+    return decodeURIComponent(String(value).replaceAll('+', ' '));
+  } catch {
+    return String(value);
+  }
+};
+
+const redactUrlParameters = (value) =>
+  String(value)
+    .split('&')
+    .map((parameter) => {
+      const equals = parameter.indexOf('=');
+      if (equals < 0 || !sensitiveName.test(decodeUrlName(parameter.slice(0, equals)))) return parameter;
+      return `${parameter.slice(0, equals + 1)}[REDACTED]`;
+    })
+    .join('&');
+
+const redactUrlCredentials = (url) => {
+  const schemeEnd = url.indexOf('://') + 3;
+  const authorityEndMatch = url.slice(schemeEnd).search(/[/?#]/);
+  const authorityEnd = authorityEndMatch < 0 ? url.length : schemeEnd + authorityEndMatch;
+  let safe = url;
+  const at = safe.lastIndexOf('@', authorityEnd);
+  if (at >= schemeEnd) {
+    const colon = safe.indexOf(':', schemeEnd);
+    if (colon >= schemeEnd && colon < at) {
+      safe = `${safe.slice(0, colon + 1)}[REDACTED]${safe.slice(at)}`;
+    }
+  }
+  const currentAuthorityMatch = safe.slice(schemeEnd).search(/[/?#]/);
+  const currentAuthorityEnd = currentAuthorityMatch < 0 ? safe.length : schemeEnd + currentAuthorityMatch;
+  const query = safe.indexOf('?', currentAuthorityEnd);
+  const fragment = safe.indexOf('#', currentAuthorityEnd);
+  if (query >= 0) {
+    const queryEnd = fragment >= 0 ? fragment : safe.length;
+    safe = `${safe.slice(0, query + 1)}${redactUrlParameters(safe.slice(query + 1, queryEnd))}${safe.slice(queryEnd)}`;
+  }
+  const safeFragment = safe.indexOf('#', currentAuthorityEnd);
+  if (safeFragment >= 0) {
+    safe = `${safe.slice(0, safeFragment + 1)}${redactUrlParameters(safe.slice(safeFragment + 1))}`;
+  }
+  return safe;
+};
+
+const redactCredentialsInWebUrls = (value) =>
+  String(value).replace(/https?:\/\/[^\s"']+/gi, (url) => redactUrlCredentials(url));
+
 const structuredValueEnd = (value, start) => {
   const stack = [value[start] === '{' ? '}' : ']'];
   let quote = null;
@@ -59,7 +107,7 @@ const redactStructuredSensitiveValues = (value) => {
 };
 
 export const redactSensitiveValues = (value) =>
-  redactStructuredSensitiveValues(value)
+  redactStructuredSensitiveValues(redactCredentialsInWebUrls(value))
     .replace(quotedNamedValue, (match, name, separator, quote, quotedValue) =>
       shouldRedact(name, quotedValue) ? `${name}${separator}${quote}[REDACTED]${quote}` : match,
     )

@@ -18,6 +18,57 @@ sub credential_value {
   return $value !~ /^(?:auto|false|file|keyring|none|null|true|unknown)$/i;
 }
 
+sub decode_url_name {
+  my ($value) = @_;
+  $value =~ tr/+/ /;
+  $value =~ s/%([0-9a-f]{2})/chr(hex($1))/ige;
+  return $value;
+}
+
+sub redact_url_parameters {
+  my ($value) = @_;
+  my @parameters = split /&/, $value, -1;
+  for my $parameter (@parameters) {
+    my $equals = index($parameter, '=');
+    next if $equals < 0;
+    my $name = decode_url_name(substr($parameter, 0, $equals));
+    $parameter = substr($parameter, 0, $equals + 1) . '[REDACTED]' if sensitive_name($name);
+  }
+  return join '&', @parameters;
+}
+
+sub redact_url_credentials {
+  my ($url) = @_;
+  my $scheme_end = index($url, '://') + 3;
+  my $remainder = substr($url, $scheme_end);
+  my $authority_length = $remainder =~ m{[/?#]} ? $-[0] : length($remainder);
+  my $authority_end = $scheme_end + $authority_length;
+  my $authority = substr($url, $scheme_end, $authority_length);
+  my $at = rindex($authority, '@');
+  if ($at >= 0) {
+    my $colon = index($authority, ':');
+    if ($colon >= 0 && $colon < $at) {
+      substr($authority, $colon + 1, $at - $colon - 1, '[REDACTED]');
+      $url = substr($url, 0, $scheme_end) . $authority . substr($url, $authority_end);
+    }
+  }
+  $remainder = substr($url, $scheme_end);
+  $authority_length = $remainder =~ m{[/?#]} ? $-[0] : length($remainder);
+  $authority_end = $scheme_end + $authority_length;
+  my $query = index($url, '?', $authority_end);
+  my $fragment = index($url, '#', $authority_end);
+  if ($query >= 0) {
+    my $query_end = $fragment >= 0 ? $fragment : length($url);
+    my $parameters = redact_url_parameters(substr($url, $query + 1, $query_end - $query - 1));
+    $url = substr($url, 0, $query + 1) . $parameters . substr($url, $query_end);
+  }
+  $fragment = index($url, '#', $authority_end);
+  if ($fragment >= 0) {
+    $url = substr($url, 0, $fragment + 1) . redact_url_parameters(substr($url, $fragment + 1));
+  }
+  return $url;
+}
+
 sub structured_value_end {
   my ($value, $start) = @_;
   my @stack = (substr($value, $start, 1) eq '{' ? '}' : ']');
@@ -86,6 +137,7 @@ while (1) {
 close $input if @ARGV;
 
 $content = redact_structured_sensitive_values($content);
+$content =~ s{https?://[^\s"']+}{redact_url_credentials($&)}ige;
 
 my @path_parts = split /(https?:\/\/[^\s"']+)/i, $content;
 for my $part (@path_parts) {
