@@ -91,6 +91,14 @@ describe RscGenerator, type: :generator do
       end
     end
 
+    it "installs the RSC agent guardrails into .claude" do
+      assert_file ".claude/skills/rsc-app-safety/SKILL.md"
+      assert_file ".claude/hooks/rsc-app-safety-check.sh"
+      assert_file ".claude/settings.json" do |content|
+        expect(content).to include("rsc-app-safety-check.sh")
+      end
+    end
+
     it "creates RSC webpack config" do
       assert_file "config/webpack/rscWebpackConfig.js" do |content|
         expect(content).to include("rscConfig")
