@@ -114,6 +114,19 @@ function teardownErrorLabel(entry: RenderedEntry, domNodeId: string): string {
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
+
+  // Guard: don't re-create an already-hydrated store.
+  // Before hydrate_on scheduling (#4037), all components hydrated in one synchronous pass, so every
+  // component read the same store instance created in that pass. Deferred hydration (visible/idle)
+  // breaks that invariant: forEachStore can run again (e.g. via reactOnRailsComponentLoaded for a
+  // Turbo Frame), re-creating the store while an already-hydrated :immediate sibling keeps the old
+  // instance and a not-yet-mounted :visible sibling will get the new one — divergent shared state.
+  // Skipping re-initialization restores the one-instance-per-name-per-page-lifetime invariant.
+  // See: https://github.com/shakacode/react_on_rails/issues/4572
+  if (StoreRegistry.getStore(name, false) !== undefined) {
+    return;
+  }
+
   const props = el.textContent !== null ? (JSON.parse(el.textContent) as Record<string, unknown>) : {};
   const storeGenerator = StoreRegistry.getStoreGenerator(name);
   const store = storeGenerator(props, railsContext);

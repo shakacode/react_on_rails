@@ -1272,4 +1272,186 @@ describe('ClientRenderer', () => {
       expect(mockHydrateOrRender).toHaveBeenCalledTimes(2);
     });
   });
+
+  // Issue #4572: deferred hydration can bind a shared Redux store to a re-created instance
+  describe('store re-initialization guard (issue #4572)', () => {
+    beforeEach(() => {
+      runPageUnload();
+      setupRailsContext();
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    afterEach(() => {
+      StoreRegistry.clearHydratedStores();
+      StoreRegistry.clearStoreGenerators();
+    });
+
+    const setupStoreElement = (storeName: string, props: Record<string, unknown>): void => {
+      // Use a div element with the store attribute, matching how forEachStore queries for stores
+      // (it queries by attribute, not by element type)
+      const storeElement = document.createElement('div');
+      storeElement.setAttribute('data-js-react-on-rails-store', storeName);
+      storeElement.textContent = JSON.stringify(props);
+      document.body.appendChild(storeElement);
+    };
+
+    it('does not re-create an already-hydrated store when forEachStore runs again', () => {
+      const storeGenerator = jest.fn((props: Record<string, unknown>) => ({
+        getState: () => ({ count: (props as { initialCount: number }).initialCount }),
+        dispatch: jest.fn(),
+        subscribe: jest.fn(),
+      }));
+      StoreRegistry.register({ SharedStore: storeGenerator });
+      setupStoreElement('SharedStore', { initialCount: 42 });
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup a component that will trigger forEachStore
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'store-guard-test');
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'store-guard-test';
+      document.body.appendChild(targetNode);
+
+      // First render: creates the store
+      renderComponent('store-guard-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const firstStore = StoreRegistry.getStore('SharedStore');
+
+      // Simulate a Turbo Frame or async content load that triggers another renderComponent
+      // This should NOT re-create the store
+      renderComponent('store-guard-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const secondStore = StoreRegistry.getStore('SharedStore');
+
+      // The store instance should be the same
+      expect(firstStore).toBe(secondStore);
+    });
+
+    it('prevents store divergence between immediate and deferred components', () => {
+      type ObserverCallback = ConstructorParameters<typeof IntersectionObserver>[0];
+      const observerInstances: Array<{
+        callback: ObserverCallback;
+        disconnect: jest.Mock;
+        observe: jest.Mock;
+      }> = [];
+
+      class MockIntersectionObserver {
+        callback: ObserverCallback;
+
+        disconnect = jest.fn();
+
+        observe = jest.fn();
+
+        constructor(callback: ObserverCallback) {
+          this.callback = callback;
+          observerInstances.push(this);
+        }
+      }
+
+      Object.defineProperty(globalThis, 'IntersectionObserver', {
+        configurable: true,
+        value: MockIntersectionObserver,
+      });
+
+      let storeCallCount = 0;
+      const stores: Array<{ id: number }> = [];
+      const storeGenerator = jest.fn(() => {
+        storeCallCount += 1;
+        const store = {
+          id: storeCallCount,
+          getState: () => ({ storeId: storeCallCount }),
+          dispatch: jest.fn(),
+          subscribe: jest.fn(),
+        };
+        stores.push(store);
+        return store;
+      });
+      StoreRegistry.register({ SharedStore: storeGenerator });
+      setupStoreElement('SharedStore', {});
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      // Setup immediate component
+      const immediateComponentEl = document.createElement('div');
+      immediateComponentEl.className = 'js-react-on-rails-component';
+      immediateComponentEl.setAttribute('data-component-name', 'TestComponent');
+      immediateComponentEl.setAttribute('data-dom-id', 'immediate-comp');
+      immediateComponentEl.setAttribute('data-hydrate-on', 'immediate');
+      immediateComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(immediateComponentEl);
+
+      const immediateTargetNode = document.createElement('div');
+      immediateTargetNode.id = 'immediate-comp';
+      immediateTargetNode.innerHTML = '<div>Server rendered</div>';
+      document.body.appendChild(immediateTargetNode);
+
+      // Setup visible (deferred) component
+      const visibleComponentEl = document.createElement('div');
+      visibleComponentEl.className = 'js-react-on-rails-component';
+      visibleComponentEl.setAttribute('data-component-name', 'TestComponent');
+      visibleComponentEl.setAttribute('data-dom-id', 'visible-comp');
+      visibleComponentEl.setAttribute('data-hydrate-on', 'visible');
+      visibleComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(visibleComponentEl);
+
+      const visibleTargetNode = document.createElement('div');
+      visibleTargetNode.id = 'visible-comp';
+      visibleTargetNode.innerHTML = '<div>Server rendered</div>';
+      document.body.appendChild(visibleTargetNode);
+
+      // First render: immediate component hydrates, visible is scheduled
+      renderComponent('immediate-comp');
+      renderComponent('visible-comp');
+
+      // Store should be created once
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const storeAfterFirstRender = StoreRegistry.getStore('SharedStore');
+
+      // Simulate async content load (e.g., Turbo Frame) triggering another forEachStore
+      // This happens when reactOnRailsComponentLoaded is called for a new component
+      const asyncComponentEl = document.createElement('div');
+      asyncComponentEl.className = 'js-react-on-rails-component';
+      asyncComponentEl.setAttribute('data-component-name', 'TestComponent');
+      asyncComponentEl.setAttribute('data-dom-id', 'async-comp');
+      asyncComponentEl.textContent = JSON.stringify({});
+      document.body.appendChild(asyncComponentEl);
+
+      const asyncTargetNode = document.createElement('div');
+      asyncTargetNode.id = 'async-comp';
+      document.body.appendChild(asyncTargetNode);
+
+      // This would previously re-create the store
+      renderComponent('async-comp');
+
+      // Store should still be the same instance
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const storeAfterAsyncLoad = StoreRegistry.getStore('SharedStore');
+      expect(storeAfterAsyncLoad).toBe(storeAfterFirstRender);
+
+      // Now the visible component becomes visible
+      observerInstances[0].callback(
+        [{ isIntersecting: true, intersectionRatio: 1 }] as IntersectionObserverEntry[],
+        observerInstances[0] as unknown as IntersectionObserver,
+      );
+
+      // The visible component should have gotten the same store instance
+      // (we can't directly test the component's store reference, but we verify
+      // the store wasn't re-created before the visible component mounted)
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      expect(StoreRegistry.getStore('SharedStore')).toBe(storeAfterFirstRender);
+
+      // Cleanup
+      const observerGlobal = globalThis as unknown as { IntersectionObserver?: unknown };
+      delete observerGlobal.IntersectionObserver;
+    });
+  });
 });
