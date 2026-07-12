@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "created_at": "2026-07-12T12:23:16.839Z",
+  "created_at": "2026-07-12T12:47:03.083Z",
   "controls": {
     "rspack": {
       "command": "pnpm exec rspack serve --config rspack.config.mjs --port <PORT>",
-      "measured_port": 60134,
-      "run_nonce": "rspack-33087-1783859000102-d02ba2812412d"
+      "measured_port": 64041,
+      "run_nonce": "rspack-37456-1783860426530-5715a80ca2306"
     },
     "vite": {
       "command": "pnpm exec vite --host 127.0.0.1 --port <PORT> --strictPort",
-      "measured_port": 60163,
-      "run_nonce": "vite-33087-1783859000955-dd93662317b1f"
+      "measured_port": 64073,
+      "run_nonce": "vite-37456-1783860427395-6f1f26cbc1e7a"
     }
   },
   "environment": {
-    "harness_git_head": "08d2afccd428925a01d4e9ba351f542bef87a391",
+    "harness_git_head": "4208014d6510875858578c638e51dc8da015a034",
     "harness_git_clean": true,
     "operating_system": "Darwin 25.5.0 arm64",
     "cpu": "Apple M5 Max",
@@ -32,16 +32,17 @@
     "hmr": "source write to browser-observed DOM update over the live dev-server connection",
     "overlay": "browser DOM inspection after introducing a JavaScript syntax error, then restoration",
     "noise_band": "maximum observed min-to-max spread of either control; conservative, local-machine only",
-    "stale_server_control": "ephemeral port preflight plus a unique compiled marker for every server process; shutdown awaits process exit and port closure"
+    "stale_server_control": "ephemeral port preflight plus a unique compiled marker for every server process; shutdown awaits process exit and port closure",
+    "control_mutation": "source writes occur only in an ignored per-run copy; tracked control files are never mutated"
   },
   "raw_samples_ms": {
     "cold_start": {
-      "rspack": [330.8, 231.1, 256.8, 239.6, 233],
-      "vite": [286.1, 244.9, 268.7, 247.7, 246]
+      "rspack": [310.4, 278.8, 259.7, 241.6, 254.1],
+      "vite": [288.3, 269.9, 267.7, 256.2, 264.7]
     },
     "hmr": {
-      "rspack": [80, 80.6, 80.9, 80.6, 81],
-      "vite": [76.2, 178.4, 22.8, 184.4, 24.7]
+      "rspack": [79.5, 78.6, 78.7, 79.8, 78.2],
+      "vite": [76.1, 177.9, 22.4, 178.3, 22.7]
     }
   },
   "overlay": {
@@ -76,38 +77,38 @@
     "cold_start": {
       "rspack": {
         "samples": 5,
-        "median_ms": 239.6,
-        "min_ms": 231.1,
-        "max_ms": 330.8,
-        "spread_ms": 99.7,
-        "spread_percent_of_median": 41.6
+        "median_ms": 259.7,
+        "min_ms": 241.6,
+        "max_ms": 310.4,
+        "spread_ms": 68.8,
+        "spread_percent_of_median": 26.5
       },
       "vite": {
         "samples": 5,
-        "median_ms": 247.7,
-        "min_ms": 244.9,
-        "max_ms": 286.1,
-        "spread_ms": 41.2,
-        "spread_percent_of_median": 16.6
+        "median_ms": 267.7,
+        "min_ms": 256.2,
+        "max_ms": 288.3,
+        "spread_ms": 32.1,
+        "spread_percent_of_median": 12
       },
       "vite_relative_to_rspack": "wash"
     },
     "hmr": {
       "rspack": {
         "samples": 5,
-        "median_ms": 80.6,
-        "min_ms": 80,
-        "max_ms": 81,
-        "spread_ms": 1,
-        "spread_percent_of_median": 1.2
+        "median_ms": 78.7,
+        "min_ms": 78.2,
+        "max_ms": 79.8,
+        "spread_ms": 1.6,
+        "spread_percent_of_median": 2
       },
       "vite": {
         "samples": 5,
-        "median_ms": 76.2,
-        "min_ms": 22.8,
-        "max_ms": 184.4,
-        "spread_ms": 161.6,
-        "spread_percent_of_median": 212.1
+        "median_ms": 76.1,
+        "min_ms": 22.4,
+        "max_ms": 178.3,
+        "spread_ms": 155.9,
+        "spread_percent_of_median": 204.9
       },
       "vite_relative_to_rspack": "ambiguous"
     }
