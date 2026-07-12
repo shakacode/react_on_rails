@@ -37,6 +37,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
+  exceptions no longer retain raw component props or generated JavaScript in log and error-tracker context.
+  Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
+  Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
   malformed-payload failure once within it. If the retry also fails, React receives the final
