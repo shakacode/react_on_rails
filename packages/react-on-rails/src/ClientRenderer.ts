@@ -570,5 +570,16 @@ function unmountAllComponents(): void {
   renderedRoots.clear();
 }
 
+/**
+ * Clear all hydrated stores on page unload so navigation to a new page re-initializes stores
+ * with the new page's props. Without this, the initializeStore guard (which prevents duplicate
+ * store creation within a single page lifecycle) would skip re-initialization on navigation,
+ * leaving components bound to stale state from the previous page.
+ */
+function clearAllStores(): void {
+  StoreRegistry.clearHydratedStores();
+}
+
 // Register cleanup on page unload
 onPageUnloaded(unmountAllComponents);
+onPageUnloaded(clearAllStores);

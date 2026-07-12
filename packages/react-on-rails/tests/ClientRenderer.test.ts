@@ -1453,5 +1453,68 @@ describe('ClientRenderer', () => {
       const observerGlobal = globalThis as unknown as { IntersectionObserver?: unknown };
       delete observerGlobal.IntersectionObserver;
     });
+
+    it('clears stores on page unload so navigation re-initializes with new props', () => {
+      const storeGenerator = jest.fn((props: Record<string, unknown>) => ({
+        getState: () => ({ count: (props as { initialCount: number }).initialCount }),
+        dispatch: jest.fn(),
+        subscribe: jest.fn(),
+      }));
+      StoreRegistry.register({ NavigationStore: storeGenerator });
+      setupStoreElement('NavigationStore', { initialCount: 1 });
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Test');
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'nav-store-test');
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'nav-store-test';
+      document.body.appendChild(targetNode);
+
+      // First page load: creates the store
+      renderComponent('nav-store-test');
+      expect(storeGenerator).toHaveBeenCalledTimes(1);
+      const firstStore = StoreRegistry.getStore('NavigationStore');
+      expect(firstStore?.getState()).toEqual({ count: 1 });
+
+      // Simulate Turbo/Turbolinks page unload (this should clear stores)
+      runPageUnload();
+
+      // After page unload, the store should be cleared
+      expect(StoreRegistry.getStore('NavigationStore', false)).toBeUndefined();
+
+      // Simulate new page - clear DOM and set up fresh page content
+      // This mimics what Turbo does: replace the entire page content
+      document.body.innerHTML = '';
+      document.head.innerHTML = '';
+      setupRailsContext();
+      setupStoreElement('NavigationStore', { initialCount: 100 });
+
+      const newComponentElement = document.createElement('div');
+      newComponentElement.className = 'js-react-on-rails-component';
+      newComponentElement.setAttribute('data-component-name', 'TestComponent');
+      newComponentElement.setAttribute('data-dom-id', 'nav-store-test-2');
+      newComponentElement.textContent = JSON.stringify({});
+      document.body.appendChild(newComponentElement);
+
+      const newTargetNode = document.createElement('div');
+      newTargetNode.id = 'nav-store-test-2';
+      document.body.appendChild(newTargetNode);
+
+      // Second page load: should create a NEW store with new props
+      renderComponent('nav-store-test-2');
+      expect(storeGenerator).toHaveBeenCalledTimes(2);
+      const secondStore = StoreRegistry.getStore('NavigationStore');
+      expect(secondStore?.getState()).toEqual({ count: 100 });
+
+      // The stores should be different instances
+      expect(secondStore).not.toBe(firstStore);
+    });
   });
 });
