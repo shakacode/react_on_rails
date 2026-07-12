@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "commands"],
+  "required": ["schema_version", "limits", "commands"],
   "properties": {
     "schema_version": { "const": "1.0" },
+    "limits": { "$ref": "#/$defs/eventLimits" },
     "commands": {
       "type": "array",
       "items": {
@@ -19,6 +20,28 @@
           "output": { "type": "string" },
           "output_truncated": { "type": "boolean" }
         }
+      }
+    }
+  },
+  "$defs": {
+    "eventLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_bytes",
+        "max_events",
+        "observed_bytes",
+        "observed_events",
+        "exceeded",
+        "reason"
+      ],
+      "properties": {
+        "max_bytes": { "type": "integer", "minimum": 1 },
+        "max_events": { "type": "integer", "minimum": 1 },
+        "observed_bytes": { "type": "integer", "minimum": 0 },
+        "observed_events": { "type": ["integer", "null"], "minimum": 0 },
+        "exceeded": { "type": "boolean" },
+        "reason": { "enum": [null, "events_bytes", "events_count"] }
       }
     }
   }

@@ -2,9 +2,47 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "artifacts"],
+  "required": ["schema_version", "limits", "artifacts"],
   "properties": {
     "schema_version": { "const": "1.0" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_file_bytes",
+        "max_files",
+        "max_total_bytes",
+        "max_visited_entries",
+        "max_depth",
+        "visited_entries",
+        "selected_files",
+        "included_files",
+        "included_bytes",
+        "omitted_files",
+        "exceeded",
+        "reasons"
+      ],
+      "properties": {
+        "max_file_bytes": { "type": "integer", "minimum": 1 },
+        "max_files": { "type": "integer", "minimum": 1 },
+        "max_total_bytes": { "type": "integer", "minimum": 1 },
+        "max_visited_entries": { "type": "integer", "minimum": 1 },
+        "max_depth": { "type": "integer", "minimum": 1 },
+        "visited_entries": { "type": "integer", "minimum": 0 },
+        "selected_files": { "type": "integer", "minimum": 0 },
+        "included_files": { "type": "integer", "minimum": 0 },
+        "included_bytes": { "type": "integer", "minimum": 0 },
+        "omitted_files": { "type": "integer", "minimum": 0 },
+        "exceeded": { "type": "boolean" },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "enum": ["depth", "file_bytes", "selected_files", "total_bytes", "visited_entries"]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
     "artifacts": {
       "type": "array",
       "items": {

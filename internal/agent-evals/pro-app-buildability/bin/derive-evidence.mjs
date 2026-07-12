@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ARTIFACT_LIMITS, readBoundedEvents } from './evidence-limits.mjs';
 import { normalizeCommand } from './normalize-command.mjs';
 import { redactSensitiveValues } from './sensitive-values.mjs';
 
@@ -13,7 +14,6 @@ if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
 
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
-const MAX_ARTIFACT_BYTES = 65_536;
 const sanitize = (value) =>
   redactSensitiveValues(
     String(value)
@@ -28,11 +28,7 @@ const truncate = (value, limit) => {
   return { value: safe.slice(0, limit), truncated: safe.length > limit };
 };
 
-const events = fs
-  .readFileSync(eventsPath, 'utf8')
-  .split('\n')
-  .filter(Boolean)
-  .map((line) => JSON.parse(line));
+const { events, limits: eventLimits } = readBoundedEvents(eventsPath);
 
 const commands = [];
 for (const event of events) {
@@ -49,37 +45,81 @@ for (const event of events) {
     });
   }
 }
-const commandEvidence = { schema_version: '1.0', commands };
+const commandEvidence = { schema_version: '1.0', limits: eventLimits, commands };
 
 const excludedDirectories = new Set(['.git', 'node_modules', 'vendor', 'tmp', 'log', 'storage']);
 const selectedBasenames = new Set(['Gemfile', 'package.json', 'routes.rb']);
 const selectedExtensions = new Set(['.rb', '.js', '.jsx', '.ts', '.tsx']);
 const selectedRoots = ['app/', 'spec/', 'test/'];
 const artifacts = [];
+const artifactLimits = {
+  ...ARTIFACT_LIMITS,
+  visited_entries: 0,
+  selected_files: 0,
+  included_files: 0,
+  included_bytes: 0,
+  omitted_files: 0,
+  exceeded: false,
+  reasons: [],
+};
+let stopWalk = false;
+const exceedArtifactLimit = (reason, omitted = false) => {
+  artifactLimits.exceeded = true;
+  if (!artifactLimits.reasons.includes(reason)) artifactLimits.reasons.push(reason);
+  if (omitted) artifactLimits.omitted_files += 1;
+};
 
-function walk(directory) {
+function walk(directory, depth = 0) {
+  if (stopWalk) return;
+  if (depth > ARTIFACT_LIMITS.max_depth) {
+    exceedArtifactLimit('depth');
+    stopWalk = true;
+    return;
+  }
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    artifactLimits.visited_entries += 1;
+    if (artifactLimits.visited_entries > ARTIFACT_LIMITS.max_visited_entries) {
+      exceedArtifactLimit('visited_entries');
+      stopWalk = true;
+      return;
+    }
     if (!entry.isSymbolicLink() && !excludedDirectories.has(entry.name)) {
       const absolute = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        walk(absolute);
+        walk(absolute, depth + 1);
       } else if (entry.isFile()) {
         const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
         const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
         const selected =
           selectedBasenames.has(entry.name) ||
           (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
-        const fileSize = fs.statSync(absolute).size;
-        if (selected && fileSize <= MAX_ARTIFACT_BYTES) {
-          const content = fs.readFileSync(absolute);
-          const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
-          artifacts.push({
-            path: relative,
-            sha256: crypto.createHash('sha256').update(content).digest('hex'),
-            size: fileSize,
-            excerpt: excerpt.value,
-            excerpt_truncated: excerpt.truncated,
-          });
+        if (selected) {
+          artifactLimits.selected_files += 1;
+          if (artifactLimits.selected_files > ARTIFACT_LIMITS.max_files) {
+            exceedArtifactLimit('selected_files', true);
+            stopWalk = true;
+            return;
+          }
+          const fileSize = fs.statSync(absolute).size;
+          if (fileSize > ARTIFACT_LIMITS.max_file_bytes) {
+            exceedArtifactLimit('file_bytes', true);
+          } else if (artifactLimits.included_bytes + fileSize > ARTIFACT_LIMITS.max_total_bytes) {
+            exceedArtifactLimit('total_bytes', true);
+            stopWalk = true;
+            return;
+          } else {
+            const content = fs.readFileSync(absolute);
+            const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
+            artifacts.push({
+              path: relative,
+              sha256: crypto.createHash('sha256').update(content).digest('hex'),
+              size: fileSize,
+              excerpt: excerpt.value,
+              excerpt_truncated: excerpt.truncated,
+            });
+            artifactLimits.included_files += 1;
+            artifactLimits.included_bytes += fileSize;
+          }
         }
       }
     }
@@ -87,7 +127,8 @@ function walk(directory) {
 }
 walk(workspace);
 artifacts.sort((left, right) => left.path.localeCompare(right.path));
-const artifactEvidence = { schema_version: '1.0', artifacts };
+artifactLimits.reasons.sort();
+const artifactEvidence = { schema_version: '1.0', limits: artifactLimits, artifacts };
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const invocation = JSON.parse(fs.readFileSync(invocationPath, 'utf8'));
@@ -282,7 +323,9 @@ const outcomeRows = [
 ];
 
 const reportCompleted = report.status === 'completed';
-const outcomesComplete = reportCompleted && outcomeRows.every((item) => item.status === 'pass');
+const sourceLimitsExceeded = eventLimits.exceeded || artifactLimits.exceeded;
+const outcomesComplete =
+  reportCompleted && !sourceLimitsExceeded && outcomeRows.every((item) => item.status === 'pass');
 const completionRow = outcomesComplete
   ? {
       id: 'evidence.complete',
@@ -293,12 +336,16 @@ const completionRow = outcomesComplete
   : {
       id: 'evidence.complete',
       status: 'unknown',
-      reason: 'At least one required outcome row is not proven; evidence completeness remains UNKNOWN.',
+      reason: sourceLimitsExceeded
+        ? 'Evidence source limits were exceeded; completeness remains UNKNOWN.'
+        : 'At least one required outcome row is not proven; evidence completeness remains UNKNOWN.',
       citations: [],
     };
 const items = [...outcomeRows, completionRow];
 let overall = 'incomplete';
-if (outcomesComplete) {
+if (sourceLimitsExceeded) {
+  overall = 'incomplete';
+} else if (outcomesComplete) {
   overall = 'pass';
 } else if (reportCompleted) {
   overall = 'fail';

@@ -69,7 +69,9 @@ rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
 rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
-rg -q 'sandbox_workspace_write.network_access=true' "$eval_dir/bin/run-eval"
+rg -q 'sandbox_workspace_write.network_access=\$sandbox_network_access' "$eval_dir/bin/run-eval"
+rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
+rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
@@ -94,8 +96,12 @@ printf '%013000d' 0 >"$tmp/long-stderr"
 test "$(jq -r .stderr_line_count "$tmp/long-diagnostics.json")" = 0
 test "$(jq -r .excerpt_truncated "$tmp/long-diagnostics.json")" = true
 test "$(jq -r '.excerpt | length' "$tmp/long-diagnostics.json")" = 12000
-"$eval_dir/bin/probe-allows-scaffold" 0 pass
-if "$eval_dir/bin/probe-allows-scaffold" 1 pass; then
+"$eval_dir/bin/probe-allows-scaffold" 0 pass true
+if "$eval_dir/bin/probe-allows-scaffold" 0 pass false; then
+  echo "network-disabled run incorrectly allows scaffold" >&2
+  exit 1
+fi
+if "$eval_dir/bin/probe-allows-scaffold" 1 pass true; then
   echo "nonzero probe exit incorrectly allows scaffold" >&2
   exit 1
 fi
@@ -155,7 +161,7 @@ fi
 rg -q 'workspace must be outside the repository' "$tmp/nested-error"
 
 printf '%s\n' \
-  '{"schema_version":"1.0","sandbox_network_access":true,"npm":{"attempts":[{"command_id":"command-1","exit_code":1}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"pass"}' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":1}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"pass"}' \
   >"$tmp/contradictory-probe.json"
 printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view","exit_code":1,"status":"failed","output":"","output_truncated":false}]}' \
   >"$tmp/probe-commands.json"
@@ -167,7 +173,7 @@ fi
 rg -q 'contradicts' "$tmp/probe-error"
 
 printf '%s\n' \
-  '{"schema_version":"1.0","sandbox_network_access":true,"npm":{"attempts":[{"command_id":"command-1","exit_code":0}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"fail"}' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":0}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"fail"}' \
   >"$tmp/wrong-command-probe.json"
 printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view unrelated-package version --json","exit_code":0,"status":"completed","output":"1.0.0","output_truncated":false}]}' \
   >"$tmp/wrong-command-evidence.json"
@@ -183,7 +189,7 @@ printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"npm view create-react-on-rails-app version --json","exit_code":0}}' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"gem search --remote --exact '\''^rails$'\''","exit_code":0}}' \
   >"$tmp/retried-probe-events.jsonl"
-node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/retried-probe-events.jsonl" "$tmp/retried-probe.json"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/retried-probe-events.jsonl" "$tmp/retried-probe.json" true
 test "$(jq -r '.npm.attempts | length' "$tmp/retried-probe.json")" = 2
 test "$(jq -r '.npm.status' "$tmp/retried-probe.json")" = fail
 test "$(jq -r '.overall' "$tmp/retried-probe.json")" = fail
@@ -192,17 +198,21 @@ printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":["npm","view","create-react-on-rails-app","version","--json"],"exit_code":0}}' \
   '{"type":"item.completed","item":{"type":"command_execution","command":["gem","search","--remote","--exact","^rails$"],"exit_code":0}}' \
   >"$tmp/argv-probe-events.jsonl"
-node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/argv-probe-events.jsonl" "$tmp/argv-probe.json"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/argv-probe-events.jsonl" "$tmp/argv-probe.json" true
 test "$(jq -r '.npm.status' "$tmp/argv-probe.json")" = pass
 test "$(jq -r '.rubygems.status' "$tmp/argv-probe.json")" = pass
 test "$(jq -r '.overall' "$tmp/argv-probe.json")" = pass
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/argv-probe-events.jsonl" \
+  "$tmp/network-disabled-probe.json" false
+test "$(jq -r '.sandbox_network_access' "$tmp/network-disabled-probe.json")" = false
+test "$(jq -r '.overall' "$tmp/network-disabled-probe.json")" = fail
 
 printf '%s\n' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc '\''npm view create-react-on-rails-app version --json'\''","exit_code":0}}' \
   '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc \"gem search --remote --exact '\''^rails$'\''\"","exit_code":0}}' \
   >"$tmp/linux-shell-probe-events.jsonl"
 node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/linux-shell-probe-events.jsonl" \
-  "$tmp/linux-shell-probe.json"
+  "$tmp/linux-shell-probe.json" true
 test "$(jq -r '.overall' "$tmp/linux-shell-probe.json")" = pass
 
 mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
@@ -259,6 +269,10 @@ if jq -e '.artifacts[] | select(.path | endswith("oversized.server.tsx"))' \
   echo "oversized agent-controlled artifact was read into evidence" >&2
   exit 1
 fi
+test "$(jq -r '.limits.exceeded' "$tmp/evidence-output/artifact-evidence.json")" = true
+test "$(jq -r '.limits.reasons | index("file_bytes") != null' \
+  "$tmp/evidence-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/evidence-output/rubric-results.json")" = incomplete
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "unaided") | .status' "$tmp/evidence-output/rubric-results.json")" = pass
@@ -268,6 +282,49 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
   "$tmp/missing-followup-invocation.json"
 test "$(jq -r '.items[] | select(.id == "unaided") | .status' \
   "$tmp/missing-followup-output/rubric-results.json")" = unknown
+
+mkdir "$tmp/limit-workspace"
+printf '%01050000d' 0 >"$tmp/oversized-events.jsonl"
+mkdir "$tmp/events-bytes-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/oversized-events.jsonl" \
+  "$tmp/limit-workspace" "$tmp/events-bytes-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reason' "$tmp/events-bytes-output/command-evidence.json")" = events_bytes
+test "$(jq -r '.overall' "$tmp/events-bytes-output/rubric-results.json")" = incomplete
+
+for ((event_index = 1; event_index <= 5001; event_index += 1)); do
+  printf '%s\n' '{}' >>"$tmp/many-events.jsonl"
+done
+mkdir "$tmp/events-count-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/many-events.jsonl" \
+  "$tmp/limit-workspace" "$tmp/events-count-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reason' "$tmp/events-count-output/command-evidence.json")" = events_count
+test "$(jq -r '.overall' "$tmp/events-count-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/many-files-workspace/eval_app/app/components" "$tmp/many-files-output"
+for ((file_index = 1; file_index <= 257; file_index += 1)); do
+  printf '%s\n' 'export default null' \
+    >"$tmp/many-files-workspace/eval_app/app/components/file-$file_index.ts"
+done
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/many-files-workspace" "$tmp/many-files-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("selected_files") != null' \
+  "$tmp/many-files-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/many-files-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/total-bytes-workspace/eval_app/app/components" "$tmp/total-bytes-output"
+yes 'export default null' | head -c 65000 >"$tmp/artifact-payload" || true
+for ((file_index = 1; file_index <= 33; file_index += 1)); do
+  cp "$tmp/artifact-payload" "$tmp/total-bytes-workspace/eval_app/app/components/file-$file_index.ts"
+done
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/total-bytes-workspace" "$tmp/total-bytes-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("total_bytes") != null' \
+  "$tmp/total-bytes-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/total-bytes-output/rubric-results.json")" = incomplete
 
 mkdir -p "$tmp/correlation-workspace/eval_app/app/components" \
   "$tmp/correlation-workspace/eval_app/app/models" \

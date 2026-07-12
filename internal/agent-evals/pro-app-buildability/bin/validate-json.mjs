@@ -21,6 +21,7 @@ addFormats(ajv);
 
 const documents = [
   ['run.json', 'run.schema.json'],
+  ['invocation.json', 'invocation.schema.json'],
   ['agent-report.json', 'agent-report.schema.json'],
   ['command-evidence.json', 'command-evidence.schema.json'],
   ['artifact-evidence.json', 'artifact-evidence.schema.json'],

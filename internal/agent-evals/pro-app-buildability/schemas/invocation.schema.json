@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "command",
+    "model",
+    "timeout_seconds",
+    "sandbox",
+    "ephemeral",
+    "ignore_user_config",
+    "ignore_rules",
+    "strict_config",
+    "multi_agent",
+    "sandbox_network_access",
+    "isolated_host_attestation",
+    "capability_probe",
+    "credential_store",
+    "auth_material_available",
+    "human_followups_sent",
+    "shell_environment_policy"
+  ],
+  "properties": {
+    "command": { "const": "codex exec" },
+    "model": { "type": "string", "minLength": 1 },
+    "timeout_seconds": { "type": "integer", "minimum": 1 },
+    "sandbox": { "const": "workspace-write" },
+    "ephemeral": { "const": true },
+    "ignore_user_config": { "const": true },
+    "ignore_rules": { "const": true },
+    "strict_config": { "const": true },
+    "multi_agent": { "const": false },
+    "sandbox_network_access": { "type": "boolean" },
+    "isolated_host_attestation": { "type": "boolean" },
+    "capability_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["npm", "rubygems"],
+      "properties": {
+        "npm": { "const": "npm view create-react-on-rails-app version --json" },
+        "rubygems": { "const": "gem search --remote --exact '^rails$'" }
+      }
+    },
+    "credential_store": { "const": "file" },
+    "auth_material_available": { "const": false },
+    "human_followups_sent": { "const": 0 },
+    "shell_environment_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inherit", "allowlist"],
+      "properties": {
+        "inherit": { "const": "none" },
+        "allowlist": {
+          "const": ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SHELL", "CODEX_EVAL"]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "sandbox_network_access": { "const": true } } },
+      "then": { "properties": { "isolated_host_attestation": { "const": true } } }
+    }
+  ]
+}

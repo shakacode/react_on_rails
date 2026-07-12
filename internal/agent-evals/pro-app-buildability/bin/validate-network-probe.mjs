@@ -40,7 +40,11 @@ for (const tool of ['npm', 'rubygems']) {
   }
 }
 
-const bothPass = probe.npm.status === 'pass' && probe.rubygems.status === 'pass';
+const bothPass =
+  !probe.limits.exceeded &&
+  probe.sandbox_network_access &&
+  probe.npm.status === 'pass' &&
+  probe.rubygems.status === 'pass';
 if ((probe.overall === 'pass') !== bothPass) {
   console.error('overall probe result contradicts per-tool results');
   valid = false;

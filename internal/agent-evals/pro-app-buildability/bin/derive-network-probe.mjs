@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { readBoundedEvents } from './evidence-limits.mjs';
 import { normalizeCommand } from './normalize-command.mjs';
 
-const [eventsPath, outputPath] = process.argv.slice(2);
-if (!eventsPath || !outputPath) {
-  console.error('usage: derive-network-probe.mjs EVENTS OUTPUT');
+const [eventsPath, outputPath, networkAccessArgument] = process.argv.slice(2);
+if (!eventsPath || !outputPath || !['true', 'false'].includes(networkAccessArgument)) {
+  console.error('usage: derive-network-probe.mjs EVENTS OUTPUT NETWORK_ACCESS');
   process.exit(64);
 }
 
-const events = fs
-  .readFileSync(eventsPath, 'utf8')
-  .split('\n')
-  .filter(Boolean)
-  .map((line) => JSON.parse(line));
+const sandboxNetworkAccess = networkAccessArgument === 'true';
+const { events, limits } = readBoundedEvents(eventsPath);
 const commands = events
   .filter((event) => event?.type === 'item.completed' && event?.item?.type === 'command_execution')
   .map((event, index) => ({
@@ -37,9 +35,13 @@ const npmStatus = probeStatus(npmAttempts);
 const rubygemsStatus = probeStatus(rubygemsAttempts);
 const result = {
   schema_version: '1.0',
-  sandbox_network_access: true,
+  sandbox_network_access: sandboxNetworkAccess,
+  limits,
   npm: { attempts: npmAttempts, status: npmStatus },
   rubygems: { attempts: rubygemsAttempts, status: rubygemsStatus },
-  overall: npmStatus === 'pass' && rubygemsStatus === 'pass' ? 'pass' : 'fail',
+  overall:
+    !limits.exceeded && sandboxNetworkAccess && npmStatus === 'pass' && rubygemsStatus === 'pass'
+      ? 'pass'
+      : 'fail',
 };
 fs.writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });

@@ -59,27 +59,43 @@ directory. Tool environment inheritance is `none`, with only `PATH`, private
 `HOME` and `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
 
 The configured file credential store is inside that empty disposable
-`CODEX_HOME`; no credential is copied, inherited, or mounted into the
-network-enabled process. Until a separately reviewed credential broker or
-stronger execution boundary exists, an authenticated capability turn is
-intentionally unsupported: Codex records an authentication-blocked `incomplete`
-run and scaffolding does not start. This is a known evidence result, not a
-supported onboarding claim.
+`CODEX_HOME`; no credential is copied, inherited, or mounted into the process.
+Private homes prevent default discovery and inheritance, but the workspace-write
+sandbox does **not** confine absolute-path reads from the host. The default local
+eval therefore keeps model-shell network access off and cannot proceed to
+scaffolding. Until a separately reviewed credential broker or stronger
+execution boundary exists, the default run records an authentication-blocked
+`incomplete` result. This is known evidence, not a supported onboarding claim.
 
-Workspace-write network access is enabled explicitly with the supported
-`sandbox_workspace_write.network_access=true` Codex configuration. Before any
-scaffold work, a capability-only Codex turn must run the exact npm and RubyGems
-commands in `network-probe-prompt.md`. The runner derives
-`sandbox-network-probe.json` from command events. Missing commands or either
-nonzero exit fail closed: the run is recorded as `incomplete` and scaffold work
-does not start.
+A network-enabled capability/scaffold run is allowed only on a disposable VM or
+container that contains no host secrets. The operator must acknowledge that
+boundary explicitly:
+
+```bash
+internal/agent-evals/pro-app-buildability/bin/run-eval \
+  --agent codex --model gpt-5.4 --timeout 2700 \
+  --workspace /tmp/ror-pro-agent-eval \
+  --output internal/agent-evals/pro-app-buildability/runs/isolated-codex \
+  --ack-disposable-secret-free-host
+```
+
+That flag records `isolated_host_attestation: true` and enables the supported
+`sandbox_workspace_write.network_access=true` setting. It is an operator
+attestation, not technical confinement. Before scaffold work, the capability
+turn must run the exact commands in `network-probe-prompt.md`; a missing command,
+nonzero exit, disabled sandbox network, missing attestation, or evidence-limit
+overflow fails closed and prevents scaffolding.
 
 Raw events and stderr live only under a mode-`0700` temporary directory. No
-authentication material is made available to the network-enabled process.
-`umask 077` applies throughout, and
+authentication material is made available to the process. `umask 077` applies throughout, and
 `EXIT`/`INT`/`TERM` traps delete the directory. Generic categories of stripped
 sensitive parent variables are recorded without exposing the operator's exact
 variable names; their values are neither read nor passed to the agent.
+
+Evidence parsing is bounded before JSON parsing or file reads. Event bytes and
+event count, visited/selected artifact counts, recursion depth, per-file bytes,
+and aggregate artifact bytes are recorded in evidence metadata. Any exceeded
+budget omits the affected evidence and forces an `incomplete` rubric result.
 
 ## Replay and validate
 
