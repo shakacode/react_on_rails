@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "overall": "incomplete",
+  "items": [
+    {
+      "id": "install.pro",
+      "status": "unknown",
+      "reason": "A successful public scaffold plus exact Ruby and JavaScript Pro manifest entries are not all evidenced.",
+      "citations": []
+    },
+    {
+      "id": "rsc.route",
+      "status": "unknown",
+      "reason": "RSC-specific route, source, and successful test output are not all evidenced.",
+      "citations": []
+    },
+    {
+      "id": "form.validation",
+      "status": "unknown",
+      "reason": "Server validation, invalid-response behavior, both-outcome tests, and successful output are not all evidenced.",
+      "citations": []
+    },
+    {
+      "id": "tests.page",
+      "status": "unknown",
+      "reason": "No passing page/RSC test is independently proven.",
+      "citations": []
+    },
+    {
+      "id": "tests.form",
+      "status": "unknown",
+      "reason": "Passing coverage of both form outcomes is not independently proven.",
+      "citations": []
+    },
+    {
+      "id": "build.production",
+      "status": "unknown",
+      "reason": "No successful production build command was captured.",
+      "citations": []
+    },
+    {
+      "id": "tests.green",
+      "status": "unknown",
+      "reason": "No successful relevant automated test command was captured.",
+      "citations": []
+    },
+    {
+      "id": "unaided",
+      "status": "pass",
+      "reason": "The schema-constrained report records 0 human interventions; the runner supplied no follow-up input.",
+      "citations": ["agent-report.json#/human_interventions"]
+    },
+    {
+      "id": "evidence.complete",
+      "status": "unknown",
+      "reason": "At least one required outcome row is not proven; evidence completeness remains UNKNOWN.",
+      "citations": []
+    }
+  ]
+}
