@@ -407,7 +407,8 @@ describe InstallGenerator, type: :generator do
       assert_file "AGENTS.md" do |content|
         expect(content).to include("react_component")
         expect(content).to include("ror_components")
-        expect(content).to include("react_on_rails:doctor")
+        expect(content).to include("react_on_rails:doctor FORMAT=json")
+        expect(content).to include("`id`, `severity`, `message`, and `remediation.prompt`")
         expect(content).to include("Component '<Name>' Not Registered")
       end
 

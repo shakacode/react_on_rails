@@ -15,6 +15,7 @@ require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "doctor_schema"
 require_relative "pro_migration"
 require_relative "node_renderer_procfile"
 require_relative "../generators/react_on_rails/js_dependency_manager"
@@ -137,7 +138,11 @@ module ReactOnRails
     #         "id": "<stable snake_case id from CHECK_SECTIONS>",
     #         "title": "<human section title>",
     #         "status": "pass" | "warn" | "fail",
+    #         "severity": "info" | "warning" | "error",
     #         "message": "<most severe message content, or null>",
+    #         "fix_command": "<safe mechanical command, or null>",
+    #         "docs_url": "<check-specific documentation URL>",
+    #         "remediation": { "prompt": "...", "files": ["..."], "expected_end_state": "..." } | null,
     #         "details": [ { "level": "success|warning|error|info", "content": "..." } ]
     #       }
     #     ],
@@ -146,7 +151,7 @@ module ReactOnRails
     #
     # No timestamp is included so output is deterministic for a given app state.
     # Exit code semantics match text mode: 1 if any check fails, else 0.
-    JSON_SCHEMA_VERSION = 1
+    JSON_SCHEMA_VERSION = DoctorSchema::VERSION
 
     # Doctor check sections. The :id values are part of the stable JSON schema
     # contract (consumed by agents/tooling) — never rename or reuse them; add new
@@ -259,7 +264,9 @@ module ReactOnRails
       stray_output = capture_stdout { results = collect_check_results }
       $stderr.print(stray_output) unless stray_output.empty?
 
-      puts JSON.pretty_generate(build_json_report(results))
+      report = build_json_report(results)
+      DoctorSchema.validate!(report)
+      puts JSON.pretty_generate(report)
       exit(diagnosis_exit_code)
     end
 
@@ -333,14 +340,42 @@ module ReactOnRails
     def build_check_entry(result)
       messages = result[:messages]
       status = check_status(messages)
+      severity = check_severity(status)
+      message = primary_message(messages, status)
+      metadata = DoctorSchema.metadata(result[:id])
 
       {
         id: result[:id],
         title: result[:title],
         status:,
-        message: primary_message(messages, status),
-        details: messages.map { |message| { level: message[:type].to_s, content: message[:content] } }
+        severity:,
+        message:,
+        fix_command: status == "pass" ? nil : metadata[:fix_command],
+        docs_url: DoctorSchema.docs_url(result[:id]),
+        remediation: build_remediation(result[:id], severity, message, metadata, status),
+        details: messages.map { |detail| { level: detail[:type].to_s, content: detail[:content] } }
       }
+    end
+
+    def check_severity(status)
+      { "pass" => "info", "warn" => "warning", "fail" => "error" }.fetch(status)
+    end
+
+    def build_remediation(check_id, severity, message, metadata, status)
+      return nil if status == "pass"
+
+      files = metadata.fetch(:files)
+      expected_end_state = metadata.fetch(:expected_end_state)
+      prompt_lines = [
+        "Fix React on Rails doctor check `#{check_id}` (#{severity}).",
+        "Diagnosis: #{message}",
+        "Inspect these paths: #{files.join(', ')}.",
+        "Expected end state: #{expected_end_state}",
+        "Re-run `bin/rails react_on_rails:doctor FORMAT=json` and confirm this check reports `pass`."
+      ]
+      prompt_lines.insert(3, "Suggested command: `#{metadata[:fix_command]}`.") if metadata[:fix_command]
+
+      { prompt: prompt_lines.join("\n"), files:, expected_end_state: }
     end
 
     def check_status(messages)
@@ -1951,7 +1986,14 @@ module ReactOnRails
     end
 
     def diagnosis_exit_code
-      checker.errors? ? 1 : 0
+      status = if checker.errors?
+                 :fail
+               elsif checker.warnings?
+                 :warn
+               else
+                 :pass
+               end
+      DoctorSchema::EXIT_CODES.fetch(status)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

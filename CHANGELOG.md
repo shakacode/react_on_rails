@@ -84,6 +84,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **Agent-legible doctor contract**: `bin/rails react_on_rails:doctor FORMAT=json` now includes stable
+  check IDs, explicit severity and documentation fields, safe mechanical fix commands when available,
+  and self-contained remediation prompts. The versioned schema, deterministic ordering, and exit-code
+  behavior are documented for CI and coding-agent integrations. Fixes
+  [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).
+
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
   license through `config.license_token`, including from Rails credentials, while standalone Node
   renderers can use the `licenseToken` option. Explicit nonblank configuration takes precedence over

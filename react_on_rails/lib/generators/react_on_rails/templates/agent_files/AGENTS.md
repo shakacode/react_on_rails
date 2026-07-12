@@ -149,11 +149,18 @@ A Redux store wasn't registered before a component that depends on it rendered.
 
 ## 6. Diagnose your setup
 
-Before guessing, run the doctor — it checks configuration, bundles, and dependencies:
+Before guessing, run the doctor in its stable machine-readable mode — it checks
+configuration, bundles, and dependencies and returns copy-promptable remediation:
 
 ```bash
-bin/rails react_on_rails:doctor
+bin/rails react_on_rails:doctor FORMAT=json
 ```
+
+Exit code `0` means there are no errors (warnings may still be present); exit code
+`1` means at least one error must be fixed. Use each non-passing check's stable
+`id`, `severity`, `message`, and `remediation.prompt`, then rerun the command until
+the report no longer contains errors. The JSON contract is documented at
+https://reactonrails.com/docs/api-reference/doctor.
 
 ## 7. Where the full reference lives
 
