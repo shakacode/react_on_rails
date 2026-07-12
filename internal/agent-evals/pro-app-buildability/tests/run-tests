@@ -152,6 +152,18 @@ printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/evidence-workspace/eval_app/Gemf
 printf '%s\n' '{"dependencies":{"react-on-rails-pro":"1.0.0"}}' >"$tmp/evidence-workspace/eval_app/package.json"
 printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}' \
   >"$tmp/fixture-report.json"
+adversarial_command="jest --$(printf '!=! --%.0s' {1..4000})"
+jq -cn --arg command "$adversarial_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"1 test passed"}}' \
+  >"$tmp/adversarial-events.jsonl"
+mkdir "$tmp/adversarial-output"
+if command -v timeout >/dev/null; then
+  test_timeout=timeout
+else
+  test_timeout=gtimeout
+fi
+"$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/adversarial-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/adversarial-output" "$tmp/fixture-report.json"
 mkdir "$tmp/argv-evidence-output"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/argv-probe-events.jsonl" \
   "$tmp/evidence-workspace" "$tmp/argv-evidence-output" "$tmp/fixture-report.json"
