@@ -17,10 +17,10 @@ const sanitize = (value) =>
     .replaceAll(/\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
     .replaceAll(/\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
     .replaceAll(/\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>')
-    .replaceAll(/(authorization["'=: ]+)[^ ,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/(cookie["'=: ]+)[^ ,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/(password["'=: ]+)[^ ,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^ ,"']+/gi, '$1[REDACTED]')
+    .replaceAll(/(authorization["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
+    .replaceAll(/(cookie["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
+    .replaceAll(/(password["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
+    .replaceAll(/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
     .replaceAll(
       /(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/gis,
       '$1[REDACTED]$2',
@@ -92,81 +92,116 @@ artifacts.sort((left, right) => left.path.localeCompare(right.path));
 const artifactEvidence = { schema_version: '1.0', artifacts };
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-const allArtifactText = artifacts
-  .map((artifact) => `${artifact.path}\n${artifact.excerpt}`)
-  .join('\n')
-  .toLowerCase();
 const successfulCommands = commands.filter((command) => command.exit_code === 0);
 const successful = (pattern) => successfulCommands.filter((command) => pattern.test(command.command));
-const artifactCitations = (pattern) =>
-  artifacts
-    .filter((artifact) => pattern.test(`${artifact.path}\n${artifact.excerpt}`))
-    .map((artifact) => `artifact-evidence.json#${artifact.path}`);
+const successfulOutcome = (commandPattern, outputPattern) =>
+  successfulCommands.filter(
+    (command) => commandPattern.test(command.command) && outputPattern.test(command.output),
+  );
+const matchingArtifacts = (pathPattern, contentPattern) =>
+  artifacts.filter((artifact) => pathPattern.test(artifact.path) && contentPattern.test(artifact.excerpt));
+const artifactCitations = (matched) => matched.map((artifact) => `artifact-evidence.json#${artifact.path}`);
 const commandCitations = (matched) => matched.map((command) => `command-evidence.json#${command.id}`);
 
-const installCitations = artifactCitations(/react[_-]on[_-]rails[_-]pro/i);
-const installPass =
-  allArtifactText.includes('react_on_rails_pro') && allArtifactText.includes('react-on-rails-pro');
-const rscCitations = artifactCitations(
-  /react server component|server_component|\.server\.|react-on-rails-rsc|rsc/i,
+const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
+const jsProManifests = matchingArtifacts(/package\.json$/, /react-on-rails-pro/);
+const installCommands = successful(/(?:npx|npm exec|pnpm dlx) .*create-react-on-rails-app/);
+const rscRoutes = matchingArtifacts(/config\/routes\.rb$/, /rsc|server_component|server-component/i);
+const rscSources = matchingArtifacts(
+  /app\/.*(?:\.server\.|rsc|server_component)/i,
+  /export|class|module|render/i,
 );
-const routeCitations = artifactCitations(/routes\.rb|route/i);
-const validationCitations = artifactCitations(
-  /validates|errors\.add|unprocessable_entity|unprocessable_content/i,
+const validationModels = matchingArtifacts(/app\/models\/.*\.rb$/, /validates|validate\s/);
+const validationControllers = matchingArtifacts(
+  /app\/controllers\/.*\.rb$/,
+  /unprocessable_entity|unprocessable_content|errors/,
 );
-const pageTestCitations = artifactCitations(/(?:spec|test).*?(?:page|rsc)|(?:page|rsc).*?(?:spec|test)/i);
-const formTestCitations = artifactCitations(/(?:spec|test).*?form|form.*?(?:spec|test)|invalid.*valid/i);
+const pageTests = matchingArtifacts(
+  /(?:spec|test)\/.*(?:page|rsc).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
+  /expect|assert|test\s|it\s/,
+);
+const formTests = matchingArtifacts(
+  /(?:spec|test)\/.*(?:form|request|system).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
+  /invalid[\s\S]*valid|valid[\s\S]*invalid/i,
+);
 const buildCommands = successful(
   /assets:precompile|shakapacker|webpack|rspack|vite|npm run build|pnpm (?:run )?build/i,
 );
-const testCommands = successful(
+const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
+  /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
 );
 
 const items = [
   {
     id: 'install.pro',
-    status: installPass ? 'pass' : 'unknown',
-    reason: installPass
-      ? 'Ruby and JavaScript Pro dependencies are present in captured manifests.'
-      : 'Captured manifests do not independently prove a complete Pro install.',
-    citations: installCitations,
+    status:
+      rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0
+        ? 'pass'
+        : 'unknown',
+    reason:
+      rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0
+        ? 'The public scaffold command exited 0 and captured Ruby/JavaScript manifests contain exact Pro dependencies.'
+        : 'A successful public scaffold plus exact Ruby and JavaScript Pro manifest entries are not all evidenced.',
+    citations: [
+      ...artifactCitations(rubyProManifests),
+      ...artifactCitations(jsProManifests),
+      ...commandCitations(installCommands),
+    ],
   },
   {
     id: 'rsc.route',
-    status: rscCitations.length > 0 && routeCitations.length > 0 ? 'pass' : 'unknown',
+    status: rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
     reason:
-      rscCitations.length > 0 && routeCitations.length > 0
-        ? 'Captured route and source artifacts contain RSC implementation evidence.'
-        : 'No complete RSC route can be proven from captured artifacts.',
-    citations: [...new Set([...rscCitations, ...routeCitations])],
+      rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0
+        ? 'An RSC-specific route and source are paired with successful test output.'
+        : 'RSC-specific route, source, and successful test output are not all evidenced.',
+    citations: [
+      ...artifactCitations(rscRoutes),
+      ...artifactCitations(rscSources),
+      ...commandCitations(testCommands),
+    ],
   },
   {
     id: 'form.validation',
-    status: validationCitations.length > 0 ? 'pass' : 'unknown',
+    status:
+      validationModels.length > 0 &&
+      validationControllers.length > 0 &&
+      formTests.length > 0 &&
+      testCommands.length > 0
+        ? 'pass'
+        : 'unknown',
     reason:
-      validationCitations.length > 0
-        ? 'Captured server source contains validation or invalid-response behavior.'
-        : 'Server-side invalid and successful form outcomes are not independently proven.',
-    citations: validationCitations,
+      validationModels.length > 0 &&
+      validationControllers.length > 0 &&
+      formTests.length > 0 &&
+      testCommands.length > 0
+        ? 'Model validation, invalid-response controller behavior, both-outcome tests, and successful test output are evidenced.'
+        : 'Server validation, invalid-response behavior, both-outcome tests, and successful output are not all evidenced.',
+    citations: [
+      ...artifactCitations(validationModels),
+      ...artifactCitations(validationControllers),
+      ...artifactCitations(formTests),
+      ...commandCitations(testCommands),
+    ],
   },
   {
     id: 'tests.page',
-    status: pageTestCitations.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
+    status: pageTests.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
     reason:
-      pageTestCitations.length > 0 && testCommands.length > 0
-        ? 'A captured page/RSC test is paired with a successful test command.'
+      pageTests.length > 0 && testCommands.length > 0
+        ? 'A page/RSC-specific test is paired with successful test output.'
         : 'No passing page/RSC test is independently proven.',
-    citations: [...pageTestCitations, ...commandCitations(testCommands)],
+    citations: [...artifactCitations(pageTests), ...commandCitations(testCommands)],
   },
   {
     id: 'tests.form',
-    status: formTestCitations.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
+    status: formTests.length > 0 && testCommands.length > 0 ? 'pass' : 'unknown',
     reason:
-      formTestCitations.length > 0 && testCommands.length > 0
-        ? 'Captured form tests are paired with a successful test command.'
+      formTests.length > 0 && testCommands.length > 0
+        ? 'A test containing both invalid and valid outcomes is paired with successful test output.'
         : 'Passing coverage of both form outcomes is not independently proven.',
-    citations: [...formTestCitations, ...commandCitations(testCommands)],
+    citations: [...artifactCitations(formTests), ...commandCitations(testCommands)],
   },
   {
     id: 'build.production',
@@ -194,12 +229,22 @@ const items = [
   },
   {
     id: 'evidence.complete',
-    status: 'pass',
-    reason:
-      'The evidence derivation completed; validate-run verifies schemas, hashes, paths, and secret patterns.',
-    citations: ['command-evidence.json', 'artifact-evidence.json', 'SHA256SUMS'],
+    status: 'unknown',
+    reason: 'Computed after all required outcome rows.',
+    citations: [],
   },
 ];
+
+const outcomeRows = items.slice(0, -1);
+const evidenceComplete = items.at(-1);
+if (outcomeRows.every((item) => item.status === 'pass')) {
+  evidenceComplete.status = 'pass';
+  evidenceComplete.reason = 'Every required outcome row has passing, cited evidence.';
+  evidenceComplete.citations = ['command-evidence.json', 'artifact-evidence.json', 'SHA256SUMS'];
+} else {
+  evidenceComplete.reason =
+    'At least one required outcome row is not proven; evidence completeness remains UNKNOWN.';
+}
 
 const overall =
   report.status !== 'completed'

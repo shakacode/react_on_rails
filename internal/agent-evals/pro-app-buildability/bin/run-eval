@@ -41,10 +41,6 @@ fi
 
 root="$(git rev-parse --show-toplevel)"
 eval_dir="$root/internal/agent-evals/pro-app-buildability"
-[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
-  echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
-  exit 65
-}
 
 resolve_future_path() {
   local requested="$1"
@@ -55,11 +51,17 @@ resolve_future_path() {
 }
 
 if [[ "$output" != /* ]]; then output="$root/$output"; fi
+[[ ! -L "$workspace" ]] || { echo "workspace symlink inputs are forbidden" >&2; exit 65; }
+[[ ! -L "$output" ]] || { echo "output symlink inputs are forbidden" >&2; exit 65; }
 workspace="$(resolve_future_path "$workspace")"
 output="$(resolve_future_path "$output")"
 case "$workspace/" in "$output/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
 case "$output/" in "$workspace/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
 [[ "$workspace" != "$output" ]] || { echo "workspace and output resolve to the same path" >&2; exit 65; }
+[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
+  echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
+  exit 65
+}
 [[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 65; }
 if [[ -e "$workspace" && -n "$(find "$workspace" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
   echo "workspace must be absent or empty: $workspace" >&2
@@ -115,42 +117,77 @@ while IFS= read -r file; do
   input_hashes="$(jq --arg path "$relative" --arg sha "$(shasum -a 256 "$file" | awk '{print $1}')" \
     --argjson executable "$executable" '. + [{path:$path,sha256:$sha,executable:$executable}]' <<<"$input_hashes")"
 done < <(find "$eval_dir/bin" "$eval_dir/schemas" -type f -print | LC_ALL=C sort)
-for file in package.json pnpm-lock.yaml prompt.md rubric.md scenario.md; do
+for file in network-probe-prompt.md package.json pnpm-lock.yaml prompt.md rubric.md scenario.md; do
   input_hashes="$(jq --arg path "$file" --arg sha "$(shasum -a 256 "$eval_dir/$file" | awk '{print $1}')" \
     '. + [{path:$path,sha256:$sha,executable:false}]' <<<"$input_hashes")"
 done
 
 shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
 codex_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --sandbox workspace-write --model "$model")
-codex_args+=(-c 'features.multi_agent=false' -c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
+codex_args+=(-c 'features.multi_agent=false' -c 'sandbox_workspace_write.network_access=true')
+codex_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
 codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
 
 jq -n --arg model "$model" --argjson timeout "$timeout_seconds" \
   '{command:"codex exec",model:$model,timeout_seconds:$timeout,sandbox:"workspace-write",ephemeral:true,
-    ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
+    ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,sandbox_network_access:true,
+    capability_probe:{npm:"npm view create-react-on-rails-app version --json",rubygems:"gem search --remote --exact ^rails$"},
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
   >"$output/invocation.json"
 
-raw_events="$private_dir/events.jsonl"
-raw_stderr="$private_dir/stderr.log"
+probe_timeout_seconds="$timeout_seconds"
+((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
+raw_probe_events="$private_dir/probe-events.jsonl"
+raw_probe_stderr="$private_dir/probe-stderr.log"
+safe_probe_events="$private_dir/probe-events.safe.jsonl"
+safe_probe_stderr="$private_dir/probe-stderr.safe.log"
+set +e
+"$timeout_command" "$probe_timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
+  codex "${codex_args[@]}" <"$eval_dir/network-probe-prompt.md" >"$raw_probe_events" 2>"$raw_probe_stderr"
+probe_exit=$?
+set -e
+EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+  perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_events" >"$safe_probe_events"
+EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+  perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_stderr" >"$safe_probe_stderr"
+node "$eval_dir/bin/derive-network-probe.mjs" "$safe_probe_events" "$output/sandbox-network-probe.json"
+probe_result="$(jq -r .overall "$output/sandbox-network-probe.json")"
+
 safe_events="$private_dir/events.safe.jsonl"
 safe_stderr="$private_dir/stderr.safe.log"
-set +e
-"$timeout_command" "$timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
-  codex "${codex_args[@]}" <"$eval_dir/prompt.md" >"$raw_events" 2>"$raw_stderr"
-runner_exit=$?
-set -e
+scaffold_invoked=false
+runner_exit="$probe_exit"
 timed_out=false
-[[ "$runner_exit" == 124 ]] && timed_out=true
-
-EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-  perl "$eval_dir/bin/sanitize-events.pl" "$raw_events" >"$safe_events"
-EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
-  perl "$eval_dir/bin/sanitize-events.pl" "$raw_stderr" >"$safe_stderr"
-if ! jq -s '[.[] | select(.type == "item.completed" and .item.type == "agent_message") | .item.text] | last // empty | fromjson' \
-  "$safe_events" >"$output/agent-report.json" || [[ ! -s "$output/agent-report.json" ]]; then
-  jq -n --arg reason "Codex runner exited without a schema-constrained final report (exit $runner_exit)" \
-    '{status:"failed",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
+[[ "$probe_exit" == 124 ]] && timed_out=true
+if [[ "$probe_result" == pass ]]; then
+  scaffold_invoked=true
+  raw_scaffold_events="$private_dir/scaffold-events.jsonl"
+  raw_scaffold_stderr="$private_dir/scaffold-stderr.log"
+  safe_scaffold_events="$private_dir/scaffold-events.safe.jsonl"
+  safe_scaffold_stderr="$private_dir/scaffold-stderr.safe.log"
+  set +e
+  "$timeout_command" "$timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
+    codex "${codex_args[@]}" <"$eval_dir/prompt.md" >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
+  runner_exit=$?
+  set -e
+  [[ "$runner_exit" == 124 ]] && timed_out=true
+  EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+    perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_events" >"$safe_scaffold_events"
+  EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+    perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_stderr" >"$safe_scaffold_stderr"
+  cat "$safe_probe_events" "$safe_scaffold_events" >"$safe_events"
+  cat "$safe_probe_stderr" "$safe_scaffold_stderr" >"$safe_stderr"
+  if ! jq -s '[.[] | select(.type == "item.completed" and .item.type == "agent_message") | .item.text] | last // empty | fromjson' \
+    "$safe_scaffold_events" >"$output/agent-report.json" || [[ ! -s "$output/agent-report.json" ]]; then
+    jq -n --arg reason "Codex scaffold runner exited without a schema-constrained final report (exit $runner_exit)" \
+      '{status:"failed",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
+      >"$output/agent-report.json"
+  fi
+else
+  cp "$safe_probe_events" "$safe_events"
+  cp "$safe_probe_stderr" "$safe_stderr"
+  jq -n --arg reason "In-sandbox npm/RubyGems capability probe failed; scaffold was not started" \
+    '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
     >"$output/agent-report.json"
 fi
 
@@ -174,15 +211,17 @@ jq -n \
   --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
   --argjson inputs "$input_hashes" --argjson stripped "$stripped_names" --argjson network "$network_json" \
   --arg timeout_command "$timeout_command" --argjson timeout "$timeout_seconds" --argjson exit_code "$runner_exit" \
+  --argjson probe_timeout "$probe_timeout_seconds" --argjson scaffold_invoked "$scaffold_invoked" \
   --argjson timed_out "$timed_out" --arg classification "$classification" --arg reason "$reason" \
   '{schema_version:"2.0",run_id:$run_id,started_at:$started,finished_at:$finished,
     repository:{revision:$revision,dirty:false},definition:{inputs:$inputs},
-    agent:{name:"codex",version:$version,model:$model,invoked:true},
+    agent:{name:"codex",version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
     environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
     security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
       stripped_sensitive_names:$stripped,raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
     runner:{timeout_command:$timeout_command,requested_timeout_seconds:$timeout,effective_timeout_seconds:$timeout,
+      probe_timeout_seconds:$probe_timeout,sandbox_network_access:true,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json"},
     result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"
 

@@ -8,19 +8,31 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 
-printf '%s\n' 'authorization: super-sensitive-value' '/tmp/private/place' '/private/tmp/agent-cache' >"$tmp/unsafe"
+printf '%s\n' 'authorization: super-sensitive-value' '/tmp/private/place' '/private/tmp/agent-cache' \
+  '-----BEGIN PRIVATE KEY-----' 'line-one' 'line-two' '-----END PRIVATE KEY-----' >"$tmp/unsafe"
 EVAL_PRIVATE_DIR="$tmp" perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unsafe" >"$tmp/safe"
 rg -q '\[REDACTED\]' "$tmp/safe"
 rg -q '<LOCAL_PATH>' "$tmp/safe"
-if rg -q 'super-sensitive-value|/tmp/private/place|/private/tmp/agent-cache' "$tmp/safe"; then
+if rg -q 'super-sensitive-value|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' "$tmp/safe"; then
   echo "sanitizer negative test failed" >&2
   exit 1
 fi
+test "$(rg -o '\[REDACTED\]' "$tmp/safe" | wc -l | tr -d ' ')" -ge 2
 
 rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
 rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
+rg -q 'sandbox_workspace_write.network_access=true' "$eval_dir/bin/run-eval"
+
+mkdir "$tmp/real-workspace"
+ln -s "$tmp/real-workspace" "$tmp/workspace-link"
+if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
+  --workspace "$tmp/workspace-link" --output "$tmp/output" 2>"$tmp/symlink-error"; then
+  echo "symlink workspace negative test failed" >&2
+  exit 1
+fi
+rg -q 'symlink inputs are forbidden' "$tmp/symlink-error"
 
 echo "focused harness tests passed"

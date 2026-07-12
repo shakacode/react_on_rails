@@ -54,12 +54,13 @@
     "agent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "model", "invoked"],
+      "required": ["name", "version", "model", "probe_invoked", "scaffold_invoked"],
       "properties": {
         "name": { "const": "codex" },
         "version": { "type": "string", "minLength": 1 },
         "model": { "type": "string", "minLength": 1 },
-        "invoked": { "type": "boolean" }
+        "probe_invoked": { "const": true },
+        "scaffold_invoked": { "type": "boolean" }
       }
     },
     "environment": {
@@ -119,6 +120,9 @@
         "timeout_command",
         "requested_timeout_seconds",
         "effective_timeout_seconds",
+        "probe_timeout_seconds",
+        "sandbox_network_access",
+        "network_probe_artifact",
         "exit_code",
         "timed_out",
         "config_artifact"
@@ -127,6 +131,9 @@
         "timeout_command": { "type": "string", "minLength": 1 },
         "requested_timeout_seconds": { "type": "integer", "minimum": 1 },
         "effective_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "probe_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "sandbox_network_access": { "const": true },
+        "network_probe_artifact": { "const": "sandbox-network-probe.json" },
         "exit_code": { "type": "integer" },
         "timed_out": { "type": "boolean" },
         "config_artifact": { "const": "invocation.json" }

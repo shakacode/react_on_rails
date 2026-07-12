@@ -23,6 +23,7 @@ const documents = [
   ['command-evidence.json', 'command-evidence.schema.json'],
   ['artifact-evidence.json', 'artifact-evidence.schema.json'],
   ['rubric-results.json', 'rubric-results.schema.json'],
+  ['sandbox-network-probe.json', 'network-probe.schema.json'],
 ];
 
 let valid = true;

@@ -2,19 +2,20 @@
 use strict;
 use warnings;
 
-while (<>) {
-  for my $variable (qw(EVAL_PRIVATE_DIR EVAL_WORKSPACE EVAL_OUTPUT)) {
-    my $value = $ENV{$variable};
-    s/\Q$value\E/<LOCAL_PATH>/g if defined $value && length $value;
-  }
-  s{/Users/[^\s"']+}{<LOCAL_PATH>}g;
-  s{/private/tmp(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
-  s{/tmp/[^\s"']+}{<LOCAL_PATH>}g;
-  s{/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
-  s/(authorization["'=: ]+)[^ ,"']+/$1\[REDACTED\]/ig;
-  s/(cookie["'=: ]+)[^ ,"']+/$1\[REDACTED\]/ig;
-  s/(password["'=: ]+)[^ ,"']+/$1\[REDACTED\]/ig;
-  s/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^ ,"']+/$1\[REDACTED\]/ig;
-  s/(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/$1\[REDACTED\]$2/g;
-  print;
+local $/;
+my $content = <>;
+
+for my $variable (qw(EVAL_PRIVATE_DIR EVAL_WORKSPACE EVAL_OUTPUT)) {
+  my $value = $ENV{$variable};
+  $content =~ s/\Q$value\E/<LOCAL_PATH>/g if defined $value && length $value;
 }
+$content =~ s{/Users/[^\s"']+}{<LOCAL_PATH>}g;
+$content =~ s{/private/tmp(?:/[^\s"']*)?}{<LOCAL_PATH>}g;
+$content =~ s{/tmp/[^\s"']+}{<LOCAL_PATH>}g;
+$content =~ s{/var/folders/[^\s"']+}{<LOCAL_PATH>}g;
+$content =~ s/(authorization["'=: ]+)[^\s,"']+/$1\[REDACTED\]/ig;
+$content =~ s/(cookie["'=: ]+)[^\s,"']+/$1\[REDACTED\]/ig;
+$content =~ s/(password["'=: ]+)[^\s,"']+/$1\[REDACTED\]/ig;
+$content =~ s/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^\s,"']+/$1\[REDACTED\]/ig;
+$content =~ s/(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/$1\[REDACTED\]$2/igs;
+print $content;

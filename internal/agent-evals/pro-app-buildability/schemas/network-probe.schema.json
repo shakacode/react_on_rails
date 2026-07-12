@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sandbox_network_access", "npm", "rubygems", "overall"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "sandbox_network_access": { "const": true },
+    "npm": { "$ref": "#/$defs/probe" },
+    "rubygems": { "$ref": "#/$defs/probe" },
+    "overall": { "enum": ["pass", "fail"] }
+  },
+  "$defs": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_id", "exit_code", "status"],
+      "properties": {
+        "command_id": { "type": ["string", "null"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "status": { "enum": ["pass", "fail"] }
+      }
+    }
+  }
+}

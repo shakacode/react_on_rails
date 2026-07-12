@@ -59,6 +59,14 @@ timeout. Both the Codex process and its shell tools start from `env -i`; tool
 environment inheritance is `none` with only `PATH`, a private empty `HOME`, a
 private `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
 
+Workspace-write network access is enabled explicitly with the supported
+`sandbox_workspace_write.network_access=true` Codex configuration. Before any
+scaffold work, a capability-only Codex turn must run the exact npm and RubyGems
+commands in `network-probe-prompt.md`. The runner derives
+`sandbox-network-probe.json` from command events. Missing commands or either
+nonzero exit fail closed: the run is recorded as `incomplete` and scaffold work
+does not start.
+
 Raw events, stderr, and the copied authentication file live only under a
 mode-`0700` temporary directory. `umask 077` applies throughout, and
 `EXIT`/`INT`/`TERM` traps delete the directory. Sensitive parent environment
@@ -81,7 +89,7 @@ internal/agent-evals/pro-app-buildability/bin/validate-run \
 
 Validation uses pinned Ajv 8 in Draft 2020-12 mode for `run.json`,
 `agent-report.json`, both independent evidence documents, and the derived
-rubric. It also verifies input/output hashes, rejects raw capture files, and
+rubric and sandbox-network probe. It also verifies input/output hashes, rejects raw capture files, and
 scans for local paths and credential-shaped content. Self-reported success is
 never sufficient.
 

@@ -15,7 +15,7 @@ done
 }
 
 for file in run.json agent-report.json command-evidence.json artifact-evidence.json rubric-results.json \
-  invocation.json runner-diagnostics.json prompt.md scenario.md rubric.md workspace-status.txt SHA256SUMS; do
+  sandbox-network-probe.json invocation.json runner-diagnostics.json prompt.md scenario.md rubric.md workspace-status.txt SHA256SUMS; do
   [[ -f "$run_dir/$file" ]] || { echo "missing artifact: $file" >&2; exit 1; }
 done
 for forbidden in events.unredacted.jsonl events.redacted.jsonl runner.stderr auth.json; do
@@ -57,5 +57,13 @@ rubric_classification="$(jq -r .overall "$run_dir/rubric-results.json")"
   echo "a single run cannot enable tutorial claims" >&2
   exit 1
 }
+probe_result="$(jq -r .overall "$run_dir/sandbox-network-probe.json")"
+scaffold_invoked="$(jq -r .agent.scaffold_invoked "$run_dir/run.json")"
+if [[ "$probe_result" == pass ]]; then
+  [[ "$scaffold_invoked" == true ]] || { echo "passing network probe must start scaffold attempt" >&2; exit 1; }
+else
+  [[ "$scaffold_invoked" == false ]] || { echo "failed network probe must block scaffold attempt" >&2; exit 1; }
+  [[ "$run_classification" == incomplete ]] || { echo "failed network probe must be incomplete" >&2; exit 1; }
+fi
 
 echo "run artifacts valid: $run_dir"
