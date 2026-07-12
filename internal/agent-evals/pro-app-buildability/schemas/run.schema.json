@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pro app buildability recorded run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "started_at",
+    "finished_at",
+    "repository",
+    "definition",
+    "agent",
+    "environment",
+    "credential_presence",
+    "runner",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "dirty"],
+      "properties": {
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "type": "boolean" }
+      }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt_sha256", "scenario_sha256", "rubric_sha256"],
+      "properties": {
+        "prompt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "scenario_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "rubric_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "model"],
+      "properties": {
+        "name": { "const": "codex" },
+        "version": { "type": "string" },
+        "model": { "type": ["string", "null"] }
+      }
+    },
+    "environment": { "type": "object", "additionalProperties": { "type": "string" } },
+    "credential_presence": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_seconds", "exit_code", "timed_out"],
+      "properties": {
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "exit_code": { "type": "integer" },
+        "timed_out": { "type": "boolean" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "reason", "tutorial_claims_supported"],
+      "properties": {
+        "classification": { "enum": ["pass", "fail", "incomplete"] },
+        "reason": { "type": "string" },
+        "tutorial_claims_supported": { "type": "boolean" }
+      }
+    }
+  }
+}

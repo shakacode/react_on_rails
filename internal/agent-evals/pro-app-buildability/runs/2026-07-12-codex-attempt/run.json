@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "run_id": "2026-07-12-codex-attempt",
+  "started_at": "2026-07-12T11:36:59Z",
+  "finished_at": "2026-07-12T11:50:30Z",
+  "repository": {
+    "revision": "dec0a06b2a17bf54cd317b797dabd6c2b9e391bb",
+    "dirty": true
+  },
+  "agent": {
+    "name": "codex",
+    "version": "codex-cli 0.136.0",
+    "model": null
+  },
+  "environment": {
+    "os": "Darwin 25.5.0 arm64",
+    "ruby": "ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +PRISM [arm64-darwin23]",
+    "node": "v22.12.0",
+    "npm": "10.9.0",
+    "git": "git version 2.54.0"
+  },
+  "credential_presence": {
+    "REACT_ON_RAILS_PRO_LICENSE_KEY": false,
+    "SHAKACODE_PRO_LICENSE_KEY": false,
+    "BUNDLE_GEMS__SHAKACODE__COM": false
+  },
+  "runner": {
+    "timeout_seconds": 900,
+    "exit_code": 0,
+    "timed_out": false
+  },
+  "result": {
+    "classification": "incomplete",
+    "reason": "Codex created a Rails scaffold but npm registry DNS failed before dependencies, tests, or the production build could complete",
+    "tutorial_claims_supported": false
+  },
+  "definition": {
+    "prompt_sha256": "1cc958c5aaead7cfb329e8d949842b91b50b20a251c684fb82bd39a919f68689",
+    "scenario_sha256": "d304f18438996a175e71bdfcbd0344e6112831bdcfe68158a1cd1e974dbd77ed",
+    "rubric_sha256": "17a30b047e5b5c2ffd2cc26aa6bd76df78e07559f6e79f7b26e651f5496b8456"
+  }
+}

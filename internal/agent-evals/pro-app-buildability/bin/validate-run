@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_dir="${1:-}"
+[[ -d "$run_dir" ]] || { echo "usage: $0 RUN_DIRECTORY" >&2; exit 64; }
+root="$(git rev-parse --show-toplevel)"
+schema="$root/internal/agent-evals/pro-app-buildability/schemas/run.schema.json"
+
+for file in run.json prompt.md scenario.md rubric.md invocation.txt agent-report.json runner-diagnostics.json \
+  workspace-status.txt workspace-files.txt verification.txt SHA256SUMS; do
+  [[ -f "$run_dir/$file" ]] || { echo "missing artifact: $file" >&2; exit 1; }
+done
+
+jq -e . "$run_dir/run.json" >/dev/null
+jq -e '.status | IN("completed", "blocked", "failed")' "$run_dir/agent-report.json" >/dev/null
+jq -e '.persisted == false and (.stderr_line_count >= 0)' "$run_dir/runner-diagnostics.json" >/dev/null
+jq -e . "$schema" >/dev/null
+jq -e '
+  .schema_version == "1.0" and
+  (.run_id | test("^[A-Za-z0-9._-]+$")) and
+  (.repository.revision | test("^[0-9a-f]{40}$")) and
+  (.agent.name == "codex") and
+  (.runner.timeout_seconds > 0) and
+  (.definition.prompt_sha256 | test("^[0-9a-f]{64}$")) and
+  (.definition.scenario_sha256 | test("^[0-9a-f]{64}$")) and
+  (.definition.rubric_sha256 | test("^[0-9a-f]{64}$")) and
+  (.result.classification | IN("pass", "fail", "incomplete"))
+' "$run_dir/run.json" >/dev/null
+
+for definition in prompt scenario rubric; do
+  expected="$(jq -r ".definition.${definition}_sha256" "$run_dir/run.json")"
+  actual="$(shasum -a 256 "$run_dir/$definition.md" | awk '{print $1}')"
+  [[ "$expected" == "$actual" ]] || { echo "definition hash mismatch: $definition" >&2; exit 1; }
+done
+
+(cd "$run_dir" && shasum -a 256 -c SHA256SUMS)
+
+if rg -n '/Users/|/tmp/' "$run_dir"; then
+  echo "local absolute path found" >&2
+  exit 1
+fi
+
+if rg -n --pcre2 --ignore-case "(bearer[[:space:]]+[a-z0-9._-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|token|secret|password|license[_-]?key)[\"'=: ]+[A-Za-z0-9_./+=-]{12,})" "$run_dir"; then
+  echo "possible unredacted credential found" >&2
+  exit 1
+fi
+
+echo "run artifacts valid: $run_dir"

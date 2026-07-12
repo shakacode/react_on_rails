@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: $0 --agent codex --workspace ABSOLUTE_PATH --output PATH" >&2
+}
+
+agent=""
+workspace=""
+output=""
+while (($#)); do
+  case "$1" in
+    --agent) agent="${2:-}"; shift 2 ;;
+    --workspace) workspace="${2:-}"; shift 2 ;;
+    --output) output="${2:-}"; shift 2 ;;
+    *) usage; exit 64 ;;
+  esac
+done
+
+[[ "$agent" == "codex" && "$workspace" = /* && -n "$output" ]] || { usage; exit 64; }
+command -v codex >/dev/null
+command -v git >/dev/null
+command -v jq >/dev/null
+
+root="$(git rev-parse --show-toplevel)"
+eval_dir="$root/internal/agent-evals/pro-app-buildability"
+if [[ -e "$workspace" && -n "$(find "$workspace" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+  echo "workspace must be absent or empty: $workspace" >&2
+  exit 64
+fi
+revision="$(git -C "$root" rev-parse HEAD)"
+dirty=false
+[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || dirty=true
+if [[ "$output" != /* ]]; then output="$root/$output"; fi
+[[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 64; }
+
+mkdir -p "$workspace" "$output"
+git -C "$workspace" init --quiet
+started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+timeout_seconds="${EVAL_TIMEOUT_SECONDS:-2700}"
+model="${CODEX_EVAL_MODEL:-}"
+
+cp "$eval_dir/prompt.md" "$eval_dir/scenario.md" "$eval_dir/rubric.md" "$output/"
+# Placeholders make the recorded invocation portable.
+# shellcheck disable=SC2016
+echo 'codex exec --ephemeral --ignore-user-config --sandbox workspace-write --output-schema "$EVAL_DIR/schemas/agent-report.schema.json" --json -C "$WORKSPACE" - < "$EVAL_DIR/prompt.md"' >"$output/invocation.txt"
+
+set +e
+codex_args=(exec --ephemeral --ignore-user-config --sandbox workspace-write)
+if [[ -n "$model" ]]; then codex_args+=(--model "$model"); fi
+codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
+if command -v timeout >/dev/null; then
+  timeout "$timeout_seconds" codex "${codex_args[@]}" \
+    <"$eval_dir/prompt.md" >"$output/events.unredacted.jsonl" 2>"$output/runner.stderr"
+  runner_exit=$?
+elif command -v gtimeout >/dev/null; then
+  gtimeout "$timeout_seconds" codex "${codex_args[@]}" \
+    <"$eval_dir/prompt.md" >"$output/events.unredacted.jsonl" 2>"$output/runner.stderr"
+  runner_exit=$?
+else
+  codex "${codex_args[@]}" \
+    <"$eval_dir/prompt.md" >"$output/events.unredacted.jsonl" 2>"$output/runner.stderr"
+  runner_exit=$?
+fi
+set -e
+
+timed_out=false
+[[ "$runner_exit" == 124 ]] && timed_out=true
+
+perl "$eval_dir/bin/sanitize-events.pl" "$output/events.unredacted.jsonl" >"$output/events.redacted.jsonl"
+rm "$output/events.unredacted.jsonl"
+stderr_lines="$(wc -l <"$output/runner.stderr" | tr -d ' ')"
+
+jq -s '[.[] | select(.type == "item.completed" and .item.type == "agent_message") | .item.text] | last // "null" | fromjson' \
+  "$output/events.redacted.jsonl" >"$output/agent-report.json"
+rm "$output/events.redacted.jsonl" "$output/runner.stderr"
+jq -n --argjson line_count "$stderr_lines" '{stderr_line_count:$line_count,persisted:false}' \
+  >"$output/runner-diagnostics.json"
+
+git -C "$workspace" status --short --untracked-files=normal >"$output/workspace-status.txt"
+find "$workspace" \( -path '*/.git' -o -path '*/node_modules' -o -path '*/vendor/bundle' -o -path '*/tmp' \) -prune -o \
+  -type f -print | LC_ALL=C sort | sed "s#^$workspace/##" >"$output/workspace-files.txt"
+
+{
+  echo '$ git status --short --untracked-files=normal'
+  git -C "$workspace" status --short --untracked-files=normal
+  echo '$ test -f eval_app/Gemfile'
+  if test -f "$workspace/eval_app/Gemfile"; then gemfile_exit=0; else gemfile_exit=1; fi
+  echo "exit_code=$gemfile_exit"
+} >"$output/verification.txt" 2>&1 || true
+
+finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+classification=fail
+reason="agent attempt completed; rubric requires manual grading from independent evidence"
+agent_status="$(jq -r '.status // "failed"' "$output/agent-report.json")"
+if [[ "$runner_exit" != 0 || "$timed_out" == true || "$agent_status" == blocked ]]; then
+  classification=incomplete
+  reason="agent or runner reported a blocker before an end-to-end result could be graded"
+fi
+
+credential_json='{}'
+for variable in REACT_ON_RAILS_PRO_LICENSE_KEY SHAKACODE_PRO_LICENSE_KEY BUNDLE_GEMS__SHAKACODE__COM; do
+  present=false
+  [[ -n "${!variable:-}" ]] && present=true
+  credential_json="$(jq --arg key "$variable" --argjson value "$present" '. + {($key): $value}' <<<"$credential_json")"
+done
+
+jq -n \
+  --arg run_id "$(basename "$output")" --arg started "$started_at" --arg finished "$finished_at" \
+  --arg revision "$revision" --argjson dirty "$dirty" --arg version "$(codex --version)" \
+  --arg prompt_sha "$(shasum -a 256 "$eval_dir/prompt.md" | awk '{print $1}')" \
+  --arg scenario_sha "$(shasum -a 256 "$eval_dir/scenario.md" | awk '{print $1}')" \
+  --arg rubric_sha "$(shasum -a 256 "$eval_dir/rubric.md" | awk '{print $1}')" \
+  --arg model "${model:-}" --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1 || true)" \
+  --arg node "$(node --version 2>&1 || true)" --arg npm "$(npm --version 2>&1 || true)" \
+  --arg git "$(git --version)" --argjson credentials "$credential_json" \
+  --argjson timeout "$timeout_seconds" --argjson exit_code "$runner_exit" --argjson timed_out "$timed_out" \
+  --arg classification "$classification" --arg reason "$reason" \
+  '{schema_version:"1.0",run_id:$run_id,started_at:$started,finished_at:$finished,
+    repository:{revision:$revision,dirty:$dirty},definition:{prompt_sha256:$prompt_sha,scenario_sha256:$scenario_sha,rubric_sha256:$rubric_sha},
+    agent:{name:"codex",version:$version,model:(if $model=="" then null else $model end)},
+    environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,git:$git},credential_presence:$credentials,
+    runner:{timeout_seconds:$timeout,exit_code:$exit_code,timed_out:$timed_out},
+    result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"
+
+(cd "$output" && shasum -a 256 prompt.md scenario.md rubric.md invocation.txt agent-report.json runner-diagnostics.json \
+  workspace-status.txt workspace-files.txt verification.txt run.json >SHA256SUMS)
+
+echo "recorded run: $output"
+echo "runner exit: $runner_exit; classification: $classification"

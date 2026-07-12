@@ -1,0 +1,1 @@
+codex exec --ephemeral --ignore-user-config --sandbox workspace-write --output-schema "$EVAL_DIR/schemas/agent-report.schema.json" --json -C "$WORKSPACE" - < "$EVAL_DIR/prompt.md"
