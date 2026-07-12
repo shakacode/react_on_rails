@@ -1947,7 +1947,14 @@ module ReactOnRails
     end
 
     def diagnosis_exit_code
-      DoctorSchema::EXIT_CODES.fetch(checker.errors? ? :fail : :pass)
+      status = if checker.errors?
+                 :fail
+               elsif checker.warnings?
+                 :warn
+               else
+                 :pass
+               end
+      DoctorSchema::EXIT_CODES.fetch(status)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
