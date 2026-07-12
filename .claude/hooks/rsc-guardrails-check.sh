@@ -23,17 +23,19 @@ fi
 [ -z "$FILE" ] && exit 0
 [ ! -f "$FILE" ] && exit 0
 
+# Best-effort relative path for display; matching below anchors on the absolute path so it is
+# robust to symlinked checkouts and path canonicalization (e.g. /var vs /private/var on macOS).
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REL_PATH="${FILE#"$REPO_ROOT/"}"
 
 # Only React on Rails Pro RSC/streaming TypeScript sources.
-case "$REL_PATH" in
-  packages/react-on-rails-pro/src/*.ts | packages/react-on-rails-pro/src/*.tsx) ;;
+case "$FILE" in
+  */packages/react-on-rails-pro/src/*.ts | */packages/react-on-rails-pro/src/*.tsx) ;;
   *) exit 0 ;;
 esac
 
 # Sanctioned emitters that are allowed (and regression-tested) to build inline script tags.
-case "$REL_PATH" in
+case "$FILE" in
   */injectRSCPayload.ts | */browserPerformanceMarks.ts | */browserPerformanceMarks.tsx) exit 0 ;;
 esac
 
@@ -41,7 +43,7 @@ esac
 PATTERN='[`'"'"'"]<script|dangerouslySetInnerHTML|\.innerHTML[[:space:]]*=|insertAdjacentHTML|document\.write\('
 
 # Match, then drop comment lines (JSDoc `*`, `//`, `/*`) to keep the signal high.
-MATCHES="$(grep -nE "$PATTERN" "$REL_PATH" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
+MATCHES="$(grep -nE "$PATTERN" "$FILE" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
 
 if [ -n "$MATCHES" ]; then
   cat >&2 <<EOF
