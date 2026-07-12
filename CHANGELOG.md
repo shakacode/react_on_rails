@@ -35,6 +35,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
   [justin808](https://github.com/justin808).
 
+#### Added
+
+- **RSC agent guardrails installer**: New `rake react_on_rails:install_rsc_agent_guardrails` task
+  (also run automatically by the RSC generator) installs a Claude Code `rsc-app-safety` skill and an
+  advisory hook into a host app's `.claude/`, steering AI coding agents away from React Server
+  Components API footguns (mounting the RSC payload route without authentication, trusting
+  server-component props, exposing the Node renderer, leaking secrets). Idempotent and safe to re-run
+  after upgrades.
+  [PR 4606](https://github.com/shakacode/react_on_rails/pull/4606) by
+  [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **Streaming caches no longer persist error-containing renders**: When a streamed render
