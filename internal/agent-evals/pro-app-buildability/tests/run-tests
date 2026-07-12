@@ -8,12 +8,14 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 
-printf '%s\n' 'authorization: super-sensitive-value' '/tmp/private/place' '/private/tmp/agent-cache' \
+printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
+  '/tmp/private/place' '/private/tmp/agent-cache' \
   '-----BEGIN PRIVATE KEY-----' 'line-one' 'line-two' '-----END PRIVATE KEY-----' >"$tmp/unsafe"
 EVAL_PRIVATE_DIR="$tmp" perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unsafe" >"$tmp/safe"
 rg -q '\[REDACTED\]' "$tmp/safe"
 rg -q '<LOCAL_PATH>' "$tmp/safe"
-if rg -q 'super-sensitive-value|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' "$tmp/safe"; then
+if rg -q 'super-sensitive-value|multi-word-secret|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' \
+  "$tmp/safe"; then
   echo "sanitizer negative test failed" >&2
   exit 1
 fi
@@ -25,6 +27,18 @@ rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
 rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
 rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
 rg -q 'sandbox_workspace_write.network_access=true' "$eval_dir/bin/run-eval"
+rg -q 'cli_auth_credentials_store=.?keyring' "$eval_dir/bin/run-eval"
+rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
+if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
+  echo "runner must not copy authentication into the sandbox filesystem" >&2
+  exit 1
+fi
+
+printf '%013000d' 0 >"$tmp/long-stderr"
+"$eval_dir/bin/build-runner-diagnostics" "$tmp/long-stderr" "$tmp/long-diagnostics.json"
+test "$(jq -r .stderr_line_count "$tmp/long-diagnostics.json")" = 0
+test "$(jq -r .excerpt_truncated "$tmp/long-diagnostics.json")" = true
+test "$(jq -r '.excerpt | length' "$tmp/long-diagnostics.json")" = 12000
 "$eval_dir/bin/probe-allows-scaffold" 0 pass
 if "$eval_dir/bin/probe-allows-scaffold" 1 pass; then
   echo "nonzero probe exit incorrectly allows scaffold" >&2
@@ -126,5 +140,30 @@ node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
   "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json"
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+
+mkdir -p "$tmp/correlation-workspace/eval_app/app/components" \
+  "$tmp/correlation-workspace/eval_app/app/models" \
+  "$tmp/correlation-workspace/eval_app/app/controllers" \
+  "$tmp/correlation-workspace/eval_app/config" \
+  "$tmp/correlation-workspace/eval_app/spec/pages" \
+  "$tmp/correlation-workspace/eval_app/spec/requests"
+printf '%s\n' 'rsc_route server_component' >"$tmp/correlation-workspace/eval_app/config/routes.rb"
+printf '%s\n' 'export const Page = () => null' >"$tmp/correlation-workspace/eval_app/app/components/page.server.tsx"
+printf '%s\n' 'it { expect(page).to be_present }' >"$tmp/correlation-workspace/eval_app/spec/pages/rsc_page_spec.rb"
+printf '%s\n' 'validates :name, presence: true' >"$tmp/correlation-workspace/eval_app/app/models/form.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/correlation-workspace/eval_app/app/controllers/forms_controller.rb"
+printf '%s\n' 'it tests invalid and valid form outcomes' \
+  >"$tmp/correlation-workspace/eval_app/spec/requests/form_spec.rb"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"bundle exec rspec spec/unrelated_spec.rb","exit_code":0,"status":"completed","aggregated_output":"1 example, 0 failures"}}' \
+  >"$tmp/unrelated-test-events.jsonl"
+mkdir "$tmp/correlation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/unrelated-test-events.jsonl" \
+  "$tmp/correlation-workspace" "$tmp/correlation-output" "$tmp/fixture-report.json"
+for row in rsc.route form.validation tests.page tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/correlation-output/rubric-results.json")" = unknown
+done
 
 echo "focused harness tests passed"

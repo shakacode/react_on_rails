@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+input="${1:-}"
+output="${2:-}"
+[[ -f "$input" && -n "$output" ]] || { echo "usage: $0 INPUT OUTPUT" >&2; exit 64; }
+
+line_count="$(wc -l <"$input" | tr -d ' ')"
+tail_file="$(mktemp "${TMPDIR:-/tmp}/ror-eval-stderr-tail.XXXXXX")"
+trap 'rm -f "$tail_file"' EXIT
+tail -n 100 "$input" >"$tail_file"
+tail_bytes="$(wc -c <"$tail_file" | tr -d ' ')"
+excerpt="$(head -c 12000 "$tail_file")"
+byte_truncated=false
+((tail_bytes > 12000)) && byte_truncated=true
+jq -n --argjson line_count "$line_count" --arg excerpt "$excerpt" \
+  --argjson byte_truncated "$byte_truncated" \
+  '{stderr_line_count:$line_count,excerpt:$excerpt,
+    excerpt_truncated:(($line_count > 100) or $byte_truncated),raw_persisted:false}' >"$output"

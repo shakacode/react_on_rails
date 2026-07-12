@@ -7,14 +7,26 @@ artifacts satisfy the rubric.
 
 ## Clean-start prerequisites
 
-- macOS or Linux with `git`, `ruby`, `node`, `npm`, `jq`, and the selected agent
-  CLI on `PATH`
+- macOS or Linux with `git`, `ruby`, `node`, `npm`, `pnpm`, `perl`, `jq`, GNU
+  `timeout`, and the selected agent CLI on `PATH`
 - network access to RubyGems, npm, and GitHub
 - enough disk space for a new Rails application and its dependencies
 - an empty, disposable workspace outside this repository
-- a local Codex login in `~/.codex/auth.json` or a path supplied through
-  `CODEX_AUTH_FILE`; the runner copies it into a mode-`0600` private temporary
-  home and removes that home unconditionally
+- a dedicated `CODEX_EVAL_HOME` directory whose Codex login uses the OS keyring;
+  the runner rejects file-backed `auth.json` credentials because a
+  network-enabled agent sandbox must not be able to read authentication material
+
+Create the dedicated home once and sign in using keyring storage:
+
+```bash
+mkdir -m 700 ~/.codex-eval
+CODEX_HOME="$HOME/.codex-eval" codex login -c 'cli_auth_credentials_store="keyring"'
+export CODEX_EVAL_HOME="$HOME/.codex-eval"
+```
+
+If that login is absent or unavailable, the agent process fails inside the
+bounded capability turn. The runner records an `incomplete` result and does not
+start scaffolding; it never falls back to file-backed credentials.
 
 Install the pinned Draft 2020-12 validator and evidence formatter without
 joining the root workspace:
@@ -67,8 +79,9 @@ commands in `network-probe-prompt.md`. The runner derives
 nonzero exit fail closed: the run is recorded as `incomplete` and scaffold work
 does not start.
 
-Raw events, stderr, and the copied authentication file live only under a
-mode-`0700` temporary directory. `umask 077` applies throughout, and
+Raw events and stderr live only under a mode-`0700` temporary directory.
+Authentication remains in the OS keyring and is never copied into the
+network-enabled sandbox's filesystem. `umask 077` applies throughout, and
 `EXIT`/`INT`/`TERM` traps delete the directory. Sensitive parent environment
 variable names are recorded as stripped; their values are neither read nor
 passed to the agent.

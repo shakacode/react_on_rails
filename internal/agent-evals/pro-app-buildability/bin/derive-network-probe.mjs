@@ -21,8 +21,8 @@ const commands = events
   }));
 
 const unwrapShellCommand = (command) => {
-  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc ['"]([\s\S]*)['"]$/);
-  return (match?.[1] ?? command).trim();
+  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
+  return (match?.[2] ?? command).trim();
 };
 const probeAttempts = (requiredCommand) =>
   commands

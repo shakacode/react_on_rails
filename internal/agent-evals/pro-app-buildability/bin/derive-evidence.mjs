@@ -17,10 +17,10 @@ const sanitize = (value) =>
     .replaceAll(/\/private\/tmp(?:\/[^\s"']*)?/g, '<LOCAL_PATH>')
     .replaceAll(/\/tmp\/[^\s"']+/g, '<LOCAL_PATH>')
     .replaceAll(/\/var\/folders\/[^\s"']+/g, '<LOCAL_PATH>')
-    .replaceAll(/(authorization["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/(cookie["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/(password["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
-    .replaceAll(/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^\s,"']+/gi, '$1[REDACTED]')
+    .replaceAll(/(authorization["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
+    .replaceAll(/(cookie["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
+    .replaceAll(/(password["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
+    .replaceAll(/((?:api[_-]?key|token|secret|license[_-]?key)["'=: ]+)[^,"'\n]+/gi, '$1[REDACTED]')
     .replaceAll(
       /(-----BEGIN [A-Z ]*PRIVATE KEY-----).*?(-----END [A-Z ]*PRIVATE KEY-----)/gis,
       '$1[REDACTED]$2',
@@ -93,7 +93,6 @@ const artifactEvidence = { schema_version: '1.0', artifacts };
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const successfulCommands = commands.filter((command) => command.exit_code === 0);
-const successful = (pattern) => successfulCommands.filter((command) => pattern.test(command.command));
 const successfulOutcome = (commandPattern, outputPattern) =>
   successfulCommands.filter(
     (command) => commandPattern.test(command.command) && outputPattern.test(command.output),
@@ -103,8 +102,8 @@ const matchingArtifacts = (pathPattern, contentPattern) =>
 const artifactCitations = (matched) => matched.map((artifact) => `artifact-evidence.json#${artifact.path}`);
 const commandCitations = (matched) => matched.map((command) => `command-evidence.json#${command.id}`);
 const unwrapShellCommand = (command) => {
-  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc ['"]([\s\S]*)['"]$/);
-  return (match?.[1] ?? command).trim();
+  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc (['"])([\s\S]*)\1$/);
+  return (match?.[2] ?? command).trim();
 };
 const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
 
@@ -153,17 +152,33 @@ const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
   /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
 );
+const fullSuiteTest = (invocation) =>
+  /^(?:(?:bundle exec )?rspec|(?:bin\/rails|bundle exec rails|bundle exec rake|rake) test|(?:npm|pnpm) (?:run )?test|jest|playwright)(?:\s+--[^\s]+(?:=[^\s]+)?)*$/i.test(
+    invocation,
+  );
+const testCommandsFor = (matchedArtifacts) =>
+  testCommands.filter((command) => {
+    const invocation = unwrapShellCommand(command.command);
+    if (fullSuiteTest(invocation)) return true;
+    return matchedArtifacts.some((artifact) => {
+      const testPath = artifact.path.match(/(?:^|\/)((?:spec|test)\/.*)$/i)?.[1];
+      if (!testPath) return false;
+      return invocation.includes(testPath) || invocation.includes(path.posix.dirname(testPath));
+    });
+  });
+const pageTestCommands = testCommandsFor(pageTests);
+const formTestCommands = testCommandsFor(formTests);
 
 const installProPassed =
   rubyProManifests.length > 0 && jsProManifests.length > 0 && installCommands.length > 0;
-const rscRoutePassed = rscRoutes.length > 0 && rscSources.length > 0 && testCommands.length > 0;
+const rscRoutePassed = rscRoutes.length > 0 && rscSources.length > 0 && pageTestCommands.length > 0;
 const formValidationPassed =
   validationModels.length > 0 &&
   validationControllers.length > 0 &&
   formTests.length > 0 &&
-  testCommands.length > 0;
-const pageTestsPassed = pageTests.length > 0 && testCommands.length > 0;
-const formTestsPassed = formTests.length > 0 && testCommands.length > 0;
+  formTestCommands.length > 0;
+const pageTestsPassed = pageTests.length > 0 && pageTestCommands.length > 0;
+const formTestsPassed = formTests.length > 0 && formTestCommands.length > 0;
 
 const outcomeRows = [
   {
@@ -187,7 +202,7 @@ const outcomeRows = [
     citations: [
       ...artifactCitations(rscRoutes),
       ...artifactCitations(rscSources),
-      ...commandCitations(testCommands),
+      ...commandCitations(pageTestCommands),
     ],
   },
   {
@@ -200,7 +215,7 @@ const outcomeRows = [
       ...artifactCitations(validationModels),
       ...artifactCitations(validationControllers),
       ...artifactCitations(formTests),
-      ...commandCitations(testCommands),
+      ...commandCitations(formTestCommands),
     ],
   },
   {
@@ -209,7 +224,7 @@ const outcomeRows = [
     reason: pageTestsPassed
       ? 'A page/RSC-specific test is paired with successful test output.'
       : 'No passing page/RSC test is independently proven.',
-    citations: [...artifactCitations(pageTests), ...commandCitations(testCommands)],
+    citations: [...artifactCitations(pageTests), ...commandCitations(pageTestCommands)],
   },
   {
     id: 'tests.form',
@@ -217,7 +232,7 @@ const outcomeRows = [
     reason: formTestsPassed
       ? 'A test containing both invalid and valid outcomes is paired with successful test output.'
       : 'Passing coverage of both form outcomes is not independently proven.',
-    citations: [...artifactCitations(formTests), ...commandCitations(testCommands)],
+    citations: [...artifactCitations(formTests), ...commandCitations(formTestCommands)],
   },
   {
     id: 'build.production',
