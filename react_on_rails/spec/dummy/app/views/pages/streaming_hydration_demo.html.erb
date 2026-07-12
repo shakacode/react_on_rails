@@ -1,0 +1,67 @@
+<h1>Streaming Hydration Demo</h1>
+
+<p>
+  This demo illustrates <strong>independent section hydration</strong> — a pattern where
+  each page section (header, hero, main, sidebar, footer) can hydrate independently
+  of the others. With React 18's streaming SSR and selective hydration, users can
+  interact with early sections (like the header) while later sections are still
+  being delivered or hydrated.
+</p>
+
+<p>
+  <strong>Note:</strong> Full streaming SSR requires React on Rails Pro's Node Renderer.
+  This demo simulates the concept using multiple independent React components with
+  different <code>hydrate_on</code> strategies.
+</p>
+
+<hr>
+
+<%= react_component("StreamingHydrationDemo",
+                    props: { section: "header" },
+                    prerender: true,
+                    id: "streaming-header",
+                    hydrate_on: :immediate) %>
+
+<%= react_component("StreamingHydrationDemo",
+                    props: { section: "hero" },
+                    prerender: true,
+                    id: "streaming-hero",
+                    hydrate_on: :immediate) %>
+
+<%= react_component("StreamingHydrationDemo",
+                    props: { section: "main" },
+                    prerender: true,
+                    id: "streaming-main",
+                    hydrate_on: :idle) %>
+
+<%= react_component("StreamingHydrationDemo",
+                    props: { section: "sidebar" },
+                    prerender: true,
+                    id: "streaming-sidebar",
+                    hydrate_on: :idle) %>
+
+<%= react_component("StreamingHydrationDemo",
+                    props: { section: "footer" },
+                    prerender: true,
+                    id: "streaming-footer",
+                    hydrate_on: :visible) %>
+
+<hr>
+
+<h2>How it works</h2>
+<ul>
+  <li><strong>Header &amp; Hero:</strong> <code>hydrate_on: :immediate</code> — hydrate as soon as the bundle loads</li>
+  <li><strong>Main &amp; Sidebar:</strong> <code>hydrate_on: :idle</code> — hydrate when the browser is idle</li>
+  <li><strong>Footer:</strong> <code>hydrate_on: :visible</code> — hydrate only when scrolled into view</li>
+</ul>
+
+<p>
+  Each section tracks its hydration state via <code>data-hydrated</code> attribute
+  and records events to <code>window.__STREAMING_HYDRATION_EVENTS__</code> for testing.
+</p>
+
+<p>
+  <a href="https://github.com/shakacode/react_on_rails/issues/4385" target="_blank">
+    Related issue: #4385
+  </a>
+</p>
