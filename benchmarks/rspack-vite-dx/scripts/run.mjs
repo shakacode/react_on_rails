@@ -341,7 +341,7 @@ function messagePathFor(tool) {
 }
 
 async function restoreMarkers() {
-  await Promise.all(tools.map((tool) => writeMarker(tool, 'ready')));
+  await Promise.all(tools.map((tool) => writeFile(messagePathFor(tool), "export default 'ready';\n")));
 }
 
 function readArgument(name) {
