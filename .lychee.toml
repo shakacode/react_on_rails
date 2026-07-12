@@ -99,6 +99,7 @@ exclude = [
   '^https://reactonrails\.com/docs/core-concepts/auto-bundling/?',  # #2929 slug cleanup - live after docs deploy
   '^https://reactonrails\.com/docs/api-reference/?$',  # Generated-index URL - not a standalone page
   '^https://reactonrails\.com/docs/reference/error-reference(#.*)?$',  # New generated docs page - live after docs deploy
+  '^https://reactonrails\.com/docs/api-reference/doctor(#.*)?$',  # New doctor contract page - live after docs deploy
   '^https://www\.reactonrails\.com/llms(-full(-pro)?)?\.txt$',  # Machine-readable docs endpoints; serving tracked in reactonrails.com#126
   '^https://reactonrails\.com/docs/building-features/debugging-hydration-mismatches/?$',  # #3892 docs page - live after docs deploy
 
