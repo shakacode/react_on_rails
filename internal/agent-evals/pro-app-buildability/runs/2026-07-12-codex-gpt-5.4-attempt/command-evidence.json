@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0",
+  "commands": [
+    {
+      "id": "command-1",
+      "command": "/bin/zsh -lc pwd",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "<LOCAL_PATH>\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-2",
+      "command": "/bin/zsh -lc 'rg --files -uu'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": ".git/HEAD\n.git/description\n.git/config\n.git/hooks/push-to-checkout.sample\n.git/hooks/update.sample\n.git/hooks/pre-push.sample\n.git/hooks/pre-applypatch.sample\n.git/hooks/pre-merge-commit.sample\n.git/hooks/post-update.sample\n.git/hooks/prepare-commit-msg.sample\n.git/hooks/pre-receive.sample\n.git/hooks/fsmonitor-watchman.sample\n.git/hooks/applypatch-msg.sample\n.git/hooks/pre-commit.sample\n.git/hooks/sendemail-validate.sample\n.git/hooks/pre-rebase.sample\n.git/hooks/commit-msg.sample\n.git/info/exclude\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-3",
+      "command": "/bin/zsh -lc 'npx create-react-on-rails-app --help'",
+      "exit_code": 1,
+      "status": "failed",
+      "output": "^C",
+      "output_truncated": false
+    },
+    {
+      "id": "command-4",
+      "command": "/bin/zsh -lc 'npx --yes create-react-on-rails-app eval_app'",
+      "exit_code": 1,
+      "status": "failed",
+      "output": "npm error code ENOTFOUND\r\nnpm error syscall getaddrinfo\r\nnpm error errno ENOTFOUND\r\nnpm error network request to https://registry.npmjs.org/create-react-on-rails-app failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\r\nnpm error network This is a problem related to network connectivity.\r\nnpm error network In most cases you are behind a proxy or have bad network settings.\r\nnpm error network\r\nnpm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'\r\nnpm error Log files were not written due to an error writing to the directory: <LOCAL_PATH> error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\r\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-5",
+      "command": "/bin/zsh -lc 'node -v'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "v25.9.0\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-6",
+      "command": "/bin/zsh -lc 'npm -v'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "11.12.1\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-7",
+      "command": "/bin/zsh -lc 'rails -v'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "Rails is not currently installed on this system. To get the latest version, simply type:\n\n    $ sudo gem install rails\n\nYou can then rerun your \"rails\" command.\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-8",
+      "command": "/bin/zsh -lc \"gem list | rg 'react-on-rails|rails '\"",
+      "exit_code": 1,
+      "status": "failed",
+      "output": "",
+      "output_truncated": false
+    },
+    {
+      "id": "command-9",
+      "command": "/bin/zsh -lc 'which rails || true'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "/usr/bin/rails\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-10",
+      "command": "/bin/zsh -lc 'gem list react-on-rails'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-11",
+      "command": "/bin/zsh -lc 'ruby -v'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "ruby 2.6.10p210 (2022-04-12 revision 67958) [universal.arm64e-darwin25]\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-12",
+      "command": "/bin/zsh -lc 'rails --version'",
+      "exit_code": 0,
+      "status": "completed",
+      "output": "Rails is not currently installed on this system. To get the latest version, simply type:\n\n    $ sudo gem install rails\n\nYou can then rerun your \"rails\" command.\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-13",
+      "command": "/bin/zsh -lc 'curl -I https://registry.npmjs.org/create-react-on-rails-app'",
+      "exit_code": 6,
+      "status": "failed",
+      "output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0curl: (6) Could not resolve host: registry.npmjs.org\n",
+      "output_truncated": false
+    },
+    {
+      "id": "command-14",
+      "command": "/bin/zsh -lc 'npm view create-react-on-rails-app version'",
+      "exit_code": 1,
+      "status": "failed",
+      "output": "npm error code ENOTFOUND\nnpm error syscall getaddrinfo\nnpm error errno ENOTFOUND\nnpm error network request to https://registry.npmjs.org/create-react-on-rails-app failed, reason: getaddrinfo ENOTFOUND registry.npmjs.org\nnpm error network This is a problem related to network connectivity.\nnpm error network In most cases you are behind a proxy or have bad network settings.\nnpm error network\nnpm error network If you are behind a proxy, please make sure that the 'proxy' config is set properly.  See: 'npm help config'\nnpm error Log files were not written due to an error writing to the directory: <LOCAL_PATH> error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal\n",
+      "output_truncated": false
+    }
+  ]
+}

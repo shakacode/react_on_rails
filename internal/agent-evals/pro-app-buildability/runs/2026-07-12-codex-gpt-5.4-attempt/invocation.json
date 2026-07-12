@@ -1,0 +1,15 @@
+{
+  "command": "codex exec",
+  "model": "gpt-5.4",
+  "timeout_seconds": 900,
+  "sandbox": "workspace-write",
+  "ephemeral": true,
+  "ignore_user_config": true,
+  "ignore_rules": true,
+  "strict_config": true,
+  "multi_agent": false,
+  "shell_environment_policy": {
+    "inherit": "none",
+    "allowlist": ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SHELL", "CODEX_EVAL"]
+  }
+}
