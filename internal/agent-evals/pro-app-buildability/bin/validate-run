@@ -59,10 +59,15 @@ if rg -n '/Users/|/tmp/|/private/tmp|/var/folders/' "$run_dir"; then
   echo "local absolute path found" >&2
   exit 1
 fi
-if "$eval_dir/bin/scan-sensitive-artifacts" "$run_dir"; then
-  echo "possible unredacted credential found" >&2
-  exit 1
-fi
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$run_dir"
+sensitive_scan_exit=$?
+set -e
+case "$sensitive_scan_exit" in
+  0) echo "possible unredacted credential found" >&2; exit 1 ;;
+  1) ;;
+  *) echo "sensitive-artifact scan failed" >&2; exit 1 ;;
+esac
 
 run_classification="$(jq -r .result.classification "$run_dir/run.json")"
 rubric_classification="$(jq -r .overall "$run_dir/rubric-results.json")"

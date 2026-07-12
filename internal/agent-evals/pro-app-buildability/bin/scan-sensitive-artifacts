@@ -9,21 +9,39 @@ if (!target || !fs.existsSync(target)) {
   process.exit(64);
 }
 
-const files = [];
-const collect = (entry) => {
-  const stat = fs.statSync(entry);
-  if (stat.isDirectory()) {
-    for (const child of fs.readdirSync(entry)) collect(path.join(entry, child));
-  } else if (stat.isFile()) {
-    files.push(entry);
-  }
-};
-collect(target);
+const MAX_VISITED_ENTRIES = 5_000;
+const MAX_DEPTH = 64;
+let visitedEntries = 0;
 
-for (const file of files) {
-  if (containsSensitiveValues(fs.readFileSync(file, 'utf8'))) {
-    console.log(file);
-    process.exit(0);
+const containsSensitiveFile = (entry, depth = 0) => {
+  if (depth > MAX_DEPTH) throw new Error(`scan depth exceeds ${MAX_DEPTH}`);
+  visitedEntries += 1;
+  if (visitedEntries > MAX_VISITED_ENTRIES) {
+    throw new Error(`scan entries exceed ${MAX_VISITED_ENTRIES}`);
   }
+  const stat = fs.lstatSync(entry);
+  if (stat.isSymbolicLink()) return false;
+  if (stat.isDirectory()) {
+    const directory = fs.opendirSync(entry);
+    try {
+      while (true) {
+        const child = directory.readSync();
+        if (child === null) break;
+        if (containsSensitiveFile(path.join(entry, child.name), depth + 1)) return true;
+      }
+    } finally {
+      directory.closeSync();
+    }
+  } else if (stat.isFile() && containsSensitiveValues(fs.readFileSync(entry, 'utf8'))) {
+    console.log(entry);
+    return true;
+  }
+  return false;
+};
+
+try {
+  process.exit(containsSensitiveFile(target) ? 0 : 1);
+} catch (error) {
+  console.error(`sensitive-artifact scan failed: ${error.message}`);
+  process.exit(2);
 }
-process.exit(1);

@@ -32,7 +32,11 @@ printf '%s\n' 'SECRET_KEY_BASE=base-secret-value-123' \
   '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' >"$tmp/sensitive-names-unsafe"
 perl "$eval_dir/bin/sanitize-events.pl" "$tmp/sensitive-names-unsafe" >"$tmp/sensitive-names-safe"
 "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-unsafe" >/dev/null
-if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-safe" >/dev/null; then
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-safe" >/dev/null
+sensitive_clean_exit=$?
+set -e
+if [[ "$sensitive_clean_exit" != 1 ]]; then
   echo "final sensitive-artifact scan rejected sanitized output" >&2
   exit 1
 fi
@@ -95,6 +99,50 @@ if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; 
   echo "final scanner disagreed with cross-language sanitized output" >&2
   exit 1
 fi
+
+mkdir -p "$tmp/scanner-cycle/a"
+ln -s ../a "$tmp/scanner-cycle/a/loop"
+printf '%s\n' 'ordinary content' >"$tmp/scanner-cycle/a/clean"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-cycle" >/dev/null
+scanner_cycle_exit=$?
+set -e
+test "$scanner_cycle_exit" = 1
+
+printf '%s\n' 'ordinary content' >"$tmp/scanner-unreadable"
+chmod 000 "$tmp/scanner-unreadable"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-unreadable" >/dev/null 2>&1
+scanner_error_exit=$?
+set -e
+chmod 600 "$tmp/scanner-unreadable"
+test "$scanner_error_exit" = 2
+rg -q 'sensitive_scan_exit' "$eval_dir/bin/validate-run"
+
+mkdir -p "$tmp/scanner-depth"
+scanner_depth="$tmp/scanner-depth"
+for ((depth_index = 0; depth_index <= 64; depth_index += 1)); do
+  scanner_depth="$scanner_depth/level"
+  mkdir "$scanner_depth"
+done
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-depth" >/dev/null 2>&1
+scanner_depth_exit=$?
+set -e
+test "$scanner_depth_exit" = 2
+
+mkdir "$tmp/scanner-entries"
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); const directory = process.argv[1];
+   for (let index = 0; index < 5001; index += 1) fs.closeSync(fs.openSync(`${directory}/entry-${index}`, "w"));' \
+  "$tmp/scanner-entries"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-entries" >/dev/null 2>&1
+scanner_entries_exit=$?
+set -e
+test "$scanner_entries_exit" = 2
 
 head -c 1048577 /dev/zero >"$tmp/oversized-raw-events"
 if perl "$eval_dir/bin/sanitize-events.pl" "$tmp/oversized-raw-events" \
