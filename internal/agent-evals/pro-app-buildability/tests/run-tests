@@ -199,4 +199,35 @@ for row in rsc.route form.validation tests.page tests.form; do
     "$tmp/correlation-output/rubric-results.json")" = unknown
 done
 
+selector_commands=(
+  'bundle exec rspec --tag=focus'
+  'jest --testNamePattern=unrelated'
+  'bin/rails test --name=test_unrelated'
+)
+selector_index=0
+for selector_command in "${selector_commands[@]}"; do
+  selector_index=$((selector_index + 1))
+  jq -cn --arg command "$selector_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"2 tests passed, 0 failures"}}' \
+    >"$tmp/selector-events-$selector_index.jsonl"
+  mkdir "$tmp/selector-output-$selector_index"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/selector-events-$selector_index.jsonl" \
+    "$tmp/correlation-workspace" "$tmp/selector-output-$selector_index" "$tmp/fixture-report.json"
+  for row in rsc.route form.validation tests.page tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/selector-output-$selector_index/rubric-results.json")" = unknown
+  done
+done
+
+jq -cn \
+  '{type:"item.completed",item:{type:"command_execution",command:"bundle exec rspec",exit_code:0,status:"completed",aggregated_output:"2 examples, 0 failures"}}' \
+  >"$tmp/full-suite-events.jsonl"
+mkdir "$tmp/full-suite-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/correlation-workspace" "$tmp/full-suite-output" "$tmp/fixture-report.json"
+for row in rsc.route form.validation tests.page tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/full-suite-output/rubric-results.json")" = pass
+done
+
 echo "focused harness tests passed"

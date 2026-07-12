@@ -171,8 +171,9 @@ const fullSuiteTest = (invocation) => {
   const tokens = invocation.trim().split(/\s+/);
   return fullSuitePrefixes.some(
     (prefix) =>
+      tokens.length === prefix.length &&
       prefix.every((token, index) => tokens[index]?.toLowerCase() === token) &&
-      tokens.slice(prefix.length).every((token) => token.startsWith('-')),
+      tokens.every((token) => !token.startsWith('-')),
   );
 };
 const testCommandsFor = (matchedArtifacts) =>
