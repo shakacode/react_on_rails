@@ -14,12 +14,15 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const scriptPath = fileURLToPath(import.meta.url);
+const packageRoot = path.resolve(path.dirname(scriptPath), '..');
+const require = createRequire(import.meta.url);
 
-const runPnpm = (args) =>
+const runPnpmCommand = (args) =>
   execFileSync('pnpm', args, {
     cwd: packageRoot,
     encoding: 'utf8',
@@ -29,18 +32,33 @@ const runPnpm = (args) =>
     .split('\n')
     .filter(Boolean);
 
-const allTests = runPnpm(['exec', 'jest', '--listTests', 'tests']);
-const selectedTests = new Set([
-  ...runPnpm(['run', '--silent', 'test:non-rsc', '--listTests']),
-  ...runPnpm(['run', '--silent', 'test:streaming', '--listTests']),
-  ...runPnpm(['run', '--silent', 'test:rsc', '--listTests']),
-]);
+export default function checkJestSuiteSelection({
+  reactVersion = require('react/package.json').version,
+  runPnpm = runPnpmCommand,
+  log = console.log,
+} = {}) {
+  if (Number.parseInt(reactVersion, 10) < 19) {
+    log(`Jest suite-selection check skipped (requires React 19+, found ${reactVersion})`);
+    return;
+  }
 
-const orphanedTests = allTests.filter((testPath) => !selectedTests.has(testPath));
+  const allTests = runPnpm(['exec', 'jest', '--listTests', 'tests']);
+  const selectedTests = new Set([
+    ...runPnpm(['run', '--silent', 'test:non-rsc', '--listTests']),
+    ...runPnpm(['run', '--silent', 'test:streaming', '--listTests']),
+    ...runPnpm(['run', '--silent', 'test:rsc', '--listTests']),
+  ]);
 
-if (orphanedTests.length > 0) {
-  const relativePaths = orphanedTests.map((testPath) => path.relative(packageRoot, testPath));
-  throw new Error(`Jest tests missing from package test suites:\n${relativePaths.join('\n')}`);
+  const orphanedTests = allTests.filter((testPath) => !selectedTests.has(testPath));
+
+  if (orphanedTests.length > 0) {
+    const relativePaths = orphanedTests.map((testPath) => path.relative(packageRoot, testPath));
+    throw new Error(`Jest tests missing from package test suites:\n${relativePaths.join('\n')}`);
+  }
+
+  log(`All ${allTests.length} Jest test files are selected by a package test suite.`);
 }
 
-console.log(`All ${allTests.length} Jest test files are selected by a package test suite.`);
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+  checkJestSuiteSelection();
+}
