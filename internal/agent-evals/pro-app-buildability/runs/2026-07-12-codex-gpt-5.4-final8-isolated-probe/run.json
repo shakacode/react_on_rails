@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final7-isolated-probe",
-  "started_at": "2026-07-12T14:08:46Z",
-  "finished_at": "2026-07-12T14:09:06Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final8-isolated-probe",
+  "started_at": "2026-07-12T14:28:59Z",
+  "finished_at": "2026-07-12T14:29:20Z",
   "repository": {
-    "revision": "eae68670d8b0fb4aaeabbb95e0b967b1e26ebfc5",
+    "revision": "947b8d70fc411f224de6d2ace47ab110ba59664c",
     "dirty": false
   },
   "definition": {
@@ -41,12 +41,12 @@
       },
       {
         "path": "bin/run-eval",
-        "sha256": "56e5840602328cc42f64a36453da76f8eb8aa399e1462211fbd2692a80b33f7d",
+        "sha256": "7aaa24527047ee5659a61ec30faa24b579efc6b47f82c20ff75d5c77dcc98339",
         "executable": true
       },
       {
         "path": "bin/sanitize-events.pl",
-        "sha256": "d7eab4dd75085ce484eda776328faa51a176e12183687309d695fa3ff3d35ee1",
+        "sha256": "02f5541e5e927bd193a71db21a9e79aa1f460d40917d2fc92df7489befaaff51",
         "executable": true
       },
       {
@@ -56,7 +56,7 @@
       },
       {
         "path": "bin/sensitive-values.mjs",
-        "sha256": "218b4eb84ba9f65273c468c1795934ef563129c4138d50d61cdfe79e6c86ad7b",
+        "sha256": "9cfaa28ab603dd9f7b018963f9be11ad58843b0cb7b3982d596f44492018d164",
         "executable": false
       },
       {
@@ -101,7 +101,7 @@
       },
       {
         "path": "schemas/run.schema.json",
-        "sha256": "abe48099f0623f4cb8246c98006c706e6a1156abf60c6fe740d20df9de543494",
+        "sha256": "51525c7ea9f702b12e54108cc455a0f82d17b0392c6c4b3e695931192bef105a",
         "executable": false
       },
       {
@@ -157,12 +157,7 @@
     "shell_environment_inherit": "none",
     "credential_store": "file",
     "auth_material_available": false,
-    "stripped_sensitive_names": [
-      "AGENT_COORD_API_TOKEN",
-      "GOOGLE_APPLICATION_CREDENTIALS",
-      "HC_DATA_API_TOKEN",
-      "SSH_AUTH_SOCK"
-    ],
+    "stripped_sensitive_variable_categories": ["auth", "credential", "token"],
     "raw_cleanup": "EXIT/INT/TERM",
     "auth_material_persisted": false
   },
