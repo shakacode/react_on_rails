@@ -13,6 +13,7 @@ if (!eventsPath || !workspace || !outputDir || !reportPath || !invocationPath) {
 
 const MAX_OUTPUT = 12_000;
 const MAX_EXCERPT = 16_000;
+const MAX_ARTIFACT_BYTES = 65_536;
 const sanitize = (value) =>
   redactSensitiveValues(
     String(value)
@@ -68,13 +69,14 @@ function walk(directory) {
         const selected =
           selectedBasenames.has(entry.name) ||
           (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
-        if (selected) {
+        const fileSize = fs.statSync(absolute).size;
+        if (selected && fileSize <= MAX_ARTIFACT_BYTES) {
           const content = fs.readFileSync(absolute);
           const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
           artifacts.push({
             path: relative,
             sha256: crypto.createHash('sha256').update(content).digest('hex'),
-            size: content.length,
+            size: fileSize,
             excerpt: excerpt.value,
             excerpt_truncated: excerpt.truncated,
           });

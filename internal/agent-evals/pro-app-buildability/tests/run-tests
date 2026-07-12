@@ -213,6 +213,8 @@ printf '%s\n' \
 mkdir "$tmp/evidence-workspace/eval_app"
 printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/evidence-workspace/eval_app/Gemfile"
 printf '%s\n' '{"dependencies":{"react-on-rails-pro":"1.0.0"}}' >"$tmp/evidence-workspace/eval_app/package.json"
+mkdir -p "$tmp/evidence-workspace/eval_app/app/components"
+printf '%070000d' 0 >"$tmp/evidence-workspace/eval_app/app/components/oversized.server.tsx"
 printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":99,"blockers":[]}' \
   >"$tmp/fixture-report.json"
 printf '%s\n' '{"human_followups_sent":0}' >"$tmp/fixture-invocation.json"
@@ -252,6 +254,11 @@ node "$eval_dir/bin/validate-network-probe.mjs" \
   "$tmp/linux-shell-probe.json" "$tmp/linux-shell-evidence-output/command-evidence.json"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
   "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+if jq -e '.artifacts[] | select(.path | endswith("oversized.server.tsx"))' \
+  "$tmp/evidence-output/artifact-evidence.json" >/dev/null; then
+  echo "oversized agent-controlled artifact was read into evidence" >&2
+  exit 1
+fi
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 test "$(jq -r '.items[] | select(.id == "unaided") | .status' "$tmp/evidence-output/rubric-results.json")" = pass

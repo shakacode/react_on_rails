@@ -7,8 +7,9 @@ artifacts satisfy the rubric.
 
 ## Clean-start prerequisites
 
-- macOS or Linux with `git`, `ruby`, `node`, `npm`, `pnpm`, `perl`, `jq`, GNU
-  `timeout`, and the selected agent CLI on `PATH`
+- macOS or Linux with `curl`, `git`, `jq`, `node`, `npm`, `perl`, `pnpm`,
+  `realpath`, `rg`, `ruby`, `shasum`, GNU `timeout`, and the selected agent CLI
+  on `PATH`
 - network access to RubyGems, npm, and GitHub
 - enough disk space for a new Rails application and its dependencies
 - an empty, disposable workspace outside this repository
