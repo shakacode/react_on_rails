@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "limits": {
+    "max_bytes": 1048576,
+    "max_events": 5000,
+    "observed_bytes": 2703,
+    "observed_events": 13,
+    "exceeded": false,
+    "reason": null
+  },
+  "commands": []
+}
