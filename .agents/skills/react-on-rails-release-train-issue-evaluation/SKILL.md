@@ -11,6 +11,28 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
 
 `release/*` receives only stabilizing fixes. Features, cleanup, docs, process work, non-blocking hardening, and ordinary follow-ups target `main`.
 
+## Backport Shape
+
+When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
+source PR per release backport PR:
+
+- Process them serially. Merge one backport, fetch the new release tip, then
+  branch the next.
+- Give each source PR its own `git cherry-pick -x` provenance, conflict record,
+  validation, QA evidence, review cycle, and rollback boundary.
+- Do not bundle independent source PRs because they share a target, component,
+  milestone, or `CHANGELOG.md`. Shared changelog edits require serialization;
+  retain each source PR's applicable changelog entry, then reconcile the entries
+  and stamp or regenerate the RC changelog after every backport retained in the
+  final release set lands.
+- Combine only behaviorally inseparable changes that cannot be reviewed,
+  tested, or reverted safely alone. Require an explicit maintainer-approved
+  rationale naming every source PR before implementation.
+- Search open release-targeted PRs before branching. If an aggregate PR already
+  violates this shape, recommend separate replacements; close it only with
+  explicit write authorization and retain its branch unless deletion is also
+  authorized.
+
 ## Workflow
 
 1. Refresh repo context: `git fetch --prune origin main`, then `.agents/bin/agent-workflow-seam-doctor`. Fetch the release branch if ancestry matters.
@@ -23,6 +45,8 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
    - `release/X.Y.Z contingent`: only needed if maintainers decide to cherry-pick a related main-only fix into the train. Name the dependency.
    - `main`: docs, changelog for main-only PRs, CI/tooling hygiene, tests, process automation, non-blocking runtime hardening, features, and performance/cleanup without release-gate proof.
    - `park/close`: P3, speculative, duplicate, no-PR evidence, or not worth doing.
+7. For multiple `release/X.Y.Z` selections, record the serial order in the
+   output; apply the **Backport Shape** rules above.
 
 Recommend labels/milestones/comments, but do not mutate GitHub unless the user explicitly authorizes writes.
 
