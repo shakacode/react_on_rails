@@ -122,9 +122,9 @@
       "additionalProperties": false,
       "required": [
         "timeout_command",
-        "requested_timeout_seconds",
-        "effective_timeout_seconds",
+        "scaffold_timeout_seconds",
         "probe_timeout_seconds",
+        "maximum_agent_call_wall_clock_seconds",
         "sandbox_network_access",
         "isolated_host_attestation",
         "network_probe_artifact",
@@ -134,9 +134,9 @@
       ],
       "properties": {
         "timeout_command": { "type": "string", "minLength": 1 },
-        "requested_timeout_seconds": { "type": "integer", "minimum": 1 },
-        "effective_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "scaffold_timeout_seconds": { "type": "integer", "minimum": 1 },
         "probe_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "maximum_agent_call_wall_clock_seconds": { "type": "integer", "minimum": 2 },
         "sandbox_network_access": { "type": "boolean" },
         "isolated_host_attestation": { "type": "boolean" },
         "network_probe_artifact": { "const": "sandbox-network-probe.json" },

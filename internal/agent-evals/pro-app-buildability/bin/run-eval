@@ -151,11 +151,19 @@ codex_args+=(-c 'cli_auth_credentials_store="file"')
 codex_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
 codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
 
-jq -n --arg model "$model" --argjson timeout "$timeout_seconds" \
+probe_timeout_seconds="$timeout_seconds"
+((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
+maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
+
+jq -n --arg model "$model" --argjson scaffold_timeout "$timeout_seconds" \
+  --argjson probe_timeout "$probe_timeout_seconds" \
+  --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" \
   --arg npm_probe "$npm_probe_command" --arg rubygems_probe "$rubygems_probe_command" \
   --argjson sandbox_network_access "$sandbox_network_access" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
-  '{command:"codex exec",model:$model,timeout_seconds:$timeout,sandbox:"workspace-write",ephemeral:true,
+  '{command:"codex exec",model:$model,scaffold_timeout_seconds:$scaffold_timeout,
+    probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+    sandbox:"workspace-write",ephemeral:true,
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
     sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
     capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
@@ -163,8 +171,6 @@ jq -n --arg model "$model" --argjson timeout "$timeout_seconds" \
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
   >"$output/invocation.json"
 
-probe_timeout_seconds="$timeout_seconds"
-((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
 raw_probe_events="$private_dir/probe-events.jsonl"
 raw_probe_stderr="$private_dir/probe-stderr.log"
 safe_probe_events="$private_dir/probe-events.safe.jsonl"
@@ -239,7 +245,8 @@ jq -n \
   --argjson inputs "$input_hashes" --argjson stripped "$stripped_categories" --argjson network "$network_json" \
   --argjson sandbox_network_access "$sandbox_network_access" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
-  --arg timeout_command "$timeout_command" --argjson timeout "$timeout_seconds" --argjson exit_code "$runner_exit" \
+  --arg timeout_command "$timeout_command" --argjson scaffold_timeout "$timeout_seconds" \
+  --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" --argjson exit_code "$runner_exit" \
   --argjson probe_timeout "$probe_timeout_seconds" --argjson scaffold_invoked "$scaffold_invoked" \
   --argjson timed_out "$timed_out" --arg classification "$classification" --arg reason "$reason" \
   '{schema_version:"2.0",run_id:$run_id,started_at:$started,finished_at:$finished,
@@ -250,8 +257,9 @@ jq -n \
       credential_store:"file",auth_material_available:false,stripped_sensitive_variable_categories:$stripped,
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
-    runner:{timeout_command:$timeout_command,requested_timeout_seconds:$timeout,effective_timeout_seconds:$timeout,
-      probe_timeout_seconds:$probe_timeout,sandbox_network_access:$sandbox_network_access,
+    runner:{timeout_command:$timeout_command,scaffold_timeout_seconds:$scaffold_timeout,
+      probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+      sandbox_network_access:$sandbox_network_access,
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
       exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json"},
     result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"

@@ -113,6 +113,12 @@ rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eva
 rg -q 'sandbox_workspace_write.network_access=\$sandbox_network_access' "$eval_dir/bin/run-eval"
 rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
 rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
+rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
+  "$eval_dir/bin/run-eval"
+rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
+rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
+rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
+rg -q 'run/invocation timeout budgets disagree' "$eval_dir/bin/validate-run"
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"

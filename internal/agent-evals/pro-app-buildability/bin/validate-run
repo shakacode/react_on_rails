@@ -26,6 +26,20 @@ node "$eval_dir/bin/validate-json.mjs" "$run_dir"
 node "$eval_dir/bin/validate-network-probe.mjs" \
   "$run_dir/sandbox-network-probe.json" "$run_dir/command-evidence.json"
 
+jq -e \
+  '.maximum_agent_call_wall_clock_seconds == (.scaffold_timeout_seconds + .probe_timeout_seconds)' \
+  "$run_dir/invocation.json" >/dev/null || { echo "invocation timeout budget mismatch" >&2; exit 1; }
+jq -e \
+  '.runner.maximum_agent_call_wall_clock_seconds ==
+    (.runner.scaffold_timeout_seconds + .runner.probe_timeout_seconds)' \
+  "$run_dir/run.json" >/dev/null || { echo "run timeout budget mismatch" >&2; exit 1; }
+jq -e --slurpfile invocation "$run_dir/invocation.json" \
+  '.runner.scaffold_timeout_seconds == $invocation[0].scaffold_timeout_seconds and
+    .runner.probe_timeout_seconds == $invocation[0].probe_timeout_seconds and
+    .runner.maximum_agent_call_wall_clock_seconds ==
+      $invocation[0].maximum_agent_call_wall_clock_seconds' \
+  "$run_dir/run.json" >/dev/null || { echo "run/invocation timeout budgets disagree" >&2; exit 1; }
+
 recorded_revision="$(jq -r .repository.revision "$run_dir/run.json")"
 while IFS=$'\t' read -r relative expected; do
   current=""

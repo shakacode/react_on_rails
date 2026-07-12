@@ -58,6 +58,13 @@ private empty `HOME` and `CODEX_HOME` directories inside the temporary run
 directory. Tool environment inheritance is `none`, with only `PATH`, private
 `HOME` and `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
 
+`--timeout` is the scaffold-agent call budget. The capability probe has its own
+`min(--timeout, 120)` budget. `invocation.json` and `run.json` record both plus
+`maximum_agent_call_wall_clock_seconds`, their sum when both agent calls consume
+their full budgets. That maximum covers Codex call time only; small runner
+preflight, sanitization, evidence derivation, and validation overhead is outside
+it.
+
 The configured file credential store is inside that empty disposable
 `CODEX_HOME`; no credential is copied, inherited, or mounted into the process.
 Private homes prevent default discovery and inheritance, but the workspace-write
