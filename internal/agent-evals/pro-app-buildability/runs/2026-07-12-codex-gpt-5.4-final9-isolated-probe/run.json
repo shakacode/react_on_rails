@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final8-isolated-probe",
-  "started_at": "2026-07-12T14:28:59Z",
-  "finished_at": "2026-07-12T14:29:20Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final9-isolated-probe",
+  "started_at": "2026-07-12T14:33:56Z",
+  "finished_at": "2026-07-12T14:34:18Z",
   "repository": {
-    "revision": "947b8d70fc411f224de6d2ace47ab110ba59664c",
+    "revision": "4f3499ea2dbfcb22680f80fb6c1f581520040546",
     "dirty": false
   },
   "definition": {
@@ -21,7 +21,7 @@
       },
       {
         "path": "bin/derive-evidence.mjs",
-        "sha256": "aa477db419512bc695bae7c5ea5d2418f24c9a64e175c7b8137eebe6824f3b3d",
+        "sha256": "bedde63fab99a679b968619a8b1f05a659d26a767f01c22e397f0c16b6694c61",
         "executable": true
       },
       {
