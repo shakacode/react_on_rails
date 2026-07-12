@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classify, summarize } from './stats.mjs';
+import { buildSummary, classify, summarize, verifySummary } from './stats.mjs';
 
 test('summarize reports median and observed spread', () => {
   assert.deepEqual(summarize([30, 10, 40, 20, 50]), {
@@ -30,4 +30,19 @@ test('classification is ambiguous when either sample spread exceeds half its med
     ),
     'ambiguous',
   );
+});
+
+test('verifySummary rejects a mutated recorded median or verdict', () => {
+  const rawSamples = {
+    cold_start: { rspack: [10, 11, 12, 13, 14], vite: [20, 21, 22, 23, 24] },
+    hmr: { rspack: [30, 31, 32, 33, 34], vite: [40, 41, 42, 43, 44] },
+  };
+  const result = { raw_samples_ms: rawSamples, summary: buildSummary(rawSamples) };
+
+  result.summary.cold_start.rspack.median_ms = 999;
+  assert.throws(() => verifySummary(result), /does not match raw samples/);
+
+  result.summary = buildSummary(rawSamples);
+  result.summary.hmr.vite_relative_to_rspack = 'wash';
+  assert.throws(() => verifySummary(result), /does not match raw samples/);
 });

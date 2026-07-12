@@ -29,6 +29,34 @@ export function classify(left, right) {
   return medianDelta > 0 ? 'regression' : 'improvement';
 }
 
+export function buildSummary(rawSamples) {
+  return Object.fromEntries(
+    METRICS.map((metric) => {
+      const rspack = summarize(rawSamples[metric].rspack);
+      const vite = summarize(rawSamples[metric].vite);
+      return [
+        metric,
+        {
+          rspack,
+          vite,
+          vite_relative_to_rspack: classify(rspack, vite),
+        },
+      ];
+    }),
+  );
+}
+
+export function verifySummary(result) {
+  const recomputed = buildSummary(result.raw_samples_ms);
+  if (!isDeepStrictEqual(result.summary, recomputed)) {
+    throw new Error('recorded summary does not match raw samples');
+  }
+  return recomputed;
+}
+
 function round(value) {
   return Math.round(value * 10) / 10;
 }
+import { isDeepStrictEqual } from 'node:util';
+
+const METRICS = ['cold_start', 'hmr'];

@@ -2,7 +2,7 @@ import { rspack } from '@rspack/core';
 
 export default {
   mode: 'development',
-  entry: './src/index.jsx',
+  entry: './src/index.js',
   devtool: 'eval-source-map',
   plugins: [new rspack.HtmlRspackPlugin({ template: './index.html' })],
   devServer: {

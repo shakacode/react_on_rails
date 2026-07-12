@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { format as formatMarkdown } from 'prettier';
+import { verifySummary } from './stats.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rawArgument = readArgument('--raw') ?? 'results/recorded.json';
@@ -10,7 +11,8 @@ const outputArgument = readArgument('--output') ?? 'RESULTS.md';
 const rawPath = path.resolve(root, rawArgument);
 const outputPath = path.resolve(root, outputArgument);
 const raw = JSON.parse(await readFile(rawPath, 'utf8'));
-const rendered = await formatMarkdown(render(raw, path.relative(root, rawPath)), {
+const verified = { ...raw, summary: verifySummary(raw) };
+const rendered = await formatMarkdown(render(verified, path.relative(root, rawPath)), {
   parser: 'markdown',
 });
 
@@ -52,7 +54,8 @@ Each timing has ${result.methodology.sample_count} samples. The conservative noi
 ## Environment
 
 - Recorded: ${result.created_at}
-- Git baseline: \`${result.environment.git_head}\`
+- Harness commit: \`${result.environment.harness_git_head ?? result.environment.git_head}\`
+- Harness worktree clean at start: ${result.environment.harness_git_clean ?? 'UNKNOWN'}
 - OS: ${result.environment.operating_system}
 - CPU: ${result.environment.cpu} (${result.environment.logical_cpu_count} logical CPUs)
 - Node: ${result.environment.node}; pnpm: ${result.environment.pnpm}
@@ -60,7 +63,7 @@ Each timing has ${result.methodology.sample_count} samples. The conservative noi
 
 ## Interpretation boundary
 
-This run compares matched, minimal React controls and isolates dev-server startup, module replacement reaching a real browser, compile-error overlay attachment, and explicit bundler configuration. It does **not** compare generated Rails applications, \`vite_ruby\`, Inertia, Rails startup, React Fast Refresh state preservation, runtime-error overlays, or click-to-editor integration. Accordingly, it is reproducible control evidence, not sufficient evidence for a supported “Rspack matches Vite” onboarding claim.
+This run compares matched, minimal JavaScript controls and isolates dev-server startup, module replacement reaching a real browser, compile-error overlay attachment, and explicit bundler configuration. It does **not** compare generated Rails applications, \`vite_ruby\`, Inertia, Rails startup, React transforms or Fast Refresh, runtime-error overlays, or click-to-editor integration. Accordingly, it is reproducible control evidence, not sufficient evidence for a supported “Rspack matches Vite” onboarding claim.
 `;
 }
 
