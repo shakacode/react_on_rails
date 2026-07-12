@@ -2,6 +2,7 @@
 
 require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/doctor"
+require_relative "../../../lib/react_on_rails/doctor_schema"
 require "fileutils"
 require "tmpdir"
 
@@ -146,6 +147,84 @@ RSpec.describe ReactOnRails::Doctor do
       expect(report["ror_version"]).to eq(ReactOnRails::VERSION)
     end
 
+    it "validates emitted reports against the public schema contract" do
+      stub_check_sections(
+        json_doctor,
+        "environment_prerequisites" => [{ type: :error, content: "Node is missing" }]
+      )
+      report = run_and_parse_json(json_doctor)
+
+      symbolized_report = JSON.parse(JSON.generate(report), symbolize_names: true)
+
+      expect { ReactOnRails::DoctorSchema.validate!(symbolized_report) }.not_to raise_error
+    end
+
+    it "summarizes statuses with zero counts for absent statuses" do
+      expect(ReactOnRails::DoctorSchema.summarize_statuses(%w[warn warn])).to eq(pass: 0, warn: 2, fail: 0)
+    end
+
+    it "reports a descriptive error when check metadata drifts from check sections" do
+      expect { ReactOnRails::DoctorSchema.metadata("new_check_without_metadata") }
+        .to raise_error(
+          ArgumentError,
+          'Missing DoctorSchema::CHECK_METADATA entry for check id "new_check_without_metadata"'
+        )
+    end
+
+    it "rejects reports that omit a required check field" do
+      stub_check_sections(json_doctor)
+      report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
+      report[:checks].first.delete(:severity)
+
+      expect { ReactOnRails::DoctorSchema.validate!(report) }
+        .to raise_error(ArgumentError, /check missing keys: severity/)
+    end
+
+    it "rejects inconsistent report semantics and duplicate check IDs" do
+      stub_check_sections(json_doctor)
+      report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
+
+      mutations = {
+        "status severity mismatch" => [
+          ->(value) { value[:checks].first[:severity] = "error" }, /severity does not match/
+        ],
+        "overall status mismatch" => [->(value) { value[:status] = "warn" }, /report status does not match/],
+        "summary mismatch" => [->(value) { value[:summary][:pass] -= 1 }, /summary does not match/],
+        "duplicate check ID" => [->(value) { value[:checks][1][:id] = value[:checks][0][:id] }, /ids must be unique/],
+        "non-string version" => [->(value) { value[:ror_version] = 17 }, /ror_version must be a string/],
+        "non-string title" => [->(value) { value[:checks].first[:title] = nil }, /invalid title/]
+      }
+
+      aggregate_failures do
+        mutations.each do |name, (mutation, error_pattern)|
+          mutated_report = Marshal.load(Marshal.dump(report))
+          mutation.call(mutated_report)
+          expect { ReactOnRails::DoctorSchema.validate!(mutated_report) }
+            .to raise_error(ArgumentError, error_pattern), name
+        end
+      end
+    end
+
+    it "rejects malformed nested detail fields" do
+      stub_check_sections(json_doctor, "environment_prerequisites" => [{ type: :info, content: "Checking" }])
+      report = JSON.parse(JSON.generate(run_and_parse_json(json_doctor)), symbolize_names: true)
+
+      mutations = {
+        "missing content" => [->(detail) { detail.delete(:content) }, /detail.*missing keys: content/],
+        "unknown level" => [->(detail) { detail[:level] = "critical" }, /invalid detail level/],
+        "non-string content" => [->(detail) { detail[:content] = nil }, /invalid detail content/]
+      }
+
+      aggregate_failures do
+        mutations.each do |name, (mutation, error_pattern)|
+          mutated_report = Marshal.load(Marshal.dump(report))
+          mutation.call(mutated_report[:checks].first[:details].first)
+          expect { ReactOnRails::DoctorSchema.validate!(mutated_report) }
+            .to raise_error(ArgumentError, error_pattern), name
+        end
+      end
+    end
+
     it "emits one entry per check section with stable snake_case ids" do
       stub_check_sections(json_doctor)
       report = run_and_parse_json(json_doctor)
@@ -203,12 +282,26 @@ RSpec.describe ReactOnRails::Doctor do
       check = report["checks"].first
 
       expect(check["message"]).to eq("Missing package manager")
+      expect(check).to include(
+        "severity" => "error",
+        "fix_command" => nil,
+        "docs_url" => "https://reactonrails.com/docs/api-reference/doctor#check-id-environment-prerequisites"
+      )
       expect(check["details"]).to eq(
         [
           { "level" => "info", "content" => "Checking environment" },
           { "level" => "warning", "content" => "Old Node version" },
           { "level" => "error", "content" => "Missing package manager" }
         ]
+      )
+      expect(check["remediation"]).to include(
+        "files" => ["package.json", "package manager lockfile"],
+        "expected_end_state" => /Node\.js/
+      )
+      expect(check.dig("remediation", "prompt")).to include(
+        "environment_prerequisites",
+        "Missing package manager",
+        "bin/rails react_on_rails:doctor FORMAT=json"
       )
     end
 
@@ -224,8 +317,33 @@ RSpec.describe ReactOnRails::Doctor do
       check = report["checks"].find { |entry| entry["id"] == "rails_integration" }
 
       expect(check["status"]).to eq("pass")
+      expect(check["severity"]).to eq("info")
       expect(check["message"]).to be_nil
+      expect(check["remediation"]).to be_nil
       expect(check["details"].length).to eq(2)
+    end
+
+    it "does not attach section-wide fix commands to unrelated failures" do
+      stub_check_sections(
+        json_doctor,
+        "react_on_rails_packages" => [{ type: :error, content: "Shakapacker is not configured" }],
+        "key_configuration_files" => [{ type: :warning, content: "Initializer is missing" }]
+      )
+      checks = run_and_parse_json(json_doctor)["checks"].to_h { |check| [check["id"], check] }
+
+      expect(checks["react_on_rails_packages"]["fix_command"]).to be_nil
+      expect(checks["key_configuration_files"]["fix_command"]).to be_nil
+      expect(checks["environment_prerequisites"]["fix_command"]).to be_nil
+    end
+
+    it "keeps checks and remediation output deterministic" do
+      messages = { "testing_setup" => [{ type: :warning, content: "No test helper" }] }
+      first_doctor = described_class.new(format: :json)
+      second_doctor = described_class.new(format: :json)
+      stub_check_sections(first_doctor, messages)
+      stub_check_sections(second_doctor, messages)
+
+      expect(run_and_parse_json(first_doctor)).to eq(run_and_parse_json(second_doctor))
     end
 
     it "reports warn overall status and exit code 0 when only warnings exist" do
@@ -234,6 +352,10 @@ RSpec.describe ReactOnRails::Doctor do
 
       expect(json_doctor).to receive(:exit).with(0)
       json_doctor.run_diagnosis
+    end
+
+    it "publishes predictable exit codes for every report severity" do
+      expect(ReactOnRails::DoctorSchema::EXIT_CODES).to eq(pass: 0, warn: 0, fail: 1)
     end
 
     it "exits with status 1 when any check fails" do

@@ -15,6 +15,7 @@ require_relative "dev/server_mode"
 require_relative "version_syntax_converter"
 require_relative "version_synchronizer"
 require_relative "system_checker"
+require_relative "doctor_schema"
 require_relative "pro_migration"
 require_relative "node_renderer_procfile"
 require_relative "../generators/react_on_rails/js_dependency_manager"
@@ -125,28 +126,11 @@ module ReactOnRails
     # a machine-readable report (see JSON_SCHEMA_VERSION below).
     OUTPUT_FORMATS = %i[text json].freeze
 
-    # Version of the machine-readable doctor report schema (FORMAT=json).
-    # Bump ONLY on breaking changes to the shape below. Schema (v1):
-    #
-    #   {
-    #     "schema_version": 1,
-    #     "ror_version": "<ReactOnRails::VERSION>",
-    #     "status": "pass" | "warn" | "fail",          // worst check status
-    #     "checks": [
-    #       {
-    #         "id": "<stable snake_case id from CHECK_SECTIONS>",
-    #         "title": "<human section title>",
-    #         "status": "pass" | "warn" | "fail",
-    #         "message": "<most severe message content, or null>",
-    #         "details": [ { "level": "success|warning|error|info", "content": "..." } ]
-    #       }
-    #     ],
-    #     "summary": { "pass": <count>, "warn": <count>, "fail": <count> }
-    #   }
-    #
+    # DoctorSchema is the canonical machine-readable report contract; bump its
+    # version only for breaking changes.
     # No timestamp is included so output is deterministic for a given app state.
     # Exit code semantics match text mode: 1 if any check fails, else 0.
-    JSON_SCHEMA_VERSION = 1
+    JSON_SCHEMA_VERSION = DoctorSchema::VERSION
 
     # Doctor check sections. The :id values are part of the stable JSON schema
     # contract (consumed by agents/tooling) — never rename or reuse them; add new
@@ -259,7 +243,9 @@ module ReactOnRails
       stray_output = capture_stdout { results = collect_check_results }
       $stderr.print(stray_output) unless stray_output.empty?
 
-      puts JSON.pretty_generate(build_json_report(results))
+      report = build_json_report(results)
+      DoctorSchema.validate!(report)
+      puts JSON.pretty_generate(report)
       exit(diagnosis_exit_code)
     end
 
@@ -320,43 +306,51 @@ module ReactOnRails
       {
         schema_version: JSON_SCHEMA_VERSION,
         ror_version: ReactOnRails::VERSION,
-        status: overall_status(statuses),
+        status: DoctorSchema.overall_status(statuses),
         checks:,
-        summary: {
-          pass: statuses.count("pass"),
-          warn: statuses.count("warn"),
-          fail: statuses.count("fail")
-        }
+        summary: DoctorSchema.summarize_statuses(statuses)
       }
     end
 
     def build_check_entry(result)
       messages = result[:messages]
       status = check_status(messages)
+      severity = DoctorSchema::STATUS_SEVERITIES.fetch(status)
+      message = primary_message(messages, status)
+      metadata = DoctorSchema.metadata(result[:id])
 
       {
         id: result[:id],
         title: result[:title],
         status:,
-        message: primary_message(messages, status),
-        details: messages.map { |message| { level: message[:type].to_s, content: message[:content] } }
+        severity:,
+        message:,
+        fix_command: nil,
+        docs_url: DoctorSchema.docs_url(result[:id]),
+        remediation: build_remediation(result[:id], severity, message, metadata, status),
+        details: messages.map { |detail| { level: detail[:type].to_s, content: detail[:content] } }
       }
+    end
+
+    def build_remediation(check_id, severity, message, metadata, status)
+      return nil if status == "pass"
+
+      files = metadata.fetch(:files)
+      expected_end_state = metadata.fetch(:expected_end_state)
+      prompt_lines = [
+        "Fix React on Rails doctor check `#{check_id}` (#{severity}).",
+        "Diagnosis: #{message}",
+        "Inspect these paths: #{files.join(', ')}.",
+        "Expected end state: #{expected_end_state}",
+        "Re-run `bin/rails react_on_rails:doctor FORMAT=json` and confirm this check reports `pass`."
+      ]
+      { prompt: prompt_lines.join("\n"), files:, expected_end_state: }
     end
 
     def check_status(messages)
       if messages.any? { |message| message[:type] == :error }
         "fail"
       elsif messages.any? { |message| message[:type] == :warning }
-        "warn"
-      else
-        "pass"
-      end
-    end
-
-    def overall_status(statuses)
-      if statuses.include?("fail")
-        "fail"
-      elsif statuses.include?("warn")
         "warn"
       else
         "pass"
@@ -1951,7 +1945,14 @@ module ReactOnRails
     end
 
     def diagnosis_exit_code
-      checker.errors? ? 1 : 0
+      status = if checker.errors?
+                 :fail
+               elsif checker.warnings?
+                 :warn
+               else
+                 :pass
+               end
+      DoctorSchema::EXIT_CODES.fetch(status)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
