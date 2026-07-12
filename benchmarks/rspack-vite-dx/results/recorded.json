@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "created_at": "2026-07-12T12:08:59.420Z",
+  "created_at": "2026-07-12T12:23:16.839Z",
   "controls": {
     "rspack": {
       "command": "pnpm exec rspack serve --config rspack.config.mjs --port <PORT>",
-      "measured_port": 57150,
-      "run_nonce": "rspack-41886-1783858143012-803631558fc77"
+      "measured_port": 60134,
+      "run_nonce": "rspack-33087-1783859000102-d02ba2812412d"
     },
     "vite": {
       "command": "pnpm exec vite --host 127.0.0.1 --port <PORT> --strictPort",
-      "measured_port": 57181,
-      "run_nonce": "vite-41886-1783858143910-fd2678b26b8a9"
+      "measured_port": 60163,
+      "run_nonce": "vite-33087-1783859000955-dd93662317b1f"
     }
   },
   "environment": {
-    "harness_git_head": "10f1eca8e77f7e55bc78979de476f197425d7ee1",
+    "harness_git_head": "08d2afccd428925a01d4e9ba351f542bef87a391",
     "harness_git_clean": true,
     "operating_system": "Darwin 25.5.0 arm64",
     "cpu": "Apple M5 Max",
@@ -36,12 +36,12 @@
   },
   "raw_samples_ms": {
     "cold_start": {
-      "rspack": [345.3, 253.4, 267.5, 241.2, 257.4],
-      "vite": [285.5, 266.1, 329.4, 264.3, 263.7]
+      "rspack": [330.8, 231.1, 256.8, 239.6, 233],
+      "vite": [286.1, 244.9, 268.7, 247.7, 246]
     },
     "hmr": {
-      "rspack": [79.2, 78.8, 179.8, 77.7, 78.4],
-      "vite": [75.5, 178.5, 23.4, 177.9, 22.5]
+      "rspack": [80, 80.6, 80.9, 80.6, 81],
+      "vite": [76.2, 178.4, 22.8, 184.4, 24.7]
     }
   },
   "overlay": {
@@ -76,38 +76,38 @@
     "cold_start": {
       "rspack": {
         "samples": 5,
-        "median_ms": 257.4,
-        "min_ms": 241.2,
-        "max_ms": 345.3,
-        "spread_ms": 104.1,
-        "spread_percent_of_median": 40.4
+        "median_ms": 239.6,
+        "min_ms": 231.1,
+        "max_ms": 330.8,
+        "spread_ms": 99.7,
+        "spread_percent_of_median": 41.6
       },
       "vite": {
         "samples": 5,
-        "median_ms": 266.1,
-        "min_ms": 263.7,
-        "max_ms": 329.4,
-        "spread_ms": 65.7,
-        "spread_percent_of_median": 24.7
+        "median_ms": 247.7,
+        "min_ms": 244.9,
+        "max_ms": 286.1,
+        "spread_ms": 41.2,
+        "spread_percent_of_median": 16.6
       },
       "vite_relative_to_rspack": "wash"
     },
     "hmr": {
       "rspack": {
         "samples": 5,
-        "median_ms": 78.8,
-        "min_ms": 77.7,
-        "max_ms": 179.8,
-        "spread_ms": 102.1,
-        "spread_percent_of_median": 129.6
+        "median_ms": 80.6,
+        "min_ms": 80,
+        "max_ms": 81,
+        "spread_ms": 1,
+        "spread_percent_of_median": 1.2
       },
       "vite": {
         "samples": 5,
-        "median_ms": 75.5,
-        "min_ms": 22.5,
-        "max_ms": 178.5,
-        "spread_ms": 156,
-        "spread_percent_of_median": 206.6
+        "median_ms": 76.2,
+        "min_ms": 22.8,
+        "max_ms": 184.4,
+        "spread_ms": 161.6,
+        "spread_percent_of_median": 212.1
       },
       "vite_relative_to_rspack": "ambiguous"
     }

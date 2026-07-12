@@ -4,8 +4,8 @@ Generated from [results/recorded.json](results/recorded.json) by `scripts/report
 
 | Metric                   | Rspack median (min–max) |  Vite median (min–max) | Vite relative to Rspack |
 | ------------------------ | ----------------------: | ---------------------: | ----------------------- |
-| Cold start to HTTP ready |  257.4 ms (241.2–345.3) | 266.1 ms (263.7–329.4) | **wash**                |
-| Browser-observed HMR     |    78.8 ms (77.7–179.8) |   75.5 ms (22.5–178.5) | **ambiguous**           |
+| Cold start to HTTP ready |  239.6 ms (231.1–330.8) | 247.7 ms (244.9–286.1) | **wash**                |
+| Browser-observed HMR     |         80.6 ms (80–81) |   76.2 ms (22.8–184.4) | **ambiguous**           |
 
 Each timing has 5 samples. The conservative noise band is the larger observed min-to-max spread for that metric. This machine-local result is not a universal product ranking.
 
@@ -17,8 +17,8 @@ Each timing has 5 samples. The conservative noise band is the larger observed mi
 
 ## Environment
 
-- Recorded: 2026-07-12T12:08:59.420Z
-- Harness commit: `10f1eca8e77f7e55bc78979de476f197425d7ee1`
+- Recorded: 2026-07-12T12:23:16.839Z
+- Harness commit: `08d2afccd428925a01d4e9ba351f542bef87a391`
 - Harness worktree clean at start: true
 - OS: Darwin 25.5.0 arm64
 - CPU: Apple M5 Max (18 logical CPUs)
