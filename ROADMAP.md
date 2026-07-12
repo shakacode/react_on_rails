@@ -39,7 +39,7 @@ The "instant to start" release. Non-breaking.
 - Agent-legible doctor and error output — structured `--format=json`, copy-promptable fixes ([#4602](https://github.com/shakacode/react_on_rails/issues/4602))
 - "An agent builds a React on Rails Pro app" tutorial + scripted eval ([#4603](https://github.com/shakacode/react_on_rails/issues/4603))
 - Pro license token via Rails credentials — customer-requested onboarding fix ([#4553](https://github.com/shakacode/react_on_rails/issues/4553))
-- Onboarding quick wins from the 2026-07 backlog triage (`llms.txt`/`llms-full.txt` generation already shipped and verified live — [#3896](https://github.com/shakacode/react_on_rails/issues/3896))
+- Onboarding quick wins from the 2026-07 backlog triage ([umbrella #4607](https://github.com/shakacode/react_on_rails/issues/4607))
 - React 19.2 security-hardened RSC baseline (react-on-rails-rsc ≥ 19.2.x line)
 
 ### 17.2 — the numbers release
