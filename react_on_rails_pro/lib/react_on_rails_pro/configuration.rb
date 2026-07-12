@@ -97,6 +97,7 @@ module ReactOnRailsPro
     DEFAULT_RSC_BUNDLE_JS_FILE = "rsc-bundle.js"
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
+    RSC_PAYLOAD_AUTHORIZER_POSITIONAL_PARAMS = %i[req opt].freeze
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
     # Ceiling TTL for a tag->cache-key index entry when the tagged cache entry
     # has no :expires_in of its own (see ReactOnRailsPro::Cache::TagIndex).
@@ -200,6 +201,11 @@ module ReactOnRailsPro
     def rsc_payload_authorizer=(value)
       unless value.nil? || value.respond_to?(:call)
         raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
+      end
+
+      if value && !rsc_payload_authorizer_signature_valid?(value)
+        raise ReactOnRailsPro::Error,
+              "config.rsc_payload_authorizer must accept call(controller, component_name) without required keywords"
       end
 
       @rsc_payload_authorizer = value
@@ -331,6 +337,33 @@ module ReactOnRailsPro
     end
 
     private
+
+    def rsc_payload_authorizer_signature_valid?(authorizer)
+      parameters = rsc_payload_authorizer_parameters(authorizer)
+      return false if parameters.any? { |type, _name| type == :keyreq }
+
+      # A non-lambda Proc intentionally ignores surplus positional arguments,
+      # unlike lambdas, Methods, and callable service objects.
+      return true if authorizer.is_a?(Proc) && !authorizer.lambda?
+
+      strict_rsc_payload_authorizer_signature_valid?(parameters)
+    end
+
+    def rsc_payload_authorizer_parameters(authorizer)
+      return authorizer.parameters if authorizer.is_a?(Proc) || authorizer.is_a?(Method)
+
+      authorizer.method(:call).parameters
+    end
+
+    def strict_rsc_payload_authorizer_signature_valid?(parameters)
+      required_positionals = parameters.count { |type, _name| type == :req }
+      accepted_positionals = parameters.count do |type, _name|
+        RSC_PAYLOAD_AUTHORIZER_POSITIONAL_PARAMS.include?(type)
+      end
+      accepts_rest = parameters.any? { |type, _name| type == :rest }
+
+      required_positionals <= 2 && (accepted_positionals >= 2 || accepts_rest)
+    end
 
     def assign_initial_renderer_http_pool_size(value)
       validate_renderer_http_pool_size(value)
