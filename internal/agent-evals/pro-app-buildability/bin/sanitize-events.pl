@@ -7,7 +7,8 @@ my $MAX_INPUT_BYTES = 1_048_576;
 sub sensitive_name {
   my ($name) = @_;
   return $name =~ /^(?:authorization|cookie)$/i ||
-    $name =~ /(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|private[_-]?key|license[_-]?key)/i;
+    $name =~ /(?:api[_-]?key|access[_-]?key|secret|token|password|passwd|credential|private[_-]?key|license[_-]?key)/i ||
+    $name =~ /(?:^|[_-])key(?:$|[_-])/i;
 }
 
 sub credential_value {

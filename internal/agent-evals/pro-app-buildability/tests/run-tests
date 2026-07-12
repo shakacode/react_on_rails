@@ -11,13 +11,14 @@ node "$eval_dir/bin/validate-json.mjs" --schemas-only
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
   'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  'RAILS_MASTER_KEY=rails-master-key-value-567' \
   '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' \
   '/tmp/private/place' '/private/tmp/agent-cache' \
   '-----BEGIN PRIVATE KEY-----' 'line-one' 'line-two' '-----END PRIVATE KEY-----' >"$tmp/unsafe"
 EVAL_PRIVATE_DIR="$tmp" perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unsafe" >"$tmp/safe"
 rg -q '\[REDACTED\]' "$tmp/safe"
 rg -q '<LOCAL_PATH>' "$tmp/safe"
-if rg -q 'super-sensitive-value|multi-word-secret|base-secret-value-123|aws-secret-value-456|aws-access-key-01234|stripe-secret-value-789|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' \
+if rg -q 'super-sensitive-value|multi-word-secret|base-secret-value-123|aws-secret-value-456|aws-access-key-01234|rails-master-key-value-567|stripe-secret-value-789|/tmp/private/place|/private/tmp/agent-cache|line-one|line-two' \
   "$tmp/safe"; then
   echo "sanitizer negative test failed" >&2
   exit 1
@@ -26,6 +27,7 @@ test "$(rg -o '\[REDACTED\]' "$tmp/safe" | wc -l | tr -d ' ')" -ge 2
 printf '%s\n' 'SECRET_KEY_BASE=base-secret-value-123' \
   'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
   'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  'RAILS_MASTER_KEY=rails-master-key-value-567' \
   'STRIPE_SECRET_KEY=x' \
   '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' >"$tmp/sensitive-names-unsafe"
 perl "$eval_dir/bin/sanitize-events.pl" "$tmp/sensitive-names-unsafe" >"$tmp/sensitive-names-safe"
@@ -41,6 +43,7 @@ printf '%s\n' \
   "password: 'p@ss,word'" \
   'SECRET_KEY_BASE="abc\"def,ghi"' \
   'AWS_SECRET_ACCESS_KEY=abc,def' \
+  'RAILS_MASTER_KEY=rails-master-parity-secret' \
   'api_key: ["array-secret-value-123"]' \
   'credential: {"value":"object-secret-value-456"}' \
   'api_key: {' \
@@ -63,7 +66,7 @@ node --input-type=module -e \
    process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
   "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
 cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
-if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|rails-master-parity-secret|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
   "$tmp/parity-perl-safe"; then
   echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
   exit 1
