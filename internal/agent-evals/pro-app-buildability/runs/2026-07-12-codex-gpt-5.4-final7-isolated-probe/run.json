@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final6-isolated-probe",
-  "started_at": "2026-07-12T13:58:24Z",
-  "finished_at": "2026-07-12T13:58:45Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final7-isolated-probe",
+  "started_at": "2026-07-12T14:08:46Z",
+  "finished_at": "2026-07-12T14:09:06Z",
   "repository": {
-    "revision": "43948f5ab16505296fd8b46832da76d465cb1aab",
+    "revision": "eae68670d8b0fb4aaeabbb95e0b967b1e26ebfc5",
     "dirty": false
   },
   "definition": {
@@ -21,17 +21,17 @@
       },
       {
         "path": "bin/derive-evidence.mjs",
-        "sha256": "7ce53ace92e99cb30659820c54470a8f2614d2972fba43843dca7f7a98342131",
+        "sha256": "aa477db419512bc695bae7c5ea5d2418f24c9a64e175c7b8137eebe6824f3b3d",
         "executable": true
       },
       {
         "path": "bin/derive-network-probe.mjs",
-        "sha256": "f60092915fdac12c6695307d28cc821a949dd803f9062defd65269f5e3758c9e",
+        "sha256": "520ffef43ac3679c9a73d3e8b99c55b77fa41de823fa21e9f5a5b035e25096bd",
         "executable": true
       },
       {
         "path": "bin/normalize-command.mjs",
-        "sha256": "f0c2f9abddbdd50c2d74cfa23fe30e08e9c56d90eccdfc772d9ec53090cb0e52",
+        "sha256": "f297b4644beb7abdf3885f440442c7ddb17bc9dc89d3f4f34217420993333d34",
         "executable": false
       },
       {
@@ -41,7 +41,7 @@
       },
       {
         "path": "bin/run-eval",
-        "sha256": "e134ddbac044ab9af594e47bc3a5786dfd674c81c0ff4f64a53e359917e641cf",
+        "sha256": "56e5840602328cc42f64a36453da76f8eb8aa399e1462211fbd2692a80b33f7d",
         "executable": true
       },
       {
@@ -61,7 +61,7 @@
       },
       {
         "path": "bin/validate-json.mjs",
-        "sha256": "9480465a86a8d8feb7d0c90fb1cec2638e5dbbef5e798b146872a3f45eb8971a",
+        "sha256": "7e12b555f8f4c3e4d6d145d96fb4bda29ef58ac18307e290deef447d0b5a45a3",
         "executable": true
       },
       {

@@ -11,7 +11,7 @@
   "sandbox_network_access": true,
   "capability_probe": {
     "npm": "npm view create-react-on-rails-app version --json",
-    "rubygems": "gem search --remote --exact ^rails$"
+    "rubygems": "gem search --remote --exact '^rails$'"
   },
   "credential_store": "file",
   "auth_material_available": false,
