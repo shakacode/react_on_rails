@@ -20465,8 +20465,11 @@ version change.
 - `severity` is `info`, `warning`, or `error` and corresponds to `status` values
   `pass`, `warn`, and `fail`.
 - `message` is the primary warning or error, or `null` for a passing check.
-- `fix_command` is present only when a single mechanical command is safe. Never
-  execute it without the normal review appropriate to the application.
+- `fix_command` is reserved for a single mechanical command that is safe for
+  the exact diagnosis. Version 1 currently emits `null` because each stable
+  check ID can aggregate several findings; consumers must not infer a broad
+  repair command from the check ID. Future additive schema updates may populate
+  this field after a diagnosis-specific command is proven safe.
 - `remediation` is `null` for passing checks. Otherwise it contains a
   self-contained `prompt`, relevant `files`, and the `expected_end_state`.
 - `details` preserves all informational, success, warning, and error messages.

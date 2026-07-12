@@ -85,7 +85,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Added
 
 - **Agent-legible doctor contract**: `bin/rails react_on_rails:doctor FORMAT=json` now includes stable
-  check IDs, explicit severity and documentation fields, safe mechanical fix commands when available,
+  check IDs, explicit severity and documentation fields, a nullable field reserved for diagnosis-specific
+  safe mechanical fix commands,
   and self-contained remediation prompts. The versioned schema, deterministic ordering, and exit-code
   behavior are documented for CI and coding-agent integrations. Fixes
   [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).

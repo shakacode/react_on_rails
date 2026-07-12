@@ -71,6 +71,10 @@ module ReactOnRails
       }
     }.freeze
 
+    # A check section can contain several distinct diagnoses, so no section-wide
+    # repair command is currently safe. Keep fix_command nullable until a future
+    # diagnosis-specific contract can prove that one command repairs the exact finding.
+
     module_function
 
     def metadata(check_id)
