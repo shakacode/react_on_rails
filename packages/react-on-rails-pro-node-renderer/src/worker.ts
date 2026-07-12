@@ -548,13 +548,18 @@ const normalizeRawRenderRequest = (
   };
 };
 
-// Extracts only the precheck fields, without shape validation, so protocol and password
-// checks run before normalizeRawRenderRequest's 400s; a malformed but unauthenticated
-// raw request must fail auth first, matching the parsed-body path and /asset-exists.
+// Extracts only the precheck fields, without shape validation, so protocol, version, and
+// password checks run before normalizeRawRenderRequest's 400s; a malformed but
+// unauthenticated raw request must fail auth first, matching the parsed-body path and
+// /asset-exists. Must include every field checkProtocolVersion reads (gemVersion and
+// railsEnv drive the non-production version-mismatch 412), since prechecks run only once
+// on this path.
 const rawRenderPrecheckBody = (headers: RawRenderHeaders) => {
   const authorization = scalarHeader(headers, 'authorization');
   return {
     protocolVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`),
+    gemVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`),
+    railsEnv: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`),
     password: authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : authorization,
   };
 };
