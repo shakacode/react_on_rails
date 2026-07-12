@@ -707,7 +707,7 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
   });
 
-  test('post /upload-assets accepts a correct password that follows the first file part', async () => {
+  test('post /upload-assets requires the password field before file parts', async () => {
     const bundleHash = 'file-first-password';
     const app = createWorker({
       password: 'my_password',
@@ -722,15 +722,35 @@ describe('worker', () => {
     form.append('railsEnv', railsEnv);
     form.append('password', 'my_password');
 
-    const res = await app.inject().post('/upload-assets').payload(form).headers(form.getHeaders()).end();
+    const payload = form.getBuffer();
+    const passwordFieldOffset = payload.indexOf(Buffer.from('name="password"'));
+    expect(passwordFieldOffset).toBeGreaterThan(0);
+    let sentFirstChunk = false;
+    const multipartStream = new Readable({
+      read() {
+        if (sentFirstChunk) return;
+        sentFirstChunk = true;
+        this.push(payload.subarray(0, passwordFieldOffset));
+        setImmediate(() => {
+          this.push(payload.subarray(passwordFieldOffset));
+          this.push(null);
+        });
+      },
+    });
 
-    expect(res.statusCode).toBe(200);
-    expect(fs.existsSync(path.join(serverBundleCachePathForTest(), bundleHash, `${bundleHash}.js`))).toBe(
-      true,
-    );
+    const res = await app
+      .inject()
+      .post('/upload-assets')
+      .payload(multipartStream)
+      .headers(form.getHeaders())
+      .end();
+
+    expect(res.statusCode).toBe(401);
+    expect(res.payload).toBe('Wrong password');
+    expect(fs.existsSync(path.join(serverBundleCachePathForTest(), 'uploads'))).toBe(false);
   });
 
-  test('post /upload-assets rejects multipart requests with too many files', async () => {
+  test('post /upload-assets rejects multipart requests with more than 1,000 parts', async () => {
     const app = createWorker({
       password: 'my_password',
     });
@@ -743,7 +763,7 @@ describe('worker', () => {
       contentType: 'text/javascript',
       filename: 'bundle.js',
     });
-    for (let index = 0; index < 100; index += 1) {
+    for (let index = 0; index < 996; index += 1) {
       form.append(`asset${index}`, Buffer.from('{}'), {
         contentType: 'application/json',
         filename: `asset-${index}.json`,

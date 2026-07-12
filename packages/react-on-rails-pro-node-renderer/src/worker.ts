@@ -553,9 +553,10 @@ export default function run(config: Partial<Config>) {
     limits: {
       fieldSize: FIELD_SIZE_LIMIT,
       // Keep each uploaded bundle/asset within the same request-size ceiling
-      // used by Fastify, and bound inode consumption from multipart parts.
+      // used by Fastify. Explicitly retain @fastify/multipart's existing
+      // 1,000-part default rather than imposing a lower file-count limit.
       fileSize: BODY_SIZE_LIMIT,
-      files: 100,
+      parts: 1000,
     },
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
@@ -566,14 +567,13 @@ export default function run(config: Partial<Config>) {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
       }
 
-      const password = multipartPassword(part);
-      if (password !== undefined) {
-        const authResult = authenticate({ password });
-        if (authResult) {
-          this.uploadAuthenticationError = authResult;
-          discardMultipartFile(part);
-          return;
-        }
+      // The official multipart protocol requires the password field before any
+      // file parts so unauthenticated file contents never reach disk.
+      const authResult = authenticate({ password: multipartPassword(part) });
+      if (authResult) {
+        this.uploadAuthenticationError = authResult;
+        discardMultipartFile(part);
+        return;
       }
 
       if (this.uploadAssetValidationError) {
