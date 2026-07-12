@@ -57,7 +57,6 @@ for entry in "${caller_path_entries[@]}"; do
     if [[ "$canonical_entry" == "${required_source_directories[$index]}" ||
       "$canonical_entry" == "${required_directories[$index]}" ]]; then
       append_safe_directory "${required_directories[$index]}"
-      break
     fi
   done
 done

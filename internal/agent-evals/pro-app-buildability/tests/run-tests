@@ -48,6 +48,12 @@ mise_node="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
 if [[ "$(basename "$(realpath "$(command -v node)")")" == mise ]]; then
   test "$(realpath "$mise_node")" != "$(realpath "$(command -v node)")"
   test "$(env -i PATH="$(dirname "$mise_node"):/usr/bin:/bin" node --version)" = "$(node --version)"
+  mise_ruby="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" --resolve ruby)"
+  mise_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" node ruby sh)"
+  test "$(realpath "$(env -i PATH="$mise_path" /bin/sh -c 'command -v node')")" = "$(realpath "$mise_node")"
+  test "$(realpath "$(env -i PATH="$mise_path" /bin/sh -c 'command -v ruby')")" = "$(realpath "$mise_ruby")"
 fi
 
 mkdir "$tmp/world-writable-bin"
