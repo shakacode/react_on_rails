@@ -48,6 +48,15 @@ bundle exec rails generate react_on_rails:install --typescript
 
 TypeScript is the recommended default for new integrations. If you want JavaScript instead, omit `--typescript`.
 
+When you run the generator in an interactive terminal without choosing a product mode, it asks whether to enable
+React on Rails Pro. Press Enter or answer `y` to include the Node Renderer and the Pro foundation for streaming SSR
+and React Server Components. Pro is free for evaluation; production use requires a subscription. See the
+[Pro upgrade guide](../../pro/upgrading-to-pro.md) for licensing and setup details.
+
+The prompt never appears in CI, redirected-input scripts, or other noninteractive sessions; those runs preserve the
+existing open-source-only default. Pass `--pro` or `--rsc` to select Pro without a prompt. Pass `--no-pro`,
+`--no-rsc`, or `--standard-only` to select the open-source setup explicitly and suppress the prompt.
+
 For generator options such as `--rspack`, `--pro`, or `--rsc`, see the [generator details](../api-reference/generator-details.md).
 
 If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...` followed by `Please run manually:`), run your package manager install and then compile once before starting the app:

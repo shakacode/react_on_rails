@@ -4278,6 +4278,85 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "interactive Pro selection" do
+    it "defaults to Pro when an existing-app user accepts the interactive prompt" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "Y")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be(true)
+      expect(install_generator).to have_received(:ask).with(
+        a_string_including("Enable React on Rails Pro features", "[Y/n]"),
+        :cyan,
+        hash_including(default: "Y")
+      )
+    end
+
+    it "keeps Pro off when an existing-app user answers no" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "n")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be(false)
+    end
+
+    it "prints the trust-license note and upgrade documentation before asking" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "Y")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator).to have_received(:say)
+        .with(a_string_including("free for evaluation", "production use requires a subscription"))
+      expect(install_generator).to have_received(:say)
+        .with(a_string_including("https://reactonrails.com/docs/pro/upgrading-to-pro/"))
+    end
+
+    it "preserves the noninteractive Pro-off default without asking" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive(:interactive_install_session?).and_return(false)
+
+      expect(install_generator).not_to receive(:ask)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be_falsey
+    end
+
+    it "does not prompt on the new-app path" do
+      install_generator = install_generator_fixture(["--new-app"])
+      allow(install_generator).to receive(:interactive_install_session?).and_return(true)
+
+      expect(install_generator).not_to receive(:ask)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+    end
+
+    {
+      ["--pro"] => true,
+      ["--no-pro"] => false,
+      ["--rsc"] => true,
+      ["--no-rsc"] => false,
+      ["--standard-only"] => false
+    }.each do |flags, expected_pro|
+      it "does not prompt when #{flags.join(' ')} makes the product choice explicit" do
+        install_generator = install_generator_fixture(flags)
+        allow(install_generator).to receive(:interactive_install_session?).and_return(true)
+
+        expect(install_generator).not_to receive(:ask)
+
+        install_generator.send(:prompt_for_pro_features_if_applicable)
+
+        expect(install_generator.send(:use_pro?)).to eq(expected_pro)
+      end
+    end
+  end
+
   context "with helpful message" do
     before do
       # Clear any previous messages to ensure clean test state

@@ -3049,7 +3049,13 @@ module ReactOnRails
     # ── React on Rails Pro Setup ──────────────────────────────────────
 
     def check_pro_setup
-      return unless ReactOnRails::Utils.react_on_rails_pro?
+      unless ReactOnRails::Utils.react_on_rails_pro?
+        checker.add_info(<<~MSG.strip)
+          💎 React on Rails Pro adds the Node Renderer, streaming SSR, and RSC.
+          Upgrade guide: https://reactonrails.com/docs/pro/upgrading-to-pro/
+        MSG
+        return
+      end
 
       check_pro_initializer_existence
       ensure_rails_environment_loaded

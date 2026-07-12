@@ -3342,10 +3342,18 @@ RSpec.describe ReactOnRails::Doctor do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      it "does not add any Pro setup messages" do
-        initial_count = checker.messages.length
+      it "shows the Pro upgrade path without changing the existing check section" do
         doctor.send(:check_pro_setup)
-        expect(checker.messages.length).to eq(initial_count)
+        info_messages = checker.messages.select { |message| message[:type] == :info }
+
+        expect(info_messages).to include(
+          hash_including(
+            content: a_string_including(
+              "React on Rails Pro",
+              "https://reactonrails.com/docs/pro/upgrading-to-pro/"
+            )
+          )
+        )
       end
     end
 
