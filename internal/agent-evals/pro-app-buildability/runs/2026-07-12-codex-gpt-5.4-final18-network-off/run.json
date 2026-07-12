@@ -1,10 +1,10 @@
 {
   "schema_version": "2.0",
-  "run_id": "2026-07-12-codex-gpt-5.4-final17-network-off",
-  "started_at": "2026-07-12T15:31:41Z",
-  "finished_at": "2026-07-12T15:32:00Z",
+  "run_id": "2026-07-12-codex-gpt-5.4-final18-network-off",
+  "started_at": "2026-07-12T15:39:24Z",
+  "finished_at": "2026-07-12T15:39:43Z",
   "repository": {
-    "revision": "f60afdaff38cbaaba13b84aaf313b70e455f2a66",
+    "revision": "266fed04cdfeaef2e5a2c8079dff6518dd98920c",
     "dirty": false
   },
   "definition": {
@@ -21,7 +21,7 @@
       },
       {
         "path": "bin/derive-evidence.mjs",
-        "sha256": "031cb22554845605de67674f696f8bee61438cd07570480abdd6eb5378162da0",
+        "sha256": "1a9f6f12c09bd412abee50b96e8a4b8787cd48c479e9084d2e50d270be7ffd4b",
         "executable": true
       },
       {
@@ -51,12 +51,12 @@
       },
       {
         "path": "bin/sanitize-events.pl",
-        "sha256": "c880640ee418594e19ff09d81bfb0a8e8078070fbd4590cb61ca2b323b68ca31",
+        "sha256": "a621704c31616b7751a2cf77740db1dfc876661e5cc97c53cf49faa7475b557b",
         "executable": true
       },
       {
         "path": "bin/scan-sensitive-artifacts",
-        "sha256": "5309657997a4a73f5599f50a3477b6c758cd785fb4dc7e8d36d75347190da344",
+        "sha256": "643b57c73792e1a6ef270cf359a53918d0cad985dbd9bb74f52b856dbbb12727",
         "executable": true
       },
       {
@@ -76,7 +76,7 @@
       },
       {
         "path": "bin/validate-run",
-        "sha256": "f5a390525557a7f4b2c0a003db7e37d1a6b03780bc2d41b2afd9f4d845f4d381",
+        "sha256": "c68fc1483418c0d8380d68d6314506503aabb984893eedbe721f7697dc9a1877",
         "executable": true
       },
       {
