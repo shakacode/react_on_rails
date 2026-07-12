@@ -20,6 +20,12 @@ per-approach setup guidance for every major CSS strategy.
 
 Status: entries marked with specific verification notes below. See the [full compatibility matrix](#compatibility-matrix) for details.
 
+Note: for extracted-CSS client-boundary approaches such as CSS Modules, SCSS Modules, and Vanilla
+Extract, the `rsc-css` path reliably protects CSS known before the first flush. For late Suspense
+reveals on stock Shakapacker production builds, see
+[Late-boundary caveat for 17.0.0](#late-boundary-caveat-for-1700) and
+[Known limitations](#known-limitations).
+
 ## How CSS reaches the browser
 
 This section explains the whole system from first principles, assuming you know the traditional SSR
@@ -174,6 +180,18 @@ Why two paths exist:
   Path A, so the stream can carry two `rsc-css` links for one href. This is benign — one network
   fetch (HTTP cache), and the hydration fixup dedupes by href + precedence — but you may notice it
   when reading page source.
+
+#### Late-boundary caveat for 17.0.0
+
+On stock Shakapacker production builds, late-revealed boundaries are the primary silent-no-op
+case. Numeric chunk ids disable Path B, and id-named extracted CSS disables Path A's old
+`css/clientN-*.css` filename fallback. In that default production posture, a boundary that resolves
+after the first flush can still end up with only the preload head start unless manifest-backed
+preload promotion lands before the reveal, so a cold-cache FOUC is still possible. Compatible or
+custom asset naming that keeps Preload Promotion or Flight-Chunk Inference active can still gate
+those late reveals. See
+[When the FOUC pipeline silently does nothing](#when-the-fouc-pipeline-silently-does-nothing) for
+the full matrix.
 
 > [!NOTE]
 > RSC CSS collection is request driven — only the client references actually rendered by a request
@@ -333,8 +351,7 @@ The key insight: **only the client bundle produces browser-loadable CSS**. The s
 need just enough CSS processing to render correct class names during SSR, but they never emit
 stylesheets.
 
-> [!NOTE]
-> `sass-loader` and `postcss-loader` still run in the server and RSC bundles because `css-loader`
+> [!NOTE] > `sass-loader` and `postcss-loader` still run in the server and RSC bundles because `css-loader`
 > needs valid CSS input to parse class names from CSS Modules. This means SCSS compilation and
 > PostCSS processing (including Tailwind) run in all three builds, but only the client build
 > produces CSS output.
@@ -496,7 +513,9 @@ export default function Card({ title }: { title: string }) {
 available in the client bundle (via a `'use client'` component or global import).
 **Client Components:** Full support. CSS is extracted and recorded in the RSC manifest.
 **Traditional SSR:** Full support. Server renders class names; client stylesheet provides CSS.
-**FOUC prevention:** Yes, via manifest `<link>` tags when behind `'use client'`.
+**FOUC prevention:** Yes before the first flush via manifest `<link>` tags when behind `'use client'`.
+For late reveals on stock Shakapacker production builds, see
+[Late-boundary caveat for 17.0.0](#late-boundary-caveat-for-1700).
 **Status:** Verified by Pro dummy app specs.
 
 ### Sass/SCSS
@@ -520,6 +539,9 @@ export default function FavoriteButton({ active }: { active: boolean }) {
 ```
 
 **Required packages:** `sass`, `sass-loader`, configured via Shakapacker's default rules.
+**FOUC prevention:** Same as CSS Modules: before the first flush via manifest `<link>` tags, with
+the same late-boundary caveat on stock Shakapacker production builds. See
+[Late-boundary caveat for 17.0.0](#late-boundary-caveat-for-1700).
 **Status:** Verified for SCSS Modules in RSC client boundary.
 
 Plain (non-module) SCSS files follow the same rules as plain CSS: import from the client pack for
@@ -689,7 +711,9 @@ so the custom rule handles it.
 **Server Components:** Importing `.css.ts` directly from a Server Component requires additional
 server/RSC bundle configuration. Use the `'use client'` wrapper pattern instead.
 **Client Components:** Works when the build plugin and CSS extraction rules are configured.
-**FOUC prevention:** Yes, via manifest `<link>` tags when behind `'use client'`.
+**FOUC prevention:** Yes before the first flush via manifest `<link>` tags when behind `'use client'`.
+For late reveals on stock Shakapacker production builds, see
+[Late-boundary caveat for 17.0.0](#late-boundary-caveat-for-1700).
 **Limitations:** Not verified end-to-end with React on Rails Pro RSC. The `.css.ts` import may need
 an `swc-plugin-vanilla-extract` workaround in some setups. Inspect your `react-client-manifest.json`
 to confirm CSS appears.
@@ -888,23 +912,23 @@ Status key:
 - **Unsupported**: does not fit the current generated RSC/server CSS pipeline.
 - **Unknown**: needs a fixture or package-specific investigation before recommendation.
 
-| Approach                            | Server Component                               | Client Component (RSC)               | Traditional SSR                        | FOUC prevention              | Required config                                            | Status              |
-| ----------------------------------- | ---------------------------------------------- | ------------------------------------ | -------------------------------------- | ---------------------------- | ---------------------------------------------------------- | ------------------- |
-| Global CSS (layout pack)            | Works (class names render; CSS loads globally) | Works                                | Works                                  | Rails `<link>`               | Import CSS in client pack; `stylesheet_pack_tag` in layout | Verified            |
-| CSS Modules (`'use client'`)        | `exportOnlyLocals` renders class names         | Works; CSS extracted and in manifest | Works; server renders locals           | Manifest `<link>` tags       | Shakapacker CSS Modules config; RSC manifest plugin        | Verified            |
-| CSS Modules (Server Component only) | Class names render but CSS is not emitted      | N/A                                  | Class names render but CSS not emitted | None                         | Move CSS to client graph                                   | Unsupported         |
-| SCSS Modules (`'use client'`)       | Same as CSS Modules                            | Same as CSS Modules                  | Same as CSS Modules                    | Manifest `<link>` tags       | `sass`, `sass-loader`                                      | Verified            |
-| Tailwind CSS                        | Works (utility class names)                    | Works (utility class names)          | Works                                  | Rails `<link>`               | PostCSS config; content paths must include component dirs  | Verified (build)    |
-| Inline styles                       | Works (serialized in RSC payload)              | Works                                | Works                                  | N/A                          | None                                                       | Verified (build)    |
-| `clsx`/`classnames`/CVA             | Works (pure string functions)                  | Works                                | Works                                  | N/A                          | None; pair with a CSS source                               | Assumed             |
-| Vanilla Extract                     | Needs `'use client'` wrapper                   | Works with build plugin              | Works                                  | Manifest `<link>` tags       | `@vanilla-extract/webpack-plugin` in client config         | Assumed             |
-| Linaria                             | Needs `'use client'` wrapper                   | Works after Babel/loader setup       | Works                                  | Depends on import path       | WyW Babel preset; `@wyw-in-js/webpack-loader`              | Assumed             |
-| Panda CSS                           | Works (classes are static strings)             | Works                                | Works                                  | Rails `<link>`               | Panda CLI or PostCSS; import generated CSS in layout       | Assumed             |
-| StyleX                              | Works (classes are static strings)             | Works                                | Works                                  | Rails `<link>`               | StyleX Babel plugin; import generated CSS                  | Assumed             |
-| Compiled                            | Needs `'use client'` wrapper                   | Works with webpack loader            | Works                                  | Depends on import path       | `@compiled/webpack-loader`; CSS extraction                 | Assumed             |
-| styled-components v6                | **Not supported** (crashes)                    | Works behind `'use client'`          | Works with `ServerStyleSheet`          | **None** (runtime injection) | Recent v6; optional Babel/SWC plugin                       | Unknown for Pro RSC |
-| Emotion                             | **Not supported** (crashes)                    | Works behind `'use client'`          | Works with SSR cache                   | **None** (runtime injection) | `@emotion/react`, `@emotion/styled`; SSR setup             | Unknown for RSC     |
-| Runtime component libraries         | Treat as Client Components                     | Works behind `'use client'`          | Depends on library SSR support         | **None** usually             | Library-specific                                           | Unknown             |
+| Approach                            | Server Component                               | Client Component (RSC)               | Traditional SSR                        | FOUC prevention                           | Required config                                            | Status              |
+| ----------------------------------- | ---------------------------------------------- | ------------------------------------ | -------------------------------------- | ----------------------------------------- | ---------------------------------------------------------- | ------------------- |
+| Global CSS (layout pack)            | Works (class names render; CSS loads globally) | Works                                | Works                                  | Rails `<link>`                            | Import CSS in client pack; `stylesheet_pack_tag` in layout | Verified            |
+| CSS Modules (`'use client'`)        | `exportOnlyLocals` renders class names         | Works; CSS extracted and in manifest | Works; server renders locals           | Manifest `<link>` tags before first flush | Shakapacker CSS Modules config; RSC manifest plugin        | Verified            |
+| CSS Modules (Server Component only) | Class names render but CSS is not emitted      | N/A                                  | Class names render but CSS not emitted | None                                      | Move CSS to client graph                                   | Unsupported         |
+| SCSS Modules (`'use client'`)       | Same as CSS Modules                            | Same as CSS Modules                  | Same as CSS Modules                    | Manifest `<link>` tags before first flush | `sass`, `sass-loader`                                      | Verified            |
+| Tailwind CSS                        | Works (utility class names)                    | Works (utility class names)          | Works                                  | Rails `<link>`                            | PostCSS config; content paths must include component dirs  | Verified (build)    |
+| Inline styles                       | Works (serialized in RSC payload)              | Works                                | Works                                  | N/A                                       | None                                                       | Verified (build)    |
+| `clsx`/`classnames`/CVA             | Works (pure string functions)                  | Works                                | Works                                  | N/A                                       | None; pair with a CSS source                               | Assumed             |
+| Vanilla Extract                     | Needs `'use client'` wrapper                   | Works with build plugin              | Works                                  | Manifest `<link>` tags before first flush | `@vanilla-extract/webpack-plugin` in client config         | Assumed             |
+| Linaria                             | Needs `'use client'` wrapper                   | Works after Babel/loader setup       | Works                                  | Depends on import path                    | WyW Babel preset; `@wyw-in-js/webpack-loader`              | Assumed             |
+| Panda CSS                           | Works (classes are static strings)             | Works                                | Works                                  | Rails `<link>`                            | Panda CLI or PostCSS; import generated CSS in layout       | Assumed             |
+| StyleX                              | Works (classes are static strings)             | Works                                | Works                                  | Rails `<link>`                            | StyleX Babel plugin; import generated CSS                  | Assumed             |
+| Compiled                            | Needs `'use client'` wrapper                   | Works with webpack loader            | Works                                  | Depends on import path                    | `@compiled/webpack-loader`; CSS extraction                 | Assumed             |
+| styled-components v6                | **Not supported** (crashes)                    | Works behind `'use client'`          | Works with `ServerStyleSheet`          | **None** (runtime injection)              | Recent v6; optional Babel/SWC plugin                       | Unknown for Pro RSC |
+| Emotion                             | **Not supported** (crashes)                    | Works behind `'use client'`          | Works with SSR cache                   | **None** (runtime injection)              | `@emotion/react`, `@emotion/styled`; SSR setup             | Unknown for RSC     |
+| Runtime component libraries         | Treat as Client Components                     | Works behind `'use client'`          | Depends on library SSR support         | **None** usually                          | Library-specific                                           | Unknown             |
 
 ## Common pitfalls
 
