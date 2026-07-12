@@ -48,12 +48,18 @@ fi
 rg -q 'contradicts' "$tmp/probe-error"
 
 mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
-printf '%s\n' '{"type":"item.completed","item":{"type":"command_execution","command":"bundle exec webpack --version","exit_code":0,"status":"completed","aggregated_output":"webpack compiled successfully"}}' \
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails assets:precompile --help","exit_code":0,"status":"completed","aggregated_output":"Usage: assets:precompile [options] - assets compiled successfully"}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npx create-react-on-rails-app --help","exit_code":0,"status":"completed","aggregated_output":"Usage: create-react-on-rails-app APP"}}' \
   >"$tmp/generic-build-events.jsonl"
+mkdir "$tmp/evidence-workspace/eval_app"
+printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/evidence-workspace/eval_app/Gemfile"
+printf '%s\n' '{"dependencies":{"react-on-rails-pro":"1.0.0"}}' >"$tmp/evidence-workspace/eval_app/package.json"
 printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}' \
   >"$tmp/fixture-report.json"
 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
   "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json"
 test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
 
 echo "focused harness tests passed"

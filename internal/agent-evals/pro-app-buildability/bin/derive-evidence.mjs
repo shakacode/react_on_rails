@@ -102,10 +102,21 @@ const matchingArtifacts = (pathPattern, contentPattern) =>
   artifacts.filter((artifact) => pathPattern.test(artifact.path) && contentPattern.test(artifact.excerpt));
 const artifactCitations = (matched) => matched.map((artifact) => `artifact-evidence.json#${artifact.path}`);
 const commandCitations = (matched) => matched.map((command) => `command-evidence.json#${command.id}`);
+const unwrapShellCommand = (command) => {
+  const match = command.match(/^\/bin\/(?:zsh|bash|sh) -lc ['"]([\s\S]*)['"]$/);
+  return (match?.[1] ?? command).trim();
+};
+const isHelpOrVersion = (command) => /(?:^|\s)(?:--help|--version|-h|-V)(?:\s|$)/.test(command);
 
 const rubyProManifests = matchingArtifacts(/Gemfile$/, /react_on_rails_pro/);
 const jsProManifests = matchingArtifacts(/package\.json$/, /react-on-rails-pro/);
-const installCommands = successful(/(?:npx|npm exec|pnpm dlx) .*create-react-on-rails-app/);
+const installCommands = successfulCommands.filter((command) => {
+  const invocation = unwrapShellCommand(command.command);
+  if (isHelpOrVersion(invocation)) return false;
+  return /^(?:npx(?: --yes)?|npm exec|pnpm dlx) create-react-on-rails-app(?:@[^\s]+)? [A-Za-z0-9][A-Za-z0-9._-]*(?:\s+[^;&|]+)?$/.test(
+    invocation,
+  );
+});
 const rscRoutes = matchingArtifacts(/config\/routes\.rb$/, /rsc|server_component|server-component/i);
 const rscSources = matchingArtifacts(
   /app\/.*(?:\.server\.|rsc|server_component)/i,
@@ -124,10 +135,20 @@ const formTests = matchingArtifacts(
   /(?:spec|test)\/.*(?:form|request|system).*(?:_spec\.rb|_test\.rb|\.(?:test|spec)\.[jt]sx?)$/i,
   /invalid[\s\S]*valid|valid[\s\S]*invalid/i,
 );
-const buildCommands = successfulOutcome(
-  /(?:^|\s)(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)(?:\s|$)/i,
-  /compiled|compilation|built|assets?|success|webpack|rspack/i,
-);
+const buildCommands = successfulCommands.filter((command) => {
+  const invocation = unwrapShellCommand(command.command);
+  if (isHelpOrVersion(invocation)) return false;
+  const allowedInvocation =
+    /^(?:(?:RAILS_ENV|NODE_ENV)=production\s+)?(?:(?:bin\/rails|bundle exec rails|bundle exec rake|rake) assets:precompile|(?:bin\/shakapacker|bundle exec rake shakapacker:compile)|(?:npm|pnpm) run build:production)$/i.test(
+      invocation,
+    );
+  const buildResult =
+    /compiled|compilation (?:complete|successful)|built successfully|assets? (?:written|built)|webpack compiled|rspack compiled/i.test(
+      command.output,
+    );
+  const helpOutput = /usage:|options:|available commands/i.test(command.output);
+  return allowedInvocation && buildResult && !helpOutput;
+});
 const testCommands = successfulOutcome(
   /rspec|rails test|rake test|npm (?:run )?test|pnpm (?:run )?test|jest|playwright/i,
   /0 failures|0 failed|pass(?:ed|ing)|[1-9][0-9]* examples?, 0 failures|[1-9][0-9]* tests?, 0 failures/i,
@@ -224,7 +245,8 @@ const outcomeRows = [
   },
 ];
 
-const outcomesComplete = outcomeRows.every((item) => item.status === 'pass');
+const reportCompleted = report.status === 'completed';
+const outcomesComplete = reportCompleted && outcomeRows.every((item) => item.status === 'pass');
 const completionRow = outcomesComplete
   ? {
       id: 'evidence.complete',
@@ -239,7 +261,7 @@ const completionRow = outcomesComplete
       citations: [],
     };
 const items = [...outcomeRows, completionRow];
-const overall = outcomesComplete ? 'pass' : report.status === 'completed' ? 'fail' : 'incomplete';
+const overall = outcomesComplete ? 'pass' : reportCompleted ? 'fail' : 'incomplete';
 const rubricResults = { schema_version: '1.0', overall, items };
 
 fs.writeFileSync(
