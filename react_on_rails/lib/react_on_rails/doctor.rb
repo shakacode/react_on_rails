@@ -327,7 +327,7 @@ module ReactOnRails
       {
         schema_version: JSON_SCHEMA_VERSION,
         ror_version: ReactOnRails::VERSION,
-        status: overall_status(statuses),
+        status: DoctorSchema.overall_status(statuses),
         checks:,
         summary: {
           pass: statuses.count("pass"),
@@ -340,7 +340,7 @@ module ReactOnRails
     def build_check_entry(result)
       messages = result[:messages]
       status = check_status(messages)
-      severity = check_severity(status)
+      severity = DoctorSchema::STATUS_SEVERITIES.fetch(status)
       message = primary_message(messages, status)
       metadata = DoctorSchema.metadata(result[:id])
 
@@ -355,10 +355,6 @@ module ReactOnRails
         remediation: build_remediation(result[:id], severity, message, metadata, status),
         details: messages.map { |detail| { level: detail[:type].to_s, content: detail[:content] } }
       }
-    end
-
-    def check_severity(status)
-      { "pass" => "info", "warn" => "warning", "fail" => "error" }.fetch(status)
     end
 
     def build_remediation(check_id, severity, message, metadata, status)
@@ -382,16 +378,6 @@ module ReactOnRails
       if messages.any? { |message| message[:type] == :error }
         "fail"
       elsif messages.any? { |message| message[:type] == :warning }
-        "warn"
-      else
-        "pass"
-      end
-    end
-
-    def overall_status(statuses)
-      if statuses.include?("fail")
-        "fail"
-      elsif statuses.include?("warn")
         "warn"
       else
         "pass"
