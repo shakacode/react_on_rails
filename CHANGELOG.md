@@ -37,6 +37,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Hardened Node renderer authentication and multipart uploads**: The renderer now discards
+  multipart file parts until the request password is validated, caps multipart file counts and per-file
+  size, and compares fixed-length password digests to avoid leaking the configured password length.
+  Fixes [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
+
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
   malformed-payload failure once within it. If the retry also fails, React receives the final
