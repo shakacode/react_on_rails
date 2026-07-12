@@ -4278,6 +4278,112 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "interactive Pro selection" do
+    it "defaults to Pro when an existing-app user accepts the interactive prompt" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be(true)
+      expect(install_generator.send(:use_rsc?)).to be_falsey
+      expect(install_generator).to have_received(:ask).with(
+        a_string_including("Enable React on Rails Pro features", "RSC available separately", "[Y/n]"),
+        :cyan
+      )
+    end
+
+    it "keeps Pro off when an existing-app user answers no" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "n")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be(false)
+    end
+
+    it "prints the trust-license note and upgrade documentation before asking" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "Y")
+      allow(install_generator).to receive(:say)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator).to have_received(:say)
+        .with(a_string_including("free for evaluation", "production use requires a subscription"))
+      expect(install_generator).to have_received(:say)
+        .with(a_string_including("https://reactonrails.com/docs/pro/upgrading-to-pro/"))
+    end
+
+    it "preserves the noninteractive Pro-off default without asking" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive(:interactive_install_session?).and_return(false)
+
+      expect(install_generator).not_to receive(:ask)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:use_pro?)).to be_falsey
+    end
+
+    it "does not prompt on the new-app path" do
+      install_generator = install_generator_fixture(new_app: true)
+      allow(install_generator).to receive(:interactive_install_session?).and_return(true)
+
+      expect(install_generator).not_to receive(:ask)
+
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+    end
+
+    it "does not prompt in CI even when stdin and stdout are TTYs" do
+      install_generator = install_generator_fixture
+      allow($stdin).to receive(:tty?).and_return(true)
+      allow($stdout).to receive(:tty?).and_return(true)
+      allow(install_generator).to receive(:ask)
+
+      original_ci = ENV.fetch("CI", nil)
+      ENV["CI"] = "true"
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator).not_to have_received(:ask)
+      expect(install_generator.send(:use_pro?)).to be(false)
+    ensure
+      original_ci.nil? ? ENV.delete("CI") : ENV["CI"] = original_ci
+    end
+
+    {
+      { pro: true } => true,
+      { pro: false } => false,
+      { rsc: true } => true,
+      { rsc: false } => false,
+      { standard_only: true } => false
+    }.each do |product_options, expected_pro|
+      it "does not prompt when #{product_options.inspect} makes the product choice explicit" do
+        install_generator = install_generator_fixture(product_options)
+        allow(install_generator).to receive(:interactive_install_session?).and_return(true)
+
+        expect(install_generator).not_to receive(:ask)
+
+        install_generator.send(:prompt_for_pro_features_if_applicable)
+
+        expect(install_generator.send(:use_pro?)).to eq(expected_pro)
+      end
+    end
+
+    standard_only_options = { standard_only: true }
+    [{ pro: true }, { rsc: true }].each do |pro_option|
+      it "rejects --standard-only combined with #{pro_option.inspect}" do
+        install_generator = install_generator_fixture(standard_only_options.merge(pro_option))
+
+        expect do
+          install_generator.send(:prompt_for_pro_features_if_applicable)
+        end.to raise_error(Thor::Error, /--standard-only cannot be combined/)
+      end
+    end
+  end
+
   context "with helpful message" do
     before do
       # Clear any previous messages to ensure clean test state
@@ -4434,6 +4540,42 @@ describe InstallGenerator, type: :generator do
       command = install_generator.send(:recovery_install_command)
 
       expect(command).to eq("rails generate react_on_rails:install --pro")
+    end
+
+    specify "recovery_install_command preserves an accepted interactive Pro selection" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "Y")
+      allow(install_generator).to receive(:say)
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:recovery_install_command)).to eq(
+        "rails generate react_on_rails:install --pro"
+      )
+    end
+
+    specify "recovery_install_command preserves a declined interactive Pro selection" do
+      install_generator = install_generator_fixture
+      allow(install_generator).to receive_messages(interactive_install_session?: true, ask: "n")
+      allow(install_generator).to receive(:say)
+      install_generator.send(:prompt_for_pro_features_if_applicable)
+
+      expect(install_generator.send(:recovery_install_command)).to eq(
+        "rails generate react_on_rails:install --standard-only"
+      )
+    end
+
+    {
+      { pro: false } => "--no-pro",
+      { rsc: false } => "--no-rsc",
+      { standard_only: true } => "--standard-only"
+    }.each do |product_options, expected_flag|
+      specify "recovery_install_command preserves #{product_options.inspect}" do
+        install_generator = install_generator_fixture(product_options)
+
+        expect(install_generator.send(:recovery_install_command)).to eq(
+          "rails generate react_on_rails:install #{expected_flag}"
+        )
+      end
     end
 
     specify "recovery_install_command normalizes the --webpack alias to --no-rspack" do
