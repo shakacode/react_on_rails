@@ -95,6 +95,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     uploadDir: string;
     uploadAssetValidationError: string | null;
+    uploadAuthenticationError: ResponseResult | null;
   }
 }
 
@@ -469,6 +470,14 @@ function discardMultipartFile(part: MultipartFile) {
   };
 }
 
+function multipartPassword(part: MultipartFile): string | undefined {
+  const passwordFields = part.fields.password;
+  const passwordField = Array.isArray(passwordFields) ? passwordFields.at(-1) : passwordFields;
+  return passwordField?.type === 'field' && typeof passwordField.value === 'string'
+    ? passwordField.value
+    : undefined;
+}
+
 export default function run(config: Partial<Config>) {
   runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
@@ -521,6 +530,7 @@ export default function run(config: Partial<Config>) {
   // The directory path is lazily assigned in onFile (only for requests with file uploads).
   app.decorateRequest('uploadDir', '');
   app.decorateRequest('uploadAssetValidationError', null);
+  app.decorateRequest('uploadAuthenticationError', null);
   // Clean up the per-request upload directory after the response is sent.
   // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
   // this is an internal service not exposed to the internet, the path is
@@ -542,8 +552,10 @@ export default function run(config: Partial<Config>) {
     preservePath: true,
     limits: {
       fieldSize: FIELD_SIZE_LIMIT,
-      // For bundles and assets
-      fileSize: Infinity,
+      // Keep each uploaded bundle/asset within the same request-size ceiling
+      // used by Fastify, and bound inode consumption from multipart parts.
+      fileSize: BODY_SIZE_LIMIT,
+      files: 100,
     },
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
@@ -552,6 +564,13 @@ export default function run(config: Partial<Config>) {
     async onFile(part) {
       if (typeof this?.uploadDir !== 'string') {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
+      }
+
+      const authResult = authenticate({ password: multipartPassword(part) });
+      if (authResult) {
+        this.uploadAuthenticationError = authResult;
+        discardMultipartFile(part);
+        return;
       }
 
       if (this.uploadAssetValidationError) {
@@ -598,6 +617,11 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
+    if (req.uploadAuthenticationError) {
+      await setResponse(req.uploadAuthenticationError, res);
+      return;
+    }
+
     const precheckResult = performRequestPrechecks(req.body);
     if (precheckResult) {
       await setResponse(precheckResult, res);
@@ -1136,6 +1160,11 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Body: Record<string, unknown>;
   }>('/upload-assets', async (req, res) => {
+    if (req.uploadAuthenticationError) {
+      await setResponse(req.uploadAuthenticationError, res);
+      return;
+    }
+
     const precheckResult = performRequestPrechecks(req.body);
     if (precheckResult) {
       await setResponse(precheckResult, res);

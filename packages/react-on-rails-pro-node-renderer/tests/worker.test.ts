@@ -451,6 +451,32 @@ describe('worker', () => {
     },
   );
 
+  test('rejects unauthenticated multipart uploads before creating an upload directory', async () => {
+    const app = createWorker({
+      password: 'password',
+    });
+    const form = new FormData();
+    form.append('gemVersion', gemVersion);
+    form.append('protocolVersion', protocolVersion);
+    form.append('railsEnv', railsEnv);
+    form.append('renderingRequest', 'ReactOnRails.dummy');
+    form.append('bundle', Buffer.from('untrusted bundle'), {
+      contentType: 'text/javascript',
+      filename: 'bundle.js',
+    });
+
+    const res = await app
+      .inject()
+      .post('/bundles/1495063024898/render/d41d8cd98f00b204e9800998ecf8427e')
+      .payload(form.getBuffer())
+      .headers(form.getHeaders())
+      .end();
+
+    expect(res.statusCode).toBe(401);
+    expect(res.payload).toBe('Wrong password');
+    expect(fs.existsSync(path.join(serverBundleCachePathForTest(), 'uploads'))).toBe(false);
+  });
+
   test(
     'POST /bundles/:bundleTimestamp/render/:renderRequestDigest ' +
       'when password is required but wrong password was provided',
@@ -678,6 +704,36 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets rejects multipart requests with too many files', async () => {
+    const app = createWorker({
+      password: 'my_password',
+    });
+    const form = new FormData();
+    form.append('gemVersion', gemVersion);
+    form.append('protocolVersion', protocolVersion);
+    form.append('railsEnv', railsEnv);
+    form.append('password', 'my_password');
+    form.append('bundle_too-many-files', Buffer.from('bundle'), {
+      contentType: 'text/javascript',
+      filename: 'bundle.js',
+    });
+    for (let index = 0; index < 100; index += 1) {
+      form.append(`asset${index}`, Buffer.from('{}'), {
+        contentType: 'application/json',
+        filename: `asset-${index}.json`,
+      });
+    }
+
+    const res = await app
+      .inject()
+      .post('/upload-assets')
+      .payload(form.getBuffer())
+      .headers(form.getHeaders())
+      .end();
+
+    expect(res.statusCode).toBe(413);
   });
 
   test('post /upload-assets rejects unsafe uploaded filenames before copying assets', async () => {
