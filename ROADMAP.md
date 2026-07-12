@@ -1,6 +1,6 @@
 # React on Rails Roadmap
 
-_Last updated: 2026-07-11 · Maintained by [ShakaCode](https://www.shakacode.com) · Live status: [GitHub milestones](https://github.com/shakacode/react_on_rails/milestones)_
+_Last updated: 2026-07-11 · Maintained by [ShakaCode](https://www.shakacode.com) · Live status: [roadmap umbrella #4607](https://github.com/shakacode/react_on_rails/issues/4607) and [GitHub milestones](https://github.com/shakacode/react_on_rails/milestones)_
 
 React on Rails 17.0.0 is shipping now. This document says where the project goes next and why, so evaluators and contributors can see the direction before committing.
 
@@ -18,7 +18,7 @@ Performance claims ship with a public, reproducible artifact — or they don't s
 
 - **Current proof:** the [Gumroad RSC comparison](https://gumroad.reactonrails.com/rsc-demo) — React Server Components vs an Inertia control on real product pages: ~48%/43% faster browser navigation, ~44% less HTML+JS delivered.
 - **Structural position:** streaming SSR, React Server Components, partial hydration, and async server props with no API layer — on a persistent Node renderer wired to `Rails.cache`. The Inertia stack has none of these (synchronous `renderToString`, monolithic SSR bundle, no RSC); Next.js has them but demands its own runtime and data layer.
-- **Next:** Partial Pre-Rendering on React 19.2's now-stable `prerender`/`resume` APIs (prototype: ~36× warm TTFB), and CSS-gated streamed reveals so streamed pages never flash unstyled content.
+- **Next:** Partial Pre-Rendering on React 19.2's now-stable `prerender`/`resume` APIs (prototype: ~36× warm TTFB). CSS-gated streamed reveals shipped in 17.0.0 — streamed pages no longer flash unstyled content; 17.1 adds the production CI gate that keeps it true.
 
 ### 2. Onboarding simplicity
 
@@ -26,7 +26,7 @@ The bar is Inertia's: one command and it works. `npx create-react-on-rails-app` 
 
 ### 3. Agent-native development
 
-AI coding agents increasingly choose the stack. React on Rails treats them as first-class developers: scaffolded `AGENTS.md` with the top runtime errors and fixes (shipped), `bin/rails react_on_rails:doctor`, `llms.txt`/`llms-full.txt`, and agent-legible error output. The 17.x cycle extends this with generated-from-docs `llms-full.txt` freshness guarantees and an agent toolchain informed by where the ecosystem landed (Next.js 16.3's bundled version-matched docs + Skills; TanStack's and Inertia's agent Skills).
+AI coding agents increasingly choose the stack. React on Rails treats them as first-class developers: scaffolded `AGENTS.md` with the top runtime errors and fixes (shipped), `bin/rails react_on_rails:doctor`, `llms.txt`/`llms-full.txt`, and agent-legible error output. `llms.txt`/`llms-full.txt` generation with a CI drift guard shipped and is verified live. The 17.x cycle extends this with an agent-legible doctor, an agent-builds-the-app tutorial + eval, and an agent toolchain informed by where the ecosystem landed (Next.js 16.3's bundled version-matched docs + Skills; TanStack's and Inertia's agent Skills).
 
 ## Release plan
 
@@ -34,17 +34,19 @@ AI coding agents increasingly choose the stack. React on Rails treats them as fi
 
 The "instant to start" release. Non-breaking.
 
-- CSS-gated streamed reveal — eliminate FOUC on streamed RSC/SSR pages ([#4557](https://github.com/shakacode/react_on_rails/issues/4557))
-- `llms-full.txt` generated from docs with CI freshness guard ([#3896](https://github.com/shakacode/react_on_rails/issues/3896))
-- Agent-legible doctor and error output (structured, copy-promptable)
-- Onboarding quick wins from the 2026-07 backlog triage
+- FOUC pipeline finished — production CI gate + simplification to the manifest-hint layer ([#4557](https://github.com/shakacode/react_on_rails/issues/4557); the reveal gating itself shipped in 17.0.0)
+- Security hardening cluster from the 2026-07 reviews — RSC payload endpoint authorization, node-renderer hardening, log hygiene ([#4595](https://github.com/shakacode/react_on_rails/issues/4595)–[#4597](https://github.com/shakacode/react_on_rails/issues/4597))
+- Agent-legible doctor and error output — structured `--format=json`, copy-promptable fixes ([#4602](https://github.com/shakacode/react_on_rails/issues/4602))
+- "An agent builds a React on Rails Pro app" tutorial + scripted eval ([#4603](https://github.com/shakacode/react_on_rails/issues/4603))
+- Pro license token via Rails credentials — customer-requested onboarding fix ([#4553](https://github.com/shakacode/react_on_rails/issues/4553))
+- Onboarding quick wins from the 2026-07 backlog triage (`llms.txt`/`llms-full.txt` generation already shipped and verified live — [#3896](https://github.com/shakacode/react_on_rails/issues/3896))
 - React 19.2 security-hardened RSC baseline (react-on-rails-rsc ≥ 19.2.x line)
 
 ### 17.2 — the numbers release
 
 The "prove it" release. Non-breaking.
 
-- **Partial Pre-Rendering productionized** ([#3245](https://github.com/shakacode/react_on_rails/issues/3245)) — static shell + streamed resume, on stable React 19.2 APIs, with a Gumroad-style public artifact
+- **Partial Pre-Rendering productionized** ([#3571](https://github.com/shakacode/react_on_rails/issues/3571)) — static shell + streamed resume, on stable React 19.2 APIs, with a Gumroad-style public artifact
 - Benchmark CI re-enabled as a gate with published results ([#3169](https://github.com/shakacode/react_on_rails/issues/3169))
 - Rspack RSC production path ([#3488](https://github.com/shakacode/react_on_rails/issues/3488))
 - Agent toolchain v2: Skills shipped in-package; minimal MCP re-evaluated against ecosystem evidence
