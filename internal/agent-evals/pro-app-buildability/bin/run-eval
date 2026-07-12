@@ -134,6 +134,8 @@ for file in network-probe-prompt.md package.json pnpm-lock.yaml prompt.md rubric
 done
 
 shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
+npm_probe_command='npm view create-react-on-rails-app version --json'
+rubygems_probe_command="gem search --remote --exact '^rails$'"
 codex_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --sandbox workspace-write --model "$model")
 codex_args+=(-c 'features.multi_agent=false' -c 'sandbox_workspace_write.network_access=true')
 codex_args+=(-c 'cli_auth_credentials_store="file"')
@@ -141,9 +143,10 @@ codex_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
 codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
 
 jq -n --arg model "$model" --argjson timeout "$timeout_seconds" \
+  --arg npm_probe "$npm_probe_command" --arg rubygems_probe "$rubygems_probe_command" \
   '{command:"codex exec",model:$model,timeout_seconds:$timeout,sandbox:"workspace-write",ephemeral:true,
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,sandbox_network_access:true,
-    capability_probe:{npm:"npm view create-react-on-rails-app version --json",rubygems:"gem search --remote --exact ^rails$"},
+    capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
     credential_store:"file",auth_material_available:false,human_followups_sent:0,
     shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
   >"$output/invocation.json"

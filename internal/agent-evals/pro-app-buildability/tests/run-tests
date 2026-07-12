@@ -45,6 +45,7 @@ rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
 rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
+rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
 if rg -q 'host_home|CODEX_EVAL_HOME|CODEX_AUTH_FILE' "$eval_dir/bin/run-eval"; then
   echo "runner must not expose host home or credential paths to Codex" >&2
   exit 1
