@@ -40,6 +40,9 @@
                     id: "streaming-sidebar",
                     hydrate_on: :idle) %>
 
+<%# Push footer below fold so hydrate_on: :visible triggers only when scrolled into view %>
+<div style="height: 150vh" aria-hidden="true"></div>
+
 <%= react_component("StreamingHydrationDemo",
                     props: { section: "footer" },
                     prerender: true,
