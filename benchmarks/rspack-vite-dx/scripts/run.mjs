@@ -33,7 +33,7 @@ if (!environment.harness_git_clean) {
 }
 
 await prepareControlWorkspaces(root);
-const browser = await chromium.launch({ headless: true });
+let browser;
 const raw = {
   schema_version: 1,
   created_at: new Date().toISOString(),
@@ -60,6 +60,7 @@ const raw = {
 };
 
 try {
+  browser = await chromium.launch({ headless: true });
   for (let iteration = 0; iteration < sampleCount; iteration += 1) {
     const order = iteration % 2 === 0 ? tools : [...tools].reverse();
     for (const tool of order) {
@@ -86,7 +87,7 @@ try {
   }
 } finally {
   try {
-    await browser.close();
+    await browser?.close();
   } finally {
     await removeControlWorkspaces(root);
   }
