@@ -1,8 +1,0 @@
-$ git status --short --untracked-files=normal
-?? eval_app/
-$ test -e eval_app/Gemfile
-exit_code=0
-$ test -e eval_app/package.json
-exit_code=0
-$ test -e eval_app/node_modules
-exit_code=1

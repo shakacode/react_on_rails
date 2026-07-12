@@ -1,6 +1,5 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Pro app buildability recorded run",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,12 +11,13 @@
     "definition",
     "agent",
     "environment",
-    "credential_presence",
+    "security",
+    "network_preflight",
     "runner",
     "result"
   ],
   "properties": {
-    "schema_version": { "const": "1.0" },
+    "schema_version": { "const": "2.0" },
     "run_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
@@ -27,39 +27,109 @@
       "required": ["revision", "dirty"],
       "properties": {
         "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-        "dirty": { "type": "boolean" }
+        "dirty": { "const": false }
       }
     },
     "definition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["prompt_sha256", "scenario_sha256", "rubric_sha256"],
+      "required": ["inputs"],
       "properties": {
-        "prompt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "scenario_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "rubric_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "executable"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^(?!/)(?!.*\\.\\.).+$" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "executable": { "type": "boolean" }
+            }
+          }
+        }
       }
     },
     "agent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "model"],
+      "required": ["name", "version", "model", "invoked"],
       "properties": {
         "name": { "const": "codex" },
-        "version": { "type": "string" },
-        "model": { "type": ["string", "null"] }
+        "version": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "invoked": { "type": "boolean" }
       }
     },
-    "environment": { "type": "object", "additionalProperties": { "type": "string" } },
-    "credential_presence": { "type": "object", "additionalProperties": { "type": "boolean" } },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "ruby", "node", "npm", "pnpm", "git"],
+      "properties": {
+        "os": { "type": "string" },
+        "ruby": { "type": "string" },
+        "node": { "type": "string" },
+        "npm": { "type": "string" },
+        "pnpm": { "type": "string" },
+        "git": { "type": "string" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "umask",
+        "process_environment",
+        "shell_environment_inherit",
+        "stripped_sensitive_names",
+        "raw_cleanup",
+        "auth_material_persisted"
+      ],
+      "properties": {
+        "umask": { "const": "077" },
+        "process_environment": { "const": "env -i" },
+        "shell_environment_inherit": { "const": "none" },
+        "stripped_sensitive_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "raw_cleanup": { "const": "EXIT/INT/TERM" },
+        "auth_material_persisted": { "const": false }
+      }
+    },
+    "network_preflight": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["endpoint", "status"],
+        "properties": {
+          "endpoint": { "type": "string", "format": "uri" },
+          "status": { "const": "pass" }
+        }
+      }
+    },
     "runner": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["timeout_seconds", "exit_code", "timed_out"],
+      "required": [
+        "timeout_command",
+        "requested_timeout_seconds",
+        "effective_timeout_seconds",
+        "exit_code",
+        "timed_out",
+        "config_artifact"
+      ],
       "properties": {
-        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "timeout_command": { "type": "string", "minLength": 1 },
+        "requested_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "effective_timeout_seconds": { "type": "integer", "minimum": 1 },
         "exit_code": { "type": "integer" },
-        "timed_out": { "type": "boolean" }
+        "timed_out": { "type": "boolean" },
+        "config_artifact": { "const": "invocation.json" }
       }
     },
     "result": {
@@ -69,7 +139,7 @@
       "properties": {
         "classification": { "enum": ["pass", "fail", "incomplete"] },
         "reason": { "type": "string" },
-        "tutorial_claims_supported": { "type": "boolean" }
+        "tutorial_claims_supported": { "const": false }
       }
     }
   }

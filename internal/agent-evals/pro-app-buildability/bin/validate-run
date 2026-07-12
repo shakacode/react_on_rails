@@ -4,45 +4,54 @@ set -euo pipefail
 run_dir="${1:-}"
 [[ -d "$run_dir" ]] || { echo "usage: $0 RUN_DIRECTORY" >&2; exit 64; }
 root="$(git rev-parse --show-toplevel)"
-schema="$root/internal/agent-evals/pro-app-buildability/schemas/run.schema.json"
+eval_dir="$root/internal/agent-evals/pro-app-buildability"
 
-for file in run.json prompt.md scenario.md rubric.md invocation.txt agent-report.json runner-diagnostics.json \
-  workspace-status.txt workspace-files.txt verification.txt SHA256SUMS; do
+for command in jq node rg shasum; do
+  command -v "$command" >/dev/null || { echo "missing required command: $command" >&2; exit 69; }
+done
+[[ -d "$eval_dir/node_modules/ajv" && -d "$eval_dir/node_modules/ajv-formats" ]] || {
+  echo "install pinned validator dependencies: pnpm --dir $eval_dir install --frozen-lockfile --ignore-workspace" >&2
+  exit 69
+}
+
+for file in run.json agent-report.json command-evidence.json artifact-evidence.json rubric-results.json \
+  invocation.json runner-diagnostics.json prompt.md scenario.md rubric.md workspace-status.txt SHA256SUMS; do
   [[ -f "$run_dir/$file" ]] || { echo "missing artifact: $file" >&2; exit 1; }
 done
-
-jq -e . "$run_dir/run.json" >/dev/null
-jq -e '.status | IN("completed", "blocked", "failed")' "$run_dir/agent-report.json" >/dev/null
-jq -e '.persisted == false and (.stderr_line_count >= 0)' "$run_dir/runner-diagnostics.json" >/dev/null
-jq -e . "$schema" >/dev/null
-jq -e '
-  .schema_version == "1.0" and
-  (.run_id | test("^[A-Za-z0-9._-]+$")) and
-  (.repository.revision | test("^[0-9a-f]{40}$")) and
-  (.agent.name == "codex") and
-  (.runner.timeout_seconds > 0) and
-  (.definition.prompt_sha256 | test("^[0-9a-f]{64}$")) and
-  (.definition.scenario_sha256 | test("^[0-9a-f]{64}$")) and
-  (.definition.rubric_sha256 | test("^[0-9a-f]{64}$")) and
-  (.result.classification | IN("pass", "fail", "incomplete"))
-' "$run_dir/run.json" >/dev/null
-
-for definition in prompt scenario rubric; do
-  expected="$(jq -r ".definition.${definition}_sha256" "$run_dir/run.json")"
-  actual="$(shasum -a 256 "$run_dir/$definition.md" | awk '{print $1}')"
-  [[ "$expected" == "$actual" ]] || { echo "definition hash mismatch: $definition" >&2; exit 1; }
+for forbidden in events.unredacted.jsonl events.redacted.jsonl runner.stderr auth.json; do
+  [[ ! -e "$run_dir/$forbidden" ]] || { echo "forbidden broad or sensitive artifact: $forbidden" >&2; exit 1; }
 done
 
+node "$eval_dir/bin/validate-json.mjs" "$run_dir"
+
+while IFS=$'\t' read -r relative expected; do
+  [[ -f "$eval_dir/$relative" ]] || { echo "missing recorded harness input: $relative" >&2; exit 1; }
+  actual="$(shasum -a 256 "$eval_dir/$relative" | awk '{print $1}')"
+  [[ "$expected" == "$actual" ]] || { echo "harness input hash mismatch: $relative" >&2; exit 1; }
+done < <(jq -r '.definition.inputs[] | [.path,.sha256] | @tsv' "$run_dir/run.json")
+
+actual_files="$(cd "$run_dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##')"
+listed_files="$(awk '{print $2}' "$run_dir/SHA256SUMS" | LC_ALL=C sort)"
+[[ "$actual_files" == "$listed_files" ]] || { echo "SHA256SUMS coverage mismatch" >&2; exit 1; }
 (cd "$run_dir" && shasum -a 256 -c SHA256SUMS)
 
-if rg -n '/Users/|/tmp/' "$run_dir"; then
+if rg -n '/Users/|/tmp/|/private/tmp|/var/folders/' "$run_dir"; then
   echo "local absolute path found" >&2
   exit 1
 fi
-
-if rg -n --pcre2 --ignore-case "(bearer[[:space:]]+[a-z0-9._-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|token|secret|password|license[_-]?key)[\"'=: ]+[A-Za-z0-9_./+=-]{12,})" "$run_dir"; then
+if rg -n --pcre2 --ignore-case \
+  "(bearer[[:space:]]+[a-z0-9._-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:api[_-]?key|token|secret|password|license[_-]?key)[\"'=: ]+[A-Za-z0-9_./+=-]{12,})" \
+  "$run_dir"; then
   echo "possible unredacted credential found" >&2
   exit 1
 fi
+
+run_classification="$(jq -r .result.classification "$run_dir/run.json")"
+rubric_classification="$(jq -r .overall "$run_dir/rubric-results.json")"
+[[ "$run_classification" == "$rubric_classification" ]] || { echo "run/rubric classification mismatch" >&2; exit 1; }
+[[ "$(jq -r .result.tutorial_claims_supported "$run_dir/run.json")" == false ]] || {
+  echo "a single run cannot enable tutorial claims" >&2
+  exit 1
+}
 
 echo "run artifacts valid: $run_dir"

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "commands"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "command", "exit_code", "status", "output", "output_truncated"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^command-[0-9]+$" },
+          "command": { "type": "string" },
+          "exit_code": { "type": ["integer", "null"] },
+          "status": { "type": "string" },
+          "output": { "type": "string" },
+          "output_truncated": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
