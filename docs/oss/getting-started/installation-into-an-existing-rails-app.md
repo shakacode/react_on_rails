@@ -56,6 +56,7 @@ and React Server Components. Pro is free for evaluation; production use requires
 The prompt never appears in CI, redirected-input scripts, or other noninteractive sessions; those runs preserve the
 existing open-source-only default. Pass `--pro` or `--rsc` to select Pro without a prompt. Pass `--no-pro`,
 `--no-rsc`, or `--standard-only` to select the open-source setup explicitly and suppress the prompt.
+Because `--standard-only` is an explicit open-source choice, the generator rejects combining it with `--pro` or `--rsc`.
 
 For generator options such as `--rspack`, `--pro`, or `--rsc`, see the [generator details](../api-reference/generator-details.md).
 

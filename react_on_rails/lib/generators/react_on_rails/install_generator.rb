@@ -101,7 +101,7 @@ module ReactOnRails
       class_option :standard_only,
                    type: :boolean,
                    default: false,
-                   desc: "Install only the open-source package and skip the interactive Pro prompt"
+                   desc: "Install only the open-source package; cannot be combined with --pro or --rsc"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -244,16 +244,17 @@ module ReactOnRails
       end
 
       def prompt_for_pro_features_if_applicable
+        validate_product_stack_choice!
         return if options.new_app? || explicit_product_stack_choice? || !interactive_install_session?
 
         say "React on Rails Pro is free for evaluation; production use requires a subscription."
         say "Learn more: https://reactonrails.com/docs/pro/upgrading-to-pro/"
         answer = ask(
-          "Enable React on Rails Pro features (Node Renderer, streaming SSR, and RSC)? [Y/n]",
-          :cyan,
-          default: "Y"
+          "Enable React on Rails Pro features (Node Renderer and streaming SSR; RSC available separately)? [Y/n]",
+          :cyan
         )
-        @interactive_pro_selection = answer.to_s.match?(/\A(?:y|yes)\z/i)
+        normalized_answer = answer.to_s.strip
+        @interactive_pro_selection = normalized_answer.empty? || normalized_answer.match?(/\A(?:y|yes)\z/i)
       end
 
       def explicit_product_stack_choice?
@@ -261,7 +262,13 @@ module ReactOnRails
       end
 
       def interactive_install_session?
-        $stdin.tty? && $stdout.tty?
+        !ReactOnRails::GitUtils.truthy_env?(ENV.fetch("CI", nil)) && $stdin.tty? && $stdout.tty?
+      end
+
+      def validate_product_stack_choice!
+        return unless options.standard_only? && (options.pro? || options.rsc?)
+
+        raise Thor::Error, "--standard-only cannot be combined with --pro or --rsc"
       end
 
       # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
@@ -900,8 +907,8 @@ module ReactOnRails
       end
 
       def product_stack_install_flag
-        return "--rsc" if options.rsc?
-        return "--pro" if options.pro?
+        return "--rsc" if use_rsc?
+        return "--pro" if use_pro?
 
         nil
       end
