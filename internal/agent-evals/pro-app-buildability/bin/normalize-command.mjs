@@ -1,3 +1,4 @@
+/* eslint-disable import/prefer-default-export -- named import keeps command normalization explicit */
 const shellQuote = (value) => {
   const argument = String(value);
   if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(argument)) return argument;

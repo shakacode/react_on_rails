@@ -36,16 +36,17 @@ const events = fs
 const commands = [];
 for (const event of events) {
   const item = event?.item;
-  if (event?.type !== 'item.completed' || item?.type !== 'command_execution') continue;
-  const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT);
-  commands.push({
-    id: `command-${commands.length + 1}`,
-    command: sanitize(normalizeCommand(item.command) || 'UNKNOWN'),
-    exit_code: Number.isInteger(item.exit_code) ? item.exit_code : null,
-    status: String(item.status ?? 'unknown'),
-    output: output.value,
-    output_truncated: output.truncated,
-  });
+  if (event?.type === 'item.completed' && item?.type === 'command_execution') {
+    const output = truncate(item.aggregated_output ?? item.output ?? '', MAX_OUTPUT);
+    commands.push({
+      id: `command-${commands.length + 1}`,
+      command: sanitize(normalizeCommand(item.command) || 'UNKNOWN'),
+      exit_code: Number.isInteger(item.exit_code) ? item.exit_code : null,
+      status: String(item.status ?? 'unknown'),
+      output: output.value,
+      output_truncated: output.truncated,
+    });
+  }
 }
 const commandEvidence = { schema_version: '1.0', commands };
 
@@ -57,30 +58,29 @@ const artifacts = [];
 
 function walk(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (entry.isSymbolicLink() || excludedDirectories.has(entry.name)) continue;
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      walk(absolute);
-      continue;
+    if (!entry.isSymbolicLink() && !excludedDirectories.has(entry.name)) {
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(absolute);
+      } else if (entry.isFile()) {
+        const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
+        const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
+        const selected =
+          selectedBasenames.has(entry.name) ||
+          (insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)));
+        if (selected) {
+          const content = fs.readFileSync(absolute);
+          const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
+          artifacts.push({
+            path: relative,
+            sha256: crypto.createHash('sha256').update(content).digest('hex'),
+            size: content.length,
+            excerpt: excerpt.value,
+            excerpt_truncated: excerpt.truncated,
+          });
+        }
+      }
     }
-    if (!entry.isFile()) continue;
-    const relative = path.relative(workspace, absolute).replaceAll(path.sep, '/');
-    const insideSelectedRoot = selectedRoots.some((root) => relative.includes(`/${root}`));
-    if (
-      !selectedBasenames.has(entry.name) &&
-      !(insideSelectedRoot && selectedExtensions.has(path.extname(entry.name)))
-    ) {
-      continue;
-    }
-    const content = fs.readFileSync(absolute);
-    const excerpt = truncate(content.toString('utf8'), MAX_EXCERPT);
-    artifacts.push({
-      path: relative,
-      sha256: crypto.createHash('sha256').update(content).digest('hex'),
-      size: content.length,
-      excerpt: excerpt.value,
-      excerpt_truncated: excerpt.truncated,
-    });
   }
 }
 walk(workspace);
@@ -295,7 +295,12 @@ const completionRow = outcomesComplete
       citations: [],
     };
 const items = [...outcomeRows, completionRow];
-const overall = outcomesComplete ? 'pass' : reportCompleted ? 'fail' : 'incomplete';
+let overall = 'incomplete';
+if (outcomesComplete) {
+  overall = 'pass';
+} else if (reportCompleted) {
+  overall = 'fail';
+}
 const rubricResults = { schema_version: '1.0', overall, items };
 
 fs.writeFileSync(

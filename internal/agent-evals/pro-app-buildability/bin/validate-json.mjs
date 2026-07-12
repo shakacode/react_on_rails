@@ -2,6 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Ajv exposes its Draft 2020 build through this extension-qualified subpath.
+// eslint-disable-next-line import/extensions
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
@@ -30,11 +32,12 @@ let valid = true;
 for (const [documentName, schemaName] of documents) {
   const schema = JSON.parse(fs.readFileSync(path.join(evalDir, 'schemas', schemaName), 'utf8'));
   const validate = ajv.compile(schema);
-  if (runDir === '--schemas-only') continue;
-  const document = JSON.parse(fs.readFileSync(path.join(runDir, documentName), 'utf8'));
-  if (!validate(document)) {
-    valid = false;
-    console.error(`${documentName}: ${ajv.errorsText(validate.errors, { separator: '\n' })}`);
+  if (runDir !== '--schemas-only') {
+    const document = JSON.parse(fs.readFileSync(path.join(runDir, documentName), 'utf8'));
+    if (!validate(document)) {
+      valid = false;
+      console.error(`${documentName}: ${ajv.errorsText(validate.errors, { separator: '\n' })}`);
+    }
   }
 }
 

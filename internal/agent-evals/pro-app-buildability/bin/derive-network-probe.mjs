@@ -28,7 +28,7 @@ const unwrapShellCommand = (command) => {
 const probeAttempts = (requiredCommand) =>
   commands
     .filter((command) => unwrapShellCommand(command.command) === requiredCommand)
-    .map(({ id: command_id, exit_code }) => ({ command_id, exit_code }));
+    .map((command) => ({ command_id: command.id, exit_code: command.exit_code }));
 const npmAttempts = probeAttempts('npm view create-react-on-rails-app version --json');
 const rubygemsAttempts = probeAttempts("gem search --remote --exact '^rails$'");
 const probeStatus = (attempts) =>
