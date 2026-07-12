@@ -121,14 +121,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [react_on_rails_rsc Issue 187](https://github.com/shakacode/react_on_rails_rsc/issues/187).
   [PR 4564](https://github.com/shakacode/react_on_rails/pull/4564) by
   [ihabadham](https://github.com/ihabadham).
-
 - **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
   preloads listed in the React client manifest, preventing a flash of unstyled content when
   production chunk CSS uses numeric IDs and id-named files. Fixes
   [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
   [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
   [justin808](https://github.com/justin808).
-
 - **[Pro]** **RSC payload prerender cache no longer stores an empty payload**: With
   `config.prerender_caching = true`, the RSC payload endpoint (`/rsc_payload/:component_name`) served
   the first visitor a correct payload but every subsequent visitor a zero-byte payload, because the
@@ -3017,7 +3015,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...main
+[17.0.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...v17.0.0.rc.9
 [17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
 [17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
 [17.0.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.5...v17.0.0.rc.6
