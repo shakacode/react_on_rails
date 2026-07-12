@@ -264,10 +264,10 @@ replay path (client-inserted styles during hydration/navigation), not to the ser
 Each of these conditions disables part or all of the streamed-CSS gating **without any error**.
 The page still works — CSS eventually arrives via the browser-side payload replay after hydration —
 but the streamed reveal is no longer gated, so a styled-late flash becomes possible. Two of these
-conditions are not edge cases but the **defaults of every production build** (numeric chunk ids
-from `chunkIds: 'deterministic'`, and id-based CSS filenames from Shakapacker's
-`chunkFilename: 'css/[id][hash].css'`) — verified against a production dummy build on 2026-07-09,
-where the streamed reveal was confirmed ungated under both bundlers:
+conditions are not edge cases but the **production defaults verified in the dummy app** (numeric
+chunk ids from `chunkIds: 'deterministic'`, and id-named extracted CSS like
+`css/[id]-[hash].css`) — verified against a production dummy build on 2026-07-09, where the
+streamed reveal was confirmed ungated under both bundlers:
 
 | Condition                                                                                          | What is disabled                                                                                   |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
