@@ -11,14 +11,11 @@ declare global {
   }
 }
 
+const streamingHydrationEventsKey = '__STREAMING_HYDRATION_EVENTS__';
+
 const recordHydrationEvent = (component: string) => {
-  /* eslint-disable no-underscore-dangle -- double-underscore marks the test-only window global */
-  window.__STREAMING_HYDRATION_EVENTS__ ||= [];
-  window.__STREAMING_HYDRATION_EVENTS__.push({
-    component,
-    timestamp: Date.now(),
-  });
-  /* eslint-enable no-underscore-dangle */
+  window[streamingHydrationEventsKey] ||= [];
+  window[streamingHydrationEventsKey].push({ component, timestamp: Date.now() });
 };
 
 type SectionProps = {
