@@ -101,7 +101,9 @@ The comparison runner:
 Comparison mode defaults to `--no-upload` because exploratory repeats can still be discarded.
 When the machine was truly idle and the local summary is credible, add `--upload` to post every
 repeat to the dedicated Bencher testbed. If a run becomes contaminated because you used the
-machine during the benchmark, discard that artifact directory and rerun.
+machine during the benchmark, discard that artifact directory and rerun. For non-`main`
+scenarios, the first upload still resets from `main` to clone thresholds, but later repetitions
+append to the same Bencher branch/version so the comparison keeps all repeated samples.
 
 Useful knobs:
 

@@ -57,6 +57,7 @@ ENV["MISE_RUBY_VERSION"] = MIN_RUBY if MIN_RUBY
 options = {
   testbed: "m1-bench",
   upload: true,
+  start_point_reset: true,
   fail_on_alert: false,
   setup: true,
   duration: "30s",
@@ -71,6 +72,9 @@ parser = OptionParser.new do |opts|
   opts.on("--branch NAME", "Bencher branch/series (default: the checked-out git ref)") { |v| options[:branch] = v }
   opts.on("--[no-]upload", "Upload results to Bencher (default: on; needs BENCHER_API_KEY or BENCHER_API_TOKEN)") do |v|
     options[:upload] = v
+  end
+  opts.on("--[no-]start-point-reset", "Reset non-main upload branches from main before uploading (default: on)") do |v|
+    options[:start_point_reset] = v
   end
   opts.on("--fail-on-alert", "Exit non-zero if Bencher flags a regression") { options[:fail_on_alert] = true }
   opts.on("--[no-]setup", "Run the build/setup steps (default: on; skip to reuse a prior build)") do |v|
@@ -365,11 +369,14 @@ log "Upload to Bencher (testbed #{options[:testbed]}, branch #{branch})"
 # an RC/feature run forms its own series instead of polluting that baseline. (Token + CLI were
 # already verified up front.) A non-main branch clones main's thresholds (same args as the CI
 # tracker's PR path) so --fail-on-alert actually compares against the baseline instead of
-# starting an empty series that can never alert.
+# starting an empty series that can never alert. Comparison uploads can disable the reset after
+# the first repetition so later samples append to the same branch version instead of recreating it.
 start_point_args = if branch == "main"
                      []
                    else
-                     ["--start-point", "main", "--start-point-clone-thresholds", "--start-point-reset"]
+                     args = ["--start-point", "main", "--start-point-clone-thresholds"]
+                     args << "--start-point-reset" if options[:start_point_reset]
+                     args
                    end
 ENV["BENCHER_TESTBED"] = options[:testbed]
 upload_env.each do |key, value|

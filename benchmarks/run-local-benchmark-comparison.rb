@@ -238,7 +238,7 @@ def benchmark_json_path!(step, destination)
   )
 end
 
-def benchmark_command(suite, branch, options, setup_arg)
+def benchmark_command(suite, branch, options, setup_arg, start_point_reset:)
   command = [
     "ruby", "benchmarks/run-local-benchmark.rb", suite,
     "--branch", branch,
@@ -249,7 +249,18 @@ def benchmark_command(suite, branch, options, setup_arg)
     options[:upload] ? "--upload" : "--no-upload"
   ]
   command << setup_arg if setup_arg
+  command << "--no-start-point-reset" if options[:upload] && branch != "main" && !start_point_reset
   command
+end
+
+def first_scenario_run?(seen_scenarios, scenario)
+  !seen_scenarios[scenario]
+end
+
+def step_command(step:, suite:, options:, seen_scenarios:)
+  setup_arg = setup_arg_for(options[:setup_mode], seen_scenarios[step.scenario])
+  start_point_reset = first_scenario_run?(seen_scenarios, step.scenario)
+  benchmark_command(suite, step.scenario, options, setup_arg, start_point_reset:)
 end
 
 def run_benchmark_step(step:, scenarios:, suite:, options:, artifact_root:, seen_scenarios:)
@@ -259,10 +270,9 @@ def run_benchmark_step(step:, scenarios:, suite:, options:, artifact_root:, seen
 
   wait_for_quiet!(step, destination, options[:quiet_thresholds]) if options[:wait_for_quiet]
 
-  setup_arg = setup_arg_for(options[:setup_mode], seen_scenarios[step.scenario])
   log "Run #{step.scenario} repetition #{step.repetition}"
   run_command!(
-    benchmark_command(suite, step.scenario, options, setup_arg),
+    step_command(step:, suite:, options:, seen_scenarios:),
     chdir: scenario.fetch(:worktree)
   )
   seen_scenarios[step.scenario] = true
@@ -383,6 +393,15 @@ puts "Order: #{plan_order}"
 puts "Artifacts: #{artifact_root}"
 puts "Upload: #{options[:upload]}"
 puts "Quiet gate: #{options[:wait_for_quiet]}"
+if options[:dry_run]
+  puts "Commands:"
+  preview_seen_scenarios = {}
+  plan.steps.each do |step|
+    command = step_command(step:, suite:, options:, seen_scenarios: preview_seen_scenarios)
+    puts "  #{step.scenario}[#{step.repetition}]: #{Shellwords.join(command)}"
+    preview_seen_scenarios[step.scenario] = true
+  end
+end
 exit 0 if options[:dry_run]
 
 begin

@@ -81,4 +81,26 @@ RSpec.describe "run-local-benchmark-comparison" do
     expect(status).not_to be_success
     expect(stderr).to include("--baseline and --candidate must match scenario names")
   end
+
+  it "resets non-main uploads only on the first repetition for each scenario" do
+    stdout, _stderr, status = run_script(
+      "--a-ref", "v17.0.0.rc.5",
+      "--a-name", "rc5",
+      "--b-ref", "origin/main",
+      "--b-name", "main",
+      "--repetitions", "2",
+      "--upload"
+    )
+
+    expect(status).to be_success
+
+    commands = stdout.lines.grep(/run-local-benchmark\.rb core/)
+    rc5_commands = commands.select { |line| line.include?("--branch rc5") }
+    main_commands = commands.select { |line| line.include?("--branch main") }
+
+    expect(rc5_commands.size).to eq(2)
+    expect(rc5_commands.first).not_to include("--no-start-point-reset")
+    expect(rc5_commands.last).to include("--no-start-point-reset")
+    expect(main_commands).to all(satisfy { |line| !line.include?("--no-start-point-reset") })
+  end
 end
