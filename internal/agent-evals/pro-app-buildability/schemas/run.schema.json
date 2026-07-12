@@ -85,7 +85,7 @@
         "shell_environment_inherit",
         "credential_store",
         "auth_material_available",
-        "stripped_sensitive_names",
+        "stripped_sensitive_variable_categories",
         "raw_cleanup",
         "auth_material_persisted"
       ],
@@ -95,9 +95,9 @@
         "shell_environment_inherit": { "const": "none" },
         "credential_store": { "const": "file" },
         "auth_material_available": { "const": false },
-        "stripped_sensitive_names": {
+        "stripped_sensitive_variable_categories": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": { "enum": ["auth", "cookie", "credential", "password", "secret", "token"] },
           "uniqueItems": true
         },
         "raw_cleanup": { "const": "EXIT/INT/TERM" },

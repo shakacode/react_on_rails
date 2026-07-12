@@ -104,13 +104,19 @@ for endpoint in https://registry.npmjs.org/ https://rubygems.org/; do
   fi
 done
 
-stripped_names='[]'
+stripped_categories='[]'
 while IFS= read -r variable; do
   case "$variable" in
-    *TOKEN*|*token*|*SECRET*|*secret*|*PASSWORD*|*password*|*PASSWD*|*passwd*|*API_KEY*|*api_key*|*AUTH*|*auth*|*COOKIE*|*cookie*|*CREDENTIAL*|*credential*|*LICENSE*|*license*)
-      stripped_names="$(jq --arg name "$variable" '. + [$name] | unique | sort' <<<"$stripped_names")"
-      ;;
+    *TOKEN*|*token*) category=token ;;
+    *PASSWORD*|*password*|*PASSWD*|*passwd*) category=password ;;
+    *AUTH*|*auth*) category=auth ;;
+    *COOKIE*|*cookie*) category=cookie ;;
+    *CREDENTIAL*|*credential*) category=credential ;;
+    *SECRET*|*secret*|*API_KEY*|*api_key*|*LICENSE*|*license*) category=secret ;;
+    *) continue ;;
   esac
+  stripped_categories="$(jq --arg category "$category" '. + [$category] | unique | sort' \
+    <<<"$stripped_categories")"
 done < <(compgen -e)
 
 mkdir -p "$workspace" "$output"
@@ -223,7 +229,7 @@ jq -n \
   --arg revision "$revision" --arg version "$(codex --version)" --arg model "$model" \
   --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1)" --arg node "$(node --version)" \
   --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
-  --argjson inputs "$input_hashes" --argjson stripped "$stripped_names" --argjson network "$network_json" \
+  --argjson inputs "$input_hashes" --argjson stripped "$stripped_categories" --argjson network "$network_json" \
   --arg timeout_command "$timeout_command" --argjson timeout "$timeout_seconds" --argjson exit_code "$runner_exit" \
   --argjson probe_timeout "$probe_timeout_seconds" --argjson scaffold_invoked "$scaffold_invoked" \
   --argjson timed_out "$timed_out" --arg classification "$classification" --arg reason "$reason" \
@@ -232,7 +238,7 @@ jq -n \
     agent:{name:"codex",version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
     environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
     security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
-      credential_store:"file",auth_material_available:false,stripped_sensitive_names:$stripped,
+      credential_store:"file",auth_material_available:false,stripped_sensitive_variable_categories:$stripped,
       raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
     network_preflight:$network,
     runner:{timeout_command:$timeout_command,requested_timeout_seconds:$timeout,effective_timeout_seconds:$timeout,

@@ -76,9 +76,9 @@ does not start.
 Raw events and stderr live only under a mode-`0700` temporary directory. No
 authentication material is made available to the network-enabled process.
 `umask 077` applies throughout, and
-`EXIT`/`INT`/`TERM` traps delete the directory. Sensitive parent environment
-variable names are recorded as stripped; their values are neither read nor
-passed to the agent.
+`EXIT`/`INT`/`TERM` traps delete the directory. Generic categories of stripped
+sensitive parent variables are recorded without exposing the operator's exact
+variable names; their values are neither read nor passed to the agent.
 
 ## Replay and validate
 

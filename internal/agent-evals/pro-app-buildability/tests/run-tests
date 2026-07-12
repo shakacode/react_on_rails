@@ -35,6 +35,35 @@ if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-safe" >/dev/nu
   exit 1
 fi
 
+printf '%s\n' \
+  'Authorization Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature' \
+  'token: "abc,secret123"' \
+  "password: 'p@ss,word'" \
+  'SECRET_KEY_BASE="abc\"def,ghi"' \
+  'AWS_SECRET_ACCESS_KEY=abc,def' \
+  'credential_store:"file"' \
+  '-----BEGIN PRIVATE KEY-----' 'complete-key-material' '-----END PRIVATE KEY-----' \
+  '-----BEGIN OPENSSH PRIVATE KEY-----' 'truncated-key-material' >"$tmp/parity-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/parity-unsafe" >"$tmp/parity-perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
+cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+  "$tmp/parity-perl-safe"; then
+  echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
+  exit 1
+fi
+rg -q 'credential_store:"file"' "$tmp/parity-perl-safe"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-unsafe" >/dev/null
+if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; then
+  echo "final scanner disagreed with cross-language sanitized output" >&2
+  exit 1
+fi
+
 rg -q '^umask 077$' "$eval_dir/bin/run-eval"
 rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
 rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
@@ -46,6 +75,11 @@ rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
+rg -q 'stripped_sensitive_variable_categories' "$eval_dir/bin/run-eval"
+if rg -q 'stripped_sensitive_names|--arg name "\$variable"' "$eval_dir/bin/run-eval"; then
+  echo "runner must not record operator-specific sensitive variable names" >&2
+  exit 1
+fi
 if rg -q 'host_home|CODEX_EVAL_HOME|CODEX_AUTH_FILE' "$eval_dir/bin/run-eval"; then
   echo "runner must not expose host home or credential paths to Codex" >&2
   exit 1
