@@ -18,7 +18,7 @@ Performance claims ship with a public, reproducible artifact — or they don't s
 
 - **Current proof:** the [Gumroad RSC comparison](https://gumroad.reactonrails.com/rsc-demo) — React Server Components vs an Inertia control on real product pages: ~48%/43% faster browser navigation, ~44% less HTML+JS delivered.
 - **Structural position:** streaming SSR, React Server Components, partial hydration, and async server props with no API layer — on a persistent Node renderer wired to `Rails.cache`. The Inertia stack has none of these (synchronous `renderToString`, monolithic SSR bundle, no RSC); Next.js has them but demands its own runtime and data layer.
-- **Next:** Partial Pre-Rendering on React 19.2's now-stable `prerender`/`resume` APIs (prototype: ~36× warm TTFB). CSS-gated streamed reveals shipped in 17.0.0 — streamed pages no longer flash unstyled content; 17.1 adds the production CI gate that keeps it true.
+- **Next:** Partial Pre-Rendering on React 19.2's now-stable `prerender`/`resume` APIs. An internal prototype showed a ~36× warm-TTFB improvement; per this roadmap's own standard, that number graduates to a headline claim only when the 17.2 work ships its public, reproducible artifact ([#3571](https://github.com/shakacode/react_on_rails/issues/3571)). CSS-gated streamed reveals shipped in 17.0.0 — streamed pages no longer flash unstyled content; 17.1 adds the production CI gate that keeps it true.
 
 ### 2. Onboarding simplicity
 

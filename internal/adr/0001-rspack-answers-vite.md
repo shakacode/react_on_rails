@@ -5,7 +5,7 @@ date: 2026-07-11
 
 # Rspack answers Vite — no Vite runtime support in the 17.x cycle
 
-The Rails ecosystem's default "modern React" stack is inertia*rails + vite_ruby, so evaluators keep asking why React on Rails runs on Shakapacker/Rspack instead of Vite. We decided **not** to build Vite runtime support in the 17.x cycle: the RSC pipeline (react-on-rails-rsc plugin, client/server manifests, flight chunk handling) is built on the webpack/rspack plugin contract, RSC-on-Vite is still experimental across the entire ecosystem, and Rspack already delivers Vite-class dev speed (~20× build improvements in our benchmarks) \_with* production RSC — which Vite cannot do. Instead we invest in Rspack DX parity (HMR speed, zero-config startup, error overlays) and publish a "Why Rspack (and not Vite)" positioning page, so the objection is answered in the open rather than dodged.
+The Rails ecosystem's default "modern React" stack is inertia_rails + vite_ruby, so evaluators keep asking why React on Rails runs on Shakapacker/Rspack instead of Vite. We decided **not** to build Vite runtime support in the 17.x cycle: the RSC pipeline (react-on-rails-rsc plugin, client/server manifests, flight chunk handling) is built on the webpack/rspack plugin contract, RSC-on-Vite is still experimental across the entire ecosystem, and Rspack already delivers Vite-class dev speed (~20× build improvements in our benchmarks) **with** production RSC — which Vite cannot do. Instead we invest in Rspack DX parity (HMR speed, zero-config startup, error overlays) and publish a "Why Rspack (and not Vite)" positioning page, so the objection is answered in the open rather than dodged.
 
 ## Considered options
 

@@ -9,7 +9,7 @@ A new Organization adopting React on Rails Pro in a real app — the roadmap's #
 _Avoid_: download count, npm installs (raw download breadth was explicitly rejected as the metric)
 
 **Trust-based license**:
-The Pro distribution model — packages freely installable with no key enforcement; Production Use requires a paid per-Organization subscription on the honor system (EULA v2.2).
+The Pro distribution model — packages freely installable with no key enforcement; Production Use requires a paid per-Organization subscription on the honor system, except where EULA v2.2 grants free use (evaluation, education, demos, and complimentary qualifying-open-source licenses under §4.1).
 _Avoid_: freemium, open core
 
 **Competitive frame**:
