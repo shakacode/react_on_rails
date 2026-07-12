@@ -1,6 +1,19 @@
 name: Benchmark Workflow
 
 on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/benchmark.yml'
+      - '.github/workflows/benchmark-suite.yml'
+      - 'benchmarks/**'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/benchmark.yml'
+      - '.github/workflows/benchmark-suite.yml'
+      - 'benchmarks/**'
   # Hosted benchmarks are manual-only. The trusted trend runs on dedicated local
   # hardware via benchmarks/run-local-benchmark.rb and uploads to the m1-bench
   # Bencher testbed; shared GitHub-hosted runners are too noisy for automatic
@@ -52,13 +65,35 @@ on:
           - 'pro_only'
           - 'pro_rails_only'
           - 'pro_node_renderer_only'
-# Cancel stale manual benchmark runs for the same ref.
+# Cancel stale benchmark workflow runs for the same ref; only workflow_dispatch
+# executes the hosted benchmark suites.
 concurrency:
   group: benchmark-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  benchmark-script-specs:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+      - name: Install gems for benchmark specs
+        uses: ./.github/actions/setup-bundle
+        with:
+          working-directory: .
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+      - name: Run benchmark script specs
+        run: bundle exec rspec benchmarks/spec
+
   prepare-benchmark-matrix:
+    if: github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
       actions: read
@@ -99,30 +134,16 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         shell: bash
-      # Only pay the Bundler setup when benchmarks will run; the manual workflow
-      # does not run for unrelated PRs.
-      - name: Install gems for benchmark specs
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true'
-        uses: ./.github/actions/setup-bundle
-        with:
-          working-directory: .
-          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
-      # Validate the benchmark scripts (matrix generation, route discovery) before
-      # any benchmark runs: if this logic is wrong, the matrix and routes feeding
-      # the run are wrong, so the results would be invalid. Running it here (rather
-      # than a separate job) reuses this job's checkout/runner and still gates the
-      # benchmark job, which needs matrix generation to succeed.
-      - name: Run benchmark script specs
-        if: steps.benchmark-matrices.outputs.run_benchmark_suites == 'true'
-        run: bundle exec rspec benchmarks/spec
 
   # Manual hosted run of every selected suite/shard. Automatic push/PR benchmarks
   # are intentionally disabled; use the dedicated local M1 runner for the trusted
   # Bencher trend and reserve this workflow for explicit hosted diagnostics.
   benchmark:
-    needs: prepare-benchmark-matrix
+    needs:
+      - benchmark-script-specs
+      - prepare-benchmark-matrix
     name: ${{ matrix.job_name }}
-    if: needs.prepare-benchmark-matrix.outputs.run_benchmark_suites == 'true'
+    if: github.event_name == 'workflow_dispatch' && needs.prepare-benchmark-matrix.outputs.run_benchmark_suites == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare-benchmark-matrix.outputs.benchmark_matrix) }}
