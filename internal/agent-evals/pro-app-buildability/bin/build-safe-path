@@ -2,10 +2,39 @@
 set -euo pipefail
 
 source_path="${SAFE_PATH_SOURCE:-${PATH:-}}"
+resolve_command() {
+  local command_name="$1"
+  local resolved
+  local resolved_target
+  resolved="$(PATH="$source_path" command -v "$command_name" 2>/dev/null || true)"
+  [[ "$resolved" = /* && -x "$resolved" ]] || { echo "missing required command: $command_name" >&2; return 69; }
+  resolved_target="$(realpath "$resolved")"
+  if [[ "$(basename "$resolved_target")" == mise ]]; then
+    resolved="$(PATH="$source_path" "$resolved_target" which "$command_name" 2>/dev/null || true)"
+    [[ "$resolved" = /* && -x "$resolved" ]] || {
+      echo "unable to resolve mise-managed command: $command_name" >&2
+      return 69
+    }
+  fi
+  printf '%s\n' "$resolved"
+}
+
+if [[ "${1:-}" == --resolve ]]; then
+  [[ "$#" == 2 ]] || { echo "usage: $0 --resolve COMMAND" >&2; exit 64; }
+  resolve_command "$2"
+  exit
+fi
+
+required_source_directories=()
 required_directories=()
 for command_name in "$@"; do
-  resolved="$(PATH="$source_path" command -v "$command_name" 2>/dev/null || true)"
-  [[ "$resolved" = /* && -x "$resolved" ]] || { echo "missing required command: $command_name" >&2; exit 69; }
+  source_resolved="$(PATH="$source_path" command -v "$command_name" 2>/dev/null || true)"
+  [[ "$source_resolved" = /* && -x "$source_resolved" ]] || {
+    echo "missing required command: $command_name" >&2
+    exit 69
+  }
+  resolved="$(resolve_command "$command_name")"
+  required_source_directories+=("$(cd "$(dirname "$source_resolved")" && pwd -P)")
   required_directories+=("$(cd "$(dirname "$resolved")" && pwd -P)")
 done
 
@@ -24,9 +53,10 @@ IFS=: read -r -a caller_path_entries <<<"$source_path"
 for entry in "${caller_path_entries[@]}"; do
   [[ -d "$entry" ]] || continue
   canonical_entry="$(cd "$entry" && pwd -P)"
-  for required_directory in "${required_directories[@]}"; do
-    if [[ "$canonical_entry" == "$required_directory" ]]; then
-      append_safe_directory "$canonical_entry"
+  for index in "${!required_directories[@]}"; do
+    if [[ "$canonical_entry" == "${required_source_directories[$index]}" ||
+      "$canonical_entry" == "${required_directories[$index]}" ]]; then
+      append_safe_directory "${required_directories[$index]}"
       break
     fi
   done

@@ -43,6 +43,13 @@ env -i PATH="$resolved_path" /bin/sh -c 'command -v user-tool >/dev/null'
 test "$(realpath "$(env -i PATH="$resolved_path" /bin/sh -c 'command -v node')")" = \
   "$(realpath "$tmp/user-bin/node")"
 
+mise_node="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+  "$eval_dir/bin/build-safe-path" --resolve node)"
+if [[ "$(basename "$(realpath "$(command -v node)")")" == mise ]]; then
+  test "$(realpath "$mise_node")" != "$(realpath "$(command -v node)")"
+  test "$(env -i PATH="$(dirname "$mise_node"):/usr/bin:/bin" node --version)" = "$(node --version)"
+fi
+
 mkdir "$tmp/world-writable-bin"
 printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/world-writable-bin/unsafe-tool"
 chmod +x "$tmp/world-writable-bin/unsafe-tool"

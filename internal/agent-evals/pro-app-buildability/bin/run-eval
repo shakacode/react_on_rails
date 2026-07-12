@@ -80,7 +80,8 @@ install -m 600 "$auth_source" "$private_dir/codex-home/auth.json"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
 for command_name in codex curl env git jq node npm pnpm realpath ruby shasum "$timeout_name"; do
-  expected_executable="$(realpath "$(command -v "$command_name")")"
+  expected_executable="$(realpath "$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" --resolve "$command_name")")"
   # The positional parameter expands inside the stripped child shell.
   # shellcheck disable=SC2016
   runtime_executable="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$command_name")" || {
