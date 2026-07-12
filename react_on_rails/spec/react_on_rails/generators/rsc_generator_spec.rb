@@ -960,7 +960,8 @@ describe RscGenerator, type: :generator do
         expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
       end
 
-      expect(GeneratorMessages.messages.join("\n")).to include("scoped clientReferences in clientWebpackConfig.js")
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1017,7 +1018,7 @@ describe RscGenerator, type: :generator do
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
       expect(messages).to include("some may already be correctly scoped")
-      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1118,7 +1119,7 @@ describe RscGenerator, type: :generator do
 
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
-      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1171,7 +1172,7 @@ describe RscGenerator, type: :generator do
 
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
-      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1219,7 +1220,7 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to include("directory: resolve(config.source_path)")
       expect(migrated_content).to match(/isServer: true,\s*\n\s*clientReferences: rscClientReferences,/)
       expect(generator.send(:check_rsc_server_config)).not_to include(
-        "generated scoped clientReferences in serverWebpackConfig.js"
+        "generated manifest-backed clientReferences resolver in serverWebpackConfig.js"
       )
     end
 
@@ -1906,8 +1907,8 @@ describe RscGenerator, type: :generator do
 
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("use non-object-literal options")
-      expect(messages).to include("cannot verify whether scoped clientReferences are configured")
-      expect(messages).not_to include("generated scoped clientReferences in clientWebpackConfig.js")
+      expect(messages).to include("cannot verify whether the generated manifest-backed resolver is configured")
+      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
 
     it "warns only once without naming only the first config when both webpack configs use non-object options" do
@@ -3257,7 +3258,7 @@ describe RscGenerator, type: :generator do
       )
     end
 
-    it "reports missing scoped clientReferences when only a nested clientReferences exists" do
+    it "reports a missing manifest-backed resolver when only a nested clientReferences exists" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
         config_path,
@@ -3275,7 +3276,9 @@ describe RscGenerator, type: :generator do
       )
 
       missing = generator.send(:check_rsc_client_config)
-      expect(missing).to include("generated scoped clientReferences in clientWebpackConfig.js")
+      expect(missing).to include(
+        "generated manifest-backed clientReferences resolver in clientWebpackConfig.js"
+      )
     end
   end
 
