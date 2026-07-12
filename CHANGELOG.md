@@ -41,12 +41,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **RSC scaffolding now installs the published `react-on-rails-rsc@19.2.1-rc.1`**:
+  The Pro generator, compatibility checks, workspace overrides, dummy app, and RSC documentation now use the
+  published RC.1 build with the coordinated React 19.2.7 peer floor. [PR 4587](https://github.com/shakacode/react_on_rails/pull/4587) by [justin808](https://github.com/justin808).
 - **[Pro]** **Production streamed RSC CSS reveal gating**: Pro streaming now promotes stylesheet
   preloads listed in the React client manifest, preventing a flash of unstyled content when
   production chunk CSS uses numeric IDs and id-named files. Fixes
   [Issue 4568](https://github.com/shakacode/react_on_rails/issues/4568).
   [PR 4570](https://github.com/shakacode/react_on_rails/pull/4570) by
   [justin808](https://github.com/justin808).
+
+### [17.0.0.rc.9] - 2026-07-11
 
 ### [17.0.0.rc.8] - 2026-07-08
 
@@ -2837,7 +2842,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...main
+[17.0.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...v17.0.0.rc.9
 [17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
 [17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
 [17.0.0.rc.6]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.5...v17.0.0.rc.6
