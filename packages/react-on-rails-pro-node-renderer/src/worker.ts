@@ -553,15 +553,24 @@ const normalizeRawRenderRequest = (
 // unauthenticated raw request must fail auth first, matching the parsed-body path and
 // /asset-exists. Must include every field checkProtocolVersion reads (gemVersion and
 // railsEnv drive the non-production version-mismatch 412), since prechecks run only once
-// on this path.
+// on this path. Absent headers must not produce keys at all, so the protocol-version
+// diagnostic's "received fields" list only names fields the client actually sent.
 const rawRenderPrecheckBody = (headers: RawRenderHeaders) => {
   const authorization = scalarHeader(headers, 'authorization');
-  return {
-    protocolVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`),
-    gemVersion: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`),
-    railsEnv: scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`),
-    password: authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : authorization,
+  const body: Record<string, string> = {};
+  const assign = (key: string, value: string | undefined) => {
+    if (value !== undefined) {
+      body[key] = value;
+    }
   };
+  assign('protocolVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}protocol-version`));
+  assign('gemVersion', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}gem-version`));
+  assign('railsEnv', scalarHeader(headers, `${RAW_RENDER_HEADER_PREFIX}rails-env`));
+  assign(
+    'password',
+    authorization?.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : authorization,
+  );
+  return body;
 };
 
 function discardMultipartFile(part: MultipartFile) {

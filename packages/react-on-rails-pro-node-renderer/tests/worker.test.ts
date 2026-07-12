@@ -294,6 +294,20 @@ describe('worker', () => {
     expect(res.payload).toContain('does not match node renderer version');
   });
 
+  test('POST raw render request reports no received fields when metadata headers are missing', async () => {
+    const app = createWorker();
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .headers({ 'content-type': 'application/vnd.react-on-rails.render-request+javascript' })
+      .payload('ReactOnRails.dummy')
+      .end();
+
+    expect(res.statusCode).toBe(412);
+    expect(res.payload).toContain('MISSING (received fields: (none))');
+  });
+
   test('POST render request still accepts application/x-www-form-urlencoded bodies from older gems', async () => {
     await createVmBundleForTest();
     const app = createWorker({ password: 'my_password' });
