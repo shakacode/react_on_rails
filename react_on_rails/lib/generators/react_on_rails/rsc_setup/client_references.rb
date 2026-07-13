@@ -594,14 +594,10 @@ module ReactOnRails
           # those configs manually.
           return true if sections.empty?
 
-          sections.all? do |section|
-            body = section.fetch(:body)
-            if rsc_plugin_body_has_top_level_scoped_client_references?(body)
-              scoped_rsc_client_references_defined?(content)
-            else
-              rsc_plugin_body_has_top_level_key?(body, "clientReferences")
+          generated_rsc_client_references_defined?(content) &&
+            sections.all? do |section|
+              rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
             end
-          end
         end
 
         # Counts active `new RSCWebpackPlugin(...)` calls whose first argument is present but
@@ -1229,19 +1225,33 @@ module ReactOnRails
         # the same comment-, string-, and brace-aware semantics as the rewrite path.
         def rsc_plugin_body_has_top_level_scoped_client_references?(body)
           [
-            /\bclientReferences\s*:\s*rscClientReferences\b/,
-            /(['"`])clientReferences\1\s*:\s*rscClientReferences\b/
-          ].any? do |pattern|
+            [/\bclientReferences\b/, false],
+            [/(['"`])clientReferences\1/, true]
+          ].any? do |pattern, quoted|
             search_from = 0
 
             while (match = pattern.match(body, search_from))
-              return true if js_top_level_position?(body, match.begin(0))
+              return true if top_level_scoped_client_references_match?(body, match, quoted:)
 
               search_from = match.end(0)
             end
           end
 
           false
+        end
+
+        def top_level_scoped_client_references_match?(body, match, quoted:)
+          return false unless js_top_level_position?(body, match.begin(0))
+          return false unless rsc_plugin_body_key_position?(body, match.begin(0), match.end(0), quoted:)
+
+          colon_index = first_js_token_index(body, match.end(0))
+          return false unless colon_index && body[colon_index] == ":"
+
+          value_index = first_js_token_index(body, colon_index + 1)
+          identifier = "rscClientReferences"
+          return false unless value_index && body[value_index, identifier.length] == identifier
+
+          !body[value_index + identifier.length]&.match?(/[A-Za-z0-9_$]/)
         end
 
         def splice_client_references_into_rsc_plugin_body(body, is_server_match)
@@ -1516,20 +1526,48 @@ module ReactOnRails
         end
 
         def generated_rsc_client_references_defined?(content)
-          # Detect the generated `const rscClientReferences = (() => { ... })()` form
-          # structurally rather than by substring-matching template internals such as the
-          # `RSC_MANIFEST_CLIENT_REFERENCES_JSON` env-var name or the `rsc-client-references.json`
-          # filename. Those `content.include?` guards would couple detection to implementation
-          # details — renaming either string would silently break detection without a failing
-          # test — while adding no safety: `scoped_object_literal_defined?` already requires a
-          # real, module-scope `fallbackRscClientReferences` object literal with
-          # `directory: resolve(config.source_path)` (the generator-specific signature), and the
-          # `rsc_client_references_defined?` precondition rejects commented-out declarations — its
-          # `^[ \t]*(?:const|let|var)` anchor skips `//`-prefixed lines, and `js_top_level_position?`
-          # rejects declarations buried inside `/* ... */` blocks.
-          return false unless rsc_client_references_defined?(content)
+          # A fallback directory object plus a binding named `rscClientReferences` is not enough:
+          # legacy configs can wire that fallback directly into the plugin and bypass graph-derived
+          # manifest selection. Verify the generated IIFE shape and its essential manifest path in
+          # executable code while allowing formatter-controlled whitespace to vary.
+          iife_body = generated_rsc_client_references_iife_body(content)
+          return false unless iife_body
 
-          scoped_object_literal_defined?(content, "fallbackRscClientReferences")
+          scoped_object_literal_defined?(content, "fallbackRscClientReferences") &&
+            js_code_matches?(
+              iife_body,
+              %r{\bdefaultRefsJson\s*=\s*resolve\(\s*['"]ssr-generated/rsc-client-references\.json['"]\s*,?\s*\)}
+            ) &&
+            js_code_matches?(iife_body, /\breadManifestReferences\s*=\s*\(/) &&
+            js_code_matches?(iife_body, /\breturn\s+readManifestReferences\(\s*defaultRefsJson\s*\)/)
+        end
+
+        def generated_rsc_client_references_iife_body(content)
+          declaration = /^[ \t]*(?:const|let|var)\s+rscClientReferences\s*=\s*\(\s*\(\s*\)\s*=>\s*\{/
+          content.to_enum(:scan, declaration).each do
+            match = Regexp.last_match
+            next unless js_top_level_position?(content, match.begin(0))
+
+            open_brace = match.end(0) - 1
+            close_brace = matching_js_closing_brace(content, open_brace)
+            next unless close_brace
+            next unless content[(close_brace + 1)..].match?(/\A\s*\)\s*\(\s*\)\s*;?/)
+
+            return content[(open_brace + 1)...close_brace]
+          end
+
+          nil
+        end
+
+        def js_code_matches?(content, pattern)
+          search_from = 0
+          while (match = pattern.match(content, search_from))
+            return true if js_code_position?(content, match.begin(0))
+
+            search_from = match.end(0)
+          end
+
+          false
         end
 
         def scoped_object_literal_defined?(content, variable_name)

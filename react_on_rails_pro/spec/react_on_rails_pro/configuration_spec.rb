@@ -820,6 +820,73 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe "RSC configuration options" do
+      it "leaves the RSC payload authorizer unset by default" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.rsc_payload_authorizer).to be_nil
+      end
+
+      it "accepts authorizers compatible with the documented two-argument call" do
+        service_class = Class.new do
+          def call(_controller, _component_name = nil) = true
+        end
+        service = service_class.new
+        authorizers = [
+          ->(_controller, _component_name) { true },
+          ->(_controller, _component_name = nil) { true },
+          ->(*_args) { true },
+          proc { |_controller| true },
+          service,
+          service.method(:call)
+        ]
+
+        aggregate_failures do
+          authorizers.each do |authorizer|
+            expect do
+              ReactOnRailsPro.configuration.rsc_payload_authorizer = authorizer
+            end.not_to raise_error
+          end
+        end
+      end
+
+      it "rejects a non-callable RSC payload authorizer" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rsc_payload_authorizer = "authenticated"
+          end
+        end.to raise_error(
+          ReactOnRailsPro::Error,
+          /config\.rsc_payload_authorizer must be nil or respond to #call/
+        )
+      end
+
+      it "rejects callables that cannot accept the documented two-argument call" do
+        one_argument_service = Class.new do
+          def call(_controller) = true
+        end
+        one_argument_method = one_argument_service.new.method(:call)
+        incompatible_authorizers = [
+          ->(_controller) { true },
+          one_argument_method,
+          one_argument_service.new,
+          ->(controller: nil, component_name: nil) { [controller, component_name] },
+          ->(_controller, _component_name, _account) { true },
+          ->(_controller, _component_name, account:) { account },
+          proc { |_controller, _component_name, account:| account }
+        ]
+
+        aggregate_failures do
+          incompatible_authorizers.each do |authorizer|
+            expect do
+              ReactOnRailsPro.configuration.rsc_payload_authorizer = authorizer
+            end.to raise_error(
+              ReactOnRailsPro::Error,
+              /must accept call\(controller, component_name\) without required keywords/
+            )
+          end
+        end
+      end
+
       it "has default values for RSC bundle and manifest files" do
         ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
 
