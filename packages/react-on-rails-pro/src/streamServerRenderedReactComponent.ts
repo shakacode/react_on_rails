@@ -236,6 +236,7 @@ const streamRenderReactComponent = (
                     ? {}
                     : { rscClientChunkStylesheetHrefsByChunkName: new Map() }),
                   rscStreamObservability: railsContext.rscStreamObservability,
+                  railsEnv: railsContext.railsEnv,
                 },
               ),
             );

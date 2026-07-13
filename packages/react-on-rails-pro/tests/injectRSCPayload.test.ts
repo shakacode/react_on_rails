@@ -493,6 +493,71 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
   });
 
+  it('redacts renderingError from diagnostic metadata in production', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'User 48213 not authorized for org 77',
+        stack: 'Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('User 48213');
+    expect(resultStr).not.toContain('not authorized');
+    expect(resultStr).not.toContain('Auth.server.tsx');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('includes full renderingError in diagnostic metadata in development', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'useState is not a function',
+        stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'development',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('useState is not a function');
+    expect(resultStr).toContain('Broken.server.tsx');
+    expect(resultStr).toContain('renderingError');
+  });
+
+  it('includes full renderingError when railsEnv is not provided (backwards compatible)', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'some server error',
+        stack: 'Error: some server error\n    at render (/app/components/Comp.tsx:5:1)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('some server error');
+    expect(resultStr).toContain('Comp.tsx');
+    expect(resultStr).toContain('renderingError');
+  });
+
   it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {
     const mockRSC = createMockRSCStream(['{"test": "data"}']);
     const mockHTML = createMockHTMLStream([
