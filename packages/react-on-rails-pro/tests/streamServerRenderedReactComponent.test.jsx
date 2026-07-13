@@ -42,7 +42,7 @@ jest.mock('react-on-rails/ReactDOMServer', () => {
   };
 });
 
-jest.mock('../src/cache/manifestLoaderServer.ts', () => ({
+jest.mock('../src/cache/manifestStylesheets.ts', () => ({
   getRSCClientManifestStylesheetHrefs: jest.fn().mockResolvedValue(new Set()),
 }));
 
@@ -50,7 +50,7 @@ jest.mock('../src/cache/manifestLoader.ts', () => ({
   setManifestFileNames: jest.fn(),
 }));
 
-const { getRSCClientManifestStylesheetHrefs } = jest.requireMock('../src/cache/manifestLoaderServer.ts');
+const { getRSCClientManifestStylesheetHrefs } = jest.requireMock('../src/cache/manifestStylesheets.ts');
 const { setManifestFileNames } = jest.requireMock('../src/cache/manifestLoader.ts');
 
 const AsyncContent = async ({ throwAsyncError }) => {

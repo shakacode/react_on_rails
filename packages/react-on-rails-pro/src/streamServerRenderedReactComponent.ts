@@ -26,7 +26,7 @@ import {
   StreamableComponentResult,
 } from 'react-on-rails/types';
 import injectRSCPayload from './injectRSCPayload.ts';
-import { getRSCClientManifestStylesheetHrefs } from './cache/manifestLoaderServer.ts';
+import { getRSCClientManifestStylesheetHrefs } from './cache/manifestStylesheets.ts';
 import { isRSCRouteSSRFalseBailoutError } from './RSCRouteSSRFalseBailoutError.ts';
 import {
   streamServerRenderedComponent,
