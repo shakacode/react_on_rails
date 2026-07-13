@@ -36,6 +36,7 @@ export default function checkJestSuiteSelection({
   reactVersion = require('react/package.json').version,
   runPnpm = runPnpmCommand,
   log = console.log,
+  react19OnlyClientTests = [path.join(packageRoot, 'tests/registerServerComponent.client.test.jsx')],
 } = {}) {
   if (Number.parseInt(reactVersion, 10) < 19) {
     log(`Jest suite-selection check skipped (requires React 19+, found ${reactVersion})`);
@@ -43,11 +44,21 @@ export default function checkJestSuiteSelection({
   }
 
   const allTests = runPnpm(['exec', 'jest', '--listTests', 'tests']);
+  const nonRscTests = runPnpm(['run', '--silent', 'test:non-rsc', '--listTests']);
+  const streamingTests = runPnpm(['run', '--silent', 'test:streaming', '--listTests']);
   const selectedTests = new Set([
-    ...runPnpm(['run', '--silent', 'test:non-rsc', '--listTests']),
-    ...runPnpm(['run', '--silent', 'test:streaming', '--listTests']),
+    ...nonRscTests,
+    ...streamingTests,
     ...runPnpm(['run', '--silent', 'test:rsc', '--listTests']),
   ]);
+
+  const misplacedReact19Tests = react19OnlyClientTests.filter((testPath) => nonRscTests.includes(testPath));
+  if (misplacedReact19Tests.length > 0) {
+    const relativePaths = misplacedReact19Tests.map((testPath) => path.relative(packageRoot, testPath));
+    throw new Error(
+      `React 19-only tests selected by the React 18-compatible test:non-rsc suite:\n${relativePaths.join('\n')}`,
+    );
+  }
 
   const orphanedTests = allTests.filter((testPath) => !selectedTests.has(testPath));
 
