@@ -438,6 +438,11 @@ class PrMergeLedger
     link.empty? ? row.to_s : link
   end
 
+  def self.ci_check_row_dedup_key(row)
+    link = row["link"].to_s
+    link.empty? ? ci_check_row_key(row) : link
+  end
+
   def self.required_ci_check_rows_complete?(required_rows, full_rows)
     required_keys = Array(required_rows).map { |row| ci_check_row_key(row) }
     return false if required_keys.empty?
@@ -463,7 +468,11 @@ class PrMergeLedger
         }
       end
 
-      rows = (Array(full_rows) + Array(hosted_rows)).uniq { |row| [row["workflow"], ci_check_row_key(row)] }
+      rows_by_key = {}
+      (Array(full_rows) + Array(hosted_rows)).each do |row|
+        rows_by_key[ci_check_row_dedup_key(row)] = row
+      end
+      rows = rows_by_key.values
       return {
         rows:,
         required_used: false,

@@ -68,6 +68,54 @@ class PrMergeLedgerHostedCiTest < Minitest::Test
     assert_equal "NOT_READY", readiness.fetch("verdict")
   end
 
+  def test_hosted_request_deduplicates_the_same_check_from_full_and_hosted_rows
+    full_check = ci_check(
+      "build",
+      bucket: "pending",
+      state: "IN_PROGRESS",
+      link: "https://github.com/shakacode/react_on_rails/actions/runs/1/job/2"
+    )
+    hosted_check = ci_check(
+      "build",
+      bucket: "pass",
+      state: "SUCCESS",
+      link: "https://github.com/shakacode/react_on_rails/actions/runs/1/job/2"
+    ).merge("workflow" => "Lint JS and Ruby")
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: [full_check],
+      hosted_ci_requested: true,
+      hosted_rows: [hosted_check],
+      expected_hosted_workflows: ["Lint JS and Ruby"]
+    )
+
+    assert_equal [hosted_check], selection.fetch(:rows)
+  end
+
+  def test_hosted_request_keeps_same_named_checks_with_distinct_links
+    full_check = ci_check(
+      "build",
+      bucket: "pass",
+      state: "SUCCESS",
+      link: "https://github.com/shakacode/react_on_rails/actions/runs/1/job/2"
+    )
+    hosted_check = ci_check(
+      "build",
+      bucket: "pass",
+      state: "SUCCESS",
+      link: "https://github.com/shakacode/react_on_rails/actions/runs/3/job/4"
+    ).merge("workflow" => "Lint JS and Ruby")
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: [full_check],
+      hosted_ci_requested: true,
+      hosted_rows: [hosted_check],
+      expected_hosted_workflows: ["Lint JS and Ruby"]
+    )
+
+    assert_equal [full_check, hosted_check], selection.fetch(:rows)
+  end
+
   def test_hosted_ci_accepts_command_dispatch_and_labeled_synchronize_runs
     assert PrMergeLedger.hosted_ci_run_event?("workflow_dispatch", allow_pull_request: true)
     assert PrMergeLedger.hosted_ci_run_event?("pull_request", allow_pull_request: true)
