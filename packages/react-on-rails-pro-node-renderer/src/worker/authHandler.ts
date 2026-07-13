@@ -32,6 +32,7 @@ function normalizeForTimingSafeComparison(value: string) {
   // This digest is never stored or used as a password hash. It only gives
   // timingSafeEqual fixed-width inputs while both cleartext values are in memory.
   // codeql[js/insufficient-password-hash]
+  // lgtm[js/insufficient-password-hash]
   return createHash('sha256').update(value).digest();
 }
 
