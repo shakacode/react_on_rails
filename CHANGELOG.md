@@ -45,6 +45,23 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
+  clients must now send the password field before file parts; the renderer rejects and discards leading file
+  parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
+  and multipart framing, plus a 1,000-part cap and a matching per-file cap. Password comparisons use fixed-length
+  digests to avoid leaking the configured password length. Fixes
+  [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
+  [PR 4623](https://github.com/shakacode/react_on_rails/pull/4623) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro] RSC migration diagnostics require graph-derived client references**: The RSC generator's
+  doctor now reports custom or legacy `clientReferences` values as missing the generated
+  manifest-backed resolver, and the migration guide shows how to print the canonical CommonJS
+  resolver and run it in custom ESM webpack configs with a tested compatibility prelude. Fixes
+  [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
+  [PR 4625](https://github.com/shakacode/react_on_rails/pull/4625) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
   malformed-payload failure once within it. If the retry also fails, React receives the final
@@ -108,6 +125,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   behavior are documented for CI and coding-agent integrations. Fixes
   [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).
   [PR 4611](https://github.com/shakacode/react_on_rails/pull/4611) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Optional authorization callback for RSC payload routes**: Apps can configure
+  `rsc_payload_authorizer` to reject payload requests before component props are parsed or rendered.
+  Existing behavior remains unchanged when the callback is unset, and the RSC security docs now explain
+  the public endpoint boundary and app-controller authorization seam.
+  Fixes [Issue 4595](https://github.com/shakacode/react_on_rails/issues/4595).
+  [PR 4621](https://github.com/shakacode/react_on_rails/pull/4621) by
   [justin808](https://github.com/justin808).
 
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid

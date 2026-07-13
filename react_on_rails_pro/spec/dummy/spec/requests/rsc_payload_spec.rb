@@ -16,6 +16,14 @@
 require "rails_helper"
 
 RSpec.describe "RSC payload endpoint" do
+  around do |example|
+    config = ReactOnRailsPro.configuration
+    original_authorizer = config.rsc_payload_authorizer if config.respond_to?(:rsc_payload_authorizer)
+    example.run
+  ensure
+    config.rsc_payload_authorizer = original_authorizer if config.respond_to?(:rsc_payload_authorizer=)
+  end
+
   def request_rsc_payload
     get "/rsc_payload/RscEchoProps", params: { props: { message: "hello" }.to_json }
   end
@@ -80,6 +88,36 @@ RSpec.describe "RSC payload endpoint" do
     expect(response).to have_http_status(:bad_request)
     expect(response.media_type).to eq("text/plain")
     expect(response.body).to eq("Invalid props JSON")
+  end
+
+  it "denies an unauthorized request before parsing malformed props" do
+    ReactOnRailsPro.configuration.rsc_payload_authorizer = ->(_controller, _component_name) { false }
+
+    get "/rsc_payload/RscEchoProps", params: { props: '{"message":' }
+
+    expect(response).to have_http_status(:forbidden)
+  end
+
+  it "passes the controller and component name to the authorizer" do
+    authorization_context = nil
+    ReactOnRailsPro.configuration.rsc_payload_authorizer = lambda do |controller, component_name|
+      authorization_context = [controller, component_name]
+      true
+    end
+
+    request_rsc_payload
+
+    expect_valid_rsc_payload_response
+    expect(authorization_context.first).to be_a(PagesController)
+    expect(authorization_context.last).to eq("RscEchoProps")
+  end
+
+  it "denies the request when the configured authorizer returns nil" do
+    ReactOnRailsPro.configuration.rsc_payload_authorizer = ->(_controller, _component_name) {}
+
+    request_rsc_payload
+
+    expect(response).to have_http_status(:forbidden)
   end
 
   # Regression for https://github.com/shakacode/react_on_rails/issues/4550.

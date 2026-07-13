@@ -150,6 +150,15 @@ ReactOnRailsPro.configure do |config|
   # Default is false
   config.enable_rsc_support = true
 
+  # Optional authorization callback for the mounted RSC payload endpoint.
+  # It receives the Rails controller and the requested component name before
+  # props are parsed or rendering begins. A false or nil result returns 403.
+  # Default is nil, which preserves the endpoint's existing allow-all behavior.
+  allowed_rsc_components = %w[AccountPage DashboardPage].freeze
+  config.rsc_payload_authorizer = lambda do |controller, component_name|
+    controller.session[:user_id].present? && allowed_rsc_components.include?(component_name)
+  end
+
   # Path to the RSC bundle file (relative to webpack output directory or absolute path)
   # The RSC bundle contains only server components and references to client components.
   # It's generated using the RSC Webpack Loader which transforms client components into
