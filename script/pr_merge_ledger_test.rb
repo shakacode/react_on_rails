@@ -2,6 +2,83 @@
 
 require "minitest/autorun"
 require_relative "pr_merge_ledger_test_helpers"
+load SCRIPT
+
+class PrMergeLedgerHostedCiTest < Minitest::Test
+  include PrMergeLedgerFixtureHelpers
+
+  def test_hosted_request_uses_selected_current_head_checks_even_when_required_gate_passed
+    required_rows = [ci_check("required-pr-gate", bucket: "pass", state: "SUCCESS")]
+    hosted_rows = [
+      ci_check("build", bucket: "pass", state: "SUCCESS").merge("workflow" => "Lint JS and Ruby"),
+      ci_check("generators", bucket: "pending", state: "IN_PROGRESS").merge("workflow" => "Rspec test for gem")
+    ]
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: required_rows,
+      hosted_ci_requested: true,
+      hosted_rows:,
+      expected_hosted_workflows: ["Lint JS and Ruby", "Rspec test for gem"]
+    )
+
+    refute selection.fetch(:required_used)
+    assert_equal required_rows + hosted_rows, selection.fetch(:rows)
+    assert_match(/hosted CI requested/, selection.fetch(:message))
+  end
+
+  def test_hosted_request_is_unknown_until_every_selected_workflow_is_observed
+    required_rows = [ci_check("required-pr-gate", bucket: "pass", state: "SUCCESS")]
+    hosted_rows = [
+      ci_check("build", bucket: "pass", state: "SUCCESS").merge("workflow" => "Lint JS and Ruby")
+    ]
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: required_rows,
+      hosted_ci_requested: true,
+      hosted_rows:,
+      expected_hosted_workflows: ["Lint JS and Ruby", "Rspec test for gem"]
+    )
+
+    assert_empty selection.fetch(:rows)
+    refute selection.fetch(:required_used)
+    assert_match(/missing: Rspec test for gem/, selection.fetch(:message))
+  end
+
+  def test_hosted_request_keeps_other_current_head_checks
+    required_rows = [ci_check("required-pr-gate", bucket: "pass", state: "SUCCESS")]
+    replay_check = ci_check("rspack-vite-dx-check", bucket: "fail", state: "FAILURE")
+    hosted_rows = [
+      ci_check("build", bucket: "pass", state: "SUCCESS").merge("workflow" => "Lint JS and Ruby")
+    ]
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: required_rows + [replay_check],
+      hosted_ci_requested: true,
+      hosted_rows:,
+      expected_hosted_workflows: ["Lint JS and Ruby"]
+    )
+
+    assert_includes selection.fetch(:rows), replay_check
+    readiness = PrMergeLedger.ci_readiness_from_check_rows(
+      123,
+      required_used: selection.fetch(:required_used),
+      rows: selection.fetch(:rows),
+      message: selection.fetch(:message)
+    )
+    assert_equal "NOT_READY", readiness.fetch("verdict")
+  end
+
+  def test_hosted_ci_accepts_command_dispatch_and_labeled_synchronize_runs
+    assert PrMergeLedger.hosted_ci_run_event?("workflow_dispatch", allow_pull_request: true)
+    assert PrMergeLedger.hosted_ci_run_event?("pull_request", allow_pull_request: true)
+    refute PrMergeLedger.hosted_ci_run_event?("push", allow_pull_request: true)
+  end
+
+  def test_dependabot_hosted_ci_requires_trusted_dispatch
+    assert PrMergeLedger.hosted_ci_run_event?("workflow_dispatch", allow_pull_request: false)
+    refute PrMergeLedger.hosted_ci_run_event?("pull_request", allow_pull_request: false)
+  end
+end
 
 class PrMergeLedgerTest < Minitest::Test
   include PrMergeLedgerFixtureHelpers

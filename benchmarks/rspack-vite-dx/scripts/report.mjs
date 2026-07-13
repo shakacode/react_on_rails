@@ -1,8 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { format as formatMarkdown } from 'prettier';
+import { assertNoLocalPaths } from './local-paths.mjs';
 import { verifySummary } from './stats.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -11,6 +12,7 @@ const outputArgument = readArgument('--output') ?? 'RESULTS.md';
 const rawPath = path.resolve(root, rawArgument);
 const outputPath = path.resolve(root, outputArgument);
 const raw = JSON.parse(await readFile(rawPath, 'utf8'));
+assertNoLocalPaths(raw, [...new Set([root, await realpath(root)])]);
 const verified = { ...raw, summary: verifySummary(raw) };
 const rendered = await formatMarkdown(render(verified, path.relative(root, rawPath)), {
   parser: 'markdown',

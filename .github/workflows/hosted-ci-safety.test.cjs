@@ -19,6 +19,7 @@ const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.y
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 const claudeWorkflow = read('.github/workflows/claude.yml');
 const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
+const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -127,6 +128,24 @@ assertDoesNotMatch(
   'ShakaPerf renderer plain curl probe',
   shakaperfReleaseGateWorkflow,
   /curl [^\n]*http:\/\/127\.0\.0\.1:3800\/info/,
+);
+
+assertMatches(
+  'Rspack/Vite DX benchmark path trigger',
+  rspackViteDxWorkflow,
+  /pull_request:[\s\S]*benchmarks\/rspack-vite-dx\/\*\*/,
+);
+assertMatches('Rspack/Vite DX runtime trigger', rspackViteDxWorkflow, /\.tool-versions/);
+assertMatches(
+  'Rspack/Vite DX benchmark frozen install',
+  rspackViteDxWorkflow,
+  /pnpm install --ignore-workspace --frozen-lockfile/,
+);
+assertMatches('Rspack/Vite DX benchmark replay', rspackViteDxWorkflow, /pnpm run check/);
+assertMatches(
+  'Rspack/Vite DX isolated working directory',
+  rspackViteDxWorkflow,
+  /working-directory: benchmarks\/rspack-vite-dx/,
 );
 
 console.log('hosted CI workflow safety tests passed');
