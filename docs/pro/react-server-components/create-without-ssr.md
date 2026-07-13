@@ -260,7 +260,7 @@ module.exports = configureClient;
 ```js
 // config/webpack/serverWebpackConfig.js
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-// existing code, including the `extractLoader` helper...
+// existing code...
 
 // Accept an `rscBundle` flag so the RSC bundle can reuse this config without the
 // client-manifest plugin. `rscWebpackConfig.js` calls `serverWebpackConfig(true)`;
@@ -278,15 +278,10 @@ const configureServer = (rscBundle = false) => {
   return config;
 };
 
-// Match the current Pro generator export shape (config factory + loader helper) so
-// `rscWebpackConfig.js` can reuse `extractLoader`. If your existing config still uses
-// `module.exports = configureServer`, you can keep it — the `rscWebpackConfig.js`
-// snippet above tolerates both shapes.
-module.exports = {
-  default: configureServer,
-  extractLoader,
-};
+module.exports = configureServer;
 ```
+
+> **Note:** The `react_on_rails:rsc` generator's Pro config exports `{ default: configureServer, extractLoader }` and updates its importers to destructure that shape, but this minimal manual snippet keeps the simple function export so existing `serverWebpackConfig()` consumers (such as your `ServerClientOrBoth.js`) keep working. The `rscWebpackConfig.js` snippet above already tolerates both export shapes.
 
 ## Create a React Server Component
 
