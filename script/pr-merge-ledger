@@ -69,6 +69,9 @@ class PrMergeLedger
   HOSTED_CI_RUN_EVENTS = %w[workflow_dispatch pull_request].freeze
   HOSTED_CI_START_COMMANDS = %w[+ci-run-hosted +ci-force-full].freeze
   GITHUB_ACTIONS_ACTORS = %w[github-actions github-actions[bot]].freeze
+  DEPENDABOT_LOGINS = %w[dependabot dependabot[bot]].freeze
+  HOSTED_CI_COMMAND_AFTER_LABEL_ACTORS = DEPENDABOT_LOGINS
+  HOSTED_CI_AUTOMATION_ACTORS = (GITHUB_ACTIONS_ACTORS + HOSTED_CI_COMMAND_AFTER_LABEL_ACTORS).freeze
   TRUSTED_HOSTED_CI_REQUEST_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
   DEPENDABOT_HOSTED_CI_EXCLUSIONS = [
     "React on Rails Pro - Integration Tests",
@@ -551,7 +554,7 @@ class PrMergeLedger
   end
 
   def self.allow_pull_request_hosted_ci?(metadata)
-    metadata["isCrossRepository"] == false && metadata.dig("author", "login") != "dependabot[bot]"
+    metadata["isCrossRepository"] == false && !DEPENDABOT_LOGINS.include?(metadata.dig("author", "login"))
   end
 
   def self.hosted_ci_request_not_before(active_labels:, label_events:, comments:, head_committed_at:,
@@ -623,6 +626,9 @@ class PrMergeLedger
     if GITHUB_ACTIONS_ACTORS.include?(actor)
       return trusted_hosted_ci_command_time(label, label_events, comments, label_time)
     end
+    if HOSTED_CI_COMMAND_AFTER_LABEL_ACTORS.include?(actor)
+      return trusted_hosted_ci_command_after_label_time(label, comments, label_time)
+    end
 
     unless Array(trusted_label_actors).include?(actor)
       raise Error, "untrusted hosted CI label actor #{actor.empty? ? '(missing)' : actor}"
@@ -636,6 +642,14 @@ class PrMergeLedger
     command = latest_trusted_hosted_ci_command(comments, label:, after: epoch_start, before: label_time)
     required_command = label == "force-full-hosted-ci" ? "+ci-force-full" : "hosted CI start"
     raise Error, "hosted CI label #{label} has no trusted #{required_command} command lineage" unless command
+
+    parse_hosted_ci_time(command["createdAt"], "hosted CI command for #{label}")
+  end
+
+  def self.trusted_hosted_ci_command_after_label_time(label, comments, label_time)
+    command = latest_trusted_hosted_ci_command(comments, label:, after: label_time, before: nil)
+    required_command = label == "force-full-hosted-ci" ? "+ci-force-full" : "hosted CI start"
+    raise Error, "hosted CI label #{label} has no later trusted #{required_command} command lineage" unless command
 
     parse_hosted_ci_time(command["createdAt"], "hosted CI command for #{label}")
   end
@@ -673,7 +687,7 @@ class PrMergeLedger
 
     created_at = parse_hosted_ci_time(comment["createdAt"], "hosted CI command")
     return if after && created_at <= after
-    return if created_at > before
+    return if before && created_at > before
 
     [comment, created_at]
   end
@@ -2406,7 +2420,7 @@ class PrMergeLedger
       latest_events = PrMergeLedger.latest_hosted_ci_label_events(active_labels, label_events)
       direct_actors = latest_events.values.filter_map do |event|
         actor = event.dig("actor", "login").to_s
-        actor unless GITHUB_ACTIONS_ACTORS.include?(actor)
+        actor unless HOSTED_CI_AUTOMATION_ACTORS.include?(actor)
       end
       trusted_label_actors = direct_actors.uniq.select { |actor| trusted_hosted_ci_label_actor?(actor) }
 
@@ -2443,7 +2457,7 @@ class PrMergeLedger
     end
 
     def expected_hosted_workflows(metadata)
-      return HOSTED_CI_WORKFLOW_NAMES unless metadata.dig("author", "login") == "dependabot[bot]"
+      return HOSTED_CI_WORKFLOW_NAMES unless DEPENDABOT_LOGINS.include?(metadata.dig("author", "login"))
 
       HOSTED_CI_WORKFLOW_NAMES - DEPENDABOT_HOSTED_CI_EXCLUSIONS
     end

@@ -189,8 +189,14 @@ class PrMergeLedgerHostedCiSafetyTest < Minitest::Test
     refute fork_allows_pull_request
     refute PrMergeLedger.hosted_ci_run_event?("pull_request", allow_pull_request: fork_allows_pull_request)
     assert PrMergeLedger.hosted_ci_run_event?("workflow_dispatch", allow_pull_request: fork_allows_pull_request)
-    refute PrMergeLedger.allow_pull_request_hosted_ci?(
-      "author" => { "login" => "dependabot[bot]" },
+    %w[dependabot dependabot[bot]].each do |login|
+      refute PrMergeLedger.allow_pull_request_hosted_ci?(
+        "author" => { "login" => login },
+        "isCrossRepository" => false
+      )
+    end
+    assert PrMergeLedger.allow_pull_request_hosted_ci?(
+      "author" => { "login" => "dependabot-preview" },
       "isCrossRepository" => false
     )
     refute PrMergeLedger.allow_pull_request_hosted_ci?(
@@ -199,7 +205,30 @@ class PrMergeLedgerHostedCiSafetyTest < Minitest::Test
   end
 end
 
+module PrMergeLedgerHostedCiRequestFixtures
+  private
+
+  def hosted_label_event(label, actor:, at:, type: "LabeledEvent")
+    {
+      "__typename" => type,
+      "createdAt" => at,
+      "actor" => { "login" => actor },
+      "label" => { "name" => label }
+    }
+  end
+
+  def hosted_command_comment(command, at:)
+    {
+      "body" => command,
+      "createdAt" => at,
+      "authorAssociation" => "MEMBER"
+    }
+  end
+end
+
 class PrMergeLedgerHostedCiRequestTrustTest < Minitest::Test
+  include PrMergeLedgerHostedCiRequestFixtures
+
   def test_hosted_request_time_uses_trusted_command_before_bot_added_labels
     threshold = PrMergeLedger.hosted_ci_request_not_before(
       active_labels: %w[ready-for-hosted-ci force-full-hosted-ci],
@@ -235,12 +264,28 @@ class PrMergeLedgerHostedCiRequestTrustTest < Minitest::Test
       label_events: [
         hosted_label_event("ready-for-hosted-ci", actor: "maintainer", at: "2026-07-13T10:02:00Z")
       ],
-      comments: [],
+      comments: [hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:03:00Z")],
       head_committed_at: "2026-07-13T10:00:00Z",
       trusted_label_actors: ["maintainer"]
     )
 
     assert_equal Time.iso8601("2026-07-13T10:02:00Z"), threshold
+  end
+
+  def test_github_actions_label_rejects_a_command_after_the_label
+    error = assert_raises(PrMergeLedger::Error) do
+      PrMergeLedger.hosted_ci_request_not_before(
+        active_labels: ["ready-for-hosted-ci"],
+        label_events: [
+          hosted_label_event("ready-for-hosted-ci", actor: "github-actions", at: "2026-07-13T10:01:00Z")
+        ],
+        comments: [hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:02:00Z")],
+        head_committed_at: "2026-07-13T10:00:00Z",
+        trusted_label_actors: []
+      )
+    end
+
+    assert_match(/no trusted hosted CI start command lineage/, error.message)
   end
 
   def test_hosted_request_time_rejects_untrusted_direct_label_actor
@@ -346,24 +391,80 @@ class PrMergeLedgerHostedCiRequestTrustTest < Minitest::Test
 
     assert_match(/ambiguous latest timeline events/, error.message)
   end
+end
 
-  private
+class PrMergeLedgerDependabotHostedCiRequestTrustTest < Minitest::Test
+  include PrMergeLedgerHostedCiRequestFixtures
 
-  def hosted_label_event(label, actor:, at:, type: "LabeledEvent")
-    {
-      "__typename" => type,
-      "createdAt" => at,
-      "actor" => { "login" => actor },
-      "label" => { "name" => label }
-    }
+  def test_prelabel_uses_a_later_trusted_command_and_normal_head_threshold
+    threshold = PrMergeLedger.hosted_ci_request_not_before(
+      active_labels: ["ready-for-hosted-ci"],
+      label_events: [
+        hosted_label_event("ready-for-hosted-ci", actor: "dependabot", at: "2026-07-13T09:00:00Z")
+      ],
+      comments: [hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:01:00Z")],
+      head_committed_at: "2026-07-13T10:02:00Z",
+      trusted_label_actors: []
+    )
+
+    assert_equal Time.iso8601("2026-07-13T10:02:00Z"), threshold
   end
 
-  def hosted_command_comment(command, at:)
-    {
-      "body" => command,
-      "createdAt" => at,
-      "authorAssociation" => "MEMBER"
-    }
+  def test_prelabel_requires_a_later_trusted_command
+    error = assert_raises(PrMergeLedger::Error) do
+      PrMergeLedger.hosted_ci_request_not_before(
+        active_labels: ["ready-for-hosted-ci"],
+        label_events: [
+          hosted_label_event("ready-for-hosted-ci", actor: "dependabot[bot]", at: "2026-07-13T09:00:00Z")
+        ],
+        comments: [],
+        head_committed_at: "2026-07-13T10:00:00Z",
+        trusted_label_actors: []
+      )
+    end
+
+    assert_match(/no later trusted hosted CI start command lineage/, error.message)
+  end
+
+  def test_relabel_rejects_a_command_before_the_active_dependabot_label
+    label_events = [
+      hosted_label_event("ready-for-hosted-ci", actor: "dependabot", at: "2026-07-13T09:00:00Z"),
+      hosted_label_event(
+        "ready-for-hosted-ci",
+        actor: "maintainer",
+        at: "2026-07-13T10:03:00Z",
+        type: "UnlabeledEvent"
+      ),
+      hosted_label_event("ready-for-hosted-ci", actor: "dependabot", at: "2026-07-13T10:05:00Z")
+    ]
+    stale_command = hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:04:00Z")
+
+    error = assert_raises(PrMergeLedger::Error) do
+      PrMergeLedger.hosted_ci_request_not_before(
+        active_labels: ["ready-for-hosted-ci"],
+        label_events:,
+        comments: [stale_command],
+        head_committed_at: "2026-07-13T10:00:00Z",
+        trusted_label_actors: []
+      )
+    end
+
+    assert_match(/no later trusted hosted CI start command lineage/, error.message)
+  end
+
+  def test_prelabel_accepts_force_full_command_with_bot_added_force_full_label
+    threshold = PrMergeLedger.hosted_ci_request_not_before(
+      active_labels: %w[ready-for-hosted-ci force-full-hosted-ci],
+      label_events: [
+        hosted_label_event("ready-for-hosted-ci", actor: "dependabot", at: "2026-07-13T09:00:00Z"),
+        hosted_label_event("force-full-hosted-ci", actor: "github-actions", at: "2026-07-13T10:02:00Z")
+      ],
+      comments: [hosted_command_comment("+ci-force-full", at: "2026-07-13T10:01:00Z")],
+      head_committed_at: "2026-07-13T10:00:00Z",
+      trusted_label_actors: []
+    )
+
+    assert_equal Time.iso8601("2026-07-13T10:01:00Z"), threshold
   end
 end
 
@@ -417,6 +518,8 @@ class PrMergeLedgerHostedCiSuiteFreshnessTest < Minitest::Test
 end
 
 class PrMergeLedgerGitHubCollectorTest < Minitest::Test
+  include PrMergeLedgerHostedCiRequestFixtures
+
   def test_fetch_labels_uses_the_paginated_connection
     collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
     captured = nil
@@ -431,6 +534,53 @@ class PrMergeLedgerGitHubCollectorTest < Minitest::Test
     assert_equal 4626, captured.fetch(0)
     assert_includes captured.fetch(1), "labels(first:100, after:$endCursor)"
     assert_equal "labels", captured.fetch(2)
+  end
+
+  def test_dependabot_label_actor_uses_command_lineage_without_permission_lookup
+    metadata = {
+      "labels" => { "nodes" => [{ "name" => "ready-for-hosted-ci" }] },
+      "headRefOid" => "abc123",
+      "commits" => {
+        "nodes" => [{ "commit" => { "oid" => "abc123", "committedDate" => "2026-07-13T10:00:00Z" } }]
+      }
+    }
+    comments = [hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:01:00Z")]
+
+    %w[dependabot dependabot[bot]].each do |actor|
+      collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
+      dependabot_label_event = hosted_label_event(
+        "ready-for-hosted-ci",
+        actor:,
+        at: "2026-07-13T09:00:00Z"
+      )
+      collector.define_singleton_method(:fetch_paginated_connection) do |_pr_number, _query, connection_name|
+        raise "unexpected connection #{connection_name}" unless connection_name == "timelineItems"
+
+        [dependabot_label_event]
+      end
+      collector.define_singleton_method(:trusted_hosted_ci_label_actor?) do |permission_actor|
+        raise "unexpected permission lookup for #{permission_actor}"
+      end
+
+      threshold = collector.send(:hosted_ci_request_not_before, metadata, 4626, comments)
+
+      assert_equal Time.iso8601("2026-07-13T10:01:00Z"), threshold
+    end
+  end
+
+  def test_dependabot_graphql_and_rest_logins_exclude_pro_workflows
+    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
+    expected = PrMergeLedger::HOSTED_CI_WORKFLOW_NAMES - PrMergeLedger::DEPENDABOT_HOSTED_CI_EXCLUSIONS
+
+    %w[dependabot dependabot[bot]].each do |login|
+      actual = collector.send(:expected_hosted_workflows, "author" => { "login" => login })
+      assert_equal expected, actual
+    end
+    preview_workflows = collector.send(
+      :expected_hosted_workflows,
+      "author" => { "login" => "dependabot-preview" }
+    )
+    assert_equal PrMergeLedger::HOSTED_CI_WORKFLOW_NAMES, preview_workflows
   end
 end
 
