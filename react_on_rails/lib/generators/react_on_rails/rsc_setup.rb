@@ -360,52 +360,63 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, config_path))
 
-        # Skip if RSC is already configured
-        return if content.include?("rscWebpackConfig")
+        unless content.include?("require('./rscWebpackConfig')")
+          server_import_pattern =
+            %r{(const\b.*require\('\./serverWebpackConfig'\)\s*;?)}
+          gsub_file(
+            config_path,
+            server_import_pattern,
+            "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
+          )
+        end
 
-        # Add RSC import after serverWebpackConfig import
-        gsub_file(
-          config_path,
-          %r{(const (?:\{ default: serverWebpackConfig \}|serverWebpackConfig) = require\('\./serverWebpackConfig'\);)},
-          "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
-        )
+        unless content.include?("rscWebpackConfig()")
+          gsub_file(
+            config_path,
+            /^(\s*const serverConfig = serverWebpackConfig\(\)\s*;?)$/,
+            "\\1\n\n  const rscConfig = rscWebpackConfig();"
+          )
+        end
 
-        # Add rscConfig variable after serverConfig (with blank line separator)
-        gsub_file(
-          config_path,
-          /^(\s*const serverConfig = serverWebpackConfig\(\);)$/,
-          "\\1\n\n  const rscConfig = rscWebpackConfig();"
-        )
+        unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
+          gsub_file(
+            config_path,
+            /envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;?/,
+            "envSpecific(clientConfig, serverConfig, rscConfig);"
+          )
+        end
 
-        # Update envSpecific call to include rscConfig
-        gsub_file(
-          config_path,
-          /envSpecific\(clientConfig, serverConfig\);/,
-          "envSpecific(clientConfig, serverConfig, rscConfig);"
-        )
+        unless content.include?("RSC_BUNDLE_ONLY")
+          rsc_bundle_handling = <<~JS.chomp
+            } else if (process.env.RSC_BUNDLE_ONLY) {
+                // eslint-disable-next-line no-console
+                console.log('[React on Rails] Creating only the RSC bundle.');
+                result = rscConfig;
+          JS
+          gsub_file(
+            config_path,
+            %r{\n(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
+            "\n  #{rsc_bundle_handling}\n\\1"
+          )
+        end
 
-        # Add RSC_BUNDLE_ONLY handling before the else block
-        rsc_bundle_handling = <<~JS.chomp
-          } else if (process.env.RSC_BUNDLE_ONLY) {
-              // eslint-disable-next-line no-console
-              console.log('[React on Rails] Creating only the RSC bundle.');
-              result = rscConfig;
-        JS
-        gsub_file(
-          config_path,
-          %r{\n(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
-          "\n  #{rsc_bundle_handling}\n\\1"
-        )
+        update_scob_default_bundle_output(config_path, content)
+      end
 
-        # Update default multi-bundle output to include RSC
+      def update_scob_default_bundle_output(config_path, content)
+        unless content.include?("client, server, and RSC bundles")
+          gsub_file(
+            config_path,
+            /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\);/,
+            "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
+          )
+        end
+
+        return if content.include?("result = [clientConfig, serverConfig, rscConfig]")
+
         gsub_file(
           config_path,
-          /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\);/,
-          "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
-        )
-        gsub_file(
-          config_path,
-          /result = \[clientConfig, serverConfig\];/,
+          /result = \[clientConfig, serverConfig\]\s*;?/,
           "result = [clientConfig, serverConfig, rscConfig];"
         )
       end
@@ -616,7 +627,14 @@ module ReactOnRails
         return [] unless scob_path
 
         content = File.read(File.join(destination_root, scob_path))
-        content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+        missing = []
+        unless content.include?("require('./rscWebpackConfig')")
+          missing << "rscWebpackConfig import in ServerClientOrBoth.js"
+        end
+        unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
+          missing << "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
+        end
+        missing
       end
 
       def warn_non_object_literal_rsc_plugin_options_for_config(content)

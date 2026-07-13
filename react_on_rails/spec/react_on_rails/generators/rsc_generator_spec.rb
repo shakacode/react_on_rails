@@ -192,7 +192,8 @@ describe RscGenerator, type: :generator do
 
       it "adds RSC handling to ServerClientOrBoth" do
         assert_file "config/webpack/ServerClientOrBoth.js" do |content|
-          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("require('./rscWebpackConfig')")
+          expect(content).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
           expect(content).to include("RSC_BUNDLE_ONLY")
           expect(content).to include("rscConfig")
         end
@@ -4700,7 +4701,8 @@ describe RscGenerator, type: :generator do
 
       it "adds RSC handling to ServerClientOrBoth" do
         assert_file "config/rspack/ServerClientOrBoth.js" do |content|
-          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("require('./rscWebpackConfig')")
+          expect(content).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
           expect(content).to include("RSC_BUNDLE_ONLY")
           expect(content).to include("rscConfig")
         end
@@ -4933,6 +4935,124 @@ describe RscGenerator, type: :generator do
         expect(content).to include("const serverWebpackConfig = require('./serverWebpackConfig');")
         expect(content).to include("const rscWebpackConfig = require('./rscWebpackConfig');")
       end
+    end
+  end
+
+  # Regression tests for #4630 — fragile envSpecific gsub and masking verifier.
+  # The standalone RSC generator gsub-rewrites ServerClientOrBoth.js; when a linter
+  # reformats the file (e.g. removes trailing semicolons), the rewrite must still
+  # succeed, the verifier must catch partial transforms, and re-running the generator
+  # must repair them.
+
+  describe "ServerClientOrBoth envSpecific rewrite robustness (#4630)" do
+    let(:generator) { described_class.new([], {}, { destination_root: }) }
+
+    before do
+      prepare_destination
+    end
+
+    it "rewrites envSpecific call even when the trailing semicolon is missing" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      base_content = server_client_or_both_content(destructured_import: true)
+      content_without_semicolons = base_content
+                                   .gsub("envSpecific(clientConfig, serverConfig);",
+                                         "envSpecific(clientConfig, serverConfig)")
+      simulate_existing_file(config_path, content_without_semicolons)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
+      expect(result).to include("require('./rscWebpackConfig')")
+      expect(result).to include("rscConfig = rscWebpackConfig()")
+      expect(result).to include("RSC_BUNDLE_ONLY")
+      expect(result).to include("[clientConfig, serverConfig, rscConfig]")
+    end
+
+    it "rewrites envSpecific call with extra whitespace around arguments" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      base_content = server_client_or_both_content(destructured_import: true)
+      content_with_spaces = base_content
+                            .gsub("envSpecific(clientConfig, serverConfig);",
+                                  "envSpecific( clientConfig ,  serverConfig )")
+      simulate_existing_file(config_path, content_with_spaces)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
+    end
+
+    it "repairs a partially transformed file on re-run" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Simulate partial state: import landed but envSpecific was NOT rewritten
+      partial_content = server_client_or_both_content(destructured_import: true)
+                        .sub(
+                          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');",
+                          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');\n" \
+                          "const rscWebpackConfig = require('./rscWebpackConfig');"
+                        )
+      simulate_existing_file(config_path, partial_content)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
+      expect(result).to include("RSC_BUNDLE_ONLY")
+      expect(result.scan("require('./rscWebpackConfig')").length).to eq(1)
+    end
+
+    it "verifier detects a partially transformed ServerClientOrBoth" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Import present but envSpecific NOT rewritten
+      partial_content = server_client_or_both_content(destructured_import: true)
+                        .sub(
+                          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');",
+                          "const { default: serverWebpackConfig } = require('./serverWebpackConfig');\n" \
+                          "const rscWebpackConfig = require('./rscWebpackConfig');"
+                        )
+      simulate_existing_file(config_path, partial_content)
+
+      missing = generator.send(:check_rsc_scob_config)
+      expect(missing).to include(
+        "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
+      )
+      expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
+    end
+
+    it "is a no-op when ServerClientOrBoth is already fully configured" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Simulate a fully configured SCOB (as the generator would produce)
+      full_content = server_client_or_both_content(destructured_import: true)
+      simulate_existing_file(config_path, full_content)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      # First run should transform it
+      generator2 = described_class.new([], {}, { destination_root: })
+      generator2.send(:update_server_client_or_both_for_rsc)
+
+      result2 = File.read(File.join(destination_root, config_path))
+      # Second run on already-transformed output should be a no-op
+      expect(result2).to eq(result)
+    end
+
+    it "repairs partially transformed default-bundle output on re-run" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Simulate: log message updated but result array NOT updated
+      partial_content = server_client_or_both_content(destructured_import: true)
+                        .sub(
+                          "console.log('[React on Rails] Creating both client and server bundles.');",
+                          "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
+                        )
+      simulate_existing_file(config_path, partial_content)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("[clientConfig, serverConfig, rscConfig]")
+      expect(result).to include("client, server, and RSC bundles")
     end
   end
 
