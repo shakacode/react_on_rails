@@ -37,6 +37,17 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
+  17.0.0.rc.9 made webpack fail with `Module not found: Can't resolve 'react-on-rails-rsc/client.node'`
+  (and `server.node`) unless the optional `react-on-rails-rsc` peer dependency was installed, because the
+  streaming path imported the RSC manifest loaders and bundlers resolve even lazy `import()` specifiers at
+  build time. The manifest stylesheet helpers now live in a module with no runtime `react-on-rails-rsc`
+  imports, and a regression test keeps every non-RSC entry graph free of them. `react-on-rails-rsc` remains
+  optional: only React Server Components (which require React 19) need it, and React on Rails Pro continues
+  to work with React 18 with RSC disabled.
+  [PR 4641](https://github.com/shakacode/react_on_rails/pull/4641) by
+  [justin808](https://github.com/justin808).
+
 - **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
   exceptions no longer retain raw component props, generated JavaScript, or renderer parse details in log and
   error-tracker context.
