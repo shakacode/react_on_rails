@@ -6,7 +6,7 @@ require "rainbow"
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
     REDACTED_VALUE = "[REDACTED]"
-    SENSITIVE_CONTEXT_KEYS = %w[props js_code].freeze
+    SENSITIVE_CONTEXT_KEYS = %w[props js_code json].freeze
     # TODO: Consider remove providing original `err` as already have access to `self.cause`
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages

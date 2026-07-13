@@ -87,6 +87,25 @@ module ReactOnRails
           expect(context.inspect).not_to include("nested-props-secret", "nested-js-secret")
         end
       end
+
+      it "does not merge raw JSON from a nested parse error into error-tracker contexts" do
+        raw_json = '{"access_token":"nested-json-secret"}'
+        json_parse_error = JsonParseError.new(parse_error: JSON::ParserError.new("unexpected token"), json: raw_json)
+        prerender_error = described_class.new(err: json_parse_error)
+
+        expect(json_parse_error.to_error_context).to include(json: raw_json)
+
+        contexts = [
+          prerender_error.to_error_context,
+          prerender_error.to_honeybadger_context,
+          prerender_error.raven_context
+        ]
+
+        contexts.each do |context|
+          expect(context).not_to have_key(:json)
+          expect(context.inspect).not_to include("nested-json-secret")
+        end
+      end
     end
 
     it "does not retain raw props or generated JavaScript on the exception" do

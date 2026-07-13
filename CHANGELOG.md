@@ -38,7 +38,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
-  exceptions no longer retain raw component props or generated JavaScript in log and error-tracker context.
+  exceptions no longer retain raw component props, generated JavaScript, or nested renderer JSON in log and
+  error-tracker context.
   Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
   Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
   [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
