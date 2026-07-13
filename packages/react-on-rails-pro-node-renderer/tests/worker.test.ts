@@ -707,20 +707,29 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
   });
 
-  test('post /upload-assets requires the password field before file parts', async () => {
+  test('post /upload-assets keeps a file-first authentication failure latched', async () => {
     const bundleHash = 'file-first-password';
     const app = createWorker({
       password: 'my_password',
+    });
+    let uploadDirDuringResponse: string | undefined;
+    app.addHook('onSend', (req, _res, payload, done) => {
+      uploadDirDuringResponse = req.uploadDir;
+      done(null, payload);
     });
     const form = new FormData();
     form.append(`bundle_${bundleHash}`, fs.readFileSync(getFixtureBundle()), {
       contentType: 'text/javascript',
       filename: 'bundle.js',
     });
+    form.append('password', 'my_password');
+    form.append('asset-after-password', fs.readFileSync(getFixtureAsset()), {
+      contentType: 'application/json',
+      filename: 'asset-after-password.json',
+    });
     form.append('gemVersion', gemVersion);
     form.append('protocolVersion', protocolVersion);
     form.append('railsEnv', railsEnv);
-    form.append('password', 'my_password');
 
     const payload = form.getBuffer();
     const passwordFieldOffset = payload.indexOf(Buffer.from('name="password"'));
@@ -747,6 +756,7 @@ describe('worker', () => {
 
     expect(res.statusCode).toBe(401);
     expect(res.payload).toBe('Wrong password');
+    expect(uploadDirDuringResponse).toBe('');
     expect(fs.existsSync(path.join(serverBundleCachePathForTest(), 'uploads'))).toBe(false);
   });
 

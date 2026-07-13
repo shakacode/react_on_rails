@@ -567,6 +567,13 @@ export default function run(config: Partial<Config>) {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
       }
 
+      // Authentication failure is terminal for the request. A later password
+      // field must not re-authorize file parts that follow a rejected file.
+      if (this.uploadAuthenticationError) {
+        discardMultipartFile(part);
+        return;
+      }
+
       // The official multipart protocol requires the password field before any
       // file parts so unauthenticated file contents never reach disk.
       const authResult = authenticate({ password: multipartPassword(part) });

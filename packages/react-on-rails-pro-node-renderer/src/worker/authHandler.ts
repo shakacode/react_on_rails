@@ -28,6 +28,13 @@ export interface AuthBody {
   password?: string;
 }
 
+function normalizeForTimingSafeComparison(value: string) {
+  // This digest is never stored or used as a password hash. It only gives
+  // timingSafeEqual fixed-width inputs while both cleartext values are in memory.
+  // codeql[js/insufficient-password-hash]
+  return createHash('sha256').update(value).digest();
+}
+
 export function authenticate(body: AuthBody) {
   const { password } = getConfig();
 
@@ -37,8 +44,8 @@ export function authenticate(body: AuthBody) {
     // Hash both values to a fixed length before the timing-safe comparison so
     // mismatched input lengths do not reveal the configured password length.
     try {
-      const passwordBuffer = createHash('sha256').update(password).digest();
-      const reqPasswordBuffer = createHash('sha256').update(reqPassword).digest();
+      const passwordBuffer = normalizeForTimingSafeComparison(password);
+      const reqPasswordBuffer = normalizeForTimingSafeComparison(reqPassword);
 
       if (!timingSafeEqual(passwordBuffer, reqPasswordBuffer)) {
         return {
