@@ -102,6 +102,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4611](https://github.com/shakacode/react_on_rails/pull/4611) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Optional authorization callback for RSC payload routes**: Apps can configure
+  `rsc_payload_authorizer` to reject payload requests before component props are parsed or rendered.
+  Existing behavior remains unchanged when the callback is unset, and the RSC security docs now explain
+  the public endpoint boundary and app-controller authorization seam.
+  Fixes [Issue 4595](https://github.com/shakacode/react_on_rails/issues/4595).
+  [PR 4621](https://github.com/shakacode/react_on_rails/pull/4621) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
   license through `config.license_token`, including from Rails credentials, while standalone Node
   renderers can use the `licenseToken` option. Explicit nonblank configuration takes precedence over
