@@ -122,7 +122,7 @@ This entry indicates that the `ToggleContainer` client component is included in 
 
 React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the RSC payload. React hoists those stylesheet links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
 
-The current resolver works from the manifest alone, so it emits CSS for every `'use client'` module entry in the manifest instead of only the client references encountered by one render. This is intentional for now: CSS modules and component-scoped styles remain safe, but global CSS imported by a client component can apply on an RSC page that did not render that component. Because these stylesheet links are render-blocking, avoid importing page-specific global CSS from broad client-component entry points until `react-on-rails-rsc` can attach CSS at the rendered client-reference boundary.
+The resolver derives CSS per render: as the RSC payload streams, React on Rails Pro scans the Flight chunks for the client chunks that render references, looks up those chunks' CSS assets from the client build's `loadable-stats.json`, and emits `rsc-css` stylesheet links before the streamed content that needs them. CSS is request/chunk driven: a stylesheet is considered only when the current payload references the corresponding client chunk, not for every `'use client'` module in the manifest. Shared or broad chunks can still bring shared/global CSS into that page's render-blocking `rsc-css` group, so keep client boundaries thin. See [CSS and Styling in RSC](./css-and-styling.md) for the full FOUC-prevention pipeline.
 
 If you want to change the file name of the `react-client-manifest.json` file, you can do so by setting the `clientManifestFilename` option in the `react-on-rails-rsc/WebpackPlugin` plugin as follows:
 
@@ -140,8 +140,8 @@ config.plugins.push(
 And because React on Rails Pro uploads the `react-client-manifest.json` file to the renderer while uploading the server bundle and it expects it to be named `react-client-manifest.json`, you need to tell React on Rails Pro that the name is changed to `client-components-webpack-manifest.json`.
 
 ```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
   config.react_client_manifest_file = "client-components-webpack-manifest.json"
 end
 ```

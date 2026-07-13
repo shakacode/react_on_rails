@@ -79,7 +79,11 @@ This happens because React on Rails by default adds the scripts that hydrate com
 
 This default behavior was kept for backward compatibility, as there were previously race conditions that could occur when using `async` scripts before the page fully loaded. However, these race conditions have been fixed in the latest React on Rails release.
 
-To enable true selective hydration, we need to configure React on Rails to load scripts as `async` scripts by setting `generated_component_packs_loading_strategy: :async` in the initializer:
+To enable true selective hydration, React on Rails must load scripts as `async` scripts (`generated_component_packs_loading_strategy: :async`).
+
+> **Note:** React on Rails **Pro** apps already default to `:async` (on Shakapacker ≥ 8.2.0), so this step is usually a no-op for the Pro/RSC audience of this guide. You only need to set it explicitly on **non-Pro** apps, which default to `:defer`. On Shakapacker **< 8.2.0**, async script loading is unsupported — upgrade Shakapacker rather than setting `:async` (otherwise configuration raises `ReactOnRails::Error`).
+
+If you do need to set it explicitly (non-Pro apps), add it to the initializer:
 
 ```ruby
 # config/initializers/react_on_rails.rb
