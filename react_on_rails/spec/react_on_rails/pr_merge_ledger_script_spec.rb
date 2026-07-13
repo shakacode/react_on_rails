@@ -15,9 +15,7 @@ RSpec.describe "script/pr-merge-ledger" do
 
   def with_fake_gh(script_body)
     Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
-      gh_path = File.join(bin_dir, "gh")
-      File.write(gh_path, fake_gh_script_with_ready_checks(script_body))
-      File.chmod(0o755, gh_path)
+      install_fake_gh(bin_dir, fake_gh_script_with_ready_checks(script_body))
 
       yield({ "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" })
     end
@@ -25,12 +23,16 @@ RSpec.describe "script/pr-merge-ledger" do
 
   def with_raw_fake_gh(script_body)
     Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
-      gh_path = File.join(bin_dir, "gh")
-      File.write(gh_path, script_body)
-      File.chmod(0o755, gh_path)
+      install_fake_gh(bin_dir, script_body)
 
       yield({ "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" }, bin_dir)
     end
+  end
+
+  def install_fake_gh(bin_dir, script_body)
+    gh_path = File.join(bin_dir, "gh")
+    File.write(gh_path, fake_gh_script_with_empty_labels(script_body))
+    File.chmod(0o755, gh_path)
   end
 
   def fake_gh_script_with_ready_checks(script_body)
@@ -45,6 +47,23 @@ RSpec.describe "script/pr-merge-ledger" do
 
       #{script_body}
     SH
+  end
+
+  def fake_gh_script_with_empty_labels(script_body)
+    comments_index = script_body.index('"pullRequest":{"comments":')
+    return script_body unless comments_index
+
+    branch_index = script_body.rindex(/^[ \t]*(?:else|elif)\b/, comments_index)
+    raise "fake gh comments response is not guarded by a shell branch" unless branch_index
+
+    labels_branch = <<~SH
+
+      elif printf '%s' "$query" | grep -q 'labels(first:100'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"labels":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+    SH
+    script_body.dup.insert(branch_index, labels_branch)
   end
 
   def fake_gh_script_with_check_rows(
@@ -7223,9 +7242,7 @@ RSpec.describe "script/pr-merge-ledger" do
     SH
 
     Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
-      gh_path = File.join(bin_dir, "gh")
-      File.write(gh_path, fake_gh)
-      File.chmod(0o755, gh_path)
+      install_fake_gh(bin_dir, fake_gh)
 
       stdout, stderr, status = Open3.capture3(
         { "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" },
@@ -7448,9 +7465,7 @@ RSpec.describe "script/pr-merge-ledger" do
     SH
 
     Dir.mktmpdir("pr-merge-ledger-gh") do |bin_dir|
-      gh_path = File.join(bin_dir, "gh")
-      File.write(gh_path, fake_gh)
-      File.chmod(0o755, gh_path)
+      install_fake_gh(bin_dir, fake_gh)
 
       stdout, stderr, status = Open3.capture3(
         { "PATH" => "#{bin_dir}:#{ENV.fetch('PATH', '')}" },
@@ -7930,7 +7945,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).to be_success
       expect(stderr).to be_empty
       expect(JSON.parse(stdout).dig("pull_requests", 0, "pr", "number")).to eq(1)
-      expect(File.read(count_path).strip).to eq("5")
+      expect(File.read(count_path).strip).to eq("6")
     end
   end
 
@@ -8007,7 +8022,7 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(status).to be_success
       expect(stderr).to be_empty
       expect(JSON.parse(stdout).dig("pull_requests", 0, "pr", "number")).to eq(1)
-      expect(File.read(count_path).strip).to eq("5")
+      expect(File.read(count_path).strip).to eq("6")
     end
   end
 
