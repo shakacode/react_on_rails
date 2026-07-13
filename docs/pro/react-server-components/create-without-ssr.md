@@ -187,7 +187,9 @@ const configureRsc = () => {
 module.exports = configureRsc;
 ```
 
-> **Note:** This config uses the same core RSC webpack patterns as the template that ships with the `react_on_rails:rsc` generator, which is the canonical, maintained version (it also wires up extra steps such as the RSC reference-discovery build). Two details matter here: `serverWebpackConfig(true)` skips the RSC manifest plugin (the RSC bundle must not inherit it), and the loader insertion handles both `babel-loader` and `swc-loader` (including SWC's function-form `rule.use`) so SWC projects still get the RSC loader. If you'd rather generate this file than hand-write it, see [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md).
+> **Note:** This config uses the same core RSC webpack patterns as the template that ships with the `react_on_rails:rsc` generator, which is the canonical, maintained version. Two details matter here: `serverWebpackConfig(true)` skips the RSC manifest plugin (the RSC bundle must not inherit it — this requires the `rscBundle` guard added to `serverWebpackConfig.js` in step 5), and the loader insertion handles both `babel-loader` and `swc-loader` (including SWC's function-form `rule.use`) so SWC projects still get the RSC loader.
+>
+> These minimal snippets intentionally omit **scoped client-reference discovery**. Because `RSCWebpackPlugin` is used without a `clientReferences` option, it falls back to a **broad scan** of every `'use client'` module — the original, working behavior. The generator additionally wires the reference-discovery build (`bin/shakapacker-precompile-hook` generates a scoped `ssr-generated/rsc-client-references.json`) so only the client references actually reachable through the server-component graph are bundled. Scoped discovery is a build-time optimization, not a correctness requirement for this manual setup. For that production-grade wiring, generate the config with `react_on_rails:rsc` or follow [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md).
 
 Add the new RSC Webpack configuration to the bundle configuration returned by `webpackConfig` function in `config/webpack/ServerClientOrBoth.js` file:
 
@@ -260,10 +262,18 @@ module.exports = configureClient;
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 // existing code...
 
-const configureServer = () => {
+// Accept an `rscBundle` flag so the RSC bundle can reuse this config without the
+// client-manifest plugin. `rscWebpackConfig.js` calls `serverWebpackConfig(true)`;
+// the regular server build calls it with no argument (`rscBundle` defaults to `false`).
+const configureServer = (rscBundle = false) => {
   // existing code...
 
-  config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  // The RSC bundle must not inherit the client-manifest plugin, so only add it
+  // for the actual server bundle. Without this guard the `serverWebpackConfig(true)`
+  // call in `rscWebpackConfig.js` has no effect and the RSC bundle still gets the plugin.
+  if (!rscBundle) {
+    config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
 
   return config;
 };
