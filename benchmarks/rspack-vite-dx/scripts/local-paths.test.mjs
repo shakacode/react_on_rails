@@ -33,10 +33,41 @@ test('redacts exact benchmark roots and common local user paths across platforms
 });
 
 test('redacts complete local paths whose segments contain spaces', () => {
-  const value = '/Users/alice/My Documents/project/error.js';
+  const cases = [
+    '/Users/Alice Smith/My Documents/project/error.js',
+    '/home/Alice Smith/My Documents/project/error.js',
+    String.raw`C:\Users\Alice Smith\My Documents\project\error.js`,
+  ];
 
-  assert.equal(redactLocalPaths(value), '<LOCAL_PATH>');
-  assert.doesNotThrow(() => assertNoLocalPaths(redactLocalPaths(value)));
+  for (const value of cases) {
+    const redacted = redactLocalPaths(value);
+    assert.equal(redacted, '<LOCAL_PATH>');
+    assert.doesNotThrow(() => assertNoLocalPaths(redacted));
+  }
+});
+
+test('preserves prose after local paths with spaced directory segments', () => {
+  const cases = [
+    ['/Users/Alice Smith/My Documents/project/error.js failed to compile', '<LOCAL_PATH> failed to compile'],
+    ['/home/Alice Smith/My Documents/project/error.js failed to compile', '<LOCAL_PATH> failed to compile'],
+    [
+      String.raw`C:\Users\Alice Smith\My Documents\project\error.js failed to compile`,
+      '<LOCAL_PATH> failed to compile',
+    ],
+  ];
+
+  for (const [value, expected] of cases) assert.equal(redactLocalPaths(value), expected);
+  assert.equal(redactLocalPaths('Visit /home/about us for docs'), 'Visit /home/about us for docs');
+});
+
+test('does not redact strings that only share a fixed local-root prefix', () => {
+  assert.equal(redactLocalPaths('/tmp'), '<LOCAL_PATH>');
+  assert.equal(redactLocalPaths('/workspace/benchmark', ['/workspace/benchmark']), '<LOCAL_PATH>');
+  assert.equal(redactLocalPaths('/tmpfs/cache'), '/tmpfs/cache');
+  assert.equal(
+    redactLocalPaths('/workspace/benchmarking/file.js', ['/workspace/benchmark']),
+    '/workspace/benchmarking/file.js',
+  );
 });
 
 test('preserves remote web URLs and relative compiler paths', () => {

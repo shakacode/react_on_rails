@@ -1,16 +1,20 @@
 const webUrlPattern = /(https?:\/\/[^\s"']+)/gi;
 const localDevServerUrlPattern =
   /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\[::\])(?::\d+)?\//i;
-const pathTail = String.raw`(?:[\\/][^\\/\r\n"',;:)\]}]+)*`;
+const spacedPathSegment = String.raw`[^\\/\r\n"',;:)\]}]+`;
+// A whitespace-free terminal segment keeps unquoted trailing prose outside the match.
+// Final segments containing spaces must be quoted or escaped by the producing tool.
+const terminalPathSegment = String.raw`[^\\/\s\r\n"',;:)\]}]+`;
+const pathBoundary = String.raw`(?=$|[\r\n"',;:)\]}])`;
+const pathTail = String.raw`(?:[\\/]${spacedPathSegment})*[\\/]${terminalPathSegment}`;
+const fixedRootSuffix = String.raw`(?:${pathTail}|${pathBoundary})`;
+const userPath = String.raw`(?:${spacedPathSegment}${pathTail}|${terminalPathSegment}${pathBoundary})`;
 const localPathPatterns = [
-  new RegExp(String.raw`\/(?:Users|home)\/[^/\s"',;:)\]}]+${pathTail}`, 'g'),
-  new RegExp(String.raw`\/root${pathTail}`, 'g'),
-  new RegExp(String.raw`\/(?:private\/)?tmp${pathTail}`, 'g'),
-  new RegExp(String.raw`\/(?:private\/)?var\/folders${pathTail}`, 'g'),
-  new RegExp(
-    String.raw`[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\\/\s"',;:)\]}]+${pathTail}`,
-    'gi',
-  ),
+  new RegExp(String.raw`\/(?:Users|home)\/${userPath}`, 'g'),
+  new RegExp(String.raw`\/root${fixedRootSuffix}`, 'g'),
+  new RegExp(String.raw`\/(?:private\/)?tmp${fixedRootSuffix}`, 'g'),
+  new RegExp(String.raw`\/(?:private\/)?var\/folders${fixedRootSuffix}`, 'g'),
+  new RegExp(String.raw`[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/]${userPath}`, 'gi'),
 ];
 
 const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -34,7 +38,8 @@ export const redactLocalPaths = (value, exactRoots = []) => {
       String(root).replaceAll('/', '\\'),
     ]);
   const exactRootPatterns = [...new Set(rootVariants)].map(
-    (root) => new RegExp(`${escapeRegExp(root)}${pathTail}`, /^[A-Za-z]:[\\/]/.test(root) ? 'gi' : 'g'),
+    (root) =>
+      new RegExp(`${escapeRegExp(root)}${fixedRootSuffix}`, /^[A-Za-z]:[\\/]/.test(root) ? 'gi' : 'g'),
   );
   return mapOutsideWebUrls(value, (part) => {
     let safe = part;
