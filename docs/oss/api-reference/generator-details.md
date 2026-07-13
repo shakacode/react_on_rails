@@ -10,12 +10,14 @@ Usage:
 
 Options:
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
-      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
       [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
-      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
-      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
+      [--agent-files], [--no-agent-files]          # Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true
+      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer
+      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro)
+      [--standard-only], [--no-standard-only]      # Install only the open-source package; cannot be combined with --pro or --rsc
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
