@@ -5020,21 +5020,20 @@ describe RscGenerator, type: :generator do
       expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
     end
 
-    it "is a no-op when ServerClientOrBoth is already fully configured" do
+    it "is idempotent across consecutive runs" do
       config_path = "config/webpack/ServerClientOrBoth.js"
-      # Simulate a fully configured SCOB (as the generator would produce)
-      full_content = server_client_or_both_content(destructured_import: true)
-      simulate_existing_file(config_path, full_content)
+      # Start with the base (unconfigured) fixture
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
 
       generator.send(:update_server_client_or_both_for_rsc)
-
       result = File.read(File.join(destination_root, config_path))
-      # First run should transform it
+
+      # Re-running on the transformed output must be a true no-op
       generator2 = described_class.new([], {}, { destination_root: })
       generator2.send(:update_server_client_or_both_for_rsc)
 
       result2 = File.read(File.join(destination_root, config_path))
-      # Second run on already-transformed output should be a no-op
       expect(result2).to eq(result)
     end
 

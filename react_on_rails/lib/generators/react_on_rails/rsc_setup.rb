@@ -362,7 +362,7 @@ module ReactOnRails
 
         unless content.include?("require('./rscWebpackConfig')")
           server_import_pattern =
-            %r{(const\b.*require\('\./serverWebpackConfig'\)\s*;?)}
+            %r{(const\s+(?:\{[^\}]*\}|\w+)\s*=\s*require\('\./serverWebpackConfig'\)\s*;?)}
           gsub_file(
             config_path,
             server_import_pattern,
@@ -407,16 +407,16 @@ module ReactOnRails
         unless content.include?("client, server, and RSC bundles")
           gsub_file(
             config_path,
-            /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\);/,
+            /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\)\s*;?/,
             "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
           )
         end
 
-        return if content.include?("result = [clientConfig, serverConfig, rscConfig]")
+        return if content.match?(/result\s*=\s*\[clientConfig,\s*serverConfig,\s*rscConfig\]/)
 
         gsub_file(
           config_path,
-          /result = \[clientConfig, serverConfig\]\s*;?/,
+          /result\s*=\s*\[clientConfig,\s*serverConfig\]\s*;?/,
           "result = [clientConfig, serverConfig, rscConfig];"
         )
       end
@@ -630,6 +630,9 @@ module ReactOnRails
         missing = []
         unless content.include?("require('./rscWebpackConfig')")
           missing << "rscWebpackConfig import in ServerClientOrBoth.js"
+        end
+        unless content.include?("rscWebpackConfig()")
+          missing << "rscWebpackConfig() invocation in ServerClientOrBoth.js"
         end
         unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
           missing << "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
