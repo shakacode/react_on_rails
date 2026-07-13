@@ -1,5 +1,6 @@
 const webUrlPattern = /(https?:\/\/[^\s"']+)/gi;
-const loopbackWebUrlPattern = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//i;
+const localDevServerUrlPattern =
+  /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\[::\])(?::\d+)?\//i;
 const pathTail = String.raw`(?:[\\/][^\s"',;:)\]}]+)*`;
 const localPathPatterns = [
   new RegExp(String.raw`\/(?:Users|home)\/[^/\s"',;:)\]}]+${pathTail}`, 'g'),
@@ -17,7 +18,9 @@ const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\
 const mapOutsideWebUrls = (value, transform) =>
   String(value)
     .split(webUrlPattern)
-    .map((part) => (/^https?:\/\//i.test(part) && !loopbackWebUrlPattern.test(part) ? part : transform(part)))
+    .map((part) =>
+      /^https?:\/\//i.test(part) && !localDevServerUrlPattern.test(part) ? part : transform(part),
+    )
     .join('');
 
 export const redactLocalPaths = (value, exactRoots = []) => {

@@ -67,6 +67,9 @@ class PrMergeLedger
     "React on Rails Pro - Package Tests"
   ].freeze
   HOSTED_CI_RUN_EVENTS = %w[workflow_dispatch pull_request].freeze
+  HOSTED_CI_START_COMMANDS = %w[+ci-run-hosted +ci-force-full].freeze
+  GITHUB_ACTIONS_ACTORS = %w[github-actions github-actions[bot]].freeze
+  TRUSTED_HOSTED_CI_REQUEST_ASSOCIATIONS = %w[COLLABORATOR MEMBER OWNER].freeze
   DEPENDABOT_HOSTED_CI_EXCLUSIONS = [
     "React on Rails Pro - Integration Tests",
     "React on Rails Pro - Package Tests"
@@ -528,6 +531,140 @@ class PrMergeLedger
     return false unless HOSTED_CI_RUN_EVENTS.include?(event.to_s)
 
     allow_pull_request || event.to_s == "workflow_dispatch"
+  end
+
+  def self.hosted_ci_request_not_before(active_labels:, label_events:, comments:, head_committed_at:,
+                                        trusted_label_actors:)
+    request_labels = Array(active_labels) & HOSTED_CI_REQUEST_LABELS
+    raise Error, "hosted CI request labels are missing" if request_labels.empty?
+
+    latest_events = latest_hosted_ci_label_events(request_labels, label_events)
+    request_times = latest_events.map do |label, event|
+      hosted_ci_label_request_time(label, event, label_events, comments, trusted_label_actors)
+    end
+
+    ([parse_hosted_ci_time(head_committed_at, "current-head commit")] + request_times).max
+  end
+
+  def self.latest_hosted_ci_label_events(active_labels, label_events)
+    Array(active_labels).to_h do |label|
+      matching_events = Array(label_events).select { |event| event.dig("label", "name") == label }
+      raise Error, "active hosted CI label #{label} has no timeline event" if matching_events.empty?
+
+      events_with_times = matching_events.map do |event|
+        [event, parse_hosted_ci_time(event["createdAt"], "hosted CI label event")]
+      end
+      latest_time = events_with_times.map(&:last).max
+      latest_events = events_with_times.select { |_event, event_time| event_time == latest_time }
+      raise Error, "active hosted CI label #{label} has ambiguous latest timeline events" if latest_events.length > 1
+
+      [label, latest_events.first.first]
+    end
+  end
+
+  def self.select_hosted_ci_suites(suites, expected_workflows:, allow_pull_request:, not_before:)
+    threshold = not_before.is_a?(Time) ? not_before : parse_hosted_ci_time(not_before, "hosted CI request threshold")
+    selected_suites = Array(suites).select do |suite|
+      hosted_ci_suite_eligible?(suite, expected_workflows, allow_pull_request:, threshold:)
+    end
+    suites_by_workflow = selected_suites.group_by { |suite| suite.dig("workflowRun", "workflow", "name") }
+    suites_by_workflow.values.map { |workflow_suites| latest_hosted_ci_suite(workflow_suites) }
+  end
+
+  def self.latest_hosted_ci_suite(workflow_suites)
+    suites_with_times = workflow_suites.map do |suite|
+      created_at = parse_hosted_ci_time(suite.dig("workflowRun", "createdAt"), "hosted CI workflow run")
+      [suite, created_at]
+    end
+    latest_time = suites_with_times.map(&:last).max
+    latest_suites = suites_with_times.select { |_suite, created_at| created_at == latest_time }
+    if latest_suites.length > 1
+      workflow = latest_suites.first.first.dig("workflowRun", "workflow", "name")
+      raise Error, "ambiguous latest workflow runs for #{workflow}"
+    end
+
+    latest_suites.first.first
+  end
+
+  def self.parse_hosted_ci_time(value, context)
+    Time.iso8601(value.to_s)
+  rescue ArgumentError
+    raise Error, "#{context} has invalid timestamp #{value.inspect}"
+  end
+
+  def self.hosted_ci_label_request_time(label, event, label_events, comments, trusted_label_actors)
+    unless event["__typename"] == "LabeledEvent"
+      raise Error, "active hosted CI label #{label} has no labeled-event lineage"
+    end
+
+    label_time = parse_hosted_ci_time(event["createdAt"], "hosted CI label #{label}")
+    actor = event.dig("actor", "login").to_s
+    if GITHUB_ACTIONS_ACTORS.include?(actor)
+      return trusted_hosted_ci_command_time(label, label_events, comments, label_time)
+    end
+
+    unless Array(trusted_label_actors).include?(actor)
+      raise Error, "untrusted hosted CI label actor #{actor.empty? ? '(missing)' : actor}"
+    end
+
+    label_time
+  end
+
+  def self.trusted_hosted_ci_command_time(label, label_events, comments, label_time)
+    epoch_start = hosted_ci_label_epoch_start(label, label_events, before: label_time)
+    command = latest_trusted_hosted_ci_command(comments, label:, after: epoch_start, before: label_time)
+    required_command = label == "force-full-hosted-ci" ? "+ci-force-full" : "hosted CI start"
+    raise Error, "hosted CI label #{label} has no trusted #{required_command} command lineage" unless command
+
+    parse_hosted_ci_time(command["createdAt"], "hosted CI command for #{label}")
+  end
+
+  def self.hosted_ci_label_epoch_start(label, label_events, before:)
+    Array(label_events).filter_map do |event|
+      next unless event["__typename"] == "UnlabeledEvent"
+      next unless event.dig("label", "name") == label
+
+      event_time = parse_hosted_ci_time(event["createdAt"], "hosted CI unlabel event")
+      event_time if event_time <= before
+    end.max
+  end
+
+  def self.hosted_ci_suite_eligible?(suite, expected_workflows, allow_pull_request:, threshold:)
+    workflow_run = suite["workflowRun"]
+    return false unless workflow_run
+    return false unless hosted_ci_run_event?(workflow_run["event"], allow_pull_request:)
+    return false unless expected_workflows.include?(workflow_run.dig("workflow", "name"))
+
+    parse_hosted_ci_time(workflow_run["createdAt"], "hosted CI workflow run") > threshold
+  end
+
+  def self.latest_trusted_hosted_ci_command(comments, label:, after:, before:)
+    allowed_commands = label == "force-full-hosted-ci" ? ["+ci-force-full"] : HOSTED_CI_START_COMMANDS
+    Array(comments).filter_map do |comment|
+      trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:)
+    end.max_by(&:last)&.first
+  end
+
+  def self.trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:)
+    association = comment["authorAssociation"].to_s
+    return unless TRUSTED_HOSTED_CI_REQUEST_ASSOCIATIONS.include?(association)
+    return unless allowed_commands.include?(hosted_ci_start_command(comment["body"]))
+
+    created_at = parse_hosted_ci_time(comment["createdAt"], "hosted CI command")
+    return if after && created_at <= after
+    return if created_at > before
+
+    [comment, created_at]
+  end
+
+  def self.hosted_ci_start_command(body)
+    command_text = body.to_s
+                       .gsub(/```.*?```/m, "")
+                       .gsub(/~~~.*?~~~/m, "")
+                       .lines
+                       .grep_v(/^\s*>/)
+                       .join
+    command_text.match(/(?:\A|\n)\s*(\+ci-(?:run-hosted|force-full))(?:[ \t]+[^\n]*)?/i)&.captures&.first&.downcase
   end
 
   def self.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message: nil)
@@ -2111,16 +2248,21 @@ class PrMergeLedger
       hosted_ci_requested = hosted_ci_requested?(metadata)
       expected_hosted_workflows = expected_hosted_workflows(metadata)
       allow_pull_request_hosted_ci = metadata.dig("author", "login") != "dependabot[bot]"
+      review_threads = fetch_review_threads(pr_number)
+      reviews = fetch_reviews(pr_number)
+      comments = fetch_comments(pr_number)
+      hosted_ci_not_before = hosted_ci_request_not_before(metadata, pr_number, comments) if hosted_ci_requested
       {
         "pull_request" => metadata,
         "files" => files,
-        "review_threads" => fetch_review_threads(pr_number),
-        "reviews" => fetch_reviews(pr_number),
-        "comments" => fetch_comments(pr_number),
+        "review_threads" => review_threads,
+        "reviews" => reviews,
+        "comments" => comments,
         "ci_readiness" => fetch_ci_readiness(
           pr_number,
           head_sha: metadata.fetch("headRefOid"),
           hosted_ci_requested:,
+          hosted_ci_not_before:,
           expected_hosted_workflows:,
           allow_pull_request_hosted_ci:
         )
@@ -2169,8 +2311,8 @@ class PrMergeLedger
       fetch_paginated_connection(pr_number, comments_query, "comments")
     end
 
-    def fetch_ci_readiness(pr_number, head_sha:, hosted_ci_requested:, expected_hosted_workflows:,
-                           allow_pull_request_hosted_ci:)
+    def fetch_ci_readiness(pr_number, head_sha:, hosted_ci_requested:, hosted_ci_not_before:,
+                           expected_hosted_workflows:, allow_pull_request_hosted_ci:)
       required_result = fetch_pr_checks(pr_number, required: true)
       required_rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
       rows, required_used, message = select_ci_readiness_rows(
@@ -2179,6 +2321,7 @@ class PrMergeLedger
         required_rows,
         head_sha:,
         hosted_ci_requested:,
+        hosted_ci_not_before:,
         expected_hosted_workflows:,
         allow_pull_request_hosted_ci:
       )
@@ -2189,7 +2332,7 @@ class PrMergeLedger
     end
 
     def select_ci_readiness_rows(pr_number, required_result, required_rows, head_sha:, hosted_ci_requested:,
-                                 expected_hosted_workflows:, allow_pull_request_hosted_ci:)
+                                 hosted_ci_not_before:, expected_hosted_workflows:, allow_pull_request_hosted_ci:)
       full_rows = fetch_full_pr_check_rows(pr_number, required_result)
 
       if hosted_ci_requested
@@ -2199,7 +2342,8 @@ class PrMergeLedger
           hosted_rows: fetch_hosted_ci_check_rows(
             head_sha,
             expected_hosted_workflows,
-            allow_pull_request: allow_pull_request_hosted_ci
+            allow_pull_request: allow_pull_request_hosted_ci,
+            not_before: hosted_ci_not_before
           ),
           expected_hosted_workflows:
         )
@@ -2222,8 +2366,53 @@ class PrMergeLedger
     end
 
     def hosted_ci_requested?(metadata)
-      label_names = Array(metadata.dig("labels", "nodes")).filter_map { |label| label["name"] }
-      label_names.any? { |name| HOSTED_CI_REQUEST_LABELS.include?(name) }
+      active_hosted_ci_labels(metadata).intersect?(HOSTED_CI_REQUEST_LABELS)
+    end
+
+    def active_hosted_ci_labels(metadata)
+      Array(metadata.dig("labels", "nodes")).filter_map { |label| label["name"] }
+    end
+
+    def hosted_ci_request_not_before(metadata, pr_number, comments)
+      active_labels = active_hosted_ci_labels(metadata) & HOSTED_CI_REQUEST_LABELS
+      label_events = fetch_paginated_connection(pr_number, hosted_ci_label_events_query, "timelineItems")
+      latest_events = PrMergeLedger.latest_hosted_ci_label_events(active_labels, label_events)
+      direct_actors = latest_events.values.filter_map do |event|
+        actor = event.dig("actor", "login").to_s
+        actor unless GITHUB_ACTIONS_ACTORS.include?(actor)
+      end
+      trusted_label_actors = direct_actors.uniq.select { |actor| trusted_hosted_ci_label_actor?(actor) }
+
+      PrMergeLedger.hosted_ci_request_not_before(
+        active_labels:,
+        label_events:,
+        comments:,
+        head_committed_at: head_committed_at(metadata),
+        trusted_label_actors:
+      )
+    end
+
+    def head_committed_at(metadata)
+      commit = Array(metadata.dig("commits", "nodes")).first&.fetch("commit", nil)
+      head_sha = metadata.fetch("headRefOid")
+      raise Error, "current-head commit metadata did not match #{head_sha}" unless commit && commit["oid"] == head_sha
+
+      commit.fetch("committedDate")
+    end
+
+    def trusted_hosted_ci_label_actor?(actor)
+      unless actor.match?(/\A[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\z/)
+        raise Error, "invalid hosted CI label actor #{actor.inspect}"
+      end
+
+      stdout, stderr, status = capture_gh([
+                                            "api", "repos/#{@owner}/#{@name}/collaborators/#{actor}/permission"
+                                          ])
+      raise Error, "unable to verify hosted CI label actor #{actor}: #{stderr.strip}" unless status.success?
+
+      %w[admin write].include?(JSON.parse(stdout).fetch("permission"))
+    rescue JSON::ParserError, KeyError => e
+      raise Error, "invalid permission response for hosted CI label actor #{actor}: #{e.message}"
     end
 
     def expected_hosted_workflows(metadata)
@@ -2232,20 +2421,16 @@ class PrMergeLedger
       HOSTED_CI_WORKFLOW_NAMES - DEPENDABOT_HOSTED_CI_EXCLUSIONS
     end
 
-    def fetch_hosted_ci_check_rows(head_sha, expected_workflows, allow_pull_request:)
+    def fetch_hosted_ci_check_rows(head_sha, expected_workflows, allow_pull_request:, not_before:)
       suites = fetch_check_suites(head_sha)
-      selected_suites = suites.select do |suite|
-        workflow_run = suite["workflowRun"]
-        workflow_run &&
-          PrMergeLedger.hosted_ci_run_event?(workflow_run["event"], allow_pull_request:) &&
-          expected_workflows.include?(workflow_run.dig("workflow", "name"))
-      end
-      suites_by_workflow = selected_suites.group_by { |suite| suite.dig("workflowRun", "workflow", "name") }
-      latest_suites = suites_by_workflow.transform_values do |workflow_suites|
-        workflow_suites.max_by { |suite| suite.dig("workflowRun", "createdAt") }
-      end
+      latest_suites = PrMergeLedger.select_hosted_ci_suites(
+        suites,
+        expected_workflows:,
+        allow_pull_request:,
+        not_before:
+      )
 
-      latest_suites.values.flat_map { |suite| hosted_ci_rows_for_suite(suite) }
+      latest_suites.flat_map { |suite| hosted_ci_rows_for_suite(suite) }
     end
 
     def fetch_check_suites(head_sha)
@@ -2550,6 +2735,14 @@ class PrMergeLedger
               body
               author { login }
               labels(first:100) { nodes { name } }
+              commits(last:1) {
+                nodes {
+                  commit {
+                    oid
+                    committedDate
+                  }
+                }
+              }
               files(first:100, after:$endCursor) {
                 nodes { path }
                 pageInfo { hasNextPage endCursor }
@@ -2709,8 +2902,40 @@ class PrMergeLedger
                   id
                   body
                   author { login }
+                  authorAssociation
                   url
                   createdAt
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def hosted_ci_label_events_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              timelineItems(
+                first:100
+                after:$endCursor
+                itemTypes:[LABELED_EVENT, UNLABELED_EVENT]
+              ) {
+                nodes {
+                  __typename
+                  ... on LabeledEvent {
+                    createdAt
+                    actor { login }
+                    label { name }
+                  }
+                  ... on UnlabeledEvent {
+                    createdAt
+                    actor { login }
+                    label { name }
+                  }
                 }
                 pageInfo { hasNextPage endCursor }
               }

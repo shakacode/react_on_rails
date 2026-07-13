@@ -45,6 +45,18 @@ test('redacts local paths embedded in loopback dev-server URLs', () => {
   assert.throws(() => assertNoLocalPaths({ overlay_url: value }), /unredacted local path/);
 });
 
+test('redacts local paths embedded in unspecified-address dev-server URLs', () => {
+  const cases = [
+    ['http://0.0.0.0:5173/@fs//Users/alice/project/file.js', 'http://0.0.0.0:5173/@fs/<LOCAL_PATH>'],
+    ['http://[::]:5173/@fs//home/bob/project/file.js', 'http://[::]:5173/@fs/<LOCAL_PATH>'],
+  ];
+
+  for (const [value, expected] of cases) {
+    assert.equal(redactLocalPaths(value), expected);
+    assert.throws(() => assertNoLocalPaths({ overlay_url: value }), /unredacted local path/);
+  }
+});
+
 test('fails closed when a committed artifact still contains a local path', () => {
   assert.throws(
     () => assertNoLocalPaths({ overlay_text_excerpt: '/Users/alice/project/error.js' }),
