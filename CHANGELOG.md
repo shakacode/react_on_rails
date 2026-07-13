@@ -37,6 +37,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
+  exceptions no longer retain raw component props, generated JavaScript, or renderer parse details in log and
+  error-tracker context.
+  Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
+  Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+  [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
   clients must now send the password field before file parts; the renderer rejects and discards leading file
   parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,

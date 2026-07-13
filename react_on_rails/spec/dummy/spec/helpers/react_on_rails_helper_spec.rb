@@ -833,6 +833,18 @@ describe ReactOnRailsHelper do
       expect(react_app).to have_key("title")
     end
 
+    it "preserves the cause when the renderer raises a non-JSON error" do
+      renderer_error = StandardError.new("renderer failed")
+      allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging)
+        .and_raise(renderer_error)
+
+      expect { react_app }.to raise_error do |error|
+        expect(error).to be_a(ReactOnRails::PrerenderError)
+        expect(error.err).to equal(renderer_error)
+        expect(error.cause).to equal(renderer_error)
+      end
+    end
+
     it "warns when immediate_hydration option is passed" do
       allow(Rails.logger).to receive(:warn)
       ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
