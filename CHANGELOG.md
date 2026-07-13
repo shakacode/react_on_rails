@@ -41,6 +41,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   exceptions no longer retain raw component props or generated JavaScript in log and error-tracker context.
   Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
   Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+  [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or

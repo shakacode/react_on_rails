@@ -53,6 +53,42 @@ module ReactOnRails
       end
     end
 
+    describe "nested error context redaction" do
+      let(:nested_context_error) do
+        Class.new(StandardError) do
+          def to_error_context
+            {
+              props: { access_token: "nested-props-secret" },
+              "js_code" => "const token = 'nested-js-secret';",
+              nested_diagnostic: "retained"
+            }
+          end
+        end.new("Nested rendering error")
+      end
+
+      let(:input_error_info) do
+        super().merge(err: nested_context_error)
+      end
+
+      it "keeps redacted fields authoritative in direct and error-tracker contexts" do
+        contexts = [
+          expected_error.to_error_context,
+          expected_error.to_honeybadger_context,
+          expected_error.raven_context
+        ]
+
+        contexts.each do |context|
+          expect(context).to include(
+            props: "[REDACTED]",
+            js_code: "[REDACTED]",
+            nested_diagnostic: "retained"
+          )
+          expect(context).not_to have_key("js_code")
+          expect(context.inspect).not_to include("nested-props-secret", "nested-js-secret")
+        end
+      end
+    end
+
     it "does not retain raw props or generated JavaScript on the exception" do
       expect(expected_error.props).to eq("[REDACTED]")
       expect(expected_error.js_code).to eq("[REDACTED]")
