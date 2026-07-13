@@ -79,18 +79,9 @@ This happens because React on Rails by default adds the scripts that hydrate com
 
 This default behavior was kept for backward compatibility, as there were previously race conditions that could occur when using `async` scripts before the page fully loaded. However, these race conditions have been fixed in the latest React on Rails release.
 
-To enable true selective hydration, React on Rails must load scripts as `async` scripts (`generated_component_packs_loading_strategy: :async`).
+To enable selective hydration for streamed Pro/RSC pages, generated component packs need to load with `async` script loading (`generated_component_packs_loading_strategy: :async`). In React on Rails Pro apps on Shakapacker ≥ 8.2.0, this is already the default when the setting is unset, so no initializer change is needed for the Pro/RSC setup in this guide.
 
-> **Note:** React on Rails **Pro** apps already default to `:async` (on Shakapacker ≥ 8.2.0), so this step is usually a no-op for the Pro/RSC audience of this guide. You only need to set it explicitly on **non-Pro** apps, which default to `:defer`. On Shakapacker **< 8.2.0**, async script loading is unsupported — upgrade Shakapacker rather than setting `:async` (otherwise configuration raises `ReactOnRails::Error`).
-
-If you do need to set it explicitly (non-Pro apps), add it to the initializer:
-
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.generated_component_packs_loading_strategy = :async
-end
-```
+> **Note:** `:async` script loading is a Pro capability in React on Rails' supported configuration. In non-Pro apps, `bin/rails react_on_rails:doctor` reports explicit `config.generated_component_packs_loading_strategy = :async` as unsupported and recommends upgrading to Pro or using `:defer` / `:sync`. On Shakapacker < 8.2.0, async script loading is unavailable; setting `:async` raises during configuration validation, so upgrade Shakapacker first.
 
 Now, when you run the page, you can see that while the Long Waiting Component is loading ⏳, the other components are interactive ✨🖱️
 
