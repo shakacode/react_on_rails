@@ -27,9 +27,11 @@ pnpm run benchmark -- --samples 5 --output results/local.json
 pnpm exec node scripts/report.mjs --raw results/local.json --output RESULTS.local.md
 ```
 
+The path-scoped `Rspack/Vite DX benchmark replay` workflow runs the same frozen install and check whenever this harness changes.
+
 Close unrelated CPU-heavy applications before measuring. Keep both controls on the same machine and power mode. Do not compare a new local run to the committed result as though it were a controlled baseline; compare both tools within one run.
 
-The committed [recorded result](RESULTS.md) is generated from [raw JSON](results/recorded.json). Run `pnpm run check` to verify the checked-in report still matches the raw artifact.
+The committed [recorded result](RESULTS.md) is generated from [raw JSON](results/recorded.json). Run `pnpm run check` to verify the checked-in report still matches the raw artifact. The replay also fails closed if the raw artifact contains an unredacted benchmark root or a common macOS, Linux, or Windows local-user path.
 
 ## Matched-control inventory
 
