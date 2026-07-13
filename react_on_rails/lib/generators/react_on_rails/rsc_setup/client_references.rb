@@ -1512,20 +1512,48 @@ module ReactOnRails
         end
 
         def generated_rsc_client_references_defined?(content)
-          # Detect the generated `const rscClientReferences = (() => { ... })()` form
-          # structurally rather than by substring-matching template internals such as the
-          # `RSC_MANIFEST_CLIENT_REFERENCES_JSON` env-var name or the `rsc-client-references.json`
-          # filename. Those `content.include?` guards would couple detection to implementation
-          # details — renaming either string would silently break detection without a failing
-          # test — while adding no safety: `scoped_object_literal_defined?` already requires a
-          # real, module-scope `fallbackRscClientReferences` object literal with
-          # `directory: resolve(config.source_path)` (the generator-specific signature), and the
-          # `rsc_client_references_defined?` precondition rejects commented-out declarations — its
-          # `^[ \t]*(?:const|let|var)` anchor skips `//`-prefixed lines, and `js_top_level_position?`
-          # rejects declarations buried inside `/* ... */` blocks.
-          return false unless rsc_client_references_defined?(content)
+          # A fallback directory object plus a binding named `rscClientReferences` is not enough:
+          # legacy configs can wire that fallback directly into the plugin and bypass graph-derived
+          # manifest selection. Verify the generated IIFE shape and its essential manifest path in
+          # executable code while allowing formatter-controlled whitespace to vary.
+          iife_body = generated_rsc_client_references_iife_body(content)
+          return false unless iife_body
 
-          scoped_object_literal_defined?(content, "fallbackRscClientReferences")
+          scoped_object_literal_defined?(content, "fallbackRscClientReferences") &&
+            js_code_matches?(
+              iife_body,
+              %r{\bdefaultRefsJson\s*=\s*resolve\(\s*['"]ssr-generated/rsc-client-references\.json['"]\s*\)}
+            ) &&
+            js_code_matches?(iife_body, /\breadManifestReferences\s*=\s*\(/) &&
+            js_code_matches?(iife_body, /\breturn\s+readManifestReferences\(\s*defaultRefsJson\s*\)/)
+        end
+
+        def generated_rsc_client_references_iife_body(content)
+          declaration = /^[ \t]*(?:const|let|var)\s+rscClientReferences\s*=\s*\(\s*\(\s*\)\s*=>\s*\{/
+          content.to_enum(:scan, declaration).each do
+            match = Regexp.last_match
+            next unless js_top_level_position?(content, match.begin(0))
+
+            open_brace = match.end(0) - 1
+            close_brace = matching_js_closing_brace(content, open_brace)
+            next unless close_brace
+            next unless content[(close_brace + 1)..].match?(/\A\s*\)\s*\(\s*\)\s*;?/)
+
+            return content[(open_brace + 1)...close_brace]
+          end
+
+          nil
+        end
+
+        def js_code_matches?(content, pattern)
+          search_from = 0
+          while (match = pattern.match(content, search_from))
+            return true if js_code_position?(content, match.begin(0))
+
+            search_from = match.end(0)
+          end
+
+          false
         end
 
         def scoped_object_literal_defined?(content, variable_name)

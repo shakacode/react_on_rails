@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../support/generator_spec_helper"
+require "open3"
+require "tempfile"
 
 describe RscGenerator, type: :generator do
   include GeneratorSpec::TestCase
@@ -1219,7 +1221,7 @@ describe RscGenerator, type: :generator do
       expect(migrated_content).to include("chunkName: 'server'")
       expect(migrated_content).to include("directory: resolve(config.source_path)")
       expect(migrated_content).to match(/isServer: true,\s*\n\s*clientReferences: rscClientReferences,/)
-      expect(generator.send(:check_rsc_server_config)).not_to include(
+      expect(generator.send(:check_rsc_server_config)).to include(
         "generated manifest-backed clientReferences resolver in serverWebpackConfig.js"
       )
     end
@@ -1720,7 +1722,7 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
     end
 
-    it "treats a server plugin with manifest-backed client references as already migrated" do
+    it "does not treat a fallback-only IIFE as manifest-backed" do
       content = <<~JS
         const { config } = require('shakapacker');
         const { resolve } = require('path');
@@ -1730,6 +1732,11 @@ describe RscGenerator, type: :generator do
           include: /\\.(js|ts|jsx|tsx)$/,
         };
         const rscClientReferences = (() => {
+          const migrationNote = `
+            const defaultRefsJson = resolve('ssr-generated/rsc-client-references.json');
+            const readManifestReferences = (refsJson) => refsJson;
+            return readManifestReferences(defaultRefsJson);
+          `;
           return [fallbackRscClientReferences];
         })();
         serverWebpackConfig.plugins.push(
@@ -1740,7 +1747,60 @@ describe RscGenerator, type: :generator do
         );
       JS
 
-      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: true)).to be(true)
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: true)).to be(false)
+    end
+
+    it "does not treat a direct fallback array as manifest-backed" do
+      content = <<~JS
+        const { config } = require('shakapacker');
+        const { resolve } = require('path');
+        const fallbackRscClientReferences = {
+          directory: resolve(config.source_path),
+          recursive: true,
+          include: /\\.(js|ts|jsx|tsx)$/,
+        };
+        const rscClientReferences = [fallbackRscClientReferences];
+        clientConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: false,
+            clientReferences: rscClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:generated_rsc_client_references_defined?, content)).to be(false)
+      expect(generator.send(:rsc_plugin_uses_scoped_client_references?, content, is_server: false)).to be(false)
+    end
+
+    it "recognizes the exact generated resolver as manifest-backed" do
+      resolver = generator.send(:rsc_client_references_js)
+
+      expect(generator.send(:generated_rsc_client_references_defined?, resolver)).to be(true)
+    end
+
+    it "runs the exact generated resolver in ESM with the documented compatibility shim" do
+      resolver = generator.send(:rsc_client_references_js)
+      esm_config = <<~JS
+        import { createRequire } from 'node:module';
+        import { dirname, resolve } from 'node:path';
+        import { fileURLToPath } from 'node:url';
+
+        const require = createRequire(import.meta.url);
+        const __dirname = dirname(fileURLToPath(import.meta.url));
+        const config = { source_path: '.', source_entry_path: '.' };
+
+        #{resolver}
+
+        if (!Array.isArray(rscClientReferences)) throw new Error('Expected an array of client references');
+      JS
+
+      Tempfile.create(["rsc-client-references", ".mjs"]) do |file|
+        file.write(esm_config)
+        file.flush
+        _stdout, stderr, status = Open3.capture3("node", file.path)
+
+        expect(status.success?).to be(true), stderr
+      end
     end
 
     it "detects scoped client references when resolve has inner whitespace" do
@@ -1780,7 +1840,7 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
     end
 
-    it "detects generated manifest client references with a scoped fallback" do
+    it "does not treat a manifest-named fallback-only helper as generated" do
       content = <<~JS
         const fallbackRscClientReferences = {
           directory: resolve(config.source_path),
@@ -1796,13 +1856,10 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_client_references_defined?, content)).to be(true)
-      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
     end
 
-    it "detects the generated manifest fallback even when the env-var/JSON marker strings change" do
-      # Detection is structural (the module-scope `fallbackRscClientReferences` literal), not
-      # coupled to the `RSC_MANIFEST_CLIENT_REFERENCES_JSON` / `rsc-client-references.json`
-      # template strings. Renaming those internals must not silently break re-run detection.
+    it "does not treat renamed manifest markers without manifest reading as generated" do
       content = <<~JS
         const fallbackRscClientReferences = {
           directory: resolve(config.source_path),
@@ -1817,7 +1874,7 @@ describe RscGenerator, type: :generator do
         })();
       JS
 
-      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(true)
+      expect(generator.send(:scoped_rsc_client_references_defined?, content)).to be(false)
     end
 
     it "does not detect a fully commented-out generated manifest block" do
@@ -2838,7 +2895,9 @@ describe RscGenerator, type: :generator do
         JS
       )
 
-      expect(generator.send(:check_rsc_client_config)).to eq([])
+      expect(generator.send(:check_rsc_client_config)).to include(
+        "generated manifest-backed clientReferences resolver in clientWebpackConfig.js"
+      )
     end
 
     it "does not inject duplicate imports when existing bindings are indented" do
@@ -3301,6 +3360,34 @@ describe RscGenerator, type: :generator do
                 clientReferences: 'unused',
               },
               isServer: false,
+            }),
+          );
+        JS
+      )
+
+      missing = generator.send(:check_rsc_client_config)
+      expect(missing).to include(
+        "generated manifest-backed clientReferences resolver in clientWebpackConfig.js"
+      )
+    end
+
+    it "reports a missing manifest-backed resolver for a fallback-only helper" do
+      config_path = "config/webpack/clientWebpackConfig.js"
+      simulate_existing_file(
+        config_path,
+        <<~JS
+          const { config } = require('shakapacker');
+          const { resolve } = require('path');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const fallbackRscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+          };
+          const rscClientReferences = [fallbackRscClientReferences];
+          clientConfig.plugins.push(
+            new RSCWebpackPlugin({
+              isServer: false,
+              clientReferences: rscClientReferences,
             }),
           );
         JS
