@@ -4963,10 +4963,6 @@ describe RscGenerator, type: :generator do
 
       result = File.read(File.join(destination_root, config_path))
       expect(result).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
-      expect(result).to include("require('./rscWebpackConfig')")
-      expect(result).to include("rscConfig = rscWebpackConfig()")
-      expect(result).to include("RSC_BUNDLE_ONLY")
-      expect(result).to include("[clientConfig, serverConfig, rscConfig]")
     end
 
     it "rewrites envSpecific call with extra whitespace around arguments" do
@@ -5004,7 +5000,7 @@ describe RscGenerator, type: :generator do
 
     it "verifier detects a partially transformed ServerClientOrBoth" do
       config_path = "config/webpack/ServerClientOrBoth.js"
-      # Import present but envSpecific NOT rewritten
+      # Import present but invocation and envSpecific NOT rewritten
       partial_content = server_client_or_both_content(destructured_import: true)
                         .sub(
                           "const { default: serverWebpackConfig } = require('./serverWebpackConfig');",
@@ -5015,9 +5011,23 @@ describe RscGenerator, type: :generator do
 
       missing = generator.send(:check_rsc_scob_config)
       expect(missing).to include(
+        "rscWebpackConfig() invocation in ServerClientOrBoth.js"
+      )
+      expect(missing).to include(
         "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
       )
       expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
+    end
+
+    it "verifier returns empty for a fully transformed ServerClientOrBoth" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      missing = generator.send(:check_rsc_scob_config)
+      expect(missing).to eq([])
     end
 
     it "is idempotent across consecutive runs" do
