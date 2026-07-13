@@ -1778,6 +1778,15 @@ describe RscGenerator, type: :generator do
       expect(generator.send(:generated_rsc_client_references_defined?, resolver)).to be(true)
     end
 
+    it "recognizes the generated resolver after a formatter adds a trailing argument comma" do
+      resolver = generator.send(:rsc_client_references_js).sub(
+        "resolve('ssr-generated/rsc-client-references.json')",
+        "resolve(\n    'ssr-generated/rsc-client-references.json',\n  )"
+      )
+
+      expect(generator.send(:generated_rsc_client_references_defined?, resolver)).to be(true)
+    end
+
     it "runs the exact generated resolver in ESM with the documented compatibility shim" do
       resolver = generator.send(:rsc_client_references_js)
       esm_config = <<~JS
@@ -2078,6 +2087,43 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_plugin_body_has_top_level_scoped_client_references?, body)).to be(true)
+    end
+
+    it "detects scoped clientReferences when comments separate the key from its value" do
+      bodies = [
+        <<~JS,
+          isServer: false,
+          clientReferences: /* preserve the graph-derived resolver */ rscClientReferences,
+        JS
+        <<~JS
+          isServer: false,
+          "clientReferences": // preserve the graph-derived resolver
+            rscClientReferences,
+        JS
+      ]
+
+      expect(bodies).to all(satisfy do |body|
+        generator.send(:rsc_plugin_body_has_top_level_scoped_client_references?, body)
+      end)
+    end
+
+    it "does not treat commented-out or nested scoped clientReferences as top-level configuration" do
+      bodies = [
+        <<~JS,
+          isServer: false,
+          // clientReferences: rscClientReferences,
+        JS
+        <<~JS
+          isServer: false,
+          metadata: {
+            clientReferences: /* nested */ rscClientReferences,
+          },
+        JS
+      ]
+
+      expect(bodies).to all(satisfy do |body|
+        !generator.send(:rsc_plugin_body_has_top_level_scoped_client_references?, body)
+      end)
     end
 
     it "matches the server setup anchor with CRLF line endings" do

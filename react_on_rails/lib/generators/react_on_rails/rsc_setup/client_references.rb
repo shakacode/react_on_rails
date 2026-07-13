@@ -1225,19 +1225,33 @@ module ReactOnRails
         # the same comment-, string-, and brace-aware semantics as the rewrite path.
         def rsc_plugin_body_has_top_level_scoped_client_references?(body)
           [
-            /\bclientReferences\s*:\s*rscClientReferences\b/,
-            /(['"`])clientReferences\1\s*:\s*rscClientReferences\b/
-          ].any? do |pattern|
+            [/\bclientReferences\b/, false],
+            [/(['"`])clientReferences\1/, true]
+          ].any? do |pattern, quoted|
             search_from = 0
 
             while (match = pattern.match(body, search_from))
-              return true if js_top_level_position?(body, match.begin(0))
+              return true if top_level_scoped_client_references_match?(body, match, quoted:)
 
               search_from = match.end(0)
             end
           end
 
           false
+        end
+
+        def top_level_scoped_client_references_match?(body, match, quoted:)
+          return false unless js_top_level_position?(body, match.begin(0))
+          return false unless rsc_plugin_body_key_position?(body, match.begin(0), match.end(0), quoted:)
+
+          colon_index = first_js_token_index(body, match.end(0))
+          return false unless colon_index && body[colon_index] == ":"
+
+          value_index = first_js_token_index(body, colon_index + 1)
+          identifier = "rscClientReferences"
+          return false unless value_index && body[value_index, identifier.length] == identifier
+
+          !body[value_index + identifier.length]&.match?(/[A-Za-z0-9_$]/)
         end
 
         def splice_client_references_into_rsc_plugin_body(body, is_server_match)
@@ -1522,7 +1536,7 @@ module ReactOnRails
           scoped_object_literal_defined?(content, "fallbackRscClientReferences") &&
             js_code_matches?(
               iife_body,
-              %r{\bdefaultRefsJson\s*=\s*resolve\(\s*['"]ssr-generated/rsc-client-references\.json['"]\s*\)}
+              %r{\bdefaultRefsJson\s*=\s*resolve\(\s*['"]ssr-generated/rsc-client-references\.json['"]\s*,?\s*\)}
             ) &&
             js_code_matches?(iife_body, /\breadManifestReferences\s*=\s*\(/) &&
             js_code_matches?(iife_body, /\breturn\s+readManifestReferences\(\s*defaultRefsJson\s*\)/)
