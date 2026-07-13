@@ -21,11 +21,19 @@
  */
 // TODO: Replace with fastify-basic-auth per https://github.com/shakacode/react_on_rails_pro/issues/110
 
-import { timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import { getConfig } from '../shared/configBuilder.js';
 
 export interface AuthBody {
   password?: string;
+}
+
+function normalizeForTimingSafeComparison(value: string) {
+  // This digest is never stored or used as a password hash. It only gives
+  // timingSafeEqual fixed-width inputs while both cleartext values are in memory.
+  // codeql[js/insufficient-password-hash]
+  // lgtm[js/insufficient-password-hash]
+  return createHash('sha256').update(value).digest();
 }
 
 export function authenticate(body: AuthBody) {
@@ -34,21 +42,11 @@ export function authenticate(body: AuthBody) {
   if (password) {
     const reqPassword = body.password || '';
 
-    // Use timing-safe comparison to prevent timing attacks
-    // Both strings must be converted to buffers of the same length
+    // Hash both values to a fixed length before the timing-safe comparison so
+    // mismatched input lengths do not reveal the configured password length.
     try {
-      const passwordBuffer = Buffer.from(password);
-      const reqPasswordBuffer = Buffer.from(reqPassword);
-
-      // If lengths differ, create a dummy buffer of the same length to compare against
-      // This ensures constant-time comparison even when lengths don't match
-      if (passwordBuffer.length !== reqPasswordBuffer.length) {
-        return {
-          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-          status: 401,
-          data: 'Wrong password',
-        };
-      }
+      const passwordBuffer = normalizeForTimingSafeComparison(password);
+      const reqPasswordBuffer = normalizeForTimingSafeComparison(reqPassword);
 
       if (!timingSafeEqual(passwordBuffer, reqPasswordBuffer)) {
         return {

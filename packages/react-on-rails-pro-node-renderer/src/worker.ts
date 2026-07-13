@@ -22,7 +22,7 @@ import path from 'path';
 import cluster from 'cluster';
 import { randomUUID } from 'crypto';
 import { rm } from 'fs/promises';
-import { Transform } from 'stream';
+import { Readable, Transform } from 'stream';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart, { type MultipartFile } from '@fastify/multipart';
@@ -95,6 +95,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     uploadDir: string;
     uploadAssetValidationError: string | null;
+    uploadAuthenticationError: ResponseResult | null;
+    uploadBodyLimitExceeded: boolean;
   }
 }
 
@@ -102,6 +104,51 @@ const HEALTH_ENDPOINT_ROUTES = ['/health', '/ready'] as const;
 // TODO: Reassess the duplicated-route message format when upgrading Fastify.
 const FASTIFY_DUPLICATED_ROUTE_ERROR_CODE = 'FST_ERR_DUPLICATED_ROUTE';
 const READY_RETRY_AFTER_SECONDS = 5;
+
+function multipartBodyTooLargeError() {
+  const error = new Error(`Multipart request body exceeds the ${BODY_SIZE_LIMIT}-byte limit.`) as Error & {
+    code: string;
+    statusCode: number;
+  };
+  error.code = 'FST_ERR_CTP_BODY_TOO_LARGE';
+  error.statusCode = 413;
+  return error;
+}
+
+function isMultipartContentType(contentType: string | undefined) {
+  return contentType?.toLowerCase().startsWith('multipart/form-data') ?? false;
+}
+
+// @fastify/multipart bypasses Fastify's returned preParsing payload and pipes
+// req.raw directly to Busboy. Intercept that one pipe so the aggregate limit
+// covers files, fields, and multipart framing before Busboy processes them.
+function limitMultipartRawPipe(payload: Readable, onLimitExceeded: () => void) {
+  const originalPipe = payload.pipe.bind(payload);
+  // eslint-disable-next-line no-param-reassign
+  payload.pipe = ((destination, options) => {
+    let receivedBytes = 0;
+    const limitedPayload = new Transform({
+      transform(chunk, encoding, callback) {
+        const chunkByteLength =
+          typeof chunk === 'string' ? Buffer.byteLength(chunk, encoding) : Buffer.byteLength(chunk);
+        receivedBytes += chunkByteLength;
+        if (receivedBytes > BODY_SIZE_LIMIT) {
+          onLimitExceeded();
+          callback(multipartBodyTooLargeError());
+          return;
+        }
+
+        callback(null, chunk);
+      },
+    });
+    limitedPayload.once('error', (error) => {
+      (destination as typeof destination & { destroy(streamError?: Error): void }).destroy(error);
+    });
+    const pipedDestination = limitedPayload.pipe(destination, options);
+    originalPipe(limitedPayload);
+    return pipedDestination;
+  }) as typeof payload.pipe;
+}
 
 function setHeaders(headers: ResponseResult['headers'], res: FastifyReply) {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fixing it with `void` just violates no-void
@@ -469,6 +516,14 @@ function discardMultipartFile(part: MultipartFile) {
   };
 }
 
+function multipartPassword(part: MultipartFile): string | undefined {
+  const passwordFields = part.fields.password;
+  const passwordField = Array.isArray(passwordFields) ? passwordFields.at(-1) : passwordFields;
+  return passwordField?.type === 'field' && typeof passwordField.value === 'string'
+    ? passwordField.value
+    : undefined;
+}
+
 export default function run(config: Partial<Config>) {
   runRscPeerCompatibilityCheck({ proVersion: packageJson.version });
 
@@ -501,6 +556,14 @@ export default function run(config: Partial<Config>) {
 
   // We shouldn't have unhandled errors here, but just in case
   app.addHook('onError', (req, res, err, done) => {
+    if (req.uploadBodyLimitExceeded) {
+      const bodyLimitError = multipartBodyTooLargeError();
+      Object.assign(err, {
+        code: bodyLimitError.code,
+        message: bodyLimitError.message,
+        statusCode: bodyLimitError.statusCode,
+      });
+    }
     // Not errorReporter.error so that integrations can decide how to log the errors.
     if (errorCode(err) === INVALID_CONTENT_LENGTH_ERROR_CODE) {
       app.log.error({
@@ -521,6 +584,8 @@ export default function run(config: Partial<Config>) {
   // The directory path is lazily assigned in onFile (only for requests with file uploads).
   app.decorateRequest('uploadDir', '');
   app.decorateRequest('uploadAssetValidationError', null);
+  app.decorateRequest('uploadAuthenticationError', null);
+  app.decorateRequest('uploadBodyLimitExceeded', false);
   // Clean up the per-request upload directory after the response is sent.
   // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
   // this is an internal service not exposed to the internet, the path is
@@ -536,14 +601,30 @@ export default function run(config: Partial<Config>) {
 
   // Supports application/x-www-form-urlencoded
   void app.register(fastifyFormbody);
+  app.addHook('preParsing', (req, _res, payload, done) => {
+    const contentLength = Number(req.headers['content-length']);
+    if (isMultipartContentType(req.headers['content-type']) && contentLength > BODY_SIZE_LIMIT) {
+      done(multipartBodyTooLargeError());
+      return;
+    }
+
+    if (isMultipartContentType(req.headers['content-type'])) {
+      limitMultipartRawPipe(req.raw, () => {
+        req.uploadBodyLimitExceeded = true;
+      });
+    }
+    done(null, payload);
+  });
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     preservePath: true,
     limits: {
       fieldSize: FIELD_SIZE_LIMIT,
-      // For bundles and assets
-      fileSize: Infinity,
+      // Defense in depth for individual files. The raw multipart stream is
+      // separately capped at BODY_SIZE_LIMIT, including fields and framing.
+      fileSize: BODY_SIZE_LIMIT,
+      parts: 1000,
     },
     // Use regular function (not arrow) because @fastify/multipart binds `this`
     // to the Fastify request in attachFieldsToBody mode.
@@ -552,6 +633,22 @@ export default function run(config: Partial<Config>) {
     async onFile(part) {
       if (typeof this?.uploadDir !== 'string') {
         throw new Error('onFile: expected `this` to be bound to the Fastify request');
+      }
+
+      // Authentication failure is terminal for the request. A later password
+      // field must not re-authorize file parts that follow a rejected file.
+      if (this.uploadAuthenticationError) {
+        discardMultipartFile(part);
+        return;
+      }
+
+      // The official multipart protocol requires the password field before any
+      // file parts so unauthenticated file contents never reach disk.
+      const authResult = authenticate({ password: multipartPassword(part) });
+      if (authResult) {
+        this.uploadAuthenticationError = authResult;
+        discardMultipartFile(part);
+        return;
       }
 
       if (this.uploadAssetValidationError) {
@@ -598,6 +695,11 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
+    if (req.uploadAuthenticationError) {
+      await setResponse(req.uploadAuthenticationError, res);
+      return;
+    }
+
     const precheckResult = performRequestPrechecks(req.body);
     if (precheckResult) {
       await setResponse(precheckResult, res);
@@ -1136,6 +1238,11 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Body: Record<string, unknown>;
   }>('/upload-assets', async (req, res) => {
+    if (req.uploadAuthenticationError) {
+      await setResponse(req.uploadAuthenticationError, res);
+      return;
+    }
+
     const precheckResult = performRequestPrechecks(req.body);
     if (precheckResult) {
       await setResponse(precheckResult, res);
