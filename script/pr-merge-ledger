@@ -445,6 +445,7 @@ class PrMergeLedger
   end
 
   def self.ci_check_row_dedup_key(row)
+    # A check link identifies one physical run across full and hosted snapshots; names are only a fallback.
     link = row["link"].to_s
     link.empty? ? ci_check_row_key(row) : link
   end
@@ -506,7 +507,7 @@ class PrMergeLedger
     rows_by_workflow = Array(hosted_rows).group_by { |row| row["workflow"] }
     Array(expected_hosted_workflows).select do |workflow|
       workflow_rows = rows_by_workflow.fetch(workflow, [])
-      workflow_rows.all? { |row| row["bucket"].to_s == "skipping" }
+      workflow_rows.any? && workflow_rows.all? { |row| row["bucket"].to_s == "skipping" }
     end
   end
 
@@ -558,13 +559,20 @@ class PrMergeLedger
   end
 
   def self.hosted_ci_request_not_before(active_labels:, label_events:, comments:, head_committed_at:,
-                                        trusted_label_actors:)
+                                        trusted_label_actors:, trusted_command_actor:)
     request_labels = Array(active_labels) & HOSTED_CI_REQUEST_LABELS
     raise Error, "hosted CI request labels are missing" if request_labels.empty?
 
     latest_events = latest_hosted_ci_label_events(request_labels, label_events)
     request_times = latest_events.map do |label, event|
-      hosted_ci_label_request_time(label, event, label_events, comments, trusted_label_actors)
+      hosted_ci_label_request_time(
+        label,
+        event,
+        label_events,
+        comments,
+        trusted_label_actors:,
+        trusted_command_actor:
+      )
     end
 
     ([parse_hosted_ci_time(head_committed_at, "current-head commit")] + request_times).max
@@ -616,7 +624,8 @@ class PrMergeLedger
     raise Error, "#{context} has invalid timestamp #{value.inspect}"
   end
 
-  def self.hosted_ci_label_request_time(label, event, label_events, comments, trusted_label_actors)
+  def self.hosted_ci_label_request_time(label, event, label_events, comments, trusted_label_actors:,
+                                        trusted_command_actor:)
     unless event["__typename"] == "LabeledEvent"
       raise Error, "active hosted CI label #{label} has no labeled-event lineage"
     end
@@ -624,10 +633,10 @@ class PrMergeLedger
     label_time = parse_hosted_ci_time(event["createdAt"], "hosted CI label #{label}")
     actor = event.dig("actor", "login").to_s
     if GITHUB_ACTIONS_ACTORS.include?(actor)
-      return trusted_hosted_ci_command_time(label, label_events, comments, label_time)
+      return trusted_hosted_ci_command_time(label, label_events, comments, label_time, trusted_command_actor:)
     end
     if HOSTED_CI_COMMAND_AFTER_LABEL_ACTORS.include?(actor)
-      return trusted_hosted_ci_command_after_label_time(label, comments, label_time)
+      return trusted_hosted_ci_command_after_label_time(label, comments, label_time, trusted_command_actor:)
     end
 
     unless Array(trusted_label_actors).include?(actor)
@@ -637,17 +646,29 @@ class PrMergeLedger
     label_time
   end
 
-  def self.trusted_hosted_ci_command_time(label, label_events, comments, label_time)
+  def self.trusted_hosted_ci_command_time(label, label_events, comments, label_time, trusted_command_actor:)
     epoch_start = hosted_ci_label_epoch_start(label, label_events, before: label_time)
-    command = latest_trusted_hosted_ci_command(comments, label:, after: epoch_start, before: label_time)
+    command = latest_trusted_hosted_ci_command(
+      comments,
+      label:,
+      after: epoch_start,
+      before: label_time,
+      trusted_command_actor:
+    )
     required_command = label == "force-full-hosted-ci" ? "+ci-force-full" : "hosted CI start"
     raise Error, "hosted CI label #{label} has no trusted #{required_command} command lineage" unless command
 
     parse_hosted_ci_time(command["createdAt"], "hosted CI command for #{label}")
   end
 
-  def self.trusted_hosted_ci_command_after_label_time(label, comments, label_time)
-    command = latest_trusted_hosted_ci_command(comments, label:, after: label_time, before: nil)
+  def self.trusted_hosted_ci_command_after_label_time(label, comments, label_time, trusted_command_actor:)
+    command = latest_trusted_hosted_ci_command(
+      comments,
+      label:,
+      after: label_time,
+      before: nil,
+      trusted_command_actor:
+    )
     required_command = label == "force-full-hosted-ci" ? "+ci-force-full" : "hosted CI start"
     raise Error, "hosted CI label #{label} has no later trusted #{required_command} command lineage" unless command
 
@@ -673,14 +694,14 @@ class PrMergeLedger
     parse_hosted_ci_time(workflow_run["createdAt"], "hosted CI workflow run") > threshold
   end
 
-  def self.latest_trusted_hosted_ci_command(comments, label:, after:, before:)
+  def self.latest_trusted_hosted_ci_command(comments, label:, after:, before:, trusted_command_actor:)
     allowed_commands = label == "force-full-hosted-ci" ? ["+ci-force-full"] : HOSTED_CI_START_COMMANDS
     Array(comments).filter_map do |comment|
-      trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:)
+      trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:, trusted_command_actor:)
     end.max_by(&:last)&.first
   end
 
-  def self.trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:)
+  def self.trusted_hosted_ci_command_candidate(comment, allowed_commands, after:, before:, trusted_command_actor:)
     association = comment["authorAssociation"].to_s
     return unless TRUSTED_HOSTED_CI_REQUEST_ASSOCIATIONS.include?(association)
     return unless allowed_commands.include?(hosted_ci_start_command(comment["body"]))
@@ -689,7 +710,14 @@ class PrMergeLedger
     return if after && created_at <= after
     return if before && created_at > before
 
+    return unless trusted_hosted_ci_command_actor?(comment, trusted_command_actor)
+
     [comment, created_at]
+  end
+
+  def self.trusted_hosted_ci_command_actor?(comment, trusted_command_actor)
+    actor = comment.dig("author", "login").to_s
+    !actor.empty? && trusted_command_actor.call(actor)
   end
 
   def self.hosted_ci_start_command(body)
@@ -2422,14 +2450,21 @@ class PrMergeLedger
         actor = event.dig("actor", "login").to_s
         actor unless HOSTED_CI_AUTOMATION_ACTORS.include?(actor)
       end
-      trusted_label_actors = direct_actors.uniq.select { |actor| trusted_hosted_ci_label_actor?(actor) }
+      actor_permissions = {}
+      trusted_actor = lambda do |actor|
+        actor_permissions.fetch(actor) do
+          actor_permissions[actor] = trusted_hosted_ci_actor?(actor)
+        end
+      end
+      trusted_label_actors = direct_actors.uniq.select(&trusted_actor)
 
       PrMergeLedger.hosted_ci_request_not_before(
         active_labels:,
         label_events:,
         comments:,
         head_committed_at: head_committed_at(metadata),
-        trusted_label_actors:
+        trusted_label_actors:,
+        trusted_command_actor: trusted_actor
       )
     end
 
@@ -2441,7 +2476,7 @@ class PrMergeLedger
       commit.fetch("committedDate")
     end
 
-    def trusted_hosted_ci_label_actor?(actor)
+    def trusted_hosted_ci_actor?(actor)
       unless actor.match?(/\A[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\z/)
         raise Error, "invalid hosted CI label actor #{actor.inspect}"
       end
