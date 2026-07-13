@@ -39,8 +39,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
   clients must now send the password field before file parts; the renderer rejects and discards leading file
-  parts before creating upload storage. Uploads retain the existing 1,000-part bound, add a 100 MB per-file
-  limit, and compare fixed-length password digests to avoid leaking the configured password length. Fixes
+  parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
+  and multipart framing, plus a 1,000-part cap and a matching per-file cap. Password comparisons use fixed-length
+  digests to avoid leaking the configured password length. Fixes
   [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
   [PR 4623](https://github.com/shakacode/react_on_rails/pull/4623) by
   [justin808](https://github.com/justin808).
