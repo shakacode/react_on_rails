@@ -21,8 +21,11 @@ describe "Server Rendering", :server_rendering do
       context = error.raven_context
 
       expect(context).not_to have_key(:json)
-      expect(context.values).not_to include(invalid_json)
-      expect(context[:original_error]).to be_a(JSON::ParserError)
+      expect(context).not_to have_key(:original_error)
+      expect(context[:err]).to be_a(String)
+      expect(context.inspect).not_to include(invalid_json)
+      expect(JSON.generate(context)).not_to include(invalid_json)
+      expect(error.message).not_to include(invalid_json)
     end)
   end
 

@@ -36,20 +36,39 @@ module ReactOnRails
     def to_error_context
       result = {
         component_name:,
-        err:,
+        err: error_context_value(err),
         props:,
         js_code:,
         console_messages:
       }
 
       if err.respond_to?(:to_error_context)
-        nested_context = err.to_error_context.reject { |key, _value| SENSITIVE_CONTEXT_KEYS.include?(key.to_s) }
+        nested_context = err.to_error_context.reject { |key, _value| sensitive_nested_context_key?(key) }
         result.merge!(nested_context)
       end
       result
     end
 
     private
+
+    def json_parse_error?(error)
+      defined?(JsonParseError) && error.is_a?(JsonParseError)
+    end
+
+    def safe_error_details(error)
+      return error.inspect unless json_parse_error?(error)
+
+      "#{error.class}: Renderer response JSON could not be parsed"
+    end
+
+    def error_context_value(error)
+      json_parse_error?(error) ? safe_error_details(error) : error
+    end
+
+    def sensitive_nested_context_key?(key)
+      SENSITIVE_CONTEXT_KEYS.include?(key.to_s) ||
+        (json_parse_error?(err) && key.to_s == "original_error")
+    end
 
     # rubocop:disable Metrics/AbcSize
     def calc_message(component_name, console_messages, err, js_code, props)
@@ -61,7 +80,7 @@ module ReactOnRails
       if err
         message << Rainbow("Error Details:").red.bright << "\n"
         message << <<~MSG
-          #{err.inspect}
+          #{safe_error_details(err)}
 
         MSG
 

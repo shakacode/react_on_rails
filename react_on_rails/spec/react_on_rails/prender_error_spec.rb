@@ -60,6 +60,7 @@ module ReactOnRails
             {
               props: { access_token: "nested-props-secret" },
               "js_code" => "const token = 'nested-js-secret';",
+              original_error: "retained original error",
               nested_diagnostic: "retained"
             }
           end
@@ -81,6 +82,7 @@ module ReactOnRails
           expect(context).to include(
             props: "[REDACTED]",
             js_code: "[REDACTED]",
+            original_error: "retained original error",
             nested_diagnostic: "retained"
           )
           expect(context).not_to have_key("js_code")
@@ -89,11 +91,20 @@ module ReactOnRails
       end
 
       it "does not merge raw JSON from a nested parse error into error-tracker contexts" do
-        raw_json = '{"access_token":"nested-json-secret"}'
-        json_parse_error = JsonParseError.new(parse_error: JSON::ParserError.new("unexpected token"), json: raw_json)
+        raw_json = '{"access_token":"nested-json-secret"'
+        parse_error = begin
+          JSON.parse(raw_json)
+        rescue JSON::ParserError => error
+          error
+        end
+        json_parse_error = JsonParseError.new(parse_error:, json: raw_json)
         prerender_error = described_class.new(err: json_parse_error)
 
-        expect(json_parse_error.to_error_context).to include(json: raw_json)
+        expect(json_parse_error.to_error_context).to include(json: raw_json, original_error: parse_error)
+        expect(parse_error.message).to include("nested-json-secret")
+        expect(json_parse_error.message).to include("nested-json-secret")
+        expect(prerender_error.err).to equal(json_parse_error)
+        expect(prerender_error.message).not_to include("nested-json-secret")
 
         contexts = [
           prerender_error.to_error_context,
@@ -103,7 +114,10 @@ module ReactOnRails
 
         contexts.each do |context|
           expect(context).not_to have_key(:json)
+          expect(context).not_to have_key(:original_error)
+          expect(context[:err]).to be_a(String)
           expect(context.inspect).not_to include("nested-json-secret")
+          expect(JSON.generate(context)).not_to include("nested-json-secret")
         end
       end
     end
