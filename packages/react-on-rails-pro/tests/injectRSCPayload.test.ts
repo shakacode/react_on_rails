@@ -517,6 +517,51 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('renderingError');
   });
 
+  it('redacts renderingError in non-development/test environments like staging', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'Internal server failure',
+        stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'staging',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Internal server failure');
+    expect(resultStr).not.toContain('server.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('forces hasErrors:true in production even when metadata has hasErrors:false with renderingError signal', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: false,
+      renderingError: {
+        message: 'Internal server failure',
+        stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Internal server failure');
+    expect(resultStr).not.toContain('server.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
   it('includes full renderingError in diagnostic metadata in development', async () => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       hasErrors: true,

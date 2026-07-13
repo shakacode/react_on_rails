@@ -105,6 +105,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **RSC render errors no longer leak server details into client DOM**: In production, the
+  `REACT_ON_RAILS_RSC_ERRORS` inline script now emits only `{ hasErrors: true }` — the full error
+  message, stack trace, and file paths are redacted. Uses an allowlist (development/test show full
+  diagnostics) so custom envs like staging default to redacted. RSC rendering errors are now also
+  reported to error reporters (Sentry/Honeybadger) even with the default `throwJsErrors: false`
+  config, via a custom `'renderingError'` stream event. Fixes
+  [Issue 4629](https://github.com/shakacode/react_on_rails/issues/4629).
+  [PR 4631](https://github.com/shakacode/react_on_rails/pull/4631) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
   clients must now send the password field before file parts; the renderer rejects and discards leading file
   parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
