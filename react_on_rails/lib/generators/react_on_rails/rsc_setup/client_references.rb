@@ -594,14 +594,10 @@ module ReactOnRails
           # those configs manually.
           return true if sections.empty?
 
-          sections.all? do |section|
-            body = section.fetch(:body)
-            if rsc_plugin_body_has_top_level_scoped_client_references?(body)
-              scoped_rsc_client_references_defined?(content)
-            else
-              rsc_plugin_body_has_top_level_key?(body, "clientReferences")
+          generated_rsc_client_references_defined?(content) &&
+            sections.all? do |section|
+              rsc_plugin_body_has_top_level_scoped_client_references?(section.fetch(:body))
             end
-          end
         end
 
         # Counts active `new RSCWebpackPlugin(...)` calls whose first argument is present but

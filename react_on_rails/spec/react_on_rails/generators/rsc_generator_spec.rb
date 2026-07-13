@@ -1018,7 +1018,7 @@ describe RscGenerator, type: :generator do
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
       expect(messages).to include("some may already be correctly scoped")
-      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
+      expect(messages).to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1119,7 +1119,7 @@ describe RscGenerator, type: :generator do
 
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
-      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
+      expect(messages).to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1172,7 +1172,7 @@ describe RscGenerator, type: :generator do
 
       messages = GeneratorMessages.messages.join("\n")
       expect(messages).to include("already define clientReferences")
-      expect(messages).not_to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
+      expect(messages).to include("generated manifest-backed clientReferences resolver in clientWebpackConfig.js")
     end
   end
 
@@ -1877,6 +1877,37 @@ describe RscGenerator, type: :generator do
       JS
 
       expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(true)
+    end
+
+    it "requires the generated resolver for a parseable plugin with custom client references" do
+      content = <<~JS
+        const customClientReferences = { directory: './custom' };
+        clientConfig.plugins.push(
+          new RSCWebpackPlugin({
+            isServer: false,
+            clientReferences: customClientReferences,
+          }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(false)
+    end
+
+    it "requires every parseable plugin to use the generated resolver" do
+      content = <<~JS
+        const fallbackRscClientReferences = {
+          directory: resolve(config.source_path),
+        };
+        const rscClientReferences = (() => [fallbackRscClientReferences])();
+        clientConfig.plugins.push(
+          new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences }),
+        );
+        clientConfig.plugins.push(
+          new RSCWebpackPlugin({ isServer: false, clientReferences: customClientReferences }),
+        );
+      JS
+
+      expect(generator.send(:rsc_plugin_client_references_configured?, content, is_server: false)).to be(false)
     end
 
     it "counts active non-object-literal plugin options without counting comments or object options" do
