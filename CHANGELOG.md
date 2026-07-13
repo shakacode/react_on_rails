@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.10] - 2026-07-13
+
 #### Fixed
 
 - **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
@@ -2876,7 +2878,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.10...main
+[17.0.0.rc.10]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...v17.0.0.rc.10
 [17.0.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...v17.0.0.rc.9
 [17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
 [17.0.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.6...v17.0.0.rc.7
