@@ -37,6 +37,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro] RSC migration diagnostics require graph-derived client references**: The RSC generator's
+  doctor now reports custom or legacy `clientReferences` values as missing the generated
+  manifest-backed resolver, and the migration guide shows how to print the canonical CommonJS
+  resolver and run it in custom ESM webpack configs with a tested compatibility prelude. Fixes
+  [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
+
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
   malformed-payload failure once within it. If the retry also fails, React receives the final
