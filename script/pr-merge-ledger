@@ -727,7 +727,9 @@ class PrMergeLedger
                        .lines
                        .grep_v(/^\s*>/)
                        .join
-    command_text.match(/(?:\A|\n)\s*(\+ci-(?:run-hosted|force-full))(?:[ \t]+[^\n]*)?/i)&.captures&.first&.downcase
+    command = command_text.match(/(?:\A|\n)\s*(\+ci-[a-z0-9][a-z0-9-]*)(?:[ \t]+[^\n]*)?/i)
+                          &.captures&.first&.downcase
+    command if HOSTED_CI_START_COMMANDS.include?(command)
   end
 
   def self.ci_readiness_from_check_rows(pr_number, required_used:, rows:, message: nil)
@@ -2481,9 +2483,8 @@ class PrMergeLedger
         raise Error, "invalid hosted CI label actor #{actor.inspect}"
       end
 
-      stdout, stderr, status = capture_gh([
-                                            "api", "repos/#{@owner}/#{@name}/collaborators/#{actor}/permission"
-                                          ])
+      permission_path = "repos/#{@owner}/#{@name}/collaborators/#{actor}/permission"
+      stdout, stderr, status = capture_gh_with_retries(["api", permission_path])
       raise Error, "unable to verify hosted CI label actor #{actor}: #{stderr.strip}" unless status.success?
 
       %w[admin write].include?(JSON.parse(stdout).fetch("permission"))

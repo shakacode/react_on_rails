@@ -234,6 +234,20 @@ end
 class PrMergeLedgerHostedCiCommandAuthorTrustTest < Minitest::Test
   include PrMergeLedgerHostedCiRequestFixtures
 
+  def test_start_command_parser_rejects_unknown_command_with_start_prefix
+    assert_nil PrMergeLedger.hosted_ci_start_command("+ci-run-hosted-now")
+  end
+
+  def test_start_command_parser_uses_only_the_first_ci_command
+    body = "+ci-status\n+ci-run-hosted"
+
+    assert_nil PrMergeLedger.hosted_ci_start_command(body)
+  end
+
+  def test_start_command_parser_accepts_exact_start_command_with_arguments
+    assert_equal "+ci-run-hosted", PrMergeLedger.hosted_ci_start_command("+ci-run-hosted because needed")
+  end
+
   def test_member_command_without_write_permission_is_ignored
     comment = hosted_command_comment("+ci-run-hosted", at: "2026-07-13T10:01:00Z")
 
@@ -729,6 +743,37 @@ class PrMergeLedgerGitHubCollectorTest < Minitest::Test
     assert_equal %w[maintainer maintainer], permission_lookups
   end
 
+  def test_hosted_actor_permission_retries_transient_failures
+    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
+    responses = [
+      ["", "HTTP 502 Bad Gateway", status(success: false)],
+      [JSON.generate("permission" => "write"), "", status(success: true)]
+    ]
+    collector.define_singleton_method(:capture_gh) { |_args| responses.shift }
+    collector.define_singleton_method(:sleep) { |_seconds| nil }
+
+    assert collector.send(:trusted_hosted_ci_actor?, "maintainer")
+    assert_empty responses
+  end
+
+  def test_hosted_actor_permission_fails_closed_after_retry_exhaustion
+    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
+    calls = 0
+    failed_status = status(success: false)
+    collector.define_singleton_method(:capture_gh) do |_args|
+      calls += 1
+      ["", "HTTP 503 Service Unavailable", failed_status]
+    end
+    collector.define_singleton_method(:sleep) { |_seconds| nil }
+
+    error = assert_raises(PrMergeLedger::Error) do
+      collector.send(:trusted_hosted_ci_actor?, "maintainer")
+    end
+
+    assert_equal PrMergeLedger::GITHUB_API_MAX_ATTEMPTS, calls
+    assert_match(/unable to verify hosted CI label actor maintainer/, error.message)
+  end
+
   def test_dependabot_graphql_and_rest_logins_exclude_pro_workflows
     collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
     expected = PrMergeLedger::HOSTED_CI_WORKFLOW_NAMES - PrMergeLedger::DEPENDABOT_HOSTED_CI_EXCLUSIONS
@@ -742,6 +787,14 @@ class PrMergeLedgerGitHubCollectorTest < Minitest::Test
       "author" => { "login" => "dependabot-preview" }
     )
     assert_equal PrMergeLedger::HOSTED_CI_WORKFLOW_NAMES, preview_workflows
+  end
+
+  private
+
+  def status(success:)
+    Object.new.tap do |result|
+      result.define_singleton_method(:success?) { success }
+    end
   end
 end
 
