@@ -26,6 +26,7 @@ describe "Server Rendering", :server_rendering do
       expect(context.inspect).not_to include(invalid_json)
       expect(JSON.generate(context)).not_to include(invalid_json)
       expect(error.message).not_to include(invalid_json)
+      expect(error.cause).to be_nil
     end)
   end
 

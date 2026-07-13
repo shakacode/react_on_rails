@@ -904,6 +904,17 @@ module ReactOnRails
       )
     end
 
+    def raise_renderer_prerender_error(err, react_component_name, props, js_code)
+      prerender_error = ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                                         # Sanitize as this might be browser logged
+                                                         props: sanitized_props_string(props),
+                                                         err:,
+                                                         js_code:)
+      raise prerender_error, cause: nil if err.is_a?(ReactOnRails::JsonParseError)
+
+      raise prerender_error
+    end
+
     def rendering_error_from_result(json_result)
       rendering_error = json_result["renderingError"]
       return unless rendering_error.is_a?(Hash)
@@ -987,11 +998,7 @@ module ReactOnRails
         result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
       rescue StandardError => err
         # This error came from the renderer
-        raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                               # Sanitize as this might be browser logged
-                                               props: sanitized_props_string(props),
-                                               err:,
-                                               js_code:)
+        raise_renderer_prerender_error(err, react_component_name, props, js_code)
       end
 
       if render_options.streaming?
