@@ -910,7 +910,10 @@ module ReactOnRails
                                                          props: sanitized_props_string(props),
                                                          err:,
                                                          js_code:)
-      raise prerender_error, cause: nil if err.is_a?(ReactOnRails::JsonParseError)
+      renderer_parse_error = err.is_a?(ReactOnRails::JsonParseError) ||
+                             (defined?(ReactOnRails::LengthPrefixedParser::ParseError) &&
+                               err.is_a?(ReactOnRails::LengthPrefixedParser::ParseError))
+      raise prerender_error, cause: nil if renderer_parse_error
 
       raise prerender_error
     end
@@ -1012,11 +1015,7 @@ module ReactOnRails
 
         result.rescue do |err|
           # This error came from the renderer
-          raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                                 # Sanitize as this might be browser logged
-                                                 props: sanitized_props_string(props),
-                                                 err:,
-                                                 js_code:)
+          raise_renderer_prerender_error(err, react_component_name, props, js_code)
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
         raise_prerender_error(result, react_component_name, props, js_code)

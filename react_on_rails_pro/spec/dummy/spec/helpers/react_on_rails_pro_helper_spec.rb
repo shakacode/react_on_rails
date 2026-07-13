@@ -694,6 +694,67 @@ describe ReactOnRailsProHelper do
       )
     end
 
+    it "redacts parser failures from the StreamRequest helper wrapper" do
+      stub_pro_bundle_hashes
+      malformed_payloads = [
+        "stream-header-secret\n",
+        "stream-metadata-secret\t5\nhello",
+        begin
+          raw_content = '{"token":"stream-object-secret"'
+          metadata = { "payloadType" => "object" }.to_json
+          "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+        end
+      ]
+
+      malformed_payloads.each do |malformed_payload|
+        response = ReactOnRailsPro::RendererHttpClient::Response.new do |yielder, status_assigner|
+          status_assigner.call(200)
+          yielder.call(malformed_payload)
+        end
+        stream = ReactOnRailsPro::StreamRequest.create { response }
+        allow(ReactOnRails::ServerRenderingPool).to receive_messages(
+          reset_pool_if_server_bundle_was_modified: nil,
+          server_render_js_with_console_logging: stream
+        )
+        render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+          react_component_name: component_name,
+          options: component_options.merge(props:, render_mode: :html_streaming)
+        )
+        wrapped_stream = send(:server_rendered_react_component, render_options)
+
+        expect { wrapped_stream.each_chunk.to_a }.to raise_error(ReactOnRails::PrerenderError) do |error|
+          expect(error.err).to be_a(ReactOnRails::LengthPrefixedParser::ParseError)
+          expect(error.cause).to be_nil
+          expect(error.message)
+            .not_to include("stream-header-secret", "stream-metadata-secret", "stream-object-secret")
+          expect(error.to_error_context.inspect)
+            .not_to include("stream-header-secret", "stream-metadata-secret", "stream-object-secret")
+          expect(JSON.generate(error.to_error_context))
+            .not_to include("stream-header-secret", "stream-metadata-secret", "stream-object-secret")
+        end
+      end
+    end
+
+    it "preserves non-parser errors through the StreamRequest helper wrapper" do
+      stub_pro_bundle_hashes
+      renderer_error = StandardError.new("stream transport failed")
+      stream = ReactOnRailsPro::StreamRequest.create { raise renderer_error }
+      allow(ReactOnRails::ServerRenderingPool).to receive_messages(
+        reset_pool_if_server_bundle_was_modified: nil,
+        server_render_js_with_console_logging: stream
+      )
+      render_options = ReactOnRails::ReactComponent::RenderOptions.new(
+        react_component_name: component_name,
+        options: component_options.merge(props:, render_mode: :html_streaming)
+      )
+      wrapped_stream = send(:server_rendered_react_component, render_options)
+
+      expect { wrapped_stream.each_chunk.to_a }.to raise_error(ReactOnRails::PrerenderError) do |error|
+        expect(error.err).to equal(renderer_error)
+        expect(error.cause).to equal(renderer_error)
+      end
+    end
+
     describe "#buffered_stream_react_component" do
       it "buffers all streamed chunks into one normal Rails helper result" do
         result = nil

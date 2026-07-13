@@ -105,7 +105,7 @@ module ReactOnRailsPro
         end
         rescue_block_index += 1
       end
-      raise current_error if current_error.present?
+      raise current_error, cause: current_error.cause if current_error.present?
     end
   end
 

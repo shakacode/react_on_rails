@@ -51,23 +51,26 @@ module ReactOnRails
 
     private
 
-    def json_parse_error?(error)
-      defined?(JsonParseError) && error.is_a?(JsonParseError)
+    def renderer_parse_error?(error)
+      json_parse_error = defined?(JsonParseError) && error.is_a?(JsonParseError)
+      length_prefixed_parse_error = defined?(LengthPrefixedParser::ParseError) &&
+                                    error.is_a?(LengthPrefixedParser::ParseError)
+      json_parse_error || length_prefixed_parse_error
     end
 
     def safe_error_details(error)
-      return error.inspect unless json_parse_error?(error)
+      return error.inspect unless renderer_parse_error?(error)
 
-      "#{error.class}: Renderer response JSON could not be parsed"
+      "#{error.class}: Renderer response could not be parsed"
     end
 
     def error_context_value(error)
-      json_parse_error?(error) ? safe_error_details(error) : error
+      renderer_parse_error?(error) ? safe_error_details(error) : error
     end
 
     def sensitive_nested_context_key?(key)
       SENSITIVE_CONTEXT_KEYS.include?(key.to_s) ||
-        (json_parse_error?(err) && key.to_s == "original_error")
+        (renderer_parse_error?(err) && key.to_s == "original_error")
     end
 
     # rubocop:disable Metrics/AbcSize

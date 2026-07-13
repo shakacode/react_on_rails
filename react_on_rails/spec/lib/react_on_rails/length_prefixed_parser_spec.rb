@@ -52,12 +52,12 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     end
 
     it "raises on a missing tab separator in the header" do
-      bad_payload = "{\"payloadType\":\"string\"}\n<content>"
+      bad_payload = "header-format-secret\n<content>"
 
       expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
-        ReactOnRails::Error,
+        described_class::ParseError,
         /missing tab/
-      )
+      ) { |error| expect(error.message).not_to include("header-format-secret") }
     end
 
     it "raises on an invalid hex length" do
@@ -65,9 +65,54 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       bad_payload = "#{metadata}\tZZZZ\ncontent"
 
       expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
-        ReactOnRails::Error,
-        /Invalid content length/
+        described_class::ParseError,
+        /invalid content length/
+      ) { |error| expect(error.cause).to be_nil }
+    end
+
+    it "raises on a negative content length" do
+      metadata = { "payloadType" => "string" }.to_json
+      bad_payload = "#{metadata}\t-1\n"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        described_class::ParseError,
+        /negative content length/
       )
+    end
+
+    it "classifies invalid metadata JSON as a parser error" do
+      bad_payload = "metadata-json-secret\t5\nhello"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        described_class::ParseError,
+        /invalid metadata JSON/
+      ) do |error|
+        expect(error.message).not_to include("metadata-json-secret")
+        expect(error.cause).to be_nil
+      end
+    end
+
+    it "rejects metadata JSON that is not an object" do
+      bad_payload = "[]\t0\n"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        described_class::ParseError,
+        /metadata JSON must be an object/
+      )
+    end
+
+    it "classifies invalid object payload JSON as a parser error" do
+      raw_content = '{"secret":"object-json-secret"'
+      metadata = { "payloadType" => "object" }.to_json
+      bad_payload = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+
+      expect { described_class.parse_one_chunk_result(bad_payload) }.to raise_error(
+        described_class::ParseError,
+        /object payload JSON/
+      ) do |error|
+        expect(error.message).not_to include("object-json-secret")
+        expect(error.cause).to be_nil
+      end
     end
 
     it "raises when the input contains more than one chunk" do
@@ -75,7 +120,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       two_chunks = chunk + chunk
 
       expect { described_class.parse_one_chunk_result(two_chunks) }.to raise_error(
-        ReactOnRails::Error,
+        described_class::ParseError,
         /expected exactly one length-prefixed chunk but found 2/
       )
     end
