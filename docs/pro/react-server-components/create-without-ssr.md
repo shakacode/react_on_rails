@@ -231,7 +231,7 @@ This change will make the bundling process generate a new bundle named `rsc-bund
 Then, we need to tell React on Rails to upload the `rsc-bundle.js` file to the renderer while uploading the server bundle.
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_bundle_js_file = "rsc-bundle.js"
 end

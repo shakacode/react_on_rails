@@ -251,7 +251,7 @@ end
 If you customize the route path, ensure the `rsc_payload_generation_url_path` config matches:
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_payload_generation_url_path = "flight-payload"
 end
