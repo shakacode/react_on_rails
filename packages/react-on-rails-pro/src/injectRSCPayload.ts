@@ -107,7 +107,7 @@ function createRSCDiagnosticScript(
   // a useful diagnostic when the server provided a non-blank message or stack.
   if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
   // In production, emit only the hasErrors signal without the server error message or stack trace.
-  // Full diagnostics are still available server-side via onDiagnosticError (Sentry/Honeybadger).
+  // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
   const clientPayload = railsEnv === 'production' ? { hasErrors } : { hasErrors, renderingError };
   return createScriptTag(
     `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(clientPayload)}`,

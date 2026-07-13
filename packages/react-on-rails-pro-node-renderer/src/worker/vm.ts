@@ -612,14 +612,23 @@ export async function buildExecutionContext(
       });
 
       if (isReadableStream(result)) {
-        const newStreamAfterHandlingError = handleStreamError(result, (error) => {
-          const msg = formatExceptionMessage(
-            { renderingRequest },
-            error,
-            'Error in a rendering stream',
-            remapStackTraceForRequest,
-          );
+        const reportedErrors = new WeakSet<Error>();
+        const reportStreamError = (error: Error, label: string) => {
+          if (reportedErrors.has(error)) return;
+          reportedErrors.add(error);
+          const msg = formatExceptionMessage({ renderingRequest }, error, label, remapStackTraceForRequest);
           errorReporter.message(msg);
+        };
+
+        result.on('renderingError', (error: Error) => {
+          reportStreamError(error, 'Rendering error in stream');
+        });
+
+        const newStreamAfterHandlingError = handleStreamError(result, (error) => {
+          reportStreamError(
+            error instanceof Error ? error : new Error(String(error)),
+            'Error in a rendering stream',
+          );
         });
         return newStreamAfterHandlingError;
       }

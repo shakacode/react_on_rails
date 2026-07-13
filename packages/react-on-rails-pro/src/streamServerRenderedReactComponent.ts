@@ -63,6 +63,7 @@ const streamRenderReactComponent = (
     pipeToTransform,
     writeChunk,
     emitError,
+    notifyRenderingError,
     endStream,
     onConsumerAbort,
     isConsumerAborted,
@@ -77,6 +78,8 @@ const streamRenderReactComponent = (
 
     if (throwJsErrors) {
       emitError(error);
+    } else {
+      notifyRenderingError(error);
     }
   };
 
