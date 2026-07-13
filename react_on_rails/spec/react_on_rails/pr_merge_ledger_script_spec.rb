@@ -150,6 +150,60 @@ RSpec.describe "script/pr-merge-ledger" do
     SH
   end
 
+  def ready_reviews_connection
+    {
+      "nodes" => [],
+      "pageInfo" => { "hasNextPage" => false, "endCursor" => nil }
+    }
+  end
+
+  def fake_gh_script_with_hosted_ci_lineage_gap(reviews: ready_reviews_connection)
+    reviews_response = JSON.generate("data" => { "repository" => { "pullRequest" => { "reviews" => reviews } } })
+
+    fake_gh_script_with_ready_checks(<<~SH)
+      pr=""
+      query=""
+      for arg in "$@"; do
+        case "$arg" in
+          pr=*) pr=${arg#pr=} ;;
+          query=*) query=${arg#query=} ;;
+        esac
+      done
+
+      if printf '%s' "$query" | grep -q 'files(first'; then
+        cat <<JSON
+      {"data":{"repository":{"pullRequest":{"number":$pr,"title":"PR $pr","url":"https://example.com/pr/$pr","state":"OPEN","isDraft":false,"baseRefName":"main","headRefName":"branch-$pr","headRefOid":"head-$pr","mergedAt":null,"reviewDecision":"APPROVED","body":"","author":{"login":"maintainer"},"isCrossRepository":false,"commits":{"nodes":[{"commit":{"oid":"head-$pr","committedDate":"2026-07-01T00:00:00Z"}}]},"files":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'labels(first:100'; then
+        if [ "$pr" = "1" ]; then
+          cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"labels":{"nodes":[{"name":"ready-for-hosted-ci"}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+        else
+          cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"labels":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+        fi
+      elif printf '%s' "$query" | grep -q 'timelineItems'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"timelineItems":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviewThreads'; then
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      elif printf '%s' "$query" | grep -q 'reviews(first'; then
+        cat <<'JSON'
+      #{reviews_response}
+      JSON
+      else
+        cat <<'JSON'
+      {"data":{"repository":{"pullRequest":{"comments":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}
+      JSON
+      fi
+    SH
+  end
+
   def write_fixture(file, fixture, binary: false)
     fixture = with_default_fixture_review_reply_author_associations(fixture)
     fixture = fixture.merge(default_ci_readiness) if fixture_needs_default_ci_readiness?(fixture)
@@ -7557,6 +7611,78 @@ RSpec.describe "script/pr-merge-ledger" do
       expect(report.fetch("violations").map { |violation| violation.fetch("code") }).to include(
         "review_decision_review_required"
       )
+    end
+  end
+
+  it "reports hosted CI lineage gaps as per-PR unknown readiness" do
+    with_raw_fake_gh(fake_gh_script_with_hosted_ci_lineage_gap) do |env, _bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "--repo",
+        "shakacode/react_on_rails",
+        "--changelog-classification",
+        "not_user_visible",
+        "--strict",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(1), stderr
+
+      report = JSON.parse(stdout)
+      ledger = report.fetch("pull_requests").fetch(0)
+      expect(ledger.fetch("ci_readiness")).to include(
+        "status" => "UNKNOWN",
+        "verdict" => "UNKNOWN",
+        "required_used" => false
+      )
+      expect(ledger.fetch("ci_readiness").fetch("message")).to include("has no timeline event")
+      expect(ledger.fetch("violations").map { |violation| violation.fetch("code") }).to include(
+        "unknown_ci_readiness"
+      )
+    end
+  end
+
+  it "keeps aggregating live PRs when one hosted CI lineage is invalid" do
+    with_raw_fake_gh(fake_gh_script_with_hosted_ci_lineage_gap) do |env, _bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "1",
+        "2",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      expect(status).to be_success, stderr
+
+      report = JSON.parse(stdout)
+      ledgers = report.fetch("pull_requests")
+      expect(ledgers.map { |ledger| ledger.dig("pr", "number") }).to eq([1, 2])
+      expect(ledgers.fetch(0).dig("ci_readiness", "verdict")).to eq("UNKNOWN")
+      expect(ledgers.fetch(1).dig("ci_readiness", "verdict")).to eq("READY")
+      expect(report.fetch("complete_allowed")).to be(false)
+    end
+  end
+
+  it "does not swallow live collector errors outside CI readiness" do
+    fake_gh = fake_gh_script_with_hosted_ci_lineage_gap(reviews: {})
+
+    with_raw_fake_gh(fake_gh) do |env, _bin_dir|
+      stdout, stderr, status = Open3.capture3(
+        env,
+        script_path,
+        "2",
+        "--repo",
+        "shakacode/react_on_rails",
+        chdir: repo_root
+      )
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to be_empty
+      expect(stderr).to include("key not found: \"nodes\"")
     end
   end
 

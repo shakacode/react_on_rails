@@ -2273,7 +2273,6 @@ class PrMergeLedger
       review_threads = fetch_review_threads(pr_number)
       reviews = fetch_reviews(pr_number)
       comments = fetch_comments(pr_number)
-      hosted_ci_not_before = hosted_ci_request_not_before(metadata, pr_number, comments) if hosted_ci_requested
       {
         "pull_request" => metadata,
         "files" => files,
@@ -2283,8 +2282,9 @@ class PrMergeLedger
         "ci_readiness" => fetch_ci_readiness(
           pr_number,
           head_sha: metadata.fetch("headRefOid"),
+          metadata:,
+          comments:,
           hosted_ci_requested:,
-          hosted_ci_not_before:,
           expected_hosted_workflows:,
           allow_pull_request_hosted_ci:
         )
@@ -2337,8 +2337,9 @@ class PrMergeLedger
       fetch_paginated_connection(pr_number, labels_query, "labels")
     end
 
-    def fetch_ci_readiness(pr_number, head_sha:, hosted_ci_requested:, hosted_ci_not_before:,
+    def fetch_ci_readiness(pr_number, head_sha:, metadata:, comments:, hosted_ci_requested:,
                            expected_hosted_workflows:, allow_pull_request_hosted_ci:)
+      hosted_ci_not_before = hosted_ci_request_not_before(metadata, pr_number, comments) if hosted_ci_requested
       required_result = fetch_pr_checks(pr_number, required: true)
       required_rows = PrMergeLedger.parse_ci_check_rows(required_result.fetch(:stdout))
       rows, required_used, message = select_ci_readiness_rows(
