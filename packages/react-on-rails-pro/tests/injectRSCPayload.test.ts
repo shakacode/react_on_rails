@@ -544,6 +544,27 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain('renderingError');
   });
 
+  it('redacts renderingError when railsEnv is not provided (undefined)', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'Database connection refused at 10.0.3.42:5432',
+        stack: 'Error: Database connection refused\n    at Pool (/app/lib/db.ts:18:11)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Database connection refused');
+    expect(resultStr).not.toContain('10.0.3.42');
+    expect(resultStr).not.toContain('db.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
   it('forces hasErrors:true in production even when metadata has hasErrors:false with renderingError signal', async () => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       hasErrors: false,
