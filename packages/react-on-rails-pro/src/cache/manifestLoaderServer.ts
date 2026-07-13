@@ -13,36 +13,24 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import type { BundleManifest } from 'react-on-rails-rsc';
+/* eslint-disable import/prefer-default-export -- named export for consistency with the other manifest loader modules */
+
 import type { buildServerRenderer as buildServerRendererType } from 'react-on-rails-rsc/server.node';
-import loadJsonFile from '../loadJsonFile.ts';
 import { getClientManifestFileName } from './manifestLoader.ts';
+import { getReactClientManifest } from './manifestStylesheets.ts';
+
+/*
+ * This module runtime-imports 'react-on-rails-rsc' (an optional peer dependency),
+ * so it must stay out of the non-RSC entry graphs (ReactOnRails.node/full/client):
+ * bundlers resolve even dynamic import() specifiers at build time, which breaks
+ * apps that do not install react-on-rails-rsc. Manifest helpers that the shared
+ * streaming path needs live in manifestStylesheets.ts instead.
+ * Guarded by tests/rscDependencyIsolation.test.ts.
+ */
 
 type ServerRenderer = ReturnType<typeof buildServerRendererType>;
 
-const reactClientManifestPromises = new Map<string, Promise<BundleManifest>>();
 let serverRendererPromise: Promise<ServerRenderer> | undefined;
-const rscClientManifestStylesheetHrefsPromises = new Map<string, Promise<ReadonlySet<string>>>();
-
-function normalizeStylesheetHref(href: string) {
-  try {
-    return new URL(href, 'http://react-on-rails.local').pathname;
-  } catch {
-    return href.split(/[?#]/, 1)[0];
-  }
-}
-
-export function collectRSCClientManifestStylesheetHrefs(
-  reactClientManifest: BundleManifest,
-): ReadonlySet<string> {
-  const stylesheetHrefs = new Set<string>();
-
-  Object.values(reactClientManifest.filePathToModuleMetadata).forEach(({ css = [] }) => {
-    css.forEach((href) => stylesheetHrefs.add(normalizeStylesheetHref(href)));
-  });
-
-  return stylesheetHrefs;
-}
 
 function requireClientManifestFileName(): string {
   const clientManifest = getClientManifestFileName();
@@ -55,23 +43,12 @@ function requireClientManifestFileName(): string {
   return clientManifest;
 }
 
-function getReactClientManifest(clientManifest = requireClientManifestFileName()): Promise<BundleManifest> {
-  const cachedPromise = reactClientManifestPromises.get(clientManifest);
-  if (cachedPromise) return cachedPromise;
-
-  const promise = loadJsonFile<BundleManifest>(clientManifest);
-  reactClientManifestPromises.set(clientManifest, promise);
-  void promise.catch(() => {
-    if (reactClientManifestPromises.get(clientManifest) === promise) {
-      reactClientManifestPromises.delete(clientManifest);
-    }
-  });
-  return promise;
-}
-
 export function getServerRenderer(): Promise<ServerRenderer> {
   if (!serverRendererPromise) {
-    serverRendererPromise = Promise.all([getReactClientManifest(), import('react-on-rails-rsc/server.node')])
+    serverRendererPromise = Promise.all([
+      getReactClientManifest(requireClientManifestFileName()),
+      import('react-on-rails-rsc/server.node'),
+    ])
       .then(([reactClientManifest, { buildServerRenderer }]) => buildServerRenderer(reactClientManifest))
       .catch((err: unknown) => {
         serverRendererPromise = undefined;
@@ -79,18 +56,4 @@ export function getServerRenderer(): Promise<ServerRenderer> {
       });
   }
   return serverRendererPromise;
-}
-
-export function getRSCClientManifestStylesheetHrefs(clientManifest: string): Promise<ReadonlySet<string>> {
-  const cachedPromise = rscClientManifestStylesheetHrefsPromises.get(clientManifest);
-  if (cachedPromise) return cachedPromise;
-
-  const promise = getReactClientManifest(clientManifest).then(collectRSCClientManifestStylesheetHrefs);
-  rscClientManifestStylesheetHrefsPromises.set(clientManifest, promise);
-  void promise.catch(() => {
-    if (rscClientManifestStylesheetHrefsPromises.get(clientManifest) === promise) {
-      rscClientManifestStylesheetHrefsPromises.delete(clientManifest);
-    }
-  });
-  return promise;
 }
