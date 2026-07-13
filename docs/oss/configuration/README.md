@@ -305,20 +305,15 @@ ReactOnRails.configure do |config|
   ################################################################################
   # DEPRECATED CONFIGURATION
   ################################################################################
-  # 🚫 DEPRECATED: immediate_hydration is no longer used
+  # 🚫 REMOVED in v16.2.0: `config.immediate_hydration` now raises NoMethodError at boot.
+  # Immediate hydration is now automatically enabled for React on Rails Pro users and
+  # cannot be disabled. Remove this line from your initializer.
   #
-  # This configuration option has been removed. Immediate hydration is now
-  # automatically enabled for React on Rails Pro users and cannot be disabled.
+  # The helper parameter (`immediate_hydration:` key in `react_component`, `react_component_hash`,
+  # `redux_store`, and the streaming helpers) was removed later in v16.6.0. Passing it now logs a
+  # one-time deprecation warning and is ignored.
   #
-  # If you still have this in your config, it will log a deprecation warning:
-  # config.immediate_hydration = false  # ⚠️ Logs warning, has no effect
-  #
-  # Action Required: Remove this line from your config/initializers/react_on_rails.rb
-  # See CHANGELOG.md for migration instructions.
-  #
-  # Historical Context:
-  # Previously controlled whether Pro components hydrated immediately upon their
-  # server-rendered HTML reaching the client, vs waiting for full page load.
+  # See CHANGELOG.md for migration details.
 
   ################################################################################
   # I18N OPTIONS
