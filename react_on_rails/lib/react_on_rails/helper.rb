@@ -7,6 +7,7 @@
 # 1. The white spacing in this file matters!
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 require "react_on_rails/prerender_error"
+require "react_on_rails/json_parse_error"
 require "react_on_rails/smart_error"
 require "addressable/uri"
 require "react_on_rails/utils"
@@ -904,6 +905,20 @@ module ReactOnRails
       )
     end
 
+    def raise_renderer_prerender_error(err, react_component_name, props, js_code)
+      prerender_error = ReactOnRails::PrerenderError.new(component_name: react_component_name,
+                                                         # Sanitize as this might be browser logged
+                                                         props: sanitized_props_string(props),
+                                                         err:,
+                                                         js_code:)
+      renderer_parse_error = err.is_a?(ReactOnRails::JsonParseError) ||
+                             (defined?(ReactOnRails::LengthPrefixedParser::ParseError) &&
+                               err.is_a?(ReactOnRails::LengthPrefixedParser::ParseError))
+      raise prerender_error, cause: nil if renderer_parse_error
+
+      raise prerender_error
+    end
+
     def rendering_error_from_result(json_result)
       rendering_error = json_result["renderingError"]
       return unless rendering_error.is_a?(Hash)
@@ -987,11 +1002,7 @@ module ReactOnRails
         result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
       rescue StandardError => err
         # This error came from the renderer
-        raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                               # Sanitize as this might be browser logged
-                                               props: sanitized_props_string(props),
-                                               err:,
-                                               js_code:)
+        raise_renderer_prerender_error(err, react_component_name, props, js_code)
       end
 
       if render_options.streaming?
@@ -1005,11 +1016,7 @@ module ReactOnRails
 
         result.rescue do |err|
           # This error came from the renderer
-          raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                                 # Sanitize as this might be browser logged
-                                                 props: sanitized_props_string(props),
-                                                 err:,
-                                                 js_code:)
+          raise_renderer_prerender_error(err, react_component_name, props, js_code)
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
         raise_prerender_error(result, react_component_name, props, js_code)

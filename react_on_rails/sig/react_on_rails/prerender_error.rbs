@@ -1,6 +1,7 @@
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
-    MAX_ERROR_SNIPPET_TO_LOG: Integer
+    REDACTED_VALUE: String
+    SENSITIVE_CONTEXT_KEYS: Array[String]
 
     attr_reader component_name: String?
     attr_reader err: StandardError?

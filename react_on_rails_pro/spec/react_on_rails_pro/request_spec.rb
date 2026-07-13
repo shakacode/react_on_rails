@@ -455,6 +455,26 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe ".asset_exists_on_vm_renderer?" do
+    it "encodes the filename as one query parameter" do
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive(:server_bundle_hash)
+        .and_return("server-bundle")
+      response = instance_double(ReactOnRailsPro::RendererHttpClient::Response, body: '{"exists":true}')
+      requested_path = nil
+      request_json = nil
+
+      allow(described_class).to receive(:perform_request) do |path, json:|
+        requested_path = path
+        request_json = json
+        response
+      end
+
+      expect(described_class.asset_exists_on_vm_renderer?("report&target=other")).to be(true)
+      expect(requested_path).to eq("/asset-exists?filename=report%26target%3Dother")
+      expect(request_json).to include("targetBundles" => ["server-bundle"])
+    end
+  end
+
   describe "thread-safe connection management" do
     before do
       described_class.instance_variable_set(:@connection, nil)
