@@ -32,6 +32,13 @@ test('redacts exact benchmark roots and common local user paths across platforms
   );
 });
 
+test('redacts complete local paths whose segments contain spaces', () => {
+  const value = '/Users/alice/My Documents/project/error.js';
+
+  assert.equal(redactLocalPaths(value), '<LOCAL_PATH>');
+  assert.doesNotThrow(() => assertNoLocalPaths(redactLocalPaths(value)));
+});
+
 test('preserves remote web URLs and relative compiler paths', () => {
   const value = 'https://example.com/Users/alice/docs\nERROR in ./src/message.js';
 

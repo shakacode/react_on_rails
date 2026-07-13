@@ -471,6 +471,15 @@ class PrMergeLedger
         }
       end
 
+      unexecuted_workflows = unexecuted_hosted_workflows(hosted_rows, expected_hosted_workflows)
+      unless unexecuted_workflows.empty?
+        return {
+          rows: [],
+          required_used: false,
+          message: "hosted CI workflows have no executed rows: #{unexecuted_workflows.join(', ')}"
+        }
+      end
+
       rows_by_key = {}
       (Array(full_rows) + Array(hosted_rows)).each do |row|
         rows_by_key[ci_check_row_dedup_key(row)] = row
@@ -488,6 +497,14 @@ class PrMergeLedger
       required_used: false,
       message: nil
     }
+  end
+
+  def self.unexecuted_hosted_workflows(hosted_rows, expected_hosted_workflows)
+    rows_by_workflow = Array(hosted_rows).group_by { |row| row["workflow"] }
+    Array(expected_hosted_workflows).select do |workflow|
+      workflow_rows = rows_by_workflow.fetch(workflow, [])
+      workflow_rows.all? { |row| row["bucket"].to_s == "skipping" }
+    end
   end
 
   def self.missing_required_ci_check_keys(required_rows, full_rows)
@@ -531,6 +548,10 @@ class PrMergeLedger
     return false unless HOSTED_CI_RUN_EVENTS.include?(event.to_s)
 
     allow_pull_request || event.to_s == "workflow_dispatch"
+  end
+
+  def self.allow_pull_request_hosted_ci?(metadata)
+    metadata["isCrossRepository"] == false && metadata.dig("author", "login") != "dependabot[bot]"
   end
 
   def self.hosted_ci_request_not_before(active_labels:, label_events:, comments:, head_committed_at:,
@@ -2245,9 +2266,10 @@ class PrMergeLedger
       # push during collection can make SHA comparisons a best-effort snapshot
       # rather than an atomic GitHub view.
       metadata, files = fetch_metadata_and_files(pr_number)
+      metadata["labels"] = { "nodes" => fetch_labels(pr_number) }
       hosted_ci_requested = hosted_ci_requested?(metadata)
       expected_hosted_workflows = expected_hosted_workflows(metadata)
-      allow_pull_request_hosted_ci = metadata.dig("author", "login") != "dependabot[bot]"
+      allow_pull_request_hosted_ci = PrMergeLedger.allow_pull_request_hosted_ci?(metadata)
       review_threads = fetch_review_threads(pr_number)
       reviews = fetch_reviews(pr_number)
       comments = fetch_comments(pr_number)
@@ -2309,6 +2331,10 @@ class PrMergeLedger
 
     def fetch_comments(pr_number)
       fetch_paginated_connection(pr_number, comments_query, "comments")
+    end
+
+    def fetch_labels(pr_number)
+      fetch_paginated_connection(pr_number, labels_query, "labels")
     end
 
     def fetch_ci_readiness(pr_number, head_sha:, hosted_ci_requested:, hosted_ci_not_before:,
@@ -2734,7 +2760,7 @@ class PrMergeLedger
               reviewDecision
               body
               author { login }
-              labels(first:100) { nodes { name } }
+              isCrossRepository
               commits(last:1) {
                 nodes {
                   commit {
@@ -2745,6 +2771,21 @@ class PrMergeLedger
               }
               files(first:100, after:$endCursor) {
                 nodes { path }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    end
+
+    def labels_query
+      <<~GRAPHQL
+        query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+          repository(owner:$owner, name:$name) {
+            pullRequest(number:$pr) {
+              labels(first:100, after:$endCursor) {
+                nodes { name }
                 pageInfo { hasNextPage endCursor }
               }
             }

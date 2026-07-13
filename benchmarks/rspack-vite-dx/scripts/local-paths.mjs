@@ -1,7 +1,7 @@
 const webUrlPattern = /(https?:\/\/[^\s"']+)/gi;
 const localDevServerUrlPattern =
   /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\[::\])(?::\d+)?\//i;
-const pathTail = String.raw`(?:[\\/][^\s"',;:)\]}]+)*`;
+const pathTail = String.raw`(?:[\\/][^\\/\r\n"',;:)\]}]+)*`;
 const localPathPatterns = [
   new RegExp(String.raw`\/(?:Users|home)\/[^/\s"',;:)\]}]+${pathTail}`, 'g'),
   new RegExp(String.raw`\/root${pathTail}`, 'g'),

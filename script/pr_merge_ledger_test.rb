@@ -155,6 +155,50 @@ class PrMergeLedgerHostedCiTest < Minitest::Test
   end
 end
 
+class PrMergeLedgerHostedCiSafetyTest < Minitest::Test
+  include PrMergeLedgerFixtureHelpers
+
+  def test_hosted_request_rejects_a_workflow_with_only_skipped_rows
+    hosted_rows = [
+      ci_check("Generator tests / workflow", bucket: "skipping", state: "SKIPPED")
+        .merge("workflow" => "Generator tests"),
+      ci_check("matrix.job_name", bucket: "skipping", state: "SKIPPED")
+        .merge("workflow" => "Generator tests")
+    ]
+
+    selection = PrMergeLedger.select_ci_readiness_rows(
+      full_rows: [],
+      hosted_ci_requested: true,
+      hosted_rows:,
+      expected_hosted_workflows: ["Generator tests"]
+    )
+
+    assert_empty selection.fetch(:rows)
+    assert_match(/no executed rows: Generator tests/, selection.fetch(:message))
+  end
+
+  def test_fork_and_dependabot_prs_require_trusted_dispatch
+    assert PrMergeLedger.allow_pull_request_hosted_ci?(
+      "author" => { "login" => "maintainer" },
+      "isCrossRepository" => false
+    )
+    fork_allows_pull_request = PrMergeLedger.allow_pull_request_hosted_ci?(
+      "author" => { "login" => "external-contributor" },
+      "isCrossRepository" => true
+    )
+    refute fork_allows_pull_request
+    refute PrMergeLedger.hosted_ci_run_event?("pull_request", allow_pull_request: fork_allows_pull_request)
+    assert PrMergeLedger.hosted_ci_run_event?("workflow_dispatch", allow_pull_request: fork_allows_pull_request)
+    refute PrMergeLedger.allow_pull_request_hosted_ci?(
+      "author" => { "login" => "dependabot[bot]" },
+      "isCrossRepository" => false
+    )
+    refute PrMergeLedger.allow_pull_request_hosted_ci?(
+      "author" => { "login" => "maintainer" }
+    )
+  end
+end
+
 class PrMergeLedgerHostedCiRequestTrustTest < Minitest::Test
   def test_hosted_request_time_uses_trusted_command_before_bot_added_labels
     threshold = PrMergeLedger.hosted_ci_request_not_before(
@@ -369,6 +413,24 @@ class PrMergeLedgerHostedCiSuiteFreshnessTest < Minitest::Test
         "workflow" => { "name" => workflow }
       }
     }
+  end
+end
+
+class PrMergeLedgerGitHubCollectorTest < Minitest::Test
+  def test_fetch_labels_uses_the_paginated_connection
+    collector = PrMergeLedger::GitHubCollector.new("shakacode", "react_on_rails")
+    captured = nil
+    collector.define_singleton_method(:fetch_paginated_connection) do |pr_number, query, connection_name|
+      captured = [pr_number, query, connection_name]
+      [{ "name" => "ready-for-hosted-ci" }]
+    end
+
+    labels = collector.send(:fetch_labels, 4626)
+
+    assert_equal [{ "name" => "ready-for-hosted-ci" }], labels
+    assert_equal 4626, captured.fetch(0)
+    assert_includes captured.fetch(1), "labels(first:100, after:$endCursor)"
+    assert_equal "labels", captured.fetch(2)
   end
 end
 
