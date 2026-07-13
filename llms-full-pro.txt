@@ -5541,14 +5541,6 @@ Rails.application.routes.draw do
 end
 ```
 
-> [!WARNING]
-> Once mounted, this endpoint is a public API. Both `:component_name` and `props` come from the client and
-> can be changed by an attacker. Configure `rsc_payload_authorizer` to check the Rails session and restrict
-> which components may be rendered, or route to an app-owned controller with your normal `before_action`
-> authentication. Never make authorization decisions from payload props. See
-> [Security Model and Hardening](../../oss/deployment/security-model-and-hardening.md#secure-the-rsc-payload-endpoint)
-> and [Pro configuration](../../oss/configuration/configuration-pro.md).
-
 You can change the path of the rsc route by passing the `path` option to the `rsc_payload_route` method.
 
 ```ruby
