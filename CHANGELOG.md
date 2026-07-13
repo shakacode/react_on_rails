@@ -37,11 +37,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
+  clients must now send the password field before file parts; the renderer rejects and discards leading file
+  parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
+  and multipart framing, plus a 1,000-part cap and a matching per-file cap. Password comparisons use fixed-length
+  digests to avoid leaking the configured password length. Fixes
+  [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
+  [PR 4623](https://github.com/shakacode/react_on_rails/pull/4623) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro] RSC migration diagnostics require graph-derived client references**: The RSC generator's
   doctor now reports custom or legacy `clientReferences` values as missing the generated
   manifest-backed resolver, and the migration guide shows how to print the canonical CommonJS
   resolver and run it in custom ESM webpack configs with a tested compatibility prelude. Fixes
   [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
+  [PR 4625](https://github.com/shakacode/react_on_rails/pull/4625) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
