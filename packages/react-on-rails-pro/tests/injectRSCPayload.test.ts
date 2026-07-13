@@ -423,7 +423,9 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
@@ -465,7 +467,9 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('First error');

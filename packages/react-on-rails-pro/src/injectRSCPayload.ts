@@ -108,10 +108,8 @@ function createRSCDiagnosticScript(
   if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
   // Outside development/test, emit only the error signal without the server error message or stack.
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
-  // Allowlist (not denylist) so custom envs like staging/uat default to redacted.
-  // When railsEnv is undefined (direct callers not threading railsContext), preserve full diagnostics
-  // for backwards compatibility — the standard render path always provides railsEnv.
-  const showFullDiagnostics = railsEnv == null || railsEnv === 'development' || railsEnv === 'test';
+  // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
+  const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
   const clientPayload = showFullDiagnostics ? { hasErrors, renderingError } : { hasErrors: true };
   return createScriptTag(
     `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(clientPayload)}`,
