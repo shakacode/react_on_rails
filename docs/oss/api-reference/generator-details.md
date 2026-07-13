@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off, with two exceptions: the bundler (**fresh installs now default to Rspack**, so pass `--no-rspack`, or its alias `--webpack`, if you want Webpack instead) and `--agent-files` (on by default — pass `--no-agent-files` to skip writing the AI-agent guidance files). Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
