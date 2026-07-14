@@ -1454,6 +1454,37 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#ci_status_override_allowed_for_release!" do
+    it "rejects a positional CI override for a stable release before CI validation" do
+      expect do
+        ci_status_override_allowed_for_release!(override_flag: true, is_prerelease: false)
+      end.to raise_error(SystemExit, /CI status override is allowed only for prerelease releases/)
+    end
+
+    it "rejects RELEASE_CI_STATUS_OVERRIDE for a stable release" do
+      allow(ENV).to receive(:fetch).with("RELEASE_CI_STATUS_OVERRIDE", nil).and_return("true")
+
+      expect do
+        ci_status_override_allowed_for_release!(override_flag: nil, is_prerelease: false)
+      end.to raise_error(SystemExit, /CI status override is allowed only for prerelease releases/)
+    end
+
+    it "preserves the prerelease waiver" do
+      expect(ci_status_override_allowed_for_release!(override_flag: true, is_prerelease: true)).to be(true)
+    end
+  end
+
+  describe "release task help" do
+    it "does not advertise strict HEAD retry before the CI gate establishes healthy evidence" do
+      rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
+      help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
+
+      expect(help).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+      expect(help).to include("only after it has found complete healthy\n    CI evidence")
+      expect(help).to include("Override prerelease CI gates only")
+    end
+  end
+
   describe "#validate_main_ci_status!" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:sha) { "abc1234def5678abcdef" }
@@ -1479,6 +1510,10 @@ RSpec.describe "release.rake helper methods" do
 
     def required_check(context, app_id: nil)
       { context:, app_id: }
+    end
+
+    def statuses_envelope(sha)
+      { "name" => "statuses", "sha" => sha }
     end
 
     def next_check_run_id
@@ -1562,9 +1597,62 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    context "when the release branch is intentionally unprotected" do
+      it "evaluates every visible prerelease check instead of treating required checks as unknown" do
+        failure_status = instance_double(Process::Status, success?: false)
+        success_status = instance_double(Process::Status, success?: true)
+        api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+        branch_path = "repos/shakacode/react_on_rails/branches/main"
+        allow(self).to receive(:required_check_names_for_branch).and_call_original
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--jq", "{contexts, checks}", api_path)
+          .and_return(["HTTP 404: Branch not protected", failure_status])
+        allow(Open3).to receive(:capture3)
+          .with("gh", "api", "--include", api_path)
+          .and_return([
+                        "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                        '{"message":"Branch not protected"}',
+                        "gh: branch protection is not enabled for this branch\n",
+                        failure_status
+                      ])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", branch_path)
+          .and_return(['{"name":"main","protected":false}', success_status])
+
+        output = nil
+        expect do
+          output = capture_stdout do
+            validate_main_ci_status!(
+              monorepo_root:,
+              is_prerelease: true,
+              allow_override: false,
+              dry_run: false
+            )
+          end
+        end.not_to raise_error
+        expect(output).to include("Main CI is healthy on #{short_sha} (1 check)")
+      end
+    end
+
     context "when strict exact-HEAD evaluation is enabled" do
       before do
         allow(self).to receive(:ci_evaluate_head_only?).and_return(true)
+      end
+
+      it "rejects a stable CI override before strict exact-HEAD evidence can be waived" do
+        expect(self).not_to receive(:fetch_main_ci_checks)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: true,
+            dry_run: false
+          )
+        end.to raise_error(SystemExit, /CI status override is allowed only for prerelease releases/)
       end
 
       it "blocks a prerelease when an unrelated exact-HEAD check fails" do
@@ -1611,6 +1699,92 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false
           )
         end.to raise_error(SystemExit, /CI is still in progress.*Benchmark/m)
+      end
+
+      it "reuses initially fetched statuses when strict evaluation reaches the missing-required fallback" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(
+            sha:,
+            head_sha: sha,
+            repo_slug: "shakacode/react_on_rails",
+            check_runs: [passing_run("Advisory")]
+          )
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
+          .and_return(required_checks(checks: [required_check("Lint", app_id: 123)]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([], nil)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            target_gem_version: "17.0.0.rc.10"
+          )
+        end.to raise_error(SystemExit) { |error|
+          expect(error.message).to include("No required CI check runs found")
+          expect(error.message).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+        }
+        expect(self).to have_received(:fetch_main_commit_statuses).once
+      end
+
+      it "accepts a successful strict exact-HEAD check rerun over an earlier failure" do
+        check_suite = { "id" => 77 }
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(
+            sha:,
+            head_sha: sha,
+            repo_slug: "shakacode/react_on_rails",
+            check_runs: [
+              failing_run("Lint", id: 1).merge("check_suite" => check_suite),
+              passing_run("Lint", id: 2).merge("check_suite" => check_suite)
+            ]
+          )
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
+          .and_return(required_checks(checks: [required_check("Lint")]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return([])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
+      end
+
+      it "accepts a successful strict exact-HEAD legacy status over an earlier failure" do
+        statuses = [
+          { "id" => 1, "context" => "Legacy CI", "state" => "failure", "created_at" => "2026-07-13T00:00:00Z" },
+          { "id" => 2, "context" => "Legacy CI", "state" => "success", "created_at" => "2026-07-13T00:01:00Z" }
+        ]
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(sha:, head_sha: sha, repo_slug: "shakacode/react_on_rails", check_runs: [])
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
+          .and_return(required_checks(contexts: ["Legacy CI"]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha:, allow_override: false, dry_run: false)
+          .and_return(statuses)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false
+          )
+        end.to output(/Main CI is healthy on #{short_sha} \(1 required check\)/).to_stdout
       end
 
       it "fetches and blocks failed legacy status evidence for app-pinned-only protection" do
@@ -2079,6 +2253,55 @@ RSpec.describe "release.rake helper methods" do
           .and_return(walkback_without_ci_runs)
       end
 
+      it "keeps the complete walkback output free of strict guidance for incomplete exact-HEAD evidence" do
+        exact_head_cases = {
+          pending: { check_runs: [in_progress_run("Slow test")], statuses: [] },
+          failed: { check_runs: [failing_run("JS unit tests")], statuses: [] },
+          empty: { check_runs: [], statuses: [] },
+          malformed: {
+            check_runs: [{
+              "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success", "app" => {}
+            }],
+            statuses: []
+          },
+          unknown: { error: "❌ Unable to query GitHub Checks API for #{exact_head_sha}." }
+        }
+
+        exact_head_cases.each do |kind, result|
+          allow(self).to receive(:fetch_ci_check_runs_for_sha)
+            .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+            .and_return(result.slice(:check_runs, :error))
+          allow(self).to receive(:fetch_ci_statuses_for_sha)
+            .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+            .and_return(statuses: result.fetch(:statuses, []))
+
+          error = nil
+          output = capture_stdout do
+            log_main_ci_walkback(
+              head_sha: exact_head_sha,
+              evaluated_sha: walked_back_sha,
+              skipped: [exact_head_sha],
+              ref: "origin/main"
+            )
+            begin
+              validate_main_ci_status!(
+                monorepo_root:,
+                is_prerelease: false,
+                allow_override: false,
+                dry_run: false,
+                target_gem_version: "17.0.0.rc.10"
+              )
+            rescue SystemExit => exception
+              error = exception
+            end
+          end
+
+          expect(error).to be_a(SystemExit), "#{kind} exact-HEAD evidence should block the release"
+          expect(output).not_to include("RELEASE_CI_EVALUATE_HEAD=true"),
+                                "#{kind} exact-HEAD evidence must not receive strict guidance"
+        end
+      end
+
       it "offers strict exact-HEAD evaluation only after exact HEAD is healthy" do
         strict_head_guidance = [
           "strict evaluation, not a waiver",
@@ -2107,6 +2330,60 @@ RSpec.describe "release.rake helper methods" do
           SystemExit,
           Regexp.new(strict_head_guidance, Regexp::MULTILINE)
         )
+      end
+
+      it "offers strict guidance when a successful exact-HEAD check rerun supersedes an earlier failure" do
+        check_suite = { "id" => 77 }
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(
+            check_runs: [
+              failing_run("Lint", id: 1).merge("check_suite" => check_suite),
+              passing_run("Lint", id: 2).merge("check_suite" => check_suite)
+            ]
+          )
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: [])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false,
+            target_gem_version: "17.0.0.rc.10"
+          )
+        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end
+
+      it "offers strict guidance when a successful exact-HEAD legacy status supersedes an earlier failure" do
+        successful_statuses = [
+          { "id" => 1, "context" => "Legacy CI", "state" => "failure", "created_at" => "2026-07-13T00:00:00Z" },
+          { "id" => 2, "context" => "Legacy CI", "state" => "success", "created_at" => "2026-07-13T00:01:00Z" }
+        ]
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, repo_slug: "shakacode/react_on_rails", ci_branch: "main")
+          .and_return(required_checks(contexts: ["Legacy CI"]))
+        allow(self).to receive(:fetch_main_commit_statuses)
+          .with(repo_slug: "shakacode/react_on_rails", sha: walked_back_sha, allow_override: false, dry_run: false)
+          .and_return([])
+        allow(self).to receive(:fetch_ci_check_runs_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(check_runs: [])
+        allow(self).to receive(:fetch_ci_statuses_for_sha)
+          .with(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)
+          .and_return(statuses: successful_statuses)
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            target_gem_version: "17.0.0.rc.10"
+          )
+        end.to raise_error(SystemExit, /RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
       end
 
       it "withholds strict exact-HEAD guidance when walked-back unrelated evidence is pending" do
@@ -2319,7 +2596,7 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with(
             "gh", "api", "--paginate", "--jq", CI_STATUSES_JSONL_QUERY,
-            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/statuses"
+            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
           )
           .and_return([malformed_status.to_json, success_status])
 
@@ -2356,10 +2633,10 @@ RSpec.describe "release.rake helper methods" do
         allow(Open3).to receive(:capture2e)
           .with(
             "gh", "api", "--paginate", "--jq", CI_STATUSES_JSONL_QUERY,
-            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/statuses"
+            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
           )
           .and_return([[
-            [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "statuses"],
+            [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, statuses_envelope(exact_head_sha)],
             *statuses.map { |status| [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, status] }
           ].map(&:to_json).join("\n"), success_status])
 
@@ -2390,16 +2667,22 @@ RSpec.describe "release.rake helper methods" do
           .and_return(check_runs: [])
         success_status = instance_double(Process::Status, success?: true)
         statuses = [
-          { "id" => 1, "context" => "Legacy CI", "state" => "success", "created_at" => "2026-07-13T10:00:00+10:00" },
-          { "id" => 2, "context" => "Legacy CI", "state" => "failure", "created_at" => "2026-07-13T01:00:00Z" }
+          {
+            "id" => 1, "context" => "Legacy CI", "state" => "success",
+            "created_at" => "2026-07-13T10:00:00+10:00"
+          },
+          {
+            "id" => 2, "context" => "Legacy CI", "state" => "failure",
+            "created_at" => "2026-07-13T01:00:00Z"
+          }
         ]
         allow(Open3).to receive(:capture2e)
           .with(
             "gh", "api", "--paginate", "--jq", CI_STATUSES_JSONL_QUERY,
-            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/statuses"
+            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
           )
           .and_return([[
-            [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "statuses"],
+            [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, statuses_envelope(exact_head_sha)],
             *statuses.map { |status| [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, status] }
           ].map(&:to_json).join("\n"), success_status])
 
@@ -2435,12 +2718,12 @@ RSpec.describe "release.rake helper methods" do
           when "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/check-runs"
             output = [
               [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
-              [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, passing_run("Legacy CI")]
+              [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, passing_run("Legacy CI").merge("head_sha" => exact_head_sha)]
             ].map(&:to_json).join("\n")
             [output, success_status]
-          when "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/statuses"
+          when "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
             statuses_query = jq_query
-            jq_query == expected_statuses_query ? ["jq: expected statuses array", failure_status] : ["", success_status]
+            jq_query == expected_statuses_query ? ["jq: expected status object", failure_status] : ["", success_status]
           else
             raise "Unexpected GitHub API request: #{args.inspect}"
           end
@@ -2485,8 +2768,12 @@ RSpec.describe "release.rake helper methods" do
       it "keeps valid empty exact-HEAD API envelopes known empty" do
         success_status = instance_double(Process::Status, success?: true)
         allow(Open3).to receive(:capture2e) do |*args|
-          envelope_name = args.last.end_with?("/check-runs") ? "check_runs" : "statuses"
-          [[CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, envelope_name].to_json, success_status]
+          envelope = if args.last.end_with?("/check-runs")
+                       "check_runs"
+                     else
+                       statuses_envelope(exact_head_sha)
+                     end
+          [[CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, envelope].to_json, success_status]
         end
 
         expect(fetch_ci_check_runs_for_sha(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha))
@@ -2501,8 +2788,71 @@ RSpec.describe "release.rake helper methods" do
         expect(Open3).to have_received(:capture2e)
           .with(
             "gh", "api", "--paginate", "--jq", CI_STATUSES_JSONL_QUERY,
-            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/statuses"
+            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
           )
+      end
+
+      it "accepts documented legacy status items without an item SHA when the response envelope matches" do
+        success_status = instance_double(Process::Status, success?: true)
+        documented_status = {
+          "id" => 7,
+          "context" => "Legacy CI",
+          "state" => "success",
+          "created_at" => "2026-07-13T00:00:00Z"
+        }
+        output = [
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, { "name" => "statuses", "sha" => exact_head_sha }],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, documented_status]
+        ].map(&:to_json).join("\n")
+        allow(Open3).to receive(:capture2e)
+          .with(
+            "gh", "api", "--paginate", "--jq", CI_STATUSES_JSONL_QUERY,
+            "repos/shakacode/react_on_rails/commits/#{exact_head_sha}/status"
+          )
+          .and_return([output, success_status])
+
+        expect(fetch_ci_statuses_for_sha(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha))
+          .to eq(statuses: [documented_status])
+      end
+
+      it "fails closed when a combined-status response envelope is missing or mismatches the requested SHA" do
+        success_status = instance_double(Process::Status, success?: true)
+        documented_status = {
+          "id" => 7,
+          "context" => "Legacy CI",
+          "state" => "success",
+          "created_at" => "2026-07-13T00:00:00Z"
+        }
+
+        [{ "name" => "statuses" }, statuses_envelope("different-sha")].each do |envelope|
+          output = [
+            [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, envelope],
+            [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, documented_status]
+          ].map(&:to_json).join("\n")
+          allow(Open3).to receive(:capture2e).and_return([output, success_status])
+
+          expect(fetch_ci_statuses_for_sha(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)[:error])
+            .to include("malformed")
+        end
+      end
+
+      it "fails closed when a later combined-status page mismatches the requested SHA" do
+        success_status = instance_double(Process::Status, success?: true)
+        documented_status = {
+          "id" => 7,
+          "context" => "Legacy CI",
+          "state" => "success",
+          "created_at" => "2026-07-13T00:00:00Z"
+        }
+        output = [
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, statuses_envelope(exact_head_sha)],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, documented_status],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, statuses_envelope("different-sha")]
+        ].map(&:to_json).join("\n")
+        allow(Open3).to receive(:capture2e).and_return([output, success_status])
+
+        expect(fetch_ci_statuses_for_sha(repo_slug: "shakacode/react_on_rails", sha: exact_head_sha)[:error])
+          .to include("malformed")
       end
 
       it "treats successful blank JSONL output as unknown evidence" do
@@ -2572,7 +2922,7 @@ RSpec.describe "release.rake helper methods" do
           "⚠️ DRY RUN: CI evidence below would block a real release:",
           '^  RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release\\[17\\.0\\.0\\.rc\\.10\\]"$',
           "⚠️ DRY RUN: Real release remains blocked.",
-          "⚠️ DRY RUN: DANGEROUS LAST RESORT",
+          "⚠️ DRY RUN: DANGEROUS PRERELEASE-ONLY LAST RESORT",
           "RELEASE_CI_STATUS_OVERRIDE=true"
         ].join(".*")
 
@@ -2888,7 +3238,7 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
-    context "when override is set on a failing main" do
+    context "when override is set on a failing prerelease" do
       it "warns and returns instead of aborting" do
         allow(self).to receive(:fetch_main_ci_checks)
           .with(monorepo_root:, allow_override: true, dry_run: false, ci_branch: "main")
@@ -2897,7 +3247,7 @@ RSpec.describe "release.rake helper methods" do
         expect do
           validate_main_ci_status!(
             monorepo_root:,
-            is_prerelease: false,
+            is_prerelease: true,
             allow_override: true,
             dry_run: false
           )
@@ -3671,18 +4021,22 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "frames every raw legacy status in page order, including pending statuses and empty pages" do
-      first_page = [
-        { "id" => 1, "context" => "Legacy CI", "state" => "success" },
-        { "id" => 2, "context" => "Advisory", "state" => "pending" }
-      ]
-      second_page = []
+      response_sha = "head5678"
+      first_page = {
+        "sha" => response_sha,
+        "statuses" => [
+          { "id" => 1, "context" => "Legacy CI", "state" => "success" },
+          { "id" => 2, "context" => "Advisory", "state" => "pending" }
+        ]
+      }
+      second_page = { "sha" => response_sha, "statuses" => [] }
 
       expect(run_ci_jsonl_query(CI_STATUSES_JSONL_QUERY, [first_page, second_page])).to eq(
         [
-          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "statuses"],
-          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, first_page[0]],
-          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, first_page[1]],
-          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "statuses"]
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, { "name" => "statuses", "sha" => response_sha }],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, first_page["statuses"][0]],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, first_page["statuses"][1]],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, { "name" => "statuses", "sha" => response_sha }]
         ]
       )
     end
@@ -3692,9 +4046,19 @@ RSpec.describe "release.rake helper methods" do
         run_ci_jsonl_query(CI_CHECK_RUNS_JSONL_QUERY, [{ "check_runs" => nil }])
       end.to raise_error(RSpec::Expectations::ExpectationNotMetError, /expected check_runs array/)
 
-      expect do
-        run_ci_jsonl_query(CI_STATUSES_JSONL_QUERY, [{ "statuses" => [] }])
-      end.to raise_error(RSpec::Expectations::ExpectationNotMetError, /expected statuses array/)
+      malformed_status_pages = [
+        { "statuses" => [] },
+        { "sha" => " ", "statuses" => [] },
+        { "sha" => "head5678", "statuses" => {} }
+      ]
+      malformed_status_pages.each do |page|
+        expect do
+          run_ci_jsonl_query(CI_STATUSES_JSONL_QUERY, [page])
+        end.to raise_error(
+          RSpec::Expectations::ExpectationNotMetError,
+          /expected status object with sha and statuses array/
+        )
+      end
     end
   end
 
@@ -3734,7 +4098,7 @@ RSpec.describe "release.rake helper methods" do
               "repos/shakacode/react_on_rails/commits/#{sha}/check-runs")
         .and_return([[
           [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
-          *check_runs.map { |run| [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, run] }
+          *check_runs.map { |run| [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, run.merge("head_sha" => sha)] }
         ].map(&:to_json).join("\n"), success_status])
     end
 
@@ -3859,11 +4223,11 @@ RSpec.describe "release.rake helper methods" do
       jsonl = [
         [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
         [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, {
-          "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success"
+          "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success", "head_sha" => "abc1234def"
         }],
         [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
         [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, {
-          "id" => 2, "name" => "Test", "status" => "completed", "conclusion" => "failure"
+          "id" => 2, "name" => "Test", "status" => "completed", "conclusion" => "failure", "head_sha" => "abc1234def"
         }]
       ].map(&:to_json).join("\n")
       allow(Open3).to receive(:capture2e)
@@ -3895,7 +4259,7 @@ RSpec.describe "release.rake helper methods" do
         .and_return([[
           [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
           [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, {
-            "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success"
+            "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success", "head_sha" => "rcsha123"
           }]
         ].map(&:to_json).join("\n"), success_status])
 
@@ -4024,6 +4388,26 @@ RSpec.describe "release.rake helper methods" do
       expect { result = main_ci_evaluation_sha(monorepo_root:, head_sha: "head") }
         .to output(/Evaluating CI on parent/).to_stdout
       expect(result).to eq("parent")
+    end
+
+    it "does not recommend strict HEAD evaluation before exact-HEAD evidence is inspected" do
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "head").and_return(true)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "parent").and_return(false)
+      allow(self).to receive(:git_parent_sha)
+        .with(monorepo_root:, sha: "head").and_return("parent")
+
+      output = capture_stdout do
+        main_ci_evaluation_sha(monorepo_root:, head_sha: "head")
+      end
+
+      expect(output).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
+      expect(output).to include(
+        "Strict exact-HEAD recovery is offered only after exact-HEAD CI evidence is complete and healthy."
+      )
     end
 
     it "labels release branch walkback output with the evaluated ref" do
@@ -4381,6 +4765,128 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#gh_included_json_response" do
+    it "rejects mixed newline framing and HTTP control bytes" do
+      mixed_newlines = "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\n\n" \
+                       '{"message":"Branch not protected"}'
+      nul_header = "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\u0000\r\n\r\n" \
+                   '{"message":"Branch not protected"}'
+
+      expect(gh_included_json_response(mixed_newlines)).to be_nil
+      expect(gh_included_json_response(nul_header)).to be_nil
+    end
+
+    it "returns nil instead of raising for invalid or incompatible response encodings" do
+      response = "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                 '{"message":"Branch not protected"}'
+      invalid_utf8 = "#{response}\xFF".b.force_encoding(Encoding::UTF_8)
+      incompatible_encoding = response.encode(Encoding::UTF_16LE)
+
+      [invalid_utf8, incompatible_encoding].each do |output|
+        parsed = nil
+        expect { parsed = gh_included_json_response(output) }.not_to raise_error
+        expect(parsed).to be_nil
+      end
+    end
+  end
+
+  describe "#validated_github_jsonl_items" do
+    it "returns nil instead of raising for invalid or incompatible evidence encodings" do
+      output = [
+        [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
+        [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, {
+          "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success"
+        }]
+      ].map(&:to_json).join("\n")
+      invalid_utf8 = "#{output}\xFF".b.force_encoding(Encoding::UTF_8)
+      incompatible_encoding = output.encode(Encoding::UTF_16LE)
+
+      [invalid_utf8, incompatible_encoding].each do |evidence|
+        items = nil
+        expect do
+          items = validated_github_jsonl_items(
+            output: evidence,
+            envelope_name: "check_runs",
+            item_validator: method(:valid_ci_check_run?)
+          )
+        end.not_to raise_error
+        expect(items).to be_nil
+      end
+    end
+
+    it "rejects item frames before the expected envelope" do
+      run = { "id" => 1, "name" => "Lint", "status" => "completed", "conclusion" => "success" }
+      output = [
+        [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, run],
+        [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
+        [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, run.merge("id" => 2)]
+      ].map(&:to_json).join("\n")
+
+      expect(
+        validated_github_jsonl_items(
+          output:,
+          envelope_name: "check_runs",
+          item_validator: method(:valid_ci_check_run?)
+        )
+      ).to be_nil
+    end
+
+    it "requires exact SHA matches and positive GitHub identities for raw CI evidence" do
+      requested_sha = "head5678"
+      check_run = {
+        "id" => 1,
+        "name" => "Lint",
+        "status" => "completed",
+        "conclusion" => "success",
+        "head_sha" => requested_sha,
+        "app" => { "id" => 2 },
+        "check_suite" => { "id" => 3 }
+      }
+      status = {
+        "id" => 4,
+        "context" => "Legacy CI",
+        "state" => "success",
+        "created_at" => "2026-07-13T00:00:00Z"
+      }
+
+      [
+        check_run.merge("head_sha" => "other"),
+        check_run.merge("id" => 0),
+        check_run.merge("check_suite" => { "id" => 0 }),
+        check_run.merge("app" => { "id" => 0 })
+      ].each do |run|
+        output = [
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, "check_runs"],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, run]
+        ].map(&:to_json).join("\n")
+
+        expect(
+          validated_github_jsonl_items(
+            output:,
+            envelope_name: "check_runs",
+            item_validator: ->(item) { valid_ci_check_run?(item, sha: requested_sha) }
+          )
+        ).to be_nil
+      end
+
+      [status.merge("id" => 0)].each do |legacy_status|
+        output = [
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, { "name" => "statuses", "sha" => requested_sha }],
+          [CI_JSONL_FRAME_KEY, CI_JSONL_ITEM_FRAME, legacy_status]
+        ].map(&:to_json).join("\n")
+
+        expect(
+          validated_github_jsonl_items(
+            output:,
+            envelope_name: "statuses",
+            envelope_validator: ->(envelope) { valid_ci_statuses_envelope?(envelope, sha: requested_sha) },
+            item_validator: method(:valid_ci_status?)
+          )
+        ).to be_nil
+      end
+    end
+  end
+
   describe "#required_check_names_for_branch" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
@@ -4451,11 +4957,197 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
-    it "returns an unknown discovery state when the branch protection endpoint returns an error" do
+    it "returns an unknown discovery state for an authentication or scope failure" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
-              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+              api_path)
         .and_return(["HTTP 403: insufficient token scope", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 403 Forbidden\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Resource not accessible by integration"}',
+                      "gh: insufficient token scope\n",
+                      failure_status
+                    ])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns an unknown discovery state for an unrelated not-found response" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Not Found", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Not Found"}',
+                      "gh: Not Found\n",
+                      failure_status
+                    ])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      expect(Open3).not_to have_received(:capture2e).with(
+        "gh", "api", "repos/shakacode/react_on_rails/branches/main"
+      )
+    end
+
+    it "returns unknown when the unprotected-branch corroboration names a different branch" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      branch_path = "repos/shakacode/react_on_rails/branches/main"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", branch_path)
+        .and_return(['{"name":"release/17.0.0","protected":false}', success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns unknown when the unprotected-branch corroboration omits its name" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      branch_path = "repos/shakacode/react_on_rails/branches/main"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", branch_path)
+        .and_return(['{"protected":false}', success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns an unknown discovery state when failed response evidence is malformed" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 500: upstream failure", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return(["HTTP/2.0 500 Internal Server Error\r\n\r\nnot JSON", "gh: upstream failure\n", failure_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns unknown instead of accepting a malformed included response header" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      branch_path = "repos/shakacode/react_on_rails/branches/main"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nnot-a-header\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", branch_path)
+        .and_return(['{"protected":false}', success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      expect(Open3).not_to have_received(:capture2e).with("gh", "api", branch_path)
+    end
+
+    it "returns unknown instead of accepting contradictory included response statuses" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      branch_path = "repos/shakacode/react_on_rails/branches/main"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 500 Internal Server Error\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Internal Server Error"}' \
+                      "\r\n\r\nHTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", branch_path)
+        .and_return(['{"protected":false}', success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      expect(Open3).not_to have_received(:capture2e).with("gh", "api", branch_path)
+    end
+
+    it "returns unknown instead of accepting a contradictory included status header" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      branch_path = "repos/shakacode/react_on_rails/branches/main"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\nStatus: 500\r\n\r\n" \
+                      '{"message":"Branch not protected"}',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", branch_path)
+        .and_return(['{"protected":false}', success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      expect(Open3).not_to have_received(:capture2e).with("gh", "api", branch_path)
+    end
+
+    it "returns unknown instead of raising for a non-object included response body" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n[]",
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
+
+      expect { required_check_names_for_branch(monorepo_root:) }
+        .not_to raise_error
+      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns unknown for trailing content after the included JSON response body" do
+      api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq, api_path)
+        .and_return(["HTTP 404: Branch not protected", failure_status])
+      allow(Open3).to receive(:capture3)
+        .with("gh", "api", "--include", api_path)
+        .and_return([
+                      "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                      '{"message":"Branch not protected"}\ntrailing content',
+                      "gh: branch protection is not enabled for this branch\n",
+                      failure_status
+                    ])
 
       expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
@@ -4514,6 +5206,17 @@ RSpec.describe "release.rake helper methods" do
         .and_return([{ contexts: [], checks: [{ context: "Lint" }] }.to_json, success_status])
 
       expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+    end
+
+    it "returns an unknown discovery state when a modern check has a nonpositive app_id" do
+      [0, -2].each do |app_id|
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--jq", expected_jq,
+                "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+          .and_return([{ contexts: [], checks: [{ context: "Lint", app_id: }] }.to_json, success_status])
+
+        expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      end
     end
 
     it "returns nil for a structurally valid empty protection configuration" do

@@ -209,6 +209,12 @@ rescue Errno::ENOENT
   abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
 end
 
+def capture_gh_stdout_and_stderr(*)
+  Open3.capture3("gh", *)
+rescue Errno::ENOENT
+  abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
+end
+
 def read_output_from_io(reader)
   Thread.new do
     reader.read
@@ -308,7 +314,7 @@ def handle_shakaperf_release_gate_violation!(message:)
     For a transient gate failure, retry the release from that same commit; the version bump is already present.
     If the gate should not be retried, push a revert commit before retrying the release.
 
-    To override this release gate (use only for an urgent release when ShakaPerf is known-unrelated):
+    For an explicitly approved prerelease override only (when ShakaPerf is known-unrelated):
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
       # or pass override_ci_status as the 4th positional argument:
       bundle exec rake "release[VERSION,false,false,true]"
@@ -418,7 +424,7 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
     Fresh dispatches can take up to #{start_timeout_minutes} minutes to appear before watching starts.
     Once a run is found, this release task will watch it for up to #{watch_timeout_minutes} minutes.
     A fresh dispatch can therefore block for up to about #{fresh_dispatch_timeout_minutes} minutes total.
-    To skip only for an urgent release where ShakaPerf is known-unrelated:
+    To skip only for an explicitly approved prerelease where ShakaPerf is known-unrelated:
       RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
       # or pass override_ci_status as the 4th positional argument:
       bundle exec rake "release[VERSION,false,false,true]"
@@ -1325,6 +1331,19 @@ def ci_status_override_enabled?(override_flag)
   release_truthy?(override_flag) || release_truthy?(ENV.fetch("RELEASE_CI_STATUS_OVERRIDE", nil))
 end
 
+def ensure_ci_status_override_is_prerelease!(allow_override:, is_prerelease:)
+  return unless allow_override && !is_prerelease
+
+  abort "❌ CI status override is allowed only for prerelease releases; " \
+        "stable/final releases require healthy CI evidence."
+end
+
+def ci_status_override_allowed_for_release!(override_flag:, is_prerelease:)
+  allow_override = ci_status_override_enabled?(override_flag)
+  ensure_ci_status_override_is_prerelease!(allow_override:, is_prerelease:)
+  allow_override
+end
+
 # Escape hatch: force the CI gate to evaluate origin/main HEAD verbatim instead
 # of walking back over non-runtime-only commits (see `main_ci_evaluation_sha`).
 def ci_evaluate_head_only?
@@ -1353,12 +1372,13 @@ CI_CHECK_RUNS_JSONL_QUERY = [
   'else error("expected check_runs array") end'
 ].join(" ")
 CI_STATUSES_JSONL_QUERY = [
-  'if type == "array" then',
+  'if type == "object" and (.sha | type == "string" and test("[^[:space:]]")) and ' \
+  '(.statuses | type == "array") then',
   [
-    "[\"#{CI_JSONL_FRAME_KEY}\", \"#{CI_JSONL_ENVELOPE_FRAME}\", \"statuses\"], ",
-    "(.[] | [\"#{CI_JSONL_FRAME_KEY}\", \"#{CI_JSONL_ITEM_FRAME}\", .])"
+    "[\"#{CI_JSONL_FRAME_KEY}\", \"#{CI_JSONL_ENVELOPE_FRAME}\", {\"name\": \"statuses\", \"sha\": .sha}], ",
+    "(.statuses[] | [\"#{CI_JSONL_FRAME_KEY}\", \"#{CI_JSONL_ITEM_FRAME}\", .])"
   ].join,
-  'else error("expected statuses array") end'
+  'else error("expected status object with sha and statuses array") end'
 ].join(" ")
 REQUIRED_CHECK_DISCOVERY_UNKNOWN = Object.new.freeze
 
@@ -1473,7 +1493,7 @@ def fetch_ci_check_runs_for_sha(repo_slug:, sha:)
   api_path = "repos/#{repo_slug}/commits/#{sha}/check-runs"
   result = fetch_github_jsonl(
     api_path:, jq_query: CI_CHECK_RUNS_JSONL_QUERY, api_name: "Checks", response_name: "check_runs", sha:,
-    envelope_name: "check_runs", item_validator: method(:valid_ci_check_run?)
+    envelope_name: "check_runs", item_validator: ->(run) { valid_ci_check_run?(run, sha:) }
   )
   return result if result[:error]
 
@@ -1481,10 +1501,11 @@ def fetch_ci_check_runs_for_sha(repo_slug:, sha:)
 end
 
 def fetch_ci_statuses_for_sha(repo_slug:, sha:)
-  api_path = "repos/#{repo_slug}/commits/#{sha}/statuses"
+  api_path = "repos/#{repo_slug}/commits/#{sha}/status"
   result = fetch_github_jsonl(
     api_path:, jq_query: CI_STATUSES_JSONL_QUERY, api_name: "Statuses", response_name: "statuses", sha:,
-    envelope_name: "statuses", item_validator: method(:valid_ci_status?)
+    envelope_name: "statuses", envelope_validator: ->(envelope) { valid_ci_statuses_envelope?(envelope, sha:) },
+    item_validator: method(:valid_ci_status?)
   )
   return result if result[:error]
 
@@ -1494,11 +1515,12 @@ end
 # Query a GitHub API endpoint as JSONL without deciding whether a failure can be
 # overridden. The normal release gate and exact-HEAD recovery diagnostic apply
 # different policy to the same evidence, so callers receive fail-closed errors.
-def fetch_github_jsonl(api_path:, jq_query:, api_name:, response_name:, sha:, envelope_name:, item_validator:)
+def fetch_github_jsonl(api_path:, jq_query:, api_name:, response_name:, sha:, envelope_name:, item_validator:,
+                       envelope_validator: nil)
   output, status = Open3.capture2e("gh", "api", "--paginate", "--jq", jq_query, api_path)
   return { error: "❌ Unable to query GitHub #{api_name} API for #{sha}.\n\n#{output}" } unless status.success?
 
-  items = validated_github_jsonl_items(output:, envelope_name:, item_validator:)
+  items = validated_github_jsonl_items(output:, envelope_name:, item_validator:, envelope_validator:)
   return { error: "❌ Received malformed GitHub #{api_name} evidence for #{sha}; release remains blocked." } unless items
 
   { items: }
@@ -1508,31 +1530,35 @@ rescue JSON::ParserError => e
   { error: "❌ Failed to parse #{response_name} response from gh: #{e.message}\n\nOutput:\n#{output}" }
 end
 
-def validated_github_jsonl_items(output:, envelope_name:, item_validator:)
+def validated_github_jsonl_items(output:, envelope_name:, item_validator:, envelope_validator: nil)
   parsed_items = parse_gh_jsonl(output)
-  return unless valid_github_jsonl_frames?(parsed_items, envelope_name:)
+  return unless parsed_items
+  return unless valid_github_jsonl_frames?(parsed_items, envelope_name:, envelope_validator:)
 
-  items = github_jsonl_frame_items(parsed_items, envelope_name:)
+  items = github_jsonl_frame_items(parsed_items, envelope_name:, envelope_validator:)
   return unless items.all?(&item_validator)
 
   items
 end
 
-def valid_github_jsonl_frames?(parsed_items, envelope_name:)
-  return false unless parsed_items.any? { |item| github_jsonl_envelope_frame?(item, envelope_name:) }
+def valid_github_jsonl_frames?(parsed_items, envelope_name:, envelope_validator:)
+  return false unless github_jsonl_envelope_frame?(parsed_items.first, envelope_name:, envelope_validator:)
 
   parsed_items.all? do |item|
-    github_jsonl_envelope_frame?(item, envelope_name:) || github_jsonl_item_frame?(item)
+    github_jsonl_envelope_frame?(item, envelope_name:, envelope_validator:) || github_jsonl_item_frame?(item)
   end
 end
 
-def github_jsonl_frame_items(parsed_items, envelope_name:)
-  parsed_items.reject { |item| github_jsonl_envelope_frame?(item, envelope_name:) }
+def github_jsonl_frame_items(parsed_items, envelope_name:, envelope_validator:)
+  parsed_items.reject { |item| github_jsonl_envelope_frame?(item, envelope_name:, envelope_validator:) }
               .map { |item| item[2] }
 end
 
-def github_jsonl_envelope_frame?(item, envelope_name:)
-  item == [CI_JSONL_FRAME_KEY, CI_JSONL_ENVELOPE_FRAME, envelope_name]
+def github_jsonl_envelope_frame?(item, envelope_name:, envelope_validator:)
+  return false unless item.is_a?(Array) && item.length == 3
+  return false unless item[0] == CI_JSONL_FRAME_KEY && item[1] == CI_JSONL_ENVELOPE_FRAME
+
+  envelope_validator ? envelope_validator.call(item[2]) : item[2] == envelope_name
 end
 
 def github_jsonl_item_frame?(item)
@@ -1540,9 +1566,25 @@ def github_jsonl_item_frame?(item)
 end
 
 def parse_gh_jsonl(output)
+  output = normalized_utf8_output(output)
+  return unless output
+
   output.lines.reject { |line| line.strip.empty? }.map do |line|
     JSON.parse(line)
   end
+end
+
+def normalized_utf8_output(output)
+  return unless output.is_a?(String)
+
+  output = output.dup
+  output.force_encoding(Encoding::UTF_8) if output.encoding == Encoding::BINARY
+  return unless output.valid_encoding? && output.encoding.ascii_compatible?
+
+  output.encode(Encoding::UTF_8)
+rescue ArgumentError, Encoding::CompatibilityError, Encoding::InvalidByteSequenceError,
+       Encoding::UndefinedConversionError
+  nil
 end
 
 def valid_ci_check_run_app?(run)
@@ -1551,18 +1593,18 @@ def valid_ci_check_run_app?(run)
   app = run["app"]
   return false unless app.is_a?(Hash) && app.key?("id")
 
-  app["id"].is_a?(Integer)
+  positive_github_id?(app["id"])
 end
 
 def valid_ci_check_run_suite?(run)
   return true unless run.key?("check_suite")
 
   suite = run["check_suite"]
-  suite.is_a?(Hash) && suite["id"].is_a?(Integer)
+  suite.is_a?(Hash) && positive_github_id?(suite["id"])
 end
 
 def valid_ci_check_run_identity?(run)
-  return false unless run.is_a?(Hash) && run["id"].is_a?(Integer)
+  return false unless run.is_a?(Hash) && positive_github_id?(run["id"])
   return false unless run["name"].is_a?(String) && !run["name"].empty?
 
   valid_ci_check_run_app?(run) && valid_ci_check_run_suite?(run)
@@ -1578,12 +1620,21 @@ def valid_ci_check_run_state?(run)
   end
 end
 
-def valid_ci_check_run?(run)
-  valid_ci_check_run_identity?(run) && valid_ci_check_run_state?(run)
+def positive_github_id?(id)
+  id.is_a?(Integer) && id.positive?
+end
+
+def valid_ci_check_run?(run, sha: nil)
+  valid_ci_check_run_identity?(run) && valid_ci_check_run_state?(run) && (sha.nil? || run["head_sha"] == sha)
+end
+
+def valid_ci_statuses_envelope?(envelope, sha:)
+  sha.is_a?(String) && !sha.empty? && envelope.is_a?(Hash) &&
+    envelope["name"] == "statuses" && envelope["sha"] == sha
 end
 
 def valid_ci_status?(status)
-  status.is_a?(Hash) && status["id"].is_a?(Integer) &&
+  status.is_a?(Hash) && positive_github_id?(status["id"]) &&
     status["context"].is_a?(String) && !status["context"].empty? &&
     CI_LEGACY_STATUS_STATES.include?(status["state"]) && valid_ci_status_created_at?(status)
 end
@@ -1631,7 +1682,7 @@ def log_main_ci_walkback(head_sha:, evaluated_sha:, skipped:, ref:)
        "CI can skip the full runtime suite on such commits."
   puts "   Skipped #{skipped.length} release-gate commit(s): #{skipped.map { |s| s[0, 8] }.join(', ')}"
   puts "   Evaluating CI on #{evaluated_sha[0, 8]} — the most recent commit that ran the full suite."
-  puts "   (Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.)"
+  puts "   Strict exact-HEAD recovery is offered only after exact-HEAD CI evidence is complete and healthy."
 end
 
 def main_ci_walkback_commit?(monorepo_root:, sha:, ref:)
@@ -1814,7 +1865,7 @@ def valid_required_check_entry?(check)
   context = check["context"]
   return false unless context.is_a?(String) && !context.empty?
 
-  check["app_id"].nil? || check["app_id"].is_a?(Integer)
+  check["app_id"].nil? || check["app_id"] == -1 || positive_github_id?(check["app_id"])
 end
 
 def valid_required_check_contexts?(contexts)
@@ -1848,6 +1899,77 @@ def normalize_required_checks_payload(parsed)
   contexts.empty? && checks.empty? ? nil : { contexts:, checks: }
 end
 
+def gh_included_json_response(output)
+  header_block, body, newline = gh_included_response_parts(output)
+  status = gh_included_response_status(header_block, newline:)
+  return nil unless status
+
+  body = JSON.parse(body)
+  return nil unless body.is_a?(Hash)
+
+  { status:, body: }
+rescue JSON::ParserError
+  nil
+end
+
+def gh_included_response_parts(output)
+  output = normalized_utf8_output(output)
+  return [nil, nil, nil] unless output
+
+  newline = gh_included_response_newline(output)
+  return [nil, nil, nil] unless newline && valid_gh_included_response_bytes?(output)
+
+  header_block, body, *trailing_sections = output.split("#{newline}#{newline}", -1)
+  return [nil, nil, nil] unless trailing_sections.empty? && header_block && body
+
+  [header_block, body, newline]
+end
+
+def gh_included_response_newline(output)
+  return unless output.is_a?(String)
+  return "\n" unless output.include?("\r")
+  return unless output.include?("\r\n") && !output.match?(/\r(?!\n)|(?<!\r)\n/)
+
+  "\r\n"
+end
+
+def valid_gh_included_response_bytes?(output)
+  !output.match?(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/)
+end
+
+def gh_included_response_status(header_block, newline:)
+  return nil unless header_block
+
+  header_lines = header_block.split(newline, -1)
+  status_match = header_lines.shift&.match(%r{\AHTTP/\d\.\d (\d{3})(?: [^\r\n]+)?\z})
+  return nil unless status_match
+  return nil unless header_lines.all? { |header| header.match?(/\A[!#$%&'*+\-.^_`|~0-9A-Za-z]+:[ \t]*[^\r\n]*\z/) }
+  return nil if header_lines.any? { |header| header.match?(/\Astatus:/i) }
+
+  status_match[1].to_i
+end
+
+def known_unprotected_branch?(repo_slug:, branch_name:, encoded_branch:, required_status_checks_path:)
+  included_output, _included_error, included_status = capture_gh_stdout_and_stderr(
+    "api", "--include", required_status_checks_path
+  )
+  return false if included_status.success?
+  return false unless branch_not_protected_response?(included_output)
+
+  branch_output, branch_status = capture_gh_output("api", "repos/#{repo_slug}/branches/#{encoded_branch}")
+  return false unless branch_status.success?
+
+  branch = JSON.parse(branch_output)
+  branch.is_a?(Hash) && branch["name"] == branch_name && branch["protected"] == false
+rescue JSON::ParserError
+  false
+end
+
+def branch_not_protected_response?(output)
+  response = gh_included_json_response(output)
+  response&.dig(:status) == 404 && response.dig(:body, "message") == "Branch not protected"
+end
+
 def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "main")
   repo_slug ||= github_repo_slug(monorepo_root)
   encoded_branch = URI.encode_www_form_component(ci_branch.to_s)
@@ -1863,6 +1985,12 @@ def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "
   output, status = capture_gh_output("api", "--jq", jq_query, api_path)
   # Only a successful, structurally valid empty configuration means no required
   # checks. API errors and malformed payloads leave required gates unknown.
+  return nil if !status.success? && known_unprotected_branch?(
+    repo_slug:,
+    branch_name: ci_branch.to_s,
+    encoded_branch:,
+    required_status_checks_path: api_path
+  )
   return REQUIRED_CHECK_DISCOVERY_UNKNOWN unless status.success?
 
   begin
@@ -2007,7 +2135,7 @@ end
 
 def main_ci_status_override_guidance(prefix: "")
   <<~GUIDANCE.strip
-    #{prefix}DANGEROUS LAST RESORT — override only if the failures are known-unrelated to this release:
+    #{prefix}DANGEROUS PRERELEASE-ONLY LAST RESORT — override only if the failures are known-unrelated to this release:
     #{prefix}this waives the release CI-status gate and does not establish healthy CI evidence.
     #{prefix}  RELEASE_CI_STATUS_OVERRIDE=true bundle exec rake release[...]
     #{prefix}  # or pass override_ci_status as the 4th positional argument:
@@ -2036,7 +2164,7 @@ end
 def deduplicate_ci_check_runs(check_runs)
   check_runs
     .group_by { |run| [run.dig("check_suite", "id") || run["id"], run["name"], check_run_app_id(run)] }
-    .map { |_key, runs| runs.max_by { |run| run["id"].to_i } }
+    .map { |_key, runs| runs.max_by { |run| run["id"] } }
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -2108,9 +2236,17 @@ def exact_head_unknown_guidance(error)
 end
 
 def recovery_ci_evidence_healthy?(check_runs:, statuses:)
-  check_runs.all? do |run|
-    valid_ci_check_run?(run) && run["status"] == "completed" && CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
-  end && statuses.all? { |status| valid_ci_status?(status) && status["state"] == "success" }
+  return false unless check_runs.all? { |run| valid_ci_check_run?(run) }
+  return false unless statuses.all? { |status| valid_ci_status?(status) }
+
+  normalized = normalized_ci_evidence(check_runs:, statuses:)
+  normalized[:check_runs].all? do |run|
+    run["status"] == "completed" && CI_PASSING_CONCLUSIONS.include?(run["conclusion"])
+  end && normalized[:statuses].all? { |status| status["state"] == "success" }
+end
+
+def normalized_ci_evidence(check_runs:, statuses:)
+  { check_runs: deduplicate_ci_check_runs(check_runs), statuses: latest_commit_statuses(statuses) }
 end
 
 def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required_names:, is_prerelease:, ci_branch:,
@@ -2126,12 +2262,16 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
   status_result = fetch_ci_statuses_for_sha(repo_slug:, sha: head_sha)
   return exact_head_unknown_guidance(status_result[:error]) if status_result[:error]
 
+  normalized_evidence = normalized_ci_evidence(
+    check_runs: check_result[:check_runs],
+    statuses: status_result[:statuses]
+  )
   unless recovery_ci_evidence_healthy?(check_runs: check_result[:check_runs], statuses: status_result[:statuses])
-    raw_status_runs = latest_commit_statuses(status_result[:statuses]).map do |status|
+    raw_status_runs = normalized_evidence[:statuses].map do |status|
       normalize_status_as_check_run(status)
     end
     raw_evaluation = main_ci_status_evaluation(
-      check_runs: check_result[:check_runs],
+      check_runs: normalized_evidence[:check_runs],
       legacy_status_runs: raw_status_runs,
       required_names: nil,
       is_prerelease: false,
@@ -2145,11 +2285,11 @@ def exact_head_recovery_guidance(repo_slug:, head_sha:, evaluated_sha:, required
     when :failed
       return [
         "❌ Exact HEAD #{head_sha[0, 8]} has failing CI evidence. Release remains blocked.",
-        raw_evaluation[:message]
+        raw_evaluation[:message] || "❌ Exact HEAD evidence is not healthy."
       ].join("\n\n")
     else
       return "❌ Exact HEAD #{head_sha[0, 8]} does not provide complete healthy CI evidence; " \
-             "release remains blocked.\n\n#{raw_evaluation[:message]}"
+             "release remains blocked.\n\n#{raw_evaluation[:message] || '❌ Exact HEAD evidence is not healthy.'}"
     end
   end
 
@@ -2197,6 +2337,7 @@ end
 
 def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dry_run:, ci_branch: "main",
                              target_gem_version: nil)
+  ensure_ci_status_override_is_prerelease!(allow_override:, is_prerelease:)
   puts "\nChecking CI status on origin/#{ci_branch}..."
 
   data = fetch_main_ci_checks(monorepo_root:, allow_override:, dry_run:, ci_branch:)
@@ -2219,10 +2360,12 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   end
 
   statuses = []
+  statuses_fetched = false
   legacy_status_runs = []
   legacy_status_fetch_unknown = false
   has_legacy_status_requirements = required_names && legacy_status_contexts_for_required_checks(required_names).any?
   if has_legacy_status_requirements || strict_exact_head_evaluation
+    statuses_fetched = true
     statuses = fetch_main_commit_statuses(
       repo_slug: repo_slug || github_repo_slug(monorepo_root), sha:, allow_override:, dry_run:
     )
@@ -2253,17 +2396,22 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
       return
     end
 
+    normalized_evidence = normalized_ci_evidence(check_runs: data[:check_runs], statuses:)
     unless recovery_ci_evidence_healthy?(check_runs: data[:check_runs], statuses:)
-      raw_status_runs = latest_commit_statuses(statuses).map { |status| normalize_status_as_check_run(status) }
+      raw_status_runs = normalized_evidence[:statuses].map { |status| normalize_status_as_check_run(status) }
       raw_evaluation = main_ci_status_evaluation(
-        check_runs: data[:check_runs],
+        check_runs: normalized_evidence[:check_runs],
         legacy_status_runs: raw_status_runs,
         required_names: nil,
         is_prerelease: false,
         sha:,
         ci_branch:
       )
-      handle_main_ci_status_violation!(message: raw_evaluation[:message], allow_override:, dry_run:)
+      handle_main_ci_status_violation!(
+        message: raw_evaluation[:message] || "❌ Strict exact-HEAD CI evidence is not healthy; release remains blocked.",
+        allow_override:,
+        dry_run:
+      )
       return
     end
   end
@@ -2282,7 +2430,7 @@ def validate_main_ci_status!(monorepo_root:, is_prerelease:, allow_override:, dr
   )
   if evaluation[:kind] != :healthy
     message = evaluation[:message]
-    if %i[no_checks no_required_checks].include?(evaluation[:kind]) && !has_legacy_status_requirements
+    if %i[no_checks no_required_checks].include?(evaluation[:kind]) && !statuses_fetched
       statuses = fetch_main_commit_statuses(
         repo_slug: repo_slug || github_repo_slug(monorepo_root), sha:, allow_override:, dry_run:
       )
@@ -3122,7 +3270,7 @@ This will update and release:
     or derive a patch candidate; the stable changelog gate still requires a matching non-empty section.
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
-4th argument: Override release CI gates (true/false, default: false)
+4th argument: Override prerelease CI gates only (true/false, default: false)
 
 Release CI policy:
   Before releasing, the script checks CI status on the tip of the branch being released:
@@ -3131,7 +3279,8 @@ Release CI policy:
     changelog/docs/comment-only (e.g. the pre-release `update-changelog`
     commit), CI path-skips the runtime suite there, so the gate walks back to
     the last runtime-bearing commit instead of waiting on meaningless checks.
-    Set RELEASE_CI_EVALUATE_HEAD=true to force strict HEAD evaluation.
+    The CI gate prints a strict exact-HEAD retry command only after it has found complete healthy
+    CI evidence on the fetched final tip.
   - Stable releases require every check run on the commit to have succeeded.
   - Pre-releases require only the GitHub-branch-protection-required checks
     to have succeeded.
@@ -3140,16 +3289,15 @@ Release CI policy:
   publishing npm packages or Ruby gems.
   If that gate fails, the remote branch has the version-bump commit but no release
   tag or published packages; retry from that commit or push a revert commit first.
-  In-progress checks and failing gates block the release until they pass, or until you
-  explicitly override via the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
+  In-progress checks and failing gates block the release until they pass. An explicitly approved
+  prerelease-only waiver may use the 4th argument or RELEASE_CI_STATUS_OVERRIDE=true.
 
 Environment variables:
   VERBOSE=1                    # Enable verbose logging (shows all output)
   NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
-  RELEASE_CI_STATUS_OVERRIDE=true      # Override release CI gates
-  RELEASE_CI_EVALUATE_HEAD=true        # Evaluate origin/main HEAD verbatim (skip the non-runtime walk-back)
+  RELEASE_CI_STATUS_OVERRIDE=true      # DANGEROUS prerelease-only release CI waiver
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
@@ -3170,7 +3318,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   is_dry_run = release_truthy?(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
-  allow_ci_status_override = ci_status_override_enabled?(args_hash[:override_ci_status])
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
 
@@ -3212,6 +3359,10 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     version_converter = ReactOnRails::VersionSyntaxConverter.new
     resolved_target_npm_version = version_converter.rubygem_to_npm(resolved_target_gem_version)
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
+    allow_ci_status_override = ci_status_override_allowed_for_release!(
+      override_flag: args_hash[:override_ci_status],
+      is_prerelease:
+    )
 
     # When cutting an rc from `main` and `release/X.Y.Z` does not yet exist, offer
     # to start the release line here instead of tagging the rc off `main`. If the
