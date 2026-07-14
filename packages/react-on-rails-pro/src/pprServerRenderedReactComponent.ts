@@ -311,7 +311,9 @@ const pprResumeRenderReactComponent = (
   options: PPRResumeRenderParams,
   streamingTrackers: StreamingTrackers,
 ) => {
-  const { name: componentName, throwJsErrors, domNodeId, railsContext, postponedState } = options;
+  const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
+  const postponedState =
+    options.postponedState ?? ((railsContext as Record<string, unknown>).pprPostponedState as PostponedState);
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
