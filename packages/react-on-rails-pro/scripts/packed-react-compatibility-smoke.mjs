@@ -195,6 +195,8 @@ const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'react-on-rails-pro-
 try {
   const artifactsDirectory = path.join(temporaryRoot, 'artifacts');
   fs.mkdirSync(artifactsDirectory);
+  runPnpm(['run', 'build'], corePackageDirectory);
+  runPnpm(['run', 'build'], proPackageDirectory);
   runPnpm(['pack', '--pack-destination', artifactsDirectory], corePackageDirectory);
   runPnpm(['pack', '--pack-destination', artifactsDirectory], proPackageDirectory);
 
