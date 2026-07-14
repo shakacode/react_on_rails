@@ -78,6 +78,10 @@ When several slow sources are independent, use the [parallel fan-out pattern bel
 The default async-props flow is **push mode**: the block starts its work and calls `emit.call` for every async prop it
 plans to provide. This is best when the page always needs those values and Rails can start them immediately.
 
+> [!NOTE]
+> Pull and mixed async-props modes (`push_props:` and `emit.pull_requests`) require React on Rails and React on Rails
+> Pro 17.0.0.rc.6 or newer. Earlier async-props releases support push mode only.
+
 Set `push_props:` to enable bidirectional **pull mode**. The block should emit names listed in `push_props:` eagerly;
 the renderer will not request those names. Any other name is queued in `emit.pull_requests` only when the rendered
 React tree calls `getReactOnRailsAsyncProp` for it. An empty list enables pure pull mode:
