@@ -120,6 +120,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
+  props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact
+  coverage verifies a production Webpack build and progressive Suspense output on React 18 without
+  installing or bundling `react-on-rails-rsc`; async props and React Server Components remain React
+  19-only. Fixes [Issue 4642](https://github.com/shakacode/react_on_rails/issues/4642).
+
 - **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
   React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
   to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain

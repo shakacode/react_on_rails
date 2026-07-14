@@ -35,10 +35,13 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 ## Prerequisites
 
 - React on Rails Pro
-- React 19
+- React 18 or 19 for `stream_react_component`; React 19.2.7 or newer for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
+
+React 18 support is scoped to non-RSC `stream_react_component` with synchronous props. Async props,
+`stream_react_component_with_async_props`, and React Server Components require React 19.
 
 ## Progressive Data with Async Props
 

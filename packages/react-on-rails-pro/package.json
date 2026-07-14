@@ -13,7 +13,7 @@
     "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(\\\\.rsc\\\\.test\\\\.|streamServerRenderedReactComponent|streamBackpressure|injectRSCPayload|parseLengthPrefixedStream|SuspenseHydration|registerServerComponent).*\"",
     "test:streaming": "node scripts/check-react-version.cjs || jest tests/streamServerRenderedReactComponent.test.jsx tests/streamBackpressure.e2e.test.tsx tests/injectRSCPayload.test.ts tests/SuspenseHydration.test.tsx tests/parseLengthPrefixedStream.test.ts tests/registerServerComponent.client.test.jsx --runInBand",
     "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
-    "test:packed-react-compatibility": "node scripts/packed-react-compatibility-smoke.mjs",
+    "test:packed-react-compatibility": "node --test scripts/packed-react-compatibility-cases.test.mjs && node scripts/packed-react-compatibility-smoke.mjs",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "pnpm run build"
