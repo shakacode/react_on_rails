@@ -92,25 +92,23 @@ After publishing an RC, replace the bracketed values and paste this prompt into 
 uses the manifest for discovery while preserving this document as the authority for release-gate
 policy.
 
-Use these Codex launch settings:
+#### Codex Task Settings
 
-| Setting             | Value                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| Project             | The regular `react_on_rails` project, opened at the repository root.                  |
-| Starting checkout   | A clean checkout of the current default branch with `origin` fetched.                 |
-| Orchestrator        | Sol with `xhigh` reasoning.                                                           |
-| Routine workers     | Terra with `high` reasoning for mechanical dependency and lockfile updates.           |
-| Uncertain workers   | Sol with `high` reasoning; escalate to Sol/`xhigh` only when required.                |
-| Routine QA          | Sol with `high` reasoning.                                                            |
-| Independent checker | A fresh Sol/`xhigh` instance, distinct from every worker.                             |
-| Access              | GitHub read/write plus authorized private Pro and HiChee access for their lanes.      |
-| Isolation           | One top-level task; let `$pr-batch` create a separate worktree for every target repo. |
-
-If those model names are unavailable on the active Codex host, bind equivalent exact routes before
-launch; never silently inherit the orchestrator route for every worker.
+| Setting     | Value            |
+| ----------- | ---------------- |
+| Project     | `react_on_rails` |
+| Model       | 5.6 Sol          |
+| Reasoning   | Extra High       |
+| Permissions | Full access      |
 
 Do not launch the batch from an individual demo app or the unpublished local
 `shakastack-demo-fleet` prototype.
+
+#### Prompt
+
+Everything else—including worker-model routing, worktrees, concurrency, coordination, validation,
+review, privacy, and tracker evidence—is handled by the prompt. No additional Codex UI settings are
+required.
 
 ```text
 /goal
@@ -165,9 +163,9 @@ Evidence and closeout:
 - Re-read the tracker immediately before any update. Prefer append-only comments for concurrent
   batch evidence; preserve its current Agent Release Mode unless a maintainer explicitly changes
   it.
-- Final output must list every discovered repo and disposition, merged and open PRs, exact
-  validation evidence, follow-up issues, and a PASS/PARTIAL/BLOCKED verdict. Do not recommend
-  final promotion until every hard gate and the exact release commit are green.
+- Final output must list every repo/disposition, PR, validation result, follow-up, and an evidence
+  status of PASS/PARTIAL/BLOCKED. This is not the final go/no-go: request an explicit maintainer
+  decision and never recommend or perform final promotion automatically.
 ```
 
 ## Required Pass Criteria
