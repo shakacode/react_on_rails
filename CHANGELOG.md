@@ -30,6 +30,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `LicenseRef-LICENSE`, while the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages
   report `SEE LICENSE IN LICENSE.md`. All three packed artifacts include the current React on Rails Pro EULA
   instead of presenting the software as `UNLICENSED` or shipping stale license terms.
+  [PR 4660](https://github.com/shakacode/react_on_rails/pull/4660) by
+  [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.10] - 2026-07-13
 
