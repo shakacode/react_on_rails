@@ -193,17 +193,22 @@ The dispatched Actions run names the target version, release branch, and exact c
 completion it uploads `shakaperf-release-evidence.json` in the `shakaperf-release-evidence` artifact,
 containing the branch, target version, candidate SHA, conclusion, run URL, completion time, and runtime
 tree fingerprint. Open that run URL from the later `rake release` output to inspect the gate and its
-artifacts. Per-release-branch concurrency cancels an obsolete in-progress run when a newer prepared
+artifacts. The sequential validation, ShakaPerf, and evidence jobs are bounded to 60 minutes in total;
+the release task allows 65 minutes after finding a run so the workflow can reach that bound cleanly.
+Per-release-branch concurrency cancels an obsolete in-progress run when a newer prepared
 candidate is dispatched; the newest branch candidate is authoritative, so a failed or cancelled newer
 run never causes fallback to an older success.
 
-When `bundle exec rake release[...]` later pushes the version-bump commit, it reuses the pre-run only
-when all of these checks succeed:
+When `bundle exec rake release[...]` later pushes the version-bump commit, it first watches the latest
+prepared-candidate pre-run if that run is still active. A failed or otherwise non-reusable exact-head run
+does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
+only when all of these checks succeed:
 
 - the run and artifact report success for the same branch, target version, candidate SHA, run ID, and
   run URL;
 - the evidence is no more than seven days old, and both its recorded completion and the workflow's
-  update occurred before this release command started;
+  update occurred before this release command started, unless the task found that same pre-run already
+  active with a provable earlier start and watched it to successful completion itself;
 - the tested candidate is an ancestor of the version-bump commit;
 - the candidate and version-bump commits have the same exact Git-tree fingerprint after excluding only
   `CHANGELOG.md` and the existing release-finalization metadata paths; and

@@ -24,6 +24,7 @@ jobs:
   candidate:
     name: Validate ${{ inputs.target_version }} on ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     outputs:
       runtime_tree_fingerprint: ${{ steps.candidate.outputs.runtime_tree_fingerprint }}
     steps:
@@ -337,6 +338,7 @@ jobs:
       - candidate
       - rsc-fouc
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     steps:
       - name: Create machine-readable evidence
         env:
