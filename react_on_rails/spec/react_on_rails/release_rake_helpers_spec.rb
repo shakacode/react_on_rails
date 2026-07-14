@@ -885,6 +885,47 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#trustworthy_terminal_shakaperf_release_gate_run?" do
+    let(:original_run) do
+      {
+        "databaseId" => 654_321,
+        "attempt" => 1,
+        "headSha" => "abc123",
+        "status" => "in_progress",
+        "conclusion" => ""
+      }
+    end
+    let(:terminal_run) { original_run.merge("status" => "completed", "conclusion" => "failure") }
+
+    it "accepts a known terminal result for the watched run" do
+      expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run: terminal_run)).to be true
+    end
+
+    it "rejects another run ID" do
+      refreshed_run = terminal_run.merge("databaseId" => 654_322)
+
+      expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)).to be false
+    end
+
+    it "rejects another head SHA" do
+      refreshed_run = terminal_run.merge("headSha" => "different-head")
+
+      expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)).to be false
+    end
+
+    it "rejects an invalid attempt" do
+      refreshed_run = terminal_run.merge("attempt" => 0)
+
+      expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)).to be false
+    end
+
+    it "rejects an unknown terminal conclusion" do
+      refreshed_run = terminal_run.merge("conclusion" => "future_conclusion")
+
+      expect(trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)).to be false
+    end
+  end
+
   describe "#run_shakaperf_release_gate!" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:repo_slug) { "shakacode/react_on_rails" }

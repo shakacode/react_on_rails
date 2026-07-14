@@ -52,6 +52,9 @@ SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT = "shakaperf-release-evidence"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE = "shakaperf-release-evidence.json"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
+SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
+  action_required cancelled failure neutral skipped stale startup_failure success timed_out
+].freeze
 SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS = %w[
   branch
   candidate_sha
@@ -712,6 +715,22 @@ def active_shakaperf_release_gate_run?(run)
   %w[queued in_progress requested waiting pending].include?(run["status"].to_s)
 end
 
+def same_shakaperf_release_gate_run_identity?(original_run:, refreshed_run:)
+  return false unless refreshed_run.is_a?(Hash)
+
+  head_sha = refreshed_run["headSha"]
+  positive_github_id?(refreshed_run["databaseId"]) &&
+    refreshed_run.values_at("databaseId", "headSha") == original_run.values_at("databaseId", "headSha") &&
+    head_sha.is_a?(String) && !head_sha.empty?
+end
+
+def trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)
+  same_shakaperf_release_gate_run_identity?(original_run:, refreshed_run:) &&
+    positive_github_id?(refreshed_run["attempt"]) &&
+    refreshed_run["status"] == "completed" &&
+    SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(refreshed_run["conclusion"])
+end
+
 def find_latest_shakaperf_release_gate_run(runs, head_sha)
   runs.select { |run| run["headSha"] == head_sha }
       .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
@@ -837,9 +856,7 @@ def watch_existing_shakaperf_release_gate_run!(repo_slug:, run:)
   end
 
   refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
-  conclusion = refreshed_run["conclusion"].to_s
-  terminal_state_known = refreshed_run["status"].to_s == "completed" && !conclusion.empty?
-  return refreshed_run if terminal_state_known
+  return refreshed_run if trustworthy_terminal_shakaperf_release_gate_run?(original_run: run, refreshed_run:)
 
   handle_shakaperf_release_gate_violation!(
     message: "❌ Unable to establish the terminal result of existing ShakaPerf release gate run #{run_id}." \
