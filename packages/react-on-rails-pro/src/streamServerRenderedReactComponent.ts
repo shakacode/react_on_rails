@@ -232,6 +232,9 @@ const streamRenderReactComponent = (
                 railsContext.cspNonce,
                 {
                   rscClientManifestStylesheetHrefs,
+                  ...(reactClientManifestFileName
+                    ? {}
+                    : { rscClientChunkStylesheetHrefsByChunkName: new Map() }),
                   rscStreamObservability: railsContext.rscStreamObservability,
                 },
               ),
