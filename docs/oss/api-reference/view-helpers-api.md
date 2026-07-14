@@ -268,6 +268,11 @@ end %>
 
 RSC Server Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
 
+By default, the block eagerly pushes every async prop it emits. Pass `push_props: []` to enable pure pull mode, where
+React requests names through `emit.pull_requests` only when the rendered tree reads them. Pass selected names (for
+example, `push_props: %w[summary]`) for mixed mode: the block must emit those declared values eagerly, while it resolves
+other allowlisted names from the pull-request queue. See [Push known props or pull them on demand](../../pro/streaming-ssr.md#push-known-props-or-pull-them-on-demand).
+
 For the complete React component pattern using `WithAsyncProps` and `getReactOnRailsAsyncProp`, see [Data Fetching in React on Rails Pro](../migrating/rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 > [!IMPORTANT]
