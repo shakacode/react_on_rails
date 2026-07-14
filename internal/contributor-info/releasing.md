@@ -19,9 +19,16 @@ See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIB
 ### Version ownership
 
 The release task owns React on Rails' coordinated product-version changes. Release-preparation PRs
-should update and stamp `CHANGELOG.md`, but should not manually edit the OSS/Pro gem versions,
-workspace package versions, related internal dependency versions, or lockfile rows solely for the next
-React on Rails version. `bundle exec rake release[...]` creates that `Bump version to ...` commit.
+should update and stamp `CHANGELOG.md`, but should not manually bump React on Rails' own OSS/Pro gem
+or npm version fields or create the ordinary `Bump version to ...` commit. `bundle exec rake
+release[...]` updates the OSS and Pro gem version files, the `version` field in all five `package.json`
+files, and the Ruby `Gemfile.lock` files in that generated commit. It does not run `pnpm install` or
+regenerate `pnpm-lock.yaml`; workspace-protocol dependency conversion during npm publishing is
+temporary and is restored afterward.
+
+If a release-preparation or dependency-pin PR changes dependency ranges or pins, regenerate the
+affected npm/pnpm lockfiles in that PR. Do not defer those lockfile updates to the React on Rails
+product-version release task.
 
 An independently published dependency pin is different: for example, moving from a
 `react-on-rails-rsc` RC to its accepted stable version must be reviewed and tested before the next

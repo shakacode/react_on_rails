@@ -464,11 +464,16 @@ non-semantic actionlint cleanup when local validation evidence documents that cl
 
 `bundle exec rake release[...]` owns the coordinated React on Rails product-version
 change. For ordinary RC and final preparation, agents prepare and stamp
-`CHANGELOG.md`, but must not manually bump the React on Rails gem/npm version
-fields, edit lockfile rows solely to mirror that product-version bump, or create
-the ordinary `Bump version to ...` commit. The release task updates the OSS and
-Pro gem versions, workspace package versions, internal cross-package dependency
-versions, and lockfiles in one generated release commit.
+`CHANGELOG.md`, but must not manually bump React on Rails' own gem/npm version
+fields or create the ordinary `Bump version to ...` commit. The release task
+updates the OSS and Pro gem version files, the `version` field in all five
+`package.json` files, and the Ruby `Gemfile.lock` files in that generated commit.
+It does not run `pnpm install` or regenerate `pnpm-lock.yaml`; workspace-protocol
+dependency conversion during npm publishing is temporary and is restored afterward.
+
+If a release-preparation or dependency-pin PR changes dependency ranges or pins,
+regenerate the affected npm/pnpm lockfiles in that PR. Do not defer those lockfile
+updates to the React on Rails product-version release task.
 
 Pins for independently released dependencies are separate changes. For example,
 promoting `react-on-rails-rsc` from an RC to a stable version still requires a
@@ -922,9 +927,10 @@ Stable/final releases must not use that global override or any accelerated
 asynchronous/deferred-gate bypass. Every unwaived final gate must pass. A
 narrowly scoped final waiver is allowed only where the existing final-release
 policy explicitly permits it, with the required evidence and maintainer sign-off;
-it does not waive any other gate. Pre-releases require only the
-GitHub-branch-protection-required checks and follow the active RC policy for any
-maintainer waiver.
+it does not waive any other gate. For the release command's CI-status gate,
+pre-releases require only the GitHub-branch-protection-required checks. That
+narrow rule does not replace the separate RC hard gates or behavioral validation,
+and any maintainer waiver must still follow the active RC policy.
 
 Claude Code sessions get `main`'s CI status injected at session start (and
 again before `gh pr create` / pushing to `main`) via
