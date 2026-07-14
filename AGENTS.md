@@ -460,6 +460,22 @@ non-semantic actionlint cleanup when local validation evidence documents that cl
 
 **Process gap disposition**: When an audit, review, or batch closeout finds a recurring process miss, do not add a prose-only rule by default. The issue plan or PR evidence must choose one mechanism target: `script`, `schema`, `checklist+replay`, or `park`, and record the motivating miss, replay evidence or park reason, and non-goal. `park` means the miss is plausible but not worth mechanizing now.
 
+### Release Version Ownership
+
+`bundle exec rake release[...]` owns the coordinated React on Rails product-version
+change. For ordinary RC and final preparation, agents prepare and stamp
+`CHANGELOG.md`, but must not manually bump the React on Rails gem/npm version
+fields, edit lockfile rows solely to mirror that product-version bump, or create
+the ordinary `Bump version to ...` commit. The release task updates the OSS and
+Pro gem versions, workspace package versions, internal cross-package dependency
+versions, and lockfiles in one generated release commit.
+
+Pins for independently released dependencies are separate changes. For example,
+promoting `react-on-rails-rsc` from an RC to a stable version still requires a
+normal reviewed and tested PR that updates the generator pin, package metadata,
+and affected lockfiles before cutting the next React on Rails RC. Do not confuse
+that dependency update with manually bumping React on Rails' own version.
+
 ## Maintainer Attention Contract
 
 Maintainer attention is for judgment, not for routine progress pings or
@@ -679,7 +695,7 @@ Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>
 ```
 
-Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on `main`, and get an explicit maintainer release decision before publishing the final release.
+Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
 
@@ -902,8 +918,13 @@ source exists.
 The `main` branch must stay green. CI failures on `main` block releases:
 `rake release` refuses to publish over a red `main` unless you explicitly
 override (via `RELEASE_CI_STATUS_OVERRIDE=true` or the 4th positional arg).
-Stable releases require every check to pass; pre-releases require only the
-GitHub-branch-protection-required checks.
+Stable/final releases must not use that global override or any accelerated
+asynchronous/deferred-gate bypass. Every unwaived final gate must pass. A
+narrowly scoped final waiver is allowed only where the existing final-release
+policy explicitly permits it, with the required evidence and maintainer sign-off;
+it does not waive any other gate. Pre-releases require only the
+GitHub-branch-protection-required checks and follow the active RC policy for any
+maintainer waiver.
 
 Claude Code sessions get `main`'s CI status injected at session start (and
 again before `gh pr create` / pushing to `main`) via
@@ -918,9 +939,10 @@ If `main` is red:
 3. **If you're the one merging a PR**, check `main` post-merge within 30
    minutes (see `.claude/docs/main-health-monitoring.md`).
 
-**Never silently override the release CI gate.** If you set
-`RELEASE_CI_STATUS_OVERRIDE=true`, document in the PR / release notes why
-the red checks are unrelated to the release.
+**Never silently override the release CI gate.** If an RC policy permits
+`RELEASE_CI_STATUS_OVERRIDE=true`, document in the release tracker or release
+notes why the failed or missing checks are unrelated. Never use it for final
+promotion.
 
 ## Key Concept: File Suffixes vs. RSC Directive
 

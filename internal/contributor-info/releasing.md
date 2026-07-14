@@ -16,6 +16,18 @@ See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIB
 
 ## Release Process
 
+### Version ownership
+
+The release task owns React on Rails' coordinated product-version changes. Release-preparation PRs
+should update and stamp `CHANGELOG.md`, but should not manually edit the OSS/Pro gem versions,
+workspace package versions, related internal dependency versions, or lockfile rows solely for the next
+React on Rails version. `bundle exec rake release[...]` creates that `Bump version to ...` commit.
+
+An independently published dependency pin is different: for example, moving from a
+`react-on-rails-rsc` RC to its accepted stable version must be reviewed and tested before the next
+React on Rails RC. Follow the ordered dependency-promotion gate in the
+[Release-Train Runbook](release-train-runbook.md#promote-prerelease-dependencies-before-final).
+
 ### 1. Update the Changelog (BEFORE releasing)
 
 **Always update CHANGELOG.md before running the release task.** The release task reads the version from CHANGELOG.md and automatically creates a GitHub release from the changelog section.
@@ -95,7 +107,7 @@ Use override only when needed:
 **Full argument list:**
 
 ```bash
-bundle exec rake "release[version,dry_run,override_version_policy]"
+bundle exec rake "release[version,dry_run,override_version_policy,override_ci_status]"
 ```
 
 1. **`version`** (optional): Version bump type or explicit version
@@ -108,6 +120,15 @@ bundle exec rake "release[version,dry_run,override_version_policy]"
 
 3. **`override_version_policy`** (optional): `true` to override version policy checks (default: `false`)
 
+4. **`override_ci_status`** (optional): global release-gate override (default: `false`). It is only for
+   an explicitly approved prerelease waiver under the active RC policy; never use it for a stable/final
+   promotion.
+
+> Stable/final promotion must not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass
+> `override_ci_status=true`, or use an accelerated asynchronous/deferred-gate bypass. Every unwaived
+> final gate must pass. A narrowly scoped final waiver remains subject to the existing final-release
+> policy, required evidence, and maintainer sign-off, and does not waive any other gate.
+
 **Environment variables:**
 
 ```bash
@@ -115,8 +136,14 @@ VERBOSE=1                    # Enable verbose logging (shows all output)
 NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
 RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
 RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
+RELEASE_CI_EVALUATE_HEAD=true # Evaluate the current release-source HEAD instead of walking back metadata-only commits
 GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 ```
+
+`RELEASE_CI_EVALUATE_HEAD=true` is a strict diagnostic, not a waiver. Use it when the current HEAD
+itself is expected to have CI evidence and must be evaluated verbatim. It is usually not appropriate
+when HEAD contains only changelog/version/release-gate metadata and the runtime-bearing commit behind
+it is the candidate whose full suite must qualify the release.
 
 **Examples:**
 
