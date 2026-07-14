@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler"
+require "digest"
 require "English"
 require "json"
 require "net/http"
@@ -44,9 +45,28 @@ SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE = "shakaperf-release-gates.yml"
 SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS = 600
 SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS = 5
 SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT = 100
-SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 50 * 60
-# Keep in sync with timeout-minutes in .github/workflows/shakaperf-release-gates.yml.
-SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES = 45
+SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS = 65 * 60
+# Keep in sync with the sum of timeout-minutes in .github/workflows/shakaperf-release-gates.yml.
+SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES = 60
+SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT = "shakaperf-release-evidence"
+SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE = "shakaperf-release-evidence.json"
+SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
+SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
+  action_required cancelled failure neutral skipped stale startup_failure success timed_out
+].freeze
+SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS = %w[
+  branch
+  candidate_sha
+  completed_at
+  conclusion
+  run_attempt
+  run_id
+  run_url
+  runtime_tree_fingerprint
+  schema_version
+  target_version
+].freeze
 # Keep in sync with every package.json, Gemfile.lock, and version file that the
 # release task rewrites while promoting an RC to a final release.
 # CHANGELOG.md is intentionally excluded. main_ci_walkback_commit? classifies
@@ -67,6 +87,7 @@ RELEASE_FINALIZATION_METADATA_PATHS = [
   "react_on_rails_pro/spec/dummy/Gemfile.lock",
   "react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile.lock"
 ].freeze
+SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS = (RELEASE_FINALIZATION_METADATA_PATHS + ["CHANGELOG.md"]).freeze
 
 # Helper methods for release-specific tasks
 # These are defined at the top level so they have access to Rake's sh method
@@ -306,6 +327,245 @@ def current_git_sha!(monorepo_root, context: nil)
   output.strip
 end
 
+def shakaperf_runtime_tree_fingerprint(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-tree", "-r", "-z", "--full-tree", sha
+  )
+  return nil unless status.success?
+
+  runtime_entries = output.split("\0").filter_map do |entry|
+    metadata, path = entry.split("\t", 2)
+    next if metadata.nil? || path.nil?
+    next if SHAKAPERF_RUNTIME_TREE_IGNORED_PATHS.include?(path)
+
+    "#{metadata}\t#{path}"
+  end
+  return nil if runtime_entries.empty?
+
+  Digest::SHA256.hexdigest(runtime_entries.sort.join("\0"))
+rescue StandardError
+  nil
+end
+
+def shakaperf_prerun_candidate(monorepo_root:, ref:, head_sha:)
+  target_version = extract_latest_changelog_version(monorepo_root:)
+  return nil unless target_version
+  return nil unless target_version.match?(/\A\d+\.\d+\.\d+(\.(test|beta|alpha|rc|pre)\.\d+)?\z/i)
+  return nil unless ref == "release/#{release_base_version(target_version)}"
+
+  current_version = current_gem_version(monorepo_root)
+  return nil unless Gem::Version.new(target_version) > Gem::Version.new(current_version)
+
+  changelog_path = File.join(monorepo_root, "CHANGELOG.md")
+  return nil unless extract_changelog_section(changelog_path:, version: target_version)
+
+  runtime_tree_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: head_sha)
+  return nil unless runtime_tree_fingerprint
+
+  {
+    branch: ref,
+    candidate_sha: head_sha,
+    target_version:,
+    runtime_tree_fingerprint:
+  }
+rescue ArgumentError
+  nil
+end
+
+def shakaperf_release_gate_evidence_rejection(monorepo_root:, ref:, head_sha:, target_version:, run:, evidence:,
+                                              release_started_at:, validation_time:, require_prerun:,
+                                              allow_prerun_completion_after_release_start: false)
+  rejection = shakaperf_release_gate_evidence_schema_rejection(evidence)
+  return rejection if rejection
+
+  rejection = shakaperf_release_gate_evidence_run_rejection(run:, evidence:)
+  return rejection if rejection
+
+  rejection = shakaperf_release_gate_evidence_candidate_rejection(ref:, target_version:, run:, evidence:)
+  return rejection if rejection
+
+  rejection = shakaperf_release_gate_evidence_time_rejection(
+    run:, evidence:, release_started_at:, validation_time:, require_prerun:,
+    allow_prerun_completion_after_release_start:
+  )
+  return rejection if rejection
+
+  shakaperf_release_gate_evidence_runtime_rejection(monorepo_root:, head_sha:, evidence:)
+rescue StandardError => e
+  "evidence verification failed: #{e.class}: #{e.message}"
+end
+
+def shakaperf_release_gate_evidence_schema_rejection(evidence)
+  return "evidence payload is not an object" unless evidence.is_a?(Hash)
+  unless evidence.keys.sort == SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS
+    return "evidence schema fields are incomplete or unknown"
+  end
+  unless evidence["schema_version"] == SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION
+    return "evidence schema version is unsupported"
+  end
+
+  nil
+end
+
+def shakaperf_release_gate_evidence_run_rejection(run:, evidence:)
+  unless run["status"] == "completed" && run["conclusion"] == "success"
+    return "workflow run did not complete successfully"
+  end
+  return "evidence conclusion is not success" unless evidence["conclusion"] == "success"
+
+  identity_rejection = shakaperf_release_gate_evidence_run_identity_rejection(run:, evidence:)
+  return identity_rejection if identity_rejection
+
+  run_url = run["url"]
+  return "workflow run URL is missing" unless run_url.is_a?(String) && !run_url.empty?
+  return "evidence run URL does not match the workflow run" unless evidence["run_url"] == run_url
+
+  nil
+end
+
+def shakaperf_release_gate_evidence_run_identity_rejection(run:, evidence:)
+  unless shakaperf_release_gate_run_id_matches?(run:, evidence:)
+    return "evidence run ID does not match the workflow run"
+  end
+  unless shakaperf_release_gate_run_attempt_matches?(run:, evidence:)
+    return "evidence run attempt does not match the workflow run"
+  end
+
+  nil
+end
+
+def shakaperf_release_gate_run_id_matches?(run:, evidence:)
+  run_id = evidence["run_id"]
+  run_id.is_a?(Integer) && run_id.positive? && run_id == run["databaseId"]
+end
+
+def shakaperf_release_gate_run_attempt_matches?(run:, evidence:)
+  run_attempt = evidence["run_attempt"]
+  run_attempt.is_a?(Integer) && run_attempt.positive? && run_attempt == run["attempt"]
+end
+
+def shakaperf_release_gate_evidence_candidate_rejection(ref:, target_version:, run:, evidence:)
+  return "evidence branch does not match the release branch" unless evidence["branch"] == ref
+  return "evidence target version does not match the release" unless evidence["target_version"] == target_version
+
+  candidate_sha = evidence["candidate_sha"]
+  return "evidence candidate SHA does not match the workflow run" unless candidate_sha == run["headSha"]
+
+  fingerprint = evidence["runtime_tree_fingerprint"]
+  return "evidence runtime fingerprint is malformed" unless fingerprint.to_s.match?(/\A[0-9a-f]{64}\z/)
+
+  nil
+end
+
+def shakaperf_release_gate_evidence_time_rejection(run:, evidence:, release_started_at:, validation_time:,
+                                                   require_prerun:,
+                                                   allow_prerun_completion_after_release_start: false)
+  times, rejection = shakaperf_release_gate_evidence_times(run:, evidence:)
+  return rejection if rejection
+
+  completed_at, updated_at = times
+  return "evidence completion time is after the workflow update" if completed_at > updated_at
+  return "evidence completion time is in the future" if completed_at > validation_time
+  return "evidence is stale" if validation_time - completed_at > SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS
+  return nil unless require_prerun
+
+  shakaperf_prerun_release_order_rejection(
+    run:, completed_at:, updated_at:, release_started_at:, allow_completion_after_release_start:
+      allow_prerun_completion_after_release_start
+  )
+end
+
+def shakaperf_prerun_release_order_rejection(run:, completed_at:, updated_at:, release_started_at:,
+                                             allow_completion_after_release_start:)
+  release_start_second = Time.at(release_started_at.to_i).utc
+  unless allow_completion_after_release_start
+    return "evidence was not complete before the release run started" if
+      completed_at >= release_start_second || updated_at >= release_start_second
+
+    return nil
+  end
+
+  started_at = shakaperf_release_gate_time(run["startedAt"])
+  return "workflow start time is invalid" unless started_at
+  return "pre-run did not start before the release run" if started_at >= release_start_second
+
+  nil
+end
+
+def shakaperf_release_gate_evidence_times(run:, evidence:)
+  completed_at = shakaperf_release_gate_time(evidence["completed_at"])
+  return [nil, "evidence completion time is invalid"] unless completed_at
+
+  updated_at = shakaperf_release_gate_time(run["updatedAt"])
+  return [nil, "workflow completion time is invalid"] unless updated_at
+
+  [[completed_at, updated_at], nil]
+end
+
+def shakaperf_release_gate_evidence_runtime_rejection(monorepo_root:, head_sha:, evidence:)
+  candidate_sha = evidence["candidate_sha"]
+  fingerprint = evidence["runtime_tree_fingerprint"]
+  candidate_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: candidate_sha)
+  return "candidate runtime tree cannot be verified" unless candidate_fingerprint == fingerprint
+
+  head_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: head_sha)
+  return "release runtime tree differs from the tested candidate" unless head_fingerprint == fingerprint
+  return nil if candidate_sha == head_sha
+
+  commits = shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
+  return "tested candidate ancestry or intervening commits cannot be verified" unless commits
+  return "release commits after the tested candidate are not metadata-only" unless commits.all? do |sha|
+    shakaperf_prerun_metadata_commit?(monorepo_root:, sha:)
+  end
+
+  nil
+end
+
+def shakaperf_release_gate_time(value)
+  return value if value.is_a?(Time)
+  return nil unless value.is_a?(String) && !value.empty?
+
+  Time.iso8601(value)
+rescue ArgumentError
+  nil
+end
+
+def shakaperf_candidate_commit_shas(monorepo_root:, candidate_sha:, head_sha:)
+  _ancestor_output, ancestor_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "merge-base", "--is-ancestor", candidate_sha, head_sha
+  )
+  return nil unless ancestor_status.success?
+
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-list", "--reverse", "#{candidate_sha}..#{head_sha}"
+  )
+  return nil unless status.success?
+
+  commits = output.lines.map(&:strip).reject(&:empty?)
+  commits.empty? ? nil : commits
+rescue StandardError
+  nil
+end
+
+def shakaperf_prerun_metadata_commit?(monorepo_root:, sha:)
+  return true if release_finalization_metadata_commit?(monorepo_root:, sha:)
+  return false unless commit_non_runtime_only?(monorepo_root:, sha:)
+
+  shakaperf_changelog_only_commit?(monorepo_root:, sha:)
+end
+
+def shakaperf_changelog_only_commit?(monorepo_root:, sha:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "diff-tree", "--no-commit-id", "--name-status", "-r", "#{sha}^", sha
+  )
+  return false unless status.success?
+
+  changes = output.lines.map(&:chomp)
+  changes.any? && changes.all?("M\tCHANGELOG.md")
+rescue StandardError
+  false
+end
+
 def handle_shakaperf_release_gate_violation!(message:)
   abort <<~ERROR
     #{message}
@@ -328,7 +588,7 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--branch", ref,
     "--event", "workflow_dispatch",
-    "--json", "attempt,createdAt,databaseId,headSha,status,conclusion,updatedAt,url",
+    "--json", "attempt,createdAt,databaseId,headSha,startedAt,status,conclusion,updatedAt,url",
     "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
   )
 
@@ -342,6 +602,74 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
 rescue JSON::ParserError => e
   handle_shakaperf_release_gate_violation!(
     message: "❌ Failed to parse ShakaPerf release gate workflow runs: #{e.message}\n\nOutput:\n#{output}"
+  )
+end
+
+def fetch_shakaperf_release_gate_evidence(repo_slug:, run:)
+  Dir.mktmpdir("shakaperf-release-evidence") do |dir|
+    output, status = capture_gh_output(
+      "run", "download", run.fetch("databaseId").to_s,
+      "--repo", repo_slug,
+      "--name", SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT,
+      "--dir", dir
+    )
+    unless status.success?
+      warn "⚠️ Unable to download ShakaPerf pre-run evidence; dispatching an exact-head gate.\n#{output}"
+      return nil
+    end
+
+    evidence_paths = Dir.glob(File.join(dir, "**", SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE))
+    unless evidence_paths.one?
+      warn "⚠️ ShakaPerf pre-run evidence artifact did not contain exactly one " \
+           "#{SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE}; dispatching an exact-head gate."
+      return nil
+    end
+
+    JSON.parse(File.read(evidence_paths.first))
+  end
+rescue JSON::ParserError => e
+  warn "⚠️ Unable to parse ShakaPerf pre-run evidence: #{e.message}; dispatching an exact-head gate."
+  nil
+rescue StandardError => e
+  warn "⚠️ Unable to inspect ShakaPerf pre-run evidence: #{e.class}: #{e.message}; " \
+       "dispatching an exact-head gate."
+  nil
+end
+
+def refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  output, status = capture_gh_output(
+    "run", "view", run.fetch("databaseId").to_s,
+    "--repo", repo_slug,
+    "--json", "attempt,createdAt,databaseId,headSha,startedAt,status,conclusion,updatedAt,url"
+  )
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to refresh ShakaPerf release gate workflow evidence.\n\n#{output}"
+    )
+  end
+
+  JSON.parse(output)
+rescue JSON::ParserError => e
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Failed to parse refreshed ShakaPerf release gate workflow evidence: #{e.message}"
+  )
+end
+
+def shakaperf_release_gate_run_evidence_rejection(repo_slug:, monorepo_root:, ref:, head_sha:, target_version:,
+                                                  run:, release_started_at:, require_prerun:)
+  evidence = fetch_shakaperf_release_gate_evidence(repo_slug:, run:)
+  return "evidence artifact is missing or unreadable" unless evidence
+
+  shakaperf_release_gate_evidence_rejection(
+    monorepo_root:,
+    ref:,
+    head_sha:,
+    target_version:,
+    run:,
+    evidence:,
+    release_started_at:,
+    validation_time: Time.now.utc,
+    require_prerun:
   )
 end
 
@@ -387,9 +715,46 @@ def active_shakaperf_release_gate_run?(run)
   %w[queued in_progress requested waiting pending].include?(run["status"].to_s)
 end
 
+def same_shakaperf_release_gate_run_identity?(original_run:, refreshed_run:)
+  return false unless refreshed_run.is_a?(Hash)
+
+  head_sha = refreshed_run["headSha"]
+  positive_github_id?(refreshed_run["databaseId"]) &&
+    refreshed_run.values_at("databaseId", "headSha") == original_run.values_at("databaseId", "headSha") &&
+    head_sha.is_a?(String) && !head_sha.empty?
+end
+
+def trustworthy_terminal_shakaperf_release_gate_run?(original_run:, refreshed_run:)
+  same_shakaperf_release_gate_run_identity?(original_run:, refreshed_run:) &&
+    positive_github_id?(refreshed_run["attempt"]) &&
+    refreshed_run["status"] == "completed" &&
+    SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(refreshed_run["conclusion"])
+end
+
 def find_latest_shakaperf_release_gate_run(runs, head_sha)
   runs.select { |run| run["headSha"] == head_sha }
       .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
+end
+
+def find_latest_shakaperf_prerun(runs, head_sha)
+  candidates = runs.reject { |run| run["headSha"] == head_sha }
+  return nil unless candidates.all? { |run| valid_shakaperf_prerun_ordering_metadata?(run) }
+
+  candidates.max_by { |run| shakaperf_prerun_candidate_sort_key(run) }
+end
+
+def valid_shakaperf_prerun_ordering_metadata?(run)
+  positive_github_id?(run["databaseId"]) &&
+    positive_github_id?(run["attempt"]) &&
+    !shakaperf_release_gate_time(run["createdAt"]).nil? &&
+    !shakaperf_release_gate_time(run["startedAt"]).nil?
+end
+
+def shakaperf_prerun_candidate_sort_key(run)
+  created_at = shakaperf_release_gate_run_timestamp(run, "createdAt")
+  updated_at = shakaperf_release_gate_run_timestamp(run, "updatedAt")
+
+  [created_at, run["databaseId"].to_i, run["attempt"].to_i, updated_at]
 end
 
 def shakaperf_release_gate_run_sort_key(run)
@@ -417,8 +782,8 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
   puts <<~NOTICE
 
     Running ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before tagging and publishing...
-    This checks for an existing matching GitHub Actions ShakaPerf Release Gates run.
-    If no reusable run exists, it dispatches a new workflow run and blocks until it passes.
+    This first checks for verified same-version pre-run evidence from this branch, then for an exact-head run.
+    If neither is reusable, it dispatches a new exact-head workflow run and blocks until verified evidence exists.
     Warm-cache waits usually take a few minutes.
     The workflow can run up to #{SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES} minutes.
     Fresh dispatches can take up to #{start_timeout_minutes} minutes to appear before watching starts.
@@ -431,9 +796,13 @@ def print_shakaperf_release_gate_notice(ref:, head_sha:)
   NOTICE
 end
 
-def dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:)
+def dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:, target_version:, candidate_sha:)
   output, status = capture_gh_output(
-    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE, "--repo", repo_slug, "--ref", ref
+    "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
+    "--repo", repo_slug,
+    "--ref", ref,
+    "-f", "target_version=#{target_version}",
+    "-f", "candidate_sha=#{candidate_sha}"
   )
 
   return if status.success?
@@ -465,32 +834,190 @@ def watch_shakaperf_release_gate_run!(repo_slug:, run:)
   )
 end
 
-def handle_existing_shakaperf_release_gate_run!(repo_slug:, run:, head_sha:)
-  return false unless run
-
+def watch_existing_shakaperf_release_gate_run!(repo_slug:, run:)
   run_id = run.fetch("databaseId").to_s
   run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
-  if run["status"].to_s == "completed"
-    conclusion = run["conclusion"].to_s
-    if conclusion == "success"
-      puts "✓ ShakaPerf release gate already passed: #{run_url}"
-      return true
-    end
+  output, status, timed_out = capture_gh_output_with_timeout(
+    "run", "watch", run_id, "--repo", repo_slug,
+    timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
+  )
 
+  if timed_out
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Timed out watching ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
+    )
+  end
+
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to watch existing ShakaPerf release gate run #{run_id}." \
+               "\n\nRun: #{run_url}\n\n#{output}"
+    )
+  end
+
+  refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  return refreshed_run if trustworthy_terminal_shakaperf_release_gate_run?(original_run: run, refreshed_run:)
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Unable to establish the terminal result of existing ShakaPerf release gate run #{run_id}." \
+             "\n\nRun: #{run_url}\n\n#{output}"
+  )
+end
+
+def handle_existing_shakaperf_release_gate_run!(repo_slug:, monorepo_root:, ref:, run:, head_sha:, target_version:,
+                                                release_started_at:)
+  return false unless run
+
+  if run["status"].to_s == "completed"
+    return handle_completed_shakaperf_release_gate_run(
+      repo_slug:, monorepo_root:, ref:, run:, head_sha:, target_version:, release_started_at:
+    )
+  end
+  return false unless active_shakaperf_release_gate_run?(run)
+
+  handle_active_shakaperf_release_gate_run(
+    repo_slug:, monorepo_root:, ref:, run:, head_sha:, target_version:, release_started_at:
+  )
+end
+
+def handle_completed_shakaperf_release_gate_run(repo_slug:, monorepo_root:, ref:, run:, head_sha:, target_version:,
+                                                release_started_at:)
+  run_id = run.fetch("databaseId").to_s
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  conclusion = run["conclusion"].to_s
+  unless conclusion == "success"
     puts "Latest ShakaPerf release gate run #{run_id} completed with conclusion " \
          "#{conclusion.empty? ? 'unknown' : conclusion}; dispatching a fresh gate run: #{run_url}"
     return false
   end
 
-  return false unless active_shakaperf_release_gate_run?(run)
+  rejection = shakaperf_release_gate_run_evidence_rejection(
+    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run:, release_started_at:, require_prerun: false
+  )
+  unless rejection
+    puts "✓ ShakaPerf release gate already passed with verified evidence: #{run_url}"
+    return true
+  end
 
-  puts "Found an existing ShakaPerf release gate run for #{head_sha[0, 8]}; watching it instead: #{run_url}"
-  watch_shakaperf_release_gate_run!(repo_slug:, run:)
-  puts "✓ ShakaPerf release gate passed: #{run_url}"
-  true
+  puts "Successful ShakaPerf release gate evidence is not reusable (#{rejection}); " \
+       "dispatching a fresh exact-head gate: #{run_url}"
+  false
 end
 
-def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:, dry_run:)
+def handle_active_shakaperf_release_gate_run(repo_slug:, monorepo_root:, ref:, run:, head_sha:, target_version:,
+                                             release_started_at:)
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  puts "Found an existing ShakaPerf release gate run for #{head_sha[0, 8]}; watching it instead: #{run_url}"
+  refreshed_run = watch_existing_shakaperf_release_gate_run!(repo_slug:, run:)
+  unless refreshed_run["conclusion"].to_s == "success"
+    return handle_completed_shakaperf_release_gate_run(
+      repo_slug:, monorepo_root:, ref:, run: refreshed_run, head_sha:, target_version:, release_started_at:
+    )
+  end
+
+  rejection = shakaperf_release_gate_run_evidence_rejection(
+    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: refreshed_run, release_started_at:,
+    require_prerun: false
+  )
+  unless rejection
+    puts "✓ ShakaPerf release gate passed with verified evidence: #{run_url}"
+    return true
+  end
+
+  puts "Completed ShakaPerf release gate evidence is not reusable (#{rejection}); " \
+       "dispatching a fresh exact-head gate: #{run_url}"
+  false
+end
+
+def reuse_shakaperf_prerun?(repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:,
+                            release_started_at:)
+  prerun = find_latest_shakaperf_prerun(existing_runs, head_sha)
+  return false unless prerun
+
+  waited_for_active_prerun = active_shakaperf_release_gate_run?(prerun)
+  if waited_for_active_prerun
+    watched_attempt = prerun["attempt"]
+    watched_started_at = prerun["startedAt"]
+    run_url = shakaperf_release_gate_run_url(repo_slug:, run: prerun)
+    puts "Found an in-progress ShakaPerf pre-run; watching it before deciding whether to dispatch: #{run_url}"
+    prerun = watch_existing_shakaperf_release_gate_run!(repo_slug:, run: prerun)
+    unless prerun["attempt"] == watched_attempt
+      puts "ShakaPerf pre-run attempt changed while the release task waited; " \
+           "dispatching an exact-head gate: #{run_url}"
+      return false
+    end
+    unless prerun["startedAt"] == watched_started_at
+      puts "ShakaPerf pre-run provenance changed while the release task waited; " \
+           "dispatching an exact-head gate: #{run_url}"
+      return false
+    end
+    conclusion = prerun["conclusion"].to_s
+    unless conclusion == "success"
+      puts "Latest ShakaPerf pre-run completed with conclusion #{conclusion}; " \
+           "dispatching an exact-head gate: #{run_url}"
+      return false
+    end
+  end
+
+  evidence = fetch_shakaperf_release_gate_evidence(repo_slug:, run: prerun)
+  return false unless evidence
+
+  rejection = shakaperf_release_gate_evidence_rejection(
+    monorepo_root:, ref:, head_sha:, target_version:, run: prerun, evidence:, release_started_at:,
+    validation_time: Time.now.utc, require_prerun: true,
+    allow_prerun_completion_after_release_start: waited_for_active_prerun
+  )
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run: prerun)
+  unless rejection
+    puts "✓ Reusing successful ShakaPerf pre-run: #{run_url}"
+    return true
+  end
+
+  puts "Latest ShakaPerf pre-run is not reusable (#{rejection}); dispatching an exact-head gate: #{run_url}"
+  false
+end
+
+def dispatch_and_validate_shakaperf_release_gate!(repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:,
+                                                  target_version:, release_started_at:)
+  existing_run_ids = existing_runs.map { |run| run["databaseId"].to_s }
+  dispatch_started_at = shakaperf_release_gate_dispatch_started_at
+  dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:, target_version:, candidate_sha: head_sha)
+  run = wait_for_shakaperf_release_gate_run!(
+    repo_slug:, ref:, head_sha:, ignored_run_ids: existing_run_ids, earliest_created_at: dispatch_started_at
+  )
+  watch_shakaperf_release_gate_run!(repo_slug:, run:)
+
+  refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  unless trustworthy_terminal_shakaperf_release_gate_run?(original_run: run, refreshed_run:)
+    run_id = run.fetch("databaseId")
+    run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to establish the terminal result of freshly dispatched " \
+               "ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
+    )
+  end
+  verify_fresh_shakaperf_release_gate_evidence!(
+    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: refreshed_run, release_started_at:
+  )
+end
+
+def verify_fresh_shakaperf_release_gate_evidence!(repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run:,
+                                                  release_started_at:)
+  rejection = shakaperf_release_gate_run_evidence_rejection(
+    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run:, release_started_at:, require_prerun: false
+  )
+  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  if rejection
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Fresh ShakaPerf release gate evidence is invalid: #{rejection}.\n\nRun: #{run_url}"
+    )
+  end
+
+  puts "✓ ShakaPerf release gate passed with verified evidence: #{run_url}"
+end
+
+def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, target_version:, release_started_at:,
+                                allow_override:, dry_run:)
   if dry_run
     puts "⚠️ DRY RUN: Would run ShakaPerf release gate on #{ref} at #{head_sha[0, 8]} before publishing."
     return
@@ -506,24 +1033,23 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, allow_override:
 
   existing_runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
   existing_run = find_latest_shakaperf_release_gate_run(existing_runs, head_sha)
-  return if handle_existing_shakaperf_release_gate_run!(repo_slug:, run: existing_run, head_sha:)
-
-  existing_run_ids = existing_runs.map do |run|
-    run["databaseId"].to_s
-  end
-  dispatch_started_at = shakaperf_release_gate_dispatch_started_at
-  dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:)
-
-  run = wait_for_shakaperf_release_gate_run!(
+  return if handle_existing_shakaperf_release_gate_run!(
     repo_slug:,
+    monorepo_root:,
     ref:,
+    run: existing_run,
     head_sha:,
-    ignored_run_ids: existing_run_ids,
-    earliest_created_at: dispatch_started_at
+    target_version:,
+    release_started_at:
   )
-  watch_shakaperf_release_gate_run!(repo_slug:, run:)
 
-  puts "✓ ShakaPerf release gate passed: #{run['url'] || "GitHub Actions run #{run.fetch('databaseId')}"}"
+  return if reuse_shakaperf_prerun?(
+    repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:, release_started_at:
+  )
+
+  dispatch_and_validate_shakaperf_release_gate!(
+    repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:, release_started_at:
+  )
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
@@ -3293,9 +3819,13 @@ Release CI policy:
   - Stable releases require every check run on the commit to have succeeded.
   - Pre-releases require only the GitHub-branch-protection-required checks
     to have succeeded.
-  After pushing the version bump commit, the script runs the ShakaPerf RSC FOUC
-  workflow_dispatch gate and waits for it before creating/pushing the tag and
-  publishing npm packages or Ruby gems.
+  A prepared next-version CHANGELOG.md push on release/** automatically starts
+  the ShakaPerf RSC FOUC gate. After pushing the version bump commit, the script
+  reuses that pre-run only when its artifact proves the same branch/version,
+  pre-release time ordering, freshness, and an identical runtime tree across
+  allowlisted release metadata changes. Otherwise it dispatches an exact-head
+  workflow_dispatch gate and waits for verified evidence before creating/pushing
+  the tag and publishing npm packages or Ruby gems.
   If that gate fails, the remote branch has the version-bump commit but no release
   tag or published packages; retry from that commit or push a revert commit first.
   In-progress checks and failing gates block the release until they pass. An explicitly approved
@@ -3321,6 +3851,7 @@ Examples:
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
 task :release, %i[version dry_run override_version_policy override_ci_status] do |_t, args|
   monorepo_root = current_monorepo_root
+  release_started_at = Time.now.utc
 
   args_hash = args.to_hash
 
@@ -3565,6 +4096,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         monorepo_root: release_root,
         ref: current_branch,
         head_sha: current_git_sha!(release_root),
+        target_version: actual_gem_version,
+        release_started_at:,
         allow_override: allow_ci_status_override,
         dry_run: is_dry_run
       )

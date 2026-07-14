@@ -181,6 +181,48 @@ stops before tagging. If `release/X.Y.Z` already exists, the task stops and tell
 > the current branch ref. If the release branch was just pushed, wait for at least one CI run on that
 > branch before cutting the first RC; otherwise the branch-tip gate can stop with a `no_checks` result.
 
+#### Automatic ShakaPerf pre-run after changelog preparation
+
+Pushing a prepared next-version `CHANGELOG.md` section to `release/X.Y.Z` automatically starts the
+ShakaPerf release gate for that branch tip. The lightweight dispatcher runs only for `CHANGELOG.md`
+pushes on `release/**`, then verifies that the first non-`Unreleased` changelog section is non-empty,
+newer than the checked-in gem version, and belongs to the branch's `X.Y.Z` release line. An arbitrary
+documentation edit or an unchanged/stale version therefore does not start the long-running gate.
+
+The dispatched Actions run names the target version, release branch, and exact candidate SHA. On
+completion it uploads `shakaperf-release-evidence.json` in the `shakaperf-release-evidence` artifact,
+containing the branch, target version, candidate SHA, conclusion, run URL, completion time, and runtime
+tree fingerprint, plus the workflow run attempt that produced the evidence. Open that run URL from the
+later `rake release` output to inspect the gate and its
+artifacts. The sequential validation, ShakaPerf, and evidence jobs are bounded to 60 minutes in total;
+the release task allows 65 minutes after finding a run so the workflow can reach that bound cleanly.
+Per-release-branch concurrency cancels an obsolete in-progress run when a newer prepared
+candidate is dispatched; the newest branch candidate is authoritative, so a failed or cancelled newer
+run never causes fallback to an older success.
+
+When `bundle exec rake release[...]` later pushes the version-bump commit, it first watches the latest
+prepared-candidate pre-run if that run is still active. A failed or otherwise non-reusable exact-head run
+does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
+only when all of these checks succeed:
+
+- the run and artifact report success for the same branch, target version, candidate SHA, run ID, run
+  attempt, and run URL;
+- the evidence is no more than seven days old, and both its recorded completion and the workflow's
+  update occurred before this release command started, unless the task found that same pre-run already
+  active with a provable earlier current-attempt start and watched that same attempt to successful
+  completion itself;
+- the tested candidate is an ancestor of the version-bump commit;
+- the candidate and version-bump commits have the same exact Git-tree fingerprint after excluding only
+  `CHANGELOG.md` and the existing release-finalization metadata paths; and
+- every intervening commit is either an existing content-validated version-finalization metadata commit
+  or a canonical CI-detector-confirmed `CHANGELOG.md`-only commit.
+
+Missing, malformed, stale, wrong-version, wrong-branch, failed, cancelled, superseded, non-ancestor, or
+runtime-different evidence is never a waiver. The task falls back to dispatching the gate on the exact
+version-bump commit and waits for that run plus its verified evidence exactly as before. If the fresh
+gate or its evidence fails, tagging and package publication remain blocked. Final promotion keeps the
+same strict final-release gates and cannot use the prerelease-only CI override.
+
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
 sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
 agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase-tiered-merge-gating)).
