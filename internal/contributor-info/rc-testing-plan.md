@@ -86,6 +86,68 @@ The tracking issue is the single source of truth for:
    every behavioral lane is green or explicitly waived (Lane 4b artifact defects cannot be
    waived).
 
+### Efficient Demo-Fleet Update Prompt
+
+After publishing an RC, replace the bracketed values and paste this prompt into a Codex task. It
+uses the manifest for discovery while preserving this document as the authority for release-gate
+policy.
+
+```text
+/goal
+Use $pr-batch to update and validate the React on Rails demo fleet for [RC TAG], tracking the
+release gate in shakacode/react_on_rails#[TRACKER]. Finish the batch; do not stop after opening
+PRs.
+
+Release artifacts:
+- react_on_rails and react_on_rails_pro gems: [RUBY RC]
+- react-on-rails, react-on-rails-pro, react-on-rails-pro-node-renderer, and
+  create-react-on-rails-app: [NPM RC]
+- react-on-rails-rsc: [RSC VERSION]
+
+Source of truth and scope:
+- Read rc-testing-plan.md and demo-fleet.yml from the current default branch. The plan controls
+  policy; the manifest supplies the complete repo inventory.
+- Before editing each target, inspect its default branch, AGENTS.md, dependencies, package manager,
+  lockfiles, CI, and smoke commands. Treat manifest entries marked verify as hints.
+- Update only packages actually consumed. Reuse a safe open RC PR; otherwise branch from the
+  current default branch. Do not stack on stale RC work merely to preserve it.
+
+Efficient execution:
+1. The coordinator verifies published versions and dist-tags, release tag/commit, changelog,
+   exact-commit CI, and RSC compatibility once. Workers reuse that evidence.
+2. Run the generator/install gate once in react_on_rails.
+3. Wave 1: one isolated worker per hard-gate repo, in parallel up to the lower of host capacity
+   and the manifest concurrency limit. Wave 2: process all soft-track repos in parallel after the
+   hard-gate edits are stable. Soft-track failures never block the release decision.
+4. Each worker updates dependencies and lockfiles, runs install, build/tests, primary route/RSC
+   smoke, and required hosted CI or review app, then opens or updates its PR. Address actionable
+   reviews. Merge when all gates pass; merge_authority is auto_merge_when_gates_pass.
+5. A fresh strongest-capability checker, distinct from every maker, independently audits every
+   hard-gate diff and the combined release evidence before any final GO recommendation.
+
+Coordination and safety:
+- Use a stable batch id based on [RC TAG] and one claim/worktree per repo. Respect existing live
+  claims and report UNKNOWN coordination state rather than guessing. Do not run two workers in
+  one checkout.
+- Bind every route to a supported model/effort pair before launch. Use balanced/high for routine
+  bumps and strongest/xhigh for uncertain, private, escalated, and final QA work.
+- Never expose private HiChee or Pro logs, URLs, screenshots, app details, tokens, or secret names
+  in public PRs or the tracker. Post only public-safe pass/fail summaries.
+- Suspected RC regressions block their gates until fixed or waived by a maintainer. File focused
+  follow-up issues for unrelated defects instead of expanding bump PRs.
+
+Evidence and closeout:
+- Append current-head evidence to #[TRACKER]: artifacts, release commit/CI, one row per hard gate
+  with PR or merge SHA and install/build/smoke/CI/review state, public-safe HiChee status,
+  soft-track results, regressions or waivers, and blockers.
+- Re-read the tracker immediately before any update. Prefer append-only comments for concurrent
+  batch evidence; preserve its current Agent Release Mode unless a maintainer explicitly changes
+  it.
+- Final output must list every discovered repo and disposition, merged and open PRs, exact
+  validation evidence, follow-up issues, and a PASS/PARTIAL/BLOCKED verdict. Do not recommend
+  final promotion until every hard gate and the exact release commit are green.
+```
+
 ## Required Pass Criteria
 
 For each hard-gate app PR:
