@@ -1026,6 +1026,21 @@ describe('streamServerRenderedReactComponent', () => {
     expect(setManifestFileNames).not.toHaveBeenCalled();
   });
 
+  it('skips the RSC manifest lookup for plain streaming', async () => {
+    const { renderResult } = setupStreamTest({
+      railsContext: {
+        ...testingRailsContext,
+        reactClientManifestFileName: '',
+        reactServerClientManifestFileName: '',
+      },
+    });
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(getRSCClientManifestStylesheetHrefs).not.toHaveBeenCalled();
+  });
+
   it('passes manifest stylesheet hrefs to streamed preload promotion', async () => {
     getRSCClientManifestStylesheetHrefs.mockResolvedValue(new Set(['/webpack/test/css/4092-98880bc1.css']));
     ReactOnRails.register({ ManifestStylesheetPreload });

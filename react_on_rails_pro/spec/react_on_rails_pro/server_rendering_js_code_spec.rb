@@ -131,5 +131,83 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         expect(result).not_to include("asyncPropManager")
       end
     end
+
+    context "when streaming without RSC support" do
+      let(:render_options) do
+        instance_double(
+          ReactOnRails::ReactComponent::RenderOptions,
+          internal_option: nil,
+          streaming?: true,
+          dom_id: "TestComponent-0",
+          trace: false
+        )
+      end
+
+      before do
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: false,
+          throw_js_errors: false,
+          rendering_returns_promises: false,
+          ssr_pre_hook_js: nil
+        )
+      end
+
+      it "selects plain streaming without RSC manifest lookups" do
+        result = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(result).to include("ReactOnRails['streamServerRenderedReactComponent']")
+        expect(result).to include('railsContext.reactClientManifestFileName = ""')
+        expect(result).to include('railsContext.reactServerClientManifestFileName = ""')
+      end
+    end
+
+    context "when streaming with RSC support" do
+      let(:render_options) do
+        instance_double(
+          ReactOnRails::ReactComponent::RenderOptions,
+          internal_option: nil,
+          streaming?: true,
+          rsc_payload_streaming?: false,
+          dom_id: "TestComponent-0",
+          trace: false
+        )
+      end
+
+      before do
+        allow(ReactOnRailsPro.configuration).to receive_messages(
+          enable_rsc_support: true,
+          react_client_manifest_file: "react-client-manifest.json",
+          react_server_client_manifest_file: "react-server-client-manifest.json",
+          throw_js_errors: false,
+          rendering_returns_promises: false,
+          ssr_pre_hook_js: nil
+        )
+        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-bundle-hash")
+      end
+
+      it "keeps the RSC-aware streaming function and manifest metadata" do
+        result = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(result).to include(
+          "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
+        )
+        expect(result).to include('railsContext.reactClientManifestFileName = "react-client-manifest.json"')
+        expected_server_manifest =
+          'railsContext.reactServerClientManifestFileName = "react-server-client-manifest.json"'
+        expect(result).to include(expected_server_manifest)
+      end
+    end
   end
 end

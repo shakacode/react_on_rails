@@ -143,7 +143,6 @@ if (${streaming}) {
   };
 
   ReactOnRails.register({ StreamingGreeting });
-  const streamStartedAt = performance.now();
   const streamResult = ReactOnRails.streamServerRenderedReactComponent({
     name: 'StreamingGreeting',
     props: {},
@@ -154,45 +153,81 @@ if (${streaming}) {
     railsContext: {
       serverSide: true,
       serverSideRSCPayloadParameters: {},
-      reactClientManifestFileName: 'clientManifest.json',
-      reactServerClientManifestFileName: 'serverClientManifest.json',
+      reactClientManifestFileName: '',
+      reactServerClientManifestFileName: '',
     },
   });
   let pendingWireBytes = Buffer.alloc(0);
   const wireChunks = [];
-  const streamErrors = [];
+  let wireChunkCountAtBoundaryRelease;
+  const streamCompletion = new Promise((resolve, reject) => {
+    let ended = false;
+    const watchdog = setTimeout(() => {
+      streamResult.destroy(new Error('Packed React ' + React.version + ' streaming timed out'));
+    }, 5_000);
+    streamResult.once('end', () => {
+      ended = true;
+      clearTimeout(watchdog);
+      resolve();
+    });
+    streamResult.once('error', (error) => {
+      clearTimeout(watchdog);
+      reject(error);
+    });
+    streamResult.once('close', () => {
+      if (ended) return;
+      clearTimeout(watchdog);
+      reject(new Error('Packed React ' + React.version + ' streaming closed before it ended'));
+    });
+  });
   streamResult.on('data', (chunk) => {
     const receivedAt = performance.now();
     pendingWireBytes = Buffer.concat([pendingWireBytes, Buffer.from(chunk)]);
     const parsed = parseAvailableWireChunks(pendingWireBytes);
     wireChunks.push(...parsed.chunks.map((wireChunk) => ({ ...wireChunk, receivedAt })));
     pendingWireBytes = parsed.remaining;
+    if (!boundaryResolved && wireChunks.length > 0) {
+      boundaryResolvedAt = performance.now();
+      wireChunkCountAtBoundaryRelease = wireChunks.length;
+      boundaryResolved = true;
+      resolveBoundary();
+    }
   });
-  streamResult.on('error', (error) => {
-    streamErrors.push(error);
-  });
-  const resolveTimer = setTimeout(() => {
-    boundaryResolvedAt = performance.now();
-    boundaryResolved = true;
-    resolveBoundary();
-  }, 75);
-  await new Promise((resolve) => streamResult.once('end', resolve));
-  clearTimeout(resolveTimer);
+  await streamCompletion;
 
-  assert.equal(streamErrors.length, 0, 'Packed React 18 streaming emitted an error');
-  assert.equal(pendingWireBytes.length, 0, 'Packed React 18 streaming ended with an incomplete wire chunk');
-  assert.ok(wireChunks.length >= 2, 'Packed React 18 streaming did not emit multiple wire chunks');
-  assert.ok(boundaryResolvedAt, 'Packed React 18 streaming boundary never resolved');
+  assert.equal(
+    pendingWireBytes.length,
+    0,
+    'Packed React ' + React.version + ' streaming ended with an incomplete wire chunk',
+  );
   assert.ok(
-    wireChunks[0].receivedAt < boundaryResolvedAt,
-    \`Expected the shell wire chunk before the delayed boundary resolved (shell \${wireChunks[0].receivedAt - streamStartedAt} ms, boundary \${boundaryResolvedAt - streamStartedAt} ms)\`,
+    wireChunks.length >= 2,
+    'Packed React ' + React.version + ' streaming did not emit multiple wire chunks',
+  );
+  assert.ok(boundaryResolvedAt, 'Packed React ' + React.version + ' streaming boundary never resolved');
+  assert.ok(
+    wireChunkCountAtBoundaryRelease >= 1,
+    'Packed React ' + React.version + ' streaming released the boundary before a complete shell chunk',
+  );
+  assert.ok(
+    wireChunks[0].receivedAt <= boundaryResolvedAt,
+    'Expected the shell wire chunk before releasing the suspended boundary',
   );
 
   assert.equal(wireChunks[0].metadata.isShellReady, true);
   assert.equal(wireChunks[0].metadata.hasErrors, false);
   assert.match(wireChunks[0].html, /Packed streaming shell/);
   assert.match(wireChunks[0].html, /Packed streaming fallback/);
-  assert.match(wireChunks.slice(1).map(({ html }) => html).join(''), /Packed streaming content resolved/);
+  const preReleaseHtml = wireChunks
+    .slice(0, wireChunkCountAtBoundaryRelease)
+    .map(({ html }) => html)
+    .join('');
+  const postReleaseHtml = wireChunks
+    .slice(wireChunkCountAtBoundaryRelease)
+    .map(({ html }) => html)
+    .join('');
+  assert.doesNotMatch(preReleaseHtml, /Packed streaming content resolved/);
+  assert.match(postReleaseHtml, /Packed streaming content resolved/);
 
   console.log(\`PACKED_PRO_STREAMING_OK React \${React.version} chunks \${wireChunks.length}\`);
 }
@@ -291,7 +326,6 @@ const verifyConsumer = async (consumerDirectory, { reactVersion, streaming }) =>
     'react-on-rails-rsc unexpectedly appeared in the webpack module graph',
   );
 
-  fs.writeFileSync(path.join(consumerDirectory, 'dist/clientManifest.json'), '{}\n');
   const runtimeOutput = execFileSync(process.execPath, [path.join(consumerDirectory, 'dist/server.cjs')], {
     cwd: consumerDirectory,
     encoding: 'utf8',

@@ -106,32 +106,42 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
+        rsc_support_enabled = ReactOnRailsPro.configuration.enable_rsc_support
         render_function_name =
-          if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
+          if rsc_support_enabled && render_options.streaming?
             # Select appropriate function based on whether the rendering request is running on server or rsc bundle
             # As the same rendering request is used to generate the rsc payload and SSR the component.
             "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
+          elsif render_options.streaming?
+            "'streamServerRenderedReactComponent'"
           else
             "'serverRenderReactComponent'"
           end
-        rsc_params = if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
-                       config = ReactOnRailsPro.configuration
-                       react_client_manifest_file = config.react_client_manifest_file
-                       react_server_client_manifest_file = config.react_server_client_manifest_file
-                       <<-JS
-                          railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
-                          railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
-                       JS
-                     else
-                       ""
-                     end
+        streaming_params = if rsc_support_enabled && render_options.streaming?
+                             config = ReactOnRailsPro.configuration
+                             react_client_manifest_file = config.react_client_manifest_file
+                             react_server_client_manifest_file = config.react_server_client_manifest_file
+                             <<-JS
+                                railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
+                                railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
+                             JS
+                           elsif render_options.streaming?
+                             # These keys are part of the streaming renderer contract, but non-RSC builds do not
+                             # produce RSC manifests. Empty names avoid a failed filesystem lookup on the shell path.
+                             <<-JS
+                                railsContext.reactClientManifestFileName = "";
+                                railsContext.reactServerClientManifestFileName = "";
+                             JS
+                           else
+                             ""
+                           end
 
         # This function is called with specific componentName and props when generateRSCPayload is invoked
         # In that case, it replaces the empty () with ('componentName', props) in the rendering request
         <<-JS
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
-          #{rsc_params}
+          #{streaming_params}
           #{generate_rsc_payload_js_function(render_options)}
           #{ssr_pre_hook_js}
           #{redux_stores}
