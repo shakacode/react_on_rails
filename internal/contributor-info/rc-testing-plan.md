@@ -202,8 +202,9 @@ resume existing ownership or a fenced handoff; launch only when coordination say
 unclaimed and incomplete. Workers read target AGENTS.md, confirm
 verify-marked manifest metadata, update only consumed packages and lockfiles, then
 install/build/test/smoke. Open/update the PR, request and wait for all required hosted CI, and, where
-the manifest configures a review app, wait for deployment and run every declared smoke path. Both
-must pass when a review app is configured. Fix actionable reviews and finish each lane.
+the manifest has a non-null `review_app.cpflow_app_name`, wait for deployment and run every declared
+smoke path. Hosted CI and review-app smoke must both pass when that real app name is configured. Fix
+actionable reviews and finish each lane.
 
 Smoke is behavioral, not path-only. For each applicable app, verify the declared routes load,
 expected SSR content is present in the initial response, the manifest headline's RSC/client
@@ -263,8 +264,9 @@ handoff; launch only when coordination says the lane is unclaimed and incomplete
 target AGENTS.md, confirm
 verify-marked manifest metadata, update only consumed packages and lockfiles, then
 install/build/test/smoke. Open/update the PR, request and wait for all required hosted CI, and, where
-the manifest configures a review app, wait for deployment and run every declared smoke path. Both
-must pass when a review app is configured. Fix actionable reviews and finish each lane.
+the manifest has a non-null `review_app.cpflow_app_name`, wait for deployment and run every declared
+smoke path. Hosted CI and review-app smoke must both pass when that real app name is configured. Fix
+actionable reviews and finish each lane.
 
 Smoke is behavioral, not path-only. For each applicable app, verify the declared routes load,
 expected SSR content is present in the initial response, the manifest headline's RSC/client
@@ -369,8 +371,9 @@ Flagship, Hacker News RSC, Marketplace RSC, Gumroad RSC, Tutorial, and TanStack.
 reuse RC PRs unless a maintainer explicitly chooses one for unusual review history. One claimed
 worktree and worker per repo; read target AGENTS.md, verify manifest data, update only consumed
 packages/lockfiles, install/build/test/smoke, and open the PR. Request and wait for all required
-hosted CI; where the manifest configures a review app, also wait for deployment and run every
-declared smoke path. Both must pass when configured. Address actionable review.
+hosted CI; where the manifest has a non-null `review_app.cpflow_app_name`, also wait for deployment
+and run every declared smoke path. Hosted CI and review-app smoke must both pass when that real app
+name is configured. Address actionable review.
 
 Smoke is behavioral, not path-only. For each applicable app, verify the declared routes load,
 expected SSR content is present in the initial response, the manifest headline's RSC/client
