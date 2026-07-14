@@ -260,6 +260,28 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Stable release 17\.0\.0 requires a non-empty CHANGELOG\.md section/)
     end
 
+    it "refuses a stable dry run with no changelog content before reporting success" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(nil)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", dry_run: true)
+      end.to raise_error(SystemExit, /Stable release 17\.0\.0 requires a non-empty CHANGELOG\.md section/)
+    end
+
+    it "does not prompt during a prerelease dry run" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0.rc.10")
+        .and_return(nil)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0.rc.10", monorepo_root: "/tmp/repo", dry_run: true)
+      end.not_to raise_error
+    end
+
     it "allows confirmation when the stable release has non-empty changelog content" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")

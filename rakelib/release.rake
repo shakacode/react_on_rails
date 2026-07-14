@@ -2251,7 +2251,7 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def confirm_release!(version:, monorepo_root:)
+def confirm_release!(version:, monorepo_root:, dry_run: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
 
@@ -2264,6 +2264,8 @@ def confirm_release!(version:, monorepo_root:)
         bundle exec rake "release[#{version}]"
     ERROR
   end
+
+  return if dry_run
 
   puts ""
   puts "################################################################################"
@@ -3100,7 +3102,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       )
     end
 
-    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
+    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root, dry_run: is_dry_run)
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")
