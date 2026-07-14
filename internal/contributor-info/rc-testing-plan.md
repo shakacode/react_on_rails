@@ -137,12 +137,12 @@ Efficient execution:
    and RSC compatibility once. Workers reuse that evidence.
 2. Run the generator/install gate once in react_on_rails.
 3. Wave 1: one isolated worker per hard-gate repo, in parallel up to the lower of host capacity
-   and the manifest concurrency limit. Wave 2: process soft-track repos with the same bound after
-   hard-gate edits are stable. Soft-track failures never block the release decision.
-4. Each worker updates dependencies and lockfiles, runs install, build/tests, primary route/RSC
-   smoke, required hosted CI, and review-app smoke where available, then opens or updates its PR.
-   Address actionable reviews. Set merge_authority to auto_merge_when_gates_pass only when the
-   tracker's mode and go/no-go state authorize it; a freeze or phase conflict disables auto-merge.
+   and manifest concurrency. Wave 2 reports all soft-track repos; update only maintainer-selected
+   IDs with the same bound. Soft-track failures never block release.
+4. Each worker updates dependencies/lockfiles, runs local install/build/tests/smoke, then opens or
+   updates its PR. Request and wait for required hosted CI and review-app smoke where available;
+   address actionable reviews. Set merge_authority to auto_merge_when_gates_pass only when the
+   tracker mode/go-no-go state authorizes it; a freeze or phase conflict disables auto-merge.
 5. A fresh strongest-capability checker, distinct from every maker, independently audits every
    hard-gate diff and the combined release evidence before any final GO recommendation.
 
