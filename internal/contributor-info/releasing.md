@@ -88,12 +88,19 @@ RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0]"
 bundle exec rake "release[16.2.0,false,true]"
 ```
 
+> **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
+> exact prerelease version, for example `bundle exec rake "release[17.0.0.rc.10]"`. From a prerelease
+> checkout, an argument-less release fails closed unless the changelog advances the same release line
+> to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
+> changelog section.
+
 When called with no arguments, `rake release`:
 
 1. Reads the first versioned header from CHANGELOG.md (e.g., `### [16.5.0]`)
 2. Compares it to the current gem version
 3. If the changelog version is newer, prompts for confirmation and uses it
-4. If no new version is found, falls back to a patch bump
+4. If no new version is found from an already-stable checkout, falls back to a patch bump; from a
+   prerelease checkout, aborts with exact retry and stable-promotion guidance
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
 
@@ -121,7 +128,9 @@ bundle exec rake "release[version,dry_run,override_version_policy,override_ci_st
    - Bump types: `patch`, `minor`, `major`
    - Explicit: `16.2.0`
    - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
-   - Empty (auto): use latest CHANGELOG.md version if newer, else patch bump
+   - Empty (auto): use a newer changelog prerelease on the same release line; from an already-stable
+     checkout, use a newer changelog version or fall back to a patch bump; otherwise abort with explicit
+     retry guidance
 
 2. **`dry_run`** (optional): `true` to preview changes without releasing (default: `false`)
 
