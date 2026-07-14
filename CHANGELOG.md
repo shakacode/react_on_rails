@@ -125,6 +125,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   coverage verifies a production Webpack build and progressive Suspense output on React 18 without
   installing or bundling `react-on-rails-rsc`; async props and React Server Components remain React
   19-only. Fixes [Issue 4642](https://github.com/shakacode/react_on_rails/issues/4642).
+  [PR 4658](https://github.com/shakacode/react_on_rails/pull/4658) by
+  [justin808](https://github.com/justin808).
 
 - **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
   React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
