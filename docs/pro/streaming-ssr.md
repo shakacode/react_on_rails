@@ -44,10 +44,10 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 
 Streaming SSR sends HTML as React renders it. **Async props** (a React Server Components feature, so it requires `enable_rsc_support`) go one step further: Rails emits each prop _as its data becomes ready_ and forwards the matching Suspense boundary to the browser the moment it resolves.
 
-This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and pushes it in**, preserving your controller / model / authorization / caching layers — the renderer never has to call back into Rails.
+This is the recommended answer to "my component needs Rails data during render": **Rails owns the data and supplies it as an async prop**, preserving your controller / model / authorization / caching layers. Rails can push known props as work finishes, or React can pull named props on demand; the renderer never needs a separate Rails application API request.
 
 > [!NOTE]
-> A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext` — and doing so bypasses Rails' auth and caching. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
+> A Server Component _can_ `fetch` a Rails API directly, but the renderer's VM has no `fetch`, `Headers`, `Request`, or `Response` by default — you must bundle an HTTP client or inject them via `additionalContext`. That call leaves the active Rails controller request and must re-establish or explicitly forward auth, tenancy, caching, and tracing context through the API endpoint. `'use server'` Server Actions are **not** supported (the renderer has no DB/session/cookie access). Prefer props / async props. See [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
 Under the hood, Rails opens a bidirectional HTTP/2 NDJSON stream to the renderer and feeds props in as it resolves them. Each update runs in that request's isolated `sharedExecutionContext` and resolves a Promise, which lets React flush the corresponding HTML back to Rails for forwarding to the browser:
 
@@ -73,6 +73,42 @@ The view helper is `stream_react_component_with_async_props`, which yields an em
 
 When several slow sources are independent, use the [parallel fan-out pattern below](#loading-multiple-slow-sources-in-parallel) so one query does not block the next.
 
+### Push known props or pull them on demand
+
+The default async-props flow is **push mode**: the block starts its work and calls `emit.call` for every async prop it
+plans to provide. This is best when the page always needs those values and Rails can start them immediately.
+
+> [!NOTE]
+> Pull and mixed async-props modes (`push_props:` and `emit.pull_requests`) require React on Rails and React on Rails
+> Pro 17.0.0 or newer. React on Rails 16 async-props releases support push mode only.
+
+Set `push_props:` to enable bidirectional **pull mode**. The block should emit names listed in `push_props:` eagerly;
+the renderer will not request those names. Any other name is queued in `emit.pull_requests` only when the rendered
+React tree calls `getReactOnRailsAsyncProp` for it. An empty list enables pure pull mode:
+
+```erb
+<%= stream_react_component_with_async_props(
+      "Dashboard",
+      props: { title: "Dashboard" },
+      push_props: []
+    ) do |emit|
+  while (prop_name = emit.pull_requests.dequeue)
+    case prop_name
+    when "recommendations"
+      emit.call(prop_name, RecommendationsQuery.call(current_user).as_json)
+    when "recent_orders"
+      emit.call(prop_name, Order.recent_for(current_user).as_json)
+    else
+      emit.reject(prop_name, "Unknown async prop")
+    end
+  end
+end %>
+```
+
+Pull mode is useful when synchronous props determine which branch renders and some Rails queries may never be needed.
+The pull queue closes when the React render completes. Always allowlist prop names and reject unknown requests; do not
+turn a prop name into an arbitrary constant, method call, or SQL fragment.
+
 For the full data-fetching guidance — synchronous props, parallelizing independent queries, and React Query / SWR interop — see [RSC data fetching patterns](../oss/migrating/rsc-data-fetching.md).
 
 ### The discouraged alternative: direct `fetch` from the renderer
@@ -80,10 +116,10 @@ For the full data-fetching guidance — synchronous props, parallelizing indepen
 For contrast, a Server Component _can_ reach Rails by calling `fetch` itself. This is a plain **network round-trip** — the renderer's VM has no in-process access to Rails models, sessions, or cookies — and it gives up what async props provide for free, so prefer async props for Rails-owned data:
 
 <p>
-  <img src="images/discouraged-direct-fetch.svg" alt="Sequence diagram across three lanes — Node Renderer, Rails API, and DB / Models. A warning banner notes this is discouraged. The renderer asks the Rails API for data, Rails loads and authorizes it from the database, returns the data to Rails, Rails returns JSON to the renderer, and the renderer continues rendering. Prefer async props so Rails keeps owning auth and caching." width="840" />
+  <img src="images/discouraged-direct-fetch.svg" alt="Sequence diagram across three lanes — Node Renderer, Rails API, and DB / Models. A warning banner notes this is discouraged. The renderer asks the Rails API for data, Rails loads and authorizes it from the database, returns the data to Rails, Rails returns JSON to the renderer, and the renderer continues rendering. Prefer async props so the active Rails page request keeps its existing auth and caching context." width="840" />
 </p>
 
-Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and it bypasses Rails' authorization and caching layers.
+Caveats: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are **not** in the VM by default (bundle an HTTP client or inject them via [runtime globals](../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)); cookies, auth, session, and CSRF are **not** forwarded automatically; and the API call must re-establish or explicitly forward the authorization, tenancy, caching, and tracing context already available in the active Rails page request.
 
 ## Implementation Steps
 

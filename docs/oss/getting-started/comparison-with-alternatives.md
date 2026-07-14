@@ -177,7 +177,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 **Key additions over OSS:**
 
 - **React Server Components** — full RSC support with Rails integration
-- **Streaming SSR** — progressive rendering with React 18's `renderToPipeableStream`
+- **Streaming SSR and Rails async props** — progressive rendering with `renderToPipeableStream`, including Rails-owned query results that resolve independent Suspense boundaries
 - **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
@@ -201,9 +201,13 @@ Available under ShakaCode Trust-Based Commercial Licensing for free evaluation, 
 
 - Usually means separating frontend and backend concerns instead of keeping one Rails app
 - Duplicates routing, auth/session, and deployment concerns across two layers unless designed very carefully
+- Rails-backed Server Components still call a Rails API over HTTP; matching Pro's per-prop streaming requires separate suspended requests or a custom streaming API contract
 - Less natural if your goal is to add React to an existing Rails app without re-architecting it
 
 **Best for:** React-first teams that want a frontend-led architecture and are willing to split responsibilities between Next.js and Rails.
+
+For the detailed streaming comparison—including how Next.js Suspense fetches differ from Pro's eager and on-demand
+Rails async props—see [Next.js with a Separate Rails Backend](./nextjs-with-separate-rails-backend.md).
 
 ## Choosing the Right Approach
 
