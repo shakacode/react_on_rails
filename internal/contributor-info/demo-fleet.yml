@@ -138,7 +138,7 @@ repos:
     needs_pro: true
     ruby_test: bin/rails test && bin/rails test:system
     build: bin/rails react_on_rails:generate_packs && bin/shakapacker
-    smoke: [/, /news]
+    smoke: [/, /news/1]
     verify: true
 
   - name: shakacode/react-on-rails-demo-marketplace-rsc
