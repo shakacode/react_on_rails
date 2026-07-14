@@ -51,12 +51,13 @@ SHAKAPERF_RELEASE_GATE_WORKFLOW_TIMEOUT_MINUTES = 60
 SHAKAPERF_RELEASE_GATE_EVIDENCE_ARTIFACT = "shakaperf-release-evidence"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_FILE = "shakaperf-release-evidence.json"
 SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
-SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 1
+SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
 SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS = %w[
   branch
   candidate_sha
   completed_at
   conclusion
+  run_attempt
   run_id
   run_url
   runtime_tree_fingerprint
@@ -409,9 +410,8 @@ def shakaperf_release_gate_evidence_run_rejection(run:, evidence:)
   end
   return "evidence conclusion is not success" unless evidence["conclusion"] == "success"
 
-  unless shakaperf_release_gate_run_id_matches?(run:, evidence:)
-    return "evidence run ID does not match the workflow run"
-  end
+  identity_rejection = shakaperf_release_gate_evidence_run_identity_rejection(run:, evidence:)
+  return identity_rejection if identity_rejection
 
   run_url = run["url"]
   return "workflow run URL is missing" unless run_url.is_a?(String) && !run_url.empty?
@@ -420,9 +420,25 @@ def shakaperf_release_gate_evidence_run_rejection(run:, evidence:)
   nil
 end
 
+def shakaperf_release_gate_evidence_run_identity_rejection(run:, evidence:)
+  unless shakaperf_release_gate_run_id_matches?(run:, evidence:)
+    return "evidence run ID does not match the workflow run"
+  end
+  unless shakaperf_release_gate_run_attempt_matches?(run:, evidence:)
+    return "evidence run attempt does not match the workflow run"
+  end
+
+  nil
+end
+
 def shakaperf_release_gate_run_id_matches?(run:, evidence:)
   run_id = evidence["run_id"]
   run_id.is_a?(Integer) && run_id.positive? && run_id == run["databaseId"]
+end
+
+def shakaperf_release_gate_run_attempt_matches?(run:, evidence:)
+  run_attempt = evidence["run_attempt"]
+  run_attempt.is_a?(Integer) && run_attempt.positive? && run_attempt == run["attempt"]
 end
 
 def shakaperf_release_gate_evidence_candidate_rejection(ref:, target_version:, run:, evidence:)
@@ -466,9 +482,9 @@ def shakaperf_prerun_release_order_rejection(run:, completed_at:, updated_at:, r
     return nil
   end
 
-  created_at = shakaperf_release_gate_time(run["createdAt"])
-  return "workflow start time is invalid" unless created_at
-  return "pre-run did not start before the release run" if created_at >= release_start_second
+  started_at = shakaperf_release_gate_time(run["startedAt"])
+  return "workflow start time is invalid" unless started_at
+  return "pre-run did not start before the release run" if started_at >= release_start_second
 
   nil
 end
@@ -569,7 +585,7 @@ def fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
     "--workflow", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
     "--branch", ref,
     "--event", "workflow_dispatch",
-    "--json", "attempt,createdAt,databaseId,headSha,status,conclusion,updatedAt,url",
+    "--json", "attempt,createdAt,databaseId,headSha,startedAt,status,conclusion,updatedAt,url",
     "--limit", SHAKAPERF_RELEASE_GATE_RUN_LIST_LIMIT.to_s
   )
 
@@ -621,7 +637,7 @@ def refresh_shakaperf_release_gate_run!(repo_slug:, run:)
   output, status = capture_gh_output(
     "run", "view", run.fetch("databaseId").to_s,
     "--repo", repo_slug,
-    "--json", "attempt,createdAt,databaseId,headSha,status,conclusion,updatedAt,url"
+    "--json", "attempt,createdAt,databaseId,headSha,startedAt,status,conclusion,updatedAt,url"
   )
   unless status.success?
     handle_shakaperf_release_gate_violation!(
@@ -709,7 +725,10 @@ def find_latest_shakaperf_prerun(runs, head_sha)
 end
 
 def valid_shakaperf_prerun_ordering_metadata?(run)
-  positive_github_id?(run["databaseId"]) && !shakaperf_release_gate_time(run["createdAt"]).nil?
+  positive_github_id?(run["databaseId"]) &&
+    positive_github_id?(run["attempt"]) &&
+    !shakaperf_release_gate_time(run["createdAt"]).nil? &&
+    !shakaperf_release_gate_time(run["startedAt"]).nil?
 end
 
 def shakaperf_prerun_candidate_sort_key(run)
@@ -800,7 +819,7 @@ def watch_existing_shakaperf_release_gate_run!(repo_slug:, run:)
   run_id = run.fetch("databaseId").to_s
   run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
   output, status, timed_out = capture_gh_output_with_timeout(
-    "run", "watch", run_id, "--repo", repo_slug, "--exit-status",
+    "run", "watch", run_id, "--repo", repo_slug,
     timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
   )
 
@@ -810,11 +829,17 @@ def watch_existing_shakaperf_release_gate_run!(repo_slug:, run:)
     )
   end
 
+  unless status.success?
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to watch existing ShakaPerf release gate run #{run_id}." \
+               "\n\nRun: #{run_url}\n\n#{output}"
+    )
+  end
+
   refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
   conclusion = refreshed_run["conclusion"].to_s
   terminal_state_known = refreshed_run["status"].to_s == "completed" && !conclusion.empty?
-  watch_matches_conclusion = status.success? == (conclusion == "success")
-  return refreshed_run if terminal_state_known && watch_matches_conclusion
+  return refreshed_run if terminal_state_known
 
   handle_shakaperf_release_gate_violation!(
     message: "❌ Unable to establish the terminal result of existing ShakaPerf release gate run #{run_id}." \
@@ -894,9 +919,15 @@ def reuse_shakaperf_prerun?(repo_slug:, monorepo_root:, ref:, existing_runs:, he
 
   waited_for_active_prerun = active_shakaperf_release_gate_run?(prerun)
   if waited_for_active_prerun
+    watched_attempt = prerun["attempt"]
     run_url = shakaperf_release_gate_run_url(repo_slug:, run: prerun)
     puts "Found an in-progress ShakaPerf pre-run; watching it before deciding whether to dispatch: #{run_url}"
     prerun = watch_existing_shakaperf_release_gate_run!(repo_slug:, run: prerun)
+    unless prerun["attempt"] == watched_attempt
+      puts "ShakaPerf pre-run attempt changed while the release task waited; " \
+           "dispatching an exact-head gate: #{run_url}"
+      return false
+    end
     conclusion = prerun["conclusion"].to_s
     unless conclusion == "success"
       puts "Latest ShakaPerf pre-run completed with conclusion #{conclusion}; " \

@@ -192,7 +192,8 @@ documentation edit or an unchanged/stale version therefore does not start the lo
 The dispatched Actions run names the target version, release branch, and exact candidate SHA. On
 completion it uploads `shakaperf-release-evidence.json` in the `shakaperf-release-evidence` artifact,
 containing the branch, target version, candidate SHA, conclusion, run URL, completion time, and runtime
-tree fingerprint. Open that run URL from the later `rake release` output to inspect the gate and its
+tree fingerprint, plus the workflow run attempt that produced the evidence. Open that run URL from the
+later `rake release` output to inspect the gate and its
 artifacts. The sequential validation, ShakaPerf, and evidence jobs are bounded to 60 minutes in total;
 the release task allows 65 minutes after finding a run so the workflow can reach that bound cleanly.
 Per-release-branch concurrency cancels an obsolete in-progress run when a newer prepared
@@ -204,11 +205,12 @@ prepared-candidate pre-run if that run is still active. A failed or otherwise no
 does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
 only when all of these checks succeed:
 
-- the run and artifact report success for the same branch, target version, candidate SHA, run ID, and
-  run URL;
+- the run and artifact report success for the same branch, target version, candidate SHA, run ID, run
+  attempt, and run URL;
 - the evidence is no more than seven days old, and both its recorded completion and the workflow's
   update occurred before this release command started, unless the task found that same pre-run already
-  active with a provable earlier start and watched it to successful completion itself;
+  active with a provable earlier current-attempt start and watched that same attempt to successful
+  completion itself;
 - the tested candidate is an ancestor of the version-bump commit;
 - the candidate and version-bump commits have the same exact Git-tree fingerprint after excluding only
   `CHANGELOG.md` and the existing release-finalization metadata paths; and

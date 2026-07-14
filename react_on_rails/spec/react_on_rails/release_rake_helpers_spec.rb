@@ -564,6 +564,10 @@ RSpec.describe "release.rake helper methods" do
       )
       expect(gate_workflow).to include("target_version:", "candidate_sha:", "cancel-in-progress: true")
       expect(gate_workflow).to include("name: shakaperf-release-evidence", "shakaperf-release-evidence.json")
+      expect(gate_workflow).to include(
+        "RUN_ATTEMPT: ${{ github.run_attempt }}",
+        'run_attempt: Integer(ENV.fetch("RUN_ATTEMPT"), 10)'
+      )
     end
 
     it "sets up a supported Ruby before either workflow loads the release helpers" do
@@ -598,17 +602,20 @@ RSpec.describe "release.rake helper methods" do
     let(:run) do
       {
         "databaseId" => 123_456,
+        "attempt" => 1,
         "headSha" => candidate_sha,
         "status" => "completed",
         "conclusion" => "success",
         "createdAt" => "2026-07-14T11:30:00Z",
+        "startedAt" => "2026-07-14T11:30:05Z",
         "updatedAt" => "2026-07-14T12:00:30Z",
         "url" => run_url
       }
     end
     let(:evidence) do
       {
-        "schema_version" => 1,
+        "schema_version" => 2,
+        "run_attempt" => 1,
         "run_id" => 123_456,
         "run_url" => run_url,
         "branch" => "release/17.0.0",
@@ -674,6 +681,11 @@ RSpec.describe "release.rake helper methods" do
         .to eq("evidence run ID does not match the workflow run")
     end
 
+    it "rejects evidence from another workflow run attempt" do
+      expect(evidence_rejection(evidence: evidence.merge("run_attempt" => 2)))
+        .to eq("evidence run attempt does not match the workflow run")
+    end
+
     %w[failure cancelled].each do |conclusion|
       it "rejects a #{conclusion} workflow run" do
         rejected_run = run.merge("conclusion" => conclusion)
@@ -710,10 +722,27 @@ RSpec.describe "release.rake helper methods" do
       ).to be_nil
     end
 
+    it "rejects a rerun attempt that started after the release even when the workflow was created earlier" do
+      late_evidence = evidence.merge("run_attempt" => 2, "completed_at" => "2026-07-14T13:02:00Z")
+      rerun = run.merge(
+        "attempt" => 2,
+        "startedAt" => "2026-07-14T13:01:00Z",
+        "updatedAt" => "2026-07-14T13:02:30Z"
+      )
+
+      expect(
+        evidence_rejection(
+          run: rerun,
+          evidence: late_evidence,
+          allow_prerun_completion_after_release_start: true
+        )
+      ).to eq("pre-run did not start before the release run")
+    end
+
     it "rejects an active pre-run whose start time cannot be proven to precede release" do
       late_evidence = evidence.merge("completed_at" => "2026-07-14T13:01:00Z")
       same_second_run = run.merge(
-        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:00Z",
         "updatedAt" => "2026-07-14T13:01:30Z"
       )
 
@@ -728,7 +757,7 @@ RSpec.describe "release.rake helper methods" do
 
     it "rejects an active pre-run when refreshed start metadata is missing" do
       late_evidence = evidence.merge("completed_at" => "2026-07-14T13:01:00Z")
-      missing_start_run = run.merge("createdAt" => nil, "updatedAt" => "2026-07-14T13:01:30Z")
+      missing_start_run = run.merge("startedAt" => nil, "updatedAt" => "2026-07-14T13:01:30Z")
 
       expect(
         evidence_rejection(
@@ -765,18 +794,22 @@ RSpec.describe "release.rake helper methods" do
     it "treats the newest branch candidate as authoritative even when it was cancelled" do
       old_success = {
         "databaseId" => 1,
+        "attempt" => 1,
         "headSha" => "old",
         "status" => "completed",
         "conclusion" => "success",
         "createdAt" => "2026-07-14T11:00:00Z",
+        "startedAt" => "2026-07-14T11:00:05Z",
         "updatedAt" => "2026-07-14T11:00:00Z"
       }
       newer_cancelled = {
         "databaseId" => 2,
+        "attempt" => 1,
         "headSha" => "new",
         "status" => "completed",
         "conclusion" => "cancelled",
         "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
         "updatedAt" => "2026-07-14T12:00:00Z"
       }
 
@@ -792,6 +825,7 @@ RSpec.describe "release.rake helper methods" do
         "conclusion" => "success",
         "attempt" => 2,
         "createdAt" => "2026-07-14T11:00:00Z",
+        "startedAt" => "2026-07-14T12:59:00Z",
         "updatedAt" => "2026-07-14T13:00:00Z"
       }
       newer_cancelled = {
@@ -801,6 +835,7 @@ RSpec.describe "release.rake helper methods" do
         "conclusion" => "cancelled",
         "attempt" => 1,
         "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
         "updatedAt" => "2026-07-14T12:00:30Z"
       }
 
@@ -811,18 +846,22 @@ RSpec.describe "release.rake helper methods" do
     it "refuses reuse when candidate ordering metadata is incomplete" do
       old_success = {
         "databaseId" => 1,
+        "attempt" => 1,
         "headSha" => "old",
         "status" => "completed",
         "conclusion" => "success",
         "createdAt" => "2026-07-14T11:00:00Z",
+        "startedAt" => "2026-07-14T11:00:05Z",
         "updatedAt" => "2026-07-14T11:30:00Z"
       }
       malformed_newer_cancelled = {
         "databaseId" => 2,
+        "attempt" => 1,
         "headSha" => "new",
         "status" => "completed",
         "conclusion" => "cancelled",
         "createdAt" => nil,
+        "startedAt" => "2026-07-14T12:00:05Z",
         "updatedAt" => "2026-07-14T12:30:00Z"
       }
 
@@ -857,8 +896,10 @@ RSpec.describe "release.rake helper methods" do
     let(:run) do
       {
         "databaseId" => 123_456,
+        "attempt" => 1,
         "headSha" => head_sha,
         "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
     end
@@ -1073,7 +1114,7 @@ RSpec.describe "release.rake helper methods" do
         .and_return([in_progress_prerun])
       allow(self).to receive(:capture_gh_output_with_timeout)
         .with(
-          "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
+          "run", "watch", "123456", "--repo", repo_slug,
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
         )
         .and_return(["", success_status, false])
@@ -1123,6 +1164,57 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
+    it "dispatches an exact-head gate when the active pre-run attempt changes while waiting" do
+      candidate_sha = "feedface" * 5
+      in_progress_prerun = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "in_progress",
+        "conclusion" => "",
+        "updatedAt" => "2026-07-14T12:00:30Z"
+      )
+      rerun_prerun = in_progress_prerun.merge(
+        "attempt" => 2,
+        "startedAt" => "2026-07-14T13:01:00Z",
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
+      )
+      fresh_run = run.merge("databaseId" => 654_321)
+      completed_fresh_run = fresh_run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T14:30:00Z"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([in_progress_prerun])
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .and_return(["", success_status, false], ["", success_status, false])
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: in_progress_prerun).and_return(rerun_prerun)
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: fresh_run).and_return(completed_fresh_run)
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(fresh_run)
+      expect(self).to receive(:dispatch_shakaperf_release_gate_workflow!).with(
+        repo_slug:,
+        ref: "release-branch",
+        target_version:,
+        candidate_sha: head_sha
+      )
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/attempt changed.*dispatching an exact-head gate.*gate passed/m).to_stdout
+    end
+
     it "dispatches an exact-head gate when an in-progress pre-run finishes unsuccessfully" do
       candidate_sha = "feedface" * 5
       in_progress_prerun = run.merge(
@@ -1145,7 +1237,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, ref: "release-branch")
         .and_return([in_progress_prerun])
       allow(self).to receive(:capture_gh_output_with_timeout)
-        .and_return(["Tests failed", failure_status, false], ["", success_status, false])
+        .and_return(["", success_status, false], ["", success_status, false])
       allow(self).to receive(:refresh_shakaperf_release_gate_run!)
         .with(repo_slug:, run: in_progress_prerun).and_return(failed_prerun)
       allow(self).to receive(:refresh_shakaperf_release_gate_run!)
@@ -1217,7 +1309,7 @@ RSpec.describe "release.rake helper methods" do
       expect(self).not_to receive(:capture_gh_output)
       allow(self).to receive(:capture_gh_output_with_timeout)
         .with(
-          "run", "watch", "321654", "--repo", repo_slug, "--exit-status",
+          "run", "watch", "321654", "--repo", repo_slug,
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
         )
         .and_return(["", success_status, false])
@@ -1257,7 +1349,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, ref: "release-branch")
         .and_return([in_progress_exact_head_run, successful_prerun])
       allow(self).to receive(:capture_gh_output_with_timeout)
-        .and_return(["Tests failed", failure_status, false])
+        .and_return(["", success_status, false])
       allow(self).to receive(:refresh_shakaperf_release_gate_run!)
         .with(repo_slug:, run: in_progress_exact_head_run).and_return(failed_exact_head_run)
       allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
@@ -1287,7 +1379,7 @@ RSpec.describe "release.rake helper methods" do
         .with(repo_slug:, ref: "release-branch")
         .and_return([in_progress_run])
       allow(self).to receive(:capture_gh_output_with_timeout)
-        .and_return(["GitHub API unavailable", failure_status, false])
+        .and_return(["", success_status, false])
       allow(self).to receive(:refresh_shakaperf_release_gate_run!)
         .with(repo_slug:, run: in_progress_run).and_return(in_progress_run)
       expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
@@ -1302,7 +1394,34 @@ RSpec.describe "release.rake helper methods" do
           allow_override: false,
           dry_run: false
         )
-      end.to raise_error(SystemExit, /Unable to establish the terminal result.*GitHub API unavailable/m)
+      end.to raise_error(SystemExit, /Unable to establish the terminal result/m)
+    end
+
+    it "fails closed on a watcher API error even when refresh reports a terminal workflow failure" do
+      in_progress_run = run.merge(
+        "databaseId" => 654_321,
+        "status" => "in_progress",
+        "conclusion" => ""
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([in_progress_run])
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .and_return(["GitHub API unavailable", failure_status, false])
+      expect(self).not_to receive(:refresh_shakaperf_release_gate_run!)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, /Unable to watch existing ShakaPerf release gate.*GitHub API unavailable/m)
     end
 
     it "does not reuse a successful run when a rerun updated a same-SHA failure more recently" do

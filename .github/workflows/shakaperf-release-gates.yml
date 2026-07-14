@@ -345,13 +345,15 @@ jobs:
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CONCLUSION: ${{ needs.rsc-fouc.result }}
           RELEASE_BRANCH: ${{ github.ref_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
           RUN_ID: ${{ github.run_id }}
           RUNTIME_TREE_FINGERPRINT: ${{ needs.candidate.outputs.runtime_tree_fingerprint }}
           TARGET_VERSION: ${{ inputs.target_version }}
         run: |
           ruby -rjson -rtime <<'RUBY'
           evidence = {
-            schema_version: 1,
+            schema_version: 2,
+            run_attempt: Integer(ENV.fetch("RUN_ATTEMPT"), 10),
             run_id: Integer(ENV.fetch("RUN_ID"), 10),
             run_url: "https://github.com/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('RUN_ID')}",
             branch: ENV.fetch("RELEASE_BRANCH"),
