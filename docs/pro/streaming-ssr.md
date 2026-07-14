@@ -80,7 +80,7 @@ plans to provide. This is best when the page always needs those values and Rails
 
 > [!NOTE]
 > Pull and mixed async-props modes (`push_props:` and `emit.pull_requests`) require React on Rails and React on Rails
-> Pro 17.0.0.rc.6 or newer. Earlier async-props releases support push mode only.
+> Pro 17.0.0 or newer. React on Rails 16 async-props releases support push mode only.
 
 Set `push_props:` to enable bidirectional **pull mode**. The block should emit names listed in `push_props:` eagerly;
 the renderer will not request those names. Any other name is queued in `emit.pull_requests` only when the rendered

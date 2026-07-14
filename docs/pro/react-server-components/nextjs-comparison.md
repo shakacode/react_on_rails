@@ -215,9 +215,9 @@ want a second, parallel copy of them. For a practical mutation recipe, see
 For a separate Rails backend, Next.js can put each Rails API fetch in an async Server Component behind
 `<Suspense>` and progressively stream the same user-visible result. React on Rails Pro's advantage is the
 application boundary: async props let the React tree suspend on Rails-owned values while the active Rails request
-continues to own policies, tenancy, caching, and queries. Bidirectional pull mode can request a prop only when the
-rendered tree needs it. This is closer to Next.js's demand-driven component model than ordinary controller props,
-without requiring a Next -> Rails page-data API call. See the
+continues to own policies, tenancy, caching, and queries. In React on Rails and React on Rails Pro 17.0.0 or newer,
+bidirectional pull mode can request a prop only when the rendered tree needs it. This is closer to Next.js's
+demand-driven component model than ordinary controller props, without requiring a Next -> Rails page-data API call. See the
 [dedicated Next.js + Rails guide](../../oss/getting-started/nextjs-with-separate-rails-backend.md) for the full flow and
 the limits of the performance claim.
 

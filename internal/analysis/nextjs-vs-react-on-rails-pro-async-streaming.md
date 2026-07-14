@@ -11,7 +11,7 @@ into React as async props? Do the current comparison docs explain that advantage
 ## Source snapshot
 
 - React on Rails checkout: [`5abee39`](https://github.com/shakacode/react_on_rails/commit/5abee39bbe1898c9abb28ab054c740d4caf44f73)
-- React on Rails / Pro version: `17.0.0.rc.6`; bidirectional pull-mode async props shipped in
+- Target React on Rails / Pro release: `17.0.0`; bidirectional pull-mode async props were implemented in
   [`c32a19d84`](https://github.com/shakacode/react_on_rails/commit/c32a19d84629897a66523a4bd453f9a55d67e9e5)
 - Next.js App Router documentation checked 2026-07-13: [Fetching Data](https://nextjs.org/docs/app/getting-started/fetching-data),
   [Data Security](https://nextjs.org/docs/app/guides/data-security), and
@@ -33,7 +33,7 @@ The app does not need a separate application/page-data JSON or GraphQL endpoint,
 forwarding for that page data. The implementation is a bidirectional HTTP/2 NDJSON channel between
 Rails and the Pro Node renderer, not a callback from React to a Rails API.
 
-Version 17.0.0.rc.6 makes the comparison stronger than eager streaming alone. Pro supports both
+React on Rails and React on Rails Pro 17.0.0 make the comparison stronger than eager streaming alone. Pro supports both
 **push mode**, where Rails starts known work and emits values as they resolve, and **pull mode**, where
 the rendered React tree requests a named prop and Rails starts only the corresponding allowlisted
 work. Mixed mode can eagerly push critical data while pulling optional, branch-dependent data. This
@@ -115,13 +115,13 @@ objects; it is not the mechanism that resolves Rails data behind Suspense bounda
 The fair Next.js baseline is **a Server Component fetching Rails directly**, not a Client Component
 that waits until hydration and not a Server Component calling its own Next Route Handler.
 
-| Architecture                                       | Data path for initial page                                                                                                         | Can progressively reveal server-rendered UI?             | Extra application boundary                                                                              |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| React on Rails Pro eager push                      | Browser → Rails; Rails starts known query/policy/cache work → internal Node renderer prop stream → Suspense HTML → browser         | Yes, one boundary per async prop                         | No separate Rails page-data API is required; there is still an internal Rails ↔ Node renderer boundary |
-| React on Rails Pro on-demand pull                  | Browser → Rails; rendered React branch requests a named prop → Rails runs allowlisted work → prop stream → Suspense HTML → browser | Yes, and an unused branch need not start its Rails query | Same internal renderer boundary, but no separate page-data API                                          |
-| Next Server Component → Rails API                  | Browser → Next; Next `fetch` → Rails API → JSON → Suspense HTML/RSC → browser                                                      | Yes, one boundary per async component/promise            | Rails API contract plus server-to-server HTTP and auth propagation                                      |
-| Next Server Component → Next Route Handler → Rails | Browser → Next render; server-side absolute `fetch` → Next public handler → Rails                                                  | Yes, but with avoidable work                             | Adds a Next BFF/handler hop on top of the Rails API                                                     |
-| Next Client Component → Rails API                  | Browser gets shell/JS, hydrates, then browser → Rails API                                                                          | Not as server-rendered data on the initial response      | Browser-facing Rails API plus auth/CORS/CSRF and client loading/cache state                             |
+| Architecture                                       | Data path for initial page                                                                                                         | Can progressively reveal server-rendered UI?            | Extra application boundary                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| React on Rails Pro eager push                      | Browser → Rails; Rails starts known query/policy/cache work → internal Node renderer prop stream → Suspense HTML → browser         | Yes, with appropriately placed Suspense boundaries      | No separate Rails page-data API is required; there is still an internal Rails ↔ Node renderer boundary |
+| React on Rails Pro on-demand pull                  | Browser → Rails; rendered React branch requests a named prop → Rails runs allowlisted work → prop stream → Suspense HTML → browser | Yes; unused branches need not start their Rails queries | Same internal renderer boundary, but no separate page-data API                                          |
+| Next Server Component → Rails API                  | Browser → Next; Next `fetch` → Rails API → JSON → Suspense HTML/RSC → browser                                                      | Yes, with appropriately placed Suspense boundaries      | Rails API contract plus server-to-server HTTP and auth propagation                                      |
+| Next Server Component → Next Route Handler → Rails | Browser → Next render; server-side absolute `fetch` → Next public handler → Rails                                                  | Yes, but with avoidable work                            | Adds a Next BFF/handler hop on top of the Rails API                                                     |
+| Next Client Component → Rails API                  | Browser gets shell/JS, hydrates, then browser → Rails API                                                                          | Not as server-rendered data on the initial response     | Browser-facing Rails API plus auth/CORS/CSRF and client loading/cache state                             |
 
 Next's official [Backend for Frontend guide](https://nextjs.org/docs/app/guides/backend-for-frontend#server-components)
 says Server Components should fetch directly from the source rather than call Route Handlers, because
@@ -160,11 +160,10 @@ authenticated user, tenant, locale, feature flags, and authorization context; qu
 scopes resolve display-safe values; Rails caching can be applied deliberately; and React receives
 only the serialized values it needs.
 
-Version 17.0.0.rc.6 also supports bidirectional **pull mode**: the renderer requests a named prop only
+React on Rails and React on Rails Pro 17.0.0 also support bidirectional **pull mode**: the renderer requests a named prop only
 when `getReactOnRailsAsyncProp` reads it, and Rails services names from `emit.pull_requests`. Passing
 `push_props: []` selects pure pull; passing selected names keeps those eager while other names are
-pulled. See the [17.0.0.rc.6 changelog](../../CHANGELOG.md),
-[`AsyncPropsManager#getProp`](../../packages/react-on-rails-pro/src/AsyncPropsManager.ts), and
+pulled. See [`AsyncPropsManager#getProp`](../../packages/react-on-rails-pro/src/AsyncPropsManager.ts),
 [`AsyncPropsEmitter`](../../react_on_rails_pro/lib/react_on_rails_pro/async_props_emitter.rb).
 
 Pull mode is the closest direct comparison to component-local Next.js fetching:
@@ -320,7 +319,7 @@ The advantage becomes smaller or may reverse when:
 - The workload is one fast API call rather than several independently useful regions.
 - Rails fiber/database configuration serializes the supposedly concurrent work.
 
-So “better” is plausible and architecturally well founded, but it should be stated as **fewer
+So “better” is plausible and architecturally well-founded, but it should be stated as **fewer
 application-layer boundaries with preserved streaming**, then verified with measurements.
 
 ## Benchmark needed before making a performance claim
@@ -385,7 +384,7 @@ for its own view layer.
   push/pull capability and the honest Next.js baseline do not drift apart.
 - Lead with “both stream; Pro removes a separate page-data application boundary for Rails-owned data.”
 - Keep fixed latency/speedup claims out of public copy until the same-workload benchmark above exists.
-- Treat pull mode as a documented public capability from 17.0.0.rc.6 onward, with allowlisting and
+- Treat pull mode as a documented public capability from 17.0.0 onward, with allowlisting and
   push-versus-pull scheduling guidance beside every example.
 
 ## Primary sources
@@ -403,8 +402,7 @@ for its own view layer.
 - [React on Rails Pro streaming guide](../../docs/pro/streaming-ssr.md) and
   [async-props database guide](../../docs/pro/async-props-database-queries.md) — eager push, on-demand
   pull, controller/view placement, fan-out, caching, and database constraints.
-- [React on Rails 17.0.0.rc.6 changelog](../../CHANGELOG.md) and
-  [pull-mode implementation commit](https://github.com/shakacode/react_on_rails/commit/c32a19d84629897a66523a4bd453f9a55d67e9e5) —
+- [Pull-mode implementation commit](https://github.com/shakacode/react_on_rails/commit/c32a19d84629897a66523a4bd453f9a55d67e9e5) —
   shipped bidirectional async-props contract.
 - [`Request.render_code_with_incremental_updates`](../../react_on_rails_pro/lib/react_on_rails_pro/request.rb),
   [`AsyncPropsEmitter`](../../react_on_rails_pro/lib/react_on_rails_pro/async_props_emitter.rb), and

@@ -72,6 +72,9 @@ Component should normally call the Rails service directly rather than proxying t
 
 React on Rails Pro keeps data loading inside the Rails page request:
 
+This path assumes the Pro Node renderer is running and React Server Components are enabled with
+`config.enable_rsc_support = true`; see the [streaming prerequisites](../../pro/streaming-ssr.md#prerequisites).
+
 ```text
 Browser -> Rails controller/view -> Pro Node renderer -> HTML shell -> Browser
                 |                         ^
@@ -84,7 +87,7 @@ fast synchronous props. Slow work should not be completed in the controller acti
 would block the shell. Instead, a thin `stream_react_component_with_async_props` block calls the same Rails model
 scopes, policies, caches, or query objects and emits each result when it is ready.
 
-Pro supports two async-props styles:
+React on Rails and React on Rails Pro 17.0.0 or newer support two async-props styles:
 
 - **Push:** Rails starts known work and emits each prop as it resolves.
 - **Pull:** React requests a named prop only when the rendered component tree reads it; Rails then resolves and emits
@@ -113,6 +116,8 @@ speedup.
 
 Also, async props do not make sequential Ruby code parallel automatically. Independent Rails queries need the
 [documented async fan-out and database connection setup](../../pro/async-props-database-queries.md) to overlap safely.
+With per-fiber isolation enabled, child tasks do not inherit `CurrentAttributes`; capture `current_user`, tenant, and
+similar request state into local IDs before fan-out so every query remains correctly scoped.
 
 ## Practical Comparison
 
