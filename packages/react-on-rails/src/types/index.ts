@@ -672,6 +672,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   streamServerRenderedReactComponent(options: RenderParams): Readable;
   /**
+   * Used by server rendering by Rails — PPR prerender mode (experimental).
+   * Produces the static shell with Suspense fallbacks and appends the PostponedState.
+   */
+  pprPrerenderServerRenderedReactComponent(options: RenderParams): Readable;
+  /**
+   * Used by server rendering by Rails — PPR resume mode (experimental).
+   * Renders only the previously-postponed Suspense boundaries.
+   */
+  pprResumeServerRenderedReactComponent(options: RenderParams & { postponedState: unknown }): Readable;
+  /**
    * Generates RSC payload, used by Rails
    */
   serverRenderRSCReactComponent(options: RSCRenderParams): Readable;

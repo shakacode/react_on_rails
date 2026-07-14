@@ -175,23 +175,23 @@ module ReactOnRails
         # - :html_streaming: Progressive SSR using renderToPipeableStream (non-blocking and rendering incrementally)
         # - :rsc_payload_streaming: Server Components serialized in React flight format
         #   (non-blocking and rendering incrementally).
+        # - :ppr_prerender: PPR prerender phase — renders the static shell and serializes PostponedState
+        # - :ppr_resume: PPR resume phase — resumes rendering dynamic Suspense boundaries from PostponedState
         options.fetch(:render_mode, :sync)
       end
 
       def streaming?
         # Returns true if the component should be rendered incrementally
-        %i[html_streaming rsc_payload_streaming].include?(render_mode)
+        %i[html_streaming rsc_payload_streaming ppr_prerender ppr_resume].include?(render_mode)
       end
 
-      def rsc_payload_streaming?
-        # Returns true if the component should be rendered as a React Server Component
-        render_mode == :rsc_payload_streaming
-      end
+      def rsc_payload_streaming? = render_mode == :rsc_payload_streaming
 
-      def html_streaming?
-        # Returns true if the component should be rendered incrementally
-        render_mode == :html_streaming
-      end
+      def html_streaming? = render_mode == :html_streaming
+
+      def ppr_prerender? = render_mode == :ppr_prerender
+
+      def ppr_resume? = render_mode == :ppr_resume
 
       def store_dependencies
         options[:store_dependencies]

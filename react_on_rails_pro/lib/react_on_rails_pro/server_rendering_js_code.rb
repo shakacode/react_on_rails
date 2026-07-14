@@ -106,25 +106,9 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
-        render_function_name =
-          if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
-            # Select appropriate function based on whether the rendering request is running on server or rsc bundle
-            # As the same rendering request is used to generate the rsc payload and SSR the component.
-            "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
-          else
-            "'serverRenderReactComponent'"
-          end
-        rsc_params = if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
-                       config = ReactOnRailsPro.configuration
-                       react_client_manifest_file = config.react_client_manifest_file
-                       react_server_client_manifest_file = config.react_server_client_manifest_file
-                       <<-JS
-                          railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
-                          railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
-                       JS
-                     else
-                       ""
-                     end
+        render_function_name = resolve_render_function_name(render_options)
+        rsc_params = rsc_context_params_js(render_options)
+        ppr_resume_params = ppr_resume_context_params_js(render_options)
 
         # This function is called with specific componentName and props when generateRSCPayload is invoked
         # In that case, it replaces the empty () with ('componentName', props) in the rendering request
@@ -132,6 +116,7 @@ module ReactOnRailsPro
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
           #{rsc_params}
+          #{ppr_resume_params}
           #{generate_rsc_payload_js_function(render_options)}
           #{ssr_pre_hook_js}
           #{redux_stores}
@@ -148,6 +133,37 @@ module ReactOnRailsPro
             generateRSCPayload: typeof generateRSCPayload !== 'undefined' ? generateRSCPayload : undefined,
           });
         })()
+        JS
+      end
+
+      def resolve_render_function_name(render_options)
+        if render_options.ppr_prerender?
+          "'pprPrerenderServerRenderedReactComponent'"
+        elsif render_options.ppr_resume?
+          "'pprResumeServerRenderedReactComponent'"
+        elsif ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
+          "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
+        else
+          "'serverRenderReactComponent'"
+        end
+      end
+
+      def rsc_context_params_js(render_options)
+        return "" unless ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
+
+        config = ReactOnRailsPro.configuration
+        <<-JS
+          railsContext.reactClientManifestFileName = #{config.react_client_manifest_file.to_json};
+          railsContext.reactServerClientManifestFileName = #{config.react_server_client_manifest_file.to_json};
+        JS
+      end
+
+      def ppr_resume_context_params_js(render_options)
+        return "" unless render_options.ppr_resume?
+
+        postponed_state = render_options.internal_option(:ppr_postponed_state)
+        <<-JS
+          railsContext.pprPostponedState = #{postponed_state.to_json};
         JS
       end
     end

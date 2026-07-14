@@ -46,6 +46,19 @@ module ReactOnRailsProHelper
     end
   end
 
+  def fetch_react_component(component_name, options, &)
+    ReactOnRailsPro::Cache.fetch_react_component(
+      component_name,
+      options,
+      {
+        on_cache_hit: lambda do |cached_component_name, cached_options|
+          load_pack_for_cached_react_component(cached_component_name, cached_options)
+        end
+      },
+      &
+    )
+  end
+
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
   # All the same options as react_component apply with the following difference:
   #
@@ -414,6 +427,46 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Renders a React component with Partial Prerendering (PPR).
+  # The static shell is prerendered and cached; dynamic Suspense boundaries
+  # are streamed fresh on each request.
+  #
+  # Experimental -- part of the PPR spike.
+  #
+  # This is a two-phase render:
+  # 1. **Prerender phase**: Renders the static shell and serializes PostponedState.
+  #    On cache miss, the shell HTML + PostponedState are cached together.
+  # 2. **Resume phase**: Streams the dynamic content from the cached PostponedState.
+  #
+  # Requires `stream_view_containing_react_components` in the view layout.
+  #
+  # @param component_name [String] Name of the registered React component
+  # @param raw_options [Hash] Options hash:
+  #   - :props [Hash] Component props (static parts)
+  #   - :cache_key [String, Array, Proc] Cache key for the prerendered shell
+  #   - :cache_options [Hash] Options passed to Rails.cache (e.g., expires_in)
+  #   - :cache_tags [String, Array] Revalidation tags for tag-based invalidation
+  def ppr_react_component(component_name, raw_options = {}, &block)
+    ReactOnRailsPro::Utils.with_trace(component_name) do
+      check_caching_options!(raw_options, block)
+      render_options = options_with_auto_load_bundle(raw_options)
+
+      # Build cache key for the shell + PostponedState pair
+      cache_key = ppr_cache_key(component_name, render_options)
+      raw_cache_options = render_options[:cache_options] || {}
+      cache_write_options = ReactOnRailsPro::Cache.cache_write_options(raw_cache_options)
+
+      # Check cache for prerendered shell + PostponedState
+      cached_entry = Rails.cache.read(cache_key, cache_write_options)
+
+      if cached_entry.is_a?(Hash) && cached_entry[:shell_html] && cached_entry[:postponed_state]
+        ppr_cache_hit(component_name, render_options, cached_entry, cache_write_options)
+      else
+        ppr_cache_miss(component_name, render_options, cache_key, cache_write_options, &block)
+      end
+    end
+  end
+
   if defined?(ScoutApm)
     include ScoutApm::Tracer
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
@@ -429,40 +482,14 @@ module ReactOnRailsProHelper
       type: "ReactOnRails",
       name: "cached_static_rsc_component"
     )
+    instrument_method(
+      :ppr_react_component,
+      type: "ReactOnRails",
+      name: "ppr_react_component"
+    )
   end
 
   private
-
-  def fetch_react_component(component_name, options)
-    return yield unless ReactOnRailsPro::Cache.use_cache?(options)
-
-    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
-    Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
-    cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
-    if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
-      return add_component_cache_metadata(yield, cache_key, false)
-    end
-
-    cache_hit = true
-    normalized_cache_tags = []
-    result = Rails.cache.fetch(cache_key, cache_options) do
-      cache_hit = false
-      normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
-      yield
-    end
-    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
-    load_pack_for_cached_react_component(component_name, options) if cache_hit
-
-    add_component_cache_metadata(result, cache_key, cache_hit)
-  end
-
-  def add_component_cache_metadata(result, cache_key, cache_hit)
-    return result unless result.is_a?(Hash)
-
-    result[:RORP_CACHE_KEY] = cache_key
-    result[:RORP_CACHE_HIT] = cache_hit
-    result
-  end
 
   def load_pack_for_cached_react_component(component_name, options)
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
@@ -1246,7 +1273,7 @@ module ReactOnRailsProHelper
   end
 
   def internal_stream_react_component(component_name, options = {})
-    options = options.merge(render_mode: :html_streaming)
+    options = options.reverse_merge(render_mode: :html_streaming)
     result = internal_react_component(component_name, options)
     build_react_component_result_for_server_streamed_content(
       rendered_html_stream: result[:result],
@@ -1255,19 +1282,126 @@ module ReactOnRailsProHelper
     )
   end
 
+  # PPR delimiter used by the Node renderer to separate shell HTML from PostponedState JSON.
+  PPR_POSTPONED_STATE_DELIMITER = "<!--PPR_POSTPONED_STATE-->"
+
+  def ppr_cache_key(component_name, render_options)
+    raw_cache_key = render_options[:cache_key]
+    cache_key_value = raw_cache_key.respond_to?(:call) ? raw_cache_key.call : raw_cache_key
+
+    ReactOnRailsPro::Cache.react_component_cache_key(
+      component_name,
+      render_options.merge(
+        cache_key: ["ppr_react_component", cache_key_value],
+        prerender: true
+      )
+    )
+  end
+
+  # Cache hit path: serve cached shell HTML immediately, then stream dynamic content
+  # via the resume phase.
+  def ppr_cache_hit(component_name, render_options, cached_entry, _cache_write_options)
+    load_pack_for_cached_react_component(component_name, render_options)
+
+    shell_html = cached_entry[:shell_html]
+    postponed_state = cached_entry[:postponed_state]
+
+    # Start the resume phase to stream dynamic Suspense boundaries
+    on_complete = render_options.delete(:on_complete)
+    consumer_stream_async(on_complete:) do
+      ppr_resume_stream(component_name, render_options, postponed_state)
+    end
+
+    # Return the cached shell HTML as the first synchronous chunk.
+    # The resume stream's dynamic chunks will be enqueued asynchronously.
+    shell_html.html_safe
+  end
+
+  # Cache miss path: run the prerender phase to generate shell + PostponedState,
+  # cache them, then stream dynamic content via the resume phase.
+  def ppr_cache_miss(component_name, render_options, cache_key, cache_write_options)
+    props = yield
+    options = render_options.merge(
+      props:,
+      prerender: true,
+      skip_prerender_cache: true
+    )
+
+    # Phase 1: Prerender -- get shell HTML + PostponedState
+    shell_html, postponed_state = ppr_prerender(component_name, options)
+
+    # Cache the shell + PostponedState for subsequent requests
+    normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(render_options[:cache_tags])
+    Rails.cache.write(
+      cache_key,
+      { shell_html:, postponed_state: },
+      cache_write_options
+    )
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
+
+    # Phase 2: Resume -- stream the dynamic Suspense boundaries
+    on_complete = render_options.delete(:on_complete)
+    consumer_stream_async(on_complete:) do
+      ppr_resume_stream(component_name, options, postponed_state)
+    end
+
+    shell_html.html_safe
+  end
+
+  # Runs the PPR prerender phase: renders the component in ppr_prerender mode,
+  # buffers the entire response, and splits it at the PPR_POSTPONED_STATE_DELIMITER.
+  # Returns [shell_html, postponed_state_json].
+  def ppr_prerender(component_name, options)
+    prerender_options = options.merge(render_mode: :ppr_prerender)
+    result = internal_react_component(component_name, prerender_options)
+
+    # Buffer the entire prerender stream to extract shell HTML and PostponedState
+    buffer = +""
+    result[:result].each_chunk do |chunk_json|
+      buffer << (chunk_json["html"] || "")
+    end
+
+    ppr_parse_prerender_response(buffer)
+  end
+
+  # Parses the prerender response buffer, splitting at the PPR delimiter.
+  # Returns [shell_html, postponed_state_json].
+  def ppr_parse_prerender_response(buffer)
+    delimiter_index = buffer.index(PPR_POSTPONED_STATE_DELIMITER)
+    unless delimiter_index
+      raise ReactOnRailsPro::Error,
+            "PPR prerender response missing #{PPR_POSTPONED_STATE_DELIMITER} delimiter. " \
+            "Ensure the Node renderer returns shell HTML followed by the delimiter and PostponedState JSON."
+    end
+
+    shell_html = buffer[0...delimiter_index]
+    postponed_state_json = buffer[(delimiter_index + PPR_POSTPONED_STATE_DELIMITER.length)..]&.strip
+
+    if postponed_state_json.blank?
+      raise ReactOnRailsPro::Error,
+            "PPR prerender response has empty PostponedState after delimiter."
+    end
+
+    [shell_html, postponed_state_json]
+  end
+
+  # Starts the PPR resume phase: renders the component in ppr_resume mode,
+  # passing the PostponedState through internal_option so it reaches the JS code generator.
+  def ppr_resume_stream(component_name, options, postponed_state)
+    resume_options = options.merge(
+      render_mode: :ppr_resume,
+      ppr_postponed_state: postponed_state
+    )
+    internal_stream_react_component(component_name, resume_options)
+  end
+
   def internal_rsc_payload_react_component(react_component_name, options = {})
     options = options.merge(render_mode: :rsc_payload_streaming)
     render_options = create_render_options(react_component_name, options)
     json_stream = server_rendered_react_component(render_options)
     json_stream.transform do |chunk|
-      # Read `html` without removing it. This chunk may be owned by StreamCache,
-      # which buffers a reference to it and writes it to Rails.cache after the
-      # stream completes. Mutating it here (e.g. `chunk.delete("html")`) would
-      # tear the payload out of the buffered Hash, so prerender caching would
-      # persist an empty payload and every cache hit would serve zero bytes.
-      # See https://github.com/shakacode/react_on_rails/issues/4550.
-      html = chunk["html"] || ""
-      metadata = chunk.except("html").to_json
+      html = chunk.delete("html") || ""
+      metadata = chunk.to_json
       content_bytes = html.bytesize.to_s(16).rjust(8, "0")
       "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end

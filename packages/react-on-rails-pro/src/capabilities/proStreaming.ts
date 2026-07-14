@@ -18,15 +18,27 @@
 import type { Readable } from 'stream';
 import type { RenderParams } from 'react-on-rails/types';
 import streamServerRenderedReactComponent from '../streamServerRenderedReactComponent.ts';
+import {
+  pprPrerenderServerRenderedReactComponent,
+  pprResumeServerRenderedReactComponent,
+  type PPRResumeRenderParams,
+} from '../pprServerRenderedReactComponent.ts';
 
 /**
  * Pro streaming capability.
- * Provides server-side streaming rendering via streamServerRenderedReactComponent.
+ * Provides server-side streaming rendering via streamServerRenderedReactComponent,
+ * and experimental PPR (Partial Prerendering) via prerender/resume functions.
  */
 export function createProStreamingCapability() {
   return {
     streamServerRenderedReactComponent(options: RenderParams): Readable {
       return streamServerRenderedReactComponent(options);
+    },
+    pprPrerenderServerRenderedReactComponent(options: RenderParams): Readable {
+      return pprPrerenderServerRenderedReactComponent(options);
+    },
+    pprResumeServerRenderedReactComponent(options: PPRResumeRenderParams): Readable {
+      return pprResumeServerRenderedReactComponent(options);
     },
   };
 }
