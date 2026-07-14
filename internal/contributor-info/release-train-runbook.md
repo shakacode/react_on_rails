@@ -214,6 +214,33 @@ fixed by republishing.
 > does **not** reach the release unless it is forward-ported in step 3 (run in reverse: cherry-pick
 > `main`→`release/X.Y.Z`). Prefer authoring stabilizing fixes against the release branch first.
 
+#### Promote prerelease dependencies before final
+
+Do not promote a React on Rails RC to final while it still pins a prerelease of a coordinated
+dependency. For `17.0.0` and `react-on-rails-rsc@19.2.1`, use this order:
+
+1. Follow the
+   [`react-on-rails-rsc` release guide](https://github.com/shakacode/react_on_rails_rsc/blob/main/internal/docs/releasing.md),
+   complete its downstream release gate, and accept the exact commit behind the tested
+   `19.2.1-rc.N`. If any code changes, publish and test another RSC RC instead of promoting an
+   untested commit.
+2. Publish that same accepted commit as stable `react-on-rails-rsc@19.2.1`, and verify the registry
+   package and `latest` dist-tag before changing React on Rails.
+3. Complete [#4357](https://github.com/shakacode/react_on_rails/issues/4357) on
+   `release/17.0.0`: update the Ruby generator's RSC pin and the Pro peer/dev dependency metadata,
+   node-renderer and dummy/override pins, and affected lockfiles. This is a dependency update, not a
+   manual bump of React on Rails' own gem/npm product version.
+4. Forward-port the dependency-pin fix to `main` with `git cherry-pick -x`, as for every other release
+   branch fix.
+5. Cut a new React on Rails RC that contains the stable RSC pin. Do not treat an earlier React on Rails
+   RC that still points at `19.2.1-rc.N` as the final candidate.
+6. Run the RC hard gates and demo-fleet QA against the newly published artifacts. Include a scratch
+   non-RSC smoke test that installs or copies the published `react-on-rails-pro@<rc>` tarball while
+   leaving `react-on-rails-rsc` absent; a monorepo/workspace symlink is not valid evidence because it
+   can mask package-resolution leaks.
+7. Only after that new RC is accepted should [#4569](https://github.com/shakacode/react_on_rails/issues/4569)
+   promote `17.0.0` final.
+
 ### 3. Forward-port stabilizing fixes back to `main`
 
 Every fix that lands on `release/X.Y.Z` must also reach `main`, or `main` regresses the moment the
@@ -297,8 +324,10 @@ git rev-parse HEAD            # confirm it equals the tag of the good RC
 git diff --stat v17.0.0.rc.3  # expect: empty (no drift since the good RC)
 ```
 
-Collapse the RC CHANGELOG sections into the final section and bump to the final version, then release —
-this is the only code change between the good RC and the final:
+Collapse the RC CHANGELOG sections into the final section, then release. Do not manually bump the
+React on Rails gem/npm product-version files; the release task owns that coordinated change. The
+CHANGELOG edit plus the task-generated version metadata is the only difference between the good RC
+and the final:
 
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
@@ -331,6 +360,13 @@ git diff --name-only v17.0.0.rc.3 v17.0.0
 be re-spun, and an explicit human sign-off on the promotion itself (see
 [Phase-tiered merge gating](#phase-tiered-merge-gating)). Set the mode to `final-release` on the tracker
 and publish phase `final` for the release line during the promotion freeze.
+
+Final promotion must fail closed. Do not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass the fourth
+`override_ci_status` argument, or use an accelerated asynchronous/deferred-gate option when publishing
+the stable version. Successful gate evidence from the accepted RC may be reused only when the final
+release policy and release tooling validate that evidence. A narrowly scoped, documented final waiver
+remains possible only where the existing final-release policy explicitly permits it, with its required
+evidence and maintainer sign-off; it must not become a global skip of CI, ShakaPerf, or any other gate.
 
 ### 5. Close out the release line
 
