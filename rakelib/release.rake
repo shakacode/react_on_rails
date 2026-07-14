@@ -2251,6 +2251,13 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
+def report_release_dry_run_changelog(version:, has_changelog:)
+  return if has_changelog
+
+  puts "⚠️ Prerelease dry run for #{version}: no matching non-empty CHANGELOG.md section; " \
+       "no GitHub release would be created."
+end
+
 def confirm_release!(version:, monorepo_root:, dry_run: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
@@ -2265,7 +2272,7 @@ def confirm_release!(version:, monorepo_root:, dry_run: false)
     ERROR
   end
 
-  return if dry_run
+  return report_release_dry_run_changelog(version:, has_changelog:) if dry_run
 
   puts ""
   puts "################################################################################"
@@ -2905,7 +2912,9 @@ This will update and release:
   - patch/minor/major
   - explicit version like 16.2.0
   - explicit prerelease like 16.2.0.rc.1
-  - empty (auto): use latest CHANGELOG.md version if newer; refuse an equal prerelease; otherwise patch bump
+  - empty (auto): from a prerelease checkout, use only a newer same-line prerelease from CHANGELOG.md;
+    otherwise abort with explicit retry guidance. From a stable checkout, use a newer CHANGELOG.md version
+    or derive a patch candidate; the stable changelog gate still requires a matching non-empty section.
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
 4th argument: Override release CI gates (true/false, default: false)
@@ -2939,7 +2948,7 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
-  rake release                                  # Use CHANGELOG.md version or patch bump
+  rake release                                  # Auto-detect version; stable targets require changelog
   rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
   rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
   rake release[major]                           # Bump major version (16.1.1 → 17.0.0)

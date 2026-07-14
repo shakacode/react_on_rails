@@ -54,14 +54,17 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
    - "Last reviewed" date and, when applicable, "Next review due"
 4. Review the PR, verify the computed version, and merge
 
-If you forget this step, the release task will print a warning and the GitHub release will need to be created manually afterward using `sync_github_release`.
+If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
+For a prerelease, the task warns and skips the GitHub release; after adding the section, create it with
+`sync_github_release`.
 
 #### Why changelog comes BEFORE the release
 
 - `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
-- The release task warns if no changelog section is found for the target version
+- The release task aborts a stable target if no matching non-empty section exists; prereleases warn and
+  skip GitHub release creation
 - A premature version header (if release fails) is harmless -- you'll release eventually
-- A missing changelog after release means the GitHub release must be created manually
+- A prerelease or historical release missing its changelog requires manual GitHub release synchronization
 
 ### 2. Run the Release Task
 
@@ -99,7 +102,8 @@ When called with no arguments, `rake release`:
 1. Reads the first versioned header from CHANGELOG.md (e.g., `### [16.5.0]`)
 2. Compares it to the current gem version
 3. If the changelog version is newer, prompts for confirmation and uses it
-4. If no new version is found from an already-stable checkout, falls back to a patch bump; from a
+4. If no new version is found from an already-stable checkout, derives a patch candidate; the stable
+   changelog gate still blocks release until that version has a matching non-empty section. From a
    prerelease checkout, aborts with exact retry and stable-promotion guidance
 
 Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
@@ -129,8 +133,8 @@ bundle exec rake "release[version,dry_run,override_version_policy,override_ci_st
    - Explicit: `16.2.0`
    - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
    - Empty (auto): use a newer changelog prerelease on the same release line; from an already-stable
-     checkout, use a newer changelog version or fall back to a patch bump; otherwise abort with explicit
-     retry guidance
+     checkout, use a newer changelog version or derive a patch candidate that the stable changelog gate
+     blocks until a matching non-empty section exists; otherwise abort with explicit retry guidance
 
 2. **`dry_run`** (optional): `true` to preview changes without releasing (default: `false`)
 
@@ -164,7 +168,7 @@ it is the candidate whose full suite must qualify the release.
 **Examples:**
 
 ```bash
-bundle exec rake release                                  # Use CHANGELOG.md version or patch bump
+bundle exec rake release                                  # Auto-detect version; stable targets require changelog
 bundle exec rake "release[patch]"                         # Bump patch version (16.1.1 → 16.1.2)
 bundle exec rake "release[minor]"                         # Bump minor version (16.1.1 → 16.2.0)
 bundle exec rake "release[major]"                         # Bump major version (16.1.1 → 17.0.0)
@@ -182,7 +186,8 @@ The `rake release` task automatically:
 1. **Validates release prerequisites**:
    - Checks for uncommitted changes (will abort if found)
    - Verifies NPM authentication (will run `npm login` if needed)
-   - Warns if CHANGELOG.md section is missing for the target version
+   - Requires a non-empty matching CHANGELOG.md section for stable targets; prereleases without one emit a warning,
+     including during dry runs
    - Validates version policy (monotonic + changelog/bump consistency)
 2. **Pulls latest changes** from the repository
 3. **Bumps version numbers** in:
@@ -264,7 +269,8 @@ The task automatically converts Ruby gem format to npm semver format:
 
 1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
 2. When prompted for **RubyGems OTP**, enter your 2FA code
-3. If using `rake release` with no version, confirm the version detected from CHANGELOG.md (or the computed patch version)
+3. If using `rake release` with no version, confirm the version detected from CHANGELOG.md. A stable checkout
+   may derive a patch candidate, but publication remains blocked until that version has a matching non-empty section.
 4. The script will automatically commit and push version bumps
 5. The script will automatically create a GitHub release (if CHANGELOG.md section exists)
 
@@ -277,7 +283,9 @@ The task automatically converts Ruby gem format to npm semver format:
 
 2. If the changelog was updated before release (recommended), verify the GitHub release was auto-created with the correct notes.
 
-3. If the changelog was NOT updated before release, update it now:
+3. For a prerelease or historical release that predates the stable changelog gate, if the changelog was NOT
+   updated before release, update it now. Current stable releases cannot reach this state because they abort
+   before publication:
 
    **Option A - Use Claude Code (recommended):**
 

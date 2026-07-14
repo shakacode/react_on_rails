@@ -271,7 +271,7 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /Stable release 17\.0\.0 requires a non-empty CHANGELOG\.md section/)
     end
 
-    it "does not prompt during a prerelease dry run" do
+    it "warns without prompting during a prerelease dry run with no changelog content" do
       allow(self).to receive(:extract_changelog_section)
         .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0.rc.10")
         .and_return(nil)
@@ -279,7 +279,7 @@ RSpec.describe "release.rake helper methods" do
 
       expect do
         confirm_release!(version: "17.0.0.rc.10", monorepo_root: "/tmp/repo", dry_run: true)
-      end.not_to raise_error
+      end.to output(/Prerelease dry run.*no matching non-empty CHANGELOG\.md section/).to_stdout
     end
 
     it "allows confirmation when the stable release has non-empty changelog content" do
@@ -454,6 +454,21 @@ RSpec.describe "release.rake helper methods" do
       expect(self).not_to receive(:version_tagged?)
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
+    end
+
+    it "blocks an inferred stable patch candidate until matching changelog evidence exists" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.2.9")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "16.3.1")
+        .and_return(nil)
+
+      version_input = resolve_version_input("", "/tmp/repo")
+      target_version = compute_target_gem_version(current_gem_version: "16.3.0", version_input:)
+
+      expect do
+        confirm_release!(version: target_version, monorepo_root: "/tmp/repo", dry_run: true)
+      end.to raise_error(SystemExit, /Stable release 16\.3\.1 requires a non-empty CHANGELOG\.md section/)
     end
   end
 
