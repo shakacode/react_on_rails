@@ -668,6 +668,10 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    */
   serverRenderReactComponent(options: RenderParams): null | string | Promise<string>;
   /**
+   * Used by Rails to select progressive streaming only when the installed React DOM server supports it.
+   */
+  isServerStreamingSupported(): boolean;
+  /**
    * Used by server rendering by Rails
    */
   streamServerRenderedReactComponent(options: RenderParams): Readable;

@@ -50,8 +50,18 @@ jest.mock('../src/cache/manifestLoader.ts', () => ({
   setManifestFileNames: jest.fn(),
 }));
 
+jest.mock('../src/injectRSCPayload.ts', () => {
+  const actual = jest.requireActual('../src/injectRSCPayload.ts');
+
+  return {
+    __esModule: true,
+    default: jest.fn(actual.default),
+  };
+});
+
 const { getRSCClientManifestStylesheetHrefs } = jest.requireMock('../src/cache/manifestStylesheets.ts');
 const { setManifestFileNames } = jest.requireMock('../src/cache/manifestLoader.ts');
+const injectRSCPayload = jest.requireMock('../src/injectRSCPayload.ts').default;
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -264,6 +274,7 @@ describe('streamServerRenderedReactComponent', () => {
     renderToPipeableStream.mockClear();
     getRSCClientManifestStylesheetHrefs.mockReset().mockResolvedValue(new Set());
     setManifestFileNames.mockReset();
+    injectRSCPayload.mockClear();
   });
 
   // Parses a length-prefixed stream chunk: metadata\tcontent_len\ncontent
@@ -1024,6 +1035,30 @@ describe('streamServerRenderedReactComponent', () => {
     });
 
     expect(setManifestFileNames).not.toHaveBeenCalled();
+  });
+
+  it('skips the RSC manifest lookup for plain streaming', async () => {
+    const { renderResult } = setupStreamTest({
+      railsContext: {
+        ...testingRailsContext,
+        reactClientManifestFileName: '',
+        reactServerClientManifestFileName: '',
+      },
+    });
+    await new Promise((resolve) => {
+      renderResult.once('end', resolve);
+    });
+
+    expect(getRSCClientManifestStylesheetHrefs).not.toHaveBeenCalled();
+    expect(injectRSCPayload).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      }),
+    );
   });
 
   it('passes manifest stylesheet hrefs to streamed preload promotion', async () => {

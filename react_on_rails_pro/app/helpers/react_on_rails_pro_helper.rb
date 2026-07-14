@@ -259,6 +259,12 @@ module ReactOnRailsProHelper
   # @see https://reactonrails.com/docs/pro/react-server-components/how-react-server-components-work
   #   for technical details about the RSC payload format
   def rsc_payload_react_component(component_name, options = {})
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "rsc_payload_react_component requires enable_rsc_support to be true. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
     # rsc_payload_react_component doesn't have the prerender option
     # Because setting prerender to false will not do anything
     options[:prerender] = true
