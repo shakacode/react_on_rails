@@ -92,11 +92,26 @@ After publishing an RC, replace the bracketed values and paste this prompt into 
 uses the manifest for discovery while preserving this document as the authority for release-gate
 policy.
 
+Use these Codex launch settings:
+
+| Setting           | Value                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| Project           | The regular `react_on_rails` project, opened at the repository root.                  |
+| Starting checkout | A clean checkout of the current default branch with `origin` fetched.                 |
+| Coordinator       | The strongest available coding model with `xhigh` reasoning.                          |
+| Access            | GitHub read/write plus authorized private Pro and HiChee access for their lanes.      |
+| Isolation         | One top-level task; let `$pr-batch` create a separate worktree for every target repo. |
+
+Do not launch the batch from an individual demo app or the unpublished local
+`shakastack-demo-fleet` prototype.
+
 ```text
 /goal
 Use $pr-batch to update and validate the React on Rails demo fleet for [RC TAG], tracking the
 release gate in shakacode/react_on_rails#[TRACKER]. Finish the batch; do not stop after opening
 PRs.
+
+Confirm the workspace is the regular react_on_rails project root.
 
 Release artifacts:
 - react_on_rails and react_on_rails_pro gems: [RUBY RC]
@@ -105,30 +120,32 @@ Release artifacts:
 - react-on-rails-rsc: [RSC VERSION]
 
 Source of truth and scope:
-- Read rc-testing-plan.md and demo-fleet.yml from the current default branch. The plan controls
-  policy; the manifest supplies the complete repo inventory.
+- Fetch [RC TAG], its release branch, and the default branch. Use the RC snapshot for package
+  coverage and the default branch for current policy/inventory. Stop for a maintainer decision if
+  a difference changes the gate.
 - Before editing each target, inspect its default branch, AGENTS.md, dependencies, package manager,
-  lockfiles, CI, and smoke commands. Treat manifest entries marked verify as hints.
+  lockfiles, CI, and smoke commands. For every manifest entry marked verify, confirm its package
+  manager, smoke paths, and needs_pro value before accepting that metadata.
 - Update only packages actually consumed. Reuse a safe open RC PR; otherwise branch from the
   current default branch. Do not stack on stale RC work merely to preserve it.
 
 Efficient execution:
-1. The coordinator verifies published versions and dist-tags, release tag/commit, changelog,
-   exact-commit CI, and RSC compatibility once. Workers reuse that evidence.
+1. The coordinator verifies versions/dist-tags, release tag/commit, changelog, exact-commit CI,
+   and RSC compatibility once. Workers reuse that evidence.
 2. Run the generator/install gate once in react_on_rails.
 3. Wave 1: one isolated worker per hard-gate repo, in parallel up to the lower of host capacity
-   and the manifest concurrency limit. Wave 2: process all soft-track repos in parallel after the
+   and the manifest concurrency limit. Wave 2: process soft-track repos with the same bound after
    hard-gate edits are stable. Soft-track failures never block the release decision.
 4. Each worker updates dependencies and lockfiles, runs install, build/tests, primary route/RSC
-   smoke, and required hosted CI or review app, then opens or updates its PR. Address actionable
-   reviews. Merge when all gates pass; merge_authority is auto_merge_when_gates_pass.
+   smoke, required hosted CI, and review-app smoke where available, then opens or updates its PR.
+   Address actionable reviews. Set merge_authority to auto_merge_when_gates_pass only when the
+   tracker's mode and go/no-go state authorize it; a freeze or phase conflict disables auto-merge.
 5. A fresh strongest-capability checker, distinct from every maker, independently audits every
    hard-gate diff and the combined release evidence before any final GO recommendation.
 
 Coordination and safety:
-- Use a stable batch id based on [RC TAG] and one claim/worktree per repo. Respect existing live
-  claims and report UNKNOWN coordination state rather than guessing. Do not run two workers in
-  one checkout.
+- Use a stable [RC TAG] batch id and one claim/worktree per repo. Respect live claims and report
+  UNKNOWN coordination state rather than guessing.
 - Bind every route to a supported model/effort pair before launch. Use balanced/high for routine
   bumps and strongest/xhigh for uncertain, private, escalated, and final QA work.
 - Never expose private HiChee or Pro logs, URLs, screenshots, app details, tokens, or secret names
@@ -137,9 +154,10 @@ Coordination and safety:
   follow-up issues for unrelated defects instead of expanding bump PRs.
 
 Evidence and closeout:
-- Append current-head evidence to #[TRACKER]: artifacts, release commit/CI, one row per hard gate
-  with PR or merge SHA and install/build/smoke/CI/review state, public-safe HiChee status,
-  soft-track results, regressions or waivers, and blockers.
+- Before closeout, fetch each target's default branch; confirm evidence belongs to the exact PR
+  head and its base matches the fetched default head. After merge, confirm the merge commit is
+  reachable from the new default head. Record every compared SHA in #[TRACKER] with artifact,
+  build, smoke, CI/review, public-safe HiChee, soft-track, regression/waiver, and blocker evidence.
 - Re-read the tracker immediately before any update. Prefer append-only comments for concurrent
   batch evidence; preserve its current Agent Release Mode unless a maintainer explicitly changes
   it.
