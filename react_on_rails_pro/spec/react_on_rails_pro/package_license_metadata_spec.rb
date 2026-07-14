@@ -18,7 +18,6 @@ require "json"
 RSpec.describe "published Pro license metadata" do
   repo_root = File.expand_path("../../..", __dir__)
   commercial_license = File.binread(File.join(repo_root, "REACT-ON-RAILS-PRO-LICENSE.md"))
-                           .gsub(/[ \t]+$/, "")
 
   it "declares the commercial gem license and includes its license file" do
     gemspec_path = File.join(repo_root, "react_on_rails_pro", "react_on_rails_pro.gemspec")

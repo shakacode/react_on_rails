@@ -1,6 +1,6 @@
 # ShakaCode React on Rails Pro – End User License Agreement (EULA)
 
-_Version 2.2 — 2026-04-12_
+_Version 2.2 — 2026-04-12_\
 © 2015–2026 ShakaCode, LLC. All rights reserved.
 
 ---
@@ -91,8 +91,8 @@ The Organization may not remove or obfuscate this attribution.
 
 Paid subscriptions may be purchased or renewed at [pro.reactonrails.com](https://pro.reactonrails.com/) or through another ShakaCode-approved order channel.
 
-Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).
-For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.
+Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).\
+For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.\
 Upon termination, lapse, or revocation, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for (a) non-commercial uses explicitly permitted in Section 4, or (b) Complimentary OSS Licenses revoked under Section 4.1(ii) for eligibility changes, in which case the Organization has thirty (30) days from written notice to comply.
 
 ---
@@ -107,7 +107,7 @@ While subscribed, the Organization receives software updates and reasonable supp
 
 If ShakaCode reasonably suspects non-compliance, the Organization will cooperate in good faith to verify compliance, including enabling inspection for attribution presence and providing a usage statement. ShakaCode will use commercially reasonable efforts to minimize disruption.
 
-**9.1 Detailed Audits**
+**9.1 Detailed Audits**\
 ShakaCode or a certified auditor acting on its behalf may, upon reasonable request and at ShakaCode’s expense, audit the Organization’s use of the Software to verify compliance with this Agreement. Audits may be conducted by mail, electronically, or by in-person visits during regular business hours and shall minimize disruption to the Organization’s business. If the audit reveals a material unauthorized use, the Organization shall reimburse ShakaCode for reasonable audit costs.
 
 ---
@@ -138,7 +138,7 @@ License keys and any non-public materials are ShakaCode confidential information
 
 ## 14. Limitation of Liability
 
-To the maximum extent permitted by law, ShakaCode is not liable for indirect, incidental, special, consequential, or punitive damages.
+To the maximum extent permitted by law, ShakaCode is not liable for indirect, incidental, special, consequential, or punitive damages.\
 Direct damages are limited to amounts paid in the 12 months preceding the claim.
 
 ---
@@ -169,13 +169,13 @@ This Agreement is governed by the laws of the **State of Hawaii**, USA. Exclusiv
 
 ## 19. Miscellaneous
 
-- **19.1 Severability**
+- **19.1 Severability**\
   If any provision is held invalid or unenforceable, the remainder shall continue in full force.
 
-- **19.2 Waiver**
+- **19.2 Waiver**\
   Failure to enforce any provision is not a waiver of rights.
 
-- **19.3 Assignment**
+- **19.3 Assignment**\
   The Organization may not assign this Agreement without prior written consent.
 
 ---
