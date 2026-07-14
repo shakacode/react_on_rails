@@ -24,11 +24,11 @@
 #   build          — command that must succeed before deploy (asset compile).
 #   review_app     — CPFlow review-app workflow file, the status check name the
 #                    orchestrator polls, and the CPFlow app name used to derive
-#                    the review-app base URL. Set the whole block to null (or
-#                    leave `cpflow_app_name: null`) for a demo with no review-app
-#                    pipeline yet; the orchestrator then skips smoke for that
-#                    repo. `cpflow_app_name` must be non-null before a repo's
-#                    `verify: true` flag can be cleared.
+#                    the review-app base URL. Set the whole block to null for a
+#                    demo with no review-app pipeline. If the block is present,
+#                    `cpflow_app_name` must be non-null before `verify: true` can
+#                    be cleared; a null name inside the block is an unverified
+#                    placeholder. The orchestrator skips smoke when no app is set.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
