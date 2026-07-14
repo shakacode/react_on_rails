@@ -1105,6 +1105,38 @@ RSpec.describe "release.rake helper methods" do
         .to_stdout
     end
 
+    it "fails closed when a freshly dispatched gate refresh changes run identity" do
+      fresh_run = run.merge("databaseId" => 654_321)
+      mismatched_run = fresh_run.merge(
+        "databaseId" => 654_322,
+        "headSha" => "different-head",
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
+      )
+      allow(self).to receive(:dispatch_shakaperf_release_gate_workflow!)
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: release_started_at,
+        wait_for_shakaperf_release_gate_run!: fresh_run
+      )
+      allow(self).to receive(:watch_shakaperf_release_gate_run!).with(repo_slug:, run: fresh_run)
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: fresh_run).and_return(mismatched_run)
+      expect(self).not_to receive(:verify_fresh_shakaperf_release_gate_evidence!)
+
+      expect do
+        dispatch_and_validate_shakaperf_release_gate!(
+          repo_slug:,
+          monorepo_root:,
+          ref: "release-branch",
+          existing_runs: [],
+          head_sha:,
+          target_version:,
+          release_started_at:
+        )
+      end.to raise_error(SystemExit, /Unable to establish the terminal result of freshly dispatched.*654321/m)
+    end
+
     it "reuses successful pre-run evidence for a runtime-equivalent metadata bump" do
       candidate_sha = "feedface" * 5
       successful_prerun = run.merge(
@@ -1254,6 +1286,58 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false
         )
       end.to output(/attempt changed.*dispatching an exact-head gate.*gate passed/m).to_stdout
+    end
+
+    it "dispatches an exact-head gate when the active pre-run start time changes while waiting" do
+      candidate_sha = "feedface" * 5
+      in_progress_prerun = run.merge(
+        "headSha" => candidate_sha,
+        "startedAt" => "2026-07-14T13:01:00Z",
+        "status" => "in_progress",
+        "conclusion" => "",
+        "updatedAt" => "2026-07-14T13:01:30Z"
+      )
+      changed_prerun = in_progress_prerun.merge(
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
+      )
+      fresh_run = run.merge("databaseId" => 654_321)
+      completed_fresh_run = fresh_run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T14:30:00Z"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([in_progress_prerun])
+      allow(self).to receive(:capture_gh_output_with_timeout)
+        .and_return(["", success_status, false], ["", success_status, false])
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: in_progress_prerun).and_return(changed_prerun)
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: fresh_run).and_return(completed_fresh_run)
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(fresh_run)
+      expect(self).not_to receive(:fetch_shakaperf_release_gate_evidence).with(repo_slug:, run: changed_prerun)
+      expect(self).to receive(:dispatch_shakaperf_release_gate_workflow!).with(
+        repo_slug:,
+        ref: "release-branch",
+        target_version:,
+        candidate_sha: head_sha
+      )
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/provenance changed.*dispatching an exact-head gate.*gate passed/m).to_stdout
     end
 
     it "dispatches an exact-head gate when an in-progress pre-run finishes unsuccessfully" do

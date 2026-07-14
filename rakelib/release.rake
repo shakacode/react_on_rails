@@ -937,11 +937,17 @@ def reuse_shakaperf_prerun?(repo_slug:, monorepo_root:, ref:, existing_runs:, he
   waited_for_active_prerun = active_shakaperf_release_gate_run?(prerun)
   if waited_for_active_prerun
     watched_attempt = prerun["attempt"]
+    watched_started_at = prerun["startedAt"]
     run_url = shakaperf_release_gate_run_url(repo_slug:, run: prerun)
     puts "Found an in-progress ShakaPerf pre-run; watching it before deciding whether to dispatch: #{run_url}"
     prerun = watch_existing_shakaperf_release_gate_run!(repo_slug:, run: prerun)
     unless prerun["attempt"] == watched_attempt
       puts "ShakaPerf pre-run attempt changed while the release task waited; " \
+           "dispatching an exact-head gate: #{run_url}"
+      return false
+    end
+    unless prerun["startedAt"] == watched_started_at
+      puts "ShakaPerf pre-run provenance changed while the release task waited; " \
            "dispatching an exact-head gate: #{run_url}"
       return false
     end
@@ -982,6 +988,14 @@ def dispatch_and_validate_shakaperf_release_gate!(repo_slug:, monorepo_root:, re
   watch_shakaperf_release_gate_run!(repo_slug:, run:)
 
   refreshed_run = refresh_shakaperf_release_gate_run!(repo_slug:, run:)
+  unless trustworthy_terminal_shakaperf_release_gate_run?(original_run: run, refreshed_run:)
+    run_id = run.fetch("databaseId")
+    run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+    handle_shakaperf_release_gate_violation!(
+      message: "❌ Unable to establish the terminal result of freshly dispatched " \
+               "ShakaPerf release gate run #{run_id}.\n\nRun: #{run_url}"
+    )
+  end
   verify_fresh_shakaperf_release_gate_evidence!(
     repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: refreshed_run, release_started_at:
   )
