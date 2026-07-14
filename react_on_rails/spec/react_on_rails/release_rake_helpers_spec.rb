@@ -485,10 +485,251 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#shakaperf_prerun_candidate" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:head_sha) { "candidate123" }
+
+    it "identifies a prepared next release on the matching release branch" do
+      allow(self).to receive(:current_gem_version).with(monorepo_root).and_return("17.0.0.rc.7")
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root:).and_return("17.0.0.rc.8")
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0.rc.8")
+        .and_return("#### Fixed\n\n- Release fix")
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root:, sha: head_sha).and_return("a" * 64)
+
+      expect(
+        shakaperf_prerun_candidate(
+          monorepo_root:,
+          ref: "release/17.0.0",
+          head_sha:
+        )
+      ).to eq(
+        branch: "release/17.0.0",
+        candidate_sha: head_sha,
+        target_version: "17.0.0.rc.8",
+        runtime_tree_fingerprint: "a" * 64
+      )
+    end
+
+    it "ignores a changelog push that does not prepare a newer matching release" do
+      allow(self).to receive(:current_gem_version).with(monorepo_root).and_return("17.0.0.rc.8")
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root:).and_return("17.0.0.rc.8")
+
+      expect(
+        shakaperf_prerun_candidate(
+          monorepo_root:,
+          ref: "release/17.0.0",
+          head_sha:
+        )
+      ).to be_nil
+    end
+  end
+
+  describe "#shakaperf_runtime_tree_fingerprint" do
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    it "hashes the exact non-release-metadata tree" do
+      entries = [
+        "100644 blob changelog\tCHANGELOG.md",
+        "100644 blob version\treact_on_rails/lib/react_on_rails/version.rb",
+        "100644 blob runtime\treact_on_rails/lib/react_on_rails/engine.rb",
+        ""
+      ].join("\0")
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "ls-tree", "-r", "-z", "--full-tree", "candidate")
+        .and_return([entries, success_status])
+
+      expected = Digest::SHA256.hexdigest(
+        "100644 blob runtime\treact_on_rails/lib/react_on_rails/engine.rb"
+      )
+      expect(shakaperf_runtime_tree_fingerprint(monorepo_root: "/tmp/repo", sha: "candidate")).to eq(expected)
+    end
+  end
+
+  describe "ShakaPerf pre-run workflow contract" do
+    let(:repo_root) { File.expand_path("../../..", __dir__) }
+
+    it "dispatches an identified changelog candidate and records reusable gate evidence" do
+      prerun_workflow = File.read(File.join(repo_root, ".github/workflows/shakaperf-release-prerun.yml"))
+      gate_workflow = File.read(File.join(repo_root, ".github/workflows/shakaperf-release-gates.yml"))
+
+      expect(prerun_workflow).to include("branches:\n      - 'release/**'", "paths:\n      - CHANGELOG.md")
+      expect(prerun_workflow).to include(
+        "workflow run shakaperf-release-gates.yml",
+        "target_version=",
+        "candidate_sha="
+      )
+      expect(gate_workflow).to include("target_version:", "candidate_sha:", "cancel-in-progress: true")
+      expect(gate_workflow).to include("name: shakaperf-release-evidence", "shakaperf-release-evidence.json")
+    end
+  end
+
+  describe "#shakaperf_release_gate_evidence_rejection" do
+    let(:monorepo_root) { "/tmp/repo" }
+    let(:candidate_sha) { "a" * 40 }
+    let(:head_sha) { "b" * 40 }
+    let(:fingerprint) { "c" * 64 }
+    let(:run_url) { "https://github.com/shakacode/react_on_rails/actions/runs/123456" }
+    let(:run) do
+      {
+        "databaseId" => 123_456,
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:00:30Z",
+        "url" => run_url
+      }
+    end
+    let(:evidence) do
+      {
+        "schema_version" => 1,
+        "run_id" => 123_456,
+        "run_url" => run_url,
+        "branch" => "release/17.0.0",
+        "candidate_sha" => candidate_sha,
+        "target_version" => "17.0.0.rc.8",
+        "conclusion" => "success",
+        "runtime_tree_fingerprint" => fingerprint,
+        "completed_at" => "2026-07-14T12:00:00Z"
+      }
+    end
+    let(:release_started_at) { Time.iso8601("2026-07-14T13:00:00Z") }
+    let(:validation_time) { Time.iso8601("2026-07-14T13:05:00Z") }
+
+    before do
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root:, sha: candidate_sha).and_return(fingerprint)
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root:, sha: head_sha).and_return(fingerprint)
+      allow(self).to receive(:shakaperf_candidate_commit_shas)
+        .with(monorepo_root:, candidate_sha:, head_sha:).and_return([head_sha])
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: head_sha).and_return(true)
+    end
+
+    def evidence_rejection(run: self.run, evidence: self.evidence, target_version: "17.0.0.rc.8",
+                           release_started_at: self.release_started_at)
+      shakaperf_release_gate_evidence_rejection(
+        monorepo_root:,
+        ref: "release/17.0.0",
+        head_sha:,
+        target_version:,
+        run:,
+        evidence:,
+        release_started_at:,
+        validation_time:,
+        require_prerun: true
+      )
+    end
+
+    it "accepts a successful pre-run followed only by a version-metadata bump" do
+      expect(evidence_rejection).to be_nil
+    end
+
+    it "rejects a runtime tree change after the tested candidate" do
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root:, sha: head_sha).and_return("d" * 64)
+
+      expect(evidence_rejection).to eq("release runtime tree differs from the tested candidate")
+    end
+
+    it "rejects evidence for another target version" do
+      expect(
+        evidence_rejection(evidence: evidence.merge("target_version" => "17.0.0.rc.9"))
+      ).to eq("evidence target version does not match the release")
+    end
+
+    it "rejects a run ID that only coerces to the workflow run ID" do
+      coerced_id_evidence = evidence.merge("run_id" => "123456junk")
+
+      expect(evidence_rejection(evidence: coerced_id_evidence))
+        .to eq("evidence run ID does not match the workflow run")
+    end
+
+    %w[failure cancelled].each do |conclusion|
+      it "rejects a #{conclusion} workflow run" do
+        rejected_run = run.merge("conclusion" => conclusion)
+
+        expect(evidence_rejection(run: rejected_run)).to eq("workflow run did not complete successfully")
+      end
+    end
+
+    it "rejects stale evidence" do
+      stale_evidence = evidence.merge("completed_at" => "2026-07-01T12:00:00Z")
+      stale_run = run.merge("updatedAt" => "2026-07-01T12:00:30Z")
+
+      expect(evidence_rejection(run: stale_run, evidence: stale_evidence)).to eq("evidence is stale")
+    end
+
+    it "rejects a gate that did not finish before the release run started" do
+      late_evidence = evidence.merge("completed_at" => "2026-07-14T13:00:00Z")
+      late_run = run.merge("updatedAt" => "2026-07-14T13:00:30Z")
+
+      expect(evidence_rejection(run: late_run, evidence: late_evidence))
+        .to eq("evidence was not complete before the release run started")
+    end
+
+    it "rejects evidence from another release branch" do
+      wrong_branch_evidence = evidence.merge("branch" => "release/17.0.1")
+
+      expect(evidence_rejection(evidence: wrong_branch_evidence))
+        .to eq("evidence branch does not match the release branch")
+    end
+
+    it "rejects unverifiable candidate ancestry instead of accepting unknown state" do
+      allow(self).to receive(:shakaperf_candidate_commit_shas)
+        .with(monorepo_root:, candidate_sha:, head_sha:).and_return(nil)
+
+      expect(evidence_rejection).to eq("tested candidate ancestry or intervening commits cannot be verified")
+    end
+  end
+
+  describe "#find_latest_shakaperf_prerun" do
+    it "treats the newest branch candidate as authoritative even when it was cancelled" do
+      old_success = {
+        "databaseId" => 1,
+        "headSha" => "old",
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T11:00:00Z"
+      }
+      newer_cancelled = {
+        "databaseId" => 2,
+        "headSha" => "new",
+        "status" => "completed",
+        "conclusion" => "cancelled",
+        "updatedAt" => "2026-07-14T12:00:00Z"
+      }
+
+      expect(find_latest_shakaperf_prerun([old_success, newer_cancelled], "release-head"))
+        .to eq(newer_cancelled)
+    end
+  end
+
+  describe "#shakaperf_prerun_metadata_commit?" do
+    let(:monorepo_root) { "/tmp/repo" }
+
+    it "does not accept an arbitrary detector-classified non-runtime commit" do
+      allow(self).to receive(:release_finalization_metadata_commit?)
+        .with(monorepo_root:, sha: "docs").and_return(false)
+      allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "docs").and_return(true)
+      allow(self).to receive(:shakaperf_changelog_only_commit?)
+        .with(monorepo_root:, sha: "docs").and_return(false)
+
+      expect(shakaperf_prerun_metadata_commit?(monorepo_root:, sha: "docs")).to be false
+    end
+  end
+
   describe "#run_shakaperf_release_gate!" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:repo_slug) { "shakacode/react_on_rails" }
     let(:head_sha) { "abc1234def5678abcdef" }
+    let(:target_version) { "17.0.0.rc.8" }
+    let(:release_started_at) { Time.iso8601("2026-07-14T13:00:00Z") }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
     let(:run) do
@@ -501,6 +742,17 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return(repo_slug)
+      allow(self).to receive_messages(
+        fetch_shakaperf_release_gate_evidence: { "verified" => true },
+        shakaperf_release_gate_evidence_rejection: nil
+      )
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!) do |run:, **|
+        run.merge(
+          "status" => "completed",
+          "conclusion" => "success",
+          "updatedAt" => "2026-07-14T13:30:00Z"
+        )
+      end
     end
 
     it "dispatches the workflow on the release ref and watches the matching run" do
@@ -511,7 +763,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
@@ -544,6 +798,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
@@ -552,7 +808,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
       expect(self).to have_received(:wait_for_shakaperf_release_gate_run!)
         .with(
@@ -585,10 +843,93 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
       end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
+    end
+
+    it "dispatches a fresh exact-head gate when a successful run has no verifiable evidence" do
+      successful_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:00:30Z"
+      )
+      fresh_run = run.merge("databaseId" => 654_321)
+      refreshed_fresh_run = fresh_run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
+      )
+      release_started_at = Time.iso8601("2026-07-14T13:00:00Z")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([successful_run])
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+        .with(repo_slug:, run: successful_run).and_return(nil)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+        .with(repo_slug:, run: refreshed_fresh_run).and_return({ "fresh" => true })
+      expect(self).to receive(:dispatch_shakaperf_release_gate_workflow!).with(
+        repo_slug:,
+        ref: "release-branch",
+        target_version: "17.0.0.rc.8",
+        candidate_sha: head_sha
+      )
+      allow(self).to receive_messages(
+        shakaperf_release_gate_evidence_rejection: nil,
+        shakaperf_release_gate_dispatch_started_at: release_started_at,
+        wait_for_shakaperf_release_gate_run!: fresh_run,
+        capture_gh_output_with_timeout: ["", success_status, false]
+      )
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: fresh_run).and_return(refreshed_fresh_run)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version: "17.0.0.rc.8",
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(/dispatching a fresh exact-head gate.*ShakaPerf release gate passed with verified evidence/m)
+        .to_stdout
+    end
+
+    it "reuses successful pre-run evidence for a runtime-equivalent metadata bump" do
+      candidate_sha = "feedface" * 5
+      successful_prerun = run.merge(
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T12:00:30Z"
+      )
+      evidence = { "candidate_sha" => candidate_sha }
+      release_started_at = Time.iso8601("2026-07-14T13:00:00Z")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch")
+        .and_return([successful_prerun])
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+        .with(repo_slug:, run: successful_prerun).and_return(evidence)
+      allow(self).to receive(:shakaperf_release_gate_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:capture_gh_output_with_timeout)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version: "17.0.0.rc.8",
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to output(%r{Reusing successful ShakaPerf pre-run.*actions/runs/123456}m).to_stdout
     end
 
     it "watches an in-progress gate run for the same head SHA without dispatching another run" do
@@ -613,6 +954,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
@@ -643,7 +986,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
@@ -667,6 +1012,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
@@ -675,7 +1022,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
     end
 
@@ -687,6 +1036,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: true,
           dry_run: false
         )
@@ -701,6 +1052,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: true
         )
@@ -715,7 +1068,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
         .and_return(["HTTP 404", failure_status])
 
@@ -724,6 +1079,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
@@ -738,7 +1095,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
@@ -762,10 +1121,47 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
       end.to raise_error(SystemExit, %r{ShakaPerf release gate failed.*actions/runs/123456.*Tests failed}m)
+    end
+
+    it "aborts after a successful fresh gate when its evidence is invalid" do
+      refreshed_run = run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
+      )
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch").and_return([])
+      allow(self).to receive(:dispatch_shakaperf_release_gate_workflow!)
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run:).and_return(refreshed_run)
+      allow(self).to receive(:fetch_shakaperf_release_gate_evidence)
+        .with(repo_slug:, run: refreshed_run).and_return({ "invalid" => true })
+      allow(self).to receive_messages(
+        wait_for_shakaperf_release_gate_run!: run,
+        capture_gh_output_with_timeout: ["", success_status, false],
+        shakaperf_release_gate_evidence_rejection: "evidence target version does not match the release"
+      )
+
+      expect do
+        run_shakaperf_release_gate!(
+          monorepo_root:,
+          ref: "release-branch",
+          head_sha:,
+          target_version:,
+          release_started_at:,
+          allow_override: false,
+          dry_run: false
+        )
+      end.to raise_error(
+        SystemExit,
+        /Fresh ShakaPerf release gate evidence is invalid: evidence target version does not match the release/
+      )
     end
 
     it "aborts when watching the matching gate run times out" do
@@ -776,7 +1172,9 @@ RSpec.describe "release.rake helper methods" do
         .with(
           "workflow", "run", SHAKAPERF_RELEASE_GATE_WORKFLOW_FILE,
           "--repo", repo_slug,
-          "--ref", "release-branch"
+          "--ref", "release-branch",
+          "-f", "target_version=#{target_version}",
+          "-f", "candidate_sha=#{head_sha}"
         )
         .and_return(["", success_status])
       allow(self).to receive(:wait_for_shakaperf_release_gate_run!)
@@ -800,6 +1198,8 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
+          release_started_at:,
           allow_override: false,
           dry_run: false
         )
