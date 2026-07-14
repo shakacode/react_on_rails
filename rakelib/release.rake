@@ -445,7 +445,9 @@ def shakaperf_release_gate_evidence_time_rejection(run:, evidence:, release_star
   return "evidence completion time is after the workflow update" if completed_at > updated_at
   return "evidence completion time is in the future" if completed_at > validation_time
   return "evidence is stale" if validation_time - completed_at > SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS
-  if require_prerun && (completed_at >= release_started_at || updated_at >= release_started_at)
+
+  release_start_second = Time.at(release_started_at.to_i).utc
+  if require_prerun && (completed_at >= release_start_second || updated_at >= release_start_second)
     return "evidence was not complete before the release run started"
   end
 
@@ -681,8 +683,21 @@ def find_latest_shakaperf_release_gate_run(runs, head_sha)
 end
 
 def find_latest_shakaperf_prerun(runs, head_sha)
-  runs.reject { |run| run["headSha"] == head_sha }
-      .max_by { |run| shakaperf_release_gate_run_sort_key(run) }
+  candidates = runs.reject { |run| run["headSha"] == head_sha }
+  return nil unless candidates.all? { |run| valid_shakaperf_prerun_ordering_metadata?(run) }
+
+  candidates.max_by { |run| shakaperf_prerun_candidate_sort_key(run) }
+end
+
+def valid_shakaperf_prerun_ordering_metadata?(run)
+  positive_github_id?(run["databaseId"]) && !shakaperf_release_gate_time(run["createdAt"]).nil?
+end
+
+def shakaperf_prerun_candidate_sort_key(run)
+  created_at = shakaperf_release_gate_run_timestamp(run, "createdAt")
+  updated_at = shakaperf_release_gate_run_timestamp(run, "updatedAt")
+
+  [created_at, run["databaseId"].to_i, run["attempt"].to_i, updated_at]
 end
 
 def shakaperf_release_gate_run_sort_key(run)

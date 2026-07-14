@@ -565,6 +565,18 @@ RSpec.describe "release.rake helper methods" do
       expect(gate_workflow).to include("target_version:", "candidate_sha:", "cancel-in-progress: true")
       expect(gate_workflow).to include("name: shakaperf-release-evidence", "shakaperf-release-evidence.json")
     end
+
+    it "sets up a supported Ruby before either workflow loads the release helpers" do
+      %w[shakaperf-release-gates.yml shakaperf-release-prerun.yml].each do |workflow_name|
+        workflow = File.read(File.join(repo_root, ".github/workflows", workflow_name))
+        version_reader = workflow.index("uses: ./.github/actions/read-tool-versions")
+        ruby_setup = workflow.index("uses: ./.github/actions/setup-ruby")
+        release_helper_load = workflow.index("ruby -rrake")
+
+        expect(version_reader).to be < ruby_setup
+        expect(ruby_setup).to be < release_helper_load
+      end
+    end
   end
 
   describe "#shakaperf_release_gate_evidence_rejection" do
@@ -672,6 +684,13 @@ RSpec.describe "release.rake helper methods" do
         .to eq("evidence was not complete before the release run started")
     end
 
+    it "rejects second-precision evidence from the same second as a fractional release start" do
+      fractional_start = Time.iso8601("2026-07-14T12:00:30.900Z")
+
+      expect(evidence_rejection(release_started_at: fractional_start))
+        .to eq("evidence was not complete before the release run started")
+    end
+
     it "rejects evidence from another release branch" do
       wrong_branch_evidence = evidence.merge("branch" => "release/17.0.1")
 
@@ -694,6 +713,7 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "old",
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T11:00:00Z",
         "updatedAt" => "2026-07-14T11:00:00Z"
       }
       newer_cancelled = {
@@ -701,11 +721,58 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "new",
         "status" => "completed",
         "conclusion" => "cancelled",
+        "createdAt" => "2026-07-14T12:00:00Z",
         "updatedAt" => "2026-07-14T12:00:00Z"
       }
 
       expect(find_latest_shakaperf_prerun([old_success, newer_cancelled], "release-head"))
         .to eq(newer_cancelled)
+    end
+
+    it "does not let a rerun of an older candidate supersede a newer candidate" do
+      old_rerun = {
+        "databaseId" => 1,
+        "headSha" => "old",
+        "status" => "completed",
+        "conclusion" => "success",
+        "attempt" => 2,
+        "createdAt" => "2026-07-14T11:00:00Z",
+        "updatedAt" => "2026-07-14T13:00:00Z"
+      }
+      newer_cancelled = {
+        "databaseId" => 2,
+        "headSha" => "new",
+        "status" => "completed",
+        "conclusion" => "cancelled",
+        "attempt" => 1,
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "updatedAt" => "2026-07-14T12:00:30Z"
+      }
+
+      expect(find_latest_shakaperf_prerun([old_rerun, newer_cancelled], "release-head"))
+        .to eq(newer_cancelled)
+    end
+
+    it "refuses reuse when candidate ordering metadata is incomplete" do
+      old_success = {
+        "databaseId" => 1,
+        "headSha" => "old",
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T11:00:00Z",
+        "updatedAt" => "2026-07-14T11:30:00Z"
+      }
+      malformed_newer_cancelled = {
+        "databaseId" => 2,
+        "headSha" => "new",
+        "status" => "completed",
+        "conclusion" => "cancelled",
+        "createdAt" => nil,
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      }
+
+      expect(find_latest_shakaperf_prerun([old_success, malformed_newer_cancelled], "release-head"))
+        .to be_nil
     end
   end
 
@@ -736,6 +803,7 @@ RSpec.describe "release.rake helper methods" do
       {
         "databaseId" => 123_456,
         "headSha" => head_sha,
+        "createdAt" => "2026-07-14T12:00:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
     end

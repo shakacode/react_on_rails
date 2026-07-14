@@ -31,6 +31,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
       - name: Validate exact candidate
         id: candidate
         env:
