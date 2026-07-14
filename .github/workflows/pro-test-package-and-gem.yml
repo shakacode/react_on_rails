@@ -393,6 +393,9 @@ jobs:
         run: pnpm run build
 
       - name: Run JS unit tests for Pro package
+        run: pnpm --filter react-on-rails-pro test
+
+      - name: Run JS unit tests for Pro Node Renderer package
         run: pnpm --filter react-on-rails-pro-node-renderer run ci
 
         env:
