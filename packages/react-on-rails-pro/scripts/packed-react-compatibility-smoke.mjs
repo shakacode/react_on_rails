@@ -143,6 +143,7 @@ const verifyConsumer = async (consumerDirectory, reactVersion) => {
   const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
   const coreEntry = fs.realpathSync(consumerRequire.resolve('react-on-rails'));
   const proEntry = fs.realpathSync(consumerRequire.resolve('react-on-rails-pro'));
+  const coreEntryFromPro = fs.realpathSync(createRequire(proEntry).resolve('react-on-rails'));
   const installedRoot = `${fs.realpathSync(path.join(consumerDirectory, 'node_modules'))}${path.sep}`;
 
   assert.ok(
@@ -152,6 +153,11 @@ const verifyConsumer = async (consumerDirectory, reactVersion) => {
   assert.ok(
     proEntry.startsWith(installedRoot),
     `Pro package resolved outside isolated consumer: ${proEntry}`,
+  );
+  assert.equal(
+    coreEntryFromPro,
+    coreEntry,
+    `Pro package resolved a different core package instance: ${coreEntryFromPro}`,
   );
   assert.equal(
     path.basename(proEntry),
