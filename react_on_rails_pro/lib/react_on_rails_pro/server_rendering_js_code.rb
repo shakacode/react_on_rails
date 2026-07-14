@@ -15,6 +15,10 @@
 
 module ReactOnRailsPro
   module ServerRenderingJsCode
+    PLAIN_STREAMING_RENDER_FUNCTION_NAME =
+      "ReactOnRails.isServerStreamingSupported() ? " \
+      "'streamServerRenderedReactComponent' : 'serverRenderReactComponent'"
+
     class << self
       def ssr_pre_hook_js
         ReactOnRailsPro.configuration.ssr_pre_hook_js || ""
@@ -113,7 +117,7 @@ module ReactOnRailsPro
             # As the same rendering request is used to generate the rsc payload and SSR the component.
             "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
           elsif render_options.streaming?
-            "'streamServerRenderedReactComponent'"
+            PLAIN_STREAMING_RENDER_FUNCTION_NAME
           else
             "'serverRenderReactComponent'"
           end

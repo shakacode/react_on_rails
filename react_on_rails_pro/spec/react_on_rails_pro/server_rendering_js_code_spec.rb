@@ -161,7 +161,10 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           render_options
         )
 
-        expect(result).to include("ReactOnRails['streamServerRenderedReactComponent']")
+        expected_render_function =
+          "ReactOnRails.isServerStreamingSupported() ? " \
+          "'streamServerRenderedReactComponent' : 'serverRenderReactComponent'"
+        expect(result).to include("ReactOnRails[#{expected_render_function}]")
         expect(result).to include('railsContext.reactClientManifestFileName = ""')
         expect(result).to include('railsContext.reactServerClientManifestFileName = ""')
       end

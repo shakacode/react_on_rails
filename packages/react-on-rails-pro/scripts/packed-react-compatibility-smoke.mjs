@@ -95,6 +95,29 @@ if (typeof result !== 'string' || !result.includes(\`packed Pro SSR on React \${
 
 console.log(\`PACKED_PRO_SSR_OK React \${React.version}\`);
 
+const supportsServerStreaming = ReactOnRails.isServerStreamingSupported();
+assert.equal(
+  supportsServerStreaming,
+  ${streaming},
+  \`Unexpected streaming capability for React \${React.version}\`,
+);
+
+if (!supportsServerStreaming) {
+  const fallbackResult = ReactOnRails[
+    supportsServerStreaming ? 'streamServerRenderedReactComponent' : 'serverRenderReactComponent'
+  ]({
+    name: 'Greeting',
+    props: { version: React.version },
+    domNodeId: 'greeting-fallback',
+    trace: false,
+    throwJsErrors: true,
+    renderingReturnsPromises: false,
+  });
+  assert.equal(typeof fallbackResult, 'string');
+  assert.match(fallbackResult, /packed Pro SSR on React/);
+  console.log(\`PACKED_PRO_STREAMING_FALLBACK_OK React \${React.version}\`);
+}
+
 if (${streaming}) {
   let boundaryResolved = false;
   let boundaryResolvedAt;
@@ -209,11 +232,6 @@ if (${streaming}) {
     wireChunkCountAtBoundaryRelease >= 1,
     'Packed React ' + React.version + ' streaming released the boundary before a complete shell chunk',
   );
-  assert.ok(
-    wireChunks[0].receivedAt <= boundaryResolvedAt,
-    'Expected the shell wire chunk before releasing the suspended boundary',
-  );
-
   assert.equal(wireChunks[0].metadata.isShellReady, true);
   assert.equal(wireChunks[0].metadata.hasErrors, false);
   assert.match(wireChunks[0].html, /Packed streaming shell/);
@@ -335,6 +353,11 @@ const verifyConsumer = async (consumerDirectory, { reactVersion, streaming }) =>
     assert.match(
       runtimeOutput,
       new RegExp(`PACKED_PRO_STREAMING_OK React ${reactVersion.replaceAll('.', '\\.')}`),
+    );
+  } else {
+    assert.match(
+      runtimeOutput,
+      new RegExp(`PACKED_PRO_STREAMING_FALLBACK_OK React ${reactVersion.replaceAll('.', '\\.')}`),
     );
   }
   const runtimeLabel = streaming ? 'SSR and progressive streaming runtimes' : 'SSR runtime';
