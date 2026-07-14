@@ -94,24 +94,28 @@ policy.
 
 Use these Codex launch settings:
 
-| Setting           | Value                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------- |
-| Project           | The regular `react_on_rails` project, opened at the repository root.                  |
-| Starting checkout | A clean checkout of the current default branch with `origin` fetched.                 |
-| Coordinator       | The strongest available coding model with `xhigh` reasoning.                          |
-| Access            | GitHub read/write plus authorized private Pro and HiChee access for their lanes.      |
-| Isolation         | One top-level task; let `$pr-batch` create a separate worktree for every target repo. |
+| Setting             | Value                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Project             | The regular `react_on_rails` project, opened at the repository root.                  |
+| Starting checkout   | A clean checkout of the current default branch with `origin` fetched.                 |
+| Orchestrator        | Sol with `xhigh` reasoning.                                                           |
+| Routine workers     | Terra with `high` reasoning for mechanical dependency and lockfile updates.           |
+| Uncertain workers   | Sol with `high` reasoning; escalate to Sol/`xhigh` only when required.                |
+| Routine QA          | Sol with `high` reasoning.                                                            |
+| Independent checker | A fresh Sol/`xhigh` instance, distinct from every worker.                             |
+| Access              | GitHub read/write plus authorized private Pro and HiChee access for their lanes.      |
+| Isolation           | One top-level task; let `$pr-batch` create a separate worktree for every target repo. |
+
+If those model names are unavailable on the active Codex host, bind equivalent exact routes before
+launch; never silently inherit the orchestrator route for every worker.
 
 Do not launch the batch from an individual demo app or the unpublished local
 `shakastack-demo-fleet` prototype.
 
 ```text
 /goal
-Use $pr-batch to update and validate the React on Rails demo fleet for [RC TAG], tracking the
-release gate in shakacode/react_on_rails#[TRACKER]. Finish the batch; do not stop after opening
-PRs.
-
-Confirm the workspace is the regular react_on_rails project root.
+Use $pr-batch to validate [RC TAG] across the complete React on Rails demo fleet; track it in
+shakacode/react_on_rails#[TRACKER]. Finish every lane, not just PR creation.
 
 Release artifacts:
 - react_on_rails and react_on_rails_pro gems: [RUBY RC]
@@ -120,14 +124,13 @@ Release artifacts:
 - react-on-rails-rsc: [RSC VERSION]
 
 Source of truth and scope:
-- Fetch [RC TAG], its release branch, and the default branch. Use the RC snapshot for package
-  coverage and the default branch for current policy/inventory. Stop for a maintainer decision if
-  a difference changes the gate.
-- Before editing each target, inspect its default branch, AGENTS.md, dependencies, package manager,
-  lockfiles, CI, and smoke commands. For every manifest entry marked verify, confirm its package
-  manager, smoke paths, and needs_pro value before accepting that metadata.
-- Update only packages actually consumed. Reuse a safe open RC PR; otherwise branch from the
-  current default branch. Do not stack on stale RC work merely to preserve it.
+- Fetch [RC TAG], its release branch, and the default branch. The RC snapshot controls package
+  coverage; the default branch controls current policy/inventory. Stop on gate-changing conflicts.
+- Each worker reads target AGENTS.md and verifies its default branch, dependencies, lockfiles,
+  package manager, CI, and smoke commands. For verify-marked entries, confirm package manager,
+  smoke paths, and needs_pro before accepting the metadata.
+- Update only consumed packages. Reuse a safe open RC PR; otherwise branch from current default.
+  Do not preserve stale RC work.
 
 Efficient execution:
 1. The coordinator verifies versions/dist-tags, release tag/commit, changelog, exact-commit CI,
@@ -146,10 +149,11 @@ Efficient execution:
 Coordination and safety:
 - Use a stable [RC TAG] batch id and one claim/worktree per repo. Respect live claims and report
   UNKNOWN coordination state rather than guessing.
-- Bind every route to a supported model/effort pair before launch. Use balanced/high for routine
-  bumps and strongest/xhigh for uncertain, private, escalated, and final QA work.
-- Never expose private HiChee or Pro logs, URLs, screenshots, app details, tokens, or secret names
-  in public PRs or the tracker. Post only public-safe pass/fail summaries.
+- Bind routes before launch: orchestrator and independent checker Sol/xhigh; routine workers
+  Terra/high; uncertain workers and routine QA Sol/high. Escalate workers to Sol/xhigh only after
+  MODEL_ESCALATION_REQUEST.
+- Never expose private HiChee/Pro logs, URLs, screenshots, app details, tokens, or secret names.
+  Post only public-safe pass/fail summaries.
 - Suspected RC regressions block their gates until fixed or waived by a maintainer. File focused
   follow-up issues for unrelated defects instead of expanding bump PRs.
 
