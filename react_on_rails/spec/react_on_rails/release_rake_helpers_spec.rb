@@ -1637,6 +1637,46 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    context "when a protected branch has required status checks disabled" do
+      it "evaluates every visible prerelease check instead of treating required checks as unknown" do
+        failure_status = instance_double(Process::Status, success?: false)
+        success_status = instance_double(Process::Status, success?: true)
+        api_path = "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks"
+        branch_path = "repos/shakacode/react_on_rails/branches/main"
+        allow(self).to receive(:required_check_names_for_branch).and_call_original
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", "--jq", "{contexts, checks}", api_path)
+          .and_return(["HTTP 404: Required status checks not enabled", failure_status])
+        allow(Open3).to receive(:capture3)
+          .with("gh", "api", "--include", api_path)
+          .and_return([
+                        "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\r\n\r\n" \
+                        '{"message":"Required status checks not enabled"}',
+                        "gh: Required status checks not enabled\n",
+                        failure_status
+                      ])
+        allow(Open3).to receive(:capture2e)
+          .with("gh", "api", branch_path)
+          .and_return(['{"name":"main","protected":true}', success_status])
+
+        output = nil
+        expect do
+          output = capture_stdout do
+            validate_main_ci_status!(
+              monorepo_root:,
+              is_prerelease: true,
+              allow_override: false,
+              dry_run: false
+            )
+          end
+        end.not_to raise_error
+        expect(output).to include("Main CI is healthy on #{short_sha} (1 check)")
+      end
+    end
+
     context "when strict exact-HEAD evaluation is enabled" do
       before do
         allow(self).to receive(:ci_evaluate_head_only?).and_return(true)

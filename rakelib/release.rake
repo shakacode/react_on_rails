@@ -1949,25 +1949,34 @@ def gh_included_response_status(header_block, newline:)
   status_match[1].to_i
 end
 
-def known_unprotected_branch?(repo_slug:, branch_name:, encoded_branch:, required_status_checks_path:)
+def known_branch_without_required_checks?(repo_slug:, branch_name:, encoded_branch:, required_status_checks_path:)
   included_output, _included_error, included_status = capture_gh_stdout_and_stderr(
     "api", "--include", required_status_checks_path
   )
   return false if included_status.success?
-  return false unless branch_not_protected_response?(included_output)
+
+  expected_protected = required_status_checks_protection_state(included_output)
+  return false if expected_protected.nil?
 
   branch_output, branch_status = capture_gh_output("api", "repos/#{repo_slug}/branches/#{encoded_branch}")
   return false unless branch_status.success?
 
   branch = JSON.parse(branch_output)
-  branch.is_a?(Hash) && branch["name"] == branch_name && branch["protected"] == false
+  branch.is_a?(Hash) && branch["name"] == branch_name && branch["protected"] == expected_protected
 rescue JSON::ParserError
   false
 end
 
-def branch_not_protected_response?(output)
+def required_status_checks_protection_state(output)
   response = gh_included_json_response(output)
-  response&.dig(:status) == 404 && response.dig(:body, "message") == "Branch not protected"
+  return unless response&.dig(:status) == 404
+
+  case response.dig(:body, "message")
+  when "Branch not protected"
+    false
+  when "Required status checks not enabled"
+    true
+  end
 end
 
 def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "main")
@@ -1985,7 +1994,7 @@ def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "
   output, status = capture_gh_output("api", "--jq", jq_query, api_path)
   # Only a successful, structurally valid empty configuration means no required
   # checks. API errors and malformed payloads leave required gates unknown.
-  return nil if !status.success? && known_unprotected_branch?(
+  return nil if !status.success? && known_branch_without_required_checks?(
     repo_slug:,
     branch_name: ci_branch.to_s,
     encoded_branch:,
