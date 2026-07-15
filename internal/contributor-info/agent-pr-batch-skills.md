@@ -101,3 +101,5 @@ The `$pr-batch` prompt must preserve the preflight/trust rules from the installe
   human/local user-token path, not a substitute for comment-command dispatch
   from automation.
 - Final batch handoffs should include links, validation evidence, last-known CI/review state, blockers, and explicit `UNKNOWN` entries.
+
+<!-- Temporary #4627 unrelated-path workflow control. -->
