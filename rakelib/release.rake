@@ -4293,24 +4293,76 @@ def confirm_accelerated_rc_publication!(version:, candidate_sha:, tracker:, reas
   abort "Accelerated RC publication aborted." unless answer == "y"
 end
 
+def abort_invalid_accelerated_rc_confirmation_evidence!
+  abort "❌ Accelerated RC confirmation evidence is malformed or incomplete; refusing publication."
+end
+
+def normalized_accelerated_rc_confirmation_hash!(value)
+  abort_invalid_accelerated_rc_confirmation_evidence! unless value.is_a?(Hash)
+
+  value.each_with_object({}) do |(key, nested_value), normalized|
+    valid_key = key.is_a?(String) || key.is_a?(Symbol)
+    abort_invalid_accelerated_rc_confirmation_evidence! unless valid_key
+    normalized_key = key.to_s
+    abort_invalid_accelerated_rc_confirmation_evidence! if normalized.key?(normalized_key)
+    normalized[normalized_key] = nested_value
+  end
+end
+
+def valid_accelerated_rc_confirmation_check?(check)
+  valid_accelerated_rc_nonempty_string?(check["name"]) &&
+    valid_accelerated_rc_nonempty_string?(check["state"]) &&
+    check["url"].is_a?(String) && valid_accelerated_rc_https_url?(check["url"])
+end
+
+def normalized_accelerated_rc_confirmation_checks!(checks)
+  abort_invalid_accelerated_rc_confirmation_evidence! unless checks.is_a?(Array)
+
+  checks.map { |check| normalized_accelerated_rc_confirmation_hash!(check) }
+end
+
+def valid_accelerated_rc_confirmation_ci?(snapshot)
+  %w[pending success].include?(snapshot["status"]) &&
+    snapshot["checks_url"].is_a?(String) && valid_accelerated_rc_https_url?(snapshot["checks_url"]) &&
+    snapshot["non_success"].all? { |check| valid_accelerated_rc_confirmation_check?(check) } &&
+    valid_accelerated_rc_ci_status?(snapshot["status"], snapshot["non_success"])
+end
+
+def valid_accelerated_rc_confirmation_shakaperf?(shakaperf)
+  %w[pending success].include?(shakaperf["status"]) &&
+    shakaperf["run_url"].is_a?(String) && valid_accelerated_rc_https_url?(shakaperf["run_url"])
+end
+
+def normalized_accelerated_rc_confirmation_evidence!(ci_snapshot:, shakaperf:)
+  ci = normalized_accelerated_rc_confirmation_hash!(ci_snapshot)
+  shakaperf_snapshot = normalized_accelerated_rc_confirmation_hash!(shakaperf)
+  ci["non_success"] = normalized_accelerated_rc_confirmation_checks!(ci["non_success"])
+  valid = valid_accelerated_rc_confirmation_ci?(ci) &&
+          valid_accelerated_rc_confirmation_shakaperf?(shakaperf_snapshot)
+  abort_invalid_accelerated_rc_confirmation_evidence! unless valid
+
+  [ci, shakaperf_snapshot]
+end
+
 def print_accelerated_rc_publication_summary(version:, candidate_sha:, tracker:, reason:, ci_snapshot:, shakaperf:)
+  ci_snapshot, shakaperf = normalized_accelerated_rc_confirmation_evidence!(ci_snapshot:, shakaperf:)
   puts "\n#{'#' * 80}"
   puts "ACCELERATED RC PUBLICATION CONFIRMATION"
   puts "#" * 80
   puts "  RC version: #{version}"
   puts "  Candidate SHA: #{candidate_sha}"
   puts "  Release tracker: ##{tracker}"
-  puts "  Exact-head CI: #{ci_snapshot.fetch(:status)} (#{ci_snapshot.fetch(:checks_url)})"
+  puts "  Exact-head CI: #{ci_snapshot.fetch('status')} (#{ci_snapshot.fetch('checks_url')})"
   print_accelerated_rc_non_success_checks(ci_snapshot)
-  puts "  ShakaPerf: #{shakaperf.fetch(:status)} (#{shakaperf.fetch(:run_url)})"
+  puts "  ShakaPerf: #{shakaperf.fetch('status')} (#{shakaperf.fetch('run_url')})"
   puts "  Maintainer reason: #{reason}"
   puts "#" * 80
 end
 
 def print_accelerated_rc_non_success_checks(ci_snapshot)
-  ci_snapshot.fetch(:non_success).each do |check|
-    puts "    - #{check.fetch(:name)}: #{check.fetch(:state)}"
-    puts "      #{check.fetch(:url)}"
+  ci_snapshot.fetch("non_success").each do |check|
+    puts "    - #{check.fetch('name')}: #{check.fetch('state')}"
+    puts "      #{check.fetch('url')}"
   end
 end
 

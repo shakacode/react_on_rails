@@ -7606,6 +7606,83 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "renders and reconfirms string-keyed refreshed pending evidence through the real prompt (V60)" do
+      changed_ci = accelerated_rc_ci_snapshot.merge(
+        non_success: accelerated_rc_ci_snapshot.fetch(:non_success) + [{
+          name: "docs",
+          state: "queued",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/124"
+        }]
+      )
+      changed_shakaperf = json_compatible_release_value(
+        accelerated_rc_shakaperf_snapshot.merge(
+          run_id: 654_321,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+        )
+      )
+      refreshed = { ci: changed_ci, shakaperf: changed_shakaperf }
+      allow($stdin).to receive(:gets).and_return("y\n", "y\n")
+      allow(self).to receive(:refresh_accelerated_rc_live_evidence!).and_return(refreshed, refreshed)
+
+      result = nil
+      expect do
+        result = confirmed_fresh_accelerated_rc_evidence!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: accelerated_rc_options.fetch(:reason),
+          ci_snapshot: accelerated_rc_ci_snapshot,
+          shakaperf: accelerated_rc_shakaperf_snapshot
+        )
+      end.to output(
+        %r{actions/runs/123456.*pending evidence changed.*docs.*actions/runs/654321}m
+      ).to_stdout
+
+      aggregate_failures do
+        expect(result).to eq(refreshed)
+        expect($stdin).to have_received(:gets).twice
+        expect(self).to have_received(:refresh_accelerated_rc_live_evidence!).twice
+      end
+    end
+
+    it "retains the three-confirmation instability cap with refreshed persisted evidence (V60)" do
+      refreshed_shakaperf = json_compatible_release_value(accelerated_rc_shakaperf_snapshot)
+      unstable_refreshes = 1.upto(3).map do |iteration|
+        changed_ci = accelerated_rc_ci_snapshot.merge(
+          non_success: accelerated_rc_ci_snapshot.fetch(:non_success) + [{
+            name: "changed-#{iteration}",
+            state: "queued",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/#{200 + iteration}"
+          }]
+        )
+        { ci: changed_ci, shakaperf: refreshed_shakaperf }
+      end
+      allow($stdin).to receive(:gets).and_return("y\n", "y\n", "y\n")
+      allow(self).to receive(:refresh_accelerated_rc_live_evidence!).and_return(*unstable_refreshes)
+
+      expect do
+        confirmed_fresh_accelerated_rc_evidence!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: accelerated_rc_options.fetch(:reason),
+          ci_snapshot: accelerated_rc_ci_snapshot,
+          shakaperf: accelerated_rc_shakaperf_snapshot
+        )
+      end.to raise_error(SystemExit, /pending evidence did not stabilize across confirmation/i)
+
+      aggregate_failures do
+        expect($stdin).to have_received(:gets).exactly(3).times
+        expect(self).to have_received(:refresh_accelerated_rc_live_evidence!).exactly(3).times
+      end
+    end
+
     it "does not reconfirm when pending CI checks only arrive in a different order" do
       check_runs = [
         {
@@ -8419,6 +8496,50 @@ RSpec.describe "release.rake helper methods" do
       end.to output(
         %r{17\.0\.0\.rc\.10.*#{'f' * 40}.*#3823.*generator-1.*actions/runs/1.*actions/runs/123456.*Start fleet QA now}m
       ).to_stdout
+    end
+
+    it "fails closed on missing, duplicate, or malformed confirmation display fields (V60)" do
+      ci = {
+        status: "pending",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: [{
+          name: "generator",
+          state: "in_progress",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+        }]
+      }
+      shakaperf = {
+        status: "pending",
+        run_id: 123_456,
+        run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      malformed = {
+        "missing CI status" => [ci.except(:status), shakaperf],
+        "duplicate CI status key shape" => [ci.merge("status" => "pending"), shakaperf],
+        "non-Array CI checks" => [ci.merge(non_success: "unknown"), shakaperf],
+        "unknown CI check state" => [
+          ci.merge(non_success: [ci.fetch(:non_success).first.merge(state: "future_state")]),
+          shakaperf
+        ],
+        "missing ShakaPerf run URL" => [ci, shakaperf.except(:run_url)]
+      }
+      expect($stdin).not_to receive(:gets)
+
+      aggregate_failures do
+        malformed.each do |description, (malformed_ci, malformed_shakaperf)|
+          expect do
+            confirm_accelerated_rc_publication!(
+              version: "17.0.0.rc.10",
+              candidate_sha: "f" * 40,
+              tracker: 3823,
+              reason: "Start fleet QA now",
+              ci_snapshot: malformed_ci,
+              shakaperf: malformed_shakaperf
+            )
+          end.to raise_error(SystemExit, /confirmation evidence.*malformed or incomplete/i), description
+        end
+      end
     end
   end
 
