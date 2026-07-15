@@ -24,7 +24,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [17.0.0.rc.11] - 2026-07-14
+### [17.0.0.rc.11] - 2026-07-15
 
 #### Changed
 
