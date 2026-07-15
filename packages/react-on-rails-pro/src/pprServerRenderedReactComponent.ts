@@ -26,7 +26,7 @@ const lazyPPR: {
 
 async function getPrerenderToNodeStream() {
   if (!lazyPPR.prerender) {
-    const mod = await import('react-dom/static.node');
+    const mod = await import(/* webpackIgnore: true */ 'react-dom/static.node');
     lazyPPR.prerender = mod.prerenderToNodeStream;
   }
   return lazyPPR.prerender;
@@ -34,7 +34,7 @@ async function getPrerenderToNodeStream() {
 
 async function getResumeToPipeableStream() {
   if (!lazyPPR.resume) {
-    const mod = await import('react-dom/server.node');
+    const mod = await import(/* webpackIgnore: true */ 'react-dom/server.node');
     lazyPPR.resume = (mod as unknown as Record<string, unknown>)
       .resumeToPipeableStream as typeof lazyPPR.resume;
   }
@@ -225,12 +225,12 @@ const pprPrerenderRenderReactComponent = (
         return;
       }
 
+      let prerenderTimeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         // Use a timeout signal so prerenderToNodeStream captures pending Suspense
         // boundaries as PostponedState instead of waiting for them to resolve.
         const providedSignal = (options as RenderParams & { signal?: AbortSignal }).signal;
         let prerenderSignal = providedSignal;
-        let prerenderTimeoutId: ReturnType<typeof setTimeout> | undefined;
         if (!prerenderSignal) {
           const controller = new AbortController();
           prerenderSignal = controller.signal;
@@ -288,8 +288,10 @@ const pprPrerenderRenderReactComponent = (
         injectedStream.on('end', () => {
           // Append the PostponedState as a delimited JSON block after the HTML.
           // Ruby will split on PPR_POSTPONED_STATE_DELIMITER to extract this.
-          const postponedJson = JSON.stringify(postponed);
-          writeChunk(`${PPR_POSTPONED_STATE_DELIMITER}${postponedJson}`);
+          if (postponed != null) {
+            const postponedJson = JSON.stringify(postponed);
+            writeChunk(`${PPR_POSTPONED_STATE_DELIMITER}${postponedJson}`);
+          }
 
           streamingTrackers.postSSRHookTracker.notifySSREnd({
             suppressDuplicateWarning:
@@ -298,6 +300,7 @@ const pprPrerenderRenderReactComponent = (
           endStream();
         });
       } catch (prerenderError) {
+        if (prerenderTimeoutId !== undefined) clearTimeout(prerenderTimeoutId);
         const error = convertToError(prerenderError);
         errorHandlers.reportError(errorHandlers.enrichWithCapturedRSCDiagnostics(error));
         errorHandlers.sendErrorHtml(error);
