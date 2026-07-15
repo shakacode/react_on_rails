@@ -1415,6 +1415,41 @@ describe ReactOnRailsProHelper do
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
       end
 
+      it "returns the initial cached chunk before normalizing and enqueuing the remainder" do
+        events = []
+        @async_barrier = Async::Barrier.new
+        @main_output_queue = instance_double(Async::Queue)
+
+        allow(self).to receive(:normalize_cached_pro_attribution).and_wrap_original do |original, chunk|
+          events << [:normalize, chunk]
+          original.call(chunk)
+        end
+        allow(@main_output_queue).to receive(:enqueue) { |chunk| events << [:enqueue, chunk] }
+
+        initial_result = send(
+          :handle_stream_cache_hit,
+          component_name,
+          { auto_load_bundle: false },
+          false,
+          ["first cached chunk", "second cached chunk"]
+        )
+        events << :returned
+        @async_barrier.wait
+
+        expect(initial_result).to end_with("first cached chunk")
+        expect(events).to eq(
+          [
+            [:normalize, "first cached chunk"],
+            :returned,
+            [:normalize, "second cached chunk"],
+            [:enqueue, "second cached chunk"]
+          ]
+        )
+      ensure
+        @async_barrier = nil
+        @main_output_queue = nil
+      end
+
       it "strips stale attribution from every cached stream chunk and emits one current comment" do
         stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Old Organization -->"
         fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
@@ -2897,6 +2932,13 @@ describe ReactOnRailsProHelper do
     end
 
     context "with async context" do
+      let(:leading_provider_metadata_pattern) do
+        %r{
+          \A<!--[ ]Powered[ ]by[ ]React[ ]on[ ]Rails[ ]Pro.*?-->\n
+          <script\b[^>]*\bid="js-react-on-rails-context"[^>]*>.*?</script>\n
+        }mx
+      end
+
       around do |example|
         Sync do
           @react_on_rails_async_barrier = Async::Barrier.new
@@ -2985,8 +3027,12 @@ describe ReactOnRailsProHelper do
         second_value = cached_async_react_component("RandomValue", cache_key:) { { a: 1 } }
         second_html = second_value.value
 
-        expect(second_html).to eq(first_html.sub(/\A<!-- Powered by React on Rails Pro.*?-->\n/m, ""))
-        expect((first_html + second_html).scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        component_html = first_html.sub(leading_provider_metadata_pattern, "")
+        combined_html = first_html + second_html
+
+        expect(second_html).to eq(component_html)
+        expect(combined_html.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_html.scan('id="js-react-on-rails-context"').length).to eq(1)
       end
 
       it "doesn't call the block on cache hit" do
@@ -3018,8 +3064,12 @@ describe ReactOnRailsProHelper do
         end
         expect(second_value).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
         second_html = second_value.value
-        expect(second_html).to eq(first_html.sub(/\A<!-- Powered by React on Rails Pro.*?-->\n/m, ""))
-        expect((first_html + second_html).scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        component_html = first_html.sub(leading_provider_metadata_pattern, "")
+        combined_html = first_html + second_html
+
+        expect(second_html).to eq(component_html)
+        expect(combined_html.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_html.scan('id="js-react-on-rails-context"').length).to eq(1)
 
         expect(ReactOnRailsPro.revalidate_tag("async-tag")).to eq(1)
 

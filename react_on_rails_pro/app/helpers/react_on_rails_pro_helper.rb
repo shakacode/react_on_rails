@@ -1060,7 +1060,9 @@ module ReactOnRailsProHelper
     initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
-    @async_barrier.async do
+    @async_barrier.async do |task|
+      task.yield
+
       cached_chunks.each_with_index do |chunk, index|
         next if index.zero?
         break if response.stream.closed?
