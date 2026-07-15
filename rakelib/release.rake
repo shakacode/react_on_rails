@@ -451,7 +451,11 @@ def run_release_preflight_checks!(monorepo_root:, dry_run:)
 end
 
 def resolve_release_version_before_auth!(version_input:, monorepo_root:, dry_run:, current_version: nil)
-  resolved_version_input = resolve_version_input(version_input, monorepo_root, current_version:)
+  resolved_version_input = resolve_version_input(
+    version_input,
+    monorepo_root,
+    argumentless_starting_prerelease_version: current_version
+  )
   validate_requested_version_input!(resolved_version_input)
   run_release_preflight_checks!(monorepo_root:, dry_run:)
   resolved_version_input
@@ -2330,13 +2334,20 @@ def version_tagged?(monorepo_root, version)
   tagged_versions.include?(version)
 end
 
-def argumentless_prerelease_release_requires_explicit_version?(changelog_version:, current_version:)
-  return false unless release_prerelease_version?(current_version)
+def argumentless_prerelease_release_requires_explicit_version?(
+  changelog_version:,
+  current_version:,
+  starting_version: current_version
+)
+  return false unless release_prerelease_version?(starting_version)
   return true unless changelog_version
   return true unless release_prerelease_version?(changelog_version)
-  return true unless same_release_base?(changelog_version, current_version)
 
-  Gem::Version.new(changelog_version) <= Gem::Version.new(current_version)
+  versions_to_advance = [starting_version, current_version].uniq
+  return true unless versions_to_advance.all? { |version| same_release_base?(changelog_version, version) }
+
+  changelog_gem_version = Gem::Version.new(changelog_version)
+  versions_to_advance.any? { |version| changelog_gem_version <= Gem::Version.new(version) }
 end
 
 def argumentless_prerelease_release_message(changelog_version:, current_version:)
@@ -2366,15 +2377,18 @@ def untagged_changelog_current_version?(monorepo_root:, changelog_version:, curr
   !version_tagged?(monorepo_root, changelog_version)
 end
 
-def resolve_version_input(version_input, monorepo_root, current_version: nil)
+def resolve_version_input(version_input, monorepo_root, current_version: nil,
+                          argumentless_starting_prerelease_version: nil)
   stripped = version_input.to_s.strip
   return stripped unless stripped.empty?
 
   changelog_version = extract_latest_changelog_version(monorepo_root:)
   current_version ||= current_gem_version(monorepo_root)
+  starting_version = [argumentless_starting_prerelease_version, current_version].compact.first
 
-  if argumentless_prerelease_release_requires_explicit_version?(changelog_version:, current_version:)
-    abort argumentless_prerelease_release_message(changelog_version:, current_version:)
+  if argumentless_prerelease_release_requires_explicit_version?(changelog_version:, current_version:,
+                                                                starting_version:)
+    abort argumentless_prerelease_release_message(changelog_version:, current_version: starting_version)
   end
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
