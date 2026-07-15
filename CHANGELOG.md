@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.11] - 2026-07-15
+
 #### Changed
 
 - **[Pro]** **RSC scaffolding now installs stable `react-on-rails-rsc@19.2.1`**: The Pro package,
@@ -2898,7 +2900,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.10...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.11...main
+[17.0.0.rc.11]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.10...v17.0.0.rc.11
 [17.0.0.rc.10]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...v17.0.0.rc.10
 [17.0.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...v17.0.0.rc.9
 [17.0.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.7...v17.0.0.rc.8
