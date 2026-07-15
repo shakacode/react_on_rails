@@ -7220,6 +7220,53 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#valid_accelerated_rc_non_runtime_classification?" do
+    let(:canonical_commit_sha) { "c" * 40 }
+
+    it "accepts only the exact positive shape with canonical git commit identities" do
+      malformed_classifications = {
+        "nil" => nil,
+        "non-Hash" => [],
+        "extra key" => { status: :non_runtime_only, commits: [canonical_commit_sha], future: true },
+        "missing status" => { commits: [canonical_commit_sha] },
+        "missing commits" => { status: :non_runtime_only },
+        "string keys" => { "status" => :non_runtime_only, "commits" => [canonical_commit_sha] },
+        "mixed future keys" => { status: :non_runtime_only, commits: [canonical_commit_sha], "future" => true },
+        "unknown status" => { status: :future, commits: [canonical_commit_sha] },
+        "none status" => { status: :none, commits: [canonical_commit_sha] },
+        "not-ancestor status" => { status: :not_ancestor, commits: [canonical_commit_sha] },
+        "runtime-bearing status" => { status: :runtime_bearing, commits: [canonical_commit_sha] },
+        "nil commits" => { status: :non_runtime_only, commits: nil },
+        "non-Array commits" => { status: :non_runtime_only, commits: canonical_commit_sha },
+        "empty commits" => { status: :non_runtime_only, commits: [] },
+        "empty identity" => { status: :non_runtime_only, commits: [""] },
+        "whitespace identity" => { status: :non_runtime_only, commits: [" \t"] },
+        "non-String identity" => { status: :non_runtime_only, commits: [123] },
+        "short identity" => { status: :non_runtime_only, commits: ["c" * 39] },
+        "long identity" => { status: :non_runtime_only, commits: ["c" * 41] },
+        "uppercase identity" => { status: :non_runtime_only, commits: ["C" * 40] },
+        "non-hex identity" => { status: :non_runtime_only, commits: ["g" * 40] }
+      }
+
+      aggregate_failures do
+        malformed_classifications.each do |description, classification|
+          result = nil
+          expect do
+            result = valid_accelerated_rc_non_runtime_classification?(classification)
+          end.not_to raise_error, description
+          expect(result).to be(false), description
+        end
+
+        expect(
+          valid_accelerated_rc_non_runtime_classification?(
+            status: :non_runtime_only,
+            commits: [canonical_commit_sha, "d" * 40]
+          )
+        ).to be(true)
+      end
+    end
+  end
+
   describe "#accepted_accelerated_rc_record_for_promotion!" do
     let(:authorization_record) do
       build_accelerated_rc_publication_record(
@@ -7511,41 +7558,7 @@ RSpec.describe "release.rake helper methods" do
       ).to eq(record)
     end
 
-    it "reuses accepted evidence for a mechanically runtime-equivalent final tip" do
-      record = authorization_record.merge(
-        "status" => "candidate-accepted",
-        "recorded_at" => "2026-07-14T15:00:00Z",
-        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
-        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
-        "evidence" => {
-          "demo_fleet" => "https://github.com/demo-fleet",
-          "behavioral" => "https://github.com/behavioral",
-          "artifacts" => "https://github.com/artifacts"
-        }
-      )
-      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
-        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
-      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
-        .with(monorepo_root: "/tmp/repo", sha: "e" * 40).and_return("a" * 64)
-      allow(self).to receive(:release_branch_commits_after_rc_tag).with(
-        monorepo_root: "/tmp/repo",
-        tag_sha: "f" * 40,
-        head_sha: "e" * 40
-      ).and_return(status: :non_runtime_only, commits: ["metadata-only-sha"])
-
-      expect(
-        accepted_accelerated_rc_record_for_promotion!(
-          records: [authorization_record, canonical_publication, record],
-          rc_version: "17.0.0.rc.10",
-          rc_sha: "f" * 40,
-          final_head_sha: "e" * 40,
-          monorepo_root: "/tmp/repo",
-          tag_provenance:
-        )
-      ).to eq(record)
-    end
-
-    it "blocks accepted evidence when the final tip changes the runtime tree" do
+    it "reuses accepted evidence for a non-runtime-only final tip despite a changed coarse fingerprint" do
       record = authorization_record.merge(
         "status" => "candidate-accepted",
         "recorded_at" => "2026-07-14T15:00:00Z",
@@ -7561,6 +7574,108 @@ RSpec.describe "release.rake helper methods" do
         .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
       allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
         .with(monorepo_root: "/tmp/repo", sha: "e" * 40).and_return("b" * 64)
+      allow(self).to receive(:release_branch_commits_after_rc_tag).with(
+        monorepo_root: "/tmp/repo",
+        tag_sha: "f" * 40,
+        head_sha: "e" * 40
+      ).and_return(status: :non_runtime_only, commits: ["c" * 40])
+
+      result = nil
+      expect do
+        result = accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, record],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "e" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.not_to raise_error
+      expect(result).to eq(record)
+    end
+
+    it "blocks every noncanonical final-tip classification even when coarse fingerprints match" do
+      record = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint).and_return("a" * 64)
+      classifications = {
+        "extra key" => { status: :non_runtime_only, commits: ["c" * 40], future: true },
+        "string keys" => { "status" => :non_runtime_only, "commits" => ["c" * 40] },
+        "mixed future keys" => { status: :non_runtime_only, commits: ["c" * 40], "future" => true },
+        "runtime-bearing" => { status: :runtime_bearing, commits: ["c" * 40] },
+        "not-ancestor" => { status: :not_ancestor, commits: [] },
+        "none" => { status: :none, commits: [] },
+        "unknown status" => { status: :future, commits: ["c" * 40] },
+        "missing status" => { commits: ["c" * 40] },
+        "missing result" => nil,
+        "malformed non-runtime commits" => { status: :non_runtime_only, commits: nil },
+        "empty non-runtime commits" => { status: :non_runtime_only, commits: [] },
+        "whitespace identity" => { status: :non_runtime_only, commits: [" \t"] },
+        "uppercase identity" => { status: :non_runtime_only, commits: ["C" * 40] },
+        "short identity" => { status: :non_runtime_only, commits: ["c" * 39] }
+      }
+
+      aggregate_failures do
+        classifications.each do |description, classification|
+          allow(self).to receive(:release_branch_commits_after_rc_tag).and_return(classification)
+
+          expect do
+            accepted_accelerated_rc_record_for_promotion!(
+              records: [authorization_record, canonical_publication, record],
+              rc_version: "17.0.0.rc.10",
+              rc_sha: "f" * 40,
+              final_head_sha: "e" * 40,
+              monorepo_root: "/tmp/repo",
+              tag_provenance:
+            )
+          end.to raise_error(SystemExit, /not runtime-equivalent/), description
+        end
+      end
+    end
+
+    it "keeps same-SHA runtime equivalence bound to the exact recorded accepted fingerprint" do
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+
+      aggregate_failures do
+        [nil, "malformed", "b" * 64].each do |stored_fingerprint|
+          record = { "runtime_tree_fingerprint" => stored_fingerprint }
+          expect(
+            accelerated_rc_runtime_equivalent?(
+              record:, rc_sha: "f" * 40, final_head_sha: "f" * 40, monorepo_root: "/tmp/repo"
+            )
+          ).to be(false), stored_fingerprint.inspect
+        end
+      end
+    end
+
+    it "blocks accepted evidence when the canonical classifier finds a runtime-bearing final tip" do
+      record = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+      allow(self).to receive(:release_branch_commits_after_rc_tag).and_return(
+        status: :runtime_bearing,
+        commits: ["runtime-bearing-sha"]
+      )
 
       expect do
         accepted_accelerated_rc_record_for_promotion!(
@@ -7830,7 +7945,7 @@ RSpec.describe "release.rake helper methods" do
         monorepo_root: "/tmp/repo",
         tag_sha: "f" * 40,
         head_sha: "e" * 40
-      ).and_return(status: :non_runtime_only, commits: ["version-only-sha"])
+      ).and_return(status: :non_runtime_only, commits: ["c" * 40])
       allow(self).to receive_messages(
         refresh_accepted_rc_ci_evidence_for_promotion!: successful_final_ci_snapshot,
         reuse_accepted_rc_shakaperf_evidence!: true,

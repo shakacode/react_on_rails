@@ -356,7 +356,11 @@ limited to ordinary RCs for which complete discovery proves there is no accelera
 Final promotion repeats repository-wide exact-version-and-SHA discovery and rejects any record on a tracker
 other than the one selected by the canonical tag provenance. The final tip must be that SHA or
 mechanically runtime-equivalent through the existing metadata-only promotion rules. Runtime
-equivalence is checked again after the final version-bump commit. Every intervening commit is inspected:
+equivalence is checked again after the final version-bump commit. The task first proves that the immutable
+accepted RC still exactly matches its recorded runtime fingerprint. When the final SHA differs, the canonical
+positive-only commit classifier then decides the RC-to-final delta and must return canonical lowercase 40-hex commit
+identities; a coarse final-tip fingerprint cannot override that classification or reject a positively classified
+docs/comment-only delta. Every intervening commit is inspected:
 package manifests, version files, and `Gemfile.lock` files may differ only by their normalized product-version
 metadata, while dependency, lockfile, or any other runtime-bearing content change requires a new accepted RC
 and cannot fall back to a fresh final ShakaPerf run. Accepted ShakaPerf evidence is

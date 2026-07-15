@@ -2301,7 +2301,7 @@ def valid_accelerated_rc_tracker_record?(record)
 end
 
 def accelerated_rc_exact_keys?(value, expected_keys)
-  value.is_a?(Hash) && value.keys.sort == expected_keys.sort
+  value.is_a?(Hash) && value.length == expected_keys.length && expected_keys.all? { |key| value.key?(key) }
 end
 
 def valid_accelerated_rc_state?(record)
@@ -4527,19 +4527,20 @@ def accelerated_rc_runtime_equivalent?(record:, rc_sha:, final_head_sha:, monore
 
   candidate_fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: rc_sha)
   return false unless candidate_fingerprint == fingerprint
-
-  final_fingerprint = if final_head_sha == rc_sha
-                        candidate_fingerprint
-                      else
-                        shakaperf_runtime_tree_fingerprint(monorepo_root:, sha: final_head_sha)
-                      end
-  return false unless final_fingerprint == fingerprint
   return true if final_head_sha == rc_sha
 
   commits_after_rc = release_branch_commits_after_rc_tag(
     monorepo_root:, tag_sha: rc_sha, head_sha: final_head_sha
   )
-  commits_after_rc[:status] == :non_runtime_only
+  valid_accelerated_rc_non_runtime_classification?(commits_after_rc)
+end
+
+def valid_accelerated_rc_non_runtime_classification?(classification)
+  return false unless accelerated_rc_exact_keys?(classification, %i[status commits])
+
+  commits = classification[:commits]
+  classification[:status] == :non_runtime_only && commits.is_a?(Array) && !commits.empty? &&
+    commits.all? { |sha| sha.is_a?(String) && sha.match?(/\A[0-9a-f]{40}\z/) }
 end
 
 def reuse_accepted_rc_shakaperf_evidence!(repo_slug:, monorepo_root:, ref:, head_sha:, record:)
