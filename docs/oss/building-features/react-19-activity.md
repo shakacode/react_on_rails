@@ -21,11 +21,11 @@ This is the React-blessed replacement for the classic "keep the inactive tab ali
 
 ## Version requirements
 
-| Layer                              | Requirement                                                                                                                                                                                                                         |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `react` / `react-dom` in your app  | **19.2.0 or later** (`Activity` does not exist in earlier versions, including 19.0/19.1)                                                                                                                                            |
-| `react_on_rails` gem + npm package | Any current version — the package's peer dependency is `react >= 16`, so React on Rails does not constrain you; just upgrade `react`/`react-dom` in **your app's** bundle                                                           |
-| RSC / Pro streaming path           | React on Rails Pro 17 RSC uses React/React DOM 19.2.x with patch >= 19.2.7 and the supported `react-on-rails-rsc` 19.2.x line (`>= 19.2.1`; `19.2.1-rc.1` during the RC soak), so `<Activity>` is available on that coordinated set |
+| Layer                              | Requirement                                                                                                                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react` / `react-dom` in your app  | **19.2.0 or later** (`Activity` does not exist in earlier versions, including 19.0/19.1)                                                                                                      |
+| `react_on_rails` gem + npm package | Any current version — the package's peer dependency is `react >= 16`, so React on Rails does not constrain you; just upgrade `react`/`react-dom` in **your app's** bundle                     |
+| RSC / Pro streaming path           | React on Rails Pro 17 RSC uses React/React DOM 19.2.x with patch >= 19.2.7 and stable `react-on-rails-rsc >= 19.2.1` on the 19.2.x line, so `<Activity>` is available on that coordinated set |
 
 `<Activity>` is a regular React feature inside your components. React on Rails needs no configuration for it — it works with the standard `react_component` helper in both client-side rendering and server-side rendering with hydration.
 

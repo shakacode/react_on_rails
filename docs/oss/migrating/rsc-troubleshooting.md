@@ -435,9 +435,8 @@ React on Rails Pro 17 RSC release set. Key constraints:
 
 - The fix landed in `react-on-rails-rsc` 19.2.0-rc.3 and is included in the 19.2.1 package line. Check the
   [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
-  and the Pro release notes for the exact package to install. React on Rails Pro 17 RC packages use
-  `react-on-rails-rsc@19.2.1-rc.1`; the 17.0 final release requires `react-on-rails-rsc >= 19.2.1`
-  on the supported RSC 19.2.x package line.
+  and the Pro release notes for the exact package to install. React on Rails Pro 17 requires stable
+  `react-on-rails-rsc >= 19.2.1` on the supported RSC 19.2.x package line.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.

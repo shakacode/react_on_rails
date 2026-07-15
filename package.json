@@ -130,7 +130,7 @@
       "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
       "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files.",
-      "react_on_rails>react(-dom) scopes React 19.2 to the OSS dummy app (for the <Activity> demo, #3883). react-on-rails-pro-node-renderer>react(-dom)/react-on-rails-rsc, react-on-rails-pro>react(-dom)/react-on-rails-rsc, and react_on_rails_pro_dummy>react(-dom)/react-on-rails-rsc scope Pro RSC package tests and dummy validation to the React 19.2.7 + react-on-rails-rsc 19.2.1-rc.1 pair, the React on Rails 17 RSC floor (#3865; gate landed in #4026). The root workspace pin stays at ~19.0.4 / react-on-rails-rsc 19.0.5 only for legacy non-Pro fixture coverage."
+      "react_on_rails>react(-dom) scopes React 19.2 to the OSS dummy app (for the <Activity> demo, #3883). react-on-rails-pro-node-renderer>react(-dom)/react-on-rails-rsc, react-on-rails-pro>react(-dom)/react-on-rails-rsc, and react_on_rails_pro_dummy>react(-dom)/react-on-rails-rsc scope Pro RSC package tests and dummy validation to the React 19.2.7 + react-on-rails-rsc 19.2.1 pair, the React on Rails 17 RSC floor (#3865; gate landed in #4026). The root workspace pin stays at ~19.0.4 / react-on-rails-rsc 19.0.5 only for legacy non-Pro fixture coverage."
     ],
     "overrides": {
       "react": "$react",
@@ -141,13 +141,13 @@
       "react_on_rails>react-dom": "^19.2.0",
       "react-on-rails-pro-node-renderer>react": "~19.2.7",
       "react-on-rails-pro-node-renderer>react-dom": "~19.2.7",
-      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.2.1-rc.1",
+      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.2.1",
       "react-on-rails-pro>react": "~19.2.7",
       "react-on-rails-pro>react-dom": "~19.2.7",
-      "react-on-rails-pro>react-on-rails-rsc": "19.2.1-rc.1",
+      "react-on-rails-pro>react-on-rails-rsc": "19.2.1",
       "react_on_rails_pro_dummy>react": "~19.2.7",
       "react_on_rails_pro_dummy>react-dom": "~19.2.7",
-      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.1-rc.1",
+      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.1",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0",
       "lodash@>=4.0.0 <=4.17.22": ">=4.17.23 <5",

@@ -27,7 +27,6 @@ const versionBelowMinimumVersion = (version: string) => {
 describe('runRscPeerCompatibilityCheck', () => {
   let warnSpy: jest.SpyInstance;
   let runRscPeerCompatibilityCheck: typeof import('../src/shared/runRscPeerCompatibilityCheck').runRscPeerCompatibilityCheck;
-  let minimumPrereleaseVersion: string | undefined;
   let minimumVersion: string;
   let belowMinimumVersion: string;
 
@@ -47,7 +46,6 @@ describe('runRscPeerCompatibilityCheck', () => {
     const { RSC_PEER_SUPPORT } = jest.requireActual(
       '../src/shared/rscPeerSupport',
     ) as typeof import('../src/shared/rscPeerSupport');
-    minimumPrereleaseVersion = RSC_PEER_SUPPORT.reactOnRailsRsc.minimumPrereleaseVersion;
     minimumVersion = RSC_PEER_SUPPORT.reactOnRailsRsc.minimumVersion;
     belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
@@ -136,12 +134,12 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('does not warn for the coordinated RC package line', () => {
+  it('throws for the superseded prerelease package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions(minimumPrereleaseVersion ?? minimumVersion),
+        resolveVersion: resolveVersions('19.2.1-rc.1'),
       }),
-    ).not.toThrow();
+    ).toThrow(new RegExp(`>= ${minimumVersion}`));
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
@@ -178,7 +176,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions(minimumPrereleaseVersion ?? minimumVersion, '19.0.4'),
+        resolveVersion: resolveVersions(minimumVersion, '19.0.4'),
       }),
     ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();

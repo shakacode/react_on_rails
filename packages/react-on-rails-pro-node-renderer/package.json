@@ -73,7 +73,7 @@
     "react": "~19.2.7",
     "react-dom": "~19.2.7",
     "react-on-rails": "workspace:*",
-    "react-on-rails-rsc": "19.2.1-rc.1",
+    "react-on-rails-rsc": "19.2.1",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
