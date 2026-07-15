@@ -1574,7 +1574,7 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
           .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
         allow(Open3).to receive(:capture2e)
-          .with("gh", "api", "--jq", "{contexts, checks}", api_path)
+          .with("gh", "api", "--jq", REQUIRED_CHECKS_JQ_QUERY, api_path)
           .and_return(["HTTP 404: Branch not protected", failure_status])
         allow(Open3).to receive(:capture3)
           .with("gh", "api", "--include", api_path)
@@ -1614,7 +1614,7 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
           .and_return(sha:, repo_slug: "shakacode/react_on_rails", check_runs: [passing_run("Lint")])
         allow(Open3).to receive(:capture2e)
-          .with("gh", "api", "--jq", "{contexts, checks}", api_path)
+          .with("gh", "api", "--jq", REQUIRED_CHECKS_JQ_QUERY, api_path)
           .and_return(["HTTP 404: Required status checks not enabled", failure_status])
         allow(Open3).to receive(:capture3)
           .with("gh", "api", "--include", api_path)
@@ -4903,11 +4903,38 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "required checks jq query" do
+    it "normalizes documented optional checks and app_id fields" do
+      cases = [
+        [
+          { "contexts" => ["Legacy CI"] },
+          { "contexts" => ["Legacy CI"], "checks" => [] }
+        ],
+        [
+          { "contexts" => [], "checks" => [{ "context" => "Lint" }] },
+          { "contexts" => [], "checks" => [{ "context" => "Lint", "app_id" => nil }] }
+        ],
+        [
+          { "contexts" => [], "checks" => {} },
+          { "contexts" => [], "checks" => {} }
+        ]
+      ]
+
+      cases.each do |payload, expected|
+        output, status = Open3.capture2e("jq", "-c", REQUIRED_CHECKS_JQ_QUERY, stdin_data: payload.to_json)
+        expect(status.success?).to be(true), output
+        expect(JSON.parse(output)).to eq(expected)
+      end
+    rescue Errno::ENOENT
+      raise "jq is required to verify required-check normalization"
+    end
+  end
+
   describe "#required_check_names_for_branch" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
-    let(:expected_jq) { "{contexts, checks}" }
+    let(:expected_jq) { REQUIRED_CHECKS_JQ_QUERY }
 
     before do
       allow(self).to receive(:github_repo_slug).with(monorepo_root).and_return("shakacode/react_on_rails")
@@ -5178,12 +5205,12 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "keeps nullable or missing branch protection fields visible to fail closed" do
-      # `{contexts, checks}` renders missing fields as null, which must remain
-      # distinguishable from a configured pair of empty arrays.
+      # The normalization deliberately preserves a missing `contexts` field as
+      # null, keeping it distinguishable from a configured empty array.
       allow(Open3).to receive(:capture2e)
-        .with("gh", "api", "--jq", "{contexts, checks}",
+        .with("gh", "api", "--jq", REQUIRED_CHECKS_JQ_QUERY,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return([{ contexts: nil, checks: nil }.to_json, success_status])
+        .and_return([{ contexts: nil, checks: [] }.to_json, success_status])
 
       expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
@@ -5206,6 +5233,18 @@ RSpec.describe "release.rake helper methods" do
       expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
 
+    it "returns legacy contexts when the optional checks field is absent" do
+      allow(Open3).to receive(:capture2e)
+        .with("gh", "api", "--jq", expected_jq,
+              "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
+        .and_return([{ contexts: ["Legacy CI"], checks: [] }.to_json, success_status])
+
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: ["Legacy CI"],
+        checks: []
+      )
+    end
+
     it "returns an unknown discovery state when a required check entry is malformed" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
@@ -5215,13 +5254,16 @@ RSpec.describe "release.rake helper methods" do
       expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
     end
 
-    it "returns an unknown discovery state when a modern check omits app_id" do
+    it "accepts a modern check with an omitted optional app_id" do
       allow(Open3).to receive(:capture2e)
         .with("gh", "api", "--jq", expected_jq,
               "repos/shakacode/react_on_rails/branches/main/protection/required_status_checks")
-        .and_return([{ contexts: [], checks: [{ context: "Lint" }] }.to_json, success_status])
+        .and_return([{ contexts: [], checks: [{ context: "Lint", app_id: nil }] }.to_json, success_status])
 
-      expect(required_check_names_for_branch(monorepo_root:)).to equal(REQUIRED_CHECK_DISCOVERY_UNKNOWN)
+      expect(required_check_names_for_branch(monorepo_root:)).to eq(
+        contexts: [],
+        checks: [{ context: "Lint", app_id: nil }]
+      )
     end
 
     it "returns an unknown discovery state when a modern check has a nonpositive app_id" do

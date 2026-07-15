@@ -1300,6 +1300,11 @@ CI_STATUSES_JSONL_QUERY = [
   ].join,
   'else error("expected status object with sha and statuses array") end'
 ].join(" ")
+REQUIRED_CHECKS_JQ_QUERY = [
+  "{contexts, checks: (if .checks == null then []",
+  'elif (.checks | type) == "array" then (.checks | map({context, app_id}))',
+  "else .checks end)}"
+].join(" ")
 REQUIRED_CHECK_DISCOVERY_UNKNOWN = Object.new.freeze
 
 # Upper bound on how many consecutive non-runtime-only commits the CI gate will
@@ -1923,12 +1928,11 @@ def required_check_names_for_branch(monorepo_root:, repo_slug: nil, ci_branch: "
   # Keep legacy `contexts` separate from modern `checks` entries. Modern
   # required checks can be pinned to a GitHub App via `app_id`; legacy contexts
   # may be satisfied by either a Checks API run or a commit-status context.
-  jq_query = "{contexts, checks}"
   # Precondition: `fetch_main_ci_checks` already verified `gh` is installed
   # before `validate_main_ci_status!` calls this helper. The remaining failure
   # mode here is "branch protection unknown". Keep it distinct from a known
   # unprotected branch so exact-HEAD recovery can fail closed.
-  output, status = capture_gh_output("api", "--jq", jq_query, api_path)
+  output, status = capture_gh_output("api", "--jq", REQUIRED_CHECKS_JQ_QUERY, api_path)
   # Only a successful, structurally valid empty configuration means no required
   # checks. API errors and malformed payloads leave required gates unknown.
   return nil if !status.success? && known_branch_without_required_checks?(
