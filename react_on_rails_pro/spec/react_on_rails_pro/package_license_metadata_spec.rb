@@ -19,6 +19,10 @@ RSpec.describe "published Pro license metadata" do
   repo_root = File.expand_path("../../..", __dir__)
   commercial_license = File.binread(File.join(repo_root, "REACT-ON-RAILS-PRO-LICENSE.md"))
 
+  it "publishes the approved EULA version" do
+    expect(commercial_license).to include("_Version 2.3 — 2026-07-14_".b)
+  end
+
   it "declares the commercial gem license and includes its license file" do
     gemspec_path = File.join(repo_root, "react_on_rails_pro", "react_on_rails_pro.gemspec")
     gemspec = Gem::Specification.load(gemspec_path)

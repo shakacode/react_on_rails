@@ -645,14 +645,14 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
   end
 
   describe ".attribution_required?" do
-    context "with paid plan (no attribution required)" do
+    context "with paid plan" do
       before do
         token = JWT.encode(valid_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns false" do
-        expect(described_class.attribution_required?).to be false
+      it "requires attribution" do
+        expect(described_class.attribution_required?).to be true
       end
 
       it "caches the result" do
@@ -662,7 +662,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
-    context "with partner plan (no attribution required)" do
+    context "with partner plan" do
       let(:partner_payload) do
         valid_payload.merge(plan: "partner")
       end
@@ -672,8 +672,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns false" do
-        expect(described_class.attribution_required?).to be false
+      it "requires attribution" do
+        expect(described_class.attribution_required?).to be true
       end
     end
 
@@ -707,7 +707,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
-    context "with nonprofit plan (attribution optional, default no)" do
+    context "with nonprofit plan" do
       let(:nonprofit_payload) do
         valid_payload.merge(plan: "nonprofit")
       end
@@ -717,12 +717,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns false by default" do
-        expect(described_class.attribution_required?).to be false
+      it "requires attribution" do
+        expect(described_class.attribution_required?).to be true
       end
     end
 
-    context "with education plan (attribution optional, default no)" do
+    context "with education plan" do
       let(:education_payload) do
         valid_payload.merge(plan: "education")
       end
@@ -732,12 +732,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns false by default" do
-        expect(described_class.attribution_required?).to be false
+      it "requires attribution" do
+        expect(described_class.attribution_required?).to be true
       end
     end
 
-    context "with explicit attribution=true override" do
+    context "with attribution=true in the credential" do
       let(:nonprofit_with_attribution) do
         valid_payload.merge(plan: "nonprofit", attribution: true)
       end
@@ -747,12 +747,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns true when explicitly set" do
+      it "requires attribution" do
         expect(described_class.attribution_required?).to be true
       end
     end
 
-    context "with explicit attribution=false override" do
+    context "with attribution=false in the credential" do
       let(:startup_without_attribution) do
         valid_payload.merge(plan: "startup", attribution: false)
       end
@@ -762,8 +762,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
       end
 
-      it "returns false when explicitly disabled" do
-        expect(described_class.attribution_required?).to be false
+      it "does not allow the credential to waive attribution" do
+        expect(described_class.attribution_required?).to be true
       end
     end
 
@@ -772,8 +772,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
       end
 
-      it "returns false" do
-        expect(described_class.attribution_required?).to be false
+      it "requires attribution for credential-free uses permitted by the EULA" do
+        expect(described_class.attribution_required?).to be true
       end
     end
   end
@@ -791,7 +791,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         expect(info[:org]).to eq("Acme Corp")
         expect(info[:plan]).to eq("paid")
         expect(info[:status]).to eq(:valid)
-        expect(info[:attribution_required]).to be false
+        expect(info[:attribution_required]).to be true
         expect(info[:expiration]).to be_a(Time)
       end
     end
@@ -825,7 +825,7 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         expect(info[:org]).to be_nil
         expect(info[:plan]).to be_nil
         expect(info[:status]).to eq(:missing)
-        expect(info[:attribution_required]).to be false
+        expect(info[:attribution_required]).to be true
         expect(info[:expiration]).to be_nil
       end
     end

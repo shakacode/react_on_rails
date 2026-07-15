@@ -127,7 +127,7 @@ Organization:  Acme Corp
 Plan:          paid
 Expiration:    2025-12-31
 Days left:     180
-Attribution:   not required
+Attribution:   required
 ```
 
 **Example JSON output:**
@@ -138,7 +138,7 @@ Attribution:   not required
   "organization": "Acme Corp",
   "plan": "paid",
   "expiration": "2025-12-31T00:00:00Z",
-  "attribution_required": false,
+  "attribution_required": true,
   "days_remaining": 180,
   "renewal_required": false
 }
