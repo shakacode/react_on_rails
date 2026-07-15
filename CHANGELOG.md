@@ -161,6 +161,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
   [ihabadham](https://github.com/ihabadham).
 
+#### Changed
+
+- **[Pro]** **Published artifacts now identify the commercial license accurately**: The Pro gem reports
+  `LicenseRef-LICENSE`, while the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages
+  report `SEE LICENSE IN LICENSE.md`. All three packed artifacts include React on Rails Pro EULA v2.3 instead
+  of presenting the software as `UNLICENSED` or shipping stale terms. EULA v2.3 clarifies organization-owned
+  internal and public use, preserves free educational/demo use, and defines one product-level attribution per
+  covered HTML document. All plan types and permitted free uses now require that attribution; a valid public
+  attribution reports `Licensed` without exposing the Organization, while private server diagnostics retain it.
+  [PR 4660](https://github.com/shakacode/react_on_rails/pull/4660) by
+  [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.7] - 2026-07-06
 
 #### Breaking Changes

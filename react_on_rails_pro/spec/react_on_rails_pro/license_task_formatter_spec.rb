@@ -79,7 +79,7 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
         expect(result[:expiration]).to be_a(String)
         expect(result[:days_remaining]).to be_positive
         expect(result[:renewal_required]).to be false
-        expect(result[:attribution_required]).to be false
+        expect(result[:attribution_required]).to be true
       end
     end
 
@@ -142,7 +142,8 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
         expect(output).to include("VALID")
         expect(output).to include("Acme Corp")
         expect(output).to include("paid")
-        expect(output).to include("not required")
+        expect(output).to include("required")
+        expect(output).not_to include("not required")
       end
     end
 
@@ -211,7 +212,7 @@ RSpec.describe ReactOnRailsPro::LicenseTaskFormatter do
         expect(parsed["expiration"]).to be_a(String)
         expect(parsed["days_remaining"]).to be_positive
         expect(parsed["renewal_required"]).to be false
-        expect(parsed["attribution_required"]).to be false
+        expect(parsed["attribution_required"]).to be true
       end
     end
 

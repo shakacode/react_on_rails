@@ -29,7 +29,7 @@ The rake task accepts `FORMAT=json` for scripting. The output shape for an expir
   "organization": "Acme Corp",
   "plan": "paid",
   "expiration": "2024-01-01T00:00:00Z",
-  "attribution_required": false,
+  "attribution_required": true,
   "days_remaining": -2,
   "renewal_required": true
 }

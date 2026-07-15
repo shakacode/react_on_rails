@@ -28,7 +28,7 @@ module ReactOnRailsPro
     # Valid license plan types
     VALID_PLANS: Array[String]
 
-    # Plans that require attribution by default
+    # Recognized plans, all of which require product-level attribution
     ATTRIBUTION_REQUIRED_PLANS: Array[String]
 
     # Returns the current license status (never raises, never logs)

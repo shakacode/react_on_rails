@@ -32,7 +32,7 @@
     "pro"
   ],
   "author": "justin@shakacode.com",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {
       "react-server": "./lib/ReactOnRailsRSC.js",
@@ -102,6 +102,7 @@
     }
   },
   "files": [
+    "LICENSE.md",
     "README.md",
     "lib/**/*.js",
     "lib/**/*.d.ts"

@@ -63,8 +63,8 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "includes the production license violation warning" do
-          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
+        it "explains that Production Use requires a license without declaring every deployment a violation" do
+          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
           described_class.log_license_status
         end
       end
@@ -89,8 +89,8 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "includes the production license violation warning" do
-          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
+        it "explains that Production Use requires a license without declaring every deployment a violation" do
+          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
           described_class.log_license_status
         end
       end
@@ -107,8 +107,8 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "includes the production license violation warning" do
-          expect(mock_logger).to receive(:warn).with(/violates the license terms/)
+        it "explains that Production Use requires a license without declaring every deployment a violation" do
+          expect(mock_logger).to receive(:warn).with(/Production Use.*requires a valid license/)
           described_class.log_license_status
         end
       end
@@ -124,8 +124,10 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
 
-        it "does not include plan type for paid licenses" do
-          expect(mock_logger).to receive(:info).with("[React on Rails Pro] License validated successfully (Acme Corp).")
+        it "keeps the organization in private diagnostics and does not include the paid plan name" do
+          expect(mock_logger).to receive(:info)
+            .with("[React on Rails Pro] License validated successfully (Acme Corp). " \
+                  "Attribution required for this license type.")
           described_class.log_license_status
         end
 
