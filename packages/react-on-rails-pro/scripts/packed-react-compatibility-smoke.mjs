@@ -20,8 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import compatibilityCases from './packed-react-compatibility-cases.mjs';
 
-const reactVersions = ['16.14.0', '17.0.2'];
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const proPackageDirectory = path.resolve(scriptDirectory, '..');
 const repoRoot = path.resolve(proPackageDirectory, '../..');
@@ -46,7 +46,7 @@ const findPackedArtifact = (artifactsDirectory, packageName) => {
   return artifactPath;
 };
 
-const writeConsumerFiles = (consumerDirectory, reactVersion, coreArtifact, proArtifact) => {
+const writeConsumerFiles = (consumerDirectory, { reactVersion, streaming }, coreArtifact, proArtifact) => {
   fs.writeFileSync(
     path.join(consumerDirectory, 'package.json'),
     `${JSON.stringify(
@@ -70,7 +70,8 @@ const writeConsumerFiles = (consumerDirectory, reactVersion, coreArtifact, proAr
 
   fs.writeFileSync(
     path.join(consumerDirectory, 'entry.mjs'),
-    `import React from 'react';
+    `import assert from 'node:assert/strict';
+import React from 'react';
 import ReactOnRails from 'react-on-rails-pro';
 
 const Greeting = ({ version }) => React.createElement('strong', null, \`packed Pro SSR on React \${version}\`);
@@ -93,6 +94,161 @@ if (typeof result !== 'string' || !result.includes(\`packed Pro SSR on React \${
 }
 
 console.log(\`PACKED_PRO_SSR_OK React \${React.version}\`);
+
+const supportsServerStreaming = ReactOnRails.isServerStreamingSupported();
+assert.equal(
+  supportsServerStreaming,
+  ${streaming},
+  \`Unexpected streaming capability for React \${React.version}\`,
+);
+
+if (!supportsServerStreaming) {
+  const fallbackResult = ReactOnRails[
+    supportsServerStreaming ? 'streamServerRenderedReactComponent' : 'serverRenderReactComponent'
+  ]({
+    name: 'Greeting',
+    props: { version: React.version },
+    domNodeId: 'greeting-fallback',
+    trace: false,
+    throwJsErrors: true,
+    renderingReturnsPromises: false,
+  });
+  assert.equal(typeof fallbackResult, 'string');
+  assert.match(fallbackResult, /packed Pro SSR on React/);
+  console.log(\`PACKED_PRO_STREAMING_FALLBACK_OK React \${React.version}\`);
+}
+
+if (${streaming}) {
+  let boundaryResolved = false;
+  let boundaryResolvedAt;
+  let resolveBoundary;
+  const boundaryPromise = new Promise((resolve) => {
+    resolveBoundary = resolve;
+  });
+
+  const DeferredContent = () => {
+    if (!boundaryResolved) throw boundaryPromise;
+    return React.createElement('p', { id: 'resolved' }, 'Packed streaming content resolved');
+  };
+  const StreamingGreeting = () =>
+    React.createElement(
+      'main',
+      null,
+      React.createElement('h1', null, 'Packed streaming shell'),
+      React.createElement(
+        React.Suspense,
+        { fallback: React.createElement('p', { id: 'fallback' }, 'Packed streaming fallback') },
+        React.createElement(DeferredContent),
+      ),
+    );
+
+  const parseAvailableWireChunks = (buffer) => {
+    const chunks = [];
+    let offset = 0;
+
+    while (offset < buffer.length) {
+      const headerEnd = buffer.indexOf(10, offset);
+      if (headerEnd === -1) break;
+      const header = buffer.subarray(offset, headerEnd).toString('utf8');
+      const separator = header.lastIndexOf('\\t');
+      assert.notEqual(separator, -1, 'Streaming wire chunk is missing its metadata separator');
+      const metadata = JSON.parse(header.slice(0, separator));
+      const contentLength = Number.parseInt(header.slice(separator + 1), 16);
+      assert.ok(Number.isSafeInteger(contentLength), 'Streaming wire chunk has an invalid content length');
+      const contentStart = headerEnd + 1;
+      const contentEnd = contentStart + contentLength;
+      if (contentEnd > buffer.length) break;
+      chunks.push({ metadata, html: buffer.subarray(contentStart, contentEnd).toString('utf8') });
+      offset = contentEnd;
+    }
+
+    return { chunks, remaining: buffer.subarray(offset) };
+  };
+
+  ReactOnRails.register({ StreamingGreeting });
+  const streamResult = ReactOnRails.streamServerRenderedReactComponent({
+    name: 'StreamingGreeting',
+    props: {},
+    domNodeId: 'streaming-greeting',
+    trace: false,
+    throwJsErrors: true,
+    renderingReturnsPromises: false,
+    railsContext: {
+      serverSide: true,
+      serverSideRSCPayloadParameters: {},
+      reactClientManifestFileName: '',
+      reactServerClientManifestFileName: '',
+    },
+  });
+  let pendingWireBytes = Buffer.alloc(0);
+  const wireChunks = [];
+  let wireChunkCountAtBoundaryRelease;
+  const streamCompletion = new Promise((resolve, reject) => {
+    let ended = false;
+    const watchdog = setTimeout(() => {
+      streamResult.destroy(new Error('Packed React ' + React.version + ' streaming timed out'));
+    }, 5_000);
+    streamResult.once('end', () => {
+      ended = true;
+      clearTimeout(watchdog);
+      resolve();
+    });
+    streamResult.once('error', (error) => {
+      clearTimeout(watchdog);
+      reject(error);
+    });
+    streamResult.once('close', () => {
+      if (ended) return;
+      clearTimeout(watchdog);
+      reject(new Error('Packed React ' + React.version + ' streaming closed before it ended'));
+    });
+  });
+  streamResult.on('data', (chunk) => {
+    const receivedAt = performance.now();
+    pendingWireBytes = Buffer.concat([pendingWireBytes, Buffer.from(chunk)]);
+    const parsed = parseAvailableWireChunks(pendingWireBytes);
+    wireChunks.push(...parsed.chunks.map((wireChunk) => ({ ...wireChunk, receivedAt })));
+    pendingWireBytes = parsed.remaining;
+    if (!boundaryResolved && wireChunks.length > 0) {
+      boundaryResolvedAt = performance.now();
+      wireChunkCountAtBoundaryRelease = wireChunks.length;
+      boundaryResolved = true;
+      resolveBoundary();
+    }
+  });
+  await streamCompletion;
+
+  assert.equal(
+    pendingWireBytes.length,
+    0,
+    'Packed React ' + React.version + ' streaming ended with an incomplete wire chunk',
+  );
+  assert.ok(
+    wireChunks.length >= 2,
+    'Packed React ' + React.version + ' streaming did not emit multiple wire chunks',
+  );
+  assert.ok(boundaryResolvedAt, 'Packed React ' + React.version + ' streaming boundary never resolved');
+  assert.ok(
+    wireChunkCountAtBoundaryRelease >= 1,
+    'Packed React ' + React.version + ' streaming released the boundary before a complete shell chunk',
+  );
+  assert.equal(wireChunks[0].metadata.isShellReady, true);
+  assert.equal(wireChunks[0].metadata.hasErrors, false);
+  assert.match(wireChunks[0].html, /Packed streaming shell/);
+  assert.match(wireChunks[0].html, /Packed streaming fallback/);
+  const preReleaseHtml = wireChunks
+    .slice(0, wireChunkCountAtBoundaryRelease)
+    .map(({ html }) => html)
+    .join('');
+  const postReleaseHtml = wireChunks
+    .slice(wireChunkCountAtBoundaryRelease)
+    .map(({ html }) => html)
+    .join('');
+  assert.doesNotMatch(preReleaseHtml, /Packed streaming content resolved/);
+  assert.match(postReleaseHtml, /Packed streaming content resolved/);
+
+  console.log(\`PACKED_PRO_STREAMING_OK React \${React.version} chunks \${wireChunks.length}\`);
+}
 `,
   );
 
@@ -139,7 +295,7 @@ const execWebpack = (webpack, webpackConfig) =>
     });
   });
 
-const verifyConsumer = async (consumerDirectory, reactVersion) => {
+const verifyConsumer = async (consumerDirectory, { reactVersion, streaming }) => {
   const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
   const coreEntry = fs.realpathSync(consumerRequire.resolve('react-on-rails'));
   const proEntry = fs.realpathSync(consumerRequire.resolve('react-on-rails-pro'));
@@ -193,7 +349,21 @@ const verifyConsumer = async (consumerDirectory, reactVersion) => {
     encoding: 'utf8',
   }).trim();
   assert.match(runtimeOutput, new RegExp(`PACKED_PRO_SSR_OK React ${reactVersion.replaceAll('.', '\\.')}`));
-  console.log(`React ${reactVersion}: packed install, node export, webpack build, and SSR runtime passed`);
+  if (streaming) {
+    assert.match(
+      runtimeOutput,
+      new RegExp(`PACKED_PRO_STREAMING_OK React ${reactVersion.replaceAll('.', '\\.')}`),
+    );
+  } else {
+    assert.match(
+      runtimeOutput,
+      new RegExp(`PACKED_PRO_STREAMING_FALLBACK_OK React ${reactVersion.replaceAll('.', '\\.')}`),
+    );
+  }
+  const runtimeLabel = streaming ? 'SSR and progressive streaming runtimes' : 'SSR runtime';
+  console.log(
+    `React ${reactVersion}: packed install, node export, webpack build, and ${runtimeLabel} passed`,
+  );
 };
 
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'react-on-rails-pro-compat-'));
@@ -209,13 +379,14 @@ try {
   const coreArtifact = findPackedArtifact(artifactsDirectory, 'react-on-rails');
   const proArtifact = findPackedArtifact(artifactsDirectory, 'react-on-rails-pro');
 
-  for (const reactVersion of reactVersions) {
+  for (const compatibilityCase of compatibilityCases) {
+    const { reactVersion } = compatibilityCase;
     const consumerDirectory = path.join(temporaryRoot, `react-${reactVersion}`);
     fs.mkdirSync(consumerDirectory);
-    writeConsumerFiles(consumerDirectory, reactVersion, coreArtifact, proArtifact);
+    writeConsumerFiles(consumerDirectory, compatibilityCase, coreArtifact, proArtifact);
     runPnpm(['install', '--ignore-scripts', '--no-frozen-lockfile'], consumerDirectory);
     // eslint-disable-next-line no-await-in-loop -- keep each isolated install/build/runtime smoke serial
-    await verifyConsumer(consumerDirectory, reactVersion);
+    await verifyConsumer(consumerDirectory, compatibilityCase);
   }
 } finally {
   fs.rmSync(temporaryRoot, { force: true, recursive: true });

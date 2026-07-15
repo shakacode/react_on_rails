@@ -10,7 +10,7 @@ Already using React on Rails? Upgrading to Pro is straightforward: swap the gem 
 Pro adds performance and rendering features on top of everything in React on Rails OSS:
 
 - **[React Server Components](./react-server-components/tutorial.md)** - RSC with full Rails integration
-- **[Streaming SSR](../oss/building-features/streaming-server-rendering.md)** - Progressive server rendering with React 19
+- **[Streaming SSR](../oss/building-features/streaming-server-rendering.md)** - Progressive non-RSC rendering with React 18 or 19; async props and RSC require React 19
 - **[Fragment Caching](../oss/building-features/caching.md)** - Cache rendered components and skip prop evaluation entirely
 - **Prerender Caching** ([`config.prerender_caching`](../oss/configuration/configuration-pro.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
 - **[Node Renderer](../oss/building-features/node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
