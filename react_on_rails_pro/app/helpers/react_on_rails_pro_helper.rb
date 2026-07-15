@@ -34,12 +34,11 @@ module ReactOnRailsProHelper
   SCRIPT_CLOSE_TAG_LENGTH = 8
   STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = "data-react-on-rails-rsc-payload"
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
+  HTML_COMMENT_OPEN = "<!--"
+  HTML_COMMENT_CLOSE = "-->"
   PRO_ATTRIBUTION_MARKER = "Powered by React on Rails Pro"
+  PRO_ATTRIBUTION_COMMENT_PREFIX = "Powered by React on Rails Pro (c) ShakaCode"
   RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
-  LEADING_PRO_ATTRIBUTION_COMMENT_PATTERN =
-    /\A(?:\s*<!--\s*Powered by React on Rails Pro \(c\) ShakaCode(?:\s*\|(?:(?!-->).)*)?\s*-->\s*)+/m
-  LEADING_RAILS_CONTEXT_SCRIPT_PATTERN =
-    %r{\A\s*<script\b(?=[^>]*\bid=(?:"js-react-on-rails-context"|'js-react-on-rails-context'))[^>]*>.*?</script>\s*}mi
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -479,11 +478,58 @@ module ReactOnRailsProHelper
                    !html.include?(RAILS_CONTEXT_MARKER)
 
     was_html_safe = html.html_safe?
-    normalized_html = html.sub(LEADING_PRO_ATTRIBUTION_COMMENT_PATTERN, "")
-                          .sub(LEADING_RAILS_CONTEXT_SCRIPT_PATTERN, "")
+    normalized_html = strip_leading_pro_attribution_comments(html)
+    normalized_html = strip_leading_rails_context_script(normalized_html)
     normalized_html = prepend_render_rails_context(normalized_html)
 
     was_html_safe ? normalized_html : String.new(normalized_html)
+  end
+
+  def strip_leading_pro_attribution_comments(html)
+    cursor = 0
+    stripped_comment = false
+
+    loop do
+      comment_start = html_space_end_index(html, cursor)
+      break unless html[comment_start, HTML_COMMENT_OPEN.length] == HTML_COMMENT_OPEN
+
+      content_start = html_space_end_index(html, comment_start + HTML_COMMENT_OPEN.length)
+      prefix_end = content_start + PRO_ATTRIBUTION_COMMENT_PREFIX.length
+      break unless html[content_start, PRO_ATTRIBUTION_COMMENT_PREFIX.length] == PRO_ATTRIBUTION_COMMENT_PREFIX
+
+      comment_end = html.index(HTML_COMMENT_CLOSE, prefix_end)
+      break unless comment_end
+
+      separator_index = html_space_end_index(html, prefix_end)
+      break unless separator_index == comment_end || html[separator_index] == "|"
+
+      cursor = html_space_end_index(html, comment_end + HTML_COMMENT_CLOSE.length)
+      stripped_comment = true
+    end
+
+    stripped_comment ? (html[cursor..] || "") : html
+  end
+
+  def strip_leading_rails_context_script(html)
+    script_start = html_space_end_index(html, 0)
+    return html unless html_ascii_case_insensitive_match?(html, SCRIPT_OPEN_TAG, script_start)
+    return html unless html_tag_name_boundary?(html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+
+    opening_tag_end = html_tag_end_index(html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+    return html unless opening_tag_end
+
+    closing_tag_range = html_script_closing_tag_range(html, opening_tag_end + 1)
+    return html unless closing_tag_range
+
+    script_node = Nokogiri::HTML5.fragment(html[script_start..closing_tag_range.end]).at_css("script")
+    return html unless script_node && script_node["id"] == RAILS_CONTEXT_MARKER
+
+    html[html_space_end_index(html, closing_tag_range.end + 1)..] || ""
+  end
+
+  def html_space_end_index(html, cursor)
+    cursor += 1 while cursor < html.length && HTML_SPACE_CHARACTERS.include?(html[cursor])
+    cursor
   end
 
   def add_component_cache_metadata(result, cache_key, cache_hit)
