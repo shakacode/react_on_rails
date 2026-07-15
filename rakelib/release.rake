@@ -2435,16 +2435,10 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
     login = comment.dig("user", "login").to_s
     abort "❌ Accelerated RC tracker record has no attributable GitHub author." if login.empty?
 
-    permission = permissions.fetch(login) do
-      output, status = capture_gh_output(
-        "api", "repos/#{repo_slug}/collaborators/#{login}/permission", "--jq", ".permission"
-      )
-      unless status.success?
-        abort "❌ Unable to verify the repository permission of accelerated RC record author #{login}.\n\n#{output}"
-      end
-      permissions[login] = output.strip
-    end
-    validate_release_approver!(login:, permission:)
+    permission = accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
+    permission_class = accelerated_rc_repository_permission_class!(permission:, login:)
+    next [] if permission_class == :non_maintainer
+
     accelerated_rc_records_from_trusted_comment!(comment:, login:)
   end
 
@@ -3394,13 +3388,6 @@ def accelerated_rc_authorization_without_history!(monorepo_root:, tag:, tag_exis
         "repository tracker chain is missing."
 end
 
-def accelerated_rc_single_retry_tracker!(candidate_records)
-  trackers = candidate_records.map { |record| record["release_tracker"] }.uniq
-  abort "❌ Accelerated RC retry history is bound to conflicting release trackers." unless trackers.one?
-
-  trackers.first
-end
-
 def validate_accelerated_rc_retry_tag_authorization!(candidate_records:, authorization:, tag_exists:, tracker:,
                                                      target_version:, candidate_sha:, monorepo_root:, tag:)
   return unless tag_exists
@@ -3414,33 +3401,11 @@ def validate_accelerated_rc_retry_tag_authorization!(candidate_records:, authori
   abort "❌ Existing RC tag references a noncanonical accelerated publication authorization."
 end
 
-def accelerated_rc_publication_authorization_for_retry!(repo_slug:, tracker:, target_version:, candidate_sha:,
-                                                        monorepo_root:, tag:)
-  records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
-  candidate_records = accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
-  abort_if_accelerated_rc_retry_rejected!(candidate_records)
-  authorizations = candidate_records.select { |record| record["status"] == "publication-authorized" }
-  authorization = if local_release_tag_exists?(monorepo_root:, tag:)
-                    accelerated_rc_tagged_authorization_for_retry!(
-                      authorizations:, tracker:, target_version:, candidate_sha:, monorepo_root:, tag:
-                    )
-                  elsif candidate_records.any?
-                    canonical_accelerated_rc_authorization_for_retry!(authorizations)
-                  end
-  return nil unless authorization
-
-  validate_accelerated_rc_retry_chain!(candidate_records, authorization)
-end
-
 def abort_if_accelerated_rc_retry_rejected!(candidate_records)
   terminal = validated_accelerated_rc_terminal_set!(candidate_records)
   return unless terminal && terminal["status"] == "candidate-rejected"
 
   abort "❌ Accelerated RC retry is blocked because this immutable candidate was permanently rejected."
-end
-
-def canonical_accelerated_rc_authorization_for_retry!(authorizations)
-  validated_accelerated_rc_authorization_set!(authorizations)
 end
 
 def validated_accelerated_rc_authorization_set!(candidate_records, selected_authorization: nil)
@@ -3455,12 +3420,6 @@ def validated_accelerated_rc_authorization_set!(candidate_records, selected_auth
   end
 
   selected_authorization || authorizations.first
-end
-
-def validate_accelerated_rc_retry_chain!(candidate_records, authorization)
-  validated_accelerated_rc_candidate_chain!(
-    candidate_records, selected_authorization: authorization
-  ).fetch(:authorization)
 end
 
 def accelerated_rc_tagged_authorization_for_retry!(authorizations:, tracker:, target_version:, candidate_sha:,

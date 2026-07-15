@@ -328,13 +328,13 @@ idempotent only when every field except `recorded_at` is identical, and any othe
 variation is conflicting. `candidate-rejected` is absorbing; append-time revalidation prevents a
 concurrent reconciliation from adding acceptance or any other later transition. Every posted transition
 is re-fetched and proven present in the complete canonical chain before the task proceeds toward immutable
-publication or reports reconciliation success. Selected-tracker markers with malformed or unsupported schemas,
-markers authored by accounts without repository write permission, or records whose named approver does not match
-the trusted comment author fail closed. Repository-wide discovery ignores an exact-candidate marker only after
-GitHub successfully proves its author lacks maintainer permission; an unknown permission/API result and every
-malformed record from a trusted author still fail closed. Only the explicit `none`, `read`, or `triage` permission
-results count as a known non-maintainer classification; blank, missing, malformed, unsupported, or future permission
-values are unknown and block even when the API call itself succeeded. Status-specific
+publication or reports reconciliation success. Aside from the canonical unrelated-marker cheap skip above,
+selected-tracker and repository-wide scans ignore a marker comment based on its author only after GitHub successfully
+proves that author lacks maintainer permission. An unknown permission/API result, every malformed or unsupported
+record from a trusted author, and any trusted record whose named approver does not match its comment author still fail
+closed. Only the explicit `none`, `read`, or `triage` permission results count as a known non-maintainer classification;
+blank, missing, malformed, unsupported, or future permission values are unknown and block even when the API call
+itself succeeded. Status-specific
 contradictions also fail closed: accepted records require every success and evidence URL, while
 rejected records require a known failed gate.
 

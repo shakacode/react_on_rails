@@ -4293,25 +4293,89 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /write, maintain, or admin/)
     end
 
-    it "rejects tracker markers authored without maintainer repository permission" do
-      record = { "schema_version" => 1 }
-      marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 " \
-               "#{JSON.generate(record).unpack1('H*')} -->"
-      allow(self).to receive(:fetch_release_tracker_comments).and_return(
-        [{ "body" => marker, "user" => { "login" => "external-user" } }]
+    it "ignores a known non-maintainer marker at an idempotent tracker append boundary" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
       )
-      status = instance_double(Process::Status, success?: true)
+      untrusted_marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 " \
+                         "#{JSON.generate({ 'schema_version' => 1 }).unpack1('H*')} -->"
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_release_tracker_comments: [
+          { "body" => untrusted_marker, "user" => { "login" => "external-user" } },
+          { "body" => accelerated_rc_tracker_comment(authorization), "user" => { "login" => "justin808" } }
+        ]
+      )
+      success = instance_double(Process::Status, success?: true)
       allow(self).to receive(:capture_gh_output)
         .with(
           "api",
           "repos/shakacode/react_on_rails/collaborators/external-user/permission",
           "--jq",
           ".permission"
-        ).and_return(["read\n", status])
+        ).and_return(["read\n", success])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "api",
+          "repos/shakacode/react_on_rails/collaborators/justin808/permission",
+          "--jq",
+          ".permission"
+        ).and_return(["write\n", success])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      result = nil
+      failure = begin
+        result = append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails", tracker: 3823, record: authorization
+        )
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_nil
+        expect(result).to eq(authorization)
+      end
+    end
+
+    it "fails closed when a tracker marker author permission lookup fails" do
+      marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 " \
+               "#{JSON.generate({ 'schema_version' => 1 }).unpack1('H*')} -->"
+      failure = instance_double(Process::Status, success?: false)
+      allow(self).to receive_messages(
+        fetch_release_tracker_comments: [
+          { "body" => marker, "user" => { "login" => "external-user" } }
+        ],
+        capture_gh_output: ["permission unavailable", failure]
+      )
 
       expect do
         fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
-      end.to raise_error(SystemExit, /write, maintain, or admin/)
+      end.to raise_error(SystemExit, /Unable to verify the repository permission/)
+    end
+
+    it "fails closed on an unknown successful tracker marker permission" do
+      marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 " \
+               "#{JSON.generate({ 'schema_version' => 1 }).unpack1('H*')} -->"
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive_messages(
+        fetch_release_tracker_comments: [
+          { "body" => marker, "user" => { "login" => "external-user" } }
+        ],
+        capture_gh_output: ["future_permission\n", success]
+      )
+
+      expect do
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /repository permission.*unknown/i)
     end
 
     it "loads repository issue-comment discovery incrementally and retains only marker comments" do
@@ -5828,18 +5892,17 @@ RSpec.describe "release.rake helper methods" do
       )
       expect(validate_accelerated_rc_tracker_record!(conflicting_authorization)).to eq(conflicting_authorization)
       allow(self).to receive_messages(
-        fetch_accelerated_rc_tracker_records!: [authorization, conflicting_authorization],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, conflicting_authorization],
         local_release_tag_exists?: false
       )
 
       expect do
-        accelerated_rc_publication_authorization_for_retry!(
+        accelerated_rc_authorization_for_same_candidate_retry!(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823,
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40,
           monorepo_root: "/tmp/repo",
-          tag: "v17.0.0.rc.10"
+          accelerated_requested: false
         )
       end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
     end
@@ -5856,8 +5919,9 @@ RSpec.describe "release.rake helper methods" do
         recorded_at: Time.utc(2026, 7, 14, 13, 30)
       )
       allow(self).to receive_messages(
-        fetch_accelerated_rc_tracker_records!: [authorization],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
         local_release_tag_exists?: true,
+        fetch_release_tracker_issue!: {},
         accelerated_rc_tag_provenance_for_tag!: {
           "target_version" => "17.0.0.rc.10",
           "candidate_sha" => "e" * 40,
@@ -5867,13 +5931,12 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect do
-        accelerated_rc_publication_authorization_for_retry!(
+        accelerated_rc_authorization_for_same_candidate_retry!(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823,
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40,
           monorepo_root: "/tmp/repo",
-          tag: "v17.0.0.rc.10"
+          accelerated_requested: false
         )
       end.to raise_error(SystemExit, /lacks matching canonical accelerated publication provenance/)
     end
@@ -5891,19 +5954,18 @@ RSpec.describe "release.rake helper methods" do
       )
       conflicting_authorization = authorization.merge("reason" => "Mutated authorization reason")
       allow(self).to receive_messages(
-        fetch_accelerated_rc_tracker_records!: [authorization, conflicting_authorization],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, conflicting_authorization],
         local_release_tag_exists?: true,
         accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization)
       )
 
       expect do
-        accelerated_rc_publication_authorization_for_retry!(
+        accelerated_rc_authorization_for_same_candidate_retry!(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823,
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40,
           monorepo_root: "/tmp/repo",
-          tag: "v17.0.0.rc.10"
+          accelerated_requested: false
         )
       end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
     end
@@ -5937,20 +5999,19 @@ RSpec.describe "release.rake helper methods" do
       )
       conflicting_accepted = accepted.merge("approved_by" => "other-maintainer")
       allow(self).to receive_messages(
-        fetch_accelerated_rc_tracker_records!: [
+        fetch_repository_accelerated_rc_records_for_candidate!: [
           authorization, publication, accepted, conflicting_accepted
         ],
         local_release_tag_exists?: false
       )
 
       expect do
-        accelerated_rc_publication_authorization_for_retry!(
+        accelerated_rc_authorization_for_same_candidate_retry!(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823,
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40,
           monorepo_root: "/tmp/repo",
-          tag: "v17.0.0.rc.10"
+          accelerated_requested: false
         )
       end.to raise_error(SystemExit, /conflicting candidate-accepted terminal records/i)
     end
@@ -6305,18 +6366,17 @@ RSpec.describe "release.rake helper methods" do
         recorded_at: Time.utc(2026, 7, 14, 14)
       ).merge("required_follow_up" => "Skip reconciliation")
       allow(self).to receive_messages(
-        fetch_accelerated_rc_tracker_records!: [authorization, mutated_publication],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, mutated_publication],
         local_release_tag_exists?: false
       )
 
       expect do
-        accelerated_rc_publication_authorization_for_retry!(
+        accelerated_rc_authorization_for_same_candidate_retry!(
           repo_slug: "shakacode/react_on_rails",
-          tracker: 3823,
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40,
           monorepo_root: "/tmp/repo",
-          tag: "v17.0.0.rc.10"
+          accelerated_requested: false
         )
       end.to raise_error(SystemExit, /not the canonical authorized transition/)
     end
