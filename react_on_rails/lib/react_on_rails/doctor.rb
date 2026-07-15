@@ -3494,8 +3494,8 @@ module ReactOnRails
       "#{RSC_SUPPORTED_PACKAGE_MAJOR}.#{minor}.x"
     end.join(" or ")
     RSC_PACKAGE_INSTALL_VERSION = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
-    # While the 17.0 RC soak accepts a prerelease package, the prerelease floor
-    # must share the same core tuple as RSC_MINIMUM_PACKAGE_VERSION.
+    # A temporary prerelease pin may define a matching exception during a future soak.
+    # Stable pins leave this nil so prereleases do not satisfy the package floor.
     RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION =
       RSC_PACKAGE_INSTALL_VERSION.include?("-") ? RSC_PACKAGE_INSTALL_VERSION : nil
     RSC_MINIMUM_REACT_VERSION = "19.2.7"

@@ -105,13 +105,13 @@ write_fixture() {
       "react_on_rails>react-dom": "^19.2.0",
       "react-on-rails-pro>react": "~19.2.7",
       "react-on-rails-pro>react-dom": "~19.2.7",
-      "react-on-rails-pro>react-on-rails-rsc": "19.2.1-rc.1",
+      "react-on-rails-pro>react-on-rails-rsc": "19.2.1",
       "react-on-rails-pro-node-renderer>react": "~19.2.7",
       "react-on-rails-pro-node-renderer>react-dom": "~19.2.7",
-      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.2.1-rc.1",
+      "react-on-rails-pro-node-renderer>react-on-rails-rsc": "19.2.1",
       "react_on_rails_pro_dummy>react": "~19.2.7",
       "react_on_rails_pro_dummy>react-dom": "~19.2.7",
-      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.1-rc.1",
+      "react_on_rails_pro_dummy>react-on-rails-rsc": "19.2.1",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }
   }

@@ -5700,9 +5700,8 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
-      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(
-        rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)[:version]
-      )
+      prerelease_match = rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)
+      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(prerelease_match&.[](:version))
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
@@ -5995,7 +5994,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.1-beta.0 is not supported by React on Rails Pro 17 RSC",
-                "or #{rsc_package_version} during the 17.0 RC soak"
+                "requires react-on-rails-rsc >= #{rsc_package_version}"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
@@ -6032,7 +6031,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.2-alpha.0 is not supported by React on Rails Pro 17 RSC",
-                "or #{rsc_package_version} during the 17.0 RC soak"
+                "requires react-on-rails-rsc >= #{rsc_package_version}"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
@@ -6313,7 +6312,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(Dir.pwd)
           .and_return(
             [
-              JSON.generate("latest" => "19.0.5", "next" => "19.2.1-rc.2"),
+              JSON.generate("latest" => "19.2.1", "next" => "19.2.2-rc.1"),
               instance_double(Process::Status, success?: true)
             ]
           )
@@ -6323,7 +6322,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc #{rsc_package_version} is behind the npm next dist-tag 19.2.1-rc.2",
+            "react-on-rails-rsc #{rsc_package_version} is behind the npm next dist-tag 19.2.2-rc.1",
             "React Server Components track React minor versions"
           )
         )

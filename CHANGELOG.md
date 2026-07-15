@@ -26,6 +26,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
+- **[Pro]** **RSC scaffolding now installs stable `react-on-rails-rsc@19.2.1`**: The Pro package,
+  node renderer, generator, dummy app, workspace overrides, and compatibility checks now use the stable
+  package and reject prereleases below the stable peer floor. This keeps React on Rails Pro 17 on the
+  coordinated React 19.2.7 runtime while including the 19.2.1 CSS/FOUC fix. The stable artifact uses the
+  React on Rails Pro commercial terms rather than MIT and reports `SEE LICENSE IN LICENSE.md` in npm metadata.
+  [Issue 4357](https://github.com/shakacode/react_on_rails/issues/4357).
 - **[Pro]** **Published artifacts now identify the commercial license accurately**: The Pro gem reports
   `LicenseRef-LICENSE`, while the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages
   report `SEE LICENSE IN LICENSE.md`. All three packed artifacts include React on Rails Pro EULA v2.3 instead
