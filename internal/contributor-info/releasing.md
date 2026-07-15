@@ -98,7 +98,7 @@ Use override only when needed:
 **Full argument list:**
 
 ```bash
-bundle exec rake "release[version,dry_run,override_version_policy]"
+bundle exec rake "release[version,dry_run,override_version_policy,override_ci_status]"
 ```
 
 1. **`version`** (optional): Version bump type or explicit version
@@ -112,6 +112,15 @@ bundle exec rake "release[version,dry_run,override_version_policy]"
 2. **`dry_run`** (optional): `true` to preview changes without releasing (default: `false`)
 
 3. **`override_version_policy`** (optional): `true` to override version policy checks (default: `false`)
+
+4. **`override_ci_status`** (optional): global release-gate override (default: `false`). It is only for
+   an explicitly approved prerelease waiver under the active RC policy; never use it for a stable/final
+   promotion.
+
+> Stable/final promotion must not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass
+> `override_ci_status=true`, or use an accelerated asynchronous/deferred-gate bypass. Every unwaived
+> final gate must pass. A narrowly scoped final waiver remains subject to the existing final-release
+> policy, required evidence, and maintainer sign-off, and does not waive any other gate.
 
 **Environment variables:**
 
