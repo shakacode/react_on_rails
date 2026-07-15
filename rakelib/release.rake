@@ -87,6 +87,10 @@ ACCELERATED_RC_CI_BOUND_FIELDS = %w[sha checks_url].freeze
 ACCELERATED_RC_SHAKAPERF_BOUND_FIELDS = %w[
   run_id attempt candidate_sha target_version release_started_at
 ].freeze
+ACCELERATED_RC_MAINTAINER_PERMISSIONS = %w[write maintain admin].freeze
+ACCELERATED_RC_NON_MAINTAINER_PERMISSIONS = %w[none read triage].freeze
+FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE = "accepted-rc-reuse"
+FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE = "strict-final"
 SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
   action_required cancelled failure neutral skipped stale startup_failure success timed_out
 ].freeze
@@ -1004,7 +1008,7 @@ end
 
 def reuse_shakaperf_prerun?(repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:,
                             release_started_at:)
-  prerun = find_latest_shakaperf_prerun(existing_runs, head_sha)
+  prerun = find_latest_shakaperf_prerun(existing_runs, head_sha, ref:, target_version:)
   return false unless prerun
 
   waited_for_active_prerun = active_shakaperf_release_gate_run?(prerun)
@@ -1107,7 +1111,7 @@ def run_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, target_version:
   print_shakaperf_release_gate_notice(ref:, head_sha:)
 
   existing_runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
-  existing_run = find_latest_shakaperf_release_gate_run(existing_runs, head_sha)
+  existing_run = find_latest_shakaperf_release_gate_run(existing_runs, head_sha, ref:, target_version:)
   validated_run = handle_existing_shakaperf_release_gate_run!(
     repo_slug:,
     monorepo_root:,
@@ -1231,6 +1235,10 @@ def reject_known_accelerated_shakaperf_failure!(repo_slug:, run:)
   return unless run&.fetch("status", nil) == "completed" && run["conclusion"] != "success"
 
   run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  unless SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(run["conclusion"])
+    abort "❌ Accelerated RC ShakaPerf result is unknown; refusing unaudited publication: #{run_url}"
+  end
+
   abort "❌ Accelerated RC publication found a known ShakaPerf failure (#{run['conclusion']}): #{run_url}"
 end
 
@@ -2630,7 +2638,9 @@ def trusted_accelerated_rc_records_from_repository_comment!(
   abort "❌ Accelerated RC tracker record has no attributable GitHub author." if login.empty?
 
   permission = accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
-  validate_release_approver!(login:, permission:)
+  permission_class = accelerated_rc_repository_permission_class!(permission:, login:)
+  return [] if permission_class == :non_maintainer
+
   records = accelerated_rc_records_from_trusted_comment!(comment:, login:)
   unless records.all? { |record| record["release_tracker"] == tracker }
     abort "❌ Accelerated RC retry history is bound to a different release tracker."
@@ -2649,16 +2659,28 @@ def release_tracker_number_from_repository_comment_issue_url!(issue_url:, repo_s
 end
 
 def accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
-  return permissions.fetch(login) if permissions.key?(login)
+  if permissions.key?(login)
+    permission = permissions.fetch(login)
+  else
+    output, status = capture_gh_output(
+      "api", "repos/#{repo_slug}/collaborators/#{login}/permission", "--jq", ".permission"
+    )
+    unless status.success?
+      abort "❌ Unable to verify the repository permission of accelerated RC record author #{login}.\n\n#{output}"
+    end
 
-  output, status = capture_gh_output(
-    "api", "repos/#{repo_slug}/collaborators/#{login}/permission", "--jq", ".permission"
-  )
-  unless status.success?
-    abort "❌ Unable to verify the repository permission of accelerated RC record author #{login}.\n\n#{output}"
+    permission = output.strip
   end
 
-  permissions[login] = output.strip
+  accelerated_rc_repository_permission_class!(permission:, login:)
+  permissions[login] = permission
+end
+
+def accelerated_rc_repository_permission_class!(permission:, login:)
+  return :maintainer if ACCELERATED_RC_MAINTAINER_PERMISSIONS.include?(permission)
+  return :non_maintainer if ACCELERATED_RC_NON_MAINTAINER_PERMISSIONS.include?(permission)
+
+  abort "❌ Accelerated RC repository permission for #{login} is unknown; durable history cannot be ignored or trusted."
 end
 
 def accelerated_rc_records_from_trusted_comment!(comment:, login:)
@@ -2691,11 +2713,15 @@ rescue JSON::ParserError => e
 end
 
 def validate_release_approver!(login:, permission:)
-  unless %w[write maintain admin].include?(permission)
+  unless valid_release_approver_permission?(permission)
     abort "❌ Accelerated RC approval requires write, maintain, or admin repository permission for #{login}."
   end
 
   login
+end
+
+def valid_release_approver_permission?(permission)
+  ACCELERATED_RC_MAINTAINER_PERMISSIONS.include?(permission)
 end
 
 def current_release_approver!(repo_slug:)
@@ -3055,17 +3081,100 @@ def accelerated_repository_boundary_context!(accelerated_publication_record:, ac
   { record:, tag_authorization: }
 end
 
-def valid_final_promotion_context_identity?(context:, candidate_sha:)
+def valid_final_promotion_context_identity?(context:, candidate_sha:,
+                                            expected_strict_final_shakaperf_identity_anchor:)
   context_record = context.fetch(:record)
   ci_branch = context.fetch(:ci_branch)
   ci_snapshot = context.fetch(:ci_snapshot)
   shakaperf_record = context.fetch(:shakaperf_record)
+  final_target_version = context.fetch(:final_target_version)
+  shakaperf_evidence_mode = context.fetch(:shakaperf_evidence_mode)
+  strict_final_shakaperf_identity_anchor = context.fetch(:strict_final_shakaperf_identity_anchor, nil)
   ci_branch.is_a?(String) && !ci_branch.empty? &&
+    strict_final_shakaperf_identity_anchor == expected_strict_final_shakaperf_identity_anchor &&
     context.fetch(:candidate_sha) == candidate_sha &&
     ci_snapshot.fetch("sha") == context_record.fetch("candidate_sha") &&
-    shakaperf_record.fetch("release_branch") == ci_branch &&
-    shakaperf_record.fetch("candidate_sha") == candidate_sha &&
+    final_target_version == Gem::Version.new(context_record.fetch("target_version")).release.to_s &&
+    valid_final_promotion_shakaperf_context_identity?(
+      shakaperf_record:, ci_branch:, context_record:, candidate_sha:, final_target_version:, shakaperf_evidence_mode:,
+      strict_final_shakaperf_identity_anchor:
+    ) &&
     valid_final_promotion_source_rc_context_identity?(context:, context_record:)
+end
+
+def valid_final_promotion_shakaperf_context_identity?(shakaperf_record:, ci_branch:, context_record:, candidate_sha:,
+                                                      final_target_version:, shakaperf_evidence_mode:,
+                                                      strict_final_shakaperf_identity_anchor:)
+  shakaperf_candidate_sha = shakaperf_record.fetch("candidate_sha")
+  return false unless valid_final_promotion_shakaperf_common_identity?(
+    shakaperf_record:, ci_branch:, shakaperf_candidate_sha:
+  )
+
+  case shakaperf_evidence_mode
+  when FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE
+    valid_accepted_rc_final_promotion_shakaperf_identity?(
+      shakaperf_record:, context_record:, shakaperf_candidate_sha:, strict_final_shakaperf_identity_anchor:
+    )
+  when FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE
+    valid_strict_final_promotion_shakaperf_identity?(
+      shakaperf_record:, shakaperf_candidate_sha:, candidate_sha:, final_target_version:,
+      identity_anchor: strict_final_shakaperf_identity_anchor
+    )
+  else
+    false
+  end
+end
+
+def valid_final_promotion_shakaperf_common_identity?(shakaperf_record:, ci_branch:, shakaperf_candidate_sha:)
+  shakaperf_record.fetch("release_branch") == ci_branch &&
+    shakaperf_record.dig("shakaperf", "candidate_sha") == shakaperf_candidate_sha &&
+    shakaperf_record.dig("shakaperf", "target_version") == shakaperf_record.fetch("target_version")
+end
+
+def valid_accepted_rc_final_promotion_shakaperf_identity?(shakaperf_record:, context_record:,
+                                                          shakaperf_candidate_sha:,
+                                                          strict_final_shakaperf_identity_anchor:)
+  strict_final_shakaperf_identity_anchor.nil? &&
+    canonical_accelerated_rc_value(shakaperf_record.fetch("shakaperf")) ==
+      canonical_accelerated_rc_value(context_record.fetch("shakaperf")) &&
+    shakaperf_candidate_sha == context_record.dig("shakaperf", "candidate_sha")
+end
+
+def valid_strict_final_promotion_shakaperf_identity?(shakaperf_record:, shakaperf_candidate_sha:, candidate_sha:,
+                                                     final_target_version:, identity_anchor:)
+  shakaperf_candidate_sha == candidate_sha && shakaperf_record.fetch("target_version") == final_target_version &&
+    valid_strict_final_promotion_shakaperf_identity_anchor?(shakaperf_record:, identity_anchor:)
+end
+
+def valid_strict_final_promotion_shakaperf_identity_anchor?(shakaperf_record:, identity_anchor:)
+  return false unless identity_anchor.is_a?(String) && identity_anchor.frozen?
+  return false unless valid_strict_final_promotion_shakaperf_record?(shakaperf_record)
+
+  identity_anchor == final_promotion_shakaperf_identity_anchor(shakaperf_record)
+end
+
+def valid_strict_final_promotion_shakaperf_record?(record)
+  return false unless accelerated_rc_exact_keys?(
+    record, %w[release_branch candidate_sha target_version shakaperf]
+  )
+
+  valid_strict_final_promotion_shakaperf_snapshot?(record.fetch("shakaperf"))
+end
+
+def valid_strict_final_promotion_shakaperf_snapshot?(snapshot)
+  accelerated_rc_exact_keys?(snapshot, ACCELERATED_RC_SHAKAPERF_FIELDS) && snapshot["status"] == "success" &&
+    valid_strict_final_promotion_shakaperf_snapshot_identity?(snapshot)
+end
+
+def valid_strict_final_promotion_shakaperf_snapshot_identity?(snapshot)
+  positive_github_id?(snapshot["run_id"]) && positive_github_id?(snapshot["attempt"]) &&
+    valid_accelerated_rc_https_url?(snapshot["run_url"]) &&
+    snapshot["candidate_sha"].to_s.match?(/\A[0-9a-f]{40}\z/) &&
+    !shakaperf_release_gate_time(snapshot["release_started_at"]).nil?
+end
+
+def final_promotion_shakaperf_identity_anchor(shakaperf_record)
+  canonical_accelerated_rc_json(shakaperf_record).freeze
 end
 
 def valid_final_promotion_source_rc_context_identity?(context:, context_record:)
@@ -3077,7 +3186,8 @@ def valid_final_promotion_source_rc_context_identity?(context:, context_record:)
       context_record.values_at("target_version", "candidate_sha", "release_tracker")
 end
 
-def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:)
+def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:,
+                                      expected_strict_final_shakaperf_identity_anchor: nil)
   unless context
     if boundary_record&.fetch("status", nil) == "candidate-accepted"
       abort "❌ Release tag handling is missing accelerated final-promotion context."
@@ -3089,7 +3199,9 @@ def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:
   context_record = context.fetch(:record)
   valid = boundary_record&.fetch("status", nil) == "candidate-accepted" &&
           accelerated_rc_retry_equivalent?(boundary_record, context_record) &&
-          valid_final_promotion_context_identity?(context:, candidate_sha:)
+          valid_final_promotion_context_identity?(
+            context:, candidate_sha:, expected_strict_final_shakaperf_identity_anchor:
+          )
   return if valid
 
   abort "❌ Release tag handling received inconsistent accelerated final-promotion boundary evidence."
@@ -3097,7 +3209,14 @@ rescue KeyError
   abort "❌ Release tag handling received incomplete accelerated final-promotion boundary evidence."
 end
 
-def validate_accelerated_tag_publication_boundary!(monorepo_root:, record:, final_promotion_context:, phase:)
+def validate_accelerated_tag_publication_boundary!(
+  monorepo_root:, record:, final_promotion_context:, candidate_sha:,
+  expected_strict_final_shakaperf_identity_anchor:, phase:
+)
+  validate_final_promotion_context!(
+    boundary_record: record, context: final_promotion_context, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor:
+  )
   validate_accelerated_repository_publication_boundary!(monorepo_root:, record:, phase:)
   validate_final_promotion_ci_publication_boundary!(
     monorepo_root:, context: final_promotion_context, phase:
@@ -3108,6 +3227,11 @@ def validate_accelerated_tag_publication_boundary!(monorepo_root:, record:, fina
   validate_final_promotion_source_rc_tag_boundary!(
     monorepo_root:, context: final_promotion_context, phase:
   )
+end
+
+def retain_final_promotion_shakaperf_identity_anchor(context)
+  identity_anchor = context&.fetch(:strict_final_shakaperf_identity_anchor, nil)
+  identity_anchor.is_a?(String) ? identity_anchor.dup.freeze : identity_anchor
 end
 
 def validate_final_promotion_source_rc_tag_boundary!(monorepo_root:, context:, phase:)
@@ -3159,17 +3283,25 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   )
   boundary_record = boundary_context.fetch(:record)
   tag_authorization = boundary_context.fetch(:tag_authorization)
+  strict_final_shakaperf_identity_anchor = retain_final_promotion_shakaperf_identity_anchor(
+    accelerated_final_promotion_context
+  )
   validate_final_promotion_context!(
-    boundary_record:, context: accelerated_final_promotion_context, candidate_sha:
+    boundary_record:, context: accelerated_final_promotion_context, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor
   )
   validate_accelerated_tag_publication_boundary!(
     monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, phase: "tag handling"
+    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
+    phase: "tag handling"
   )
   ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:)
   validate_accelerated_tag_publication_boundary!(
     monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, phase: "git tag push"
+    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
+    phase: "git tag push"
   )
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
@@ -3177,7 +3309,9 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
   validate_accelerated_tag_publication_boundary!(
     monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, phase: "package publication"
+    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
+    phase: "package publication"
   )
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "package publication"
@@ -3934,14 +4068,50 @@ def reconcile_accelerated_rc_record(published_record:, ci_snapshot:, shakaperf:,
   )
 end
 
-def run_accelerated_rc_reconciliation!(repo_slug:, monorepo_root:, tracker:, target_version:, reason:, evidence:)
-  fetch_release_tracker_issue!(repo_slug:, tracker:)
-  approved_by = current_release_approver!(repo_slug:)
-  records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
-  published_record = accelerated_rc_published_record!(records:, target_version:)
-  terminal_record = terminal_accelerated_rc_reconciliation_record!(published_record)
-  return terminal_record if terminal_record
+def validate_repository_accelerated_rc_reconciliation_history!(repo_slug:, tracker:, transition:, authorization:)
+  history = validated_repository_accelerated_rc_candidate_history!(
+    repo_slug:,
+    target_version: transition.fetch("target_version"),
+    candidate_sha: transition.fetch("candidate_sha"),
+    expected_tracker: tracker,
+    selected_authorization: authorization
+  )
+  repository_terminal = history.dig(:chain, :terminal)
+  return history unless repository_terminal &&
+                        !accelerated_rc_retry_equivalent?(repository_terminal, transition)
 
+  if repository_terminal["status"] == "candidate-rejected"
+    abort "❌ Repository-wide accelerated RC history permanently rejected this candidate; " \
+          "candidate-rejected is absorbing."
+  end
+
+  abort "❌ Repository-wide accelerated RC history contains a conflicting terminal transition."
+end
+
+def accelerated_rc_reconciliation_context!(records:, target_version:)
+  published_record = accelerated_rc_published_record!(records:, target_version:)
+  candidate_records = accelerated_rc_records_for_candidate(
+    records,
+    target_version: published_record.fetch("target_version"),
+    candidate_sha: published_record.fetch("candidate_sha")
+  )
+  authorization = validated_accelerated_rc_candidate_chain!(
+    candidate_records, require_publication: true
+  ).fetch(:authorization)
+  { published_record:, authorization: }
+end
+
+def existing_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, context:)
+  terminal_record = context.fetch(:published_record)
+  return nil unless ACCELERATED_RC_TERMINAL_STATUSES.include?(terminal_record["status"])
+
+  validate_repository_accelerated_rc_reconciliation_history!(
+    repo_slug:, tracker:, transition: terminal_record, authorization: context.fetch(:authorization)
+  )
+  terminal_accelerated_rc_reconciliation_record!(terminal_record)
+end
+
+def accelerated_rc_reconciliation_gate_snapshots!(repo_slug:, monorepo_root:, published_record:)
   candidate_sha = published_record.fetch("candidate_sha")
   ci = json_compatible_release_value(
     fetch_accelerated_rc_ci_snapshot!(
@@ -3957,16 +4127,42 @@ def run_accelerated_rc_reconciliation!(repo_slug:, monorepo_root:, tracker:, tar
               else
                 accelerated_rc_shakaperf_snapshot!(repo_slug:, monorepo_root:, record: published_record)
               end
+  { ci:, shakaperf: }
+end
+
+def append_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, record:, authorization:)
+  validate_repository_accelerated_rc_reconciliation_history!(
+    repo_slug:, tracker:, transition: record, authorization:
+  )
+  append_accelerated_rc_tracker_record!(repo_slug:, tracker:, record:)
+  validate_repository_accelerated_rc_reconciliation_history!(
+    repo_slug:, tracker:, transition: record, authorization:
+  )
+  record
+end
+
+def run_accelerated_rc_reconciliation!(repo_slug:, monorepo_root:, tracker:, target_version:, reason:, evidence:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  approved_by = current_release_approver!(repo_slug:)
+  records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
+  context = accelerated_rc_reconciliation_context!(records:, target_version:)
+  terminal_record = existing_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, context:)
+  return terminal_record if terminal_record
+
+  published_record = context.fetch(:published_record)
+  snapshots = accelerated_rc_reconciliation_gate_snapshots!(repo_slug:, monorepo_root:, published_record:)
   reconciled_record = reconcile_accelerated_rc_record(
     published_record:,
-    ci_snapshot: ci,
-    shakaperf:,
+    ci_snapshot: snapshots.fetch(:ci),
+    shakaperf: snapshots.fetch(:shakaperf),
     evidence:,
     approved_by:,
     reason: normalized_accelerated_rc_reason!(reason, action: "reconciliation"),
     recorded_at: Time.now.utc.iso8601
   )
-  append_accelerated_rc_tracker_record!(repo_slug:, tracker:, record: reconciled_record)
+  append_accelerated_rc_reconciliation_record!(
+    repo_slug:, tracker:, record: reconciled_record, authorization: context.fetch(:authorization)
+  )
   if reconciled_record["status"] == "candidate-rejected"
     abort "❌ Accelerated RC candidate was rejected. Do not promote this immutable RC; " \
           "fix the failure and cut the next RC."
@@ -4169,10 +4365,11 @@ end
 def validate_final_promotion_shakaperf_publication_boundary!(monorepo_root:, context:, phase:)
   return unless context
 
-  record = context.fetch(:shakaperf_record)
-  expected_snapshot = record.fetch("shakaperf")
+  carried_record = context.fetch(:shakaperf_record)
+  expected_snapshot = carried_record.fetch("shakaperf")
+  refresh_record = final_promotion_shakaperf_refresh_record!(context:, carried_record:)
   refreshed_snapshot = accelerated_rc_shakaperf_snapshot!(
-    repo_slug: github_repo_slug(monorepo_root), monorepo_root:, record:
+    repo_slug: github_repo_slug(monorepo_root), monorepo_root:, record: refresh_record
   )
   unless refreshed_snapshot.is_a?(Hash) && refreshed_snapshot["status"] == "success"
     abort "❌ Final promotion #{phase} boundary ShakaPerf evidence is failed, missing, malformed, or unknown."
@@ -4181,6 +4378,19 @@ def validate_final_promotion_shakaperf_publication_boundary!(monorepo_root:, con
                                canonical_accelerated_rc_value(expected_snapshot)
 
   abort "❌ Final promotion #{phase} boundary found materially changed ShakaPerf evidence."
+end
+
+def final_promotion_shakaperf_refresh_record!(context:, carried_record:)
+  case context.fetch(:shakaperf_evidence_mode)
+  when FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE
+    carried_record.merge("candidate_sha" => context.fetch(:record).fetch("candidate_sha"))
+  when FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE
+    carried_record
+  else
+    abort "❌ Final promotion ShakaPerf boundary has an unknown evidence mode."
+  end
+rescue KeyError
+  abort "❌ Final promotion ShakaPerf boundary has incomplete evidence identity."
 end
 
 def accepted_rc_record_at_publication_boundary!(monorepo_root:, rc_tag:, final_head_sha:, tracker_input:, record:)
@@ -4222,33 +4432,44 @@ def strict_final_promotion_shakaperf_snapshot!(monorepo_root:, current_branch:, 
   unless run.is_a?(Hash) && run["status"] == "completed" && run["conclusion"] == "success"
     abort "❌ Final promotion is blocked: strict ShakaPerf gate identity is missing, malformed, or unknown."
   end
+  unless run["headSha"] == final_head_sha
+    abort "❌ Final promotion is blocked: strict ShakaPerf gate is not bound to the exact final candidate."
+  end
 
   accelerated_shakaperf_snapshot(
     repo_slug: github_repo_slug(monorepo_root),
     run:,
     ref: current_branch,
-    candidate_sha: run.fetch("headSha"),
+    candidate_sha: final_head_sha,
     target_version:,
     release_started_at:,
     status: "success"
   )
 end
 
-def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, ci_snapshot:, shakaperf:,
-                                     source_rc_context:)
-  normalized_shakaperf = json_compatible_release_value(shakaperf)
-  {
+def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, ci_snapshot:, shakaperf_evidence:,
+                                     final_target_version:, source_rc_context:)
+  normalized_shakaperf = json_compatible_release_value(shakaperf_evidence.fetch(:snapshot))
+  shakaperf_evidence_mode = shakaperf_evidence.fetch(:mode)
+  shakaperf_record = {
+    "release_branch" => current_branch,
+    "candidate_sha" => normalized_shakaperf.fetch("candidate_sha"),
+    "target_version" => normalized_shakaperf.fetch("target_version"),
+    "shakaperf" => normalized_shakaperf
+  }
+  context = {
     candidate_sha: final_head_sha,
     ci_branch: current_branch,
+    final_target_version:,
     record:,
     ci_snapshot: json_compatible_release_value(ci_snapshot),
-    shakaperf_record: {
-      "release_branch" => current_branch,
-      "candidate_sha" => final_head_sha,
-      "target_version" => normalized_shakaperf.fetch("target_version"),
-      "shakaperf" => normalized_shakaperf
-    }
-  }.merge(source_rc_context)
+    shakaperf_evidence_mode:,
+    shakaperf_record:
+  }
+  if shakaperf_evidence_mode == FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE
+    context[:strict_final_shakaperf_identity_anchor] = final_promotion_shakaperf_identity_anchor(shakaperf_record)
+  end
+  context.merge(source_rc_context)
 end
 
 def final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record:)
@@ -4270,17 +4491,25 @@ def final_promotion_shakaperf_snapshot!(repo_slug:, monorepo_root:, current_bran
   reused = reuse_accepted_rc_shakaperf_evidence!(
     repo_slug:, monorepo_root:, ref: current_branch, head_sha: final_head_sha, record:
   )
-  return record.fetch("shakaperf") if reused
+  if reused
+    return {
+      mode: FINAL_PROMOTION_SHAKAPERF_ACCEPTED_RC_MODE,
+      snapshot: record.fetch("shakaperf")
+    }
+  end
 
-  strict_final_promotion_shakaperf_snapshot!(
-    monorepo_root:,
-    current_branch:,
-    final_head_sha:,
-    target_version:,
-    release_started_at:,
-    allow_ci_override:,
-    dry_run:
-  )
+  {
+    mode: FINAL_PROMOTION_SHAKAPERF_STRICT_FINAL_MODE,
+    snapshot: strict_final_promotion_shakaperf_snapshot!(
+      monorepo_root:,
+      current_branch:,
+      final_head_sha:,
+      target_version:,
+      release_started_at:,
+      allow_ci_override:,
+      dry_run:
+    )
+  }
 end
 
 def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_branch:, rc_tag:, tracker_input:,
@@ -4296,7 +4525,7 @@ def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_b
   ci_snapshot = refresh_accepted_rc_ci_evidence_for_promotion!(
     repo_slug:, monorepo_root:, ci_branch: current_branch, record:
   )
-  shakaperf = final_promotion_shakaperf_snapshot!(
+  shakaperf_evidence = final_promotion_shakaperf_snapshot!(
     repo_slug:,
     monorepo_root:,
     current_branch:,
@@ -4327,7 +4556,8 @@ def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_b
     current_branch:,
     record: boundary_record,
     ci_snapshot: boundary_ci_snapshot,
-    shakaperf:,
+    shakaperf_evidence:,
+    final_target_version: target_version,
     source_rc_context:
   )
 end

@@ -289,7 +289,11 @@ selected-tracker publication. Pull requests cannot serve as release trackers eve
 comments through the issues APIs.
 
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
-through reconciliation and final reuse. Every authorization record for the candidate must have the
+through reconciliation and every publication boundary. Reused accepted-RC evidence remains bound to
+the accepted record's exact stored snapshot. That snapshot can identify a verified runtime-equivalent pre-run whose
+candidate differs from the immutable RC candidate; the pre-run policy is rechecked live, while accepted-RC and final-tip
+runtime equivalence remain separate required gates. A newly run strict final gate is instead bound directly to the final
+candidate. Every authorization record must have the
 same canonical digest; canonical-digest-identical duplicates are idempotent, but any distinct
 authorization blocks append, retry, reconciliation, and final promotion. Every
 `published-awaiting-gates` record for the candidate must be the complete canonical transition from
@@ -300,6 +304,9 @@ final promotion require at least one canonical `published-awaiting-gates` transi
 be ordered authorization, publication completion, then terminal state, with parseable monotonic timestamps.
 Exact authorization duplicates and the narrowly permitted publication/terminal retry variants remain
 idempotent only within their phase; pending transitions after terminal state are invalid.
+Reconciliation performs bounded repository-wide exact-version-and-SHA validation against the selected
+tracker and canonical authorization before reporting existing terminal state or appending a new terminal
+transition, then repeats that validation after the append helper re-fetches the selected tracker.
 
 Reconcile the record after the deferred gates and all downstream RC testing finish:
 
@@ -321,9 +328,13 @@ idempotent only when every field except `recorded_at` is identical, and any othe
 variation is conflicting. `candidate-rejected` is absorbing; append-time revalidation prevents a
 concurrent reconciliation from adding acceptance or any other later transition. Every posted transition
 is re-fetched and proven present in the complete canonical chain before the task proceeds toward immutable
-publication or reports reconciliation success. Tracker markers with
-malformed or unsupported schemas, markers authored by accounts without repository write permission,
-or records whose named approver does not match the trusted comment author fail closed. Status-specific
+publication or reports reconciliation success. Selected-tracker markers with malformed or unsupported schemas,
+markers authored by accounts without repository write permission, or records whose named approver does not match
+the trusted comment author fail closed. Repository-wide discovery ignores an exact-candidate marker only after
+GitHub successfully proves its author lacks maintainer permission; an unknown permission/API result and every
+malformed record from a trusted author still fail closed. Only the explicit `none`, `read`, or `triage` permission
+results count as a known non-maintainer classification; blank, missing, malformed, unsupported, or future permission
+values are unknown and block even when the API call itself succeeded. Status-specific
 contradictions also fail closed: accepted records require every success and evidence URL, while
 rejected records require a known failed gate.
 
@@ -373,9 +384,18 @@ and require the same unique tracker and canonical, retry-equivalent authorizatio
 rejection, tracker conflict, chain mutation, missing record, or unknown repository read aborts before the
 next irreversible step. Accelerated final promotion also carries the exact refreshed RC CI snapshot and the
 exact ShakaPerf identity that passed the final gate, whether reused from the accepted RC or produced by a new
-strict final run. It refreshes and compares both at tag handling, immediately before stable-tag push, and again
-after the push before npm or gem publication; failed, missing, malformed, stale, unknown, or materially changed
-evidence blocks. All of those exact-RC CI refreshes use the carried final-promotion branch, even when the accepted
+strict final run. The carried boundary context names that mode explicitly: reused evidence must exactly match the
+accepted record's stored candidate, target, run, and attempt, including a validated pre-run candidate when applicable;
+live refreshes compare that stored candidate with the accepted RC candidate so the pre-run policy remains required.
+Strict-final evidence must match the validated final candidate and stable target. A strict-final run is also captured as
+a frozen canonical identity anchor containing its
+branch/ref, run ID, attempt, URL, candidate, target, and release-start identity. At publication-operation entry, the
+task copies that validated anchor outside the mutable carried context; replacing both the live record and its context
+anchor therefore cannot redefine the evidence that passed the gate. The complete context identity, including that mode
+and candidate/target binding, is revalidated at tag handling, immediately before stable-tag push, and after the push
+before packages. The task also
+refreshes and compares the live gate evidence at each boundary; failed, missing, malformed, stale, unknown, or materially
+changed evidence blocks. All of those exact-RC CI refreshes use the carried final-promotion branch, even when the accepted
 RC record originated on a different source branch. A `candidate-accepted` stable-tag boundary without this complete,
 internally consistent final-promotion context aborts before tag handling; nil context remains valid only for ordinary
 releases and accelerated RC publication authorization, which use their separate live boundaries. Accelerated or broad
