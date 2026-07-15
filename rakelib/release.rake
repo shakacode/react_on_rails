@@ -1836,13 +1836,30 @@ def gh_included_response_parts(output)
   output = normalized_utf8_output(output)
   return [nil, nil, nil] unless output
 
-  newline = gh_included_response_newline(output)
-  return [nil, nil, nil] unless newline && valid_gh_included_response_bytes?(output)
+  status_line_parts = gh_included_response_status_line_parts(output)
+  return [nil, nil, nil] unless status_line_parts && valid_gh_included_response_bytes?(output)
 
-  header_block, body, *trailing_sections = output.split("#{newline}#{newline}", -1)
-  return [nil, nil, nil] unless trailing_sections.empty? && header_block && body
+  status_line, status_newline, remainder = status_line_parts
+  newline = gh_included_response_newline(remainder)
+  # gh writes the status line with the platform newline, then writes HTTP
+  # headers with CRLF. Accept that CLI byte shape while continuing
+  # to reject the inverse or arbitrarily mixed framing.
+  return [nil, nil, nil] unless compatible_gh_included_response_newlines?(status_newline, newline)
 
-  [header_block, body, newline]
+  headers, body, *trailing_sections = remainder.split("#{newline}#{newline}", -1)
+  return [nil, nil, nil] unless trailing_sections.empty? && headers && body
+
+  [[status_line, headers].join(newline), body, newline]
+end
+
+def gh_included_response_status_line_parts(output)
+  output.match(/\A([^\r\n]+)(\r?\n)(.*)\z/m)&.captures
+end
+
+def compatible_gh_included_response_newlines?(status_newline, header_newline)
+  return false unless header_newline
+
+  status_newline == header_newline || (status_newline == "\n" && header_newline == "\r\n")
 end
 
 def gh_included_response_newline(output)

@@ -4772,6 +4772,16 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#gh_included_json_response" do
+    it "parses the mixed status and header newlines emitted by gh api --include" do
+      response = "HTTP/2.0 404 Not Found\nContent-Type: application/json\r\n\r\n" \
+                 '{"message":"Branch not protected"}'
+
+      expect(gh_included_json_response(response)).to eq(
+        status: 404,
+        body: { "message" => "Branch not protected" }
+      )
+    end
+
     it "rejects mixed newline framing and HTTP control bytes" do
       mixed_newlines = "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\n\n" \
                        '{"message":"Branch not protected"}'
