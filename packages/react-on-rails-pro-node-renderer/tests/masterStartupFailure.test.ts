@@ -65,9 +65,11 @@ function buildStartupFailureMessage(
 function setupMasterRunHarness({
   config = {},
   restartWorkers = jest.fn(),
+  licenseStatus = 'valid',
 }: {
   config?: Record<string, unknown>;
   restartWorkers?: jest.Mock;
+  licenseStatus?: 'valid' | 'missing' | 'expired' | 'invalid';
 } = {}) {
   const operations: string[] = [];
   const clusterHandlers: Partial<ClusterHandlers> = {};
@@ -159,7 +161,7 @@ function setupMasterRunHarness({
     ...config,
   }));
   const mockLogSanitizedConfig = jest.fn();
-  const mockGetLicenseStatus = jest.fn(() => 'valid');
+  const mockGetLicenseStatus = jest.fn(() => licenseStatus);
   const mockRunRscPeerCompatibilityCheck = jest.fn();
   const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
   const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((callback, delay) => {
@@ -436,6 +438,73 @@ describe('master startup failure handling via masterRun wiring', () => {
     );
     expect(harness.mockFork).toHaveBeenCalledTimes(3);
     expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('master production license logging', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRailsEnv = process.env.RAILS_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.RAILS_ENV;
+  });
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalRailsEnv === undefined) delete process.env.RAILS_ENV;
+    else process.env.RAILS_ENV = originalRailsEnv;
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  it.each([
+    ['missing', 'No license found', 'get a license'],
+    ['expired', 'License has expired', 'renew your license'],
+    ['invalid', 'Invalid license', 'get a license'],
+  ] as const)(
+    'conditions the %s warning and remediation on Production Use',
+    (licenseStatus, statusMessage, action) => {
+      const harness = setupMasterRunHarness({ licenseStatus });
+
+      expect(harness.mockLog.warn).toHaveBeenCalledWith(
+        `[React on Rails Pro] ${statusMessage}. ` +
+          'Production Use of React on Rails Pro requires an appropriate license. ' +
+          `If this deployment is Production Use, ${action} at https://pro.reactonrails.com/`,
+      );
+    },
+  );
+});
+
+describe('master non-production license logging', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRailsEnv = process.env.RAILS_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'development';
+    process.env.RAILS_ENV = 'test';
+  });
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalRailsEnv === undefined) delete process.env.RAILS_ENV;
+    else process.env.RAILS_ENV = originalRailsEnv;
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  it.each([
+    ['missing', 'No license found'],
+    ['expired', 'License has expired'],
+    ['invalid', 'Invalid license'],
+  ] as const)('reports %s status without implying a license is required', (licenseStatus, statusMessage) => {
+    const harness = setupMasterRunHarness({ licenseStatus });
+
+    expect(harness.mockLog.info).toHaveBeenCalledWith(
+      `[React on Rails Pro] ${statusMessage}. No license required for development/test environments.`,
+    );
   });
 });
 

@@ -33,20 +33,8 @@ module ReactOnRailsPro
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
     # MIRROR VALUES END
 
-    # Plans that require attribution by default (complimentary licenses)
-    #
-    # Attribution defaults by plan:
-    #   Plan       | Attribution Required?
-    #   -----------|----------------------
-    #   paid       | No
-    #   partner    | No
-    #   startup    | Yes
-    #   oss        | Yes
-    #   nonprofit  | No (default)
-    #   education  | No (default)
-    #
-    # These defaults can be overridden by explicit "attribution" field in the license JWT.
-    ATTRIBUTION_REQUIRED_PLANS = %w[startup oss].freeze
+    # Public compatibility alias: product-level attribution is required for every recognized plan.
+    ATTRIBUTION_REQUIRED_PLANS = VALID_PLANS
 
     # Mutex for thread-safe license status initialization.
     # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
@@ -104,11 +92,9 @@ module ReactOnRailsPro
         end
       end
 
-      # Returns whether attribution is required for this license
-      # Checks explicit attribution field first, then infers from plan type:
-      # - paid, partner: No attribution required
-      # - startup, oss: Attribution required
-      # - nonprofit, education: Attribution optional (default: no)
+      # Returns whether the product-level attribution is required.
+      # Attribution applies to every recognized plan and to free uses permitted by the EULA.
+      # A license JWT cannot waive the requirement.
       # @return [Boolean] True if attribution is required
       def attribution_required?
         return @attribution_required if defined?(@attribution_required)
@@ -226,25 +212,11 @@ module ReactOnRailsPro
         yield decoded_data
       end
 
-      # Determines if attribution is required based on license data
-      # Checks explicit attribution field first, then infers from plan type
+      # Attribution is required for every use permitted by the EULA, including
+      # paid, complimentary, educational, demo, and personal/hobby use.
       # @return [Boolean] True if attribution is required
       def determine_attribution_required
-        license_string = load_license_string
-        return false unless license_string
-
-        decoded_data = decode_license(license_string)
-        return false unless decoded_data
-
-        # Check explicit attribution field first
-        attribution = decoded_data["attribution"]
-        return attribution if [true, false].include?(attribution)
-
-        # Infer from plan type
-        plan = decoded_data["plan"]
-        return false unless plan.is_a?(String)
-
-        ATTRIBUTION_REQUIRED_PLANS.include?(plan.strip)
+        true
       end
 
       # Loads license string from environment variable
