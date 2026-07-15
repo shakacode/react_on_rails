@@ -35,7 +35,8 @@ async function getPrerenderToNodeStream() {
 async function getResumeToPipeableStream() {
   if (!lazyPPR.resume) {
     const mod = await import('react-dom/server.node');
-    lazyPPR.resume = (mod as { resumeToPipeableStream?: typeof lazyPPR.resume }).resumeToPipeableStream;
+    lazyPPR.resume = (mod as unknown as Record<string, unknown>)
+      .resumeToPipeableStream as typeof lazyPPR.resume;
   }
   return lazyPPR.resume;
 }
@@ -258,7 +259,6 @@ const pprPrerenderRenderReactComponent = (
             return undefined;
           },
           identifierPrefix: domNodeId,
-          nonce: sanitizeNonce(railsContext.cspNonce),
           signal: prerenderSignal,
         });
 
