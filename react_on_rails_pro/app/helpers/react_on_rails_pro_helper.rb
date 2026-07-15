@@ -501,6 +501,14 @@ module ReactOnRailsProHelper
 
   private
 
+  def add_component_cache_metadata(result, cache_key, cache_hit)
+    return result unless result.is_a?(Hash)
+
+    result[:RORP_CACHE_KEY] = cache_key
+    result[:RORP_CACHE_HIT] = cache_hit
+    result
+  end
+
   def load_pack_for_cached_react_component(component_name, options)
     render_options = ReactOnRails::ReactComponent::RenderOptions.new(
       react_component_name: component_name,
@@ -1283,7 +1291,7 @@ module ReactOnRailsProHelper
   end
 
   def internal_stream_react_component(component_name, options = {})
-    options = options.reverse_merge(render_mode: :html_streaming)
+    options = options.merge(render_mode: :html_streaming)
     result = internal_react_component(component_name, options)
     build_react_component_result_for_server_streamed_content(
       rendered_html_stream: result[:result],
@@ -1360,7 +1368,7 @@ module ReactOnRailsProHelper
     # consumer_stream_async captures the first chunk separately via a promise;
     # for PPR all resume chunks (including the first) must reach the client,
     # so we re-enqueue it into the main output queue.
-    on_complete = render_options.delete(:on_complete)
+    on_complete = options.delete(:on_complete)
     first_resume_chunk = consumer_stream_async(on_complete:) do
       ppr_resume_stream(component_name, options, postponed_state)
     end
@@ -1430,8 +1438,8 @@ module ReactOnRailsProHelper
     render_options = create_render_options(react_component_name, options)
     json_stream = server_rendered_react_component(render_options)
     json_stream.transform do |chunk|
-      html = chunk.delete("html") || ""
-      metadata = chunk.to_json
+      html = chunk["html"] || ""
+      metadata = chunk.except("html").to_json
       content_bytes = html.bytesize.to_s(16).rjust(8, "0")
       "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end
