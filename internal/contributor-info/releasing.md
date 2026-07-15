@@ -98,7 +98,7 @@ Use override only when needed:
 **Full argument list:**
 
 ```bash
-bundle exec rake "release[version,dry_run,override_version_policy]"
+bundle exec rake "release[version,dry_run,override_version_policy,override_ci_status]"
 ```
 
 1. **`version`** (optional): Version bump type or explicit version
@@ -113,6 +113,15 @@ bundle exec rake "release[version,dry_run,override_version_policy]"
 
 3. **`override_version_policy`** (optional): `true` to override version policy checks (default: `false`)
 
+4. **`override_ci_status`** (optional): global release-gate override (default: `false`). It is only for
+   an explicitly approved prerelease waiver under the active RC policy; never use it for a stable/final
+   promotion.
+
+> Stable/final promotion must not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass
+> `override_ci_status=true`, or use an accelerated asynchronous/deferred-gate bypass. Every unwaived
+> final gate must pass. A narrowly scoped final waiver remains subject to the existing final-release
+> policy, required evidence, and maintainer sign-off, and does not waive any other gate.
+
 **Environment variables:**
 
 ```bash
@@ -120,8 +129,45 @@ VERBOSE=1                    # Enable verbose logging (shows all output)
 NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
 RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
 RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
+RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
+RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
 GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 ```
+
+#### Release CI evidence and strict HEAD evaluation
+
+For this gate, **HEAD** means the fetched exact tip of the release-source branch that would be
+tagged and published: `origin/main` for a mainline release or `origin/release/X.Y.Z` for a
+release-branch cut/promotion. It never means an unpushed local checkout tip.
+
+Normally, the gate walks back metadata-only commits (for example, a changelog/version commit) to
+the newest runtime-bearing commit. This is intentional: CI path filtering can attach no meaningful
+runtime suite to metadata-only commits, while the runtime-bearing commit is the one whose full
+suite establishes release health.
+
+`RELEASE_CI_EVALUATE_HEAD=true` disables only that walkback. It still queries and enforces the
+same CI gate at the exact fetched HEAD; it is a strict evaluation, not a waiver. It is appropriate
+only for the narrow topology where GitHub attached complete workflows to the final release tip,
+while the intermediate runtime SHA selected by normal walkback has zero usable runs.
+
+| Normal walkback / exact HEAD evidence                                                                                      | Required action                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Walked-back SHA has usable CI evidence                                                                                     | Let the normal gate decide. Do not set either variable.                                                    |
+| Walked-back SHA has no usable runs; exact HEAD is pending                                                                  | Wait for the linked exact-HEAD checks. They remain blocking.                                               |
+| Walked-back SHA has no usable runs; exact HEAD has failed checks                                                           | Fix or otherwise resolve the failures. They remain blocking.                                               |
+| Walked-back SHA has no usable runs; exact HEAD is completely healthy under the same stable/prerelease required-check rules | Re-run with `RELEASE_CI_EVALUATE_HEAD=true`; it evaluates that exact HEAD and still blocks on any failure. |
+| Walked-back SHA has no usable runs; exact HEAD has no checks, unknown status, or an API failure                            | Fail closed. Wait for evidence or repair API/auth access; do not use strict HEAD without evidence.         |
+| Any case where a maintainer-approved waiver is truly required                                                              | `RELEASE_CI_STATUS_OVERRIDE=true` is the dangerous last resort, not a recovery default.                    |
+
+Examples:
+
+```bash
+# Only after the task reports complete healthy exact-HEAD evidence, retry the explicit target version:
+RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10]"
+```
+
+Do not use `RELEASE_CI_STATUS_OVERRIDE=true` to substitute for pending, missing, failed, or
+unknown exact-HEAD evidence. It waives the release CI-status gate and does not make CI healthy.
 
 **Examples:**
 
