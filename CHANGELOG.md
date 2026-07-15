@@ -24,6 +24,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
+  props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact
+  coverage verifies a production Webpack build and progressive Suspense output on React 18 without
+  installing or bundling `react-on-rails-rsc`; async props and React Server Components remain React
+  19-only. Fixes [Issue 4642](https://github.com/shakacode/react_on_rails/issues/4642).
+  [PR 4658](https://github.com/shakacode/react_on_rails/pull/4658) by
+  [justin808](https://github.com/justin808).
+
 ### [17.0.0.rc.11] - 2026-07-15
 
 #### Changed
