@@ -2720,8 +2720,6 @@ def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
   permissions = {}
   records = marker_comments.flat_map do |comment|
     login = accelerated_rc_comment_author_login!(comment)
-    next [] if login.nil?
-
     permission = accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
     permission_class = accelerated_rc_repository_permission_class!(permission:, login:)
     next [] if permission_class == :non_maintainer
@@ -2740,7 +2738,8 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
   comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
   marker_comments = comments.select do |comment|
     next false unless accelerated_rc_machine_marker_comment?(comment)
-    next false if accelerated_rc_comment_author_login!(comment).nil?
+
+    accelerated_rc_comment_author_login!(comment)
 
     repository_accelerated_rc_comment_plausibly_targets_candidate?(
       comment:, target_version:, candidate_sha:
@@ -2932,8 +2931,6 @@ def trusted_accelerated_rc_records_from_repository_comment!(
   comment:, repo_slug:, permissions:, tracker_issues: {}
 )
   login = accelerated_rc_comment_author_login!(comment)
-  return [] if login.nil?
-
   tracker = release_tracker_number_from_repository_comment_issue_url!(
     issue_url: comment.fetch("issue_url", nil), repo_slug:
   )
@@ -2957,7 +2954,7 @@ def accelerated_rc_comment_author_login!(comment)
   end
 
   user = comment.fetch("user")
-  return nil if user.nil?
+  abort "❌ Accelerated RC machine-marker author is unattributable; durable history is unknown." if user.nil?
 
   valid = user.is_a?(Hash) && user.key?("login") && user["login"].is_a?(String) && !user["login"].empty?
   abort "❌ Accelerated RC marker author envelope is malformed; durable history is unknown." unless valid

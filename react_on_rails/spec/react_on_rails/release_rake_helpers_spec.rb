@@ -5745,7 +5745,11 @@ RSpec.describe "release.rake helper methods" do
         "literal ASCII opener `<!-- react-on-rails-accelerated-rc `, including its single trailing space"
       )
       expect(normalized_guide).to include(
-        "Only an exactly present `user: nil` author is known deleted"
+        "A safely structured markerless ordinary comment may remain ignorable when its author envelope is " \
+        "exactly `user: nil`"
+      )
+      expect(normalized_guide).to include(
+        "An explicit machine-marker comment with `user: nil` instead blocks replay as unattributable history"
       )
       expect(normalized_guide).to include(
         "Missing, malformed, or unparseable creation or update timestamps block even on markerless API comments"
@@ -5837,7 +5841,95 @@ RSpec.describe "release.rake helper methods" do
       ).to eq([])
     end
 
-    it "ignores an unattributable explicit marker while retaining canonical trusted history" do
+    it "keeps a safely structured markerless deleted-author comment outside durable marker history (V58)" do
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: "ordinary release discussion",
+        user: nil
+      )
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate([comment]), success])
+
+      expect(
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([])
+      expect(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      ).to eq([])
+    end
+
+    it "blocks a deleted-author candidate rejection during selected-tracker replay (V58)" do
+      rejected = accelerated_rc_test_rejected_history.last
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(rejected),
+        user: nil
+      )
+      allow(self).to receive(:fetch_release_tracker_comments).and_return([comment])
+
+      expect do
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /machine-marker author.*unattributable|author.*unknown/i)
+    end
+
+    it "does not omit a deleted-author rejection beside later acceptance in repository replay (V58)" do
+      rejected = accelerated_rc_test_rejected_history.last
+      accepted = accelerated_rc_test_accepted_history.last
+      comments = [
+        accelerated_rc_test_issue_comment(
+          id: 1,
+          body: accelerated_rc_tracker_comment(rejected),
+          user: nil
+        ),
+        accelerated_rc_test_issue_comment(
+          id: 2,
+          body: accelerated_rc_tracker_comment(accepted),
+          created_at: "2026-07-14T13:01:00Z",
+          user: { "login" => "justin808" }
+        )
+      ]
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: comments,
+        accelerated_rc_repository_comment_permission!: "maintain",
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /machine-marker author.*unattributable|author.*unknown/i)
+    end
+
+    it "blocks malformed deleted-author machine markers before selected or repository omission (V58)" do
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        user: nil
+      )
+      allow(self).to receive_messages(
+        fetch_release_tracker_comments: [comment],
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment]
+      )
+
+      aggregate_failures do
+        expect do
+          fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        end.to raise_error(SystemExit, /machine-marker author.*unattributable|author.*unknown/i)
+
+        expect do
+          fetch_repository_accelerated_rc_records_for_candidate!(
+            repo_slug: "shakacode/react_on_rails",
+            target_version: "17.0.0.rc.10",
+            candidate_sha: "f" * 40
+          )
+        end.to raise_error(SystemExit, /machine-marker author.*unattributable|author.*unknown/i)
+      end
+    end
+
+    it "blocks an unattributable explicit marker before using canonical trusted history" do
       authorization = build_accelerated_rc_publication_record(
         options: accelerated_rc_options,
         candidate_sha: "f" * 40,
@@ -5859,19 +5951,12 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:fetch_release_tracker_comments).and_return(
         [deleted_author_marker, trusted_marker]
       )
-      success = instance_double(Process::Status, success?: true)
-      allow(self).to receive(:capture_gh_output)
-        .with(
-          "api",
-          "repos/shakacode/react_on_rails/collaborators/justin808/permission",
-          "--jq",
-          ".permission"
-        ).and_return(["write\n", success])
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:accelerated_rc_records_from_trusted_comment!)
 
-      expect(
+      expect do
         fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
-      ).to eq([authorization])
-      expect(self).to have_received(:capture_gh_output).once
+      end.to raise_error(SystemExit, /machine-marker author.*unattributable/i)
     end
 
     it "fails closed on every malformed selected-tracker marker author envelope before decoding" do
@@ -6445,7 +6530,7 @@ RSpec.describe "release.rake helper methods" do
       ).to eq([])
     end
 
-    it "ignores an unattributable repository marker while retaining canonical trusted candidate history" do
+    it "blocks an unattributable repository marker before using canonical trusted candidate history" do
       authorization = accelerated_rc_test_authorization
       deleted_author_marker = accelerated_rc_test_issue_comment(
         id: 1,
@@ -6458,22 +6543,18 @@ RSpec.describe "release.rake helper methods" do
         created_at: "2026-07-14T13:01:00Z",
         user: { "login" => "justin808" }
       )
-      allow(self).to receive_messages(
-        fetch_repository_issue_comments_for_accelerated_rc_retry!: [deleted_author_marker, trusted_marker],
-        accelerated_rc_repository_comment_permission!: "maintain"
-      )
-      expect(self).to receive(:fetch_release_tracker_issue!)
-        .once.with(repo_slug: "shakacode/react_on_rails", tracker: 3823)
-        .and_return({})
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!)
+        .and_return([deleted_author_marker, trusted_marker])
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
 
-      expect(
+      expect do
         fetch_repository_accelerated_rc_records_for_candidate!(
           repo_slug: "shakacode/react_on_rails",
           target_version: "17.0.0.rc.10",
           candidate_sha: "f" * 40
         )
-      ).to eq([authorization])
-      expect(self).to have_received(:accelerated_rc_repository_comment_permission!).once
+      end.to raise_error(SystemExit, /machine-marker author.*unattributable/i)
     end
 
     it "fails closed on every malformed repository marker author envelope before decoding" do

@@ -304,10 +304,11 @@ completes discovery; exceeding 1,000 markers or requiring a 251st page blocks as
 exhausting unbounded memory/API work. Missing, malformed, or unparseable creation or update timestamps block even on
 markerless API comments. Durable marker comments must remain unedited: their parsed creation and update instants must be
 equal, so an in-place rewrite of acceptance, rejection, conflict, approval, or evidence fields blocks before trust or
-state use. Comments whose authors were deleted may remain when their safe structural fields are valid. Only an exactly
-present `user: nil` author is known deleted and contributes no durable record; a missing or
-malformed author envelope is unknown and blocks. Unattributable machine-marker comments cannot authorize, satisfy,
-mutate, or conflict with trusted history. A marker comment is ignored before author permission checks only when it contains
+state use. A safely structured markerless ordinary comment may remain ignorable when its author envelope is exactly
+`user: nil`. An explicit machine-marker comment with `user: nil` instead blocks replay as unattributable history, because
+silently dropping it could erase an absorbing rejection or another durable transition. A missing or malformed author
+envelope is likewise unknown and blocks. Unattributable machine-marker comments cannot authorize, satisfy, mutate,
+conflict with, or be omitted from trusted history. A marker comment is ignored before author permission checks only when it contains
 exactly one canonical marker whose payload is the byte-for-byte lowercase hexadecimal encoding of key-sorted
 canonical JSON for a complete, structurally valid tracker record and proves it targets another
 version-and-SHA pair. Reordered or whitespace-varied JSON, uppercase hexadecimal, incomplete records,
