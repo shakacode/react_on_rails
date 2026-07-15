@@ -271,11 +271,15 @@ its lightweight-tag path. Same-version retry discovery must complete successfull
 prove that accelerated history is absent; API, pagination, permission, or parse failure therefore blocks
 that retry as unknown. Repository and selected-tracker discovery read chronological 100-comment pages
 incrementally, validate string bodies, positive unique comment IDs, canonical repository issue URLs, and
-nondecreasing creation times, and retain only marker-bearing comments. Exactly 1,000 retained marker comments
-are allowed, and a short 250th page completes discovery; exceeding 1,000 markers or requiring a 251st page blocks
-as unknown instead of ignoring history or exhausting unbounded memory/API work. Markerless ordinary comments may
-have a deleted author when their safe structural fields remain valid; marker records still require an attributable
-trusted author. A marker comment is ignored before author permission checks only when it contains
+nondecreasing creation times, and retain only comments containing the explicit hidden machine-marker opener
+with the literal ASCII opener `<!-- react-on-rails-accelerated-rc `, including its single trailing space. A plain-text
+mention, suffix lookalike, alternate whitespace, or escaped opener is ordinary discussion: it is not parsed, attributed,
+or counted toward the marker bound. Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page
+completes discovery; exceeding 1,000 markers or requiring a 251st page blocks as unknown instead of ignoring history or
+exhausting unbounded memory/API work. Comments whose authors were deleted may remain when their safe structural fields
+are valid. Only an exactly present `user: nil` author is known deleted and contributes no durable record; a missing or
+malformed author envelope is unknown and blocks. Unattributable machine-marker comments cannot authorize, satisfy,
+mutate, or conflict with trusted history. A marker comment is ignored before author permission checks only when it contains
 exactly one canonical marker whose payload is the byte-for-byte lowercase hexadecimal encoding of key-sorted
 canonical JSON for a complete, structurally valid tracker record and proves it targets another
 version-and-SHA pair. Reordered or whitespace-varied JSON, uppercase hexadecimal, incomplete records,
@@ -329,10 +333,11 @@ variation is conflicting. `candidate-rejected` is absorbing; append-time revalid
 concurrent reconciliation from adding acceptance or any other later transition. Every posted transition
 is re-fetched and proven present in the complete canonical chain before the task proceeds toward immutable
 publication or reports reconciliation success. Aside from the canonical unrelated-marker cheap skip above,
-selected-tracker and repository-wide scans ignore a marker comment based on its author only after GitHub successfully
-proves that author lacks maintainer permission. An unknown permission/API result, every malformed or unsupported
-record from a trusted author, and any trusted record whose named approver does not match its comment author still fail
-closed. Only the explicit `none`, `read`, or `triage` permission results count as a known non-maintainer classification;
+selected-tracker and repository-wide scans ignore an attributable marker comment based on its author only after GitHub
+successfully proves that author lacks maintainer permission. Unattributable comments are never trusted evidence; an
+unknown permission/API result for an attributable author, every malformed or unsupported record from a trusted author,
+and any trusted record whose named approver does not match its comment author still fail closed. Only the explicit
+`none`, `read`, or `triage` permission results count as a known non-maintainer classification;
 blank, missing, malformed, unsupported, or future permission values are unknown and block even when the API call
 itself succeeded. Status-specific
 contradictions also fail closed: accepted records require every success and evidence URL, while

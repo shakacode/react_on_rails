@@ -4136,7 +4136,7 @@ RSpec.describe "release.rake helper methods" do
         accelerated_rc_test_issue_comment(id: index + 1, body: "ordinary tracker discussion")
       end
       marker_comment = accelerated_rc_test_issue_comment(
-        id: 100, body: ACCELERATED_RC_RECORD_MARKER
+        id: 100, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
       )
       endpoint = lambda do |page|
         "repos/shakacode/react_on_rails/issues/3823/comments?per_page=100" \
@@ -4152,6 +4152,59 @@ RSpec.describe "release.rake helper methods" do
       expect(
         fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
       ).to eq([marker_comment])
+    end
+
+    it "uses the explicit hidden machine-marker opener in selected and repository discovery" do
+      success = instance_double(Process::Status, success?: true)
+      casual_mention = accelerated_rc_test_issue_comment(
+        id: 1, body: "Discussion about #{ACCELERATED_RC_RECORD_MARKER} availability"
+      )
+      explicit_marker = accelerated_rc_test_issue_comment(
+        id: 2, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+      )
+      allow(self).to receive(:capture_gh_output)
+        .and_return([JSON.generate([casual_mention, explicit_marker]), success])
+
+      aggregate_failures do
+        expect(
+          fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        ).to eq([explicit_marker])
+        expect(
+          fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+        ).to eq([explicit_marker])
+      end
+    end
+
+    it "retains only the literal ASCII machine-marker opener in bounded selected and repository discovery" do
+      success = instance_double(Process::Status, success?: true)
+      lookalike_bodies = {
+        "near prefix" => "<!-- react-on-rails-accelerated-r v1 malformed -->",
+        "alphabetic suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}x v1 malformed -->",
+        "hyphen suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}-provenance v1 malformed -->",
+        "dot suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}.lookalike v1 malformed -->",
+        "tab delimiter" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}\tv1 malformed -->",
+        "newline delimiter" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}\nv1 malformed -->",
+        "doubled space after comment opener" => "<!--  #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        "escaped HTML" => "&lt;!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed --&gt;"
+      }
+      lookalikes = lookalike_bodies.each_with_index.map do |(_description, body), index|
+        accelerated_rc_test_issue_comment(id: index + 1, body:)
+      end
+      exact_marker = accelerated_rc_test_issue_comment(
+        id: lookalikes.length + 1,
+        body: "prefix <!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed --> suffix"
+      )
+      allow(self).to receive(:capture_gh_output)
+        .and_return([JSON.generate(lookalikes + [exact_marker]), success])
+
+      aggregate_failures do
+        expect(
+          fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        ).to eq([exact_marker])
+        expect(
+          fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+        ).to eq([exact_marker])
+      end
     end
 
     it "fails closed when selected-tracker discovery reaches its configured page bound on a full page" do
@@ -4182,7 +4235,7 @@ RSpec.describe "release.rake helper methods" do
         page_count += 1
         comments = if page_count == 250
                      final_marker = accelerated_rc_test_issue_comment(
-                       id: 24_901, body: ACCELERATED_RC_RECORD_MARKER
+                       id: 24_901, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
                      )
                      [final_marker]
                    else
@@ -4208,7 +4261,7 @@ RSpec.describe "release.rake helper methods" do
         Array.new(100) do |index|
           accelerated_rc_test_issue_comment(
             id: (page * 100) + index + 1,
-            body: ACCELERATED_RC_RECORD_MARKER
+            body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
           )
         end
       end
@@ -4230,11 +4283,15 @@ RSpec.describe "release.rake helper methods" do
         Array.new(100) do |index|
           accelerated_rc_test_issue_comment(
             id: (page * 100) + index + 1,
-            body: ACCELERATED_RC_RECORD_MARKER
+            body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
           )
         end
       end
-      pages << [accelerated_rc_test_issue_comment(id: 1_001, body: ACCELERATED_RC_RECORD_MARKER)]
+      pages << [
+        accelerated_rc_test_issue_comment(
+          id: 1_001, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+        )
+      ]
       allow(self).to receive(:capture_gh_output) do
         [JSON.generate(pages.shift), success]
       end
@@ -4244,6 +4301,58 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /bounded release tracker.*marker.*limit.*unknown/i)
     end
 
+    it "does not count casual feature-name mentions against the bounded machine-marker limit" do
+      success = instance_double(Process::Status, success?: true)
+      pages = Array.new(10) do |page|
+        Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: (page * 100) + index + 1,
+            body: "Discussion about #{ACCELERATED_RC_RECORD_MARKER} availability"
+          )
+        end
+      end
+      explicit_marker = accelerated_rc_test_issue_comment(
+        id: 1_001, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+      )
+      pages << [explicit_marker]
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(pages.shift), success]
+      end
+
+      expect(
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([explicit_marker])
+    end
+
+    it "does not count machine-marker opener lookalikes against the bounded marker limit" do
+      success = instance_double(Process::Status, success?: true)
+      lookalikes = [
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER}-provenance v1 malformed -->",
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER}.lookalike v1 malformed -->",
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER}\tv1 malformed -->",
+        "<!-- #{ACCELERATED_RC_RECORD_MARKER}\nv1 malformed -->"
+      ]
+      pages = Array.new(10) do |page|
+        Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: (page * 100) + index + 1,
+            body: lookalikes.fetch(index % lookalikes.length)
+          )
+        end
+      end
+      exact_marker = accelerated_rc_test_issue_comment(
+        id: 1_001, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+      )
+      pages << [exact_marker]
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(pages.shift), success]
+      end
+
+      expect(
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([exact_marker])
+    end
+
     it "documents the exact accelerated-comment discovery boundaries" do
       guide = File.read(
         File.expand_path("../../../internal/contributor-info/releasing.md", __dir__)
@@ -4251,10 +4360,16 @@ RSpec.describe "release.rake helper methods" do
       normalized_guide = guide.gsub(/\s+/, " ")
 
       expect(normalized_guide).to include(
-        "Exactly 1,000 retained marker comments are allowed, and a short 250th page completes discovery"
+        "Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page completes discovery"
       )
       expect(normalized_guide).to include(
         "exceeding 1,000 markers or requiring a 251st page blocks as unknown"
+      )
+      expect(normalized_guide).to include(
+        "literal ASCII opener `<!-- react-on-rails-accelerated-rc `, including its single trailing space"
+      )
+      expect(normalized_guide).to include(
+        "Only an exactly present `user: nil` author is known deleted"
       )
     end
 
@@ -4291,6 +4406,99 @@ RSpec.describe "release.rake helper methods" do
       expect do
         validate_release_approver!(login: "external-user", permission: "read")
       end.to raise_error(SystemExit, /write, maintain, or admin/)
+    end
+
+    it "ignores a plain-text feature-name mention before selected-tracker trust or parsing" do
+      casual_mention = {
+        "body" => "Can we discuss #{ACCELERATED_RC_RECORD_MARKER} in the release guide?",
+        "user" => { "login" => "external-user" }
+      }
+      allow(self).to receive(:fetch_release_tracker_comments).and_return([casual_mention])
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:accelerated_rc_records_from_trusted_comment!)
+
+      expect(
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([])
+    end
+
+    it "ignores an unattributable explicit marker while retaining canonical trusted history" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      deleted_author_marker = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        "user" => nil
+      }
+      trusted_marker = {
+        "body" => accelerated_rc_tracker_comment(authorization),
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive(:fetch_release_tracker_comments).and_return(
+        [deleted_author_marker, trusted_marker]
+      )
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "api",
+          "repos/shakacode/react_on_rails/collaborators/justin808/permission",
+          "--jq",
+          ".permission"
+        ).and_return(["write\n", success])
+
+      expect(
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([authorization])
+      expect(self).to have_received(:capture_gh_output).once
+    end
+
+    it "fails closed on every malformed selected-tracker marker author envelope before decoding" do
+      malformed_author_envelopes = {
+        "missing user key" => {},
+        "non-Hash user" => { "user" => "deleted" },
+        "empty user Hash" => { "user" => {} },
+        "missing login key" => { "user" => { "name" => "unknown" } },
+        "nil login" => { "user" => { "login" => nil } },
+        "empty login" => { "user" => { "login" => "" } },
+        "non-String login" => { "user" => { "login" => 123 } }
+      }
+      marker_body = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:accelerated_rc_records_from_trusted_comment!)
+
+      aggregate_failures do
+        malformed_author_envelopes.each do |description, envelope|
+          comment = { "body" => marker_body }.merge(envelope)
+          allow(self).to receive(:fetch_release_tracker_comments).and_return([comment])
+
+          expect do
+            fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+          end.to raise_error(SystemExit, /author envelope.*malformed|author metadata.*unknown/i), description
+        end
+      end
+    end
+
+    it "fails closed on a trusted maintainer's malformed explicit machine marker" do
+      malformed_marker = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        "user" => { "login" => "justin808" }
+      }
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive_messages(
+        fetch_release_tracker_comments: [malformed_marker],
+        capture_gh_output: ["write\n", success]
+      )
+
+      expect do
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /malformed accelerated RC record/i)
     end
 
     it "ignores a known non-maintainer marker at an idempotent tracker append boundary" do
@@ -4384,7 +4592,7 @@ RSpec.describe "release.rake helper methods" do
         accelerated_rc_test_issue_comment(id: index + 1, body: "ordinary repository discussion")
       end
       marker_comment = accelerated_rc_test_issue_comment(
-        id: 100, body: "prefix #{ACCELERATED_RC_RECORD_MARKER} suffix"
+        id: 100, body: "prefix <!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed --> suffix"
       )
       full_page = ordinary_comments + [marker_comment]
       endpoint = lambda do |page|
@@ -4514,7 +4722,9 @@ RSpec.describe "release.rake helper methods" do
       stub_const("ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT", 1)
       success = instance_double(Process::Status, success?: true)
       marker_comments = Array.new(2) do |index|
-        accelerated_rc_test_issue_comment(id: index + 1, body: ACCELERATED_RC_RECORD_MARKER)
+        accelerated_rc_test_issue_comment(
+          id: index + 1, body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->"
+        )
       end
       allow(self).to receive(:capture_gh_output).and_return([JSON.generate(marker_comments), success])
 
@@ -4659,6 +4869,25 @@ RSpec.describe "release.rake helper methods" do
       ).to eq([])
     end
 
+    it "ignores a casual repository feature-name mention before candidate trust attribution" do
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: "Discussion about #{ACCELERATED_RC_RECORD_MARKER} availability",
+        user: { "login" => "justin808" }
+      )
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return([comment])
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([])
+    end
+
     it "ignores an exact-candidate repository marker after proving its author is not a maintainer" do
       authorization = accelerated_rc_test_authorization
       comment = accelerated_rc_test_issue_comment(
@@ -4679,6 +4908,72 @@ RSpec.describe "release.rake helper methods" do
           candidate_sha: "f" * 40
         )
       ).to eq([])
+    end
+
+    it "ignores an unattributable repository marker while retaining canonical trusted candidate history" do
+      authorization = accelerated_rc_test_authorization
+      deleted_author_marker = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        user: nil
+      )
+      trusted_marker = accelerated_rc_test_issue_comment(
+        id: 2,
+        body: accelerated_rc_tracker_comment(authorization),
+        created_at: "2026-07-14T13:01:00Z",
+        user: { "login" => "justin808" }
+      )
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [deleted_author_marker, trusted_marker],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+      expect(self).to receive(:fetch_release_tracker_issue!)
+        .once.with(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        .and_return({})
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([authorization])
+      expect(self).to have_received(:accelerated_rc_repository_comment_permission!).once
+    end
+
+    it "fails closed on every malformed repository marker author envelope before decoding" do
+      authorization = accelerated_rc_test_authorization
+      malformed_author_envelopes = {
+        "missing user key" => {},
+        "non-Hash user" => { "user" => "deleted" },
+        "empty user Hash" => { "user" => {} },
+        "missing login key" => { "user" => { "name" => "unknown" } },
+        "nil login" => { "user" => { "login" => nil } },
+        "empty login" => { "user" => { "login" => "" } },
+        "non-String login" => { "user" => { "login" => 123 } }
+      }
+      marker_body = accelerated_rc_tracker_comment(authorization).lines.first.strip
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:accelerated_rc_records_from_trusted_comment!)
+      expect(self).not_to receive(:repository_accelerated_rc_marker_candidate_identity)
+
+      aggregate_failures do
+        malformed_author_envelopes.each_with_index do |(description, envelope), index|
+          comment = accelerated_rc_test_issue_comment(
+            id: index + 1, body: marker_body, user: { "login" => "placeholder" }
+          ).merge(envelope)
+          comment.delete("user") unless envelope.key?("user")
+          allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return([comment])
+
+          expect do
+            fetch_repository_accelerated_rc_records_for_candidate!(
+              repo_slug: "shakacode/react_on_rails",
+              target_version: "17.0.0.rc.10",
+              candidate_sha: "f" * 40
+            )
+          end.to raise_error(SystemExit, /author envelope.*malformed|author metadata.*unknown/i), description
+        end
+      end
     end
 
     it "fails closed when exact-candidate marker author permission cannot be determined" do
@@ -5131,6 +5426,96 @@ RSpec.describe "release.rake helper methods" do
       expect(comment).to include("published-awaiting-gates", "17.0.0.rc.10", "123456")
       expect(comment).to include(canonical_accelerated_rc_encoded_payload(record))
       expect(accelerated_rc_records_from_comments([{ "body" => comment }])).to eq([record])
+    end
+
+    it "ignores a casual feature-name mention in the direct marker parser" do
+      comment = { "body" => "Discussion about #{ACCELERATED_RC_RECORD_MARKER} availability" }
+
+      expect(accelerated_rc_records_from_comments([comment])).to eq([])
+    end
+
+    it "uses the literal ASCII opener for direct parsing and repository candidate plausibility" do
+      lookalike_bodies = {
+        "bare prose" => "Discussion about #{ACCELERATED_RC_RECORD_MARKER} availability",
+        "near prefix" => "<!-- react-on-rails-accelerated-r v1 malformed -->",
+        "alphabetic suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}x v1 malformed -->",
+        "hyphen suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}-provenance v1 malformed -->",
+        "dot suffix" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}.lookalike v1 malformed -->",
+        "tab delimiter" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}\tv1 malformed -->",
+        "newline delimiter" => "<!-- #{ACCELERATED_RC_RECORD_MARKER}\nv1 malformed -->",
+        "doubled space after comment opener" => "<!--  #{ACCELERATED_RC_RECORD_MARKER} v1 malformed -->",
+        "escaped HTML" => "&lt;!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed --&gt;"
+      }
+
+      aggregate_failures do
+        lookalike_bodies.each do |description, body|
+          comment = { "body" => body }
+          result = nil
+          failure = begin
+            result = accelerated_rc_records_from_comment(comment)
+            nil
+          rescue SystemExit, StandardError => error
+            error
+          end
+
+          expect(accelerated_rc_machine_marker_comment?(comment)).to be(false), description
+          expect(
+            repository_accelerated_rc_comment_plausibly_targets_candidate?(
+              comment:, target_version: "17.0.0.rc.10", candidate_sha: "f" * 40
+            )
+          ).to be(false), description
+          expect(failure).to be_nil, description
+          expect(result).to eq([]), description
+        end
+      end
+    end
+
+    it "recognizes the exact literal opener and keeps a trusted malformed exact marker fail closed" do
+      comment = { "body" => "prefix <!-- #{ACCELERATED_RC_RECORD_MARKER} v1 malformed --> suffix" }
+
+      aggregate_failures do
+        expect(accelerated_rc_machine_marker_comment?(comment)).to be(true)
+        expect(
+          repository_accelerated_rc_comment_plausibly_targets_candidate?(
+            comment:, target_version: "17.0.0.rc.10", candidate_sha: "f" * 40
+          )
+        ).to be(true)
+        expect do
+          accelerated_rc_records_from_comment(comment)
+        end.to raise_error(SystemExit, /malformed accelerated RC record/i)
+      end
+    end
+
+    it "safely ignores non-Hash and non-String-body inputs before direct body access" do
+      invalid_inputs = {
+        "nil" => nil,
+        "String" => "not a comment",
+        "Array" => [],
+        "Integer" => 1,
+        "Hash without body" => {},
+        "nil body" => { "body" => nil },
+        "Array body" => { "body" => [] }
+      }
+
+      aggregate_failures do
+        invalid_inputs.each do |description, comment|
+          result = nil
+          failure = begin
+            result = accelerated_rc_records_from_comment(comment)
+            nil
+          rescue StandardError => error
+            error
+          end
+
+          expect(failure).to be_nil, description
+          expect(result).to eq([]), description
+          expect(
+            repository_accelerated_rc_comment_plausibly_targets_candidate?(
+              comment:, target_version: "17.0.0.rc.10", candidate_sha: "f" * 40
+            )
+          ).to be(false), description
+        end
+      end
     end
 
     it "fails closed when a tracker marker is malformed instead of ignoring it" do

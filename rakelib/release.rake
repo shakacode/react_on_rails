@@ -54,6 +54,7 @@ SHAKAPERF_RELEASE_GATE_EVIDENCE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
 ACCELERATED_RC_RECORD_SCHEMA_VERSION = 1
 ACCELERATED_RC_RECORD_MARKER = "react-on-rails-accelerated-rc"
+ACCELERATED_RC_RECORD_MARKER_OPENER = "<!-- #{ACCELERATED_RC_RECORD_MARKER} ".freeze
 ACCELERATED_RC_TAG_PROVENANCE_MARKER = "react-on-rails-accelerated-rc-provenance"
 ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE = 100
 ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES = 250
@@ -2239,7 +2240,7 @@ def normalized_accelerated_rc_reason!(reason, action:)
 end
 
 def accelerated_rc_tracker_comment(record)
-  marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v#{ACCELERATED_RC_RECORD_SCHEMA_VERSION} " \
+  marker = "#{ACCELERATED_RC_RECORD_MARKER_OPENER}v#{ACCELERATED_RC_RECORD_SCHEMA_VERSION} " \
            "#{canonical_accelerated_rc_encoded_payload(record)} -->"
   ci = record.fetch("ci")
   shakaperf = record.fetch("shakaperf")
@@ -2260,15 +2261,21 @@ def accelerated_rc_records_from_comments(comments)
   comments.flat_map { |comment| accelerated_rc_records_from_comment(comment) }
 end
 
-def accelerated_rc_records_from_comment(comment)
-  marker = Regexp.escape(ACCELERATED_RC_RECORD_MARKER)
-  body = comment.fetch("body", "")
-  return [] unless body.include?(ACCELERATED_RC_RECORD_MARKER)
+def accelerated_rc_machine_marker_comment?(comment)
+  return false unless comment.is_a?(Hash) && comment["body"].is_a?(String)
 
-  marker_count = body.scan(/<!-- #{marker}\b/).length
+  comment.fetch("body").include?(ACCELERATED_RC_RECORD_MARKER_OPENER)
+end
+
+def accelerated_rc_records_from_comment(comment)
+  return [] unless accelerated_rc_machine_marker_comment?(comment)
+
+  body = comment.fetch("body")
+  marker_count = body.scan(ACCELERATED_RC_RECORD_MARKER_OPENER).length
   abort "❌ Release tracker contains a malformed accelerated RC record." unless marker_count == 1
 
-  matches = body.scan(/<!-- #{marker} v(\d+) ([0-9a-fA-F]+) -->/)
+  opener = Regexp.escape(ACCELERATED_RC_RECORD_MARKER_OPENER)
+  matches = body.scan(/#{opener}v(\d+) ([0-9a-fA-F]+) -->/)
   abort "❌ Release tracker contains a malformed accelerated RC record." unless matches.one?
 
   matches.map do |schema_version, encoded_payload|
@@ -2429,11 +2436,11 @@ end
 
 def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
   comments = fetch_release_tracker_comments(repo_slug:, tracker:)
-  marker_comments = comments.select { |comment| comment.fetch("body", "").include?(ACCELERATED_RC_RECORD_MARKER) }
+  marker_comments = comments.select { |comment| accelerated_rc_machine_marker_comment?(comment) }
   permissions = {}
   records = marker_comments.flat_map do |comment|
-    login = comment.dig("user", "login").to_s
-    abort "❌ Accelerated RC tracker record has no attributable GitHub author." if login.empty?
+    login = accelerated_rc_comment_author_login!(comment)
+    next [] if login.nil?
 
     permission = accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
     permission_class = accelerated_rc_repository_permission_class!(permission:, login:)
@@ -2452,6 +2459,9 @@ end
 def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_version:, candidate_sha:)
   comments = fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
   marker_comments = comments.select do |comment|
+    next false unless accelerated_rc_machine_marker_comment?(comment)
+    next false if accelerated_rc_comment_author_login!(comment).nil?
+
     repository_accelerated_rc_comment_plausibly_targets_candidate?(
       comment:, target_version:, candidate_sha:
     )
@@ -2491,13 +2501,14 @@ def validated_repository_accelerated_rc_candidate_history!(
 end
 
 def repository_accelerated_rc_comment_plausibly_targets_candidate?(comment:, target_version:, candidate_sha:)
-  body = comment.fetch("body", "")
-  return false unless body.include?(ACCELERATED_RC_RECORD_MARKER)
+  return false unless accelerated_rc_machine_marker_comment?(comment)
+
+  body = comment.fetch("body")
   return true if body.include?("- RC: `#{target_version}` at `#{candidate_sha}`")
 
-  marker = Regexp.escape(ACCELERATED_RC_RECORD_MARKER)
-  marker_count = body.scan(/<!-- #{marker}\b/).length
-  matches = body.scan(/<!-- #{marker} v(\d+) ([0-9a-fA-F]+) -->/)
+  marker_count = body.scan(ACCELERATED_RC_RECORD_MARKER_OPENER).length
+  opener = Regexp.escape(ACCELERATED_RC_RECORD_MARKER_OPENER)
+  matches = body.scan(/#{opener}v(\d+) ([0-9a-fA-F]+) -->/)
   return true unless marker_count == 1 && matches.one?
 
   identities = matches.map do |schema_version, encoded_payload|
@@ -2603,7 +2614,7 @@ def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil)
     comments = fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:)
 
     marker_comments.concat(
-      comments.select { |comment| comment.fetch("body").include?(ACCELERATED_RC_RECORD_MARKER) }
+      comments.select { |comment| accelerated_rc_machine_marker_comment?(comment) }
     )
     if marker_comments.length > ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT
       source = accelerated_rc_comment_source_label(tracker)
@@ -2624,12 +2635,12 @@ end
 def trusted_accelerated_rc_records_from_repository_comment!(
   comment:, repo_slug:, permissions:, tracker_issues: {}
 )
+  login = accelerated_rc_comment_author_login!(comment)
+  return [] if login.nil?
+
   tracker = release_tracker_number_from_repository_comment_issue_url!(
     issue_url: comment.fetch("issue_url", nil), repo_slug:
   )
-
-  login = comment.dig("user", "login").to_s
-  abort "❌ Accelerated RC tracker record has no attributable GitHub author." if login.empty?
 
   permission = accelerated_rc_repository_comment_permission!(repo_slug:, login:, permissions:)
   permission_class = accelerated_rc_repository_permission_class!(permission:, login:)
@@ -2642,6 +2653,20 @@ def trusted_accelerated_rc_records_from_repository_comment!(
   tracker_issues[tracker] = fetch_release_tracker_issue!(repo_slug:, tracker:) unless tracker_issues.key?(tracker)
 
   records
+end
+
+def accelerated_rc_comment_author_login!(comment)
+  unless comment.is_a?(Hash) && comment.key?("user")
+    abort "❌ Accelerated RC marker author envelope is malformed; durable history is unknown."
+  end
+
+  user = comment.fetch("user")
+  return nil if user.nil?
+
+  valid = user.is_a?(Hash) && user.key?("login") && user["login"].is_a?(String) && !user["login"].empty?
+  abort "❌ Accelerated RC marker author envelope is malformed; durable history is unknown." unless valid
+
+  user.fetch("login")
 end
 
 def release_tracker_number_from_repository_comment_issue_url!(issue_url:, repo_slug:)
