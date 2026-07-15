@@ -16,12 +16,7 @@
 import { checkRscPeerCompatibility } from '../src/shared/checkRscPeerCompatibility';
 import { RSC_PEER_SUPPORT } from '../src/shared/rscPeerSupport';
 
-const { minimumVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
-type MutableRscSupport = {
-  minimumVersion: string;
-  minimumPrereleaseVersion?: string;
-  supportedMajor: number;
-};
+const { minimumPrereleaseVersion, minimumVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
 
 const versionBelowMinimumVersion = (version: string) => {
   const [major, minor, patch] = version.split('.').map(Number);
@@ -30,24 +25,11 @@ const versionBelowMinimumVersion = (version: string) => {
   throw new Error('minimumVersion must allow a lower supported-major version for the floor test');
 };
 
-const coreTuple = (version: string) => {
-  const [core = ''] = version
-    .replace(/^[v=]+/, '')
-    .split('+')[0]
-    .split('-');
-  return core.split('.').map(Number);
-};
-
 const belowMinimumVersion = versionBelowMinimumVersion(minimumVersion);
 
 describe('checkRscPeerCompatibility', () => {
-  it('keeps the prerelease floor on the stable floor tuple when RC soak is configured', () => {
-    const { minimumPrereleaseVersion } = RSC_PEER_SUPPORT.reactOnRailsRsc;
-
-    expect(
-      minimumPrereleaseVersion === undefined ||
-        coreTuple(minimumPrereleaseVersion).join('.') === coreTuple(minimumVersion).join('.'),
-    ).toBe(true);
+  it('does not configure a prerelease exception for the stable package floor', () => {
+    expect(minimumPrereleaseVersion).toBeUndefined();
   });
 
   it('returns ok when react-on-rails-rsc is absent (optional peer not installed)', () => {
@@ -67,47 +49,25 @@ describe('checkRscPeerCompatibility', () => {
     expect(r.message).toContain(`>= ${minimumVersion}`);
   });
 
-  it('omits the RC soak clause when no prerelease floor is configured', () => {
-    const rscSupport = RSC_PEER_SUPPORT.reactOnRailsRsc as MutableRscSupport;
-    const originalMinimumPrereleaseVersion = rscSupport.minimumPrereleaseVersion;
-
-    try {
-      rscSupport.minimumPrereleaseVersion = undefined;
-      const r = checkRscPeerCompatibility({ rscVersion: belowMinimumVersion, reactVersion: '19.2.7' });
+  it.each(['19.2.1-beta.0', '19.2.1-rc.1', '19.2.1-rc.2', '19.2.1-rc-1', '19.2.2-alpha.0'])(
+    'errors for prerelease %s once the stable package floor is active',
+    (prerelease) => {
+      const r = checkRscPeerCompatibility({ rscVersion: prerelease, reactVersion: '19.2.7' });
 
       expect(r.level).toBe('error');
+      expect(r.message).toContain(prerelease);
       expect(r.message).toContain(`>= ${minimumVersion}`);
       expect(r.message).not.toContain('during the RC soak');
       expect(r.message).not.toContain('undefined');
-    } finally {
-      rscSupport.minimumPrereleaseVersion = originalMinimumPrereleaseVersion;
-    }
-  });
+    },
+  );
 
-  it('returns ok for the coordinated RC floor prerelease', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.0', reactVersion: '19.2.7' }).level).toBe('ok');
-  });
-
-  it('returns ok for a prerelease newer than the coordinated RC floor', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.1', reactVersion: '19.2.7' }).level).toBe('ok');
-  });
-
-  it('returns ok for a hyphenated prerelease newer than the coordinated RC floor', () => {
-    expect(checkRscPeerCompatibility({ rscVersion: '19.2.1-rc-1', reactVersion: '19.2.7' }).level).toBe('ok');
-  });
-
-  it('errors for prereleases older than the coordinated RC floor', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-beta.0', reactVersion: '19.2.7' });
+  it('omits the RC soak clause when reporting the stable package floor', () => {
+    const r = checkRscPeerCompatibility({ rscVersion: belowMinimumVersion, reactVersion: '19.2.7' });
     expect(r.level).toBe('error');
-    expect(r.message).toContain('19.2.1-beta.0');
-    expect(r.message).toContain('19.2.1-rc.0');
-  });
-
-  it('errors for future prereleases outside the coordinated RC floor tuple', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.2-alpha.0', reactVersion: '19.2.7' });
-    expect(r.level).toBe('error');
-    expect(r.message).toContain('19.2.2-alpha.0');
-    expect(r.message).toContain('19.2.1-rc.0');
+    expect(r.message).toContain(`>= ${minimumVersion}`);
+    expect(r.message).not.toContain('during the RC soak');
+    expect(r.message).not.toContain('undefined');
   });
 
   it('returns ok for a version with a leading v (prefix stripped for comparison)', () => {
@@ -161,7 +121,7 @@ describe('checkRscPeerCompatibility', () => {
   });
 
   it('errors when React 19.0 is paired with the React 19.2 RSC package line', () => {
-    const r = checkRscPeerCompatibility({ rscVersion: '19.2.1-rc.0', reactVersion: '19.0.4' });
+    const r = checkRscPeerCompatibility({ rscVersion: minimumVersion, reactVersion: '19.0.4' });
     expect(r.level).toBe('error');
     expect(r.message).toContain('react');
     expect(r.message).toContain('19.0.4');
