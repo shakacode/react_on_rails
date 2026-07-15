@@ -267,17 +267,45 @@ must still exactly match the confirmed authorization, while a transition to succ
 pending-state change is untriaged at these boundaries and requires a new authorization rather than silent reuse.
 Omission never downgrades an interrupted accelerated attempt to an ordinary lightweight-tag release and
 never permits the broad prerelease CI override. A genuinely ordinary RC with no accelerated history keeps
-its lightweight-tag path. Same-version retry discovery must complete successfully before the task can
+its lightweight-tag path. Before a fresh exact-head asynchronous ShakaPerf dispatch, a latest structurally valid
+same-target pre-run with a completed known failure or unknown terminal conclusion blocks publication instead of being
+superseded by new pending evidence. Accelerated selection first classifies every fetched run as the exact target, a
+canonically self-consistent unrelated target, or unknown; only proven unrelated evidence is ignored. Missing, malformed,
+or mismatched title, head, run, attempt, URL, status, conclusion, or timestamp identity remains visible and cannot
+authorize reuse. Before target filtering, duplicate collapse, ordering, reuse, or dispatch, every fetched accelerated
+run—including a canonically unrelated target—must have positive integer run and attempt IDs and the literal URL
+`https://github.com/<bound-repository>/actions/runs/<same-run-id>` with no alternate host, repository, path, port, query,
+fragment, or normalization. The API state is also total: active states permit only a null conclusion, completed runs
+require a recognized terminal conclusion, `createdAt` and `updatedAt` must be present and ordered parseable timestamps,
+and every state except queued requires a present `startedAt` ordered between them. A queued run may have a null
+`startedAt`; a non-null value must still be parseable and ordered. The same contract applies to a freshly dispatched run
+and every later refresh. During accelerated post-dispatch polling, the complete fetched array and every member are
+validated before target, ignored-run, or dispatch-time filtering; conflicting duplicates, ambiguous multiple fresh runs,
+and any malformed or unknown sibling block independent of API order. Only a fully valid canonical unrelated run is
+ignored. Accelerated evidence never synthesizes a missing run URL. A valid active exact-head run may remain pending and
+a valid active pre-run may trigger an exact-head dispatch, but malformed or contradictory evidence blocks before either
+disposition. The selected exact-head or pre-run state is classified before a dispatch request can take effect, so any
+selected known failure or unknown state outranks pending dispatch independent of API order. This accelerated-only polling
+seam does not change the ordinary blocking ShakaPerf waiter or its historical display-URL fallback.
+Conflicting duplicate run identities or equal ordering keys block independent of API order; only canonically identical
+duplicates collapse. A deterministically newer ordered success may supersede older ordered failures after normal
+runtime-equivalent evidence verification, while a newer ordered failure remains blocking. Reusable successful pre-runs
+remain valid, and only fully formed canonically unrelated targets are ignored without poisoning the lane. Same-version
+retry discovery must complete successfully before the task can
 prove that accelerated history is absent; API, pagination, permission, or parse failure therefore blocks
 that retry as unknown. Repository and selected-tracker discovery read chronological 100-comment pages
-incrementally, validate string bodies, positive unique comment IDs, canonical repository issue URLs, and
-nondecreasing creation times, and retain only comments containing the explicit hidden machine-marker opener
+incrementally, validate string bodies, positive unique comment IDs, canonical repository issue URLs, parseable string
+creation and update timestamps, and nondecreasing creation times, and retain only comments containing the explicit hidden
+machine-marker opener
 with the literal ASCII opener `<!-- react-on-rails-accelerated-rc `, including its single trailing space. A plain-text
 mention, suffix lookalike, alternate whitespace, or escaped opener is ordinary discussion: it is not parsed, attributed,
 or counted toward the marker bound. Exactly 1,000 retained machine-marker comments are allowed, and a short 250th page
 completes discovery; exceeding 1,000 markers or requiring a 251st page blocks as unknown instead of ignoring history or
-exhausting unbounded memory/API work. Comments whose authors were deleted may remain when their safe structural fields
-are valid. Only an exactly present `user: nil` author is known deleted and contributes no durable record; a missing or
+exhausting unbounded memory/API work. Missing, malformed, or unparseable creation or update timestamps block even on
+markerless API comments. Durable marker comments must remain unedited: their parsed creation and update instants must be
+equal, so an in-place rewrite of acceptance, rejection, conflict, approval, or evidence fields blocks before trust or
+state use. Comments whose authors were deleted may remain when their safe structural fields are valid. Only an exactly
+present `user: nil` author is known deleted and contributes no durable record; a missing or
 malformed author envelope is unknown and blocks. Unattributable machine-marker comments cannot authorize, satisfy,
 mutate, or conflict with trusted history. A marker comment is ignored before author permission checks only when it contains
 exactly one canonical marker whose payload is the byte-for-byte lowercase hexadecimal encoding of key-sorted

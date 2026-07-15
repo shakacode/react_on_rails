@@ -96,6 +96,10 @@ SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
   action_required cancelled failure neutral skipped stale startup_failure success timed_out
 ].freeze
 SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES = %w[queued in_progress requested waiting pending].freeze
+SHAKAPERF_RELEASE_GATE_CANONICAL_VERSION_PATTERN =
+  /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\.rc\.(?:0|[1-9]\d*))?\z/
+SHAKAPERF_RELEASE_GATE_DISPLAY_TITLE_PATTERN =
+  /\AShakaPerf Release Gates — (?<target_version>.+) on (?<ref>.+) @ (?<head_sha>[0-9a-f]{40})\z/
 SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS = %w[
   branch
   candidate_sha
@@ -753,6 +757,65 @@ def wait_for_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, target_ver
   )
 end
 
+def accelerated_shakaperf_polling_target_runs!(runs:, ref:, target_version:)
+  collapse_accelerated_shakaperf_run_duplicates!(runs).filter_map do |run|
+    case accelerated_shakaperf_run_target_classification(run:, ref:, target_version:)
+    when :target
+      run
+    when :unrelated
+      nil
+    else
+      abort "❌ Accelerated RC ShakaPerf polling target identity is unknown or malformed; " \
+            "refusing unaudited publication."
+    end
+  end
+end
+
+def accelerated_shakaperf_fresh_polling_run!(
+  runs:, repo_slug:, ref:, head_sha:, target_version:, ignored_run_ids:, earliest_created_at:
+)
+  unless runs.is_a?(Array)
+    abort "❌ Accelerated RC ShakaPerf polling collection is unknown or malformed; " \
+          "refusing unaudited publication."
+  end
+
+  runs.each { |run| validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:) }
+  target_runs = accelerated_shakaperf_polling_target_runs!(runs:, ref:, target_version:)
+  fresh_runs = target_runs.select do |run|
+    shakaperf_release_gate_run_matches_target?(run:, ref:, head_sha:, target_version:) &&
+      !ignored_run_ids.include?(run["databaseId"].to_s) &&
+      shakaperf_release_gate_run_created_after?(run, earliest_created_at)
+  end
+  if fresh_runs.length > 1
+    abort "❌ Accelerated RC ShakaPerf polling returned ambiguous concurrent fresh runs; " \
+          "refusing unaudited publication."
+  end
+
+  fresh_runs.first
+end
+
+def wait_for_accelerated_shakaperf_release_gate_run!(repo_slug:, ref:, head_sha:, target_version:,
+                                                     ignored_run_ids: [], earliest_created_at: nil)
+  deadline = Time.now + SHAKAPERF_RELEASE_GATE_START_TIMEOUT_SECONDS
+  ignored_run_ids = ignored_run_ids.map(&:to_s)
+
+  loop do
+    runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
+    fresh_run = accelerated_shakaperf_fresh_polling_run!(
+      runs:, repo_slug:, ref:, head_sha:, target_version:, ignored_run_ids:, earliest_created_at:
+    )
+    return fresh_run if fresh_run
+
+    break if Time.now >= deadline
+
+    sleep SHAKAPERF_RELEASE_GATE_START_POLL_SECONDS
+  end
+
+  handle_shakaperf_release_gate_violation!(
+    message: "❌ Timed out waiting for accelerated ShakaPerf release gate workflow to start for #{head_sha[0, 8]}."
+  )
+end
+
 def shakaperf_release_gate_display_title(ref:, head_sha:, target_version:)
   "ShakaPerf Release Gates — #{target_version} on #{ref} @ #{head_sha}"
 end
@@ -760,6 +823,33 @@ end
 def shakaperf_release_gate_run_matches_target?(run:, ref:, head_sha:, target_version:)
   run["headSha"] == head_sha && positive_github_id?(run["attempt"]) &&
     run["displayTitle"] == shakaperf_release_gate_display_title(ref:, head_sha:, target_version:)
+end
+
+def shakaperf_release_gate_canonical_title_identity(run)
+  return nil unless run.is_a?(Hash) && run["headSha"].is_a?(String)
+
+  match = SHAKAPERF_RELEASE_GATE_DISPLAY_TITLE_PATTERN.match(run["displayTitle"].to_s)
+  return nil unless match && match[:head_sha] == run["headSha"]
+
+  title_target = match[:target_version]
+  title_ref = match[:ref]
+  return nil unless title_target.match?(SHAKAPERF_RELEASE_GATE_CANONICAL_VERSION_PATTERN)
+
+  target_base = title_target.split(".").first(3).join(".")
+  return nil unless title_ref == "release/#{target_base}"
+
+  { target_version: title_target, ref: title_ref, head_sha: match[:head_sha] }
+end
+
+def accelerated_shakaperf_run_target_classification(run:, ref:, target_version:)
+  identity = shakaperf_release_gate_canonical_title_identity(run)
+  return :unknown unless identity
+
+  if identity.fetch(:ref) == ref && identity.fetch(:target_version) == target_version
+    :target
+  else
+    :unrelated
+  end
 end
 
 def active_shakaperf_release_gate_run?(run)
@@ -807,7 +897,7 @@ def find_latest_shakaperf_release_gate_run(runs, head_sha, ref: nil, target_vers
   matching_runs.max_by { |run| shakaperf_release_gate_run_sort_key(run) }
 end
 
-def find_latest_shakaperf_prerun(runs, head_sha, ref: nil, target_version: nil)
+def shakaperf_prerun_candidates(runs, head_sha, ref: nil, target_version: nil)
   candidates = runs.reject { |run| run["headSha"] == head_sha }
   if target_version
     candidates = candidates.select do |run|
@@ -816,9 +906,98 @@ def find_latest_shakaperf_prerun(runs, head_sha, ref: nil, target_version: nil)
       )
     end
   end
+
+  candidates
+end
+
+def find_latest_shakaperf_prerun(runs, head_sha, ref: nil, target_version: nil)
+  candidates = shakaperf_prerun_candidates(runs, head_sha, ref:, target_version:)
   return nil unless candidates.all? { |run| valid_shakaperf_prerun_ordering_metadata?(run) }
 
   candidates.max_by { |run| shakaperf_prerun_candidate_sort_key(run) }
+end
+
+def collapse_accelerated_shakaperf_run_duplicates!(runs)
+  identities = {}
+  runs.each_with_object([]) do |run, unique_runs|
+    abort "❌ Accelerated RC ShakaPerf run identity is unknown or malformed." unless run.is_a?(Hash)
+
+    identity = [run["databaseId"], run["attempt"]]
+    unless identity.all? { |value| positive_github_id?(value) }
+      unique_runs << run
+      next
+    end
+
+    existing = identities[identity]
+    if existing
+      unless existing == run
+        abort "❌ Accelerated RC ShakaPerf duplicate run identity is conflicting; refusing unaudited publication."
+      end
+      next
+    end
+
+    identities[identity] = run
+    unique_runs << run
+  end
+end
+
+def valid_shakaperf_release_gate_ordering_metadata?(run)
+  valid_identity_and_times = positive_github_id?(run["databaseId"]) &&
+                             positive_github_id?(run["attempt"]) &&
+                             !shakaperf_release_gate_time(run["createdAt"]).nil? &&
+                             !shakaperf_release_gate_time(run["updatedAt"]).nil?
+  return false unless valid_identity_and_times
+
+  if SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(run["status"])
+    run["startedAt"].nil? || !shakaperf_release_gate_time(run["startedAt"]).nil?
+  else
+    !shakaperf_release_gate_time(run["startedAt"]).nil?
+  end
+end
+
+def accelerated_shakaperf_candidate_selection!(runs, exact_head:)
+  if exact_head
+    ordering_validator = method(:valid_shakaperf_release_gate_ordering_metadata?)
+    sort_key = method(:shakaperf_release_gate_run_sort_key)
+  else
+    ordering_validator = method(:valid_accelerated_shakaperf_prerun_ordering_metadata?)
+    sort_key = method(:shakaperf_prerun_candidate_sort_key)
+  end
+  ordered, unordered = runs.partition { |run| ordering_validator.call(run) }
+  ordered.group_by { |run| sort_key.call(run) }.each_value do |same_key_runs|
+    next if same_key_runs.one?
+
+    abort "❌ Accelerated RC ShakaPerf equal ordering keys are conflicting; refusing unaudited publication."
+  end
+
+  { run: ordered.max_by { |run| sort_key.call(run) }, unordered_runs: unordered }
+end
+
+def accelerated_shakaperf_run_selection!(runs, head_sha, repo_slug:, ref:, target_version:)
+  unless runs.is_a?(Array)
+    abort "❌ Accelerated RC ShakaPerf run collection is unknown or malformed; refusing unaudited publication."
+  end
+
+  runs.each { |run| validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:) }
+  unique_runs = collapse_accelerated_shakaperf_run_duplicates!(runs)
+  relevant_runs = unique_runs.filter_map do |run|
+    case accelerated_shakaperf_run_target_classification(run:, ref:, target_version:)
+    when :target
+      run
+    when :unrelated
+      nil
+    else
+      abort "❌ Accelerated RC ShakaPerf target identity is unknown or malformed; refusing unaudited publication."
+    end
+  end
+  exact_runs, preruns = relevant_runs.partition { |run| run["headSha"] == head_sha }
+  exact_selection = accelerated_shakaperf_candidate_selection!(exact_runs, exact_head: true)
+  prerun_selection = accelerated_shakaperf_candidate_selection!(preruns, exact_head: false)
+  {
+    exact_run: exact_selection.fetch(:run),
+    prerun: prerun_selection.fetch(:run),
+    unordered_runs: exact_selection.fetch(:unordered_runs) + prerun_selection.fetch(:unordered_runs)
+  }
 end
 
 def valid_shakaperf_prerun_ordering_metadata?(run)
@@ -826,6 +1005,11 @@ def valid_shakaperf_prerun_ordering_metadata?(run)
     positive_github_id?(run["attempt"]) &&
     !shakaperf_release_gate_time(run["createdAt"]).nil? &&
     !shakaperf_release_gate_time(run["startedAt"]).nil?
+end
+
+def valid_accelerated_shakaperf_prerun_ordering_metadata?(run)
+  valid_shakaperf_prerun_ordering_metadata?(run) &&
+    !shakaperf_release_gate_time(run["updatedAt"]).nil?
 end
 
 def shakaperf_prerun_candidate_sort_key(run)
@@ -1137,29 +1321,50 @@ end
 def run_accelerated_shakaperf_release_gate!(monorepo_root:, ref:, head_sha:, target_version:, release_started_at:)
   repo_slug = github_repo_slug(monorepo_root)
   existing_runs = fetch_shakaperf_release_gate_runs(repo_slug:, ref:)
-  existing_run = find_latest_shakaperf_release_gate_run(existing_runs, head_sha, ref:, target_version:)
-  if existing_run && active_shakaperf_release_gate_run?(existing_run)
+  selection = accelerated_shakaperf_run_selection!(existing_runs, head_sha, repo_slug:, ref:, target_version:)
+  unordered_states = selection.fetch(:unordered_runs).map do |unordered_run|
+    accelerated_shakaperf_run_state!(repo_slug:, run: unordered_run, unordered: true)
+  end
+  force_exact_head_dispatch = unordered_states.include?(:dispatch)
+  existing_snapshot = selected_accelerated_shakaperf_snapshot(
+    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, release_started_at:, selection:,
+    force_exact_head_dispatch:
+  )
+  return existing_snapshot if existing_snapshot.is_a?(Hash)
+
+  dispatch_accelerated_shakaperf_release_gate!(
+    repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:, release_started_at:
+  )
+end
+
+def selected_accelerated_shakaperf_snapshot(repo_slug:, monorepo_root:, ref:, head_sha:, target_version:,
+                                            release_started_at:, selection:, force_exact_head_dispatch:)
+  existing_run = selection.fetch(:exact_run)
+  exact_state = accelerated_shakaperf_run_state!(repo_slug:, run: existing_run, unordered: false)
+  return nil if force_exact_head_dispatch && exact_state != :none
+
+  if exact_state == :active
     return accelerated_shakaperf_snapshot(
       repo_slug:, run: existing_run, ref:, candidate_sha: head_sha, target_version:, release_started_at:,
       status: "pending"
     )
   end
-  exact_snapshot = verified_accelerated_shakaperf_snapshot(
-    repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: existing_run,
-    release_started_at:, require_prerun: false, candidate_sha: head_sha
-  )
-  return exact_snapshot if exact_snapshot
+  if exact_state == :success
+    exact_snapshot = verified_accelerated_shakaperf_snapshot(
+      repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: existing_run,
+      release_started_at:, require_prerun: false, candidate_sha: head_sha
+    )
+    return exact_snapshot if exact_snapshot
+  end
 
-  reject_known_accelerated_shakaperf_failure!(repo_slug:, run: existing_run)
-  prerun = find_latest_shakaperf_prerun(existing_runs, head_sha, ref:, target_version:)
-  prerun_snapshot = verified_accelerated_shakaperf_snapshot(
+  prerun = selection.fetch(:prerun)
+  prerun_state = accelerated_shakaperf_run_state!(repo_slug:, run: prerun, unordered: false)
+  return nil if force_exact_head_dispatch
+  return unless prerun_state == :success
+
+  verified_accelerated_shakaperf_snapshot(
     repo_slug:, monorepo_root:, ref:, head_sha:, target_version:, run: prerun,
-    release_started_at:, require_prerun: true, candidate_sha: prerun&.fetch("headSha", nil)
-  )
-  return prerun_snapshot if prerun_snapshot
-
-  dispatch_accelerated_shakaperf_release_gate!(
-    repo_slug:, monorepo_root:, ref:, existing_runs:, head_sha:, target_version:, release_started_at:
+    release_started_at:, require_prerun: true, candidate_sha: prerun.fetch("headSha")
   )
 end
 
@@ -1168,7 +1373,7 @@ def dispatch_accelerated_shakaperf_release_gate!(repo_slug:, monorepo_root:, ref
   existing_run_ids = existing_runs.map { |run| run["databaseId"].to_s }
   dispatch_started_at = shakaperf_release_gate_dispatch_started_at
   dispatch_shakaperf_release_gate_workflow!(repo_slug:, ref:, target_version:, candidate_sha: head_sha)
-  run = wait_for_shakaperf_release_gate_run!(
+  run = wait_for_accelerated_shakaperf_release_gate_run!(
     repo_slug:,
     ref:,
     head_sha:,
@@ -1176,6 +1381,7 @@ def dispatch_accelerated_shakaperf_release_gate!(repo_slug:, monorepo_root:, ref
     ignored_run_ids: existing_run_ids,
     earliest_created_at: dispatch_started_at
   )
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
 
   if run["status"] == "completed"
     reject_known_accelerated_shakaperf_failure!(repo_slug:, run:)
@@ -1213,11 +1419,12 @@ end
 
 def accelerated_shakaperf_snapshot(repo_slug:, run:, ref:, candidate_sha:, target_version:, release_started_at:,
                                    status:)
-  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
+  run_url = run.fetch("url")
   started_at = shakaperf_release_gate_time(release_started_at)
-  unless positive_github_id?(run["databaseId"]) && run["headSha"] == candidate_sha &&
+  unless run["headSha"] == candidate_sha &&
          shakaperf_release_gate_run_matches_target?(run:, ref:, head_sha: candidate_sha, target_version:) &&
-         %w[pending success].include?(status) && valid_accelerated_rc_https_url?(run_url) && started_at
+         %w[pending success].include?(status) && started_at
     abort "❌ Accelerated RC ShakaPerf run identity is unknown or malformed; refusing unaudited publication."
   end
 
@@ -1233,14 +1440,87 @@ def accelerated_shakaperf_snapshot(repo_slug:, run:, ref:, candidate_sha:, targe
 end
 
 def reject_known_accelerated_shakaperf_failure!(repo_slug:, run:)
-  return unless run&.fetch("status", nil) == "completed" && run["conclusion"] != "success"
+  return unless run.is_a?(Hash) && run["status"] == "completed" && run["conclusion"] != "success"
 
-  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
+  run_url = run.fetch("url")
   unless SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(run["conclusion"])
     abort "❌ Accelerated RC ShakaPerf result is unknown; refusing unaudited publication: #{run_url}"
   end
 
   abort "❌ Accelerated RC publication found a known ShakaPerf failure (#{run['conclusion']}): #{run_url}"
+end
+
+def accelerated_shakaperf_run_state!(repo_slug:, run:, unordered:)
+  return :none unless run
+
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
+
+  status = run["status"]
+  conclusion = run["conclusion"]
+  if status == "completed"
+    return unordered ? :ignore : :success if conclusion == "success"
+
+    reject_known_accelerated_shakaperf_failure!(repo_slug:, run:)
+  elsif SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(status)
+    active_shakaperf_release_gate_run?(run)
+    return unordered ? :dispatch : :active
+  end
+
+  abort "❌ Accelerated RC ShakaPerf run state is unknown or malformed; refusing unaudited publication."
+end
+
+def validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
+  return run if valid_accelerated_shakaperf_run_metadata?(repo_slug:, run:)
+
+  abort "❌ Accelerated RC ShakaPerf run identity, URL, state, or timestamp metadata is malformed; " \
+        "refusing unaudited publication."
+end
+
+def valid_accelerated_shakaperf_run_metadata?(repo_slug:, run:)
+  return false unless run.is_a?(Hash)
+
+  valid_accelerated_shakaperf_run_identity_metadata?(repo_slug:, run:) &&
+    valid_accelerated_shakaperf_run_state_metadata?(run) &&
+    valid_accelerated_shakaperf_run_timestamp_metadata?(run)
+end
+
+def valid_accelerated_shakaperf_run_identity_metadata?(repo_slug:, run:)
+  run_id = run["databaseId"]
+  positive_github_id?(run_id) && positive_github_id?(run["attempt"]) &&
+    valid_accelerated_shakaperf_run_url?(repo_slug:, run_id:, url: run["url"])
+end
+
+def valid_accelerated_shakaperf_run_state_metadata?(run)
+  status = run["status"]
+  conclusion = run["conclusion"]
+  return SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS.include?(conclusion) if status == "completed"
+
+  SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.include?(status) && conclusion.nil?
+end
+
+def valid_accelerated_shakaperf_run_timestamp_metadata?(run)
+  created_at = accelerated_shakaperf_api_timestamp(run["createdAt"])
+  updated_at = accelerated_shakaperf_api_timestamp(run["updatedAt"])
+  return false unless created_at && updated_at && created_at <= updated_at
+
+  started_at_value = run["startedAt"]
+  return run["status"] == "queued" if started_at_value.nil?
+
+  started_at = accelerated_shakaperf_api_timestamp(started_at_value)
+  started_at && created_at <= started_at && started_at <= updated_at
+end
+
+def accelerated_shakaperf_api_timestamp(value)
+  return nil unless value.is_a?(String)
+
+  shakaperf_release_gate_time(value)
+end
+
+def valid_accelerated_shakaperf_run_url?(repo_slug:, run_id:, url:)
+  repo_slug.is_a?(String) && repo_slug.match?(%r{\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z}) &&
+    positive_github_id?(run_id) &&
+    url == "https://github.com/#{repo_slug}/actions/runs/#{run_id}"
 end
 
 def run_release_preflight_checks!(monorepo_root:, dry_run:)
@@ -2534,21 +2814,37 @@ rescue ArgumentError, JSON::ParserError
   nil
 end
 
+def valid_accelerated_rc_comment_schema_shape?(comment)
+  comment.is_a?(Hash) &&
+    comment["id"].is_a?(Integer) && comment["id"].positive? &&
+    comment["body"].is_a?(String) &&
+    comment["created_at"].is_a?(String) &&
+    comment["updated_at"].is_a?(String)
+end
+
+def accelerated_rc_comment_timestamps!(comment)
+  created_at = Time.iso8601(comment.fetch("created_at"))
+  updated_at = Time.iso8601(comment.fetch("updated_at"))
+  if accelerated_rc_machine_marker_comment?(comment) && updated_at != created_at
+    abort "❌ Edited accelerated RC marker comment detected; durable history must remain append-only."
+  end
+
+  [created_at, updated_at]
+end
+
 def validate_accelerated_rc_comment_schema!(comment:, repo_slug:)
-  valid = comment.is_a?(Hash) &&
-          comment["id"].is_a?(Integer) && comment["id"].positive? &&
-          comment["body"].is_a?(String) &&
-          comment["created_at"].is_a?(String)
-  abort "❌ Accelerated RC comment page contains an invalid comment schema." unless valid
+  unless valid_accelerated_rc_comment_schema_shape?(comment)
+    abort "❌ Accelerated RC comment page contains an invalid comment schema."
+  end
 
   tracker = release_tracker_number_from_repository_comment_issue_url!(
     issue_url: comment["issue_url"], repo_slug:
   )
-  created_at = Time.iso8601(comment.fetch("created_at"))
+  created_at, updated_at = accelerated_rc_comment_timestamps!(comment)
 
-  # GitHub can retain an ordinary comment after its author is deleted. Marker records still require
-  # an attributable trusted author later, but markerless comments need only this safe structural schema.
-  { id: comment.fetch("id"), tracker:, created_at: }
+  # Every API comment needs trustworthy chronology. GitHub can retain an ordinary comment after its author is deleted;
+  # marker records additionally must be unedited and require an attributable trusted author later.
+  { id: comment.fetch("id"), tracker:, created_at:, updated_at: }
 rescue ArgumentError
   abort "❌ Accelerated RC comment page contains an invalid comment schema."
 end
@@ -3966,21 +4262,24 @@ def verified_accelerated_rc_shakaperf_success_snapshot!(repo_slug:, monorepo_roo
 end
 
 def validated_accelerated_rc_shakaperf_run_url!(repo_slug:, run:, stored:, ref:)
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
   unless valid_accelerated_rc_shakaperf_run_identity?(repo_slug:, run:, stored:, ref:)
     abort "❌ Refreshed ShakaPerf run identity is unknown or malformed; reconciliation remains blocked."
   end
 
-  shakaperf_release_gate_run_url(repo_slug:, run:)
+  run.fetch("url")
 end
 
 def valid_accelerated_rc_shakaperf_run_identity?(repo_slug:, run:, stored:, ref:)
-  return false unless run.is_a?(Hash) && positive_github_id?(run["databaseId"])
+  return false unless stored.is_a?(Hash) && valid_accelerated_shakaperf_run_metadata?(repo_slug:, run:)
+  return false unless valid_accelerated_shakaperf_run_url?(
+    repo_slug:, run_id: stored["run_id"], url: stored["run_url"]
+  )
 
-  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
   run["databaseId"] == stored["run_id"] && run["attempt"] == stored["attempt"] &&
     shakaperf_release_gate_run_matches_target?(
       run:, ref:, head_sha: stored["candidate_sha"], target_version: stored["target_version"]
-    ) && valid_accelerated_rc_https_url?(run_url)
+    )
 end
 
 def accelerated_rc_shakaperf_requires_prerun?(record)
@@ -4571,11 +4870,12 @@ end
 def reuse_accepted_rc_shakaperf_evidence!(repo_slug:, monorepo_root:, ref:, head_sha:, record:)
   stored = record.fetch("shakaperf")
   run = refresh_shakaperf_release_gate_run!(repo_slug:, run: { "databaseId" => stored.fetch("run_id") })
+  validate_accelerated_shakaperf_run_metadata!(repo_slug:, run:)
   unless valid_accelerated_rc_shakaperf_run_identity?(repo_slug:, run:, stored:, ref:)
     puts "Accepted RC ShakaPerf evidence is not reusable (run identity changed); running the strict final gate."
     return false
   end
-  run_url = shakaperf_release_gate_run_url(repo_slug:, run:)
+  run_url = run.fetch("url")
   unless run["status"] == "completed" && run["conclusion"] == "success"
     puts "Accepted RC ShakaPerf evidence is not reusable (workflow is no longer a successful terminal run): #{run_url}"
     return false

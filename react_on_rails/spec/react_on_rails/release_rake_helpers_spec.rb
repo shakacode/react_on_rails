@@ -208,12 +208,14 @@ RSpec.describe "release.rake helper methods" do
     snapshot["target_version"] = context.fetch(:final_target_version)
   end
 
-  def accelerated_rc_test_issue_comment(id:, body:, tracker: 3823, created_at: "2026-07-14T13:00:00Z", user: nil)
+  def accelerated_rc_test_issue_comment(id:, body:, tracker: 3823, created_at: "2026-07-14T13:00:00Z",
+                                        updated_at: created_at, user: nil)
     {
       "id" => id,
       "body" => body,
       "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/#{tracker}",
       "created_at" => created_at,
+      "updated_at" => updated_at,
       "user" => user
     }
   end
@@ -2187,6 +2189,25 @@ RSpec.describe "release.rake helper methods" do
       ).to eq(matching_run)
     end
 
+    it "keeps ordinary polling permissive and preserves its missing-URL fallback" do
+      matching_run = {
+        "databaseId" => 2,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
+        "headSha" => head_sha
+      }
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug:, ref: "release-branch").and_return([matching_run])
+
+      expect(
+        wait_for_shakaperf_release_gate_run!(repo_slug:, ref: "release-branch", head_sha:, target_version:)
+      ).to eq(matching_run)
+      expect(shakaperf_release_gate_run_url(repo_slug:, run: matching_run))
+        .to eq("https://github.com/shakacode/react_on_rails/actions/runs/2")
+    end
+
     it "ignores stale workflow_dispatch runs for the same head SHA" do
       run_identity = {
         "attempt" => 1,
@@ -2281,6 +2302,77 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#run_accelerated_shakaperf_release_gate!" do
+    it "uses only Ruby core collection APIs when loaded by the real root Rake application" do
+      monorepo_root = File.expand_path("../../..", __dir__)
+      root_probe = <<~'RUBY'
+        require "json"
+        require "rake"
+
+        Rake.application.init
+        Rake.application.load_rakefile
+
+        repo_slug = "shakacode/react_on_rails"
+        ref = "release/17.0.0"
+        head_sha = "d" * 40
+        target_version = "17.0.0.rc.10"
+        earliest_created_at = Time.iso8601("2026-07-14T13:00:00Z")
+        queued_run = {
+          "databaseId" => 980_001,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+          "headSha" => head_sha,
+          "status" => "queued",
+          "conclusion" => nil,
+          "createdAt" => "2026-07-14T13:00:01Z",
+          "startedAt" => nil,
+          "updatedAt" => "2026-07-14T13:00:01Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/980001"
+        }
+        second_run = queued_run.merge(
+          "databaseId" => 980_002,
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/980002"
+        )
+        capture_case = lambda do |runs|
+          result = accelerated_shakaperf_fresh_polling_run!(
+            runs:, repo_slug:, ref:, head_sha:, target_version:, ignored_run_ids: [], earliest_created_at:
+          )
+          { "nil_result" => result.nil?, "run_id" => result&.fetch("databaseId") }
+        rescue SystemExit => error
+          { "error_class" => error.class.name, "status" => error.status }
+        rescue NoMethodError => error
+          { "error_class" => error.class.name, "missing_method" => error.name.to_s }
+        end
+
+        results = {
+          "array_many" => [].respond_to?(:many?),
+          "empty" => capture_case.call([]),
+          "single" => capture_case.call([queued_run]),
+          "ambiguous" => capture_case.call([queued_run, second_run])
+        }
+        puts "ROOT_RAKE_RESULT=#{JSON.generate(results)}"
+      RUBY
+      root_bundle_environment = {
+        "BUNDLE_GEMFILE" => File.join(monorepo_root, "Gemfile"),
+        "BUNDLE_LOCKFILE" => File.join(monorepo_root, "Gemfile.lock")
+      }
+      stdout, stderr, status = Bundler.with_unbundled_env do
+        Open3.capture3(
+          root_bundle_environment,
+          "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
+        )
+      end
+      result_line = stdout.lines.find { |line| line.start_with?("ROOT_RAKE_RESULT=") }
+
+      expect(status).to be_success, "root Rake probe failed:\n#{stdout}\n#{stderr}"
+      expect(result_line).not_to be_nil, "root Rake probe produced no result:\n#{stdout}\n#{stderr}"
+      results = JSON.parse(result_line.delete_prefix("ROOT_RAKE_RESULT="))
+      expect(results.fetch("array_many")).to be(false)
+      expect(results.fetch("empty")).to eq("nil_result" => true, "run_id" => nil)
+      expect(results.fetch("single")).to eq("nil_result" => false, "run_id" => 980_001)
+      expect(results.fetch("ambiguous")).to eq("error_class" => "SystemExit", "status" => 1)
+      expect(stderr).to include("ambiguous concurrent fresh runs")
+    end
+
     it "rejects every active status when its conclusion is non-nil" do
       non_nil_conclusions = ["failure", ""]
       aggregate_failures do
@@ -2316,7 +2408,7 @@ RSpec.describe "release.rake helper methods" do
         shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
         dispatch_shakaperf_release_gate_workflow!: nil
       )
-      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+      allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(run)
       expect(self).not_to receive(:watch_shakaperf_release_gate_run!)
 
       result = run_accelerated_shakaperf_release_gate!(
@@ -2356,7 +2448,7 @@ RSpec.describe "release.rake helper methods" do
         shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
         dispatch_shakaperf_release_gate_workflow!: nil
       )
-      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+      allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(run)
 
       expect do
         run_accelerated_shakaperf_release_gate!(
@@ -2366,7 +2458,7 @@ RSpec.describe "release.rake helper methods" do
           target_version: "17.0.0.rc.10",
           release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
         )
-      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+      end.to raise_error(SystemExit, /ShakaPerf.*(?:contradictory|state|metadata|malformed)/i)
     end
 
     it "blocks a freshly dispatched run that is already known to have failed" do
@@ -2391,7 +2483,7 @@ RSpec.describe "release.rake helper methods" do
         shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
         dispatch_shakaperf_release_gate_workflow!: nil
       )
-      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+      allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(run)
 
       expect do
         run_accelerated_shakaperf_release_gate!(
@@ -2463,7 +2555,7 @@ RSpec.describe "release.rake helper methods" do
           target_version: "17.0.0.rc.10",
           release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
         )
-      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+      end.to raise_error(SystemExit, /ShakaPerf.*(?:contradictory|state|metadata|malformed)/i)
     end
 
     it "ignores a same-SHA run dispatched for another target version" do
@@ -2515,7 +2607,7 @@ RSpec.describe "release.rake helper methods" do
           target_version: "17.0.0.rc.10",
           release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
         )
-      end.to raise_error(SystemExit, /identity is unknown/)
+      end.to raise_error(SystemExit, /identity.*(?:unknown|malformed)/)
     end
 
     it "reuses a completed exact-head run only after verifying its evidence" do
@@ -2609,7 +2701,7 @@ RSpec.describe "release.rake helper methods" do
           target_version: "17.0.0.rc.10",
           release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
         )
-      end.to raise_error(SystemExit, /ShakaPerf.*unknown.*refusing unaudited publication/i)
+      end.to raise_error(SystemExit, /ShakaPerf.*(?:unknown|malformed).*refusing unaudited publication/i)
     end
 
     it "reuses a completed pre-run only when runtime-equivalent evidence verifies" do
@@ -2642,6 +2734,1290 @@ RSpec.describe "release.rake helper methods" do
       )
 
       expect(result).to include(status: "success", run_id: 222_222)
+    end
+
+    it "blocks the latest completed same-target failed or unknown pre-run before asynchronous dispatch" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      run_url = "https://github.com/shakacode/react_on_rails/actions/runs/222222"
+      base_prerun = {
+        "databaseId" => 222_222,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: "e" * 40, target_version:
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => run_url
+      }
+      cases = {
+        "known failure" => ["failure", %r{known ShakaPerf failure.*actions/runs/222222}im],
+        "unknown conclusion" => ["future_conclusion", /ShakaPerf.*(?:unknown|malformed)/i]
+      }
+      queued_run = base_prerun.merge(
+        "databaseId" => 333_333,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "queued",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/333333"
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run
+      )
+
+      aggregate_failures do
+        cases.each do |label, (conclusion, message)|
+          prerun = base_prerun.merge("conclusion" => conclusion)
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([prerun])
+
+          expect do
+            run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+          end.to raise_error(SystemExit, message), label
+        end
+      end
+      expect(self).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+    end
+
+    it "blocks completed same-target failures and unknown conclusions across mixed unordered candidate sets" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_prerun = lambda do |candidate_sha:, run_id:, conclusion:, created_at:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      malformed_success = build_prerun.call(
+        candidate_sha: "f" * 40, run_id: 333_333, conclusion: "success", created_at: nil
+      )
+      ordered_success = build_prerun.call(
+        candidate_sha: "a" * 40, run_id: 444_444, conclusion: "success",
+        created_at: "2026-07-14T13:00:00Z"
+      )
+      queued_run = build_prerun.call(
+        candidate_sha: head_sha, run_id: 555_555, conclusion: nil,
+        created_at: "2026-07-14T14:00:00Z"
+      ).merge("status" => "queued", "startedAt" => nil)
+      blocking_conclusions = SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS - ["success"]
+      cases = blocking_conclusions.to_h do |conclusion|
+        [conclusion, /ShakaPerf.*(?:failure|unknown|malformed|metadata)/i]
+      end.merge("future_conclusion" => /ShakaPerf.*(?:unknown|malformed|metadata)/i)
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T14:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run,
+        shakaperf_release_gate_run_evidence_rejection: nil
+      )
+
+      aggregate_failures do
+        cases.each_with_index do |(conclusion, message), index|
+          ordered_blocker = build_prerun.call(
+            candidate_sha: "e" * 40,
+            run_id: 222_222 + index,
+            conclusion:,
+            created_at: "2026-07-14T12:00:00Z"
+          )
+          unordered_blocker = ordered_blocker.merge(
+            "databaseId" => 666_666 + index,
+            "headSha" => "b" * 40,
+            "displayTitle" => shakaperf_release_gate_display_title(
+              ref:, head_sha: "b" * 40, target_version:
+            ),
+            "createdAt" => nil,
+            "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{666_666 + index}"
+          )
+          candidate_sets = {
+            "ordered #{conclusion} with malformed success" => [ordered_blocker, malformed_success],
+            "unordered #{conclusion} with ordered success" => [unordered_blocker, ordered_success]
+          }
+
+          candidate_sets.each do |label, runs|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, message), label
+          end
+        end
+      end
+      expect(self).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+    end
+
+    it "reuses a deterministically newer valid success despite an older ordered failure" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_prerun = lambda do |candidate_sha:, run_id:, conclusion:, created_at:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      older_failure = build_prerun.call(
+        candidate_sha: "e" * 40, run_id: 222_222, conclusion: "failure",
+        created_at: "2026-07-14T11:00:00Z"
+      )
+      newer_success = build_prerun.call(
+        candidate_sha: "f" * 40, run_id: 333_333, conclusion: "success",
+        created_at: "2026-07-14T12:00:00Z"
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref:)
+        .and_return([older_failure, newer_success])
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref:,
+        head_sha:,
+        target_version:,
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(status: "success", run_id: 333_333, candidate_sha: "f" * 40)
+    end
+
+    it "fails closed on malformed exact-target identity instead of reusing or dispatching" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, conclusion: "success", created_at: "2026-07-14T12:00:00Z"|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      reusable_success = build_run.call(candidate_sha: "f" * 40, run_id: 900_001)
+      pre_run_failure = build_run.call(candidate_sha: "e" * 40, run_id: 900_002, conclusion: "failure")
+      exact_head_failure = build_run.call(candidate_sha: head_sha, run_id: 900_003, conclusion: "failure")
+      malformed_head_success = build_run.call(candidate_sha: "malformed-sha", run_id: 900_004)
+      identity_cases = {
+        "pre-run missing attempt" => pre_run_failure.except("attempt"),
+        "pre-run zero attempt" => pre_run_failure.merge("attempt" => 0),
+        "pre-run non-integer attempt" => pre_run_failure.merge("attempt" => "1"),
+        "exact-head missing attempt" => exact_head_failure.except("attempt"),
+        "exact-head zero attempt" => exact_head_failure.merge("attempt" => 0),
+        "exact-head non-integer attempt" => exact_head_failure.merge("attempt" => "1"),
+        "missing title" => pre_run_failure.except("displayTitle"),
+        "non-String title" => pre_run_failure.merge("displayTitle" => 17),
+        "title and head mismatch" => pre_run_failure.merge(
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: "a" * 40, target_version:
+          )
+        ),
+        "missing head" => pre_run_failure.except("headSha"),
+        "malformed head success" => malformed_head_success
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      aggregate_failures do
+        identity_cases.each do |label, malformed_run|
+          [[malformed_run, reusable_success], [reusable_success, malformed_run]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:identity|state|failure|unknown|malformed)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+      end
+    end
+
+    it "totally classifies unordered same-target state before reusing ordered success" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, status:, conclusion:, created_at:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      ordered_success = build_run.call(
+        candidate_sha: "e" * 40,
+        run_id: 910_001,
+        status: "completed",
+        conclusion: "success",
+        created_at: "2026-07-14T12:00:00Z"
+      )
+      queued_run = build_run.call(
+        candidate_sha: head_sha,
+        run_id: 910_003,
+        status: "queued",
+        conclusion: nil,
+        created_at: "2026-07-14T14:00:00Z"
+      ).merge("startedAt" => nil)
+      cases = {
+        "completed success without ordering timestamps" => ["completed", "success", :block],
+        "completed known failure" => ["completed", "failure", :block],
+        "completed unknown conclusion" => ["completed", "future_conclusion", :block],
+        "completed nil conclusion" => ["completed", nil, :block],
+        "active nil conclusion without ordering timestamps" => ["in_progress", nil, :block],
+        "active terminal conclusion" => ["in_progress", "failure", :block],
+        "unknown status nil conclusion" => ["future_status", nil, :block],
+        "unknown status known conclusion" => ["future_status", "failure", :block],
+        "unknown status unknown conclusion" => ["future_status", "future_conclusion", :block],
+        "malformed status" => [17, nil, :block],
+        "malformed conclusion" => ["completed", ["success"], :block]
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_run_evidence_rejection: nil,
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T14:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run
+      )
+
+      aggregate_failures do
+        cases.each_with_index do |(label, (status, conclusion, expected)), index|
+          unordered_run = build_run.call(
+            candidate_sha: "f" * 40,
+            run_id: 920_000 + index,
+            status:,
+            conclusion:,
+            created_at: nil
+          )
+          [[unordered_run, ordered_success], [ordered_success, unordered_run]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            if expected == :block
+              expect do
+                run_accelerated_shakaperf_release_gate!(
+                  monorepo_root: "/tmp/repo",
+                  ref:,
+                  head_sha:,
+                  target_version:,
+                  release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+                )
+              end.to raise_error(SystemExit, /ShakaPerf.*(?:state|failure|unknown|contradictory|malformed)/i),
+                     "#{label}, order #{order}"
+            else
+              result = run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+              expected_status = expected == :reuse ? "success" : "pending"
+              expected_run_id = expected == :reuse ? 910_001 : 910_003
+              expect(result).to include(status: expected_status, run_id: expected_run_id),
+                                "#{label}, order #{order}"
+            end
+          end
+        end
+      end
+    end
+
+    it "lets blocking unordered and selected evidence outrank exact-head dispatch in every array order" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, status:, conclusion:, created_at:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => status == "queued" ? nil : "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      unordered_active = build_run.call(
+        candidate_sha: "e" * 40, run_id: 925_001, status: "in_progress", conclusion: nil, created_at: nil
+      )
+      second_unordered_active = build_run.call(
+        candidate_sha: "f" * 40, run_id: 925_002, status: "queued", conclusion: nil, created_at: nil
+      )
+      unordered_failure = build_run.call(
+        candidate_sha: "a" * 40, run_id: 925_003, status: "completed", conclusion: "failure", created_at: nil
+      )
+      unordered_unknown = build_run.call(
+        candidate_sha: "b" * 40, run_id: 925_004, status: "future_status", conclusion: nil, created_at: nil
+      )
+      selected_prerun_failure = build_run.call(
+        candidate_sha: "c" * 40, run_id: 925_005, status: "completed", conclusion: "cancelled",
+        created_at: "2026-07-14T12:00:00Z"
+      )
+      selected_exact_failure = build_run.call(
+        candidate_sha: head_sha, run_id: 925_006, status: "completed", conclusion: "timed_out",
+        created_at: "2026-07-14T12:00:00Z"
+      )
+      queued_run = build_run.call(
+        candidate_sha: head_sha, run_id: 925_007, status: "queued", conclusion: nil,
+        created_at: "2026-07-14T13:00:00Z"
+      )
+      blocking_sets = {
+        "later unordered failure" => [unordered_active, second_unordered_active, unordered_failure],
+        "later unordered unknown state" => [unordered_active, second_unordered_active, unordered_unknown],
+        "selected ordered pre-run failure" => [unordered_active, selected_prerun_failure],
+        "selected exact-head failure" => [unordered_active, selected_exact_failure]
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run
+      )
+
+      aggregate_failures do
+        blocking_sets.each do |label, records|
+          [records, records.reverse].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:failure|state|unknown|contradictory|malformed)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+      end
+      expect(self).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+    end
+
+    it "validates complete accelerated run metadata before pending, dispatch, or unrelated filtering" do
+      target_version = "17.0.0.rc.10"
+      unrelated_version = "17.0.0.rc.9"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, target: target_version, status: "completed",
+                             conclusion: "success"|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version: target
+          ),
+          "headSha" => candidate_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => "2026-07-14T12:00:00Z",
+          "startedAt" => status == "queued" ? nil : "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      target_success = build_run.call(candidate_sha: "e" * 40, run_id: 926_001)
+      exact_active = build_run.call(
+        candidate_sha: head_sha, run_id: 926_002, status: "queued", conclusion: nil
+      )
+      unordered_active = build_run.call(
+        candidate_sha: "f" * 40, run_id: 926_003, status: "in_progress", conclusion: nil
+      ).merge("createdAt" => nil)
+      unrelated = build_run.call(
+        candidate_sha: "a" * 40, run_id: 926_004, target: unrelated_version
+      )
+      malformed_cases = {
+        "exact active missing URL" => [exact_active.except("url")],
+        "exact active non-String URL" => [exact_active.merge("url" => 17)],
+        "unordered active empty URL" => [unordered_active.merge("url" => ""), target_success],
+        "unordered active malformed URL" => [unordered_active.merge("url" => "javascript:alert(1)"), target_success],
+        "unrelated missing run id" => [unrelated.except("databaseId"), target_success],
+        "unrelated missing attempt" => [unrelated.except("attempt"), target_success],
+        "unrelated missing URL" => [unrelated.except("url"), target_success],
+        "unrelated non-HTTPS URL" => [unrelated.merge("url" => "http://example.test/run"), target_success],
+        "unrelated malformed URL" => [unrelated.merge("url" => "https://[invalid"), target_success]
+      }
+      queued_run = exact_active.merge(
+        "databaseId" => 926_005,
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/926005"
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run
+      )
+
+      aggregate_failures do
+        malformed_cases.each do |label, records|
+          [records, records.reverse].uniq.each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:identity|metadata|unknown|malformed)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+      end
+      expect(self).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+    end
+
+    it "totally validates state and timestamps before target filtering, ordering, reuse, or dispatch" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, target: target_version|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version: target
+          ),
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => "success",
+          "createdAt" => "2026-07-14T12:00:00Z",
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      reusable_success = build_run.call(candidate_sha: "e" * 40, run_id: 926_100)
+      unrelated = build_run.call(
+        candidate_sha: "a" * 40, run_id: 926_200, target: "17.0.0.rc.9"
+      )
+      malformed_cases = {
+        "unrelated missing createdAt" => unrelated.except("createdAt"),
+        "unrelated missing updatedAt" => unrelated.except("updatedAt"),
+        "unrelated completed missing startedAt" => unrelated.merge("startedAt" => nil),
+        "unrelated malformed createdAt" => unrelated.merge("createdAt" => "not-a-time"),
+        "unrelated created after started" => unrelated.merge("createdAt" => "2026-07-14T12:01:00Z"),
+        "unrelated started after updated" => unrelated.merge("startedAt" => "2026-07-14T13:00:00Z"),
+        "unrelated unknown status" => unrelated.merge("status" => "future_status", "conclusion" => nil),
+        "unrelated active terminal conclusion" => unrelated.merge(
+          "status" => "in_progress", "conclusion" => "failure"
+        ),
+        "same-target completed missing createdAt" => reusable_success.except("createdAt"),
+        "same-target completed missing updatedAt" => reusable_success.except("updatedAt"),
+        "same-target completed missing startedAt" => reusable_success.merge("startedAt" => nil),
+        "same-target completed nil conclusion" => reusable_success.merge("conclusion" => nil),
+        "same-target queued malformed timestamps" => reusable_success.merge(
+          "status" => "queued", "conclusion" => nil, "createdAt" => nil, "startedAt" => nil
+        ),
+        "same-target in-progress missing startedAt" => reusable_success.merge(
+          "status" => "in_progress", "conclusion" => nil, "startedAt" => nil
+        )
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        wait_for_accelerated_shakaperf_release_gate_run!: reusable_success.merge(
+          "databaseId" => 926_300,
+          "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+          "headSha" => head_sha,
+          "status" => "queued",
+          "conclusion" => nil,
+          "createdAt" => "2026-07-14T13:00:00Z",
+          "startedAt" => nil,
+          "updatedAt" => "2026-07-14T13:00:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/926300"
+        )
+      )
+
+      aggregate_failures do
+        malformed_cases.each do |label, malformed_run|
+          records = label.start_with?("unrelated") ? [malformed_run, reusable_success] : [malformed_run]
+          [records, records.reverse].uniq.each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:metadata|state|unknown|malformed|timestamp)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+      end
+      expect(self).not_to have_received(:dispatch_shakaperf_release_gate_workflow!)
+    end
+
+    it "requires the exact canonical accelerated Actions run URL before selection or pending dispatch" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      run_id = 926_400
+      canonical_run = {
+        "databaseId" => run_id,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "queued",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+      }
+      malformed_urls = {
+        "wrong host" => "https://example.com/shakacode/react_on_rails/actions/runs/#{run_id}",
+        "wrong repository" => "https://github.com/shakacode/other/actions/runs/#{run_id}",
+        "wrong path" => "https://github.com/shakacode/react_on_rails/actions/workflows/#{run_id}",
+        "wrong run ID" => "https://github.com/shakacode/react_on_rails/actions/runs/999999",
+        "query" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}?x=1",
+        "fragment" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}#summary",
+        "port" => "https://github.com:443/shakacode/react_on_rails/actions/runs/#{run_id}",
+        "missing" => nil,
+        "malformed" => "https://[invalid",
+        "non-String" => 17
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil,
+        shakaperf_release_gate_run_evidence_rejection: nil
+      )
+
+      aggregate_failures do
+        malformed_urls.each do |label, url|
+          malformed_run = canonical_run.merge("url" => url)
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([malformed_run])
+          expect do
+            run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|malformed)/i), label
+
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([])
+          allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(malformed_run)
+          expect do
+            run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|malformed)/i),
+                 "fresh #{label}"
+        end
+      end
+    end
+
+    it "rejects incomplete state metadata returned by a fresh accelerated dispatch" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      fresh_run = {
+        "databaseId" => 926_500,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "queued",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/926500"
+      }
+      malformed_runs = {
+        "missing createdAt" => fresh_run.except("createdAt"),
+        "missing updatedAt" => fresh_run.except("updatedAt"),
+        "in-progress missing startedAt" => fresh_run.merge("status" => "in_progress"),
+        "completed missing startedAt" => fresh_run.merge("status" => "completed", "conclusion" => "success"),
+        "created after updated" => fresh_run.merge(
+          "createdAt" => "2026-07-14T13:01:00Z", "updatedAt" => "2026-07-14T13:00:00Z"
+        )
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([])
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil
+      )
+
+      aggregate_failures do
+        malformed_runs.each do |label, malformed_run|
+          allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(malformed_run)
+          expect do
+            run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:metadata|state|unknown|malformed|timestamp)/i), label
+        end
+      end
+    end
+
+    it "totally validates every accelerated polling response before filtering or returning a fresh run" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      release_started_at = Time.iso8601("2026-07-14T12:59:00Z")
+      dispatch_started_at = Time.iso8601("2026-07-14T13:00:00Z")
+      build_run = lambda do |run_id:, candidate_sha: head_sha, version: target_version, status: "queued",
+                             conclusion: nil, created_at: "2026-07-14T13:00:01Z",
+                             started_at: nil, updated_at: "2026-07-14T13:00:01Z"|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version: version
+          ),
+          "headSha" => candidate_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => started_at,
+          "updatedAt" => updated_at,
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      fresh_run = build_run.call(run_id: 970_001)
+      malformed_run = build_run.call(run_id: 970_002)
+      malformed_identity = shakaperf_release_gate_display_title(
+        ref:, head_sha: "b" * 40, target_version:
+      )
+      malformed_cases = {
+        "non-Hash member" => 17,
+        "missing databaseId" => malformed_run.except("databaseId"),
+        "zero databaseId" => malformed_run.merge("databaseId" => 0),
+        "negative databaseId" => malformed_run.merge("databaseId" => -1),
+        "non-Integer databaseId" => malformed_run.merge("databaseId" => "970002"),
+        "missing attempt" => malformed_run.except("attempt"),
+        "zero attempt" => malformed_run.merge("attempt" => 0),
+        "negative attempt" => malformed_run.merge("attempt" => -1),
+        "non-Integer attempt" => malformed_run.merge("attempt" => "1"),
+        "missing title" => malformed_run.except("displayTitle"),
+        "empty title" => malformed_run.merge("displayTitle" => ""),
+        "non-String title" => malformed_run.merge("displayTitle" => 17),
+        "title and head mismatch" => malformed_run.merge("displayTitle" => malformed_identity),
+        "missing head" => malformed_run.except("headSha"),
+        "empty head" => malformed_run.merge("headSha" => ""),
+        "non-String head" => malformed_run.merge("headSha" => 17),
+        "unknown status" => malformed_run.merge("status" => "future_status"),
+        "non-String status" => malformed_run.merge("status" => :queued),
+        "active terminal conclusion" => malformed_run.merge("conclusion" => "failure"),
+        "completed nil conclusion" => malformed_run.merge(
+          "status" => "completed", "conclusion" => nil, "startedAt" => "2026-07-14T13:00:02Z",
+          "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "completed unknown conclusion" => malformed_run.merge(
+          "status" => "completed", "conclusion" => "future_conclusion",
+          "startedAt" => "2026-07-14T13:00:02Z", "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "missing createdAt" => malformed_run.except("createdAt"),
+        "malformed createdAt" => malformed_run.merge("createdAt" => "not-a-time"),
+        "missing updatedAt" => malformed_run.except("updatedAt"),
+        "malformed updatedAt" => malformed_run.merge("updatedAt" => "not-a-time"),
+        "created after updated" => malformed_run.merge(
+          "createdAt" => "2026-07-14T13:00:03Z", "updatedAt" => "2026-07-14T13:00:02Z"
+        ),
+        "in-progress nil startedAt" => malformed_run.merge(
+          "status" => "in_progress", "startedAt" => nil, "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "completed nil startedAt" => malformed_run.merge(
+          "status" => "completed", "conclusion" => "success", "startedAt" => nil,
+          "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "malformed startedAt" => malformed_run.merge(
+          "status" => "in_progress", "startedAt" => "not-a-time",
+          "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "started before creation" => malformed_run.merge(
+          "status" => "in_progress", "createdAt" => "2026-07-14T13:00:02Z",
+          "startedAt" => "2026-07-14T13:00:01Z", "updatedAt" => "2026-07-14T13:00:03Z"
+        ),
+        "started after update" => malformed_run.merge(
+          "status" => "in_progress", "startedAt" => "2026-07-14T13:00:04Z",
+          "updatedAt" => "2026-07-14T13:00:03Z"
+        )
+      }
+      url_mutations = {
+        "wrong host" => "https://example.com/shakacode/react_on_rails/actions/runs/970002",
+        "wrong owner" => "https://github.com/other/react_on_rails/actions/runs/970002",
+        "wrong repository" => "https://github.com/shakacode/other/actions/runs/970002",
+        "case variant" => "https://github.com/ShakaCode/react_on_rails/actions/runs/970002",
+        "repository suffix" => "https://github.com/shakacode/react_on_rails.evil/actions/runs/970002",
+        "wrong path" => "https://github.com/shakacode/react_on_rails/actions/workflows/970002",
+        "wrong run ID" => "https://github.com/shakacode/react_on_rails/actions/runs/999999",
+        "extra path segment" => "https://github.com/shakacode/react_on_rails/actions/runs/970002/attempts/1",
+        "port" => "https://github.com:443/shakacode/react_on_rails/actions/runs/970002",
+        "query" => "https://github.com/shakacode/react_on_rails/actions/runs/970002?attempt=1",
+        "fragment" => "https://github.com/shakacode/react_on_rails/actions/runs/970002#summary",
+        "userinfo" => "https://user@github.com/shakacode/react_on_rails/actions/runs/970002",
+        "missing" => nil,
+        "empty" => "",
+        "malformed" => "https://[invalid",
+        "HTTP" => "http://github.com/shakacode/react_on_rails/actions/runs/970002",
+        "non-String" => 17,
+        "generic HTTPS" => "https://example.org/run/970002"
+      }
+      dispatch_count = 0
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: dispatch_started_at,
+        shakaperf_release_gate_run_evidence_rejection: nil
+      )
+      allow(self).to receive(:dispatch_shakaperf_release_gate_workflow!) { dispatch_count += 1 }
+      run_with_poll = lambda do |poll_response, initial_runs: []|
+        responses = [initial_runs, poll_response]
+        allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+          .with(repo_slug: "shakacode/react_on_rails", ref:).and_wrap_original do
+            responses.empty? ? poll_response : responses.shift
+          end
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref:,
+          head_sha:,
+          target_version:,
+          release_started_at:
+        )
+      end
+      expected_dispatches = 0
+
+      aggregate_failures do
+        expect do
+          expected_dispatches += 1
+          run_with_poll.call({ "unexpected" => "collection" })
+        end.to raise_error(SystemExit, /collection.*(?:unknown|malformed)/i), "non-Array collection"
+
+        malformed_cases.each do |label, invalid_run|
+          [[fresh_run, invalid_run], [invalid_run, fresh_run]].each_with_index do |runs, order|
+            expect do
+              expected_dispatches += 1
+              run_with_poll.call(runs)
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:identity|metadata|state|unknown|malformed|timestamp)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+
+        url_mutations.each do |label, url|
+          same_target = malformed_run.merge("url" => url)
+          unrelated = same_target.merge(
+            "displayTitle" => shakaperf_release_gate_display_title(
+              ref:, head_sha: "a" * 40, target_version: "17.0.0.rc.9"
+            ),
+            "headSha" => "a" * 40
+          )
+          { "same target" => same_target, "canonical unrelated target" => unrelated }.each do |scope, invalid_run|
+            [[fresh_run, invalid_run], [invalid_run, fresh_run]].each_with_index do |runs, order|
+              expect do
+                expected_dispatches += 1
+                run_with_poll.call(runs)
+              end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|unknown|malformed)/i),
+                     "#{scope} #{label}, order #{order}"
+            end
+          end
+        end
+
+        valid_old_run = build_run.call(
+          run_id: 970_099,
+          candidate_sha: "a" * 40,
+          version: "17.0.0.rc.9",
+          status: "completed",
+          conclusion: "success",
+          started_at: "2026-07-14T12:00:01Z",
+          created_at: "2026-07-14T12:00:00Z",
+          updated_at: "2026-07-14T12:00:02Z"
+        )
+        malformed_ignored = malformed_run.merge(
+          "databaseId" => 970_099,
+          "url" => "https://example.com/shakacode/react_on_rails/actions/runs/970099"
+        )
+        [[fresh_run, malformed_ignored], [malformed_ignored, fresh_run]].each_with_index do |runs, order|
+          expect do
+            expected_dispatches += 1
+            run_with_poll.call(runs, initial_runs: [valid_old_run])
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|unknown|malformed)/i),
+                 "malformed ignored old ID, order #{order}"
+        end
+
+        malformed_predispatch = malformed_run.merge("createdAt" => "not-a-time")
+        [[fresh_run, malformed_predispatch], [malformed_predispatch, fresh_run]].each_with_index do |runs, order|
+          expect do
+            expected_dispatches += 1
+            run_with_poll.call(runs)
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:identity|metadata|unknown|malformed|timestamp)/i),
+                 "malformed pre-dispatch timestamp, order #{order}"
+        end
+      end
+
+      expect(dispatch_count).to eq(expected_dispatches)
+    end
+
+    it "rejects ambiguous or blocking concurrent accelerated fresh runs independent of polling order" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      release_started_at = Time.iso8601("2026-07-14T12:59:00Z")
+      build_run = lambda do |run_id:, status: "queued", conclusion: nil|
+        started_at = status == "queued" ? nil : "2026-07-14T13:00:02Z"
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+          "headSha" => head_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => "2026-07-14T13:00:01Z",
+          "startedAt" => started_at,
+          "updatedAt" => "2026-07-14T13:00:03Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      pending_run = build_run.call(run_id: 971_001)
+      successful_run = build_run.call(run_id: 971_002, status: "completed", conclusion: "success")
+      failed_run = build_run.call(run_id: 971_003, status: "completed", conclusion: "failure")
+      unknown_run = build_run.call(run_id: 971_004, status: "future_status")
+      conflicting_duplicate = pending_run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "startedAt" => "2026-07-14T13:00:02Z"
+      )
+      active_terminal = build_run.call(run_id: 971_005, status: "in_progress", conclusion: "failure")
+      ambiguous_cases = {
+        "multiple eligible pending and success" => [pending_run, successful_run],
+        "pending beside known failure" => [pending_run, failed_run],
+        "success beside known failure" => [successful_run, failed_run],
+        "pending beside unknown state" => [pending_run, unknown_run],
+        "success beside contradictory active state" => [successful_run, active_terminal],
+        "conflicting duplicate and equal ordering identity" => [pending_run, conflicting_duplicate]
+      }
+      dispatch_count = 0
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        shakaperf_release_gate_run_evidence_rejection: nil
+      )
+      allow(self).to receive(:dispatch_shakaperf_release_gate_workflow!) { dispatch_count += 1 }
+      run_with_poll = lambda do |poll_response|
+        responses = [[], poll_response]
+        allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+          .with(repo_slug: "shakacode/react_on_rails", ref:).and_wrap_original do
+            responses.empty? ? poll_response : responses.shift
+          end
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref:,
+          head_sha:,
+          target_version:,
+          release_started_at:
+        )
+      end
+      expected_dispatches = 0
+
+      aggregate_failures do
+        ambiguous_cases.each do |label, runs|
+          [runs, runs.reverse].uniq.each_with_index do |ordered_runs, order|
+            expect do
+              expected_dispatches += 1
+              run_with_poll.call(ordered_runs)
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:ambiguous|duplicate|conflicting|unknown|malformed)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+
+        canonical_duplicate_result = begin
+          expected_dispatches += 1
+          run_with_poll.call([pending_run, pending_run.dup])
+        end
+        expect(canonical_duplicate_result).to include(status: "pending", run_id: 971_001)
+
+        queued_result = begin
+          expected_dispatches += 1
+          run_with_poll.call([pending_run])
+        end
+        expect(queued_result).to include(status: "pending", run_id: 971_001)
+
+        unrelated = pending_run.merge(
+          "databaseId" => 971_006,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: "a" * 40, target_version: "17.0.0.rc.9"
+          ),
+          "headSha" => "a" * 40,
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/971006"
+        )
+        unrelated_result = begin
+          expected_dispatches += 1
+          run_with_poll.call([unrelated, pending_run])
+        end
+        expect(unrelated_result).to include(status: "pending", run_id: 971_001)
+      end
+
+      expect(dispatch_count).to eq(expected_dispatches)
+    end
+
+    it "does not expose or synthesize a URL for a malformed known failure" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      malformed_failure = {
+        "databaseId" => 927_001,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([malformed_failure])
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref:,
+          head_sha:,
+          target_version:,
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit) { |error|
+        expect(error.message).to match(/ShakaPerf.*(?:identity|metadata|unknown|malformed)/i)
+        expect(error.message).not_to include("https://github.com/shakacode/react_on_rails/actions/runs/927001")
+      }
+    end
+
+    it "rejects conflicting duplicate identities and equal ordering keys independent of array order" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      success = {
+        "databaseId" => 930_001,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: "e" * 40, target_version:
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/930001"
+      }
+      equal_key_failure = success.merge("conclusion" => "failure")
+      conflicting_identity = success.merge(
+        "conclusion" => "failure",
+        "updatedAt" => "2026-07-14T12:45:00Z"
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      aggregate_failures do
+        {
+          "equal key" => equal_key_failure,
+          "same run identity with different ordering metadata" => conflicting_identity
+        }.each do |label, conflict|
+          [[success, conflict], [conflict, success]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /ShakaPerf.*(?:duplicate|conflicting|unknown)/i),
+                   "#{label}, order #{order}"
+          end
+        end
+      end
+    end
+
+    it "collapses canonically identical duplicates and preserves deterministic newer-run policy" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |candidate_sha:, run_id:, conclusion:, created_at:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version:
+          ),
+          "headSha" => candidate_sha,
+          "status" => "completed",
+          "conclusion" => conclusion,
+          "createdAt" => created_at,
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      older_failure = build_run.call(
+        candidate_sha: "e" * 40,
+        run_id: 940_001,
+        conclusion: "failure",
+        created_at: "2026-07-14T11:00:00Z"
+      )
+      newer_success = build_run.call(
+        candidate_sha: "f" * 40,
+        run_id: 940_002,
+        conclusion: "success",
+        created_at: "2026-07-14T12:00:00Z"
+      )
+      newer_failure = newer_success.merge("conclusion" => "failure")
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      allow(self).to receive(:reject_known_accelerated_shakaperf_failure!).and_call_original
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      aggregate_failures do
+        duplicate_cases = [
+          [older_failure, newer_success, newer_success.dup],
+          [newer_success.dup, newer_success, older_failure]
+        ]
+        duplicate_cases.each do |runs|
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+          result = run_accelerated_shakaperf_release_gate!(
+            monorepo_root: "/tmp/repo",
+            ref:,
+            head_sha:,
+            target_version:,
+            release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+          )
+          expect(result).to include(status: "success", run_id: 940_002)
+        end
+
+        [[older_failure, newer_failure], [newer_failure, older_failure]].each_with_index do |runs, order|
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+          expect do
+            run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+          end.to raise_error(SystemExit, /known ShakaPerf failure/i), "newer failure, order #{order}"
+        end
+      end
+      expect(self).to have_received(:shakaperf_release_gate_run_evidence_rejection)
+        .with(hash_including(run: newer_success, require_prerun: true)).twice
+      expect(self).not_to have_received(:reject_known_accelerated_shakaperf_failure!)
+        .with(run: older_failure)
+    end
+
+    it "keeps an active same-target pre-run deferable" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      active_prerun = {
+        "databaseId" => 222_222,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: "e" * 40, target_version:
+        ),
+        "headSha" => "e" * 40,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/222222"
+      }
+      queued_run = active_prerun.merge(
+        "databaseId" => 333_333,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "queued",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/333333"
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([active_prerun])
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        wait_for_accelerated_shakaperf_release_gate_run!: queued_run
+      )
+      expect(self).to receive(:dispatch_shakaperf_release_gate_workflow!).once
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref:,
+        head_sha:,
+        target_version:,
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(status: "pending", run_id: 333_333)
+    end
+
+    it "does not let stale or canonically unrelated pre-runs poison exact-head dispatch" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      base_prerun = {
+        "databaseId" => 222_222,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: "e" * 40, target_version:
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/222222"
+      }
+      variants = {
+        "stale success" => base_prerun,
+        "unrelated target" => base_prerun.merge(
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: "e" * 40, target_version: "17.0.0.rc.9"
+          )
+        )
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive_messages(
+        shakaperf_release_gate_run_evidence_rejection: "evidence is stale",
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil
+      )
+
+      aggregate_failures do
+        variants.each_with_index do |(label, prerun), index|
+          queued_run = base_prerun.merge(
+            "databaseId" => 333_333 + index,
+            "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+            "headSha" => head_sha,
+            "status" => "queued",
+            "conclusion" => nil,
+            "createdAt" => "2026-07-14T13:00:00Z",
+            "startedAt" => nil,
+            "updatedAt" => "2026-07-14T13:00:00Z",
+            "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{333_333 + index}"
+          )
+          allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+            .with(repo_slug: "shakacode/react_on_rails", ref:).and_return([prerun])
+          allow(self).to receive(:wait_for_accelerated_shakaperf_release_gate_run!).and_return(queued_run)
+
+          result = run_accelerated_shakaperf_release_gate!(
+            monorepo_root: "/tmp/repo",
+            ref:,
+            head_sha:,
+            target_version:,
+            release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+          )
+          expect(result).to include(status: "pending", run_id: 333_333 + index), label
+        end
+      end
+      expect(self).to have_received(:dispatch_shakaperf_release_gate_workflow!).exactly(2).times
     end
   end
 
@@ -4371,6 +5747,45 @@ RSpec.describe "release.rake helper methods" do
       expect(normalized_guide).to include(
         "Only an exactly present `user: nil` author is known deleted"
       )
+      expect(normalized_guide).to include(
+        "Missing, malformed, or unparseable creation or update timestamps block even on markerless API comments"
+      )
+      expect(normalized_guide).to include(
+        "Durable marker comments must remain unedited"
+      )
+      expect(normalized_guide).to include(
+        "completed known failure or unknown terminal conclusion blocks publication"
+      )
+      expect(normalized_guide).to include(
+        "only proven unrelated evidence is ignored"
+      )
+      expect(normalized_guide).to include(
+        "Before target filtering, duplicate collapse, ordering, reuse, or dispatch, every fetched accelerated"
+      )
+      expect(normalized_guide).to include(
+        "The API state is also total: active states permit only a null conclusion"
+      )
+      expect(normalized_guide).to include(
+        "Accelerated evidence never synthesizes a missing run URL"
+      )
+      expect(normalized_guide).to include(
+        "During accelerated post-dispatch polling, the complete fetched array and every member are validated"
+      )
+      expect(normalized_guide).to include(
+        "This accelerated-only polling seam does not change the ordinary blocking ShakaPerf waiter"
+      )
+      expect(normalized_guide).to include(
+        "positive integer run and attempt IDs and the literal URL"
+      )
+      expect(normalized_guide).to include(
+        "selected known failure or unknown state outranks pending dispatch independent of API order"
+      )
+      expect(normalized_guide).to include(
+        "only canonically identical duplicates collapse"
+      )
+      expect(normalized_guide).to include(
+        "deterministically newer ordered success may supersede older ordered failures"
+      )
     end
 
     it "rejects a closed release tracker" do
@@ -4621,6 +6036,126 @@ RSpec.describe "release.rake helper methods" do
       expect(
         fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
       ).to eq([])
+    end
+
+    it "accepts an unedited trusted marker when canonicalized creation and update instants match" do
+      authorization = accelerated_rc_test_authorization
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(authorization),
+        created_at: "2026-07-14T13:00:00Z",
+        updated_at: "2026-07-14T03:00:00-10:00",
+        user: { "login" => "justin808" }
+      )
+      success = instance_double(Process::Status, success?: true)
+      tracker_issue = {
+        "number" => 3823,
+        "state" => "open",
+        "title" => "Release gate: React on Rails 17.0.0",
+        "labels" => [],
+        "pull_request" => nil
+      }
+      allow(self).to receive(:capture_gh_output) do |*args|
+        endpoint = args.fetch(1)
+        case endpoint
+        when /comments\?/
+          [JSON.generate([comment]), success]
+        when %r{collaborators/justin808/permission}
+          ["maintain\n", success]
+        when "repos/shakacode/react_on_rails/issues/3823"
+          [JSON.generate(tracker_issue), success]
+        else
+          raise "Unexpected gh API request: #{args.inspect}"
+        end
+      end
+
+      aggregate_failures do
+        expect(
+          fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        ).to eq([authorization])
+        expect(
+          fetch_repository_accelerated_rc_records_for_candidate!(
+            repo_slug: "shakacode/react_on_rails",
+            target_version: authorization.fetch("target_version"),
+            candidate_sha: authorization.fetch("candidate_sha")
+          )
+        ).to eq([authorization])
+      end
+    end
+
+    it "blocks edited durable terminal and conflicting markers before trust or state use" do
+      accepted = accelerated_rc_test_accepted_history.last
+      rejected = accelerated_rc_test_rejected_history.last
+      conflicting = accepted.merge("reason" => "Conflicting edited acceptance")
+      success = instance_double(Process::Status, success?: true)
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+
+      aggregate_failures do
+        { "accepted" => accepted, "rejected" => rejected, "conflicting" => conflicting }.each do |label, record|
+          comment = accelerated_rc_test_issue_comment(
+            id: 1,
+            body: accelerated_rc_tracker_comment(record),
+            updated_at: "2026-07-14T13:00:01Z",
+            user: { "login" => "justin808" }
+          )
+          allow(self).to receive(:capture_gh_output).and_return([JSON.generate([comment]), success])
+
+          expect do
+            fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+          end.to raise_error(SystemExit, /edited.*accelerated RC.*comment|marker.*edited/i), label
+        end
+      end
+    end
+
+    it "fails closed on missing or malformed update timestamps even for markerless comments" do
+      success = instance_double(Process::Status, success?: true)
+      variants = {
+        "missing" => :missing,
+        "nil" => nil,
+        "non-String" => 123,
+        "unparseable" => "not-a-time"
+      }
+
+      aggregate_failures do
+        variants.each do |label, updated_at|
+          comment = accelerated_rc_test_issue_comment(id: 1, body: "ordinary repository discussion")
+          updated_at == :missing ? comment.delete("updated_at") : comment["updated_at"] = updated_at
+          allow(self).to receive(:capture_gh_output).and_return([JSON.generate([comment]), success])
+
+          expect do
+            fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+          end.to raise_error(SystemExit, /comment.*schema/i), "selected tracker: #{label}"
+          expect do
+            fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+          end.to raise_error(SystemExit, /comment.*schema/i), "repository: #{label}"
+        end
+      end
+    end
+
+    it "does not let an edited acceptance rewrite an unedited absorbing rejection" do
+      rejected = accelerated_rc_test_rejected_history.last
+      accepted = accelerated_rc_test_accepted_history.last
+      comments = [
+        accelerated_rc_test_issue_comment(
+          id: 1,
+          body: accelerated_rc_tracker_comment(rejected),
+          user: { "login" => "justin808" }
+        ),
+        accelerated_rc_test_issue_comment(
+          id: 2,
+          body: accelerated_rc_tracker_comment(accepted),
+          created_at: "2026-07-14T13:01:00Z",
+          updated_at: "2026-07-14T13:02:00Z",
+          user: { "login" => "justin808" }
+        )
+      ]
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(comments), success])
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+
+      expect do
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /edited.*accelerated RC.*comment|marker.*edited/i)
     end
 
     it "fails closed when a repository comment page contains a malformed comment hash" do
@@ -6239,6 +7774,9 @@ RSpec.describe "release.rake helper methods" do
           "headSha" => "f" * 40,
           "status" => "in_progress",
           "conclusion" => "failure",
+          "createdAt" => "2026-07-14T13:00:00Z",
+          "startedAt" => "2026-07-14T13:00:05Z",
+          "updatedAt" => "2026-07-14T13:01:00Z",
           "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
         }
       )
@@ -6255,7 +7793,7 @@ RSpec.describe "release.rake helper methods" do
           release_started_at: Time.utc(2026, 7, 14, 14),
           tag: "v17.0.0.rc.10"
         )
-      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+      end.to raise_error(SystemExit, /ShakaPerf.*(?:contradictory|state|metadata|malformed)/i)
     end
 
     it "blocks an untagged retry when a later valid authorization changes CI detail" do
@@ -6900,6 +8438,58 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#accelerated_rc_shakaperf_snapshot!" do
+    it "never synthesizes or accepts a noncanonical refreshed run URL" do
+      record = {
+        "candidate_sha" => "f" * 40,
+        "release_branch" => "release/17.0.0",
+        "shakaperf" => {
+          "status" => "pending",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        }
+      }
+      refreshed_run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "f" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "f" * 40,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      malformed_urls = {
+        "missing" => nil,
+        "wrong host" => "https://example.com/shakacode/react_on_rails/actions/runs/123456",
+        "wrong repository" => "https://github.com/shakacode/other/actions/runs/123456",
+        "wrong run ID" => "https://github.com/shakacode/react_on_rails/actions/runs/999999",
+        "query" => "https://github.com/shakacode/react_on_rails/actions/runs/123456?attempt=1",
+        "fragment" => "https://github.com/shakacode/react_on_rails/actions/runs/123456#summary"
+      }
+
+      aggregate_failures do
+        malformed_urls.each do |label, url|
+          allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+            .and_return(refreshed_run.merge("url" => url))
+          expect do
+            accelerated_rc_shakaperf_snapshot!(
+              repo_slug: "shakacode/react_on_rails",
+              monorepo_root: "/tmp/repo",
+              record:
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|malformed)/i), label
+        end
+      end
+    end
+
     it "fails closed when the refreshed pending run no longer matches the recorded candidate" do
       record = {
         "candidate_sha" => "f" * 40,
@@ -6922,6 +8512,10 @@ RSpec.describe "release.rake helper methods" do
         ),
         "headSha" => "e" * 40,
         "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       )
 
@@ -6957,6 +8551,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "f" * 40,
         "status" => "completed",
         "conclusion" => "unrecognized",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       )
 
@@ -6966,7 +8563,7 @@ RSpec.describe "release.rake helper methods" do
           monorepo_root: "/tmp/repo",
           record:
         )
-      end.to raise_error(SystemExit, /reconciliation is unknown.*refusing to accept or reject/i)
+      end.to raise_error(SystemExit, /ShakaPerf.*(?:unknown|malformed).*refusing unaudited publication/i)
     end
 
     it "fails closed when the refreshed run attempt differs from the authorized attempt" do
@@ -6992,6 +8589,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "f" * 40,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       )
 
@@ -8513,6 +10113,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "f" * 40,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
       allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(refreshed_run)
@@ -8544,6 +10147,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => prerun_sha,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
         "url" => record.dig("shakaperf", "run_url")
       }
       runtime_checks = []
@@ -8797,6 +10403,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "e" * 40,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
       allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(run)
@@ -8825,6 +10434,46 @@ RSpec.describe "release.rake helper methods" do
       end.to output(/Reusing accepted RC ShakaPerf evidence/).to_stdout
     end
 
+    it "blocks accepted-record reuse when refreshed accelerated URL identity is missing or noncanonical" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      malformed_urls = {
+        "missing" => nil,
+        "wrong repository" => "https://github.com/shakacode/other/actions/runs/123456",
+        "wrong path" => "https://github.com/shakacode/react_on_rails/actions/workflows/123456",
+        "wrong run ID" => "https://github.com/shakacode/react_on_rails/actions/runs/999999",
+        "query" => "https://github.com/shakacode/react_on_rails/actions/runs/123456?attempt=1"
+      }
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+
+      aggregate_failures do
+        malformed_urls.each do |label, url|
+          allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(run.merge("url" => url))
+          expect do
+            reuse_accepted_rc_shakaperf_evidence!(
+              repo_slug: "shakacode/react_on_rails",
+              monorepo_root: "/tmp/repo",
+              ref: "release/17.0.0",
+              head_sha: "e" * 40,
+              record:
+            )
+          end.to raise_error(SystemExit, /ShakaPerf.*(?:URL|identity|metadata|malformed)/i), label
+        end
+      end
+    end
+
     it "declines stale or invalid accepted evidence so final promotion runs the strict gate" do
       run = {
         "databaseId" => 123_456,
@@ -8835,6 +10484,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "e" * 40,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
       allow(self).to receive_messages(
@@ -8865,6 +10517,9 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => "e" * 40,
         "status" => "completed",
         "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
         "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
       }
       allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(run)
