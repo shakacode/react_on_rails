@@ -9,7 +9,7 @@ track a release-candidate trend.
 [`run-local-benchmark.rb`](run-local-benchmark.rb) runs a benchmark suite on such a machine
 and uploads to its own Bencher testbed. Tracking issue: **#4073**.
 
-## Operator quickstart: main vs RC
+## Operator quickstart: RC vs main
 
 Use this flow when a release candidate needs a credible local comparison against current
 `main`. Run it first without upload, inspect the local artifacts, then repeat with upload
@@ -19,9 +19,9 @@ only if the machine stayed quiet and the result is worth publishing.
 git fetch --tags origin main
 
 ruby benchmarks/run-local-benchmark-comparison.rb core \
-  --a-ref v17.0.0.rc.5 --a-name rc5 \
-  --b-ref origin/main --b-name main \
-  --baseline rc5 --candidate main \
+  --a-ref origin/main --a-name main \
+  --b-ref v17.0.0.rc.5 --b-name rc5 \
+  --baseline main --candidate rc5 \
   --repetitions 5 \
   --duration 30s \
   --connections 10 \
@@ -41,9 +41,9 @@ credentials loaded:
 
 ```bash
 BENCHER_API_KEY=... ruby benchmarks/run-local-benchmark-comparison.rb core \
-  --a-ref v17.0.0.rc.5 --a-name rc5 \
-  --b-ref origin/main --b-name main \
-  --baseline rc5 --candidate main \
+  --a-ref origin/main --a-name main \
+  --b-ref v17.0.0.rc.5 --b-name rc5 \
+  --baseline main --candidate rc5 \
   --repetitions 5 \
   --duration 30s \
   --connections 10 \
