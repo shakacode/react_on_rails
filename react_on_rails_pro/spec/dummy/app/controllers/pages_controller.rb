@@ -296,6 +296,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/posts_page"
   end
 
+  def selective_hydration_demo
+    render "/pages/selective_hydration_demo"
+  end
+
   def loadable_component
     render "/pages/pro/loadable_component"
   end
