@@ -158,6 +158,9 @@ RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for bo
 RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
 RELEASE_CI_EVALUATE_HEAD=true # Strictly evaluate the fetched exact release-source HEAD; not a waiver
 RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release CI-status gate
+RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
+RELEASE_TRACKER=<issue> # Active release tracker for accelerated RC records and final promotion
+RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer reason for accelerated publication
 GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 ```
 
@@ -195,6 +198,175 @@ RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10]"
 
 Do not use `RELEASE_CI_STATUS_OVERRIDE=true` to substitute for pending, missing, failed, or
 unknown exact-HEAD evidence. It waives the release CI-status gate and does not make CI healthy.
+
+#### Audited accelerated RC publication
+
+The accelerated path exists only to start published-artifact testing of an explicit RC while
+otherwise healthy exact-head CI or ShakaPerf is still pending. It is not a waiver and does not
+apply to beta/alpha versions or stable/final releases. Use it only with an active release tracker
+and a GitHub account that has write, maintain, or admin permission:
+
+```bash
+RELEASE_ACCELERATED_RC=true \
+RELEASE_TRACKER=4821 \
+RELEASE_ACCELERATED_RC_REASON="Start published-artifact fleet testing while the named gates finish" \
+bundle exec rake "release[17.0.0.rc.10]"
+```
+
+The task rejects the accelerated path when the version is implicit, the target is not a canonical
+lowercase `.rc.` version, the tracker is closed or ineligible, the reason is missing, or
+`RELEASE_CI_STATUS_OVERRIDE` is also set. Case-varied spellings such as `.RC.` are rejected before
+tracker records or tag provenance can be created. Every numeric core component and the numeric `rc`
+identifier must also use canonical npm-semver spelling: zero itself is valid, but leading zeroes are not.
+It still fails closed on failed, missing, malformed,
+ambiguous, stale, or API-unknown evidence. The only release-source CI state it may defer is a visible
+in-progress state.
+
+After pushing the version-bump commit, the task binds all evidence to that exact SHA. It reuses a
+verified ShakaPerf run or dispatches one and records its URL without waiting for completion, then
+queries exact-head CI and displays every non-success check and URL. A second confirmation names the
+RC, exact SHA, tracker, ShakaPerf run, pending CI checks, and maintainer reason before any tag or
+package is published. Immediately after that answer, the task refreshes both exact-candidate CI and the
+recorded ShakaPerf run. Failure, missing or malformed evidence, an unknown API result, or an unrecognized
+state aborts before authorization is recorded. If refreshed evidence is still deferable but materially
+differs from what the prompt displayed, the task displays the new snapshot and requires confirmation again;
+continually changing evidence eventually aborts rather than authorizing an unstable snapshot. It then
+appends the refreshed machine-readable `publication-authorized` record before
+creating the tag or publishing any package. After immutable artifacts and the GitHub release are
+available, it appends `published-awaiting-gates`. An interrupted attempt therefore remains visibly
+blocking even if publication partly succeeds, and retries reuse the same candidate without appending
+duplicate status records. Accelerated RCs use an annotated tag containing canonical tracker and
+authorization provenance; retries load and reuse that persisted authorization instead of refreshing
+it into a conflicting record. Persisted authorization is not permission to reuse stale pending evidence:
+before retrying any tag or immutable publication, the task refreshes exact-candidate CI and the exact
+recorded ShakaPerf run. Current success remains usable, and only a live in-progress state with no
+conclusion may remain deferred; an active status paired with any non-null conclusion is contradictory
+evidence and blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence
+also blocks the retry. Every same-version-and-SHA retry discovers durable repository history first,
+whether or not it explicitly supplies `RELEASE_ACCELERATED_RC`. If history exists, the unique tracker and
+canonical authorization chain control the retry; explicit tracker, reason, and options must match that
+authorization exactly, and a rejected or conflicting chain remains blocking. The task never refreshes or
+creates a conflicting authorization. A history-free explicit attempt may create its first authorization only
+when the exact RC tag does not exist. An existing ordinary lightweight RC tag can be retried unflagged through
+the ordinary path, but `RELEASE_ACCELERATED_RC=true` cannot convert it or append accelerated history that lacks
+matching annotated-tag provenance. Every explicit accelerated cut checks both the local and `origin` exact-target
+tag and force-fetches a remote-only tag for provenance classification, regardless of the starting checkout
+version. An unavailable remote read or unclassifiable tag blocks. This runs before live gates, confirmation,
+version mutation, tracker append, or push; only an exact canonical annotated retry from its tagged candidate
+may continue.
+Exact-head CI snapshots sort non-success checks canonically by name, state, and URL before persistence and
+comparison. API enumeration-order changes therefore do not require another confirmation or block a publication
+boundary, while any real check identity, state, URL, duplicate, or conflicting-entry change remains material.
+Before accepting, reusing, or appending that authorization, the task loads every trusted repository issue
+comment for the exact version and SHA and requires one tracker with one canonical chain. It repeats that
+repository-wide proof after posting and immediately before tag handling, so an authorization or rejection
+that appears concurrently on another tracker blocks immutable publication. Before tag handling, immediately
+before tag push, and again after tag push before package publication, accelerated RCs also refresh exact-head
+CI and the recorded ShakaPerf run. A newly failed, missing, malformed, or unknown gate blocks; pending evidence
+must still exactly match the confirmed authorization, while a transition to success is allowed. A material
+pending-state change is untriaged at these boundaries and requires a new authorization rather than silent reuse.
+Omission never downgrades an interrupted accelerated attempt to an ordinary lightweight-tag release and
+never permits the broad prerelease CI override. A genuinely ordinary RC with no accelerated history keeps
+its lightweight-tag path. Same-version retry discovery must complete successfully before the task can
+prove that accelerated history is absent; API, pagination, permission, or parse failure therefore blocks
+that retry as unknown. A marker comment is ignored before author permission checks only when it contains
+exactly one canonical marker whose payload is the byte-for-byte lowercase hexadecimal encoding of key-sorted
+canonical JSON for a complete, structurally valid tracker record and proves it targets another
+version-and-SHA pair. Reordered or whitespace-varied JSON, uppercase hexadecimal, incomplete records,
+unknown fields, noncanonical state, odd-length or partially decoded payloads, escaped or corrupt identities,
+malformed boundaries, duplicated markers, and
+spoofed summaries cannot prove irrelevance and therefore reach strict parsing and block. Discovery comments
+must name the canonical API issue URL in the exact requested repository; wrong hosts, repositories, paths,
+queries, fragments, and pull-request URLs are rejected before their issue number is used. Pull requests
+cannot serve as release trackers even though GitHub exposes their comments through the issues APIs.
+
+ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
+through reconciliation and final reuse. Every authorization record for the candidate must have the
+same canonical digest; canonical-digest-identical duplicates are idempotent, but any distinct
+authorization blocks append, retry, reconciliation, and final promotion. Every
+`published-awaiting-gates` record for the candidate must be the complete canonical transition from
+that authorization. Only `approved_by` and `recorded_at` may differ across idempotent publication
+completion retries; any other contradiction blocks append, retry, reconciliation, and final
+promotion. An empty publication set is valid only before immutable publication. Reconciliation and
+final promotion require at least one canonical `published-awaiting-gates` transition. Durable records must
+be ordered authorization, publication completion, then terminal state, with parseable monotonic timestamps.
+Exact authorization duplicates and the narrowly permitted publication/terminal retry variants remain
+idempotent only within their phase; pending transitions after terminal state are invalid.
+
+Reconcile the record after the deferred gates and all downstream RC testing finish:
+
+```bash
+RELEASE_TRACKER=4821 \
+RELEASE_ACCELERATED_RC_RECONCILIATION_REASON="All deferred gates and published-artifact checks passed" \
+RELEASE_DEMO_FLEET_EVIDENCE_URL=https://github.com/example/demo-evidence \
+RELEASE_BEHAVIORAL_EVIDENCE_URL=https://github.com/example/behavioral-evidence \
+RELEASE_ARTIFACT_EVIDENCE_URL=https://github.com/example/artifact-evidence \
+bundle exec rake "release:reconcile_accelerated_rc[17.0.0.rc.10]"
+```
+
+Reconciliation refreshes exact-candidate CI and the recorded ShakaPerf run. A known failure writes
+`candidate-rejected` with do-not-promote guidance; fix the cause and cut the next immutable RC.
+Pending or unknown evidence remains unresolved and cannot be accepted. Success requires HTTPS links
+for demo-fleet, behavioral, and published-artifact verification before the task writes
+`candidate-accepted`. Terminal state is validated as a complete set: accepted duplicates are
+idempotent only when every field except `recorded_at` is identical, and any other accepted-record
+variation is conflicting. `candidate-rejected` is absorbing; append-time revalidation prevents a
+concurrent reconciliation from adding acceptance or any other later transition. Every posted transition
+is re-fetched and proven present in the complete canonical chain before the task proceeds toward immutable
+publication or reports reconciliation success. Tracker markers with
+malformed or unsupported schemas, markers authored by accounts without repository write permission,
+or records whose named approver does not match the trusted comment author fail closed. Status-specific
+contradictions also fail closed: accepted records require every success and evidence URL, while
+rejected records require a known failed gate.
+
+Final promotion of an accelerated RC from `release/X.Y.Z` requires `RELEASE_TRACKER=<issue>`;
+ordinary strictly gated lightweight RC tags keep the standard promotion path only when no tracker is
+supplied and complete repository-wide exact-version-and-SHA discovery proves that no durable accelerated
+history exists. Supplying `RELEASE_TRACKER` while the RC tag lacks canonical accelerated provenance, or
+finding accelerated history behind a lightweight tag, blocks promotion instead of falling back to the
+ordinary path. A markerless annotated RC
+tag is never treated as ordinary, and inability to determine the tag object type blocks promotion as
+unknown. For an accelerated RC, `RELEASE_TRACKER` must match the tracker encoded in the annotated RC
+tag, the tag's authorization digest must match the canonical `publication-authorized` record, and the
+candidate's latest state must be `candidate-accepted`. Missing or deleted authorization or publication
+transition, mismatched trackers, and any `candidate-rejected` state block permanently. The accepted
+record must bind to the exact remote RC tag SHA and be complete. A provenance-bearing accelerated tag must
+also use the literal canonical ref `v<target_version>` with lowercase dotted `.rc.` spelling; a dashed or
+case-varied alias is rejected even when it points at the same annotated object. Dashed-tag compatibility is
+limited to ordinary RCs for which complete discovery proves there is no accelerated provenance or history.
+Final promotion repeats repository-wide exact-version-and-SHA discovery and rejects any record on a tracker
+other than the one selected by the canonical tag provenance. The final tip must be that SHA or
+mechanically runtime-equivalent through the existing metadata-only promotion rules. Runtime
+equivalence is checked again after the final version-bump commit. Every intervening commit is inspected:
+package manifests, version files, and `Gemfile.lock` files may differ only by their normalized product-version
+metadata, while dependency, lockfile, or any other runtime-bearing content change requires a new accepted RC
+and cannot fall back to a fresh final ShakaPerf run. Accepted ShakaPerf evidence is
+refreshed and re-verified against the final tip; otherwise the normal strict final ShakaPerf gate runs
+only for a still-runtime-equivalent finalization. After that gate completes, the task re-fetches the live
+remote RC tag, repository-wide canonical tracker chain, and exact accepted-RC CI immediately before stable
+tagging and publication. The re-fetched accepted record must differ from the originally gated record only by its
+permitted retry timestamp. Local `HEAD` must still equal the validated final candidate, and the stable tag
+is created and verified against that explicit SHA rather than implicit moving `HEAD`. Deletion, mutation,
+newly appended rejection or conflict, or pending, failed, missing, stale, or unknown current evidence
+blocks the boundary. Both `publication-authorized` and `published-awaiting-gates` are unresolved states
+that block final promotion. Stable CI, version policy, and every other final gate remain strict. Multiple
+remote tag names that normalize to the same RC version are ambiguous and block every first-promotion and
+retry source-selection route, regardless of alias ordering or which alias carries accelerated provenance.
+After existing-tag validation or explicit-SHA tag creation, the task revalidates both local `HEAD` and the
+tag against the carried candidate SHA immediately before `git push --tags`, then repeats that validation
+after the push immediately before package publication. For accelerated RC publication and accelerated-RC
+final promotion, both boundaries also re-fetch all trusted repository history for the exact RC candidate
+and require the same unique tracker and canonical, retry-equivalent authorization/terminal chain. A new
+rejection, tracker conflict, chain mutation, missing record, or unknown repository read aborts before the
+next irreversible step. Accelerated final promotion also carries the exact refreshed RC CI snapshot and the
+exact ShakaPerf identity that passed the final gate, whether reused from the accepted RC or produced by a new
+strict final run. It refreshes and compares both at tag handling, immediately before stable-tag push, and again
+after the push before npm or gem publication; failed, missing, malformed, stale, unknown, or materially changed
+evidence blocks. All of those exact-RC CI refreshes use the carried final-promotion branch, even when the accepted
+RC record originated on a different source branch. A `candidate-accepted` stable-tag boundary without this complete,
+internally consistent final-promotion context aborts before tag handling; nil context remains valid only for ordinary
+releases and accelerated RC publication authorization, which use their separate live boundaries. Accelerated or broad
+CI override flags cannot weaken final promotion.
 
 **Examples:**
 

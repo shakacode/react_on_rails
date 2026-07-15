@@ -16,6 +16,83 @@ RSpec.describe "release.rake helper methods" do
     $stdout = original_stdout
   end
 
+  def accelerated_rc_test_authorization(tracker: 3823)
+    build_accelerated_rc_publication_record(
+      options: {
+        target_gem_version: "17.0.0.rc.10",
+        tracker:,
+        reason: "Start published-artifact QA while remaining checks finish"
+      },
+      candidate_sha: "f" * 40,
+      runtime_tree_fingerprint: "a" * 64,
+      release_branch: "release/17.0.0",
+      ci_snapshot: {
+        status: "pending",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: [
+          {
+            name: "generator",
+            state: "in_progress",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+          }
+        ]
+      },
+      shakaperf: {
+        status: "pending",
+        run_id: 123_456,
+        attempt: 1,
+        run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+        candidate_sha: "f" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: "2026-07-14T13:00:00Z"
+      },
+      approved_by: "justin808",
+      recorded_at: Time.utc(2026, 7, 14, 13, 30)
+    )
+  end
+
+  def accelerated_rc_test_accepted_history(tracker: 3823)
+    authorization = accelerated_rc_test_authorization(tracker:)
+    publication = accelerated_rc_published_record(
+      authorized_record: authorization,
+      recorded_at: Time.utc(2026, 7, 14, 14)
+    )
+    accepted = publication.merge(
+      "status" => "candidate-accepted",
+      "ci" => publication.fetch("ci").merge("status" => "success", "non_success" => []),
+      "shakaperf" => publication.fetch("shakaperf").merge("status" => "success"),
+      "reason" => "All required evidence passed",
+      "recorded_at" => "2026-07-14T15:00:00Z",
+      "required_follow_up" => "Proceed only through the strict final promotion gates.",
+      "evidence" => {
+        "demo_fleet" => "https://github.com/demo-fleet",
+        "behavioral" => "https://github.com/behavioral",
+        "artifacts" => "https://github.com/artifacts"
+      }
+    )
+    [authorization, publication, accepted]
+  end
+
+  def accelerated_rc_test_rejected_history(tracker: 3823)
+    authorization, publication, accepted = accelerated_rc_test_accepted_history(tracker:)
+    rejected = accepted.merge(
+      "status" => "candidate-rejected",
+      "ci" => accepted.fetch("ci").merge(
+        "status" => "failed",
+        "non_success" => [{
+          "name" => "generator",
+          "state" => "failure",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/999"
+        }]
+      ),
+      "reason" => "Current exact-candidate CI failed",
+      "required_follow_up" => "Do not promote this immutable RC; fix the failure and cut the next RC.",
+      "evidence" => {}
+    )
+    [authorization, publication, rejected]
+  end
+
   before do
     next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
 
@@ -892,7 +969,7 @@ RSpec.describe "release.rake helper methods" do
         "attempt" => 1,
         "headSha" => "abc123",
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
       }
     end
     let(:terminal_run) { original_run.merge("status" => "completed", "conclusion" => "failure") }
@@ -938,6 +1015,9 @@ RSpec.describe "release.rake helper methods" do
       {
         "databaseId" => 123_456,
         "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
         "headSha" => head_sha,
         "createdAt" => "2026-07-14T12:00:00Z",
         "startedAt" => "2026-07-14T12:00:05Z",
@@ -978,6 +1058,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: ["999999"],
           earliest_created_at: kind_of(Time)
         )
@@ -998,8 +1079,9 @@ RSpec.describe "release.rake helper methods" do
         Regexp::IGNORECASE | Regexp::MULTILINE
       )
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1022,6 +1104,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: ["999999"],
           earliest_created_at: kind_of(Time)
         )
@@ -1030,6 +1113,20 @@ RSpec.describe "release.rake helper methods" do
           "run", "watch", "123456", "--repo", repo_slug, "--exit-status",
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
         )
+      expect(validated_run).to include(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "headSha" => head_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
+      expect(validated_run).to eq(
+        run.merge(
+          "status" => "completed",
+          "conclusion" => "success",
+          "updatedAt" => "2026-07-14T13:30:00Z"
+        )
+      )
     end
 
     it "reuses an already successful gate run for the same head SHA without dispatching another run" do
@@ -1043,8 +1140,9 @@ RSpec.describe "release.rake helper methods" do
       expect(self).not_to receive(:capture_gh_output)
       expect(self).not_to receive(:capture_gh_output_with_timeout)
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1054,6 +1152,14 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false
         )
       end.to output(%r{ShakaPerf release gate already passed.*actions/runs/123456}m).to_stdout
+      expect(validated_run).to eq(successful_run)
+      expect(validated_run).to include(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "headSha" => head_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
     end
 
     it "dispatches a fresh exact-head gate when a successful run has no verifiable evidence" do
@@ -1091,8 +1197,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:refresh_shakaperf_release_gate_run!)
         .with(repo_slug:, run: fresh_run).and_return(refreshed_fresh_run)
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1103,6 +1210,14 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to output(/dispatching a fresh exact-head gate.*ShakaPerf release gate passed with verified evidence/m)
         .to_stdout
+      expect(validated_run).to eq(refreshed_fresh_run)
+      expect(validated_run).to include(
+        "databaseId" => 654_321,
+        "attempt" => 1,
+        "headSha" => head_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
     end
 
     it "fails closed when a freshly dispatched gate refresh changes run identity" do
@@ -1156,8 +1271,9 @@ RSpec.describe "release.rake helper methods" do
       expect(self).not_to receive(:capture_gh_output_with_timeout)
       expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1167,6 +1283,14 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false
         )
       end.to output(%r{Reusing successful ShakaPerf pre-run.*actions/runs/123456}m).to_stdout
+      expect(validated_run).to eq(successful_prerun)
+      expect(validated_run).to include(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
     end
 
     it "waits for an in-progress pre-run before reusing its evidence" do
@@ -1174,7 +1298,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_prerun = run.merge(
         "headSha" => candidate_sha,
         "status" => "in_progress",
-        "conclusion" => "",
+        "conclusion" => nil,
         "updatedAt" => "2026-07-14T12:00:30Z"
       )
       completed_prerun = in_progress_prerun.merge(
@@ -1211,8 +1335,9 @@ RSpec.describe "release.rake helper methods" do
       ).and_return(nil)
       expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1235,6 +1360,14 @@ RSpec.describe "release.rake helper methods" do
         require_prerun: true,
         allow_prerun_completion_after_release_start: true
       )
+      expect(validated_run).to eq(completed_prerun)
+      expect(validated_run).to include(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "headSha" => candidate_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
     end
 
     it "dispatches an exact-head gate when the active pre-run attempt changes while waiting" do
@@ -1242,7 +1375,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_prerun = run.merge(
         "headSha" => candidate_sha,
         "status" => "in_progress",
-        "conclusion" => "",
+        "conclusion" => nil,
         "updatedAt" => "2026-07-14T12:00:30Z"
       )
       rerun_prerun = in_progress_prerun.merge(
@@ -1294,7 +1427,7 @@ RSpec.describe "release.rake helper methods" do
         "headSha" => candidate_sha,
         "startedAt" => "2026-07-14T13:01:00Z",
         "status" => "in_progress",
-        "conclusion" => "",
+        "conclusion" => nil,
         "updatedAt" => "2026-07-14T13:01:30Z"
       )
       changed_prerun = in_progress_prerun.merge(
@@ -1345,7 +1478,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_prerun = run.merge(
         "headSha" => candidate_sha,
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
       )
       failed_prerun = in_progress_prerun.merge(
         "status" => "completed",
@@ -1426,7 +1559,12 @@ RSpec.describe "release.rake helper methods" do
       in_progress_run = run.merge(
         "databaseId" => 321_654,
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
+      )
+      completed_run = in_progress_run.merge(
+        "status" => "completed",
+        "conclusion" => "success",
+        "updatedAt" => "2026-07-14T13:30:00Z"
       )
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
@@ -1438,9 +1576,12 @@ RSpec.describe "release.rake helper methods" do
           timeout_seconds: SHAKAPERF_RELEASE_GATE_WATCH_TIMEOUT_SECONDS
         )
         .and_return(["", success_status, false])
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!)
+        .with(repo_slug:, run: in_progress_run).and_return(completed_run)
 
+      validated_run = nil
       expect do
-        run_shakaperf_release_gate!(
+        validated_run = run_shakaperf_release_gate!(
           monorepo_root:,
           ref: "release-branch",
           head_sha:,
@@ -1450,6 +1591,14 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false
         )
       end.to output(/watching it instead.*ShakaPerf release gate passed/m).to_stdout
+      expect(validated_run).to eq(completed_run)
+      expect(validated_run).to include(
+        "databaseId" => 321_654,
+        "attempt" => 1,
+        "headSha" => head_sha,
+        "status" => "completed",
+        "conclusion" => "success"
+      )
     end
 
     it "considers reusable pre-run evidence when an in-progress exact-head run finishes unsuccessfully" do
@@ -1457,7 +1606,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_exact_head_run = run.merge(
         "databaseId" => 654_321,
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
       )
       failed_exact_head_run = in_progress_exact_head_run.merge(
         "status" => "completed",
@@ -1498,7 +1647,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_run = run.merge(
         "databaseId" => 654_321,
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
       )
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
@@ -1526,7 +1675,7 @@ RSpec.describe "release.rake helper methods" do
       in_progress_run = run.merge(
         "databaseId" => 654_321,
         "status" => "in_progress",
-        "conclusion" => ""
+        "conclusion" => nil
       )
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
@@ -1583,6 +1732,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: %w[222222 111111],
           earliest_created_at: kind_of(Time)
         )
@@ -1692,6 +1842,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: [],
           earliest_created_at: kind_of(Time)
         )
@@ -1769,6 +1920,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: [],
           earliest_created_at: kind_of(Time)
         )
@@ -1794,19 +1946,33 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "finds the workflow_dispatch run for the pushed head SHA" do
-      matching_run = { "databaseId" => 2, "headSha" => head_sha }
+      matching_run = {
+        "databaseId" => 2,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
+        "headSha" => head_sha
+      }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
         .and_return([{ "databaseId" => 1, "headSha" => "old" }, matching_run])
 
       expect(
-        wait_for_shakaperf_release_gate_run!(repo_slug:, ref: "release-branch", head_sha:)
+        wait_for_shakaperf_release_gate_run!(repo_slug:, ref: "release-branch", head_sha:, target_version:)
       ).to eq(matching_run)
     end
 
     it "ignores stale workflow_dispatch runs for the same head SHA" do
-      stale_run = { "databaseId" => 1, "headSha" => head_sha }
-      matching_run = { "databaseId" => 2, "headSha" => head_sha }
+      run_identity = {
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
+        "headSha" => head_sha
+      }
+      stale_run = run_identity.merge("databaseId" => 1)
+      matching_run = run_identity.merge("databaseId" => 2)
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
         .and_return([stale_run, matching_run])
@@ -1816,14 +1982,22 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           ignored_run_ids: [1]
         )
       ).to eq(matching_run)
     end
 
     it "ignores workflow_dispatch runs created before the new dispatch starts" do
-      stale_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:00Z" }
-      matching_run = { "databaseId" => 2, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:10Z" }
+      run_identity = {
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
+        "headSha" => head_sha
+      }
+      stale_run = run_identity.merge("databaseId" => 1, "createdAt" => "2026-06-05T01:00:00Z")
+      matching_run = run_identity.merge("databaseId" => 2, "createdAt" => "2026-06-05T01:00:10Z")
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
         .and_return([stale_run, matching_run])
@@ -1833,6 +2007,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           earliest_created_at: Time.iso8601("2026-06-05T01:00:05Z")
         )
       ).to eq(matching_run)
@@ -1840,7 +2015,15 @@ RSpec.describe "release.rake helper methods" do
 
     it "uses GitHub's second-precision timestamps when matching newly dispatched runs" do
       allow(Time).to receive(:now).and_return(Time.iso8601("2026-06-05T01:00:05.900Z"))
-      newly_dispatched_run = { "databaseId" => 1, "headSha" => head_sha, "createdAt" => "2026-06-05T01:00:05Z" }
+      newly_dispatched_run = {
+        "databaseId" => 1,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release-branch", head_sha:, target_version:
+        ),
+        "headSha" => head_sha,
+        "createdAt" => "2026-06-05T01:00:05Z"
+      }
       allow(self).to receive(:fetch_shakaperf_release_gate_runs)
         .with(repo_slug:, ref: "release-branch")
         .and_return([newly_dispatched_run])
@@ -1850,6 +2033,7 @@ RSpec.describe "release.rake helper methods" do
           repo_slug:,
           ref: "release-branch",
           head_sha:,
+          target_version:,
           earliest_created_at: shakaperf_release_gate_dispatch_started_at
         )
       ).to eq(newly_dispatched_run)
@@ -1865,9 +2049,344 @@ RSpec.describe "release.rake helper methods" do
         wait_for_shakaperf_release_gate_run!(
           repo_slug:,
           ref: "release-branch",
-          head_sha:
+          head_sha:,
+          target_version:
         )
       end.to raise_error(SystemExit, /Timed out waiting for ShakaPerf release gate workflow to start/)
+    end
+  end
+
+  describe "#run_accelerated_shakaperf_release_gate!" do
+    it "rejects every active status when its conclusion is non-nil" do
+      non_nil_conclusions = ["failure", ""]
+      aggregate_failures do
+        SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES.each do |status|
+          non_nil_conclusions.each do |conclusion|
+            expect do
+              active_shakaperf_release_gate_run?("status" => status, "conclusion" => conclusion)
+            end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+          end
+        end
+      end
+    end
+
+    it "dispatches an exact-head gate and returns its URL without watching it" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "queued",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([])
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil
+      )
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+      expect(self).not_to receive(:watch_shakaperf_release_gate_run!)
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref: "release/17.0.0",
+        head_sha: "d" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(
+        status: "pending",
+        run_id: 123_456,
+        run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      )
+    end
+
+    it "blocks a freshly dispatched active run that already has a terminal conclusion" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "queued",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => nil,
+        "updatedAt" => "2026-07-14T13:00:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([])
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil
+      )
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "d" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+    end
+
+    it "blocks a freshly dispatched run that is already known to have failed" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:01Z",
+        "updatedAt" => "2026-07-14T13:00:02Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([])
+      allow(self).to receive_messages(
+        shakaperf_release_gate_dispatch_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+        dispatch_shakaperf_release_gate_workflow!: nil
+      )
+      allow(self).to receive(:wait_for_shakaperf_release_gate_run!).and_return(run)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "d" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit, /known ShakaPerf failure/)
+    end
+
+    it "reuses an active exact-head run without dispatching a duplicate" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref: "release/17.0.0",
+        head_sha: "d" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(status: "pending", run_id: 123_456)
+    end
+
+    it "blocks an existing active exact-head run that already has a terminal conclusion" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "d" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+    end
+
+    it "ignores a same-SHA run dispatched for another target version" do
+      wrong_target = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.9"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress"
+      }
+
+      expect(
+        find_latest_shakaperf_release_gate_run(
+          [wrong_target],
+          "d" * 40,
+          ref: "release/17.0.0",
+          target_version: "17.0.0.rc.10"
+        )
+      ).to be_nil
+    end
+
+    it "fails closed when an active exact-head run has no trustworthy GitHub identity" do
+      run = {
+        "databaseId" => nil,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/unknown"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "d" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit, /identity is unknown/)
+    end
+
+    it "reuses a completed exact-head run only after verifying its evidence" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref: "release/17.0.0",
+        head_sha: "d" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(status: "success", run_id: 123_456)
+    end
+
+    it "fails closed on a completed exact-head ShakaPerf failure" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "d" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "d" * 40,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      expect do
+        run_accelerated_shakaperf_release_gate!(
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "d" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+        )
+      end.to raise_error(SystemExit, %r{known ShakaPerf failure.*actions/runs/123456}mi)
+    end
+
+    it "reuses a completed pre-run only when runtime-equivalent evidence verifies" do
+      run = {
+        "databaseId" => 222_222,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/222222"
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+        .with(repo_slug: "shakacode/react_on_rails", ref: "release/17.0.0").and_return([run])
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return(nil)
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      result = run_accelerated_shakaperf_release_gate!(
+        monorepo_root: "/tmp/repo",
+        ref: "release/17.0.0",
+        head_sha: "d" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+      )
+
+      expect(result).to include(status: "success", run_id: 222_222)
     end
   end
 
@@ -2423,6 +2942,69 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#preflight_explicit_accelerated_rc_target_tag!" do
+    let(:tag) { "v17.0.0.rc.10" }
+
+    it "allows a canonical annotated retry only from the exact tagged candidate" do
+      provenance = {
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40
+      }
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        remote_git_tag_exists?: true,
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: provenance,
+        peeled_git_tag_sha: "f" * 40,
+        current_git_sha!: "f" * 40
+      )
+
+      expect(
+        preflight_explicit_accelerated_rc_target_tag!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0.rc.10",
+          current_checkout_version: "17.0.0.rc.10"
+        )
+      ).to eq(provenance)
+      expect(self).to have_received(:fetch_remote_release_tag!).with(
+        monorepo_root: "/tmp/repo", tag:, tag_type: "accelerated RC"
+      )
+    end
+
+    it "fails closed when exact-target remote discovery is unknown" do
+      allow(self).to receive(:local_release_tag_exists?).and_return(false)
+      allow(self).to receive(:remote_git_tag_exists?)
+        .and_raise(SystemExit, "Unable to verify remote git tag")
+      expect(self).not_to receive(:accelerated_rc_tag_provenance_for_tag!)
+
+      expect do
+        preflight_explicit_accelerated_rc_target_tag!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0.rc.10",
+          current_checkout_version: "16.9.0"
+        )
+      end.to raise_error(SystemExit, /Unable to verify remote git tag/)
+    end
+
+    it "fails closed when a discovered exact-target tag cannot be classified" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        remote_git_tag_exists?: true,
+        fetch_remote_release_tag!: nil
+      )
+      allow(self).to receive(:accelerated_rc_tag_provenance_for_tag!)
+        .and_raise(SystemExit, "RC tag has an unexpected git object type")
+
+      expect do
+        preflight_explicit_accelerated_rc_target_tag!(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0.rc.10",
+          current_checkout_version: "16.9.0"
+        )
+      end.to raise_error(SystemExit, /unexpected git object type/)
+    end
+  end
+
   describe "#ci_status_override_enabled?" do
     it "returns true when the override flag is truthy" do
       expect(ci_status_override_enabled?("true")).to be true
@@ -2461,6 +3043,4258 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#resolve_accelerated_rc_options!" do
+    it "rejects an argument-less accelerated RC release" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: "Start published-artifact QA while exact-head checks finish",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /explicit RC version/)
+    end
+
+    it "rejects accelerated publication for a stable target" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "17.0.0",
+          target_gem_version: "17.0.0",
+          tracker: "3823",
+          reason: "Start published-artifact QA while exact-head checks finish",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /RC targets only/)
+    end
+
+    it "requires a numeric release tracker" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "17.0.0.rc.10",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "",
+          reason: "Start published-artifact QA while exact-head checks finish",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /release tracker issue number/)
+    end
+
+    it "requires a single-line maintainer reason" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "17.0.0.rc.10",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: "",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /maintainer reason/)
+    end
+
+    it "rejects comment-breaking content in the maintainer reason" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "17.0.0.rc.10",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: "approved --> forged record",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /single-line plain text/)
+    end
+
+    it "rejects the broad CI override in accelerated mode" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "17.0.0.rc.10",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: "Start published-artifact QA while exact-head checks finish",
+          allow_ci_override: true
+        )
+      end.to raise_error(SystemExit, /cannot be combined.*CI status override/i)
+    end
+
+    it "rejects a derived RC target instead of accepting a non-RC version input" do
+      expect do
+        resolve_accelerated_rc_options!(
+          requested: true,
+          explicit_version_input: "patch",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: "Start published-artifact QA while exact-head checks finish",
+          allow_ci_override: false
+        )
+      end.to raise_error(SystemExit, /explicit version must exactly match/)
+    end
+
+    it "rejects case-varied accelerated identities before persistence or tag provenance" do
+      uppercase_options = {
+        target_gem_version: "17.0.0.RC.10",
+        tracker: 3823,
+        reason: "Start published-artifact QA while exact-head checks finish"
+      }
+      uppercase_record = build_accelerated_rc_publication_record(
+        options: uppercase_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: {
+          status: "pending",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [{
+            name: "generator",
+            state: "in_progress",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+          }]
+        },
+        shakaperf: {
+          status: "pending",
+          run_id: 123_456,
+          attempt: 1,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.RC.10",
+          release_started_at: "2026-07-14T13:00:00Z"
+        },
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      uppercase_provenance = {
+        "schema_version" => 1,
+        "target_version" => "17.0.0.RC.10",
+        "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
+        "authorization_digest" => "b" * 64
+      }
+
+      aggregate_failures do
+        expect do
+          resolve_accelerated_rc_options!(
+            requested: true,
+            explicit_version_input: "17.0.0.RC.10",
+            target_gem_version: "17.0.0.RC.10",
+            tracker: "3823",
+            reason: uppercase_options.fetch(:reason),
+            allow_ci_override: false
+          )
+        end.to raise_error(SystemExit, /canonical lowercase.*\.rc\./i)
+        expect do
+          validate_accelerated_rc_tracker_record!(uppercase_record)
+        end.to raise_error(SystemExit, /malformed accelerated RC record/)
+        expect(valid_accelerated_rc_tag_provenance?(uppercase_provenance)).to be(false)
+      end
+    end
+
+    it "rejects accelerated RC numeric identifiers with leading zeroes" do
+      invalid_versions = %w[
+        17.0.0.rc.01
+        017.0.0.rc.1
+        17.00.0.rc.1
+        17.0.00.rc.1
+      ]
+
+      aggregate_failures do
+        invalid_versions.each do |version|
+          expect do
+            resolve_accelerated_rc_options!(
+              requested: true,
+              explicit_version_input: version,
+              target_gem_version: version,
+              tracker: "3823",
+              reason: "Start published-artifact QA while exact-head checks finish",
+              allow_ci_override: false
+            )
+          end.to raise_error(SystemExit, /canonical npm semver.*leading zero/i), version
+        end
+      end
+    end
+
+    it "accepts canonical accelerated RC versions with zero and positive numeric components" do
+      valid_versions = %w[0.0.0.rc.0 17.0.0.rc.10]
+
+      aggregate_failures do
+        valid_versions.each do |version|
+          options = resolve_accelerated_rc_options!(
+            requested: true,
+            explicit_version_input: version,
+            target_gem_version: version,
+            tracker: "3823",
+            reason: "Start published-artifact QA while exact-head checks finish",
+            allow_ci_override: false
+          )
+          expect(options.fetch(:target_gem_version)).to eq(version)
+        end
+      end
+    end
+
+    it "carries a canonical lowercase accelerated identity through final-promotion validation" do
+      options = resolve_accelerated_rc_options!(
+        requested: true,
+        explicit_version_input: "17.0.0.rc.10",
+        target_gem_version: "17.0.0.rc.10",
+        tracker: "3823",
+        reason: "Start published-artifact QA while exact-head checks finish",
+        allow_ci_override: false
+      )
+      authorization = build_accelerated_rc_publication_record(
+        options:,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: {
+          status: "pending",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [{
+            name: "generator",
+            state: "in_progress",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+          }]
+        },
+        shakaperf: {
+          status: "pending",
+          run_id: 123_456,
+          attempt: 1,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: "2026-07-14T13:00:00Z"
+        },
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      accepted = reconcile_accelerated_rc_record(
+        published_record: publication,
+        ci_snapshot: authorization.fetch("ci").merge("status" => "success", "non_success" => []),
+        shakaperf: authorization.fetch("shakaperf").merge("status" => "success"),
+        evidence: {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        },
+        approved_by: "justin808",
+        reason: "All required evidence passed",
+        recorded_at: "2026-07-14T15:00:00Z"
+      )
+      provenance = accelerated_rc_tag_provenance(authorization)
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint).and_return("a" * 64)
+
+      expect(
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization, publication, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance: provenance
+        )
+      ).to eq(accepted)
+    end
+  end
+
+  describe "#resolve_accelerated_rc_options_for_release!" do
+    let(:authorization) do
+      build_accelerated_rc_publication_record(
+        options: {
+          target_gem_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: "Start published-artifact QA while remaining checks finish"
+        },
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: {
+          status: "pending",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [
+            {
+              name: "generator",
+              state: "in_progress",
+              url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+            }
+          ]
+        },
+        shakaperf: {
+          status: "pending",
+          run_id: 123_456,
+          attempt: 1,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: "2026-07-14T13:00:00Z"
+        },
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+    end
+
+    def resolve_unflagged_accelerated_retry(allow_ci_override: false)
+      resolve_accelerated_rc_options_for_release!(
+        requested: false,
+        explicit_version_input: "17.0.0.rc.10",
+        target_gem_version: "17.0.0.rc.10",
+        tracker: nil,
+        reason: nil,
+        allow_ci_override:,
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        current_checkout_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    def resolve_flagged_accelerated_retry(tracker: 3823, reason: nil)
+      resolve_accelerated_rc_options_for_release!(
+        requested: true,
+        explicit_version_input: "17.0.0.rc.10",
+        target_gem_version: "17.0.0.rc.10",
+        tracker: tracker.to_s,
+        reason: reason || authorization.fetch("reason"),
+        allow_ci_override: false,
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        current_checkout_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "resumes persisted pre-tag authorization when accelerated variables are omitted" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect(resolve_unflagged_accelerated_retry).to include(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: authorization.fetch("reason")
+      )
+    end
+
+    it "resumes an annotated accelerated-tag retry when accelerated variables are omitted" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization),
+        fetch_release_tracker_issue!: {},
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization]
+      )
+
+      expect(resolve_unflagged_accelerated_retry).to include(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: authorization.fetch("reason")
+      )
+    end
+
+    it "preserves an ordinary RC retry when no accelerated history exists" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: []
+      )
+
+      expect(resolve_unflagged_accelerated_retry).to be_nil
+    end
+
+    it "blocks a flagged retry over an existing ordinary lightweight tag before authorization append" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: [],
+        append_accelerated_rc_tracker_record!: nil
+      )
+
+      failure = begin
+        options = resolve_flagged_accelerated_retry
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: options.fetch(:tracker),
+          record: authorization
+        )
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/ordinary lightweight RC tag.*accelerated/i)
+        expect(self).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+
+    it "rejects the broad prerelease override when durable accelerated history is discovered" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_unflagged_accelerated_retry(allow_ci_override: true)
+      end.to raise_error(SystemExit, /accelerated RC retry.*broad CI status override/i)
+    end
+
+    it "blocks a flagged same-candidate retry that switches the durable tracker or reason" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      aggregate_failures do
+        expect do
+          resolve_flagged_accelerated_retry(tracker: 3824)
+        end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
+        expect do
+          resolve_flagged_accelerated_retry(reason: "A different retry reason")
+        end.to raise_error(SystemExit, /explicit accelerated RC retry.*canonical authorization/i)
+      end
+    end
+
+    it "reuses the canonical authorization for a flagged same-tracker retry with a deleted tag" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect(resolve_flagged_accelerated_retry).to eq(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: authorization.fetch("reason"),
+        allow_ci_override: false
+      )
+      expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "keeps candidate-rejected absorbing for a flagged retry after its tag is deleted" do
+      publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      failed_ci = authorization.fetch("ci").merge(
+        "status" => "failed",
+        "non_success" => [authorization.dig("ci", "non_success").first.merge("state" => "failure")]
+      )
+      rejected = reconcile_accelerated_rc_record(
+        published_record: publication,
+        ci_snapshot: failed_ci,
+        shakaperf: authorization.fetch("shakaperf"),
+        evidence: {},
+        approved_by: "justin808",
+        reason: "Exact-head CI failed after publication",
+        recorded_at: "2026-07-14T15:00:00Z"
+      )
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, rejected],
+        fetch_release_tracker_issue!: {}
+      )
+
+      expect do
+        resolve_flagged_accelerated_retry
+      end.to raise_error(SystemExit, /permanently rejected/i)
+    end
+
+    it "blocks conflicting durable trackers and authorizations before a flagged retry" do
+      conflicting_tracker = authorization.merge("release_tracker" => 3824)
+      conflicting_authorization = authorization.merge("reason" => "Conflicting durable authorization")
+      histories = {
+        "trackers" => [authorization, conflicting_tracker],
+        "authorizations" => [authorization, conflicting_authorization]
+      }
+      allow(self).to receive_messages(local_release_tag_exists?: false, fetch_release_tracker_issue!: {})
+
+      aggregate_failures do
+        histories.each do |description, records|
+          allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!).and_return(records)
+          expect do
+            resolve_flagged_accelerated_retry
+          end.to raise_error(SystemExit, /conflicting.*(?:trackers|authorizations)/i), description
+        end
+      end
+    end
+
+    it "allows a history-free explicit first attempt only after exact-candidate discovery" do
+      allow(self).to receive_messages(
+        local_release_tag_exists?: false,
+        fetch_repository_accelerated_rc_records_for_candidate!: []
+      )
+
+      expect(resolve_flagged_accelerated_retry).to include(
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: authorization.fetch("reason")
+      )
+      expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+  end
+
+  describe "#accelerated_rc_ci_snapshot" do
+    it "captures every pending or skipped exact-head check with its URL" do
+      snapshot = accelerated_rc_ci_snapshot(
+        sha: "a" * 40,
+        repo_slug: "shakacode/react_on_rails",
+        check_runs: [
+          {
+            "id" => 1,
+            "name" => "lint",
+            "status" => "completed",
+            "conclusion" => "success",
+            "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/1"
+          },
+          {
+            "id" => 2,
+            "name" => "generator-1",
+            "status" => "in_progress",
+            "conclusion" => nil,
+            "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/2"
+          },
+          {
+            "id" => 3,
+            "name" => "intentional-skip",
+            "status" => "completed",
+            "conclusion" => "skipped",
+            "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/3"
+          }
+        ],
+        statuses: []
+      )
+
+      expect(snapshot).to include(status: "pending", sha: "a" * 40)
+      expect(snapshot[:non_success]).to contain_exactly(
+        include(name: "generator-1", state: "in_progress", url: %r{runs/2}),
+        include(name: "intentional-skip", state: "skipped", url: %r{runs/3})
+      )
+    end
+
+    it "uses the exact-SHA checks page when a non-success check has no direct URL" do
+      snapshot = accelerated_rc_ci_snapshot(
+        sha: "a" * 40,
+        repo_slug: "shakacode/react_on_rails",
+        check_runs: [
+          {
+            "id" => 2,
+            "name" => "generator-1",
+            "status" => "in_progress",
+            "conclusion" => nil,
+            "html_url" => nil
+          }
+        ],
+        statuses: []
+      )
+
+      expect(snapshot.fetch(:non_success)).to contain_exactly(
+        include(url: "https://github.com/shakacode/react_on_rails/commit/#{'a' * 40}/checks")
+      )
+    end
+
+    it "fails closed on a known failed exact-head check" do
+      expect do
+        accelerated_rc_ci_snapshot(
+          sha: "b" * 40,
+          repo_slug: "shakacode/react_on_rails",
+          check_runs: [
+            {
+              "id" => 4,
+              "name" => "generator-2",
+              "status" => "completed",
+              "conclusion" => "failure",
+              "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/4"
+            }
+          ],
+          statuses: []
+        )
+      end.to raise_error(SystemExit, %r{known failed.*generator-2.*actions/runs/4}mi)
+    end
+
+    it "fails closed when the exact-head CI API returns no evidence" do
+      expect do
+        accelerated_rc_ci_snapshot(
+          sha: "c" * 40,
+          repo_slug: "shakacode/react_on_rails",
+          check_runs: [],
+          statuses: []
+        )
+      end.to raise_error(SystemExit, /exact-head CI evidence is unknown/)
+    end
+
+    it "fails closed while a required exact-head check has not appeared" do
+      expect do
+        accelerated_rc_ci_snapshot(
+          sha: "d" * 40,
+          repo_slug: "shakacode/react_on_rails",
+          check_runs: [
+            {
+              "id" => 5,
+              "name" => "optional-docs",
+              "status" => "completed",
+              "conclusion" => "success",
+              "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/5"
+            }
+          ],
+          statuses: [],
+          required_names: { contexts: [], checks: [{ context: "generator", app_id: nil }] }
+        )
+      end.to raise_error(SystemExit, /required exact-head CI checks have not appeared.*generator/i)
+    end
+  end
+
+  describe "#fetch_accelerated_rc_ci_snapshot!" do
+    it "fails closed when either exact-head CI API is unknown" do
+      allow(self).to receive(:fetch_ci_check_runs_for_sha)
+        .and_return(error: "GitHub Checks API unavailable")
+      expect(self).not_to receive(:fetch_ci_statuses_for_sha)
+
+      expect do
+        fetch_accelerated_rc_ci_snapshot!(
+          repo_slug: "shakacode/react_on_rails",
+          sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /Checks API unavailable.*unknown/mi)
+    end
+  end
+
+  describe "accelerated RC tracker records" do
+    let(:accelerated_rc_options) do
+      {
+        target_gem_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: "Start published-artifact QA while remaining checks finish"
+      }
+    end
+
+    let(:accelerated_rc_ci_snapshot) do
+      {
+        status: "pending",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: [
+          {
+            name: "generator",
+            state: "in_progress",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+          }
+        ]
+      }
+    end
+
+    let(:accelerated_rc_shakaperf_snapshot) do
+      {
+        status: "pending",
+        run_id: 123_456,
+        attempt: 1,
+        run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+        candidate_sha: "f" * 40,
+        target_version: "17.0.0.rc.10",
+        release_started_at: "2026-07-14T13:00:00Z"
+      }
+    end
+
+    it "blocks a fresh accelerated request over an existing ordinary lightweight target tag" do
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [],
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        run_accelerated_shakaperf_release_gate!: accelerated_rc_shakaperf_snapshot,
+        fetch_accelerated_rc_ci_snapshot!: accelerated_rc_ci_snapshot,
+        confirm_accelerated_rc_publication!: nil,
+        shakaperf_runtime_tree_fingerprint: "a" * 64,
+        fetch_release_tracker_issue!: nil,
+        append_accelerated_rc_tracker_record!: nil,
+        push_release_tag_for_candidate!: nil
+      )
+
+      failure = begin
+        options = resolve_accelerated_rc_options_for_release!(
+          requested: true,
+          explicit_version_input: "17.0.0.rc.10",
+          target_gem_version: "17.0.0.rc.10",
+          tracker: "3823",
+          reason: accelerated_rc_options.fetch(:reason),
+          allow_ci_override: false,
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          current_checkout_version: "16.9.0",
+          candidate_sha: nil
+        )
+        authorization = authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options:,
+          approver: "justin808",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/ordinary lightweight RC tag.*accelerated/i)
+        expect(self).not_to have_received(:run_accelerated_shakaperf_release_gate!)
+        expect(self).not_to have_received(:confirm_accelerated_rc_publication!)
+        expect(self).not_to have_received(:append_accelerated_rc_tracker_record!)
+        expect(self).not_to have_received(:push_release_tag_for_candidate!)
+      end
+    end
+
+    it "blocks authorization when exact-candidate history already exists on another tracker" do
+      conflicting_authorization = accelerated_rc_test_authorization(tracker: 3824)
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [conflicting_authorization],
+        fetch_accelerated_rc_tracker_records!: [],
+        local_release_tag_exists?: false,
+        run_accelerated_shakaperf_release_gate!: accelerated_rc_shakaperf_snapshot,
+        fetch_accelerated_rc_ci_snapshot!: accelerated_rc_ci_snapshot,
+        confirm_accelerated_rc_publication!: nil,
+        shakaperf_runtime_tree_fingerprint: "a" * 64,
+        fetch_release_tracker_issue!: nil,
+        append_accelerated_rc_tracker_record!: nil
+      )
+
+      expect do
+        authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "justin808",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /repository-wide.*tracker|different release tracker/i)
+    end
+
+    it "blocks immutable tag handling when a cross-tracker conflict appears after authorization append" do
+      authorization = accelerated_rc_test_authorization
+      conflicting_authorization = accelerated_rc_test_authorization(tracker: 3824)
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, conflicting_authorization],
+        github_repo_slug: "shakacode/react_on_rails",
+        system: true,
+        validate_existing_accelerated_rc_tag!: nil,
+        validate_release_candidate_publication_boundary!: nil,
+        sh_in_dir_for_release: nil
+      )
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+      end.to raise_error(SystemExit, /repository-wide.*tracker|conflicting release trackers/i)
+    end
+
+    it "records a durable authorization state before immutable publication" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+
+      expect(record).to include(
+        "status" => "publication-authorized",
+        "recorded_at" => "2026-07-14T13:30:00Z",
+        "required_follow_up" => /complete immutable publication/i
+      )
+      expect(validate_accelerated_rc_tracker_record!(record)).to eq(record)
+    end
+
+    it "transitions the authorized snapshot only after immutable publication completes" do
+      authorized_record = {
+        "status" => "publication-authorized",
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "recorded_at" => "2026-07-14T13:30:00Z"
+      }
+
+      published_record = accelerated_rc_published_record(
+        authorized_record:,
+        recorded_at: Time.utc(2026, 7, 14, 14, 0)
+      )
+
+      expect(published_record).to include(
+        "status" => "published-awaiting-gates",
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "recorded_at" => "2026-07-14T14:00:00Z",
+        "required_follow_up" => /reconcile_accelerated_rc/
+      )
+      expect(authorized_record["status"]).to eq("publication-authorized")
+    end
+
+    it "fails closed when paginated tracker comments have an unexpected JSON shape" do
+      status = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate("not-pages"), status])
+
+      expect do
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /unexpected JSON structure/)
+    end
+
+    it "rejects a closed release tracker" do
+      expect do
+        validate_release_tracker_issue!(
+          {
+            "number" => 3823,
+            "state" => "closed",
+            "title" => "Release gate: React on Rails 17.0.0",
+            "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }]
+          },
+          tracker: 3823
+        )
+      end.to raise_error(SystemExit, /active open release tracker/)
+    end
+
+    it "rejects a pull request even when its issue fields otherwise look like a release tracker" do
+      expect do
+        validate_release_tracker_issue!(
+          {
+            "number" => 3823,
+            "state" => "open",
+            "title" => "Release gate: React on Rails 17.0.0",
+            "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }],
+            "pull_request" => { "url" => "https://api.github.com/repos/shakacode/react_on_rails/pulls/3823" }
+          },
+          tracker: 3823
+        )
+      end.to raise_error(SystemExit, /active open release tracker/)
+    end
+
+    it "rejects an approver without maintainer repository permission" do
+      expect do
+        validate_release_approver!(login: "external-user", permission: "read")
+      end.to raise_error(SystemExit, /write, maintain, or admin/)
+    end
+
+    it "rejects tracker markers authored without maintainer repository permission" do
+      record = { "schema_version" => 1 }
+      marker = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 " \
+               "#{JSON.generate(record).unpack1('H*')} -->"
+      allow(self).to receive(:fetch_release_tracker_comments).and_return(
+        [{ "body" => marker, "user" => { "login" => "external-user" } }]
+      )
+      status = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "api",
+          "repos/shakacode/react_on_rails/collaborators/external-user/permission",
+          "--jq",
+          ".permission"
+        ).and_return(["read\n", status])
+
+      expect do
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /write, maintain, or admin/)
+    end
+
+    it "discovers exact candidate history from trusted repository issue comments" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      comment = {
+        "body" => accelerated_rc_tracker_comment(authorization),
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output)
+        .with("api", "--paginate", "--slurp", "repos/shakacode/react_on_rails/issues/comments?per_page=100")
+        .and_return([JSON.generate([[comment]]), success])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "api", "repos/shakacode/react_on_rails/collaborators/justin808/permission", "--jq", ".permission"
+        ).and_return(["maintain\n", success])
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([authorization])
+    end
+
+    it "ignores one clearly unrelated valid repository marker before author permission checks" do
+      unrelated_options = accelerated_rc_options.merge(target_gem_version: "16.9.0.rc.1")
+      unrelated_authorization = build_accelerated_rc_publication_record(
+        options: unrelated_options,
+        candidate_sha: "e" * 40,
+        runtime_tree_fingerprint: "b" * 64,
+        release_branch: "release/16.9.0",
+        ci_snapshot: accelerated_rc_ci_snapshot.merge(sha: "e" * 40),
+        shakaperf: accelerated_rc_shakaperf_snapshot.merge(
+          candidate_sha: "e" * 40,
+          target_version: "16.9.0.rc.1"
+        ),
+        approved_by: "read-only-user",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      unrelated_marker = accelerated_rc_tracker_comment(unrelated_authorization).lines.first
+      comments = [{
+        "body" => unrelated_marker,
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3800",
+        "user" => { "login" => "read-only-user" }
+      }]
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return(comments)
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([])
+    end
+
+    it "strictly rejects complete unrelated records whose marker encoding is noncanonical" do
+      unrelated_authorization = accelerated_rc_test_authorization.merge(
+        "target_version" => "16.9.0.rc.1",
+        "candidate_sha" => "e" * 40,
+        "release_branch" => "release/16.9.0",
+        "ci" => accelerated_rc_test_authorization.fetch("ci").merge("sha" => "e" * 40),
+        "shakaperf" => accelerated_rc_test_authorization.fetch("shakaperf").merge(
+          "candidate_sha" => "e" * 40,
+          "target_version" => "16.9.0.rc.1"
+        )
+      )
+      canonical_json = JSON.generate(canonical_accelerated_rc_value(unrelated_authorization))
+      noncanonical_payloads = {
+        "reordered whitespace JSON" => JSON.pretty_generate(unrelated_authorization.to_a.reverse.to_h).unpack1("H*"),
+        "uppercase hexadecimal" => canonical_json.unpack1("H*").upcase
+      }
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!).and_return("maintain")
+
+      aggregate_failures do
+        noncanonical_payloads.each do |description, encoded_payload|
+          comment = {
+            "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{encoded_payload} -->",
+            "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+            "user" => { "login" => "justin808" }
+          }
+          allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return([comment])
+
+          expect do
+            fetch_repository_accelerated_rc_records_for_candidate!(
+              repo_slug: "shakacode/react_on_rails",
+              target_version: "17.0.0.rc.10",
+              candidate_sha: "f" * 40
+            )
+          end.to raise_error(SystemExit, /malformed accelerated RC record/), description
+        end
+      end
+      expect(self).to have_received(:accelerated_rc_repository_comment_permission!).twice
+    end
+
+    it "strictly rejects an incomplete valid-JSON unrelated repository marker" do
+      incomplete_record = {
+        "target_version" => "16.9.0.rc.1",
+        "candidate_sha" => "e" * 40
+      }
+      encoded_payload = JSON.generate(incomplete_record).unpack1("H*")
+      comment = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{encoded_payload} -->",
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3800",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+      expect(self).to have_received(:accelerated_rc_repository_comment_permission!)
+    end
+
+    it "strictly rejects duplicated valid unrelated repository markers as malformed" do
+      unrelated_authorization = accelerated_rc_test_authorization.merge(
+        "target_version" => "16.9.0.rc.1",
+        "candidate_sha" => "e" * 40,
+        "release_branch" => "release/16.9.0",
+        "ci" => accelerated_rc_test_authorization.fetch("ci").merge("sha" => "e" * 40),
+        "shakaperf" => accelerated_rc_test_authorization.fetch("shakaperf").merge(
+          "candidate_sha" => "e" * 40,
+          "target_version" => "16.9.0.rc.1"
+        )
+      )
+      unrelated_marker = accelerated_rc_tracker_comment(unrelated_authorization).lines.first
+      comment = {
+        "body" => "#{unrelated_marker}#{unrelated_marker}",
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3800",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "fails closed when a malformed repository marker plausibly names the exact candidate" do
+      comment = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 not-hex -->\n" \
+                  "- RC: `17.0.0.rc.10` at `#{'f' * 40}`",
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "strictly parses a corrupted encoded marker that names the exact candidate despite a spoofed summary" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      corrupted_payload = "#{JSON.generate(authorization)} trailing-corruption".unpack1("H*")
+      comment = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{corrupted_payload} -->\n" \
+                  "- RC: `16.9.0.rc.1` at `#{'e' * 40}`",
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "strictly parses uppercase encoded exact-candidate markers before ignoring malformed JSON" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      corrupted_payload = "#{JSON.generate(authorization)} trailing-corruption".unpack1("H*").upcase
+      comment = {
+        "body" => "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{corrupted_payload} -->",
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: [comment],
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "fails closed for every malformed marker shape that cannot prove it targets another candidate" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      unrelated_authorization = authorization.merge(
+        "target_version" => "16.9.0.rc.1",
+        "candidate_sha" => "e" * 40,
+        "release_branch" => "release/16.9.0",
+        "ci" => authorization.fetch("ci").merge("sha" => "e" * 40),
+        "shakaperf" => authorization.fetch("shakaperf").merge(
+          "candidate_sha" => "e" * 40,
+          "target_version" => "16.9.0.rc.1"
+        )
+      )
+      exact_payload = JSON.generate(authorization).unpack1("H*")
+      odd_exact_payload = exact_payload[0...-1]
+      escaped_version = ["17", '\u002e', "0", '\u002e', "0", '\u002e', "rc", '\u002e', "10"].join
+      escaped_sha = '\u0066' * 40
+      escaped_corrupt_payload =
+        %({"target_version":"#{escaped_version}","candidate_sha":"#{escaped_sha}"} trailing-corruption).unpack1("H*")
+      unrelated_marker = accelerated_rc_tracker_comment(unrelated_authorization).lines.first.strip
+      spoofed_summary = "- RC: `16.8.0.rc.2` at `#{'d' * 40}`"
+      malformed_bodies = {
+        "odd-length exact payload" =>
+          "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{odd_exact_payload} -->\n#{spoofed_summary}",
+        "Unicode-escaped exact identity with trailing corruption" =>
+          "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{escaped_corrupt_payload} -->\n#{spoofed_summary}",
+        "corrupted marker boundary" =>
+          "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{exact_payload} --!>\n#{spoofed_summary}",
+        "unrelated marker followed by a duplicated malformed exact marker" =>
+          "#{unrelated_marker}\n<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{odd_exact_payload} -->\n#{spoofed_summary}"
+      }
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!).and_return("maintain")
+
+      aggregate_failures do
+        malformed_bodies.each do |description, body|
+          comment = {
+            "body" => body,
+            "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+            "user" => { "login" => "justin808" }
+          }
+          allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return([comment])
+
+          expect do
+            fetch_repository_accelerated_rc_records_for_candidate!(
+              repo_slug: "shakacode/react_on_rails",
+              target_version: "17.0.0.rc.10",
+              candidate_sha: "f" * 40
+            )
+          end.to raise_error(SystemExit, /malformed accelerated RC record/), description
+        end
+      end
+    end
+
+    it "rejects repository discovery comments whose issue URL is not the exact requested repository issue" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      invalid_urls = [
+        "https://github.com/shakacode/react_on_rails/issues/3823",
+        "https://api.github.example/repos/shakacode/react_on_rails/issues/3823",
+        "https://api.github.com/repos/other/react_on_rails/issues/3823",
+        "https://api.github.com/repos/shakacode/other/issues/3823",
+        "https://api.github.com/repos/shakacode/react_on_rails/pulls/3823",
+        "https://api.github.com/repos/shakacode/react_on_rails/issues/3823/extra",
+        "https://api.github.com/repos/shakacode/react_on_rails/issues/3823?redirect=/issues/3824",
+        "https://api.github.com/repos/shakacode/react_on_rails/issues/3823#issues/3824",
+        "not-a-url/issues/3823"
+      ]
+      expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+
+      aggregate_failures do
+        invalid_urls.each do |issue_url|
+          comment = {
+            "body" => accelerated_rc_tracker_comment(authorization),
+            "issue_url" => issue_url,
+            "user" => { "login" => "justin808" }
+          }
+          expect do
+            trusted_accelerated_rc_records_from_repository_comment!(
+              comment:, repo_slug: "shakacode/react_on_rails", permissions: {}
+            )
+          end.to raise_error(SystemExit, /exact requested repository issue URL/i), issue_url
+        end
+      end
+    end
+
+    it "accepts the canonical API issue URL for the exact requested repository" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      comment = {
+        "body" => accelerated_rc_tracker_comment(authorization),
+        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
+        "user" => { "login" => "justin808" }
+      }
+      allow(self).to receive(:accelerated_rc_repository_comment_permission!).and_return("maintain")
+
+      expect(
+        trusted_accelerated_rc_records_from_repository_comment!(
+          comment:, repo_slug: "shakacode/react_on_rails", permissions: {}
+        )
+      ).to eq([authorization])
+    end
+
+    it "rejects an auditable record that names a different approver than its comment author" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "claimed-approver",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      status = instance_double(Process::Status, success?: true)
+      allow(self).to receive_messages(
+        fetch_release_tracker_comments: [
+          { "body" => accelerated_rc_tracker_comment(record), "user" => { "login" => "actual-author" } }
+        ],
+        capture_gh_output: ["write\n", status]
+      )
+
+      expect do
+        fetch_accelerated_rc_tracker_records!(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /approver does not match.*comment author/i)
+    end
+
+    it "round-trips a published-awaiting-gates record through the auditable comment marker" do
+      record = {
+        "schema_version" => 1,
+        "status" => "published-awaiting-gates",
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "runtime_tree_fingerprint" => "a" * 64,
+        "release_branch" => "release/17.0.0",
+        "release_tracker" => 3823,
+        "ci" => {
+          "status" => "pending",
+          "sha" => "f" * 40,
+          "checks_url" => "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          "non_success" => [
+            {
+              "name" => "generator",
+              "state" => "in_progress",
+              "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123"
+            }
+          ]
+        },
+        "shakaperf" => {
+          "status" => "pending",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        },
+        "reason" => "Start published-artifact QA while remaining checks finish",
+        "approved_by" => "justin808",
+        "recorded_at" => "2026-07-14T13:30:00Z",
+        "required_follow_up" => "Run reconciliation before final promotion.",
+        "evidence" => {}
+      }
+
+      comment = accelerated_rc_tracker_comment(record)
+
+      expect(comment).to include("published-awaiting-gates", "17.0.0.rc.10", "123456")
+      expect(comment).to include(canonical_accelerated_rc_encoded_payload(record))
+      expect(accelerated_rc_records_from_comments([{ "body" => comment }])).to eq([record])
+    end
+
+    it "fails closed when a tracker marker is malformed instead of ignoring it" do
+      comment = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 {not-json} -->"
+
+      expect do
+        accelerated_rc_records_from_comments([{ "body" => comment }])
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "fails closed when a tracker marker contains an incomplete hex payload" do
+      comment = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 f -->"
+
+      expect do
+        accelerated_rc_records_from_comments([{ "body" => comment }])
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "fails closed when a tracker marker uses an unsupported schema" do
+      record = { "schema_version" => 2, "status" => "candidate-accepted" }
+      payload = JSON.generate(record).unpack1("H*")
+      comment = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v2 #{payload} -->"
+
+      expect do
+        accelerated_rc_records_from_comments([{ "body" => comment }])
+      end.to raise_error(SystemExit, /unsupported accelerated RC record schema/)
+    end
+
+    it "fails closed when a versioned tracker record omits required identity fields" do
+      record = { "schema_version" => 1, "status" => "candidate-accepted" }
+      payload = JSON.generate(record).unpack1("H*")
+      comment = "<!-- #{ACCELERATED_RC_RECORD_MARKER} v1 #{payload} -->"
+
+      expect do
+        accelerated_rc_records_from_comments([{ "body" => comment }])
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "rejects a candidate-accepted state whose required evidence is incomplete" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot.merge(status: "success"),
+        shakaperf: accelerated_rc_shakaperf_snapshot.merge(status: "success"),
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      ).merge("status" => "candidate-accepted")
+
+      expect do
+        validate_accelerated_rc_tracker_record!(record)
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "rejects malformed nested CI evidence and unknown ShakaPerf fields" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+
+      malformed_ci = Marshal.load(Marshal.dump(record))
+      malformed_ci["ci"]["non_success"] = "malformed"
+      expect do
+        validate_accelerated_rc_tracker_record!(malformed_ci)
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+
+      malformed_shakaperf = Marshal.load(Marshal.dump(record))
+      malformed_shakaperf["shakaperf"]["unexpected"] = true
+      expect do
+        validate_accelerated_rc_tracker_record!(malformed_shakaperf)
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+
+      nil_ci = Marshal.load(Marshal.dump(record))
+      nil_ci["ci"] = nil
+      expect do
+        validate_accelerated_rc_tracker_record!(nil_ci)
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "refuses to publish an invalid locally generated tracker record" do
+      expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: { "schema_version" => 1 }
+        )
+      end.to raise_error(SystemExit, /malformed accelerated RC record/)
+    end
+
+    it "re-reads the tracker after posting and rejects a concurrently appended authorization" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      conflicting_authorization = authorization.merge("reason" => "Concurrent authorization")
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!).and_return([])
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return(
+        [],
+        [authorization, conflicting_authorization]
+      )
+      allow(self).to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: authorization
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "requires the exact posted payload instead of a concurrent retry-equivalent publication" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      concurrent_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        approved_by: "first-maintainer",
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      posted_publication = concurrent_publication.merge(
+        "approved_by" => "second-maintainer",
+        "recorded_at" => "2026-07-14T14:01:00Z"
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return(
+        [authorization],
+        [authorization, concurrent_publication]
+      )
+      allow(self).to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: posted_publication
+        )
+      end.to raise_error(SystemExit, /append could not be verified after posting/i)
+    end
+
+    it "reuses only the canonical persisted record for an equivalent retry" do
+      authorized_record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      persisted_record = accelerated_rc_published_record(
+        authorized_record:,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      retry_record = persisted_record.merge(
+        "approved_by" => "another-maintainer",
+        "recorded_at" => "2026-07-14T14:01:00Z"
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .with(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        .and_return([authorized_record, persisted_record])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      result = nil
+      expect do
+        result = append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: retry_record
+        )
+      end.not_to raise_error
+      expect(result).to eq(persisted_record)
+    end
+
+    it "rejects the complete publication set before an append can reuse its canonical first record" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      mutated_publication = canonical_publication.merge(
+        "shakaperf" => canonical_publication.fetch("shakaperf").merge(
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+        )
+      )
+      retry_record = canonical_publication.merge(
+        "approved_by" => "another-maintainer",
+        "recorded_at" => "2026-07-14T14:01:00Z"
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization, canonical_publication, mutated_publication])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: retry_record
+        )
+      end.to raise_error(SystemExit, /publication set.*not the canonical authorized transition/i)
+    end
+
+    it "rejects conflicting authorizations before an append can reuse canonical publication state" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      conflicting_authorization = authorization.merge(
+        "ci" => authorization.fetch("ci").merge("status" => "success", "non_success" => [])
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      retry_record = canonical_publication.merge("recorded_at" => "2026-07-14T14:01:00Z")
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization, conflicting_authorization, canonical_publication])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: retry_record
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "rejects appending terminal candidate state before canonical publication" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      accepted = authorization.merge(
+        "status" => "candidate-accepted",
+        "ci" => authorization.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        },
+        "required_follow_up" => "Proceed only through the strict final promotion gates."
+      )
+      expect(validate_accelerated_rc_tracker_record!(accepted)).to eq(accepted)
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: accepted
+        )
+      end.to raise_error(SystemExit, /canonical published-awaiting-gates transition is missing/i)
+    end
+
+    it "does not append candidate-accepted after candidate-rejected" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      rejected = publication.merge(
+        "status" => "candidate-rejected",
+        "ci" => publication.fetch("ci").merge(
+          "status" => "failed",
+          "non_success" => [
+            { "name" => "generator", "state" => "failure", "url" => "https://example.com/failure" }
+          ]
+        ),
+        "reason" => "Exact-head CI failed",
+        "required_follow_up" => "Do not promote this immutable RC; fix the failure and cut the next RC."
+      )
+      accepted = publication.merge(
+        "status" => "candidate-accepted",
+        "ci" => publication.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => publication.fetch("shakaperf").merge("status" => "success"),
+        "reason" => "All required evidence passed",
+        "required_follow_up" => "Proceed only through the strict final promotion gates.",
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      expect(validate_accelerated_rc_tracker_record!(rejected)).to eq(rejected)
+      expect(validate_accelerated_rc_tracker_record!(accepted)).to eq(accepted)
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization, publication, rejected])
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: accepted
+        )
+      end.to raise_error(SystemExit, /permanently rejected.*absorbing/i)
+    end
+
+    it "rejects a same-state retry when its authorization evidence changed" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [record],
+        fetch_accelerated_rc_tracker_records!: [record]
+      )
+      expect(self).not_to receive(:post_release_tracker_comment!)
+
+      expect do
+        append_accelerated_rc_tracker_record!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          record: record.merge("reason" => "Changed authorization after interruption")
+        )
+      end.to raise_error(SystemExit, /not canonical|conflicting canonical publication authorizations/i)
+    end
+
+    it "blocks fresh authorization when pending CI fails during confirmation" do
+      failed_ci = accelerated_rc_ci_snapshot.merge(
+        status: "failed",
+        non_success: [accelerated_rc_ci_snapshot.fetch(:non_success).first.merge(state: "failure")]
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [],
+        local_release_tag_exists?: false,
+        run_accelerated_shakaperf_release_gate!: accelerated_rc_shakaperf_snapshot,
+        confirm_accelerated_rc_publication!: nil,
+        accelerated_rc_shakaperf_snapshot!: json_compatible_release_value(accelerated_rc_shakaperf_snapshot),
+        shakaperf_runtime_tree_fingerprint: "a" * 64,
+        fetch_release_tracker_issue!: nil,
+        append_accelerated_rc_tracker_record!: nil,
+        push_release_tag_for_candidate!: nil
+      )
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!)
+        .and_return(accelerated_rc_ci_snapshot, failed_ci)
+
+      failure = begin
+        authorization = authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "justin808",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/refreshed.*exact-candidate CI.*failed|known failed.*CI/i)
+        expect(self).to have_received(:accelerated_rc_shakaperf_snapshot!).once
+        expect(self).to have_received(:fetch_accelerated_rc_ci_snapshot!).twice
+        expect(self).not_to have_received(:append_accelerated_rc_tracker_record!)
+        expect(self).not_to have_received(:push_release_tag_for_candidate!)
+      end
+    end
+
+    it "reconfirms materially changed pending evidence before recording fresh authorization" do
+      changed_ci = accelerated_rc_ci_snapshot.merge(
+        non_success: accelerated_rc_ci_snapshot.fetch(:non_success) + [{
+          name: "docs",
+          state: "queued",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/124"
+        }]
+      )
+      persisted_record = nil
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [],
+        local_release_tag_exists?: false,
+        run_accelerated_shakaperf_release_gate!: accelerated_rc_shakaperf_snapshot,
+        confirm_accelerated_rc_publication!: nil,
+        accelerated_rc_shakaperf_snapshot!: json_compatible_release_value(accelerated_rc_shakaperf_snapshot),
+        shakaperf_runtime_tree_fingerprint: "a" * 64,
+        fetch_release_tracker_issue!: nil
+      )
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!)
+        .and_return(accelerated_rc_ci_snapshot, changed_ci, changed_ci)
+      allow(self).to receive(:append_accelerated_rc_tracker_record!) do |record:, **|
+        persisted_record = record
+      end
+
+      authorize_accelerated_rc_publication!(
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        release_branch: "release/17.0.0",
+        candidate_sha: "f" * 40,
+        options: accelerated_rc_options,
+        approver: "justin808",
+        release_started_at: Time.utc(2026, 7, 14, 14),
+        tag: "v17.0.0.rc.10"
+      )
+
+      aggregate_failures do
+        expect(self).to have_received(:confirm_accelerated_rc_publication!).twice
+        expect(self).to have_received(:accelerated_rc_shakaperf_snapshot!).twice
+        expect(self).to have_received(:fetch_accelerated_rc_ci_snapshot!).exactly(3).times
+        expect(persisted_record.fetch("ci")).to eq(json_compatible_release_value(changed_ci))
+      end
+    end
+
+    it "does not reconfirm when pending CI checks only arrive in a different order" do
+      check_runs = [
+        {
+          "id" => 1,
+          "name" => "generator",
+          "status" => "in_progress",
+          "conclusion" => nil,
+          "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123"
+        },
+        {
+          "id" => 2,
+          "name" => "docs",
+          "status" => "queued",
+          "conclusion" => nil,
+          "html_url" => "https://github.com/shakacode/react_on_rails/actions/runs/124"
+        }
+      ]
+      snapshot_arguments = {
+        sha: "f" * 40,
+        repo_slug: "shakacode/react_on_rails",
+        statuses: []
+      }
+      snapshot_builder = Object.instance_method(:accelerated_rc_ci_snapshot).bind(self)
+      prompted_ci = snapshot_builder.call(**snapshot_arguments, check_runs:)
+      refreshed_ci = snapshot_builder.call(**snapshot_arguments, check_runs: check_runs.reverse)
+      allow(self).to receive(:confirm_accelerated_rc_publication!)
+      allow(self).to receive(:refresh_accelerated_rc_live_evidence!).and_return(
+        ci: refreshed_ci,
+        shakaperf: accelerated_rc_shakaperf_snapshot
+      )
+
+      evidence = confirmed_fresh_accelerated_rc_evidence!(
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        release_branch: "release/17.0.0",
+        candidate_sha: "f" * 40,
+        target_version: "17.0.0.rc.10",
+        tracker: 3823,
+        reason: accelerated_rc_options.fetch(:reason),
+        ci_snapshot: prompted_ci,
+        shakaperf: accelerated_rc_shakaperf_snapshot
+      )
+
+      aggregate_failures do
+        expect(self).to have_received(:confirm_accelerated_rc_publication!).once
+        expect(evidence.fetch(:ci)).to eq(prompted_ci)
+      end
+    end
+
+    it "refreshes live pending evidence before reusing persisted authorization" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        local_release_tag_exists?: false
+      )
+      expect(self).not_to receive(:run_accelerated_shakaperf_release_gate!)
+      allow(self).to receive(:accelerated_rc_shakaperf_snapshot!).with(
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        record: authorization
+      ).and_return(authorization.fetch("shakaperf"))
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).with(
+        repo_slug: "shakacode/react_on_rails",
+        sha: "f" * 40,
+        monorepo_root: "/tmp/repo",
+        ci_branch: "release/17.0.0"
+      ).and_return(accelerated_rc_ci_snapshot)
+      expect(self).not_to receive(:confirm_accelerated_rc_publication!)
+      expect(self).not_to receive(:shakaperf_runtime_tree_fingerprint)
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      result = nil
+      expect do
+        result = authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "another-maintainer",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+      end.to output(/Reusing canonical accelerated RC publication authorization/).to_stdout
+      expect(result).to eq(authorization)
+      expect(self).to have_received(:accelerated_rc_shakaperf_snapshot!)
+      expect(self).to have_received(:fetch_accelerated_rc_ci_snapshot!)
+    end
+
+    it "fails closed when persisted authorization refresh returns malformed exact-candidate CI" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        local_release_tag_exists?: false,
+        fetch_accelerated_rc_ci_snapshot!: {
+          status: "pending",
+          sha: "f" * 40,
+          non_success: nil
+        }
+      )
+      expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+
+      expect do
+        authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "another-maintainer",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /current exact-candidate CI.*malformed/i)
+    end
+
+    %w[failed missing stale unknown].each do |outcome|
+      it "blocks persisted authorization reuse when current exact-candidate CI is #{outcome}" do
+        authorization = build_accelerated_rc_publication_record(
+          options: accelerated_rc_options,
+          candidate_sha: "f" * 40,
+          runtime_tree_fingerprint: "a" * 64,
+          release_branch: "release/17.0.0",
+          ci_snapshot: accelerated_rc_ci_snapshot,
+          shakaperf: accelerated_rc_shakaperf_snapshot,
+          approved_by: "justin808",
+          recorded_at: Time.utc(2026, 7, 14, 13, 30)
+        )
+        current_ci = case outcome
+                     when "failed"
+                       accelerated_rc_ci_snapshot.merge(
+                         status: "failed",
+                         non_success: [
+                           accelerated_rc_ci_snapshot.fetch(:non_success).first.merge(state: "failure")
+                         ]
+                       )
+                     when "missing"
+                       accelerated_rc_ci_snapshot.merge(non_success: [])
+                     when "stale"
+                       accelerated_rc_ci_snapshot.merge(sha: "e" * 40)
+                     when "unknown"
+                       accelerated_rc_ci_snapshot.merge(
+                         status: "success",
+                         non_success: [
+                           accelerated_rc_ci_snapshot.fetch(:non_success).first.merge(state: "future_state")
+                         ]
+                       )
+                     end
+        allow(self).to receive_messages(
+          fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+          fetch_accelerated_rc_tracker_records!: [authorization],
+          local_release_tag_exists?: false,
+          fetch_accelerated_rc_ci_snapshot!: current_ci
+        )
+        expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+
+        expect do
+          authorize_accelerated_rc_publication!(
+            repo_slug: "shakacode/react_on_rails",
+            monorepo_root: "/tmp/repo",
+            release_branch: "release/17.0.0",
+            candidate_sha: "f" * 40,
+            options: accelerated_rc_options,
+            approver: "another-maintainer",
+            release_started_at: Time.utc(2026, 7, 14, 14),
+            tag: "v17.0.0.rc.10"
+          )
+        end.to raise_error(SystemExit, /current exact-candidate CI/i)
+      end
+    end
+
+    it "blocks persisted authorization reuse when refreshed ShakaPerf has failed" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        local_release_tag_exists?: false,
+        fetch_accelerated_rc_ci_snapshot!: accelerated_rc_ci_snapshot,
+        accelerated_rc_shakaperf_snapshot!: authorization.fetch("shakaperf").merge("status" => "failed")
+      )
+
+      expect do
+        authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "another-maintainer",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /current ShakaPerf evidence failed/i)
+    end
+
+    it "blocks persisted authorization reuse when an active ShakaPerf run has a terminal conclusion" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        local_release_tag_exists?: false,
+        fetch_accelerated_rc_ci_snapshot!: accelerated_rc_ci_snapshot,
+        refresh_shakaperf_release_gate_run!: {
+          "databaseId" => 123_456,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref: "release/17.0.0", head_sha: "f" * 40, target_version: "17.0.0.rc.10"
+          ),
+          "headSha" => "f" * 40,
+          "status" => "in_progress",
+          "conclusion" => "failure",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+        }
+      )
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        authorize_accelerated_rc_publication!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          release_branch: "release/17.0.0",
+          candidate_sha: "f" * 40,
+          options: accelerated_rc_options,
+          approver: "another-maintainer",
+          release_started_at: Time.utc(2026, 7, 14, 14),
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /active ShakaPerf run.*terminal conclusion/i)
+    end
+
+    it "blocks an untagged retry when a later valid authorization changes CI detail" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      ci = authorization.fetch("ci")
+      conflicting_authorization = authorization.merge(
+        "ci" => ci.merge(
+          "non_success" => [ci.fetch("non_success").first.merge("url" => "https://example.com/other-check")]
+        )
+      )
+      expect(validate_accelerated_rc_tracker_record!(conflicting_authorization)).to eq(conflicting_authorization)
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization, conflicting_authorization],
+        local_release_tag_exists?: false
+      )
+
+      expect do
+        accelerated_rc_publication_authorization_for_retry!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "blocks a tagged retry whose provenance names another immutable candidate" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: {
+          "target_version" => "17.0.0.rc.10",
+          "candidate_sha" => "e" * 40,
+          "release_tracker" => 3823,
+          "authorization_digest" => accelerated_rc_record_digest(authorization)
+        }
+      )
+
+      expect do
+        accelerated_rc_publication_authorization_for_retry!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /lacks matching canonical accelerated publication provenance/)
+    end
+
+    it "blocks a tagged retry when provenance selects the canonical first of conflicting authorizations" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      conflicting_authorization = authorization.merge("reason" => "Mutated authorization reason")
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization, conflicting_authorization],
+        local_release_tag_exists?: true,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization)
+      )
+
+      expect do
+        accelerated_rc_publication_authorization_for_retry!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "blocks a retry when accepted terminal records contradict each other" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      accepted = publication.merge(
+        "status" => "candidate-accepted",
+        "ci" => publication.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => publication.fetch("shakaperf").merge("status" => "success"),
+        "reason" => "All required evidence passed",
+        "required_follow_up" => "Proceed only through the strict final promotion gates.",
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      conflicting_accepted = accepted.merge("approved_by" => "other-maintainer")
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [
+          authorization, publication, accepted, conflicting_accepted
+        ],
+        local_release_tag_exists?: false
+      )
+
+      expect do
+        accelerated_rc_publication_authorization_for_retry!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /conflicting candidate-accepted terminal records/i)
+    end
+
+    it "round-trips canonical accelerated provenance through the annotated tag message" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+
+      provenance = accelerated_rc_tag_provenance_from_message(accelerated_rc_tag_message(record))
+
+      expect(provenance).to include(
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
+        "authorization_digest" => accelerated_rc_record_digest(record)
+      )
+    end
+
+    it "creates the annotated tag at the explicitly authorized candidate SHA" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive(:current_git_sha!).with("/tmp/repo").and_return("f" * 40)
+      expect(self).to receive(:sh_args_in_dir_for_release).with(
+        "/tmp/repo",
+        "git", "tag", "-a", "v17.0.0.rc.10", "f" * 40, "-m", accelerated_rc_tag_message(record)
+      )
+
+      create_accelerated_rc_tag!(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10", record:)
+    end
+
+    it "refuses tag creation when HEAD moved after publication authorization" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive(:current_git_sha!).with("/tmp/repo").and_return("e" * 40)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        create_accelerated_rc_tag!(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10", record:)
+      end.to raise_error(SystemExit, /HEAD moved after accelerated RC authorization/)
+    end
+
+    it "rejects an existing accelerated tag whose peeled target is not the authorized candidate" do
+      record = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      allow(self).to receive_messages(
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(record),
+        peeled_git_tag_sha: "e" * 40
+      )
+
+      expect do
+        validate_existing_accelerated_rc_tag!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          record:
+        )
+      end.to raise_error(SystemExit, /does not match the persisted accelerated publication authorization/)
+    end
+
+    it "rejects a mutated existing publication-complete record on retry" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      existing = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      ).merge("reason" => "Mutated after authorization")
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization, existing])
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "another-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      end.to raise_error(SystemExit, /not the canonical authorized transition/)
+    end
+
+    it "reuses the canonical publication-complete transition across trusted retry approvers" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      existing = accelerated_rc_published_record(
+        authorized_record: authorization,
+        approved_by: "first-completing-maintainer",
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization, existing])
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect(
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      ).to eq(existing)
+    end
+
+    it "rejects the complete publication set when a later same-identity record contradicts the canonical first" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        approved_by: "first-completing-maintainer",
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      mutated_publication = canonical_publication.merge(
+        "reason" => "Mutated after the canonical publication record"
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization, canonical_publication, mutated_publication])
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      end.to raise_error(SystemExit, /publication set.*not the canonical authorized transition/i)
+    end
+
+    it "rejects publication completion when a later authorization contradicts the canonical first" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      conflicting_authorization = authorization.merge("required_follow_up" => "Skip canonical publication")
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization, conflicting_authorization, canonical_publication])
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "treats every non-metadata publication mutation as contradictory" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      mutations = {
+        "reason" => canonical_publication.merge("reason" => "Changed reason"),
+        "required follow-up" => canonical_publication.merge("required_follow_up" => "Skip reconciliation"),
+        "CI status" => canonical_publication.merge(
+          "ci" => canonical_publication.fetch("ci").merge("status" => "failed")
+        ),
+        "CI checks URL" => canonical_publication.merge(
+          "ci" => canonical_publication.fetch("ci").merge("checks_url" => "https://example.com/other-checks")
+        ),
+        "CI non-success detail" => canonical_publication.merge(
+          "ci" => canonical_publication.fetch("ci").merge(
+            "non_success" => [{ "name" => "generator", "state" => "failure", "url" => "https://example.com/fail" }]
+          )
+        ),
+        "ShakaPerf status" => canonical_publication.merge(
+          "shakaperf" => canonical_publication.fetch("shakaperf").merge("status" => "failed")
+        ),
+        "ShakaPerf run URL" => canonical_publication.merge(
+          "shakaperf" => canonical_publication.fetch("shakaperf").merge("run_url" => "https://example.com/other-run")
+        ),
+        "evidence" => canonical_publication.merge("evidence" => { "unexpected" => "https://example.com" })
+      }
+
+      aggregate_failures do
+        mutations.each do |name, mutated_publication|
+          expect do
+            validated_accelerated_rc_publication_set!(
+              [authorization, canonical_publication, mutated_publication], authorization
+            )
+          end.to raise_error(
+            SystemExit,
+            /publication set.*not the canonical authorized transition/i
+          ), name
+        end
+      end
+    end
+
+    it "treats every distinct valid authorization digest as conflicting" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      ci = authorization.fetch("ci")
+      shakaperf = authorization.fetch("shakaperf")
+      mutations = {
+        "reason" => authorization.merge("reason" => "Changed authorization reason"),
+        "required follow-up" => authorization.merge("required_follow_up" => "Changed required follow-up"),
+        "CI status" => authorization.merge("ci" => ci.merge("status" => "success", "non_success" => [])),
+        "CI checks URL" => authorization.merge(
+          "ci" => ci.merge("checks_url" => "https://example.com/other-checks")
+        ),
+        "CI check detail" => authorization.merge(
+          "ci" => ci.merge(
+            "non_success" => [ci.fetch("non_success").first.merge("name" => "mutated-generator")]
+          )
+        ),
+        "ShakaPerf status" => authorization.merge("shakaperf" => shakaperf.merge("status" => "success")),
+        "ShakaPerf run URL" => authorization.merge(
+          "shakaperf" => shakaperf.merge("run_url" => "https://example.com/other-run")
+        ),
+        "ShakaPerf attempt" => authorization.merge("shakaperf" => shakaperf.merge("attempt" => 2)),
+        "ShakaPerf candidate identity" => authorization.merge(
+          "shakaperf" => shakaperf.merge("candidate_sha" => "e" * 40)
+        ),
+        "runtime fingerprint" => authorization.merge("runtime_tree_fingerprint" => "b" * 64),
+        "approver metadata" => authorization.merge("approved_by" => "another-maintainer"),
+        "recorded-at metadata" => authorization.merge("recorded_at" => "2026-07-14T13:31:00Z")
+      }
+
+      aggregate_failures do
+        mutations.each do |name, conflicting_authorization|
+          expect(validate_accelerated_rc_tracker_record!(conflicting_authorization)).to eq(
+            conflicting_authorization
+          ), name
+          expect do
+            validated_accelerated_rc_authorization_set!(
+              [authorization, conflicting_authorization], selected_authorization: authorization
+            )
+          end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i), name
+        end
+      end
+    end
+
+    it "allows exact duplicate authorization copies to remain idempotent" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      duplicate = JSON.parse(JSON.generate(authorization))
+
+      expect(
+        validated_accelerated_rc_authorization_set!(
+          [authorization, duplicate], selected_authorization: authorization
+        )
+      ).to eq(authorization)
+    end
+
+    it "rejects mutated publication-complete state before an interrupted retry republishes" do
+      authorization = build_accelerated_rc_publication_record(
+        options: accelerated_rc_options,
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: accelerated_rc_ci_snapshot,
+        shakaperf: accelerated_rc_shakaperf_snapshot,
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+      mutated_publication = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      ).merge("required_follow_up" => "Skip reconciliation")
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization, mutated_publication],
+        local_release_tag_exists?: false
+      )
+
+      expect do
+        accelerated_rc_publication_authorization_for_retry!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /not the canonical authorized transition/)
+    end
+  end
+
+  describe "#confirm_accelerated_rc_publication!" do
+    it "names the exact candidate, tracker, non-success checks, ShakaPerf run, and reason" do
+      allow($stdin).to receive(:gets).and_return("y\n")
+      ci = {
+        status: "pending",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: [
+          {
+            name: "generator-1",
+            state: "in_progress",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/1"
+          }
+        ]
+      }
+      shakaperf = {
+        status: "pending",
+        run_id: 123_456,
+        run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+
+      expect do
+        confirm_accelerated_rc_publication!(
+          version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          tracker: 3823,
+          reason: "Start fleet QA now",
+          ci_snapshot: ci,
+          shakaperf:
+        )
+      end.to output(
+        %r{17\.0\.0\.rc\.10.*#{'f' * 40}.*#3823.*generator-1.*actions/runs/1.*actions/runs/123456.*Start fleet QA now}m
+      ).to_stdout
+    end
+  end
+
+  describe "#accelerated_rc_shakaperf_requires_prerun?" do
+    it "distinguishes a runtime-equivalent pre-run from an exact-candidate run" do
+      exact_record = {
+        "candidate_sha" => "f" * 40,
+        "shakaperf" => { "candidate_sha" => "f" * 40 }
+      }
+      prerun_record = {
+        "candidate_sha" => "f" * 40,
+        "shakaperf" => { "candidate_sha" => "e" * 40 }
+      }
+
+      expect(accelerated_rc_shakaperf_requires_prerun?(exact_record)).to be(false)
+      expect(accelerated_rc_shakaperf_requires_prerun?(prerun_record)).to be(true)
+    end
+  end
+
+  describe "#reconcile_accelerated_rc_record" do
+    let(:published_record) do
+      {
+        "schema_version" => 1,
+        "status" => "published-awaiting-gates",
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "runtime_tree_fingerprint" => "a" * 64,
+        "release_branch" => "release/17.0.0",
+        "release_tracker" => 3823,
+        "ci" => { "status" => "pending" },
+        "shakaperf" => { "status" => "pending" },
+        "reason" => "Start fleet QA now",
+        "approved_by" => "justin808",
+        "recorded_at" => "2026-07-14T13:30:00Z",
+        "evidence" => {}
+      }
+    end
+
+    it "records candidate-accepted only after every deferred and downstream gate is evidenced" do
+      record = reconcile_accelerated_rc_record(
+        published_record:,
+        ci_snapshot: { "status" => "success", "checks_url" => "https://github.com/checks" },
+        shakaperf: { "status" => "success", "run_url" => "https://github.com/shakaperf" },
+        evidence: {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        },
+        approved_by: "justin808",
+        reason: "All RC gates and published-artifact checks passed",
+        recorded_at: "2026-07-14T15:00:00Z"
+      )
+
+      expect(record).to include(
+        "status" => "candidate-accepted",
+        "candidate_sha" => "f" * 40,
+        "approved_by" => "justin808",
+        "required_follow_up" => /strict final promotion gates/i
+      )
+      expect(record.fetch("evidence").keys).to contain_exactly("demo_fleet", "behavioral", "artifacts")
+    end
+
+    it "records candidate-rejected with do-not-promote guidance after a relevant late failure" do
+      record = reconcile_accelerated_rc_record(
+        published_record:,
+        ci_snapshot: { "status" => "failed", "checks_url" => "https://github.com/checks" },
+        shakaperf: { "status" => "success", "run_url" => "https://github.com/shakaperf" },
+        evidence: {},
+        approved_by: "justin808",
+        reason: "Generator validation failed on the published candidate",
+        recorded_at: "2026-07-14T15:00:00Z"
+      )
+
+      expect(record).to include(
+        "status" => "candidate-rejected",
+        "candidate_sha" => "f" * 40,
+        "required_follow_up" => /Do not promote.*cut the next RC/i
+      )
+    end
+
+    it "does not accept syntactically incomplete HTTPS evidence URLs" do
+      expect do
+        reconcile_accelerated_rc_record(
+          published_record:,
+          ci_snapshot: { "status" => "success", "checks_url" => "https://github.com/checks" },
+          shakaperf: { "status" => "success", "run_url" => "https://github.com/shakaperf" },
+          evidence: {
+            "demo_fleet" => "https://",
+            "behavioral" => "https://github.com/behavioral",
+            "artifacts" => "https://github.com/artifacts"
+          },
+          approved_by: "justin808",
+          reason: "All RC gates and published-artifact checks passed",
+          recorded_at: "2026-07-14T15:00:00Z"
+        )
+      end.to raise_error(SystemExit, /required gate evidence is incomplete/)
+    end
+  end
+
+  describe "#accelerated_rc_shakaperf_snapshot!" do
+    it "fails closed when the refreshed pending run no longer matches the recorded candidate" do
+      record = {
+        "candidate_sha" => "f" * 40,
+        "release_branch" => "release/17.0.0",
+        "shakaperf" => {
+          "status" => "pending",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        }
+      }
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "in_progress",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      )
+
+      expect do
+        accelerated_rc_shakaperf_snapshot!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          record:
+        )
+      end.to raise_error(SystemExit, /run identity is unknown or malformed/)
+    end
+
+    it "keeps an unknown completed conclusion unresolved instead of rejecting the immutable RC" do
+      record = {
+        "candidate_sha" => "f" * 40,
+        "release_branch" => "release/17.0.0",
+        "shakaperf" => {
+          "status" => "pending",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        }
+      }
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "f" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "f" * 40,
+        "status" => "completed",
+        "conclusion" => "unrecognized",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      )
+
+      expect do
+        accelerated_rc_shakaperf_snapshot!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          record:
+        )
+      end.to raise_error(SystemExit, /reconciliation is unknown.*refusing to accept or reject/i)
+    end
+
+    it "fails closed when the refreshed run attempt differs from the authorized attempt" do
+      record = {
+        "candidate_sha" => "f" * 40,
+        "release_branch" => "release/17.0.0",
+        "shakaperf" => {
+          "status" => "pending",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        }
+      }
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(
+        "databaseId" => 123_456,
+        "attempt" => 2,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "f" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "f" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      )
+
+      expect do
+        accelerated_rc_shakaperf_snapshot!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          record:
+        )
+      end.to raise_error(SystemExit, /run identity is unknown or malformed/)
+    end
+  end
+
+  describe "#run_accelerated_rc_reconciliation!" do
+    let(:authorization_record) do
+      build_accelerated_rc_publication_record(
+        options: {
+          target_gem_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: "Start fleet QA now"
+        },
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: {
+          status: "pending",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [
+            {
+              name: "generator",
+              state: "in_progress",
+              url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+            }
+          ]
+        },
+        shakaperf: {
+          status: "pending",
+          run_id: 123_456,
+          attempt: 1,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: "2026-07-14T13:00:00Z"
+        },
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+    end
+
+    let(:published_record) do
+      accelerated_rc_published_record(
+        authorized_record: authorization_record,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+    end
+
+    let(:accepted_record) do
+      published_record.merge(
+        "status" => "candidate-accepted",
+        "ci" => published_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => published_record.fetch("shakaperf").merge("status" => "success"),
+        "reason" => "All required evidence passed",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "required_follow_up" => "Proceed only through the strict final promotion gates.",
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+    end
+
+    before do
+      allow(self).to receive_messages(
+        fetch_release_tracker_issue!: nil,
+        current_release_approver!: "justin808",
+        fetch_accelerated_rc_tracker_records!: [authorization_record, published_record]
+      )
+    end
+
+    it "is idempotent after a terminal tracker record and does not re-query deferred gates" do
+      retry_equivalent_accepted = accepted_record.merge("recorded_at" => "2026-07-14T15:01:00Z")
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization_record, published_record, accepted_record, retry_equivalent_accepted])
+      expect(self).not_to receive(:fetch_accelerated_rc_ci_snapshot!)
+      expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        expect(
+          run_accelerated_rc_reconciliation!(
+            repo_slug: "shakacode/react_on_rails",
+            monorepo_root: "/tmp/repo",
+            tracker: 3823,
+            target_version: "17.0.0.rc.10",
+            reason: "All required evidence passed",
+            evidence: {}
+          )
+        ).to eq(accepted_record)
+      end.to output(/already terminal.*candidate-accepted/i).to_stdout
+    end
+
+    it "rejects out-of-order candidate histories before reconciliation consumes terminal state" do
+      publication_after_terminal = published_record.merge(
+        "approved_by" => "retrying-maintainer",
+        "recorded_at" => "2026-07-14T15:01:00Z"
+      )
+      histories = {
+        "publication before authorization" => [published_record, authorization_record],
+        "acceptance before publication" => [authorization_record, accepted_record, published_record],
+        "pending publication after terminal" => [
+          authorization_record, published_record, accepted_record, publication_after_terminal
+        ]
+      }
+
+      aggregate_failures do
+        histories.each do |name, records|
+          expect do
+            accelerated_rc_published_record!(records:, target_version: "17.0.0.rc.10")
+          end.to raise_error(SystemExit, /transition order/i), name
+        end
+      end
+    end
+
+    it "rejects non-monotonic candidate transition timestamps" do
+      early_publication = published_record.merge("recorded_at" => "2026-07-14T13:00:00Z")
+
+      expect do
+        accelerated_rc_published_record!(
+          records: [authorization_record, early_publication],
+          target_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /timestamps.*monotonic/i)
+    end
+
+    it "fails closed when reconciliation sees conflicting accepted terminal records" do
+      conflicting_accepted = accepted_record.merge("reason" => "Different claimed acceptance basis")
+      expect(validate_accelerated_rc_tracker_record!(accepted_record)).to eq(accepted_record)
+      expect(validate_accelerated_rc_tracker_record!(conflicting_accepted)).to eq(conflicting_accepted)
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return(
+        [authorization_record, published_record, accepted_record, conflicting_accepted]
+      )
+      expect(self).not_to receive(:fetch_accelerated_rc_ci_snapshot!)
+      expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "All required evidence passed",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /conflicting candidate-accepted terminal records/i)
+    end
+
+    it "records a known late failure as rejected before stopping promotion" do
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).and_return(
+        status: "failed",
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks"
+      )
+      expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+      expect(self).to receive(:append_accelerated_rc_tracker_record!) do |record:, **|
+        expect(record["status"]).to eq("candidate-rejected")
+      end
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Exact-head generator CI failed",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /Do not promote.*cut the next RC/i)
+    end
+
+    it "cannot append acceptance when concurrent reconciliation has already rejected the candidate" do
+      rejected_record = published_record.merge(
+        "status" => "candidate-rejected",
+        "ci" => published_record.fetch("ci").merge(
+          "status" => "failed",
+          "non_success" => [
+            { "name" => "generator", "state" => "failure", "url" => "https://example.com/failure" }
+          ]
+        ),
+        "reason" => "Concurrent reconciliation found failed CI",
+        "recorded_at" => "2026-07-14T14:55:00Z",
+        "required_follow_up" => "Do not promote this immutable RC; fix the failure and cut the next RC."
+      )
+      expect(validate_accelerated_rc_tracker_record!(rejected_record)).to eq(rejected_record)
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return(
+        [authorization_record, published_record],
+        [authorization_record, published_record],
+        [authorization_record, published_record, rejected_record]
+      )
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_ci_snapshot!: {
+          status: "success",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: []
+        },
+        accelerated_rc_shakaperf_snapshot!: published_record.fetch("shakaperf").merge("status" => "success")
+      )
+      expect(self).to receive(:post_release_tracker_comment!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "All required evidence passed",
+          evidence: {
+            "demo_fleet" => "https://github.com/demo-fleet",
+            "behavioral" => "https://github.com/behavioral",
+            "artifacts" => "https://github.com/artifacts"
+          }
+        )
+      end.to raise_error(SystemExit, /permanently rejected.*absorbing/i)
+    end
+
+    it "blocks reconciliation when the canonical publication transition is missing" do
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization_record])
+      expect(self).not_to receive(:fetch_accelerated_rc_ci_snapshot!)
+      expect(self).not_to receive(:accelerated_rc_shakaperf_snapshot!)
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "All required evidence passed",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /No published-awaiting-gates record exists/)
+    end
+
+    it "blocks reconciliation when a later authorization contradicts the canonical first" do
+      conflicting_authorization = authorization_record.merge(
+        "shakaperf" => authorization_record.fetch("shakaperf").merge(
+          "status" => "success",
+          "run_url" => "https://example.com/mutated-run"
+        )
+      )
+      expect(validate_accelerated_rc_tracker_record!(conflicting_authorization)).to eq(conflicting_authorization)
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [
+          authorization_record, conflicting_authorization, published_record
+        ],
+        fetch_accelerated_rc_ci_snapshot!: {
+          status: "success",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: []
+        },
+        accelerated_rc_shakaperf_snapshot!: {
+          "status" => "success",
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+        },
+        append_accelerated_rc_tracker_record!: nil
+      )
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "All required evidence passed",
+          evidence: {
+            "demo_fleet" => "https://github.com/demo-fleet",
+            "behavioral" => "https://github.com/behavioral",
+            "artifacts" => "https://github.com/artifacts"
+          }
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "rejects a later contradictory publication record before reconciliation accepts the candidate" do
+      mutated_publication = published_record.merge("reason" => "Mutated after the canonical publication record")
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record, published_record, mutated_publication],
+        fetch_accelerated_rc_ci_snapshot!: {
+          status: "success",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: []
+        },
+        accelerated_rc_shakaperf_snapshot!: {
+          "status" => "success",
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+        },
+        append_accelerated_rc_tracker_record!: nil
+      )
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "All required evidence passed",
+          evidence: {
+            "demo_fleet" => "https://github.com/demo-fleet",
+            "behavioral" => "https://github.com/behavioral",
+            "artifacts" => "https://github.com/artifacts"
+          }
+        )
+      end.to raise_error(SystemExit, /publication set.*not the canonical authorized transition/i)
+    end
+  end
+
+  describe "#accepted_accelerated_rc_record_for_release_branch_promotion!" do
+    it "rejects cross-tracker exact-candidate history during final promotion" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      conflicting_authorization = accelerated_rc_test_authorization(tracker: 3824)
+      provenance = accelerated_rc_tag_provenance(authorization)
+      allow(self).to receive_messages(
+        accelerated_rc_tag_provenance_for_tag!: provenance,
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_release_tracker_issue!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: [
+          authorization, publication, accepted, conflicting_authorization
+        ],
+        fetch_accelerated_rc_tracker_records!: [authorization, publication, accepted],
+        peeled_git_tag_sha: "f" * 40,
+        shakaperf_runtime_tree_fingerprint: "a" * 64
+      )
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: "3823"
+        )
+      end.to raise_error(SystemExit, /repository-wide.*tracker|conflicting release trackers/i)
+    end
+
+    it "requires the literal canonical tag name for accelerated provenance" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      provenance = accelerated_rc_tag_provenance(authorization)
+      allow(self).to receive_messages(
+        accelerated_rc_tag_provenance_for_tag!: provenance,
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_release_tracker_issue!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
+        fetch_accelerated_rc_tracker_records!: [authorization, publication, accepted],
+        peeled_git_tag_sha: "f" * 40,
+        shakaperf_runtime_tree_fingerprint: "a" * 64
+      )
+
+      aggregate_failures do
+        ["v17.0.0-rc.10", "v17.0.0.RC.10"].each do |alias_tag|
+          expect do
+            accepted_accelerated_rc_record_for_release_branch_promotion!(
+              monorepo_root: "/tmp/repo",
+              rc_tag: alias_tag,
+              final_head_sha: "f" * 40,
+              tracker_input: "3823"
+            )
+          end.to raise_error(SystemExit, /literal canonical accelerated RC tag.*v17\.0\.0\.rc\.10/i), alias_tag
+        end
+
+        expect(
+          accepted_accelerated_rc_record_for_release_branch_promotion!(
+            monorepo_root: "/tmp/repo",
+            rc_tag: "v17.0.0.rc.10",
+            final_head_sha: "f" * 40,
+            tracker_input: "3823"
+          )
+        ).to eq(accepted)
+      end
+    end
+
+    it "does not require a tracker for an ordinary lightweight RC tag" do
+      status = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
+        .and_return(["commit\n", status])
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10").and_return("f" * 40)
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      ).and_return([])
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
+      expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
+
+      result = accepted_accelerated_rc_record_for_release_branch_promotion!(
+        monorepo_root: "/tmp/repo",
+        rc_tag: "v17.0.0.rc.10",
+        final_head_sha: "f" * 40,
+        tracker_input: nil
+      )
+
+      expect(result).to be_nil
+      expect(self).to have_received(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      )
+    end
+
+    it "blocks a lightweight RC tag when durable accelerated history exists for the exact candidate" do
+      status = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
+        .and_return(["commit\n", status])
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:peeled_git_tag_sha)
+        .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10").and_return("f" * 40)
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!).with(
+        repo_slug: "shakacode/react_on_rails",
+        target_version: "17.0.0.rc.10",
+        candidate_sha: "f" * 40
+      ).and_return(
+        [{ "status" => "publication-authorized", "release_tracker" => 3823 }]
+      )
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
+      expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: nil
+        )
+      end.to raise_error(SystemExit, /lightweight RC tag.*durable accelerated history/i)
+    end
+
+    it "blocks a markerless annotated RC tag even when no tracker is supplied" do
+      status = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
+        .and_return(["tag\n", status])
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/v17.0.0.rc.10"
+        ).and_return(["Ordinary-looking annotation without canonical provenance\n", status])
+      expect(self).not_to receive(:github_repo_slug)
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: nil
+        )
+      end.to raise_error(SystemExit, /annotated RC tag.*lacks canonical accelerated provenance/i)
+    end
+
+    it "blocks a markerless annotated RC tag when an explicit tracker is supplied" do
+      status = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
+        .and_return(["tag\n", status])
+      allow(Open3).to receive(:capture2e)
+        .with(
+          "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/v17.0.0.rc.10"
+        ).and_return(["Ordinary-looking annotation without canonical provenance\n", status])
+      expect(self).not_to receive(:github_repo_slug)
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
+      expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: "3823"
+        )
+      end.to raise_error(SystemExit, /annotated RC tag.*lacks canonical accelerated provenance/i)
+    end
+
+    it "blocks when the RC tag object type cannot be determined" do
+      status = instance_double(Process::Status, success?: false)
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
+        .and_return(["fatal: object unavailable\n", status])
+      expect(self).not_to receive(:github_repo_slug)
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: nil
+        )
+      end.to raise_error(SystemExit, /Unable to inspect RC tag provenance.*object unavailable/i)
+    end
+
+    it "requires the tracker encoded by an accelerated RC tag" do
+      allow(self).to receive(:accelerated_rc_tag_provenance_for_tag!).and_return(
+        "target_version" => "17.0.0.rc.10",
+        "release_tracker" => 3823
+      )
+      expect(self).not_to receive(:github_repo_slug)
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: "3824"
+        )
+      end.to raise_error(SystemExit, /RELEASE_TRACKER must match the canonical tracker/)
+    end
+  end
+
+  describe "#accepted_accelerated_rc_record_for_promotion!" do
+    let(:authorization_record) do
+      build_accelerated_rc_publication_record(
+        options: {
+          target_gem_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: "Start fleet QA now"
+        },
+        candidate_sha: "f" * 40,
+        runtime_tree_fingerprint: "a" * 64,
+        release_branch: "release/17.0.0",
+        ci_snapshot: {
+          status: "pending",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [
+            {
+              name: "generator",
+              state: "in_progress",
+              url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+            }
+          ]
+        },
+        shakaperf: {
+          status: "pending",
+          run_id: 123_456,
+          attempt: 1,
+          run_url: "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          candidate_sha: "f" * 40,
+          target_version: "17.0.0.rc.10",
+          release_started_at: "2026-07-14T13:00:00Z"
+        },
+        approved_by: "justin808",
+        recorded_at: Time.utc(2026, 7, 14, 13, 30)
+      )
+    end
+
+    let(:tag_provenance) do
+      {
+        "schema_version" => 1,
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
+        "authorization_digest" => accelerated_rc_record_digest(authorization_record)
+      }
+    end
+
+    let(:canonical_publication) do
+      accelerated_rc_published_record(
+        authorized_record: authorization_record,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+    end
+
+    it "blocks final promotion while accelerated RC evidence is unresolved" do
+      expect(self).not_to receive(:shakaperf_runtime_tree_fingerprint)
+
+      %w[publication-authorized published-awaiting-gates].each do |status|
+        pending_record = if status == "publication-authorized"
+                           authorization_record
+                         else
+                           accelerated_rc_published_record(
+                             authorized_record: authorization_record,
+                             recorded_at: Time.utc(2026, 7, 14, 14)
+                           )
+                         end
+        records = status == "publication-authorized" ? [authorization_record] : [authorization_record, pending_record]
+        expected_error = if status == "publication-authorized"
+                           /canonical published-awaiting-gates transition is missing/i
+                         else
+                           /pending, rejected, or unreconciled evidence/
+                         end
+
+        expect do
+          accepted_accelerated_rc_record_for_promotion!(
+            records:,
+            rc_version: "17.0.0.rc.10",
+            rc_sha: "f" * 40,
+            final_head_sha: "f" * 40,
+            monorepo_root: "/tmp/repo",
+            tag_provenance:
+          )
+        end.to raise_error(SystemExit, expected_error)
+      end
+    end
+
+    it "blocks when canonical tag provenance has no matching authorization record" do
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /canonical accelerated RC publication authorization is missing/)
+    end
+
+    it "blocks tracker records whose RC tag lacks canonical accelerated provenance" do
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance: nil
+        )
+      end.to raise_error(SystemExit, /RC tag lacks canonical accelerated-publication provenance/)
+    end
+
+    it "treats candidate-rejected as absorbing even if a later accepted record exists" do
+      rejected = authorization_record.merge("status" => "candidate-rejected")
+      accepted = rejected.merge("status" => "candidate-accepted")
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, rejected, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /permanently rejected/)
+    end
+
+    it "fails closed when final promotion sees conflicting accepted terminal records" do
+      accepted = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "reason" => "All required evidence passed",
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      conflicting_accepted = accepted.merge("approved_by" => "other-maintainer")
+      expect(validate_accelerated_rc_tracker_record!(accepted)).to eq(accepted)
+      expect(validate_accelerated_rc_tracker_record!(conflicting_accepted)).to eq(conflicting_accepted)
+      expect(self).not_to receive(:shakaperf_runtime_tree_fingerprint)
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, accepted, conflicting_accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /conflicting candidate-accepted terminal records/i)
+    end
+
+    it "blocks terminal tracker state that mutates authorization-bound evidence" do
+      accepted = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "release_branch" => "release/tampered"
+      )
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /tracker state is not bound to the canonical publication authorization/)
+    end
+
+    it "blocks final promotion when the canonical publication transition is missing" do
+      accepted = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      expect(self).not_to receive(:shakaperf_runtime_tree_fingerprint)
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /canonical published-awaiting-gates transition is missing/i)
+    end
+
+    it "blocks final promotion when tag provenance selects the canonical first of conflicting authorizations" do
+      conflicting_authorization = authorization_record.merge("reason" => "Mutated authorization reason")
+      expect(validate_accelerated_rc_tracker_record!(conflicting_authorization)).to eq(conflicting_authorization)
+      accepted = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, conflicting_authorization, canonical_publication, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /conflicting canonical publication authorizations/i)
+    end
+
+    it "blocks final promotion when a later publication record contradicts the canonical first" do
+      canonical_publication = accelerated_rc_published_record(
+        authorized_record: authorization_record,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      mutated_publication = canonical_publication.merge(
+        "ci" => canonical_publication.fetch("ci").merge(
+          "status" => "failed",
+          "non_success" => [{ "name" => "generator", "state" => "failure", "url" => "https://example.com/fail" }]
+        )
+      )
+      accepted = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, mutated_publication, accepted],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /publication set.*not the canonical authorized transition/i)
+    end
+
+    it "reuses accepted evidence bound to the exact RC candidate SHA" do
+      record = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+
+      expect(
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, record],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "f" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      ).to eq(record)
+    end
+
+    it "reuses accepted evidence for a mechanically runtime-equivalent final tip" do
+      record = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "e" * 40).and_return("a" * 64)
+      allow(self).to receive(:release_branch_commits_after_rc_tag).with(
+        monorepo_root: "/tmp/repo",
+        tag_sha: "f" * 40,
+        head_sha: "e" * 40
+      ).and_return(status: :non_runtime_only, commits: ["metadata-only-sha"])
+
+      expect(
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, record],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "e" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      ).to eq(record)
+    end
+
+    it "blocks accepted evidence when the final tip changes the runtime tree" do
+      record = authorization_record.merge(
+        "status" => "candidate-accepted",
+        "recorded_at" => "2026-07-14T15:00:00Z",
+        "ci" => authorization_record.fetch("ci").merge("status" => "success", "non_success" => []),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("status" => "success"),
+        "evidence" => {
+          "demo_fleet" => "https://github.com/demo-fleet",
+          "behavioral" => "https://github.com/behavioral",
+          "artifacts" => "https://github.com/artifacts"
+        }
+      )
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "f" * 40).and_return("a" * 64)
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint)
+        .with(monorepo_root: "/tmp/repo", sha: "e" * 40).and_return("b" * 64)
+
+      expect do
+        accepted_accelerated_rc_record_for_promotion!(
+          records: [authorization_record, canonical_publication, record],
+          rc_version: "17.0.0.rc.10",
+          rc_sha: "f" * 40,
+          final_head_sha: "e" * 40,
+          monorepo_root: "/tmp/repo",
+          tag_provenance:
+        )
+      end.to raise_error(SystemExit, /not runtime-equivalent/)
+    end
+  end
+
+  describe "#refresh_accepted_rc_ci_evidence_for_promotion!" do
+    let(:record) { { "candidate_sha" => "f" * 40 } }
+
+    it "requires a fresh successful exact-candidate CI snapshot before final promotion" do
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).and_return(
+        status: "success",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: []
+      )
+
+      expect(
+        refresh_accepted_rc_ci_evidence_for_promotion!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          ci_branch: "release/17.0.0",
+          record:
+        )
+      ).to include(status: "success", sha: "f" * 40)
+    end
+
+    it "blocks when the refreshed exact-candidate CI is still pending" do
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).and_return(
+        status: "pending",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: []
+      )
+
+      expect do
+        refresh_accepted_rc_ci_evidence_for_promotion!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          ci_branch: "release/17.0.0",
+          record:
+        )
+      end.to raise_error(SystemExit, /refreshed exact-RC CI is failed, pending/)
+    end
+  end
+
+  describe "#validate_final_promotion_ci_publication_boundary!" do
+    let(:candidate_sha) { "f" * 40 }
+    let(:record) { { "candidate_sha" => candidate_sha } }
+    let(:promotion_branch) { "release/17.0.0" }
+    let(:checks) do
+      [
+        {
+          name: "generator",
+          state: "skipped",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/123"
+        },
+        {
+          name: "docs",
+          state: "neutral",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/124"
+        }
+      ]
+    end
+    let(:expected_snapshot) do
+      {
+        status: "success",
+        sha: candidate_sha,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{candidate_sha}/checks",
+        non_success: checks
+      }
+    end
+    let(:context) do
+      {
+        record:,
+        ci_branch: promotion_branch,
+        ci_snapshot: json_compatible_release_value(expected_snapshot)
+      }
+    end
+
+    before do
+      allow(self).to receive(:github_repo_slug).and_return("shakacode/react_on_rails")
+    end
+
+    it "accepts the same logical non-success checks in a different order" do
+      refreshed_snapshot = expected_snapshot.merge(non_success: checks.reverse)
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).and_return(refreshed_snapshot)
+
+      expect(
+        validate_final_promotion_ci_publication_boundary!(
+          monorepo_root: "/tmp/repo", context:, phase: "package publication"
+        )
+      ).to eq(refreshed_snapshot)
+    end
+
+    it "blocks a real non-success check identity change" do
+      changed_checks = checks.map(&:dup)
+      changed_checks.first[:url] = "https://github.com/shakacode/react_on_rails/actions/runs/999"
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!).and_return(
+        expected_snapshot.merge(non_success: changed_checks)
+      )
+
+      expect do
+        validate_final_promotion_ci_publication_boundary!(
+          monorepo_root: "/tmp/repo", context:, phase: "package publication"
+        )
+      end.to raise_error(SystemExit, /materially changed exact-candidate CI evidence/)
+    end
+  end
+
+  describe "#run_accepted_rc_final_promotion_gates!" do
+    let(:accepted_record) do
+      {
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "runtime_tree_fingerprint" => "a" * 64,
+        "release_branch" => "release/17.0.0",
+        "shakaperf" => {
+          "status" => "success",
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "candidate_sha" => "f" * 40,
+          "target_version" => "17.0.0.rc.10",
+          "release_started_at" => "2026-07-14T13:00:00Z"
+        }
+      }
+    end
+
+    let(:gate_arguments) do
+      {
+        repo_slug: "shakacode/react_on_rails",
+        monorepo_root: "/tmp/repo",
+        current_branch: "release/17.0.0",
+        rc_tag: "v17.0.0.rc.10",
+        tracker_input: "3823",
+        final_head_sha: "e" * 40,
+        record: accepted_record,
+        target_version: "17.0.0",
+        release_started_at: Time.utc(2026, 7, 14, 14),
+        allow_ci_override: false,
+        dry_run: false
+      }
+    end
+
+    let(:successful_final_ci_snapshot) do
+      {
+        status: "success",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: []
+      }
+    end
+
+    let(:strict_final_shakaperf_run) do
+      {
+        "databaseId" => 654_321,
+        "attempt" => 1,
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+      }
+    end
+
+    let(:strict_final_shakaperf_snapshot) do
+      {
+        status: "success",
+        run_id: 654_321,
+        attempt: 1,
+        run_url: strict_final_shakaperf_run.fetch("url"),
+        candidate_sha: "e" * 40,
+        target_version: "17.0.0",
+        release_started_at: "2026-07-14T14:00:00Z"
+      }
+    end
+
+    before do
+      allow(self).to receive_messages(
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        current_git_sha!: "e" * 40,
+        github_repo_slug: "shakacode/react_on_rails",
+        accelerated_shakaperf_snapshot: strict_final_shakaperf_snapshot
+      )
+    end
+
+    it "aborts post-bump runtime drift instead of falling back to a fresh ShakaPerf gate" do
+      allow(self).to receive(:accelerated_rc_runtime_equivalent?).and_return(false)
+      expect(self).not_to receive(:refresh_accepted_rc_ci_evidence_for_promotion!)
+      expect(self).not_to receive(:reuse_accepted_rc_shakaperf_evidence!)
+      expect(self).not_to receive(:run_shakaperf_release_gate!)
+      expect(self).not_to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!)
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /post-bump.*runtime.*new accepted RC/i)
+    end
+
+    it "reuses accepted evidence only after content-validating version-only finalization commits" do
+      allow(self).to receive(:shakaperf_runtime_tree_fingerprint).and_return("a" * 64)
+      allow(self).to receive(:release_branch_commits_after_rc_tag).with(
+        monorepo_root: "/tmp/repo",
+        tag_sha: "f" * 40,
+        head_sha: "e" * 40
+      ).and_return(status: :non_runtime_only, commits: ["version-only-sha"])
+      allow(self).to receive_messages(
+        refresh_accepted_rc_ci_evidence_for_promotion!: successful_final_ci_snapshot,
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: accepted_record
+      )
+
+      expect(run_accepted_rc_final_promotion_gates!(**gate_arguments)).to include(candidate_sha: "e" * 40)
+    end
+
+    it "blocks dependency and lockfile drift even when the coarse runtime fingerprints still match" do
+      allow(self).to receive_messages(
+        shakaperf_runtime_tree_fingerprint: "a" * 64,
+        refresh_accepted_rc_ci_evidence_for_promotion!: nil,
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: accepted_record
+      )
+
+      aggregate_failures do
+        {
+          "package.json dependency drift" => "package-dependency-sha",
+          "Gemfile.lock dependency drift" => "lockfile-dependency-sha"
+        }.each do |description, sha|
+          allow(self).to receive(:release_branch_commits_after_rc_tag).and_return(
+            status: :runtime_bearing,
+            commits: [sha]
+          )
+
+          expect do
+            run_accepted_rc_final_promotion_gates!(**gate_arguments)
+          end.to raise_error(SystemExit, /post-bump.*runtime.*new accepted RC/i), description
+        end
+      end
+    end
+
+    it "re-fetches tracker state after the final gate and blocks a newly appended rejection" do
+      allow(self).to receive(:accelerated_rc_runtime_equivalent?).and_return(true)
+      expect(self).to receive(:refresh_accepted_rc_ci_evidence_for_promotion!).ordered
+                                                                              .and_return(successful_final_ci_snapshot)
+      expect(self).to receive(:reuse_accepted_rc_shakaperf_evidence!).ordered.and_return(false)
+      expect(self).to receive(:run_shakaperf_release_gate!).ordered.and_return(strict_final_shakaperf_run)
+      expect(self).to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!).ordered.and_raise(
+        SystemExit, "Final promotion is blocked: RC was permanently rejected"
+      )
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /permanently rejected/)
+    end
+
+    it "blocks when the live remote RC tag is deleted at the irreversible boundary" do
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: nil,
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        remote_git_tag_exists?: false
+      )
+      expect(self).not_to receive(:fetch_remote_rc_tag!)
+      expect(self).not_to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!)
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /live remote RC tag.*publication boundary/i)
+    end
+
+    it "force-fetches the live remote RC tag before rejecting a moved tag" do
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: nil,
+        reuse_accepted_rc_shakaperf_evidence!: true
+      )
+      expect(self).to receive(:fetch_remote_rc_tag!).ordered
+      expect(self).to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!).ordered.and_raise(
+        SystemExit, "RC tag provenance does not match the selected RC SHA"
+      )
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /RC tag provenance.*RC SHA/)
+    end
+
+    it "refreshes exact accepted-RC CI again at the irreversible boundary" do
+      boundary_record = accepted_record.merge("recorded_at" => "2026-07-14T14:30:00Z")
+      allow(self).to receive(:accelerated_rc_runtime_equivalent?).and_return(true)
+      expect(self).to receive(:refresh_accepted_rc_ci_evidence_for_promotion!).ordered.with(
+        hash_including(record: accepted_record)
+      ).and_return(successful_final_ci_snapshot)
+      expect(self).to receive(:reuse_accepted_rc_shakaperf_evidence!).ordered.and_return(false)
+      expect(self).to receive(:run_shakaperf_release_gate!).ordered.and_return(strict_final_shakaperf_run)
+      expect(self).to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!).ordered.and_return(
+        boundary_record
+      )
+      expect(self).to receive(:refresh_accepted_rc_ci_evidence_for_promotion!).ordered.with(
+        hash_including(record: boundary_record)
+      ).and_raise(SystemExit, "refreshed exact-RC CI is pending")
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /exact-RC CI is pending/)
+    end
+
+    it "blocks a valid but mutated accepted record at the irreversible boundary" do
+      mutations = {
+        "reason" => accepted_record.merge("reason" => "Changed acceptance basis"),
+        "approver" => accepted_record.merge("approved_by" => "another-maintainer"),
+        "evidence" => accepted_record.merge("evidence" => { "demo_fleet" => "https://example.com/changed" })
+      }
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: nil,
+        reuse_accepted_rc_shakaperf_evidence!: true
+      )
+
+      aggregate_failures do
+        mutations.each do |name, boundary_record|
+          allow(self).to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!)
+            .and_return(boundary_record)
+
+          expect do
+            run_accepted_rc_final_promotion_gates!(**gate_arguments)
+          end.to raise_error(SystemExit, /accepted RC record.*changed.*boundary/i), name
+        end
+      end
+    end
+
+    it "blocks when local HEAD moves after the boundary evidence refresh" do
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: successful_final_ci_snapshot,
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: accepted_record,
+        current_git_sha!: "d" * 40
+      )
+
+      expect do
+        run_accepted_rc_final_promotion_gates!(**gate_arguments)
+      end.to raise_error(SystemExit, /local HEAD moved.*publication boundary/i)
+    end
+
+    it "returns the validated final candidate SHA for tag and publication handling" do
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: {
+          status: "success",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: []
+        },
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: accepted_record
+      )
+
+      context = run_accepted_rc_final_promotion_gates!(**gate_arguments)
+
+      expect(context).to include(candidate_sha: "e" * 40, record: accepted_record)
+      expect(context.fetch(:shakaperf_record).fetch("shakaperf")).to eq(accepted_record.fetch("shakaperf"))
+    end
+
+    it "carries the promotion CI branch when accepted evidence originated on another branch" do
+      source_record = accepted_record.merge("release_branch" => "release/17.0.0-rc-source")
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        refresh_accepted_rc_ci_evidence_for_promotion!: successful_final_ci_snapshot,
+        reuse_accepted_rc_shakaperf_evidence!: true,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: source_record
+      )
+
+      context = run_accepted_rc_final_promotion_gates!(**gate_arguments.merge(record: source_record))
+
+      expect(context).to include(
+        candidate_sha: "e" * 40,
+        ci_branch: "release/17.0.0",
+        record: source_record
+      )
+      expect(self).to have_received(:refresh_accepted_rc_ci_evidence_for_promotion!).with(
+        hash_including(ci_branch: "release/17.0.0")
+      ).twice
+    end
+
+    it "carries a newly run strict ShakaPerf identity into final publication boundaries" do
+      ci_snapshot = {
+        status: "success",
+        sha: "f" * 40,
+        checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+        non_success: []
+      }
+      strict_run = {
+        "databaseId" => 654_321,
+        "attempt" => 1,
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+      }
+      strict_snapshot = {
+        status: "success",
+        run_id: 654_321,
+        attempt: 1,
+        run_url: strict_run.fetch("url"),
+        candidate_sha: "e" * 40,
+        target_version: "17.0.0",
+        release_started_at: "2026-07-14T14:00:00Z"
+      }
+      allow(self).to receive_messages(
+        accelerated_rc_runtime_equivalent?: true,
+        github_repo_slug: "shakacode/react_on_rails",
+        refresh_accepted_rc_ci_evidence_for_promotion!: ci_snapshot,
+        reuse_accepted_rc_shakaperf_evidence!: false,
+        run_shakaperf_release_gate!: strict_run,
+        accelerated_shakaperf_snapshot: strict_snapshot,
+        accepted_accelerated_rc_record_for_release_branch_promotion!: accepted_record
+      )
+
+      context = run_accepted_rc_final_promotion_gates!(**gate_arguments)
+
+      aggregate_failures do
+        expect(context).to include(candidate_sha: "e" * 40, record: accepted_record)
+        expect(context.fetch(:ci_snapshot)).to eq(json_compatible_release_value(ci_snapshot))
+        expect(context.fetch(:shakaperf_record)).to include(
+          "release_branch" => "release/17.0.0",
+          "candidate_sha" => "e" * 40,
+          "target_version" => "17.0.0",
+          "shakaperf" => json_compatible_release_value(strict_snapshot)
+        )
+      end
+    end
+  end
+
+  describe "#create_release_tag_at_candidate_sha!" do
+    it "creates and verifies a release tag against the explicit candidate SHA" do
+      allow(self).to receive_messages(
+        current_git_sha!: "e" * 40,
+        peeled_git_tag_sha: "e" * 40
+      )
+      expect(self).to receive(:sh_args_in_dir_for_release).with(
+        "/tmp/repo", "git", "tag", "v17.0.0", "e" * 40
+      )
+
+      expect(
+        create_release_tag_at_candidate_sha!(
+          monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha: "e" * 40
+        )
+      ).to eq("e" * 40)
+    end
+
+    it "refuses explicit tag creation when local HEAD moved" do
+      allow(self).to receive(:current_git_sha!).and_return("d" * 40)
+      expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+      expect do
+        create_release_tag_at_candidate_sha!(
+          monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha: "e" * 40
+        )
+      end.to raise_error(SystemExit, /local HEAD moved.*tag creation/i)
+    end
+  end
+
+  describe "#reuse_accepted_rc_shakaperf_evidence!" do
+    let(:record) do
+      {
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "e" * 40,
+        "shakaperf" => {
+          "run_id" => 123_456,
+          "attempt" => 1,
+          "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456",
+          "release_started_at" => "2026-07-14T13:00:00Z",
+          "candidate_sha" => "e" * 40,
+          "target_version" => "17.0.0.rc.10"
+        }
+      }
+    end
+
+    it "reuses only refreshed successful evidence bound to the accepted RC and runtime-equivalent final tip" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(run)
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection)
+        .with(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          ref: "release/17.0.0",
+          head_sha: "e" * 40,
+          target_version: "17.0.0.rc.10",
+          run:,
+          release_started_at: Time.iso8601("2026-07-14T13:00:00Z"),
+          require_prerun: false
+        ).and_return(nil)
+
+      expect do
+        expect(
+          reuse_accepted_rc_shakaperf_evidence!(
+            repo_slug: "shakacode/react_on_rails",
+            monorepo_root: "/tmp/repo",
+            ref: "release/17.0.0",
+            head_sha: "e" * 40,
+            record:
+          )
+        ).to be(true)
+      end.to output(/Reusing accepted RC ShakaPerf evidence/).to_stdout
+    end
+
+    it "declines stale or invalid accepted evidence so final promotion runs the strict gate" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive_messages(
+        refresh_shakaperf_release_gate_run!: run,
+        shakaperf_release_gate_run_evidence_rejection: "evidence is stale"
+      )
+
+      expect do
+        expect(
+          reuse_accepted_rc_shakaperf_evidence!(
+            repo_slug: "shakacode/react_on_rails",
+            monorepo_root: "/tmp/repo",
+            ref: "release/17.0.0",
+            head_sha: "e" * 40,
+            record:
+          )
+        ).to be(false)
+      end.to output(/not reusable.*evidence is stale/).to_stdout
+    end
+
+    it "declines a different run attempt so final promotion dispatches the strict gate" do
+      run = {
+        "databaseId" => 123_456,
+        "attempt" => 2,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref: "release/17.0.0", head_sha: "e" * 40, target_version: "17.0.0.rc.10"
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "success",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      allow(self).to receive(:refresh_shakaperf_release_gate_run!).and_return(run)
+      expect(self).not_to receive(:shakaperf_release_gate_run_evidence_rejection)
+
+      expect do
+        expect(
+          reuse_accepted_rc_shakaperf_evidence!(
+            repo_slug: "shakacode/react_on_rails",
+            monorepo_root: "/tmp/repo",
+            ref: "release/17.0.0",
+            head_sha: "e" * 40,
+            record:
+          )
+        ).to be(false)
+      end.to output(/not reusable.*run identity changed/i).to_stdout
+    end
+  end
+
   describe "release task help" do
     it "does not advertise strict HEAD retry before the CI gate establishes healthy evidence" do
       rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
@@ -2469,6 +7303,629 @@ RSpec.describe "release.rake helper methods" do
       expect(help).not_to include("RELEASE_CI_EVALUATE_HEAD=true")
       expect(help).to include("only after it has found complete healthy\n    CI evidence")
       expect(help).to include("Override prerelease CI gates only")
+    end
+
+    it "documents the explicit accelerated RC inputs and exposes the reconciliation task" do
+      rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
+      help = rakefile.match(/desc\("(.*?)"\)\ntask :release/m)[1]
+
+      expect(help).to include(
+        "RELEASE_ACCELERATED_RC=true",
+        "RELEASE_TRACKER=<issue>",
+        "RELEASE_ACCELERATED_RC_REASON=<reason>"
+      )
+      expect(Rake::Task.task_defined?("release:reconcile_accelerated_rc")).to be(true)
+    end
+
+    it "orders retry discovery and final evidence refresh before their irreversible boundaries" do
+      rakefile = File.read(File.expand_path("../../../rakelib/release.rake", __dir__))
+      release_task = rakefile.match(/task :release,.*?(?=\ndesc\("Creates or updates a GitHub release)/m)[0]
+      tag_push_helper = rakefile.match(/def push_release_tag_for_candidate!.*?^end$/m)[0]
+      tag_retry_index = release_task.index("release_tag_retry_state_for_current_head")
+      retry_mode_index = release_task.index("resolve_accelerated_rc_options_for_release!")
+      ci_gate_index = release_task.index("validate_main_ci_status!")
+      final_refresh_index = release_task.index("run_accepted_rc_final_promotion_gates!")
+      tag_push_index = release_task.index("push_release_tag_for_candidate!")
+      package_publish_index = release_task.index("Publishing PUBLIC packages to npmjs.org")
+      tag_handling_index = tag_push_helper.index('phase: "tag handling"')
+      tag_creation_index = tag_push_helper.index("ensure_release_tag_for_candidate!")
+      pre_push_boundary_index = tag_push_helper.index('phase: "git tag push"')
+      git_push_index = tag_push_helper.index('sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")')
+      package_boundary_index = tag_push_helper.index('phase: "package publication"')
+
+      expect(tag_retry_index).to be < retry_mode_index
+      expect(retry_mode_index).to be < ci_gate_index
+      expect(final_refresh_index).to be < tag_push_index
+      expect(tag_push_index).to be < package_publish_index
+      expect(tag_handling_index).to be < tag_creation_index
+      expect(tag_creation_index).to be < pre_push_boundary_index
+      expect(pre_push_boundary_index).to be < git_push_index
+      expect(git_push_index).to be < package_boundary_index
+      expect(release_task).to include(
+        "final_promotion_context = run_accepted_rc_final_promotion_gates!",
+        "validated_release_candidate_sha = final_promotion_context.fetch(:candidate_sha)",
+        "candidate_sha: validated_release_candidate_sha",
+        "accelerated_boundary_record: accelerated_publication_record || accepted_rc_record",
+        "accelerated_final_promotion_context: final_promotion_context",
+        "accelerated_rc_same_candidate_retry =",
+        "candidate_sha: accelerated_rc_same_candidate_retry ? current_git_sha!(release_root) : nil"
+      )
+      expect(release_task).not_to match(/sh_in_dir_for_release\(release_root, "git tag /)
+    end
+  end
+
+  describe "release task accelerated RC preflight" do
+    it "blocks a remote-only ordinary target tag before gates or release side effects from a mismatched checkout" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+      events = []
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.0.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "16.9.0",
+        github_repo_slug: "shakacode/react_on_rails",
+        local_release_tag_exists?: false,
+        remote_git_tag_exists?: true,
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: nil,
+        fetch_release_tracker_issue!: {},
+        current_release_approver!: "justin808"
+      )
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |_dir, command|
+        events << :push if command.include?("git push")
+        events << :version_mutation if command.include?("gem bump")
+      end
+      allow(task_receiver).to receive(:validate_main_ci_status!) do
+        events << :ci
+        abort "CI was reached before exact-target tag classification"
+      end
+      allow(task_receiver).to receive(:confirm_release!) { events << :confirmation }
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) { events << :tracker_append }
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return("true")
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil)
+                                   .and_return("Start published-artifact QA while exact-head checks finish")
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", false, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      ensure
+        release_task.reenable
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/ordinary lightweight.*v17\.0\.0\.rc\.10.*accelerated/i)
+        expect(events).to be_empty
+        expect(task_receiver).to have_received(:local_release_tag_exists?)
+          .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10")
+        expect(task_receiver).to have_received(:remote_git_tag_exists?)
+          .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10")
+        expect(task_receiver).to have_received(:fetch_remote_release_tag!)
+          .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10", tag_type: "accelerated RC")
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+  end
+
+  describe "#push_release_tag_for_candidate!" do
+    it "blocks candidate-accepted tag handling when final-promotion context is missing" do
+      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      tag_handled = false
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:validate_accelerated_tag_publication_boundary!)
+      allow(self).to receive(:ensure_release_tag_for_candidate!) { tag_handled = true }
+      allow(self).to receive(:validate_release_candidate_publication_boundary!)
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      failure = begin
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted
+        )
+        package_publication_started = true
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/missing accelerated final-promotion context/i)
+        expect(tag_handled).to be(false)
+        expect(pushed).to be(false)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "blocks newly failed live CI immediately before accelerated RC tag push" do
+      authorization = accelerated_rc_test_authorization
+      pending_ci = {
+        status: "pending",
+        sha: authorization.fetch("candidate_sha"),
+        checks_url: authorization.dig("ci", "checks_url"),
+        non_success: authorization.dig("ci", "non_success").map do |check|
+          check.transform_keys(&:to_sym)
+        end
+      }
+      failed_ci = {
+        status: "failed",
+        sha: "f" * 40,
+        checks_url: authorization.dig("ci", "checks_url"),
+        non_success: [{
+          name: "generator",
+          state: "failure",
+          url: authorization.dig("ci", "non_success", 0, "url")
+        }]
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        accelerated_rc_shakaperf_snapshot!: authorization.fetch("shakaperf"),
+        system: true,
+        validate_existing_accelerated_rc_tag!: nil,
+        validate_release_candidate_publication_boundary!: nil
+      )
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!)
+        .and_return(pending_ci, failed_ci)
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      failure = begin
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+        package_publication_started = true
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/live.*exact-candidate CI.*failed|known failed.*CI/i)
+        expect(pushed).to be(false)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "blocks unknown live ShakaPerf after tag push before accelerated package publication" do
+      authorization = accelerated_rc_test_authorization
+      pending_ci = {
+        status: "pending",
+        sha: authorization.fetch("candidate_sha"),
+        checks_url: authorization.dig("ci", "checks_url"),
+        non_success: authorization.dig("ci", "non_success").map do |check|
+          check.transform_keys(&:to_sym)
+        end
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization],
+        fetch_accelerated_rc_ci_snapshot!: pending_ci,
+        system: true,
+        validate_existing_accelerated_rc_tag!: nil,
+        validate_release_candidate_publication_boundary!: nil
+      )
+      allow(self).to receive(:accelerated_rc_shakaperf_snapshot!)
+        .and_return(authorization.fetch("shakaperf"), authorization.fetch("shakaperf"), { "status" => "unknown" })
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      failure = begin
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+        package_publication_started = true
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/live ShakaPerf.*unknown/i)
+        expect(pushed).to be(true)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "blocks a repository-wide tracker conflict that appears immediately before accelerated RC tag push" do
+      authorization = accelerated_rc_test_authorization
+      conflicting_authorization = accelerated_rc_test_authorization(tracker: 3824)
+      pending_ci = {
+        status: "pending",
+        sha: authorization.fetch("candidate_sha"),
+        checks_url: authorization.dig("ci", "checks_url"),
+        non_success: authorization.dig("ci", "non_success").map do |check|
+          check.transform_keys(&:to_sym)
+        end
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_accelerated_rc_ci_snapshot!: pending_ci,
+        accelerated_rc_shakaperf_snapshot!: authorization.fetch("shakaperf"),
+        system: true,
+        validate_existing_accelerated_rc_tag!: nil,
+        validate_release_candidate_publication_boundary!: nil
+      )
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!)
+        .and_return([authorization], [authorization, conflicting_authorization])
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      failure = begin
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha: "f" * 40,
+          accelerated_publication_record: authorization
+        )
+        package_publication_started = true
+        nil
+      rescue SystemExit => e
+        e
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/repository-wide.*tracker|conflicting release trackers/i)
+        expect(pushed).to be(false)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "blocks stable final package publication when rejection appears after tag push" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      rejected_history = accelerated_rc_test_rejected_history
+      successful_ci = {
+        status: "success",
+        sha: accepted.fetch("candidate_sha"),
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      final_promotion_context = {
+        candidate_sha: "e" * 40,
+        ci_branch: "release/17.0.0",
+        record: accepted,
+        ci_snapshot: json_compatible_release_value(successful_ci),
+        shakaperf_record: {
+          "release_branch" => "release/17.0.0",
+          "candidate_sha" => "e" * 40,
+          "target_version" => accepted.fetch("target_version"),
+          "shakaperf" => accepted.fetch("shakaperf")
+        }
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_accelerated_rc_ci_snapshot!: successful_ci,
+        accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf"),
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40,
+        validate_release_candidate_publication_boundary!: "e" * 40
+      )
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!)
+        .and_return([authorization, publication, accepted], [authorization, publication, accepted], rejected_history)
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: final_promotion_context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /permanently rejected|candidate-rejected.*absorbing/i)
+
+      expect(pushed).to be(true)
+      expect(package_publication_started).to be(false)
+    end
+
+    it "blocks stable final package publication when exact-candidate CI fails after tag push" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      successful_ci = {
+        status: "success",
+        sha: accepted.fetch("candidate_sha"),
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      failed_ci = successful_ci.merge(
+        status: "failed",
+        non_success: [{
+          name: "generator",
+          state: "failure",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/999"
+        }]
+      )
+      final_promotion_context = {
+        candidate_sha: "e" * 40,
+        ci_branch: "release/17.0.0",
+        record: accepted,
+        ci_snapshot: json_compatible_release_value(successful_ci),
+        shakaperf_record: {
+          "release_branch" => "release/17.0.0",
+          "candidate_sha" => "e" * 40,
+          "target_version" => accepted.fetch("target_version"),
+          "shakaperf" => accepted.fetch("shakaperf")
+        }
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
+        accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf"),
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40,
+        validate_release_candidate_publication_boundary!: "e" * 40
+      )
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!)
+        .and_return(successful_ci, successful_ci, failed_ci)
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: final_promotion_context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /final promotion.*exact-candidate CI.*failed|exact-RC CI.*pending/i)
+
+      expect(pushed).to be(true)
+      expect(package_publication_started).to be(false)
+    end
+
+    it "blocks stable final package publication when the exact ShakaPerf run becomes unknown after tag push" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      successful_ci = {
+        status: "success",
+        sha: accepted.fetch("candidate_sha"),
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      final_promotion_context = {
+        candidate_sha: "e" * 40,
+        ci_branch: "release/17.0.0",
+        record: accepted,
+        ci_snapshot: json_compatible_release_value(successful_ci),
+        shakaperf_record: {
+          "release_branch" => "release/17.0.0",
+          "candidate_sha" => "e" * 40,
+          "target_version" => accepted.fetch("target_version"),
+          "shakaperf" => accepted.fetch("shakaperf")
+        }
+      }
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
+        fetch_accelerated_rc_ci_snapshot!: successful_ci,
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40,
+        validate_release_candidate_publication_boundary!: "e" * 40
+      )
+      allow(self).to receive(:accelerated_rc_shakaperf_snapshot!)
+        .and_return(accepted.fetch("shakaperf"), accepted.fetch("shakaperf"), { "status" => "unknown" })
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: final_promotion_context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /final promotion.*ShakaPerf.*unknown/i)
+
+      expect(pushed).to be(true)
+      expect(package_publication_started).to be(false)
+    end
+
+    it "blocks stable final package publication when exact ShakaPerf evidence changes after tag push" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      successful_ci = {
+        status: "success",
+        sha: accepted.fetch("candidate_sha"),
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      final_promotion_context = {
+        candidate_sha: "e" * 40,
+        ci_branch: "release/17.0.0",
+        record: accepted,
+        ci_snapshot: json_compatible_release_value(successful_ci),
+        shakaperf_record: {
+          "release_branch" => "release/17.0.0",
+          "candidate_sha" => "e" * 40,
+          "target_version" => accepted.fetch("target_version"),
+          "shakaperf" => accepted.fetch("shakaperf")
+        }
+      }
+      changed_shakaperf = accepted.fetch("shakaperf").merge(
+        "run_url" => "https://github.com/shakacode/react_on_rails/actions/runs/654321"
+      )
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
+        fetch_accelerated_rc_ci_snapshot!: successful_ci,
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40,
+        validate_release_candidate_publication_boundary!: "e" * 40
+      )
+      allow(self).to receive(:accelerated_rc_shakaperf_snapshot!)
+        .and_return(accepted.fetch("shakaperf"), accepted.fetch("shakaperf"), changed_shakaperf)
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: final_promotion_context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /final promotion.*materially changed ShakaPerf/i)
+
+      expect(pushed).to be(true)
+      expect(package_publication_started).to be(false)
+    end
+
+    it "uses the promotion CI branch at all final boundaries and blocks its post-push failure" do
+      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      source_record = accepted.merge("release_branch" => "release/17.0.0-rc-source")
+      promotion_branch = "release/17.0.0"
+      successful_ci = {
+        status: "success",
+        sha: source_record.fetch("candidate_sha"),
+        checks_url: source_record.dig("ci", "checks_url"),
+        non_success: []
+      }
+      failed_ci = successful_ci.merge(
+        status: "failed",
+        non_success: [{
+          name: "required-generator",
+          state: "failure",
+          url: "https://github.com/shakacode/react_on_rails/actions/runs/999"
+        }]
+      )
+      final_promotion_context = {
+        candidate_sha: "e" * 40,
+        ci_branch: promotion_branch,
+        record: source_record,
+        ci_snapshot: json_compatible_release_value(successful_ci),
+        shakaperf_record: {
+          "release_branch" => promotion_branch,
+          "candidate_sha" => "e" * 40,
+          "target_version" => source_record.fetch("target_version"),
+          "shakaperf" => source_record.fetch("shakaperf")
+        }
+      }
+      promotion_snapshots = [successful_ci, successful_ci, failed_ci]
+      fetched_branches = []
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40,
+        validate_release_candidate_publication_boundary!: "e" * 40
+      )
+      allow(self).to receive(:fetch_accelerated_rc_ci_snapshot!) do |**arguments|
+        ci_branch = arguments.fetch(:ci_branch)
+        fetched_branches << ci_branch
+        ci_branch == promotion_branch ? promotion_snapshots.shift : successful_ci
+      end
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: source_record,
+          accelerated_final_promotion_context: final_promotion_context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /refreshed exact-RC CI is failed/)
+
+      aggregate_failures do
+        expect(fetched_branches).to eq([promotion_branch, promotion_branch, promotion_branch])
+        expect(pushed).to be(true)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "blocks an existing stable tag before push when HEAD moved after final gates" do
+      allow(self).to receive(:system).and_return(true)
+      allow(self).to receive_messages(
+        validate_release_tag_candidate_sha!: "e" * 40,
+        current_git_sha!: "d" * 40
+      )
+      expect(self).not_to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40
+        )
+      end.to raise_error(SystemExit, /HEAD moved.*before git tag push/i)
+    end
+
+    it "blocks a newly created stable tag before push when HEAD moves after tag creation" do
+      allow(self).to receive_messages(system: false, current_git_sha!: "d" * 40)
+      expect(self).to receive(:create_release_tag_at_candidate_sha!).with(
+        monorepo_root: "/tmp/repo",
+        tag: "v17.0.0",
+        candidate_sha: "e" * 40
+      )
+      expect(self).not_to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40
+        )
+      end.to raise_error(SystemExit, /HEAD moved.*before git tag push/i)
+    end
+
+    it "revalidates HEAD after tag push before package publication" do
+      head_shas = ["e" * 40, "d" * 40]
+      allow(self).to receive_messages(
+        system: true,
+        validate_release_tag_candidate_sha!: "e" * 40
+      )
+      allow(self).to receive(:current_git_sha!) { head_shas.shift }
+      expect(self).to receive(:sh_in_dir_for_release).with("/tmp/repo", "LEFTHOOK=0 git push --tags")
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40
+        )
+      end.to raise_error(SystemExit, /HEAD moved.*before package publication/i)
     end
   end
 
@@ -3136,6 +8593,40 @@ RSpec.describe "release.rake helper methods" do
             dry_run: false
           )
         end.to raise_error(SystemExit, /CI is still in progress.*Slow test/m)
+      end
+
+      it "allows only the explicit accelerated RC path to defer pending required checks" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(sha:, check_runs: [in_progress_run("Lint")])
+        allow(self).to receive(:required_check_names_for_branch)
+          .with(monorepo_root:, ci_branch: "main").and_return(required_checks(checks: [required_check("Lint")]))
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: true,
+            allow_override: false,
+            dry_run: false,
+            defer_pending: true
+          )
+        end.to output(/ACCELERATED RC.*deferring pending CI.*Lint/mi).to_stdout
+      end
+
+      it "never defers pending checks for stable or final promotion" do
+        allow(self).to receive(:fetch_main_ci_checks)
+          .with(monorepo_root:, allow_override: false, dry_run: false, ci_branch: "main")
+          .and_return(sha:, check_runs: [in_progress_run("Lint")])
+
+        expect do
+          validate_main_ci_status!(
+            monorepo_root:,
+            is_prerelease: false,
+            allow_override: false,
+            dry_run: false,
+            defer_pending: true
+          )
+        end.to raise_error(SystemExit, /CI is still in progress.*Lint/m)
       end
     end
 
@@ -6487,6 +11978,20 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#latest_remote_rc_tag_for_version" do
+    %w[dotted-first dashed-first].each do |ordering|
+      it "rejects equivalent dotted and dashed RC tag names when #{ordering.tr('-', ' ')}" do
+        tags = %w[v17.0.0.rc.10 v17.0.0-rc.10]
+        tags.reverse! if ordering == "dashed-first"
+        allow(self).to receive(:remote_release_tags).and_return(tags)
+
+        expect do
+          latest_remote_rc_tag_for_version(monorepo_root: "/tmp/repo", target_gem_version: "17.0.0")
+        end.to raise_error(SystemExit, /ambiguous remote RC tags.*v17\.0\.0[.-]rc\.10/mi)
+      end
+    end
+  end
+
   describe "#ensure_release_branch_promotes_tagged_rc!" do
     let(:monorepo_root) { "/tmp/repo" }
     let(:success_status) { instance_double(Process::Status, success?: true) }
@@ -6506,6 +12011,7 @@ RSpec.describe "release.rake helper methods" do
 
     before do
       allow(self).to receive(:remote_git_tag_exists?).and_call_original
+      allow(self).to receive(:remote_release_tags).and_return(["v17.0.0.rc.3"])
       allow(self)
         .to receive(:remote_git_tag_exists?)
         .with(monorepo_root:, tag: "v17.0.0.rc.3")
@@ -6528,6 +12034,63 @@ RSpec.describe "release.rake helper methods" do
           target_gem_version: "17.0.1"
         )
       ).to eq(stable_tag_retry: false, stable_tag_at_head: false)
+    end
+
+    %w[dotted-first dashed-first].product(%w[dotted dashed]).each do |ordering, provenance_alias|
+      it "blocks first promotion when #{ordering.tr('-', ' ')} and #{provenance_alias} carries provenance" do
+        tags = %w[v17.0.0.rc.10 v17.0.0-rc.10]
+        tags.reverse! if ordering == "dashed-first"
+        provenance_tag = provenance_alias == "dotted" ? "v17.0.0.rc.10" : "v17.0.0-rc.10"
+        allow(self).to receive(:remote_release_tags).and_return(tags)
+        allow(self).to receive(:remote_git_tag_exists?)
+          .with(monorepo_root:, tag: "v17.0.0.rc.10")
+          .and_return(true)
+        allow(self).to receive_messages(
+          fetch_remote_rc_tag!: nil,
+          peeled_git_tag_sha: "headsha",
+          current_git_sha!: "headsha"
+        )
+        allow(self).to receive(:accepted_accelerated_rc_record_for_release_branch_promotion!) do |rc_tag:, **|
+          { "status" => "candidate-accepted" } if rc_tag == provenance_tag
+        end
+
+        expect do
+          promotion = ensure_release_branch_promotes_tagged_rc!(
+            monorepo_root:,
+            current_branch: "release/17.0.0",
+            current_checkout_version: "17.0.0.rc.10",
+            target_gem_version: "17.0.0"
+          )
+          accepted_accelerated_rc_record_for_release_branch_promotion!(
+            monorepo_root:,
+            rc_tag: promotion.fetch(:rc_tag),
+            final_head_sha: "headsha",
+            tracker_input: "3823"
+          )
+        end.to raise_error(SystemExit, /ambiguous remote RC tags.*v17\.0\.0[.-]rc\.10/mi)
+        expect(self).not_to have_received(:accepted_accelerated_rc_record_for_release_branch_promotion!)
+      end
+    end
+
+    it "preserves a unique dashed RC tag identity through first final promotion" do
+      allow(self).to receive(:remote_release_tags).and_return(["v17.0.0-rc.10"])
+      allow(self).to receive(:remote_git_tag_exists?)
+        .with(monorepo_root:, tag: "v17.0.0-rc.10")
+        .and_return(true)
+      allow(self).to receive_messages(
+        fetch_remote_rc_tag!: nil,
+        peeled_git_tag_sha: "headsha",
+        current_git_sha!: "headsha"
+      )
+
+      expect(
+        ensure_release_branch_promotes_tagged_rc!(
+          monorepo_root:,
+          current_branch: "release/17.0.0",
+          current_checkout_version: "17.0.0.rc.10",
+          target_gem_version: "17.0.0"
+        )
+      ).to include(rc_tag: "v17.0.0-rc.10")
     end
 
     it "allows a matching release branch when HEAD is the current RC tag" do
@@ -6582,6 +12145,12 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "notessha")
         .and_return(true)
+      allow(self).to receive(:release_finalization_metadata_touched)
+        .with(monorepo_root:, sha: "changelogsha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_touched)
+        .with(monorepo_root:, sha: "notessha")
+        .and_return(false)
 
       expect do
         ensure_release_branch_promotes_tagged_rc!(
@@ -6633,6 +12202,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "versionbumpsha")
         .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_touched)
+        .with(monorepo_root:, sha: "versionbumpsha")
+        .and_return(true)
       allow(self).to receive(:release_finalization_metadata_commit?)
         .with(monorepo_root:, sha: "versionbumpsha")
         .and_return(true)
@@ -6680,6 +12252,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "changelogsha")
         .and_return(true)
+      allow(self).to receive(:release_finalization_metadata_touched)
+        .with(monorepo_root:, sha: "changelogsha")
+        .and_return(false)
 
       expect do
         ensure_release_branch_promotes_tagged_rc!(
@@ -6722,6 +12297,9 @@ RSpec.describe "release.rake helper methods" do
         .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
         .and_return(["runtimesha\n", success_status])
       allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_touched)
         .with(monorepo_root:, sha: "runtimesha")
         .and_return(false)
       allow(self).to receive(:release_finalization_metadata_commit?)
@@ -6775,6 +12353,9 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive(:commit_non_runtime_only?)
         .with(monorepo_root:, sha: "versionbumpsha")
         .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_touched)
+        .with(monorepo_root:, sha: "versionbumpsha")
+        .and_return(true)
       allow(self).to receive(:release_finalization_metadata_commit?)
         .with(monorepo_root:, sha: "versionbumpsha")
         .and_return(true)
@@ -7014,6 +12595,9 @@ RSpec.describe "release.rake helper methods" do
         .with("git", "-C", monorepo_root, "rev-list", "--reverse", "tagsha..headsha")
         .and_return(["runtimesha\n", success_status])
       allow(self).to receive(:commit_non_runtime_only?)
+        .with(monorepo_root:, sha: "runtimesha")
+        .and_return(false)
+      allow(self).to receive(:release_finalization_metadata_touched)
         .with(monorepo_root:, sha: "runtimesha")
         .and_return(false)
       allow(self).to receive(:release_finalization_metadata_commit?)
