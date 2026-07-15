@@ -2584,7 +2584,13 @@ def valid_accelerated_rc_tracker_record?(record)
   valid_accelerated_rc_identity?(record) && valid_accelerated_rc_audit_metadata?(record) &&
     valid_accelerated_rc_ci_record?(record["ci"], record["candidate_sha"]) &&
     valid_accelerated_rc_shakaperf_record?(record["shakaperf"], record["target_version"]) &&
+    valid_accelerated_rc_deferred_shakaperf_candidate?(record) &&
     valid_accelerated_rc_state?(record)
+end
+
+def valid_accelerated_rc_deferred_shakaperf_candidate?(record)
+  shakaperf = record.fetch("shakaperf")
+  shakaperf["status"] != "pending" || shakaperf["candidate_sha"] == record.fetch("candidate_sha")
 end
 
 def accelerated_rc_exact_keys?(value, expected_keys)
@@ -4216,6 +4222,11 @@ def accelerated_rc_shakaperf_snapshot!(repo_slug:, monorepo_root:, record:)
     repo_slug:, run:, stored:, ref: record.fetch("release_branch")
   )
   if active_shakaperf_release_gate_run?(run)
+    if accelerated_rc_shakaperf_requires_prerun?(record)
+      abort "❌ Pending ShakaPerf evidence must match the exact RC candidate; " \
+            "a different-SHA pre-run must complete and pass live mechanical verification."
+    end
+
     return stored.merge("status" => "pending", "run_id" => run.fetch("databaseId"), "run_url" => run_url)
   end
 

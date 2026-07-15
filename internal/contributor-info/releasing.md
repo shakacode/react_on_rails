@@ -240,9 +240,12 @@ authorization provenance; retries load and reuse that persisted authorization in
 it into a conflicting record. Persisted authorization is not permission to reuse stale pending evidence:
 before retrying any tag or immutable publication, the task refreshes exact-candidate CI and the exact
 recorded ShakaPerf run. Current success remains usable, and only a live in-progress state with no
-conclusion may remain deferred; an active status paired with any non-null conclusion is contradictory
-evidence and blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence
-also blocks the retry. Every same-version-and-SHA retry discovers durable repository history first,
+conclusion that is bound to the immutable RC candidate may remain deferred. A different-SHA pre-run must
+already be completed successfully and pass the live artifact, runtime-tree, ancestry, and metadata-only
+commit proof; an active different-SHA run cannot be authorized, persisted, reused, or carried across a
+publication boundary. An active status paired with any non-null conclusion is contradictory evidence and
+blocks. Failed, missing, malformed, stale, API-unknown, or otherwise non-deferable evidence also blocks the
+retry. Every same-version-and-SHA retry discovers durable repository history first,
 whether or not it explicitly supplies `RELEASE_ACCELERATED_RC`. If history exists, the unique tracker and
 canonical authorization chain control the retry; explicit tracker, reason, and options must match that
 authorization exactly, and a rejected or conflicting chain remains blocking. The task never refreshes or
@@ -263,7 +266,8 @@ repository-wide proof after posting and immediately before tag handling, so an a
 that appears concurrently on another tracker blocks immutable publication. Before tag handling, immediately
 before tag push, and again after tag push before package publication, accelerated RCs also refresh exact-head
 CI and the recorded ShakaPerf run. A newly failed, missing, malformed, or unknown gate blocks; pending evidence
-must still exactly match the confirmed authorization, while a transition to success is allowed. A material
+must still exactly match the confirmed authorization, and pending ShakaPerf must name the immutable RC candidate,
+while a transition to success is allowed. A material
 pending-state change is untriaged at these boundaries and requires a new authorization rather than silent reuse.
 Omission never downgrades an interrupted accelerated attempt to an ordinary lightweight-tag release and
 never permits the broad prerelease CI override. A genuinely ordinary RC with no accelerated history keeps
@@ -283,7 +287,8 @@ and every later refresh. During accelerated post-dispatch polling, the complete 
 validated before target, ignored-run, or dispatch-time filtering; conflicting duplicates, ambiguous multiple fresh runs,
 and any malformed or unknown sibling block independent of API order. Only a fully valid canonical unrelated run is
 ignored. Accelerated evidence never synthesizes a missing run URL. A valid active exact-head run may remain pending and
-a valid active pre-run may trigger an exact-head dispatch, but malformed or contradictory evidence blocks before either
+a valid active pre-run may trigger an exact-head dispatch during fresh selection, but that active different-SHA run is
+never itself persisted or reused as deferred evidence. Malformed or contradictory evidence blocks before either
 disposition. The selected exact-head or pre-run state is classified before a dispatch request can take effect, so any
 selected known failure or unknown state outranks pending dispatch independent of API order. This accelerated-only polling
 seam does not change the ordinary blocking ShakaPerf waiter or its historical display-URL fallback.
@@ -324,7 +329,8 @@ comments through the issues APIs.
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
 through reconciliation and every publication boundary. Reused accepted-RC evidence remains bound to
 the accepted record's exact stored snapshot. That snapshot can identify a verified runtime-equivalent pre-run whose
-candidate differs from the immutable RC candidate; the pre-run policy is rechecked live, while accepted-RC and final-tip
+candidate differs from the immutable RC candidate only after the run completed successfully and passed mechanical
+verification; the pre-run policy is rechecked live, while accepted-RC and final-tip
 runtime equivalence remain separate required gates. A newly run strict final gate is instead bound directly to the final
 candidate. Every authorization record must have the
 same canonical digest; canonical-digest-identical duplicates are idempotent, but any distinct
