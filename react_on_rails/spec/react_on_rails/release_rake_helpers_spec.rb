@@ -323,7 +323,7 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
     end
 
-    it "uses the pre-pull prerelease version when a pull advances the checkout to stable" do
+    it "reports the post-pull stable version when a pull advances the checkout to stable" do
       allow(self).to receive(:extract_latest_changelog_version)
         .with(monorepo_root: "/tmp/repo")
         .and_return("17.0.0")
@@ -337,7 +337,10 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false,
           current_version: "17.0.0.rc.10"
         )
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(
+        SystemExit,
+        /Current version: 17\.0\.0\n.*bundle exec rake "release\[17\.0\.0\]"/m
+      )
     end
 
     it "refuses a changelog prerelease older than the post-pull checkout" do
@@ -354,7 +357,10 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false,
           current_version: "17.0.0.rc.10"
         )
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(
+        SystemExit,
+        /Current version: 17\.0\.0\.rc\.12\n.*bundle exec rake "release\[17\.0\.0\.rc\.12\]"/m
+      )
     end
 
     it "refuses a changelog prerelease matching the post-pull checkout" do
@@ -371,7 +377,10 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false,
           current_version: "17.0.0.rc.10"
         )
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(
+        SystemExit,
+        /Current version: 17\.0\.0\.rc\.11\n.*bundle exec rake "release\[17\.0\.0\.rc\.11\]"/m
+      )
     end
 
     it "allows a changelog prerelease newer than an unchanged post-pull checkout" do
@@ -422,7 +431,10 @@ RSpec.describe "release.rake helper methods" do
           dry_run: false,
           current_version: "17.0.0.rc.10"
         )
-      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+      end.to raise_error(
+        SystemExit,
+        /Current version: 18\.0\.0\.beta\.1\n.*bundle exec rake "release\[18\.0\.0\.beta\.1\]"/m
+      )
     end
   end
 

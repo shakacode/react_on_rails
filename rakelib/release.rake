@@ -3360,7 +3360,7 @@ def resolve_version_input(version_input, monorepo_root, current_version: nil,
 
   if argumentless_prerelease_release_requires_explicit_version?(changelog_version:, current_version:,
                                                                 starting_version:)
-    abort argumentless_prerelease_release_message(changelog_version:, current_version: starting_version)
+    abort argumentless_prerelease_release_message(changelog_version:, current_version:)
   end
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
