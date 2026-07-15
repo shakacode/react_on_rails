@@ -46,17 +46,27 @@ module ReactOnRailsProHelper
     end
   end
 
-  def fetch_react_component(component_name, options, &)
-    ReactOnRailsPro::Cache.fetch_react_component(
-      component_name,
-      options,
-      {
-        on_cache_hit: lambda do |cached_component_name, cached_options|
-          load_pack_for_cached_react_component(cached_component_name, cached_options)
-        end
-      },
-      &
-    )
+  def fetch_react_component(component_name, options)
+    return yield unless ReactOnRailsPro::Cache.use_cache?(options)
+
+    cache_key = ReactOnRailsPro::Cache.react_component_cache_key(component_name, options)
+    Rails.logger.debug { "React on Rails Pro cache_key is #{cache_key.inspect}" }
+    cache_options = ReactOnRailsPro::Cache.cache_write_options(options[:cache_options])
+    if ReactOnRailsPro::Cache.cache_write_expired?(options[:cache_options])
+      return add_component_cache_metadata(yield, cache_key, false)
+    end
+
+    cache_hit = true
+    normalized_cache_tags = []
+    result = Rails.cache.fetch(cache_key, cache_options) do
+      cache_hit = false
+      normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(options[:cache_tags])
+      yield
+    end
+    ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
+    load_pack_for_cached_react_component(component_name, options) if cache_hit
+
+    add_component_cache_metadata(result, cache_key, cache_hit)
   end
 
   # Provide caching support for react_component in a manner akin to Rails fragment caching.
@@ -460,7 +470,7 @@ module ReactOnRailsProHelper
       cached_entry = Rails.cache.read(cache_key, cache_write_options)
 
       if cached_entry.is_a?(Hash) && cached_entry[:shell_html] && cached_entry[:postponed_state]
-        ppr_cache_hit(component_name, render_options, cached_entry, cache_write_options)
+        ppr_cache_hit(component_name, render_options, cached_entry, cache_write_options, &block)
       else
         ppr_cache_miss(component_name, render_options, cache_key, cache_write_options, &block)
       end
@@ -1300,17 +1310,24 @@ module ReactOnRailsProHelper
 
   # Cache hit path: serve cached shell HTML immediately, then stream dynamic content
   # via the resume phase.
-  def ppr_cache_hit(component_name, render_options, cached_entry, _cache_write_options)
+  def ppr_cache_hit(component_name, render_options, cached_entry, _cache_write_options, &block)
     load_pack_for_cached_react_component(component_name, render_options)
 
     shell_html = cached_entry[:shell_html]
     postponed_state = cached_entry[:postponed_state]
 
-    # Start the resume phase to stream dynamic Suspense boundaries
-    on_complete = render_options.delete(:on_complete)
-    consumer_stream_async(on_complete:) do
-      ppr_resume_stream(component_name, render_options, postponed_state)
+    # Evaluate the props block for the resume phase — the dynamic Suspense
+    # boundaries need fresh data even though the shell comes from cache.
+    props = block ? yield : {}
+    options = render_options.merge(props:, prerender: true, skip_prerender_cache: true)
+
+    # Start the resume phase to stream dynamic Suspense boundaries.
+    # Re-enqueue the first chunk (see ppr_cache_miss for explanation).
+    on_complete = options.delete(:on_complete)
+    first_resume_chunk = consumer_stream_async(on_complete:) do
+      ppr_resume_stream(component_name, options, postponed_state)
     end
+    @main_output_queue.enqueue(first_resume_chunk) if first_resume_chunk.present?
 
     # Return the cached shell HTML as the first synchronous chunk.
     # The resume stream's dynamic chunks will be enqueued asynchronously.
@@ -1339,11 +1356,15 @@ module ReactOnRailsProHelper
     )
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_write_options)
 
-    # Phase 2: Resume -- stream the dynamic Suspense boundaries
+    # Phase 2: Resume -- stream the dynamic Suspense boundaries.
+    # consumer_stream_async captures the first chunk separately via a promise;
+    # for PPR all resume chunks (including the first) must reach the client,
+    # so we re-enqueue it into the main output queue.
     on_complete = render_options.delete(:on_complete)
-    consumer_stream_async(on_complete:) do
+    first_resume_chunk = consumer_stream_async(on_complete:) do
       ppr_resume_stream(component_name, options, postponed_state)
     end
+    @main_output_queue.enqueue(first_resume_chunk) if first_resume_chunk.present?
 
     shell_html.html_safe
   end
@@ -1387,12 +1408,21 @@ module ReactOnRailsProHelper
 
   # Starts the PPR resume phase: renders the component in ppr_resume mode,
   # passing the PostponedState through internal_option so it reaches the JS code generator.
+  # Unlike internal_stream_react_component, this does NOT wrap chunks in a component div
+  # or spec tag — the shell div was already rendered during prerender.
   def ppr_resume_stream(component_name, options, postponed_state)
     resume_options = options.merge(
       render_mode: :ppr_resume,
       ppr_postponed_state: postponed_state
     )
-    internal_stream_react_component(component_name, resume_options)
+    result = internal_react_component(component_name, resume_options)
+    render_opts = result[:render_options]
+    result[:result].transform do |chunk_json_result|
+      html = chunk_json_result["html"] || ""
+      console_script = chunk_json_result["consoleReplayScript"]
+      result_console_script = render_opts.replay_console ? wrap_console_script_with_nonce(console_script) : ""
+      compose_react_component_html_with_spec_and_console("", html, result_console_script)
+    end
   end
 
   def internal_rsc_payload_react_component(react_component_name, options = {})

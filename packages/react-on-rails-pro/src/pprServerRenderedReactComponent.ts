@@ -15,13 +15,30 @@
 
 import { Readable } from 'stream';
 
-// prerenderToNodeStream is available in React 19.0+; resumeToPipeableStream requires React 19.2+.
-// Both type declarations exist in @types/react-dom; the runtime export for resume may be undefined
-// on older React versions. This file is an experimental PPR spike and will fail at runtime if the
-// React version does not ship the resume API.
-import { prerenderToNodeStream } from 'react-dom/static.node';
-import { resumeToPipeableStream } from 'react-dom/server.node';
 import type { PostponedState } from 'react-dom/static';
+
+// Lazy-loaded PPR APIs — only imported when the PPR helpers are actually called,
+// so apps on React 18 or 19.0/19.1 can still load this bundle without crashing.
+const lazyPPR: {
+  prerender?: typeof import('react-dom/static.node').prerenderToNodeStream;
+  resume?: typeof import('react-dom/server.node').resumeToPipeableStream;
+} = {};
+
+async function getPrerenderToNodeStream() {
+  if (!lazyPPR.prerender) {
+    const mod = await import('react-dom/static.node');
+    lazyPPR.prerender = mod.prerenderToNodeStream;
+  }
+  return lazyPPR.prerender;
+}
+
+async function getResumeToPipeableStream() {
+  if (!lazyPPR.resume) {
+    const mod = await import('react-dom/server.node');
+    lazyPPR.resume = (mod as { resumeToPipeableStream?: typeof lazyPPR.resume }).resumeToPipeableStream;
+  }
+  return lazyPPR.resume;
+}
 
 import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import captureReactOwnerStack from 'react-on-rails/captureReactOwnerStack';
@@ -208,9 +225,24 @@ const pprPrerenderRenderReactComponent = (
       }
 
       try {
-        const { prelude, postponed } = await prerenderToNodeStream(reactRenderedElement, {
+        // Use a timeout signal so prerenderToNodeStream captures pending Suspense
+        // boundaries as PostponedState instead of waiting for them to resolve.
+        const providedSignal = (options as RenderParams & { signal?: AbortSignal }).signal;
+        let prerenderSignal = providedSignal;
+        let prerenderTimeoutId: ReturnType<typeof setTimeout> | undefined;
+        if (!prerenderSignal) {
+          const controller = new AbortController();
+          prerenderSignal = controller.signal;
+          prerenderTimeoutId = setTimeout(() => controller.abort(), 500);
+        }
+
+        const prerenderFn = await getPrerenderToNodeStream();
+        const { prelude, postponed } = await prerenderFn(reactRenderedElement, {
           onError(e) {
             const error = convertToError(e);
+            if (error.name === 'AbortError') {
+              return undefined;
+            }
             if (isRSCRouteSSRFalseBailoutError(error)) {
               errorHandlers.sawRSCRouteSSRFalseBailout = true;
               return error.digest;
@@ -226,9 +258,11 @@ const pprPrerenderRenderReactComponent = (
             return undefined;
           },
           identifierPrefix: domNodeId,
-          signal: (options as RenderParams & { signal?: AbortSignal }).signal,
+          nonce: sanitizeNonce(railsContext.cspNonce),
+          signal: prerenderSignal,
         });
 
+        if (prerenderTimeoutId !== undefined) clearTimeout(prerenderTimeoutId);
         renderState.isShellReady = true;
 
         // Pipe the HTML prelude through injectRSCPayload so CSS/JS hints are included in the shell,
@@ -312,8 +346,11 @@ const pprResumeRenderReactComponent = (
   streamingTrackers: StreamingTrackers,
 ) => {
   const { name: componentName, throwJsErrors, domNodeId, railsContext } = options;
-  const postponedState =
-    options.postponedState ?? ((railsContext as Record<string, unknown>).pprPostponedState as PostponedState);
+  const rawPostponedState =
+    options.postponedState ??
+    ((railsContext as Record<string, unknown>).pprPostponedState as PostponedState | string);
+  const postponedState: PostponedState =
+    typeof rawPostponedState === 'string' ? JSON.parse(rawPostponedState) : rawPostponedState;
   const renderState: StreamRenderState = {
     result: null,
     hasErrors: false,
@@ -345,15 +382,6 @@ const pprResumeRenderReactComponent = (
 
   assertRailsContextWithServerStreamingCapabilities(railsContext);
 
-  if (typeof resumeToPipeableStream !== 'function') {
-    const error = new Error(
-      'resumeToPipeableStream is not available in this React version. PPR resume requires React 19.2+.',
-    );
-    errorHandlers.reportError(error);
-    errorHandlers.sendErrorHtml(error);
-    return readableStream;
-  }
-
   Promise.resolve(reactRenderingResult)
     .then(async (reactRenderedElement) => {
       if (typeof reactRenderedElement === 'string') {
@@ -368,8 +396,14 @@ const pprResumeRenderReactComponent = (
       }
 
       try {
-        // resumeToPipeableStream returns a Promise<PipeableStream> in the 19.2 types.
-        const renderingStream = await resumeToPipeableStream(reactRenderedElement, postponedState, {
+        const resumeFn = await getResumeToPipeableStream();
+        if (typeof resumeFn !== 'function') {
+          throw new Error(
+            'resumeToPipeableStream is not available in this React version. PPR resume requires React 19.2+.',
+          );
+        }
+
+        const renderingStream = await resumeFn(reactRenderedElement, postponedState, {
           onError(e) {
             const error = convertToError(e);
             if (isRSCRouteSSRFalseBailoutError(error)) {
@@ -392,15 +426,23 @@ const pprResumeRenderReactComponent = (
         renderState.isShellReady = true;
 
         // Pipe through injectRSCPayload so any RSC payload for the dynamic content is included.
-        pipeToTransform(
-          injectRSCPayload(
-            renderingStream,
-            streamingTrackers.rscRequestTracker,
-            domNodeId,
-            railsContext.cspNonce,
-            { rscStreamObservability: railsContext.rscStreamObservability },
-          ),
+        const injectedResumeStream = injectRSCPayload(
+          renderingStream,
+          streamingTrackers.rscRequestTracker,
+          domNodeId,
+          railsContext.cspNonce,
+          { rscStreamObservability: railsContext.rscStreamObservability },
         );
+
+        // Notify post-SSR hooks when the resume stream completes successfully.
+        injectedResumeStream.on('end', () => {
+          streamingTrackers.postSSRHookTracker.notifySSREnd({
+            suppressDuplicateWarning:
+              errorHandlers.sawRSCRouteSSRFalseBailout && !errorHandlers.sawUnexpectedRenderError,
+          });
+        });
+
+        pipeToTransform(injectedResumeStream);
 
         // Consumer disconnect teardown.
         onConsumerAbort(() => {
