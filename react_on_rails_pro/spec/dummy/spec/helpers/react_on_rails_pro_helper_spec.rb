@@ -108,7 +108,7 @@ describe ReactOnRailsProHelper do
           expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
         end
 
-        it "replaces cached attribution with one current request-level comment" do
+        it "adds one current attribution and Rails context before cached content without context" do
           cache_key = "attribution-cache-hit"
           expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
           stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Old Organization -->"
@@ -124,14 +124,52 @@ describe ReactOnRailsProHelper do
           second_result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
             raise "props block should not run on cache hit"
           end
+          live_result = react_component("App", props: { a: 1 }, auto_load_bundle: false)
 
-          combined_result = first_result + second_result
+          combined_result = first_result + second_result + live_result
           expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+          expect(combined_result.scan('id="js-react-on-rails-context"').length).to eq(1)
           expect(combined_result).to include(fresh_comment)
           expect(combined_result).not_to include("Old Organization")
+          expect(first_result).to include('id="js-react-on-rails-context"')
+          expect(second_result).not_to include('id="js-react-on-rails-context"')
+          expect(live_result).not_to include('id="js-react-on-rails-context"')
           expect(first_result).to be_html_safe
           expect(second_result).to be_html_safe
           expect(Rails.cache.read(expected_cache_key)).to eq(cached_html)
+        end
+
+        it "replaces stale leading cached context without removing matching component content" do
+          cache_key = "stale-context-cache-hit"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+          stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | License Expired -->"
+          user_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | User-authored content -->"
+          stale_context =
+            '<script type="application/json" id="js-react-on-rails-context">{"railsEnv":"stale"}</script>'
+          cached_html =
+            "#{stale_comment}\n#{stale_context}\n<div>#{user_comment}<span>cached component</span></div>".html_safe
+
+          Rails.cache.write(expected_cache_key, cached_html)
+
+          result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+
+          expect(result.scan('id="js-react-on-rails-context"').length).to eq(1)
+          expect(result).not_to include('"railsEnv":"stale"')
+          expect(result).to include(user_comment)
+          expect(result.scan("<!-- Powered by React on Rails Pro").length).to eq(2)
+          expect(result).to be_html_safe
+          expect(Rails.cache.read(expected_cache_key)).to eq(cached_html)
+        end
+
+        it "returns marker-free cached content unchanged after request context is emitted" do
+          marker_free_html = "<div>cached component without provider metadata</div>".html_safe
+          @rendered_rails_context = true
+
+          expect(send(:normalize_cached_pro_attribution, marker_free_html)).to equal(marker_free_html)
+        ensure
+          @rendered_rails_context = nil
         end
 
         it "caches the content" do
@@ -1380,9 +1418,11 @@ describe ReactOnRailsProHelper do
       it "strips stale attribution from every cached stream chunk and emits one current comment" do
         stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Old Organization -->"
         fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+        stale_context =
+          '<script type="application/json" id="js-react-on-rails-context">{"railsEnv":"stale"}</script>'
         cached_chunks = [
           "#{stale_comment}\n<div>first cached chunk</div>".html_safe,
-          "#{stale_comment}\n<div>second cached chunk</div>".html_safe
+          "#{stale_comment}\n#{stale_context}\n<div>second cached chunk</div>".html_safe
         ]
 
         allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
@@ -1405,8 +1445,10 @@ describe ReactOnRailsProHelper do
         combined_result = ([initial_result] + remaining_results).join
 
         expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_result.scan('id="js-react-on-rails-context"').length).to eq(1)
         expect(combined_result).to include(fresh_comment)
         expect(combined_result).not_to include("Old Organization")
+        expect(combined_result).not_to include('"railsEnv":"stale"')
         expect(initial_result).to be_html_safe
         expect(remaining_results).to all(be_html_safe)
         expect(cached_chunks).to all(include(stale_comment))

@@ -477,6 +477,37 @@ describe('master production license logging', () => {
   );
 });
 
+describe('master non-production license logging', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRailsEnv = process.env.RAILS_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = 'development';
+    process.env.RAILS_ENV = 'test';
+  });
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalRailsEnv === undefined) delete process.env.RAILS_ENV;
+    else process.env.RAILS_ENV = originalRailsEnv;
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  it.each([
+    ['missing', 'No license found'],
+    ['expired', 'License has expired'],
+    ['invalid', 'Invalid license'],
+  ] as const)('reports %s status without implying a license is required', (licenseStatus, statusMessage) => {
+    const harness = setupMasterRunHarness({ licenseStatus });
+
+    expect(harness.mockLog.info).toHaveBeenCalledWith(
+      `[React on Rails Pro] ${statusMessage}. No license required for development/test environments.`,
+    );
+  });
+});
+
 describe('master graceful shutdown on external signals via masterRun wiring', () => {
   afterEach(() => {
     jest.restoreAllMocks();

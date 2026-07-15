@@ -34,8 +34,12 @@ module ReactOnRailsProHelper
   SCRIPT_CLOSE_TAG_LENGTH = 8
   STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = "data-react-on-rails-rsc-payload"
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
-  PRO_ATTRIBUTION_COMMENT_PATTERN =
-    /<!--\s*Powered by React on Rails Pro \(c\) ShakaCode(?:\s*\|(?:(?!-->).)*)?\s*-->\s*/m
+  PRO_ATTRIBUTION_MARKER = "Powered by React on Rails Pro"
+  RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
+  LEADING_PRO_ATTRIBUTION_COMMENT_PATTERN =
+    /\A(?:\s*<!--\s*Powered by React on Rails Pro \(c\) ShakaCode(?:\s*\|(?:(?!-->).)*)?\s*-->\s*)+/m
+  LEADING_RAILS_CONTEXT_SCRIPT_PATTERN =
+    %r{\A\s*<script\b(?=[^>]*\bid=(?:"js-react-on-rails-context"|'js-react-on-rails-context'))[^>]*>.*?</script>\s*}mi
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -471,15 +475,15 @@ module ReactOnRailsProHelper
   end
 
   def normalize_cached_pro_attribution_html(html)
+    return html if @rendered_rails_context && !html.include?(PRO_ATTRIBUTION_MARKER) &&
+                   !html.include?(RAILS_CONTEXT_MARKER)
+
     was_html_safe = html.html_safe?
-    normalized_html = html.gsub(PRO_ATTRIBUTION_COMMENT_PATTERN, "")
+    normalized_html = html.sub(LEADING_PRO_ATTRIBUTION_COMMENT_PATTERN, "")
+                          .sub(LEADING_RAILS_CONTEXT_SCRIPT_PATTERN, "")
+    normalized_html = prepend_render_rails_context(normalized_html)
 
-    unless @rendered_rails_context
-      @rendered_rails_context = true
-      normalized_html = "#{ReactOnRailsPro::Utils.pro_attribution_comment}\n#{normalized_html}"
-    end
-
-    was_html_safe ? normalized_html.html_safe : normalized_html
+    was_html_safe ? normalized_html : String.new(normalized_html)
   end
 
   def add_component_cache_metadata(result, cache_key, cache_hit)
@@ -1053,15 +1057,15 @@ module ReactOnRailsProHelper
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
-    normalized_chunks = cached_chunks.map { |chunk| normalize_cached_pro_attribution(chunk) }
-    initial_result, *rest_chunks = normalized_chunks
+    initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
-      rest_chunks.each do |chunk|
+      cached_chunks.each_with_index do |chunk, index|
+        next if index.zero?
         break if response.stream.closed?
 
-        @main_output_queue.enqueue(chunk)
+        @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
