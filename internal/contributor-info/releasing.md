@@ -269,7 +269,13 @@ Omission never downgrades an interrupted accelerated attempt to an ordinary ligh
 never permits the broad prerelease CI override. A genuinely ordinary RC with no accelerated history keeps
 its lightweight-tag path. Same-version retry discovery must complete successfully before the task can
 prove that accelerated history is absent; API, pagination, permission, or parse failure therefore blocks
-that retry as unknown. A marker comment is ignored before author permission checks only when it contains
+that retry as unknown. Repository and selected-tracker discovery read chronological 100-comment pages
+incrementally, validate string bodies, positive unique comment IDs, canonical repository issue URLs, and
+nondecreasing creation times, and retain only marker-bearing comments. Exactly 1,000 retained marker comments
+are allowed, and a short 250th page completes discovery; exceeding 1,000 markers or requiring a 251st page blocks
+as unknown instead of ignoring history or exhausting unbounded memory/API work. Markerless ordinary comments may
+have a deleted author when their safe structural fields remain valid; marker records still require an attributable
+trusted author. A marker comment is ignored before author permission checks only when it contains
 exactly one canonical marker whose payload is the byte-for-byte lowercase hexadecimal encoding of key-sorted
 canonical JSON for a complete, structurally valid tracker record and proves it targets another
 version-and-SHA pair. Reordered or whitespace-varied JSON, uppercase hexadecimal, incomplete records,
@@ -277,8 +283,10 @@ unknown fields, noncanonical state, odd-length or partially decoded payloads, es
 malformed boundaries, duplicated markers, and
 spoofed summaries cannot prove irrelevance and therefore reach strict parsing and block. Discovery comments
 must name the canonical API issue URL in the exact requested repository; wrong hosts, repositories, paths,
-queries, fragments, and pull-request URLs are rejected before their issue number is used. Pull requests
-cannot serve as release trackers even though GitHub exposes their comments through the issues APIs.
+queries, and fragments are rejected before their issue number is used. Every tracker referenced by a plausible
+exact-candidate marker is fetched once and must pass the same open release-tracker eligibility check used by
+selected-tracker publication. Pull requests cannot serve as release trackers even though GitHub exposes their
+comments through the issues APIs.
 
 ShakaPerf evidence is bound to the requested version, workflow run, run attempt, and candidate SHA
 through reconciliation and final reuse. Every authorization record for the candidate must have the
@@ -353,8 +361,13 @@ that block final promotion. Stable CI, version policy, and every other final gat
 remote tag names that normalize to the same RC version are ambiguous and block every first-promotion and
 retry source-selection route, regardless of alias ordering or which alias carries accelerated provenance.
 After existing-tag validation or explicit-SHA tag creation, the task revalidates both local `HEAD` and the
-tag against the carried candidate SHA immediately before `git push --tags`, then repeats that validation
-after the push immediately before package publication. For accelerated RC publication and accelerated-RC
+tag against the carried candidate SHA immediately before `git push --tags`. After the push it repeats the local
+validation and resolves the live remote stable tag's peeled SHA immediately before package publication. Accelerated
+final promotion additionally carries the canonical source RC tag, its candidate SHA, and its exact annotated-tag
+authorization provenance. It force-fetches and revalidates that live source tag at final tag handling, immediately
+before stable-tag push, and after stable-tag push before packages; deletion, movement, lost provenance, or an
+unclassifiable tag blocks. This source-tag check is additional to the live stable-tag peeled-SHA validation. For
+accelerated RC publication and accelerated-RC
 final promotion, both boundaries also re-fetch all trusted repository history for the exact RC candidate
 and require the same unique tracker and canonical, retry-equivalent authorization/terminal chain. A new
 rejection, tracker conflict, chain mutation, missing record, or unknown repository read aborts before the

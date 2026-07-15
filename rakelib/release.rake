@@ -55,6 +55,9 @@ SHAKAPERF_RELEASE_GATE_EVIDENCE_SCHEMA_VERSION = 2
 ACCELERATED_RC_RECORD_SCHEMA_VERSION = 1
 ACCELERATED_RC_RECORD_MARKER = "react-on-rails-accelerated-rc"
 ACCELERATED_RC_TAG_PROVENANCE_MARKER = "react-on-rails-accelerated-rc-provenance"
+ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE = 100
+ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES = 250
+ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT = 1_000
 ACCELERATED_RC_CANONICAL_TARGET_PATTERN =
   /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.rc\.(?:0|[1-9]\d*)\z/
 ACCELERATED_RC_CANONICAL_TARGET_CASE_INSENSITIVE_PATTERN =
@@ -2413,22 +2416,7 @@ rescue URI::InvalidURIError
 end
 
 def fetch_release_tracker_comments(repo_slug:, tracker:)
-  output, status = capture_gh_output(
-    "api", "--paginate", "--slurp", "repos/#{repo_slug}/issues/#{tracker}/comments"
-  )
-  abort "❌ Unable to read release tracker ##{tracker}.\n\n#{output}" unless status.success?
-
-  pages = JSON.parse(output)
-  unless pages.is_a?(Array) && pages.all?(Array)
-    abort "❌ Release tracker ##{tracker} comments returned an unexpected JSON structure."
-  end
-
-  comments = pages.flatten(1)
-  abort "❌ Release tracker ##{tracker} comments returned an unexpected JSON structure." unless comments.all?(Hash)
-
-  comments
-rescue JSON::ParserError => e
-  abort "❌ Release tracker ##{tracker} comments returned invalid JSON: #{e.message}"
+  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker:)
 end
 
 def fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
@@ -2467,8 +2455,11 @@ def fetch_repository_accelerated_rc_records_for_candidate!(repo_slug:, target_ve
     )
   end
   permissions = {}
+  tracker_issues = {}
   records = marker_comments.flat_map do |comment|
-    trusted_accelerated_rc_records_from_repository_comment!(comment:, repo_slug:, permissions:)
+    trusted_accelerated_rc_records_from_repository_comment!(
+      comment:, repo_slug:, permissions:, tracker_issues:
+    )
   end
 
   accelerated_rc_records_for_candidate(records, target_version:, candidate_sha:)
@@ -2530,28 +2521,107 @@ rescue ArgumentError, JSON::ParserError
   nil
 end
 
-def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
-  output, status = capture_gh_output(
-    "api", "--paginate", "--slurp", "repos/#{repo_slug}/issues/comments?per_page=100"
+def validate_accelerated_rc_comment_schema!(comment:, repo_slug:)
+  valid = comment.is_a?(Hash) &&
+          comment["id"].is_a?(Integer) && comment["id"].positive? &&
+          comment["body"].is_a?(String) &&
+          comment["created_at"].is_a?(String)
+  abort "❌ Accelerated RC comment page contains an invalid comment schema." unless valid
+
+  tracker = release_tracker_number_from_repository_comment_issue_url!(
+    issue_url: comment["issue_url"], repo_slug:
   )
-  abort "❌ Unable to discover durable accelerated RC retry history.\n\n#{output}" unless status.success?
+  created_at = Time.iso8601(comment.fetch("created_at"))
 
-  pages = JSON.parse(output)
-  unless pages.is_a?(Array) && pages.all?(Array)
-    abort "❌ Repository issue comments returned an unexpected JSON structure during accelerated RC retry discovery."
-  end
-
-  comments = pages.flatten(1)
-  unless comments.all?(Hash)
-    abort "❌ Repository issue comments returned an unexpected JSON structure during accelerated RC retry discovery."
-  end
-
-  comments
-rescue JSON::ParserError => e
-  abort "❌ Repository issue comments returned invalid JSON during accelerated RC retry discovery: #{e.message}"
+  # GitHub can retain an ordinary comment after its author is deleted. Marker records still require
+  # an attributable trusted author later, but markerless comments need only this safe structural schema.
+  { id: comment.fetch("id"), tracker:, created_at: }
+rescue ArgumentError
+  abort "❌ Accelerated RC comment page contains an invalid comment schema."
 end
 
-def trusted_accelerated_rc_records_from_repository_comment!(comment:, repo_slug:, permissions:)
+def validate_accelerated_rc_comment_identity!(comment:, repo_slug:, state:, expected_tracker:)
+  metadata = validate_accelerated_rc_comment_schema!(comment:, repo_slug:)
+  if expected_tracker && metadata.fetch(:tracker) != expected_tracker
+    abort "❌ Accelerated RC comment page contains an issue URL inconsistent with its selected tracker."
+  end
+
+  comment_id = metadata.fetch(:id)
+  seen_ids = state.fetch(:seen_ids)
+  abort "❌ Accelerated RC comment pages contain a duplicate comment ID." if seen_ids.key?(comment_id)
+
+  created_at = metadata.fetch(:created_at)
+  previous_created_at = state[:last_created_at]
+  if previous_created_at && created_at < previous_created_at
+    abort "❌ Accelerated RC comment pages are out of chronological order."
+  end
+
+  seen_ids[comment_id] = true
+  state[:last_created_at] = created_at
+  metadata
+end
+
+def accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:)
+  resource = tracker ? "repos/#{repo_slug}/issues/#{tracker}/comments" : "repos/#{repo_slug}/issues/comments"
+  "#{resource}?per_page=#{ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE}" \
+    "&sort=created&direction=asc&page=#{page}"
+end
+
+def accelerated_rc_comment_source_label(tracker)
+  tracker ? "release tracker ##{tracker}" : "repository"
+end
+
+def fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:)
+  endpoint = accelerated_rc_comment_page_endpoint(repo_slug:, tracker:, page:)
+  output, status = capture_gh_output("api", endpoint)
+  source = accelerated_rc_comment_source_label(tracker)
+  abort "❌ Unable to read #{source} comments for accelerated RC history.\n\n#{output}" unless status.success?
+
+  comments = JSON.parse(output)
+  valid = comments.is_a?(Array) && comments.length <= ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE &&
+          comments.all?(Hash)
+  if valid
+    comments.each do |comment|
+      validate_accelerated_rc_comment_identity!(
+        comment:, repo_slug:, state:, expected_tracker: tracker
+      )
+    end
+    return comments
+  end
+
+  abort "❌ #{source.capitalize} comments returned an unexpected JSON structure."
+rescue JSON::ParserError => e
+  abort "❌ #{source.capitalize} comments returned invalid JSON: #{e.message}"
+end
+
+def fetch_bounded_accelerated_rc_marker_comments!(repo_slug:, tracker: nil)
+  marker_comments = []
+  state = { seen_ids: {}, last_created_at: nil }
+  1.upto(ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES) do |page|
+    comments = fetch_accelerated_rc_comment_page!(repo_slug:, tracker:, page:, state:)
+
+    marker_comments.concat(
+      comments.select { |comment| comment.fetch("body").include?(ACCELERATED_RC_RECORD_MARKER) }
+    )
+    if marker_comments.length > ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT
+      source = accelerated_rc_comment_source_label(tracker)
+      abort "❌ Bounded #{source} accelerated-marker limit was exceeded; durable retry history is unknown."
+    end
+
+    return marker_comments if comments.length < ACCELERATED_RC_REPOSITORY_COMMENT_PAGE_SIZE
+  end
+
+  source = accelerated_rc_comment_source_label(tracker)
+  abort "❌ Bounded #{source} issue-comment page limit was reached; durable retry history is unknown."
+end
+
+def fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug:)
+  fetch_bounded_accelerated_rc_marker_comments!(repo_slug:)
+end
+
+def trusted_accelerated_rc_records_from_repository_comment!(
+  comment:, repo_slug:, permissions:, tracker_issues: {}
+)
   tracker = release_tracker_number_from_repository_comment_issue_url!(
     issue_url: comment.fetch("issue_url", nil), repo_slug:
   )
@@ -2565,6 +2635,7 @@ def trusted_accelerated_rc_records_from_repository_comment!(comment:, repo_slug:
   unless records.all? { |record| record["release_tracker"] == tracker }
     abort "❌ Accelerated RC retry history is bound to a different release tracker."
   end
+  tracker_issues[tracker] = fetch_release_tracker_issue!(repo_slug:, tracker:) unless tracker_issues.key?(tracker)
 
   records
 end
@@ -2880,6 +2951,52 @@ def validate_release_candidate_publication_boundary!(monorepo_root:, tag:, candi
   validate_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:)
 end
 
+def abort_malformed_remote_release_tag!(tag:, phase:)
+  abort "❌ Remote release tag #{tag} is missing or malformed before #{phase}; refusing to continue."
+end
+
+def valid_remote_release_tag_entry?(fields:, tag_ref:, peeled_ref:)
+  fields.length == 2 && fields.first.match?(/\A[0-9a-f]{40}\z/) &&
+    [tag_ref, peeled_ref].include?(fields.last)
+end
+
+def parse_remote_release_tag_refs!(output:, tag_ref:, peeled_ref:, tag:, phase:)
+  lines = output.lines.map(&:strip).reject(&:empty?)
+  refs = lines.to_h do |line|
+    fields = line.split(/\s+/)
+    abort_malformed_remote_release_tag!(tag:, phase:) unless
+      valid_remote_release_tag_entry?(fields:, tag_ref:, peeled_ref:)
+
+    [fields.last, fields.first]
+  end
+  abort_malformed_remote_release_tag!(tag:, phase:) unless refs.length == lines.length && refs.key?(tag_ref)
+
+  refs
+end
+
+def remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
+  tag_ref = "refs/tags/#{tag}"
+  peeled_ref = "#{tag_ref}^{}"
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "ls-remote", "--tags", "origin", tag_ref, peeled_ref
+  )
+  unless status.success?
+    abort "❌ Unable to verify remote release tag #{tag.inspect} before #{phase}.\n\n#{output.strip}"
+  end
+
+  refs = parse_remote_release_tag_refs!(output:, tag_ref:, peeled_ref:, tag:, phase:)
+
+  refs.fetch(peeled_ref, refs.fetch(tag_ref))
+end
+
+def validate_remote_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:, phase:)
+  remote_sha = remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
+  return remote_sha if remote_sha == candidate_sha
+
+  abort "❌ Remote release tag #{tag} moved away from the validated release candidate before #{phase}; " \
+        "refusing to continue."
+end
+
 def validate_repository_accelerated_rc_authorization_boundary!(monorepo_root:, record:, phase:)
   repo_slug = github_repo_slug(monorepo_root)
   history = validated_repository_accelerated_rc_candidate_history!(
@@ -2947,7 +3064,17 @@ def valid_final_promotion_context_identity?(context:, candidate_sha:)
     context.fetch(:candidate_sha) == candidate_sha &&
     ci_snapshot.fetch("sha") == context_record.fetch("candidate_sha") &&
     shakaperf_record.fetch("release_branch") == ci_branch &&
-    shakaperf_record.fetch("candidate_sha") == candidate_sha
+    shakaperf_record.fetch("candidate_sha") == candidate_sha &&
+    valid_final_promotion_source_rc_context_identity?(context:, context_record:)
+end
+
+def valid_final_promotion_source_rc_context_identity?(context:, context_record:)
+  source_rc_tag_provenance = context.fetch(:source_rc_tag_provenance)
+  context.fetch(:source_rc_tag) == "v#{context_record.fetch('target_version')}" &&
+    context.fetch(:source_rc_candidate_sha) == context_record.fetch("candidate_sha") &&
+    valid_accelerated_rc_tag_provenance?(source_rc_tag_provenance) &&
+    source_rc_tag_provenance.values_at("target_version", "candidate_sha", "release_tracker") ==
+      context_record.values_at("target_version", "candidate_sha", "release_tracker")
 end
 
 def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:)
@@ -2978,6 +3105,32 @@ def validate_accelerated_tag_publication_boundary!(monorepo_root:, record:, fina
   validate_final_promotion_shakaperf_publication_boundary!(
     monorepo_root:, context: final_promotion_context, phase:
   )
+  validate_final_promotion_source_rc_tag_boundary!(
+    monorepo_root:, context: final_promotion_context, phase:
+  )
+end
+
+def validate_final_promotion_source_rc_tag_boundary!(monorepo_root:, context:, phase:)
+  return unless context
+
+  source_rc_tag = context.fetch(:source_rc_tag)
+  expected_candidate_sha = context.fetch(:source_rc_candidate_sha)
+  expected_provenance = context.fetch(:source_rc_tag_provenance)
+  unless remote_git_tag_exists?(monorepo_root:, tag: source_rc_tag)
+    abort "❌ Final promotion source RC tag #{source_rc_tag} disappeared before #{phase}; refusing to continue."
+  end
+
+  fetch_remote_rc_tag!(monorepo_root:, rc_tag: source_rc_tag)
+  actual_provenance = accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag: source_rc_tag)
+  unless actual_provenance == expected_provenance
+    abort "❌ Final promotion source RC tag #{source_rc_tag} lost or changed its canonical annotated " \
+          "authorization provenance before #{phase}; refusing to continue."
+  end
+
+  actual_candidate_sha = peeled_git_tag_sha(monorepo_root:, tag: source_rc_tag)
+  return actual_candidate_sha if actual_candidate_sha == expected_candidate_sha
+
+  abort "❌ Final promotion source RC tag #{source_rc_tag} moved before #{phase}; refusing to continue."
 end
 
 def ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:)
@@ -3027,6 +3180,9 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
     final_promotion_context: accelerated_final_promotion_context, phase: "package publication"
   )
   validate_release_candidate_publication_boundary!(
+    monorepo_root:, tag:, candidate_sha:, phase: "package publication"
+  )
+  validate_remote_release_tag_candidate_sha!(
     monorepo_root:, tag:, candidate_sha:, phase: "package publication"
   )
 end
@@ -4078,7 +4234,8 @@ def strict_final_promotion_shakaperf_snapshot!(monorepo_root:, current_branch:, 
   )
 end
 
-def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, ci_snapshot:, shakaperf:)
+def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, ci_snapshot:, shakaperf:,
+                                     source_rc_context:)
   normalized_shakaperf = json_compatible_release_value(shakaperf)
   {
     candidate_sha: final_head_sha,
@@ -4091,6 +4248,20 @@ def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, 
       "target_version" => normalized_shakaperf.fetch("target_version"),
       "shakaperf" => normalized_shakaperf
     }
+  }.merge(source_rc_context)
+end
+
+def final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record:)
+  provenance = accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag: rc_tag)
+  expected_identity = record.values_at("target_version", "candidate_sha", "release_tracker")
+  valid = provenance && rc_tag == "v#{record.fetch('target_version')}" &&
+          provenance.values_at("target_version", "candidate_sha", "release_tracker") == expected_identity
+  abort "❌ Final promotion is blocked: source RC tag lacks matching canonical accelerated provenance." unless valid
+
+  {
+    source_rc_tag: rc_tag,
+    source_rc_candidate_sha: record.fetch("candidate_sha"),
+    source_rc_tag_provenance: provenance
   }
 end
 
@@ -4149,13 +4320,15 @@ def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_b
     abort "❌ Final promotion is blocked: exact-candidate CI evidence changed at the publication boundary."
   end
   validate_final_promotion_boundary_head!(monorepo_root:, final_head_sha:)
+  source_rc_context = final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record: boundary_record)
 
   final_promotion_boundary_context(
     final_head_sha:,
     current_branch:,
     record: boundary_record,
     ci_snapshot: boundary_ci_snapshot,
-    shakaperf:
+    shakaperf:,
+    source_rc_context:
   )
 end
 

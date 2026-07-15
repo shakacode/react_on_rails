@@ -93,6 +93,36 @@ RSpec.describe "release.rake helper methods" do
     [authorization, publication, rejected]
   end
 
+  def accelerated_final_promotion_test_context(record:, ci_snapshot:, ci_branch: "release/17.0.0",
+                                               final_candidate_sha: "e" * 40)
+    authorization = accelerated_rc_test_authorization(tracker: record.fetch("release_tracker"))
+    {
+      candidate_sha: final_candidate_sha,
+      ci_branch:,
+      record:,
+      source_rc_tag: "v#{record.fetch('target_version')}",
+      source_rc_candidate_sha: record.fetch("candidate_sha"),
+      source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
+      ci_snapshot: json_compatible_release_value(ci_snapshot),
+      shakaperf_record: {
+        "release_branch" => ci_branch,
+        "candidate_sha" => final_candidate_sha,
+        "target_version" => record.fetch("target_version"),
+        "shakaperf" => record.fetch("shakaperf")
+      }
+    }
+  end
+
+  def accelerated_rc_test_issue_comment(id:, body:, tracker: 3823, created_at: "2026-07-14T13:00:00Z", user: nil)
+    {
+      "id" => id,
+      "body" => body,
+      "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/#{tracker}",
+      "created_at" => created_at,
+      "user" => user
+    }
+  end
+
   before do
     next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
 
@@ -3875,6 +3905,134 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /unexpected JSON structure/)
     end
 
+    it "loads selected-tracker comments incrementally and retains only marker comments" do
+      success = instance_double(Process::Status, success?: true)
+      ordinary_comments = Array.new(99) do |index|
+        accelerated_rc_test_issue_comment(id: index + 1, body: "ordinary tracker discussion")
+      end
+      marker_comment = accelerated_rc_test_issue_comment(
+        id: 100, body: ACCELERATED_RC_RECORD_MARKER
+      )
+      endpoint = lambda do |page|
+        "repos/shakacode/react_on_rails/issues/3823/comments?per_page=100" \
+          "&sort=created&direction=asc&page=#{page}"
+      end
+      expect(self).to receive(:capture_gh_output)
+        .ordered.with("api", endpoint.call(1))
+        .and_return([JSON.generate(ordinary_comments + [marker_comment]), success])
+      expect(self).to receive(:capture_gh_output)
+        .ordered.with("api", endpoint.call(2))
+        .and_return([JSON.generate([]), success])
+
+      expect(
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([marker_comment])
+    end
+
+    it "fails closed when selected-tracker discovery reaches its configured page bound on a full page" do
+      success = instance_double(Process::Status, success?: true)
+      page_count = 0
+      allow(self).to receive(:capture_gh_output) do
+        page_count += 1
+        comments = Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: ((page_count - 1) * 100) + index + 1,
+            body: "ordinary tracker discussion"
+          )
+        end
+        [JSON.generate(comments), success]
+      end
+
+      expect do
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /bounded release tracker.*page limit.*unknown/i)
+      expect(page_count).to eq(250)
+    end
+
+    it "allows selected-tracker discovery to complete on a short 250th page" do
+      success = instance_double(Process::Status, success?: true)
+      page_count = 0
+      final_marker = nil
+      allow(self).to receive(:capture_gh_output) do
+        page_count += 1
+        comments = if page_count == 250
+                     final_marker = accelerated_rc_test_issue_comment(
+                       id: 24_901, body: ACCELERATED_RC_RECORD_MARKER
+                     )
+                     [final_marker]
+                   else
+                     Array.new(100) do |index|
+                       accelerated_rc_test_issue_comment(
+                         id: ((page_count - 1) * 100) + index + 1,
+                         body: "ordinary tracker discussion"
+                       )
+                     end
+                   end
+        [JSON.generate(comments), success]
+      end
+
+      expect(
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      ).to eq([final_marker])
+      expect(page_count).to eq(250)
+    end
+
+    it "allows exactly 1,000 marker comments in selected-tracker discovery" do
+      success = instance_double(Process::Status, success?: true)
+      pages = Array.new(10) do |page|
+        Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: (page * 100) + index + 1,
+            body: ACCELERATED_RC_RECORD_MARKER
+          )
+        end
+      end
+      pages << []
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(pages.shift), success]
+      end
+
+      comments = nil
+      expect do
+        comments = fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.not_to raise_error
+      expect(comments).to have_attributes(length: 1_000)
+    end
+
+    it "fails closed on marker 1,001 in selected-tracker discovery" do
+      success = instance_double(Process::Status, success?: true)
+      pages = Array.new(10) do |page|
+        Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: (page * 100) + index + 1,
+            body: ACCELERATED_RC_RECORD_MARKER
+          )
+        end
+      end
+      pages << [accelerated_rc_test_issue_comment(id: 1_001, body: ACCELERATED_RC_RECORD_MARKER)]
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(pages.shift), success]
+      end
+
+      expect do
+        fetch_release_tracker_comments(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+      end.to raise_error(SystemExit, /bounded release tracker.*marker.*limit.*unknown/i)
+    end
+
+    it "documents the exact accelerated-comment discovery boundaries" do
+      guide = File.read(
+        File.expand_path("../../../internal/contributor-info/releasing.md", __dir__)
+      )
+      normalized_guide = guide.gsub(/\s+/, " ")
+
+      expect(normalized_guide).to include(
+        "Exactly 1,000 retained marker comments are allowed, and a short 250th page completes discovery"
+      )
+      expect(normalized_guide).to include(
+        "exceeding 1,000 markers or requiring a 251st page blocks as unknown"
+      )
+    end
+
     it "rejects a closed release tracker" do
       expect do
         validate_release_tracker_issue!(
@@ -3931,6 +4089,151 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /write, maintain, or admin/)
     end
 
+    it "loads repository issue-comment discovery incrementally and retains only marker comments" do
+      success = instance_double(Process::Status, success?: true)
+      ordinary_comments = Array.new(99) do |index|
+        accelerated_rc_test_issue_comment(id: index + 1, body: "ordinary repository discussion")
+      end
+      marker_comment = accelerated_rc_test_issue_comment(
+        id: 100, body: "prefix #{ACCELERATED_RC_RECORD_MARKER} suffix"
+      )
+      full_page = ordinary_comments + [marker_comment]
+      endpoint = lambda do |page|
+        "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=#{page}"
+      end
+      expect(self).to receive(:capture_gh_output)
+        .ordered.with("api", endpoint.call(1))
+        .and_return([JSON.generate(full_page), success])
+      expect(self).to receive(:capture_gh_output)
+        .ordered.with("api", endpoint.call(2))
+        .and_return([JSON.generate([]), success])
+
+      expect(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      ).to eq([marker_comment])
+    end
+
+    it "allows a safely structured markerless repository comment whose author was deleted" do
+      success = instance_double(Process::Status, success?: true)
+      deleted_user_comment = accelerated_rc_test_issue_comment(
+        id: 1, body: "ordinary repository discussion", user: nil
+      )
+      allow(self).to receive(:capture_gh_output)
+        .and_return([JSON.generate([deleted_user_comment]), success])
+
+      expect(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      ).to eq([])
+    end
+
+    it "fails closed when a repository comment page contains a malformed comment hash" do
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate([{}]), success])
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /comment.*schema|unexpected JSON structure/i)
+    end
+
+    it "fails closed on duplicate repository comment IDs within one page" do
+      success = instance_double(Process::Status, success?: true)
+      comments = [
+        accelerated_rc_test_issue_comment(id: 1, body: "ordinary comment"),
+        accelerated_rc_test_issue_comment(id: 1, body: "another ordinary comment")
+      ]
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(comments), success])
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /duplicate.*comment.*id|comment.*identity/i)
+    end
+
+    it "fails closed on duplicate repository comment IDs across pages" do
+      success = instance_double(Process::Status, success?: true)
+      full_page = Array.new(100) do |index|
+        accelerated_rc_test_issue_comment(id: index + 1, body: "ordinary comment")
+      end
+      duplicate = accelerated_rc_test_issue_comment(id: 100, body: "duplicate on next page")
+      responses = [full_page, [duplicate]]
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(responses.shift), success]
+      end
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /duplicate.*comment.*id|comment.*identity/i)
+    end
+
+    it "fails closed on out-of-order repository comments within one page" do
+      success = instance_double(Process::Status, success?: true)
+      comments = [
+        accelerated_rc_test_issue_comment(
+          id: 1, body: "ordinary comment", created_at: "2026-07-14T13:01:00Z"
+        ),
+        accelerated_rc_test_issue_comment(
+          id: 2, body: "older ordinary comment", created_at: "2026-07-14T13:00:00Z"
+        )
+      ]
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(comments), success])
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /comment.*chronolog|out.of.order/i)
+    end
+
+    it "fails closed on out-of-order repository comment pages" do
+      success = instance_double(Process::Status, success?: true)
+      full_page = Array.new(100) do |index|
+        accelerated_rc_test_issue_comment(
+          id: index + 1, body: "ordinary comment", created_at: "2026-07-14T13:01:00Z"
+        )
+      end
+      older_comment = accelerated_rc_test_issue_comment(
+        id: 101, body: "older comment on next page", created_at: "2026-07-14T13:00:00Z"
+      )
+      responses = [full_page, [older_comment]]
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(responses.shift), success]
+      end
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /comment.*chronolog|out.of.order/i)
+    end
+
+    it "fails closed at the bounded repository issue-comment page limit" do
+      stub_const("ACCELERATED_RC_REPOSITORY_COMMENT_MAX_PAGES", 2)
+      success = instance_double(Process::Status, success?: true)
+      pages = Array.new(2) do |page|
+        Array.new(100) do |index|
+          accelerated_rc_test_issue_comment(
+            id: (page * 100) + index + 1, body: "ordinary repository discussion"
+          )
+        end
+      end
+      allow(self).to receive(:capture_gh_output) do
+        [JSON.generate(pages.shift), success]
+      end
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /bounded repository.*page limit.*unknown/i)
+      expect(self).to have_received(:capture_gh_output).twice
+    end
+
+    it "fails closed at the bounded repository accelerated-marker retention limit" do
+      stub_const("ACCELERATED_RC_REPOSITORY_MARKER_COMMENT_LIMIT", 1)
+      success = instance_double(Process::Status, success?: true)
+      marker_comments = Array.new(2) do |index|
+        accelerated_rc_test_issue_comment(id: index + 1, body: ACCELERATED_RC_RECORD_MARKER)
+      end
+      allow(self).to receive(:capture_gh_output).and_return([JSON.generate(marker_comments), success])
+
+      expect do
+        fetch_repository_issue_comments_for_accelerated_rc_retry!(repo_slug: "shakacode/react_on_rails")
+      end.to raise_error(SystemExit, /bounded repository.*marker.*limit.*unknown/i)
+    end
+
     it "discovers exact candidate history from trusted repository issue comments" do
       authorization = build_accelerated_rc_publication_record(
         options: accelerated_rc_options,
@@ -3942,19 +4245,22 @@ RSpec.describe "release.rake helper methods" do
         approved_by: "justin808",
         recorded_at: Time.utc(2026, 7, 14, 13, 30)
       )
-      comment = {
-        "body" => accelerated_rc_tracker_comment(authorization),
-        "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
-        "user" => { "login" => "justin808" }
-      }
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(authorization),
+        user: { "login" => "justin808" }
+      )
       success = instance_double(Process::Status, success?: true)
       allow(self).to receive(:capture_gh_output)
-        .with("api", "--paginate", "--slurp", "repos/shakacode/react_on_rails/issues/comments?per_page=100")
-        .and_return([JSON.generate([[comment]]), success])
+        .with(
+          "api",
+          "repos/shakacode/react_on_rails/issues/comments?per_page=100&sort=created&direction=asc&page=1"
+        ).and_return([JSON.generate([comment]), success])
       allow(self).to receive(:capture_gh_output)
         .with(
           "api", "repos/shakacode/react_on_rails/collaborators/justin808/permission", "--jq", ".permission"
         ).and_return(["maintain\n", success])
+      allow(self).to receive(:fetch_release_tracker_issue!).and_return({})
 
       expect(
         fetch_repository_accelerated_rc_records_for_candidate!(
@@ -3963,6 +4269,71 @@ RSpec.describe "release.rake helper methods" do
           candidate_sha: "f" * 40
         )
       ).to eq([authorization])
+    end
+
+    it "caches eligibility for repeated repository-discovered markers on the same tracker" do
+      authorization = accelerated_rc_test_authorization
+      comments = [
+        accelerated_rc_test_issue_comment(
+          id: 1,
+          body: accelerated_rc_tracker_comment(authorization),
+          user: { "login" => "justin808" }
+        ),
+        accelerated_rc_test_issue_comment(
+          id: 2,
+          body: accelerated_rc_tracker_comment(authorization),
+          created_at: "2026-07-14T13:01:00Z",
+          user: { "login" => "justin808" }
+        )
+      ]
+      allow(self).to receive_messages(
+        fetch_repository_issue_comments_for_accelerated_rc_retry!: comments,
+        accelerated_rc_repository_comment_permission!: "maintain"
+      )
+      expect(self).to receive(:fetch_release_tracker_issue!)
+        .once.with(repo_slug: "shakacode/react_on_rails", tracker: 3823)
+        .and_return({})
+
+      expect(
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      ).to eq([authorization, authorization])
+    end
+
+    it "rejects repository-discovered candidate history whose canonical issue URL resolves to a pull request" do
+      authorization = accelerated_rc_test_authorization
+      comment = accelerated_rc_test_issue_comment(
+        id: 1,
+        body: accelerated_rc_tracker_comment(authorization),
+        user: { "login" => "justin808" }
+      )
+      success = instance_double(Process::Status, success?: true)
+      pull_request_issue = {
+        "number" => 3823,
+        "state" => "open",
+        "title" => "Release gate: React on Rails 17.0.0",
+        "labels" => [{ "name" => "release" }, { "name" => "TRACKING" }],
+        "pull_request" => { "url" => "https://api.github.com/repos/shakacode/react_on_rails/pulls/3823" }
+      }
+      allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return([comment])
+      allow(self).to receive(:capture_gh_output)
+        .with("api", "repos/shakacode/react_on_rails/issues/3823")
+        .and_return([JSON.generate(pull_request_issue), success])
+      allow(self).to receive(:capture_gh_output)
+        .with(
+          "api", "repos/shakacode/react_on_rails/collaborators/justin808/permission", "--jq", ".permission"
+        ).and_return(["maintain\n", success])
+
+      expect do
+        fetch_repository_accelerated_rc_records_for_candidate!(
+          repo_slug: "shakacode/react_on_rails",
+          target_version: "17.0.0.rc.10",
+          candidate_sha: "f" * 40
+        )
+      end.to raise_error(SystemExit, /active open release tracker/)
     end
 
     it "ignores one clearly unrelated valid repository marker before author permission checks" do
@@ -3988,6 +4359,7 @@ RSpec.describe "release.rake helper methods" do
       }]
       allow(self).to receive(:fetch_repository_issue_comments_for_accelerated_rc_retry!).and_return(comments)
       expect(self).not_to receive(:accelerated_rc_repository_comment_permission!)
+      expect(self).not_to receive(:fetch_release_tracker_issue!)
 
       expect(
         fetch_repository_accelerated_rc_records_for_candidate!(
@@ -4295,7 +4667,10 @@ RSpec.describe "release.rake helper methods" do
         "issue_url" => "https://api.github.com/repos/shakacode/react_on_rails/issues/3823",
         "user" => { "login" => "justin808" }
       }
-      allow(self).to receive(:accelerated_rc_repository_comment_permission!).and_return("maintain")
+      allow(self).to receive_messages(
+        accelerated_rc_repository_comment_permission!: "maintain",
+        fetch_release_tracker_issue!: {}
+      )
 
       expect(
         trusted_accelerated_rc_records_from_repository_comment!(
@@ -4334,9 +4709,9 @@ RSpec.describe "release.rake helper methods" do
         "status" => "published-awaiting-gates",
         "target_version" => "17.0.0.rc.10",
         "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
         "runtime_tree_fingerprint" => "a" * 64,
         "release_branch" => "release/17.0.0",
-        "release_tracker" => 3823,
         "ci" => {
           "status" => "pending",
           "sha" => "f" * 40,
@@ -5684,9 +6059,9 @@ RSpec.describe "release.rake helper methods" do
         "status" => "published-awaiting-gates",
         "target_version" => "17.0.0.rc.10",
         "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
         "runtime_tree_fingerprint" => "a" * 64,
         "release_branch" => "release/17.0.0",
-        "release_tracker" => 3823,
         "ci" => { "status" => "pending" },
         "shakaperf" => { "status" => "pending" },
         "reason" => "Start fleet QA now",
@@ -6835,6 +7210,7 @@ RSpec.describe "release.rake helper methods" do
       {
         "target_version" => "17.0.0.rc.10",
         "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
         "runtime_tree_fingerprint" => "a" * 64,
         "release_branch" => "release/17.0.0",
         "shakaperf" => {
@@ -6897,13 +7273,24 @@ RSpec.describe "release.rake helper methods" do
       }
     end
 
+    let(:source_rc_tag_provenance) do
+      {
+        "schema_version" => ACCELERATED_RC_RECORD_SCHEMA_VERSION,
+        "target_version" => "17.0.0.rc.10",
+        "candidate_sha" => "f" * 40,
+        "release_tracker" => 3823,
+        "authorization_digest" => "b" * 64
+      }
+    end
+
     before do
       allow(self).to receive_messages(
         remote_git_tag_exists?: true,
         fetch_remote_rc_tag!: nil,
         current_git_sha!: "e" * 40,
         github_repo_slug: "shakacode/react_on_rails",
-        accelerated_shakaperf_snapshot: strict_final_shakaperf_snapshot
+        accelerated_shakaperf_snapshot: strict_final_shakaperf_snapshot,
+        accelerated_rc_tag_provenance_for_tag!: source_rc_tag_provenance
       )
     end
 
@@ -7079,7 +7466,13 @@ RSpec.describe "release.rake helper methods" do
 
       context = run_accepted_rc_final_promotion_gates!(**gate_arguments)
 
-      expect(context).to include(candidate_sha: "e" * 40, record: accepted_record)
+      expect(context).to include(
+        candidate_sha: "e" * 40,
+        record: accepted_record,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: "f" * 40,
+        source_rc_tag_provenance:
+      )
       expect(context.fetch(:shakaperf_record).fetch("shakaperf")).to eq(accepted_record.fetch("shakaperf"))
     end
 
@@ -7454,6 +7847,133 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "blocks stable-tag push when the live source RC tag disappears after initial final gates" do
+      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      candidate_sha = "e" * 40
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      successful_ci = {
+        status: "success",
+        sha: source_candidate_sha,
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
+        peeled_git_tag_sha: source_candidate_sha,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      allow(self).to receive(:remote_git_tag_exists?).and_return(true, false)
+      expect(self).not_to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha:,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: context
+        )
+      end.to raise_error(SystemExit, /source RC tag.*disappeared.*git tag push/i)
+    end
+
+    it "blocks packages when the live source RC tag moves after stable-tag push" do
+      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      candidate_sha = "e" * 40
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      moved_sha = "d" * 40
+      successful_ci = {
+        status: "success",
+        sha: source_candidate_sha,
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      allow(self).to receive(:peeled_git_tag_sha)
+        .and_return(source_candidate_sha, source_candidate_sha, moved_sha)
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha:,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: context
+        )
+        package_publication_started = true
+      end.to raise_error(SystemExit, /source RC tag.*moved.*package publication/i)
+
+      aggregate_failures do
+        expect(pushed).to be(true)
+        expect(package_publication_started).to be(false)
+      end
+    end
+
+    it "still validates the live stable tag after all source RC boundaries pass" do
+      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      candidate_sha = "e" * 40
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      successful_ci = {
+        status: "success",
+        sha: source_candidate_sha,
+        checks_url: accepted.dig("ci", "checks_url"),
+        non_success: []
+      }
+      context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
+        peeled_git_tag_sha: source_candidate_sha
+      )
+      allow(self).to receive(:sh_in_dir_for_release)
+      allow(self).to receive(:validate_remote_release_tag_candidate_sha!).with(
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+      ).and_return(candidate_sha)
+
+      push_release_tag_for_candidate!(
+        monorepo_root: "/tmp/repo",
+        tag: "v17.0.0",
+        candidate_sha:,
+        accelerated_boundary_record: accepted,
+        accelerated_final_promotion_context: context
+      )
+
+      expect(self).to have_received(:fetch_remote_rc_tag!).exactly(3).times
+      expect(self).to have_received(:validate_remote_release_tag_candidate_sha!).with(
+        monorepo_root: "/tmp/repo", tag: "v17.0.0", candidate_sha:, phase: "package publication"
+      )
+    end
+
     it "blocks newly failed live CI immediately before accelerated RC tag push" do
       authorization = accelerated_rc_test_authorization
       pending_ci = {
@@ -7613,6 +8133,9 @@ RSpec.describe "release.rake helper methods" do
         candidate_sha: "e" * 40,
         ci_branch: "release/17.0.0",
         record: accepted,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: accepted.fetch("candidate_sha"),
+        source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
         ci_snapshot: json_compatible_release_value(successful_ci),
         shakaperf_record: {
           "release_branch" => "release/17.0.0",
@@ -7623,6 +8146,7 @@ RSpec.describe "release.rake helper methods" do
       }
       allow(self).to receive_messages(
         github_repo_slug: "shakacode/react_on_rails",
+        validate_final_promotion_source_rc_tag_boundary!: nil,
         fetch_accelerated_rc_ci_snapshot!: successful_ci,
         accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf"),
         system: true,
@@ -7670,6 +8194,9 @@ RSpec.describe "release.rake helper methods" do
         candidate_sha: "e" * 40,
         ci_branch: "release/17.0.0",
         record: accepted,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: accepted.fetch("candidate_sha"),
+        source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
         ci_snapshot: json_compatible_release_value(successful_ci),
         shakaperf_record: {
           "release_branch" => "release/17.0.0",
@@ -7680,6 +8207,7 @@ RSpec.describe "release.rake helper methods" do
       }
       allow(self).to receive_messages(
         github_repo_slug: "shakacode/react_on_rails",
+        validate_final_promotion_source_rc_tag_boundary!: nil,
         fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
         accelerated_rc_shakaperf_snapshot!: accepted.fetch("shakaperf"),
         system: true,
@@ -7719,6 +8247,9 @@ RSpec.describe "release.rake helper methods" do
         candidate_sha: "e" * 40,
         ci_branch: "release/17.0.0",
         record: accepted,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: accepted.fetch("candidate_sha"),
+        source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
         ci_snapshot: json_compatible_release_value(successful_ci),
         shakaperf_record: {
           "release_branch" => "release/17.0.0",
@@ -7729,6 +8260,7 @@ RSpec.describe "release.rake helper methods" do
       }
       allow(self).to receive_messages(
         github_repo_slug: "shakacode/react_on_rails",
+        validate_final_promotion_source_rc_tag_boundary!: nil,
         fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
         fetch_accelerated_rc_ci_snapshot!: successful_ci,
         system: true,
@@ -7768,6 +8300,9 @@ RSpec.describe "release.rake helper methods" do
         candidate_sha: "e" * 40,
         ci_branch: "release/17.0.0",
         record: accepted,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: accepted.fetch("candidate_sha"),
+        source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
         ci_snapshot: json_compatible_release_value(successful_ci),
         shakaperf_record: {
           "release_branch" => "release/17.0.0",
@@ -7781,6 +8316,7 @@ RSpec.describe "release.rake helper methods" do
       )
       allow(self).to receive_messages(
         github_repo_slug: "shakacode/react_on_rails",
+        validate_final_promotion_source_rc_tag_boundary!: nil,
         fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
         fetch_accelerated_rc_ci_snapshot!: successful_ci,
         system: true,
@@ -7809,7 +8345,7 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "uses the promotion CI branch at all final boundaries and blocks its post-push failure" do
-      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
       source_record = accepted.merge("release_branch" => "release/17.0.0-rc-source")
       promotion_branch = "release/17.0.0"
       successful_ci = {
@@ -7830,6 +8366,9 @@ RSpec.describe "release.rake helper methods" do
         candidate_sha: "e" * 40,
         ci_branch: promotion_branch,
         record: source_record,
+        source_rc_tag: "v17.0.0.rc.10",
+        source_rc_candidate_sha: source_record.fetch("candidate_sha"),
+        source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
         ci_snapshot: json_compatible_release_value(successful_ci),
         shakaperf_record: {
           "release_branch" => promotion_branch,
@@ -7844,6 +8383,7 @@ RSpec.describe "release.rake helper methods" do
         github_repo_slug: "shakacode/react_on_rails",
         validate_accelerated_repository_publication_boundary!: nil,
         validate_final_promotion_shakaperf_publication_boundary!: nil,
+        validate_final_promotion_source_rc_tag_boundary!: nil,
         system: true,
         validate_release_tag_candidate_sha!: "e" * 40,
         validate_release_candidate_publication_boundary!: "e" * 40
@@ -7873,6 +8413,77 @@ RSpec.describe "release.rake helper methods" do
         expect(pushed).to be(true)
         expect(package_publication_started).to be(false)
       end
+    end
+
+    it "blocks package continuation when the remote tag moves after tag push" do
+      candidate_sha = "e" * 40
+      moved_sha = "d" * 40
+      success = instance_double(Process::Status, success?: true)
+      allow(self).to receive_messages(
+        system: true,
+        validate_accelerated_tag_publication_boundary!: nil,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0", "refs/tags/v17.0.0^{}"
+      ).and_return(["#{moved_sha}\trefs/tags/v17.0.0\n", success])
+      pushed = false
+      package_publication_started = false
+      allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
+
+      failure = begin
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha:
+        )
+        package_publication_started = true
+        nil
+      rescue SystemExit => error
+        error
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/remote release tag.*moved.*package publication/i)
+        expect(pushed).to be(true)
+        expect(package_publication_started).to be(false)
+      end
+      expect(Open3).to have_received(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0", "refs/tags/v17.0.0^{}"
+      )
+    end
+
+    it "uses the peeled remote SHA for an annotated accelerated RC tag" do
+      candidate_sha = "e" * 40
+      tag_object_sha = "a" * 40
+      success = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(
+        [
+          "#{tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{candidate_sha}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success
+        ]
+      )
+
+      expect(
+        validate_remote_release_tag_candidate_sha!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0.rc.10",
+          candidate_sha:,
+          phase: "package publication"
+        )
+      ).to eq(candidate_sha)
+      expect(Open3).to have_received(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      )
     end
 
     it "blocks an existing stable tag before push when HEAD moved after final gates" do
