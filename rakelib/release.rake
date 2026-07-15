@@ -450,6 +450,17 @@ def run_release_preflight_checks!(monorepo_root:, dry_run:)
   verify_gh_auth(monorepo_root:)
 end
 
+def resolve_release_version_before_auth!(version_input:, monorepo_root:, dry_run:, current_version: nil)
+  resolved_version_input = resolve_version_input(
+    version_input,
+    monorepo_root,
+    argumentless_starting_prerelease_version: current_version
+  )
+  validate_requested_version_input!(resolved_version_input)
+  run_release_preflight_checks!(monorepo_root:, dry_run:)
+  resolved_version_input
+end
+
 def current_gem_version(monorepo_root)
   version_file = File.join(monorepo_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
   content = File.read(version_file)
@@ -2160,9 +2171,28 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def confirm_release!(version:, monorepo_root:)
+def report_release_dry_run_changelog(version:, has_changelog:)
+  return if has_changelog
+
+  puts "⚠️ Prerelease dry run for #{version}: no matching non-empty CHANGELOG.md section; " \
+       "no GitHub release would be created."
+end
+
+def confirm_release!(version:, monorepo_root:, dry_run: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
+
+  if !has_changelog && !release_prerelease_version?(version)
+    abort <<~ERROR
+      ❌ Stable release #{version} requires a non-empty CHANGELOG.md section.
+
+      Refusing to continue before confirmation, tagging, or publication.
+      Stamp the changelog for #{version}, complete the final-release gates, and retry explicitly:
+        bundle exec rake "release[#{version}]"
+    ERROR
+  end
+
+  return report_release_dry_run_changelog(version:, has_changelog:) if dry_run
 
   puts ""
   puts "################################################################################"
@@ -2304,12 +2334,62 @@ def version_tagged?(monorepo_root, version)
   tagged_versions.include?(version)
 end
 
-def resolve_version_input(version_input, monorepo_root)
+def argumentless_prerelease_release_requires_explicit_version?(
+  changelog_version:,
+  current_version:,
+  starting_version: current_version
+)
+  return false unless release_prerelease_version?(starting_version)
+  return true unless changelog_version
+  return true unless release_prerelease_version?(changelog_version)
+
+  versions_to_advance = [starting_version, current_version].uniq
+  return true unless versions_to_advance.all? { |version| same_release_base?(changelog_version, version) }
+
+  changelog_gem_version = Gem::Version.new(changelog_version)
+  versions_to_advance.any? { |version| changelog_gem_version <= Gem::Version.new(version) }
+end
+
+def argumentless_prerelease_release_message(changelog_version:, current_version:)
+  stable_version = release_base_version(current_version)
+
+  <<~ERROR
+    ❌ No explicit release version was supplied.
+
+    Current version: #{current_version}
+    Latest changelog version: #{changelog_version || 'none'}
+
+    Refusing to infer stable #{stable_version} from an argument-less prerelease retry.
+
+    To resume #{current_version} publication, run:
+      bundle exec rake "release[#{current_version}]"
+
+    To prepare the final #{stable_version} release, add a non-empty CHANGELOG.md section for #{stable_version},
+    complete the final-release gates, then run:
+      bundle exec rake "release[#{stable_version}]"
+  ERROR
+end
+
+def untagged_changelog_current_version?(monorepo_root:, changelog_version:, current_version:)
+  return false unless changelog_version
+  return false unless Gem::Version.new(changelog_version) == Gem::Version.new(current_version)
+
+  !version_tagged?(monorepo_root, changelog_version)
+end
+
+def resolve_version_input(version_input, monorepo_root, current_version: nil,
+                          argumentless_starting_prerelease_version: nil)
   stripped = version_input.to_s.strip
   return stripped unless stripped.empty?
 
   changelog_version = extract_latest_changelog_version(monorepo_root:)
-  current_version = current_gem_version(monorepo_root)
+  current_version ||= current_gem_version(monorepo_root)
+  starting_version = [argumentless_starting_prerelease_version, current_version].compact.first
+
+  if argumentless_prerelease_release_requires_explicit_version?(changelog_version:, current_version:,
+                                                                starting_version:)
+    abort argumentless_prerelease_release_message(changelog_version:, current_version: starting_version)
+  end
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
     puts "Found CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
@@ -2319,9 +2399,7 @@ def resolve_version_input(version_input, monorepo_root)
   # If the latest changelog version matches the current version but hasn't been
   # tagged yet, use it. This handles the case where the changelog was updated
   # and the version bumped in a prior step (e.g., RC → stable promotion).
-  if changelog_version &&
-     Gem::Version.new(changelog_version) == Gem::Version.new(current_version) &&
-     !version_tagged?(monorepo_root, changelog_version)
+  if untagged_changelog_current_version?(monorepo_root:, changelog_version:, current_version:)
     puts "Found untagged CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
     return changelog_version
   end
@@ -2747,6 +2825,10 @@ skip git branch checks, allowing releases from non-main branches. A stable relea
 `main` (standard) or from a matching `release/X.Y.Z` branch (release-train RC -> final promotion,
 see internal/contributor-info/release-train-runbook.md).
 
+Retry safety: Never drop the version argument when resuming an interrupted release. Always retry
+the exact version, for example `bundle exec rake \"release[16.2.0.rc.1]\"`. An argument-less command
+from a prerelease checkout fails closed instead of inferring promotion to the stable version.
+
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
     - react-on-rails NPM package
@@ -2760,7 +2842,9 @@ This will update and release:
   - patch/minor/major
   - explicit version like 16.2.0
   - explicit prerelease like 16.2.0.rc.1
-  - empty (auto): use latest CHANGELOG.md version if newer, else patch bump
+  - empty (auto): from a prerelease checkout, use only a newer same-line prerelease from CHANGELOG.md;
+    otherwise abort with explicit retry guidance. From a stable checkout, use a newer CHANGELOG.md version
+    or derive a patch candidate; the stable changelog gate still requires a matching non-empty section.
 2nd argument: Dry run (true/false, default: false)
 3rd argument: Override version policy checks (true/false, default: false)
 4th argument: Override release CI gates (true/false, default: false)
@@ -2794,7 +2878,7 @@ Environment variables:
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 
 Examples:
-  rake release                                  # Use CHANGELOG.md version or patch bump
+  rake release                                  # Auto-detect version; stable targets require changelog
   rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
   rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
   rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
@@ -2827,17 +2911,23 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   # Configure output verbosity
   verbose(is_verbose)
 
-  run_release_preflight_checks!(monorepo_root:, dry_run: is_dry_run)
-
   released_gem_version = nil
   released_npm_version = nil
+  argumentless_starting_prerelease_version = if args_hash.fetch(:version, "").to_s.strip.empty?
+                                               starting_version = current_gem_version(monorepo_root)
+                                               starting_version if release_prerelease_version?(starting_version)
+                                             end
 
   with_release_checkout(monorepo_root:, dry_run: is_dry_run) do |release_root|
     release_paths_hash = release_paths(release_root)
     sh_in_dir_for_release(release_root, "git pull --rebase") unless is_dry_run
 
-    version_input = resolve_version_input(args_hash.fetch(:version, ""), release_root)
-    validate_requested_version_input!(version_input)
+    version_input = resolve_release_version_before_auth!(
+      version_input: args_hash.fetch(:version, ""),
+      monorepo_root: release_root,
+      dry_run: is_dry_run,
+      current_version: argumentless_starting_prerelease_version
+    )
 
     current_checkout_version = current_gem_version(release_root)
     resolved_target_gem_version = compute_target_gem_version(
@@ -2951,7 +3041,7 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       )
     end
 
-    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
+    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root, dry_run: is_dry_run)
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")

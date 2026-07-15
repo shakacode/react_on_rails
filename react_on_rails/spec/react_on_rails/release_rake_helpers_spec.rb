@@ -248,6 +248,52 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#confirm_release!" do
+    it "refuses a stable release with no changelog content before prompting even when input would confirm" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(nil)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
+      end.to raise_error(SystemExit, /Stable release 17\.0\.0 requires a non-empty CHANGELOG\.md section/)
+    end
+
+    it "refuses a stable dry run with no changelog content before reporting success" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(nil)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo", dry_run: true)
+      end.to raise_error(SystemExit, /Stable release 17\.0\.0 requires a non-empty CHANGELOG\.md section/)
+    end
+
+    it "warns without prompting during a prerelease dry run with no changelog content" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0.rc.10")
+        .and_return(nil)
+      expect($stdin).not_to receive(:gets)
+
+      expect do
+        confirm_release!(version: "17.0.0.rc.10", monorepo_root: "/tmp/repo", dry_run: true)
+      end.to output(/Prerelease dry run.*no matching non-empty CHANGELOG\.md section/).to_stdout
+    end
+
+    it "allows confirmation when the stable release has non-empty changelog content" do
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return("#### Breaking Changes\n\n- Final release notes")
+      allow($stdin).to receive(:gets).and_return("y\n")
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
+      end.to output(/Changelog: ✓ section found.*Proceed with release\?/m).to_stdout
+    end
+  end
+
   describe "#run_release_preflight_checks!" do
     it "checks both npm and GitHub auth before a real release" do
       expect(self).to receive(:verify_npm_auth)
@@ -264,12 +310,211 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#resolve_release_version_before_auth!" do
+    it "aborts an argument-less prerelease retry before external authentication checks" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.10")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        resolve_release_version_before_auth!(version_input: "", monorepo_root: "/tmp/repo", dry_run: false)
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+
+    it "uses the pre-pull prerelease version when a pull advances the checkout to stable" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        resolve_release_version_before_auth!(
+          version_input: "",
+          monorepo_root: "/tmp/repo",
+          dry_run: false,
+          current_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+
+    it "refuses a changelog prerelease older than the post-pull checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.12")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        resolve_release_version_before_auth!(
+          version_input: "",
+          monorepo_root: "/tmp/repo",
+          dry_run: false,
+          current_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+
+    it "refuses a changelog prerelease matching the post-pull checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.11")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        resolve_release_version_before_auth!(
+          version_input: "",
+          monorepo_root: "/tmp/repo",
+          dry_run: false,
+          current_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+
+    it "allows a changelog prerelease newer than an unchanged post-pull checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).to receive(:run_release_preflight_checks!).with(monorepo_root: "/tmp/repo", dry_run: false)
+
+      result = resolve_release_version_before_auth!(
+        version_input: "",
+        monorepo_root: "/tmp/repo",
+        dry_run: false,
+        current_version: "17.0.0.rc.10"
+      )
+
+      expect(result).to eq("17.0.0.rc.11")
+    end
+
+    it "allows a changelog prerelease newer than an advanced post-pull checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.12")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.11")
+      expect(self).to receive(:run_release_preflight_checks!).with(monorepo_root: "/tmp/repo", dry_run: false)
+
+      result = resolve_release_version_before_auth!(
+        version_input: "",
+        monorepo_root: "/tmp/repo",
+        dry_run: false,
+        current_version: "17.0.0.rc.10"
+      )
+
+      expect(result).to eq("17.0.0.rc.12")
+    end
+
+    it "refuses a changelog prerelease on a different line than the post-pull checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("18.0.0.beta.1")
+      expect(self).not_to receive(:run_release_preflight_checks!)
+
+      expect do
+        resolve_release_version_before_auth!(
+          version_input: "",
+          monorepo_root: "/tmp/repo",
+          dry_run: false,
+          current_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+  end
+
   describe "#resolve_version_input" do
+    it "preserves an explicit prerelease version without inferring from repository state" do
+      expect(self).not_to receive(:extract_latest_changelog_version)
+      expect(self).not_to receive(:current_gem_version)
+      expect(self).not_to receive(:version_tagged?)
+
+      expect(resolve_version_input("17.0.0.rc.10", "/tmp/repo")).to eq("17.0.0.rc.10")
+    end
+
     it "uses the latest changelog version when it is newer than the current gem version" do
       allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.4.0")
       allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("16.4.0")
+    end
+
+    it "refuses an argument-less prerelease retry before tag lookup instead of inferring stable promotion" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.10")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).not_to receive(:version_tagged?)
+
+      expect do
+        resolve_version_input("", "/tmp/repo")
+      end.to raise_error(
+        SystemExit,
+        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\.rc\.10\]"/m
+      )
+    end
+
+    it "refuses argument-less stable promotion from a prerelease checkout" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).not_to receive(:version_tagged?)
+
+      expect do
+        resolve_version_input("", "/tmp/repo")
+      end.to raise_error(
+        SystemExit,
+        /Refusing to infer stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\]"/m
+      )
+    end
+
+    it "refuses an argument-less prerelease retry when the changelog has no version" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return(nil)
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).not_to receive(:version_tagged?)
+
+      expect do
+        resolve_version_input("", "/tmp/repo")
+      end.to raise_error(
+        SystemExit,
+        /bundle exec rake "release\[17\.0\.0\.rc\.10\]".*non-empty CHANGELOG\.md section for 17\.0\.0/m
+      )
+    end
+
+    it "refuses an argument-less prerelease retry when the changelog prerelease is stale" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.9")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+      expect(self).not_to receive(:version_tagged?)
+
+      expect do
+        resolve_version_input("", "/tmp/repo")
+      end.to raise_error(SystemExit, /bundle exec rake "release\[17\.0\.0\.rc\.10\]"/)
+    end
+
+    it "derives stable-promotion guidance from the current prerelease when the changelog is stale" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("16.6.0")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+
+      expect do
+        resolve_version_input("", "/tmp/repo")
+      end.to raise_error(SystemExit, /stable 17\.0\.0.*bundle exec rake "release\[17\.0\.0\]"/m)
+    end
+
+    it "allows an argument-less advance to a newer prerelease from the changelog" do
+      allow(self).to receive(:extract_latest_changelog_version)
+        .with(monorepo_root: "/tmp/repo")
+        .and_return("17.0.0.rc.11")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("17.0.0.rc.10")
+
+      expect(resolve_version_input("", "/tmp/repo")).to eq("17.0.0.rc.11")
     end
 
     it "uses the current version when changelog version matches and is untagged" do
@@ -294,6 +539,21 @@ RSpec.describe "release.rake helper methods" do
       expect(self).not_to receive(:version_tagged?)
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
+    end
+
+    it "blocks an inferred stable patch candidate until matching changelog evidence exists" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.2.9")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "16.3.1")
+        .and_return(nil)
+
+      version_input = resolve_version_input("", "/tmp/repo")
+      target_version = compute_target_gem_version(current_gem_version: "16.3.0", version_input:)
+
+      expect do
+        confirm_release!(version: target_version, monorepo_root: "/tmp/repo", dry_run: true)
+      end.to raise_error(SystemExit, /Stable release 16\.3\.1 requires a non-empty CHANGELOG\.md section/)
     end
   end
 
