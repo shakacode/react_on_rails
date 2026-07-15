@@ -163,6 +163,38 @@ describe ReactOnRailsProHelper do
           expect(Rails.cache.read(expected_cache_key)).to eq(cached_html)
         end
 
+        it "replaces stale cached context whose script closing tag contains HTML whitespace" do
+          cache_key = "stale-context-whitespace-cache-hit"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+          stale_context =
+            '<script type="application/json" id="js-react-on-rails-context">{"railsEnv":"stale"}</script >'
+          cached_html = "#{stale_context}\n<div>cached component</div>".html_safe
+
+          Rails.cache.write(expected_cache_key, cached_html)
+
+          result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+
+          expect(result.scan('id="js-react-on-rails-context"').length).to eq(1)
+          expect(result).not_to include('"railsEnv":"stale"')
+          expect(result).to include("<div>cached component</div>")
+        end
+
+        it "normalizes an incomplete attribution prefix in bounded time" do
+          original_regexp_timeout = Regexp.timeout
+          incomplete_comment =
+            "<!-- Powered by React on Rails Pro (c) ShakaCode |#{' ' * 200_000}not closed"
+          cached_html = "#{incomplete_comment}<div>cached component</div>".html_safe
+          Regexp.timeout = 0.001
+
+          expect do
+            send(:normalize_cached_pro_attribution, cached_html)
+          end.not_to raise_error
+        ensure
+          Regexp.timeout = original_regexp_timeout
+        end
+
         it "returns marker-free cached content unchanged after request context is emitted" do
           marker_free_html = "<div>cached component without provider metadata</div>".html_safe
           @rendered_rails_context = true
