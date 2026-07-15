@@ -49,7 +49,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7` and a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1`. During the 17.0 release-candidate soak, use `react-on-rails-rsc@19.2.1-rc.0` until the stable package is published. Older 19.0.x RSC packages no longer satisfy the Pro 17 runtime floor.
+> **Version requirements:** React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7` and a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1`. Older 19.0.x packages and 19.2.1 prereleases no longer satisfy the Pro 17 runtime floor.
 
 ## Step 2: Configure Rails for RSC
 
@@ -636,7 +636,7 @@ React on Rails Pro 17 RSC requires the coordinated React 19.2.x / `react-on-rail
 **Fix:** Upgrade React, React DOM, and `react-on-rails-rsc` together:
 
 ```bash
-yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
+yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 ```
 
 ### Mistake 2: Forgetting the RSC bundle watcher in development
