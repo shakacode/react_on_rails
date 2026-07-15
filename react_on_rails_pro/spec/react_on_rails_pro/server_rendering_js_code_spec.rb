@@ -67,6 +67,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ReactOnRails::ReactComponent::RenderOptions,
           internal_option: async_props_block,
           streaming?: false,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
@@ -103,6 +105,8 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ReactOnRails::ReactComponent::RenderOptions,
           internal_option: nil,
           streaming?: false,
+          ppr_prerender?: false,
+          ppr_resume?: false,
           dom_id: "TestComponent-0",
           trace: false
         )
