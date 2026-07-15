@@ -33,6 +33,9 @@ module ReactOnRailsPro
     VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
     # MIRROR VALUES END
 
+    # Public compatibility alias: product-level attribution is required for every recognized plan.
+    ATTRIBUTION_REQUIRED_PLANS = VALID_PLANS
+
     # Mutex for thread-safe license status initialization.
     # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
     # See: https://bugs.ruby-lang.org/issues/20875

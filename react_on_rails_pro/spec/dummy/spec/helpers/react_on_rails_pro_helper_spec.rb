@@ -93,6 +93,47 @@ describe ReactOnRailsProHelper do
 
     describe "caching" do
       describe "ReactOnRailsProHelper.cached_react_component" do
+        it "emits attribution once across a cache miss and multiple hits" do
+          props_calls = 0
+          render_cached = lambda do
+            cached_react_component("App", cache_key: "attribution-miss-and-hits") do
+              props_calls += 1
+              { a: 1, b: 2 }
+            end
+          end
+
+          combined_result = Array.new(3) { render_cached.call }.join
+
+          expect(props_calls).to eq(1)
+          expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        end
+
+        it "replaces cached attribution with one current request-level comment" do
+          cache_key = "attribution-cache-hit"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+          stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Old Organization -->"
+          fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+          cached_html = "#{stale_comment}\n<div>cached component</div>".html_safe
+
+          Rails.cache.write(expected_cache_key, cached_html)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
+
+          first_result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+          second_result = cached_react_component("App", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+
+          combined_result = first_result + second_result
+          expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+          expect(combined_result).to include(fresh_comment)
+          expect(combined_result).not_to include("Old Organization")
+          expect(first_result).to be_html_safe
+          expect(second_result).to be_html_safe
+          expect(Rails.cache.read(expected_cache_key)).to eq(cached_html)
+        end
+
         it "caches the content" do
           props = { a: 1, b: 2 }
 
@@ -344,7 +385,7 @@ describe ReactOnRailsProHelper do
               raise "props block should not run on cache hit"
             end
 
-            expect(result).to eq("<div>cached component</div>")
+            expect(result).to end_with("<div>cached component</div>")
             expect(captured_auto_load_bundle).to be(false)
           end
 
@@ -362,13 +403,44 @@ describe ReactOnRailsProHelper do
               raise "props block should not run on cache hit"
             end
 
-            expect(result).to eq("<div>cached component</div>")
+            expect(result).to end_with("<div>cached component</div>")
             expect(captured_auto_load_bundle).to be(true)
           end
         end
       end
 
       describe "ReactOnRailsProHelper.cached_react_component_hash" do
+        it "normalizes cached componentHtml attribution without mutating the cached hash" do
+          cache_key = "hash-attribution-cache-hit"
+          expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key(
+            "ReactHelmetApp",
+            cache_key:,
+            prerender: true
+          )
+          stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | License Expired -->"
+          fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+          cached_html = "#{stale_comment}\n<div>cached hash component</div>".html_safe
+          cached_hash = { "componentHtml" => cached_html, "title" => "Cached title" }
+
+          Rails.cache.write(expected_cache_key, cached_hash)
+          allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
+
+          first_result = cached_react_component_hash("ReactHelmetApp", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+          second_result = cached_react_component_hash("ReactHelmetApp", cache_key:, auto_load_bundle: false) do
+            raise "props block should not run on cache hit"
+          end
+
+          combined_html = first_result["componentHtml"] + second_result["componentHtml"]
+          expect(combined_html.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+          expect(combined_html).to include(fresh_comment)
+          expect(combined_html).not_to include("License Expired")
+          expect(first_result["componentHtml"]).to be_html_safe
+          expect(second_result["componentHtml"]).to be_html_safe
+          expect(Rails.cache.read(expected_cache_key)).to eq(cached_hash)
+        end
+
         it "caches the content" do
           props = { helloWorldData: { name: "Mr. Server Side Rendering" } }
 
@@ -1298,11 +1370,49 @@ describe ReactOnRailsProHelper do
         @async_barrier = Async::Barrier.new
         result = send(:handle_stream_cache_hit, component_name, { auto_load_bundle: false }, false, ["cached chunk"])
 
-        expect(result).to eq("cached chunk")
+        expect(result).to end_with("cached chunk")
         expect(captured_auto_load_bundle).to be(false)
       ensure
         @async_barrier = nil
         ReactOnRails.configuration.auto_load_bundle = original_auto_load_bundle
+      end
+
+      it "strips stale attribution from every cached stream chunk and emits one current comment" do
+        stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Old Organization -->"
+        fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+        cached_chunks = [
+          "#{stale_comment}\n<div>first cached chunk</div>".html_safe,
+          "#{stale_comment}\n<div>second cached chunk</div>".html_safe
+        ]
+
+        allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
+        @async_barrier = Async::Barrier.new
+        @main_output_queue = Async::Queue.new
+
+        initial_result = send(
+          :handle_stream_cache_hit,
+          component_name,
+          { auto_load_bundle: false },
+          false,
+          cached_chunks
+        )
+        @async_barrier.wait
+        @main_output_queue.close
+        remaining_results = []
+        while (chunk = @main_output_queue.dequeue)
+          remaining_results << chunk
+        end
+        combined_result = ([initial_result] + remaining_results).join
+
+        expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_result).to include(fresh_comment)
+        expect(combined_result).not_to include("Old Organization")
+        expect(initial_result).to be_html_safe
+        expect(remaining_results).to all(be_html_safe)
+        expect(cached_chunks).to all(include(stale_comment))
+      ensure
+        @async_barrier = nil
+        @main_output_queue = nil
       end
 
       it "re-renders after revalidate_tag busts the tagged stream cache" do
@@ -1804,7 +1914,7 @@ describe ReactOnRailsProHelper do
           end
         end
 
-        expect(result).to eq("<div>cached buffered stream</div>")
+        expect(result).to end_with("<div>cached buffered stream</div>")
         expect(result).to be_html_safe
         expect(captured_auto_load_bundle).to be(false)
       ensure
@@ -1976,6 +2086,37 @@ describe ReactOnRailsProHelper do
           <script>window.ReactOnRailsReveal && window.ReactOnRailsReveal("#{component_name}")</script>
           <script src="/packs/generated/PublicPageClientEffects.js"></script>
         HTML
+      end
+
+      it "replaces cached static RSC attribution once per request" do
+        stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Invalid License -->"
+        fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+        cached_html = "#{stale_comment}\n<div>cached static RSC</div>".html_safe
+
+        Rails.cache.write(static_rsc_cache_key, cached_html)
+        allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
+
+        render_cached = lambda do
+          cached_static_rsc_component(
+            component_name,
+            cache_key: ["static-rsc-cache-spec", component_name],
+            auto_load_bundle: false,
+            cache_options: { expires_in: 60 }
+          ) do
+            raise "props block should not run on cache hit"
+          end
+        end
+
+        first_result = render_cached.call
+        second_result = render_cached.call
+        combined_result = first_result + second_result
+
+        expect(combined_result.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_result).to include(fresh_comment)
+        expect(combined_result).not_to include("Invalid License")
+        expect(first_result).to be_html_safe
+        expect(second_result).to be_html_safe
+        expect(Rails.cache.read(static_rsc_cache_key)).to eq(cached_html)
       end
 
       it "caches the stripped static HTML and preserves unrelated scripts" do
@@ -2174,7 +2315,7 @@ describe ReactOnRailsProHelper do
           end
         end
 
-        expect(result).to eq("<div>cached static rsc</div>")
+        expect(result).to end_with("<div>cached static rsc</div>")
         expect(result).to be_html_safe
         expect(captured_auto_load_bundle).to be(false)
       ensure
@@ -2307,13 +2448,15 @@ describe ReactOnRailsProHelper do
         expect(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path)
           .once
           .and_return(Rails.root.join("tmp/missing-static-rsc-client-manifest.json").to_s)
+        miss_result = nil
+        hit_result = nil
 
         Sync do
           stub_pro_bundle_hashes
           allow(self).to receive(:buffered_stream_react_component).and_return(static_rsc_html.html_safe)
 
-          render_cached.call
-          render_cached.call
+          miss_result = render_cached.call
+          hit_result = render_cached.call
         end
 
         expect(diagnostics.size).to eq(2)
@@ -2324,7 +2467,7 @@ describe ReactOnRailsProHelper do
         expect(diagnostics.first[:auto_load_bundle]).to be(false)
         expect(diagnostics.first[:html]).to include(
           raw_bytes: static_rsc_html.bytesize,
-          cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize
+          cached_bytes: miss_result.bytesize
         )
         expect(diagnostics.first[:rsc_payload]).to include(
           bootstrap_script_count: 3,
@@ -2341,7 +2484,7 @@ describe ReactOnRailsProHelper do
           entries: [],
           unavailable_reason: "cache_hit"
         )
-        expect(diagnostics.second[:html]).to include(cached_bytes: Rails.cache.read(static_rsc_cache_key).bytesize)
+        expect(diagnostics.second[:html]).to include(cached_bytes: hit_result.bytesize)
         expect(notifications.first[:component]).to eq(component_name)
       ensure
         ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
@@ -2736,6 +2879,36 @@ describe ReactOnRailsProHelper do
         expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
       end
 
+      it "normalizes cached async attribution once per request" do
+        cache_key = "async-attribution-cache-hit"
+        expected_cache_key = ReactOnRailsPro::Cache.react_component_cache_key("App", cache_key:)
+        stale_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | License Expired -->"
+        fresh_comment = "<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->"
+        cached_html = "#{stale_comment}\n<div>cached async component</div>".html_safe
+
+        Rails.cache.write(expected_cache_key, cached_html)
+        allow(ReactOnRailsPro::Utils).to receive(:pro_attribution_comment).and_return(fresh_comment)
+
+        first_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) do
+          raise "props block should not run on cache hit"
+        end
+        second_result = cached_async_react_component("App", cache_key:, auto_load_bundle: false) do
+          raise "props block should not run on cache hit"
+        end
+        first_html = first_result.value
+        second_html = second_result.value
+        combined_html = first_html + second_html
+
+        expect(first_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(second_result).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
+        expect(combined_html.scan("<!-- Powered by React on Rails Pro").length).to eq(1)
+        expect(combined_html).to include(fresh_comment)
+        expect(combined_html).not_to include("License Expired")
+        expect(first_html).to be_html_safe
+        expect(second_html).to be_html_safe
+        expect(Rails.cache.read(expected_cache_key)).to eq(cached_html)
+      end
+
       it "respects explicit auto_load_bundle false on cache hits" do
         original_auto_load_bundle = ReactOnRails.configuration.auto_load_bundle
         ReactOnRails.configuration.auto_load_bundle = true
@@ -2770,7 +2943,8 @@ describe ReactOnRailsProHelper do
         second_value = cached_async_react_component("RandomValue", cache_key:) { { a: 1 } }
         second_html = second_value.value
 
-        expect(second_html).to eq(first_html)
+        expect(second_html).to eq(first_html.sub(/\A<!-- Powered by React on Rails Pro.*?-->\n/m, ""))
+        expect((first_html + second_html).scan("<!-- Powered by React on Rails Pro").length).to eq(1)
       end
 
       it "doesn't call the block on cache hit" do
@@ -2801,7 +2975,9 @@ describe ReactOnRailsProHelper do
           { a: 1 }
         end
         expect(second_value).to be_a(ReactOnRailsPro::ImmediateAsyncValue)
-        expect(second_value.value).to eq(first_html)
+        second_html = second_value.value
+        expect(second_html).to eq(first_html.sub(/\A<!-- Powered by React on Rails Pro.*?-->\n/m, ""))
+        expect((first_html + second_html).scan("<!-- Powered by React on Rails Pro").length).to eq(1)
 
         expect(ReactOnRailsPro.revalidate_tag("async-tag")).to eq(1)
 

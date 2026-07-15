@@ -34,6 +34,8 @@ module ReactOnRailsProHelper
   SCRIPT_CLOSE_TAG_LENGTH = 8
   STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = "data-react-on-rails-rsc-payload"
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
+  PRO_ATTRIBUTION_COMMENT_PATTERN =
+    /<!--\s*Powered by React on Rails Pro \(c\) ShakaCode(?:\s*\|(?:(?!-->).)*)?\s*-->\s*/m
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -452,8 +454,32 @@ module ReactOnRailsProHelper
     end
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
     load_pack_for_cached_react_component(component_name, options) if cache_hit
+    result = normalize_cached_pro_attribution(result) if cache_hit
 
     add_component_cache_metadata(result, cache_key, cache_hit)
+  end
+
+  def normalize_cached_pro_attribution(result)
+    return normalize_cached_pro_attribution_html(result) if result.is_a?(String)
+
+    return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
+
+    result.merge(
+      ReactOnRails::Helper::COMPONENT_HTML_KEY =>
+        normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY])
+    )
+  end
+
+  def normalize_cached_pro_attribution_html(html)
+    was_html_safe = html.html_safe?
+    normalized_html = html.gsub(PRO_ATTRIBUTION_COMMENT_PATTERN, "")
+
+    unless @rendered_rails_context
+      @rendered_rails_context = true
+      normalized_html = "#{ReactOnRailsPro::Utils.pro_attribution_comment}\n#{normalized_html}"
+    end
+
+    was_html_safe ? normalized_html.html_safe : normalized_html
   end
 
   def add_component_cache_metadata(result, cache_key, cache_hit)
@@ -596,6 +622,7 @@ module ReactOnRailsProHelper
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
+    result = normalize_cached_pro_attribution(result) if cache_hit
     result
   end
 
@@ -1026,7 +1053,8 @@ module ReactOnRailsProHelper
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
-    initial_result, *rest_chunks = cached_chunks
+    normalized_chunks = cached_chunks.map { |chunk| normalize_cached_pro_attribution(chunk) }
+    initial_result, *rest_chunks = normalized_chunks
 
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
@@ -1122,7 +1150,8 @@ module ReactOnRailsProHelper
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
       load_pack_for_cached_react_component(component_name, cache_options)
-      return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
+      normalized_result = normalize_cached_pro_attribution(cached_result)
+      return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }

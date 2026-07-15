@@ -69,18 +69,38 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   // with Ruby's Rails.env.production? check
   const status = getLicenseStatus();
   const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILS_ENV === 'production';
-  const logLicenseIssue = isProduction ? log.warn.bind(log) : log.info.bind(log);
+  const logLicenseIssue = (summary: string, productionAction: string, nonProductionAction: string) => {
+    if (isProduction) {
+      log.warn(
+        `[React on Rails Pro] ${summary}. ` +
+          'Production Use of React on Rails Pro requires an appropriate license. ' +
+          `If this deployment is Production Use, ${productionAction}`,
+      );
+    } else {
+      log.info(`[React on Rails Pro] ${summary}. ${nonProductionAction}`);
+    }
+  };
 
   if (status === 'valid') {
     log.info('[React on Rails Pro] License validated successfully.');
   } else if (status === 'missing') {
-    logLicenseIssue('[React on Rails Pro] No license found. Get a license at https://pro.reactonrails.com/');
+    logLicenseIssue(
+      'No license found',
+      'get a license at https://pro.reactonrails.com/',
+      'Get a license at https://pro.reactonrails.com/',
+    );
   } else if (status === 'expired') {
     logLicenseIssue(
-      '[React on Rails Pro] License has expired. Renew your license at https://pro.reactonrails.com/',
+      'License has expired',
+      'renew your license at https://pro.reactonrails.com/',
+      'Renew your license at https://pro.reactonrails.com/',
     );
   } else {
-    logLicenseIssue('[React on Rails Pro] Invalid license. Get a license at https://pro.reactonrails.com/');
+    logLicenseIssue(
+      'Invalid license',
+      'get a license at https://pro.reactonrails.com/',
+      'Get a license at https://pro.reactonrails.com/',
+    );
   }
 
   // Store config in app state. From now it can be loaded by any module using getConfig():

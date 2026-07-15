@@ -59,6 +59,12 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
+  describe "ATTRIBUTION_REQUIRED_PLANS" do
+    it "preserves the public constant as all recognized plans" do
+      expect(described_class::ATTRIBUTION_REQUIRED_PLANS).to equal(described_class::VALID_PLANS)
+    end
+  end
+
   describe ".license_status" do
     context "with valid license in ENV" do
       before do
