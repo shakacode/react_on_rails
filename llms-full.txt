@@ -6766,11 +6766,11 @@ This is the React-blessed replacement for the classic "keep the inactive tab ali
 
 ## Version requirements
 
-| Layer                              | Requirement                                                                                                                                                                                                                         |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `react` / `react-dom` in your app  | **19.2.0 or later** (`Activity` does not exist in earlier versions, including 19.0/19.1)                                                                                                                                            |
-| `react_on_rails` gem + npm package | Any current version — the package's peer dependency is `react >= 16`, so React on Rails does not constrain you; just upgrade `react`/`react-dom` in **your app's** bundle                                                           |
-| RSC / Pro streaming path           | React on Rails Pro 17 RSC uses React/React DOM 19.2.x with patch >= 19.2.7 and the supported `react-on-rails-rsc` 19.2.x line (`>= 19.2.1`; `19.2.1-rc.0` during the RC soak), so `<Activity>` is available on that coordinated set |
+| Layer                              | Requirement                                                                                                                                                                                   |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `react` / `react-dom` in your app  | **19.2.0 or later** (`Activity` does not exist in earlier versions, including 19.0/19.1)                                                                                                      |
+| `react_on_rails` gem + npm package | Any current version — the package's peer dependency is `react >= 16`, so React on Rails does not constrain you; just upgrade `react`/`react-dom` in **your app's** bundle                     |
+| RSC / Pro streaming path           | React on Rails Pro 17 RSC uses React/React DOM 19.2.x with patch >= 19.2.7 and stable `react-on-rails-rsc >= 19.2.1` on the 19.2.x line, so `<Activity>` is available on that coordinated set |
 
 `<Activity>` is a regular React feature inside your components. React on Rails needs no configuration for it — it works with the standard `react_component` helper in both client-side rendering and server-side rendering with hydration.
 
@@ -25509,7 +25509,7 @@ Before starting any component migration, verify these items. Skipping them is th
 
 - [ ] **React 19.2 installed** -- both `react` and `react-dom` on 19.2.x with patch `>= 19.2.7`, with matching versions (`yarn why react` shows no duplicates)
 - [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **`react-on-rails-rsc` 19.2.x with patch `>= 19.2.1`** -- during the React on Rails Pro 17 RC soak, use `19.2.1-rc.0`; check with `yarn why react-on-rails-rsc`
+- [ ] **Stable `react-on-rails-rsc` 19.2.x with patch `>= 19.2.1`** -- install `19.2.1` or later on the 19.2.x line; check with `yarn why react-on-rails-rsc`
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
@@ -25610,7 +25610,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7` and a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1`. During the 17.0 release-candidate soak, use `react-on-rails-rsc@19.2.1-rc.0` until the stable package is published. Older 19.0.x RSC packages no longer satisfy the Pro 17 runtime floor.
+> **Version requirements:** React on Rails Pro 17 RSC requires React/React DOM 19.2.x with patch `>= 19.2.7` and a stable `react-on-rails-rsc` 19.2.x package with patch `>= 19.2.1`. Older 19.0.x packages and 19.2.1 prereleases no longer satisfy the Pro 17 runtime floor.
 
 ## Step 2: Configure Rails for RSC
 
@@ -26195,7 +26195,7 @@ React on Rails Pro 17 RSC requires the coordinated React 19.2.x / `react-on-rail
 **Fix:** Upgrade React, React DOM, and `react-on-rails-rsc` together:
 
 ```bash
-yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1-rc.0
+yarn add react@~19.2.7 react-dom@~19.2.7 react-on-rails-rsc@19.2.1
 ```
 
 ### Mistake 2: Forgetting the RSC bundle watcher in development
@@ -29853,9 +29853,8 @@ React on Rails Pro 17 RSC release set. Key constraints:
 
 - The fix landed in `react-on-rails-rsc` 19.2.0-rc.3 and is included in the 19.2.1 package line. Check the
   [react_on_rails_rsc releases](https://github.com/shakacode/react_on_rails_rsc/releases)
-  and the Pro release notes for the exact package to install. React on Rails Pro 17 RC packages use
-  `react-on-rails-rsc@19.2.1-rc.0`; the 17.0 final release requires `react-on-rails-rsc >= 19.2.1`
-  on the supported RSC 19.2.x package line.
+  and the Pro release notes for the exact package to install. React on Rails Pro 17 requires stable
+  `react-on-rails-rsc >= 19.2.1` on the supported RSC 19.2.x package line.
 - **Do not** bump `react-on-rails-rsc` on its own; it must be upgraded together with a compatible
   React, React DOM, and React on Rails Pro set, or the Pro node renderer's peer-compatibility check
   can fail at startup.

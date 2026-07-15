@@ -134,14 +134,17 @@ describe('runRscPeerCompatibilityCheck', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('does not warn for the coordinated RC package line', () => {
-    expect(() =>
-      runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.1-rc.0'),
-      }),
-    ).not.toThrow();
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
+  it.each(['19.2.1-rc.0', '19.2.1-rc.1'])(
+    'throws for the superseded prerelease package line %s',
+    (prerelease) => {
+      expect(() =>
+        runRscPeerCompatibilityCheck({
+          resolveVersion: resolveVersions(prerelease),
+        }),
+      ).toThrow(new RegExp(`>= ${minimumVersion}`));
+      expect(warnSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it('downgrades a hard error to a warning when the env hatch is set', () => {
     expect(() =>
@@ -176,7 +179,7 @@ describe('runRscPeerCompatibilityCheck', () => {
   it('throws when React 19.0 is paired with the React 19.2 RSC package line', () => {
     expect(() =>
       runRscPeerCompatibilityCheck({
-        resolveVersion: resolveVersions('19.2.1-rc.0', '19.0.4'),
+        resolveVersion: resolveVersions(minimumVersion, '19.0.4'),
       }),
     ).toThrow(/Incompatible react/);
     expect(warnSpy).not.toHaveBeenCalled();
