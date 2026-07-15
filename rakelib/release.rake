@@ -1340,7 +1340,9 @@ end
 def selected_accelerated_shakaperf_snapshot(repo_slug:, monorepo_root:, ref:, head_sha:, target_version:,
                                             release_started_at:, selection:, force_exact_head_dispatch:)
   existing_run = selection.fetch(:exact_run)
+  prerun = selection.fetch(:prerun)
   exact_state = accelerated_shakaperf_run_state!(repo_slug:, run: existing_run, unordered: false)
+  prerun_state = accelerated_shakaperf_run_state!(repo_slug:, run: prerun, unordered: false)
   return nil if force_exact_head_dispatch && exact_state != :none
 
   if exact_state == :active
@@ -1357,8 +1359,6 @@ def selected_accelerated_shakaperf_snapshot(repo_slug:, monorepo_root:, ref:, he
     return exact_snapshot if exact_snapshot
   end
 
-  prerun = selection.fetch(:prerun)
-  prerun_state = accelerated_shakaperf_run_state!(repo_slug:, run: prerun, unordered: false)
   return nil if force_exact_head_dispatch
   return unless prerun_state == :success
 

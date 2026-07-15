@@ -2527,6 +2527,94 @@ RSpec.describe "release.rake helper methods" do
       expect(result).to include(status: "pending", run_id: 123_456)
     end
 
+    it "classifies a selected terminal pre-run before reusing an active exact-head run (V62)" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      active_exact_run = {
+        "databaseId" => 123_456,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(ref:, head_sha:, target_version:),
+        "headSha" => head_sha,
+        "status" => "in_progress",
+        "conclusion" => nil,
+        "createdAt" => "2026-07-14T13:00:00Z",
+        "startedAt" => "2026-07-14T13:00:05Z",
+        "updatedAt" => "2026-07-14T13:01:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/123456"
+      }
+      prerun = {
+        "databaseId" => 222_222,
+        "attempt" => 1,
+        "displayTitle" => shakaperf_release_gate_display_title(
+          ref:, head_sha: "e" * 40, target_version:
+        ),
+        "headSha" => "e" * 40,
+        "status" => "completed",
+        "conclusion" => "failure",
+        "createdAt" => "2026-07-14T12:00:00Z",
+        "startedAt" => "2026-07-14T12:00:05Z",
+        "updatedAt" => "2026-07-14T12:30:00Z",
+        "url" => "https://github.com/shakacode/react_on_rails/actions/runs/222222"
+      }
+      terminal_cases = {
+        "known failure" => [prerun, /known ShakaPerf failure/i],
+        "unknown terminal conclusion" => [prerun.merge("conclusion" => "future_failure"), /metadata|unknown/i]
+      }
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      allow(self).to receive(:shakaperf_release_gate_run_evidence_rejection).and_return("evidence is stale")
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      aggregate_failures do
+        terminal_cases.each do |label, (terminal_prerun, expected_error)|
+          [[active_exact_run, terminal_prerun], [terminal_prerun, active_exact_run]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, expected_error), "#{label}, order #{order}"
+          end
+        end
+
+        successful_prerun = prerun.merge("conclusion" => "success")
+        active_prerun = prerun.merge("status" => "in_progress", "conclusion" => nil)
+        unrelated_prerun = successful_prerun.merge(
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: "e" * 40, target_version: "17.0.0.rc.9"
+          )
+        )
+        control_sets = {
+          "absent pre-run" => [active_exact_run],
+          "successful or stale successful pre-run" => [active_exact_run, successful_prerun],
+          "active pre-run" => [active_exact_run, active_prerun],
+          "canonically unrelated pre-run" => [active_exact_run, unrelated_prerun]
+        }
+        control_sets.each do |label, records|
+          [records, records.reverse].uniq.each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            result = run_accelerated_shakaperf_release_gate!(
+              monorepo_root: "/tmp/repo",
+              ref:,
+              head_sha:,
+              target_version:,
+              release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+            )
+            expect(result).to include(status: "pending", run_id: 123_456), "#{label}, order #{order}"
+          end
+        end
+      end
+      expect(self).not_to have_received(:shakaperf_release_gate_run_evidence_rejection)
+    end
+
     it "blocks an existing active exact-head run that already has a terminal conclusion" do
       run = {
         "databaseId" => 123_456,
