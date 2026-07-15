@@ -53,3 +53,5 @@ This is an isolation benchmark, not the final Rails onboarding comparison reques
 Overlay attachment is a useful smoke check, not an overlay-quality score. Click-to-editor remains explicitly unverified because it depends on local editor protocol setup. Configuration line counts are descriptive and should not be treated as equal to concepts a new user must understand without a separate user study or generated-app audit.
 
 Therefore, use this artifact to refine a future full Rails-vs-Rails benchmark and to catch large local regressions. Do not use it alone to publish “parity,” “faster,” “near-instant,” “sub-second,” or onboarding-superiority claims.
+
+<!-- Verification-only change for the post-merge workflow exercise in #4627. -->
