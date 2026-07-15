@@ -756,6 +756,15 @@ describe ReactOnRailsProHelper do
     end
   end
 
+  describe "#rsc_payload_react_component" do
+    it "rejects RSC payload rendering when RSC support is disabled" do
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+
+      expect { rsc_payload_react_component("RscEchoProps") }
+        .to raise_error(ReactOnRailsPro::Error, /requires enable_rsc_support to be true/)
+    end
+  end
+
   describe "html_streaming_react_component" do
     include StreamingTestHelpers
 

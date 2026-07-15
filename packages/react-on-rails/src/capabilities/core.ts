@@ -294,6 +294,10 @@ export function createCoreCapability(registries: Registries) {
       throw new Error('reactOnRailsStoreLoaded requires the react-on-rails-pro package.');
     },
 
+    isServerStreamingSupported(): boolean {
+      throw new Error('isServerStreamingSupported requires the react-on-rails-pro package.');
+    },
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     streamServerRenderedReactComponent(...args: any[]): any {
       void args;

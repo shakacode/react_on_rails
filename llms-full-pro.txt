@@ -1045,7 +1045,8 @@ See [License Configuration](#license-configuration-production-only) below for ot
 
 > **Using React 18, or not using RSC?** Skip this section and do not install
 > `react-on-rails-rsc` — it is an **optional** peer dependency needed only when RSC
-> support is enabled. React on Rails Pro works with React 18; only React Server
+> support is enabled. React on Rails Pro works with React 18, including non-RSC
+> `stream_react_component` with synchronous props. Async props and React Server
 > Components require React 19, and RSC stays disabled unless you set
 > `config.enable_rsc_support = true` (the default is `false`).
 
@@ -1745,7 +1746,7 @@ Already using React on Rails? Upgrading to Pro is straightforward: swap the gem 
 Pro adds performance and rendering features on top of everything in React on Rails OSS:
 
 - **[React Server Components](./react-server-components/tutorial.md)** - RSC with full Rails integration
-- **[Streaming SSR](../oss/building-features/streaming-server-rendering.md)** - Progressive server rendering with React 19
+- **[Streaming SSR](../oss/building-features/streaming-server-rendering.md)** - Progressive non-RSC rendering with React 18 or 19; async props and RSC require React 19
 - **[Fragment Caching](../oss/building-features/caching.md)** - Cache rendered components and skip prop evaluation entirely
 - **Prerender Caching** ([`config.prerender_caching`](../oss/configuration/configuration-pro.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
 - **[Node Renderer](../oss/building-features/node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
@@ -1906,10 +1907,13 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 ## Prerequisites
 
 - React on Rails Pro
-- React 19
+- React 18 or 19 for `stream_react_component`; React 19.2.x with patch 19.2.7 or newer for async props and React Server Components
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
 - For async props (streaming each slow prop independently): React Server Components enabled — `config.enable_rsc_support = true`
+
+React 18 support is scoped to non-RSC `stream_react_component` with synchronous props. Async props,
+`stream_react_component_with_async_props`, and React Server Components require React 19.2.x with patch 19.2.7 or newer.
 
 ## Progressive Data with Async Props
 
