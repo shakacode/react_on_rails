@@ -514,6 +514,38 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
+    test('a registration with a confirmed no-map result never reads, even if marked retryable', async () => {
+      // `sourceMapJson: null` means "confirmed no usable map for this generation".
+      // It is terminal on its own, not because preload happens to pair it with
+      // `retryMissingSourceMap: false` — this pins that invariant so a future
+      // preload change cannot silently fall back into retry churn.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+      const registration = registerBundleForSourceMaps(
+        bundlePath,
+        0,
+        bundleContents,
+        /* preloadedSourceMapJson */ null,
+        /* retryMissingSourceMap */ true,
+      );
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        // A usable map is sitting on disk; the confirmed-null registration must
+        // never consult it for this generation.
+        expect(readFileSyncSpy.mock.calls.map(([filePath]) => filePath)).not.toContain(mapPath);
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
+
     test('oversized external map warns once per map path across repeated lookups', async () => {
       const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);

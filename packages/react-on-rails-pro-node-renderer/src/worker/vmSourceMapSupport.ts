@@ -673,14 +673,20 @@ function loadSourceMapForBundle(
         ? extractSourceMappingUrl(readRegisteredBundleContentsForSourceMapLookup(bundleFilePath))
         : (registration.sourceMappingUrl ?? undefined);
 
+    // A registration's own null means "confirmed no usable map for this VM
+    // generation", which is terminal by definition. Say so here rather than
+    // letting `?? undefined` coerce it into the retryable `missing` path and
+    // relying on the caller's `shouldRetryMissingSourceMap` check to settle it.
+    if (registration.sourceMapJson === null) {
+      return { status: 'terminal' };
+    }
+
+    // The reader returns null only for an oversized map — also terminal.
     const sourceMapJson =
       registration.sourceMapJson === undefined
         ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl, registration.realBundleDirectory)
-        : (registration.sourceMapJson ?? undefined);
+        : registration.sourceMapJson;
 
-    // Only the reader returns null, and only for an oversized map. A
-    // registration's own null ("confirmed no usable map") is coerced to
-    // undefined above and settles through the `missing` path as before.
     if (sourceMapJson === null) {
       return { status: 'terminal' };
     }
