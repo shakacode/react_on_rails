@@ -271,14 +271,18 @@ serialize the sequence:
    authorization, retain its branch unless deletion is separately authorized,
    and replace it with source-atomic PRs.
 2. Fetch the target release branch. Using that refreshed ref, verify the source
-   PR is merged, is a release stabilizer, and is not already present or
-   superseded on `release/X.Y.Z`.
+   PR is merged, is a release stabilizer, its patch is still live on refreshed
+   `origin/main`, and it is not already present or superseded on
+   `release/X.Y.Z`. If the source was reverted or superseded on `main`, stop
+   unless a maintainer renews the backport approval with that current state.
 3. If step 1 found a valid backport PR, update its branch onto the current
    release tip under the repository's branch-rewrite policy. Repeat the
    presence and supersession checks, then rerun validation, QA, and review on
    the updated current head. Otherwise, create a branch from the fetched tip.
 4. On a new branch, resolve the complete source shape before cherry-picking:
-   - For a single-parent squash commit, use `git cherry-pick -x <source-sha>`.
+   - For a source PR that landed as exactly one single-parent commit, whether by
+     squash merge or a one-commit rebase merge, use
+     `git cherry-pick -x <source-sha>`.
    - For a true multi-parent merge commit, use
      `git cherry-pick -m 1 -x <source-sha>` and record the mainline-parent
      choice.
@@ -288,12 +292,14 @@ serialize the sequence:
      commit oldest-first with `git cherry-pick -x <source-sha>` only after the
      maintainer-approved merge plan required by step 7 exists. Stop if the
      complete mapping cannot be proven or that merge plan is absent.
-5. After any source-shape path, normalize every release commit message to
-   exactly one direct `(cherry picked from commit <source-sha>)` footer. If a
+5. If a cherry-pick conflicts, preserve release-only divergence while resolving
+   it, record the source SHA and every non-mechanical resolution in the PR, and
+   complete the operation with `git cherry-pick --continue` before inspecting
+   the resulting commit message.
+6. After any source-shape path, normalize every resulting release commit message
+   to exactly one direct `(cherry picked from commit <source-sha>)` footer. If a
    source commit already has inherited `-x` provenance, record that deeper
    lineage in the PR and remove its footer from the release commit message.
-6. Preserve release-only divergence while resolving conflicts; record the
-   source SHA and every non-mechanical resolution in the PR.
 7. Run the release-phase validation, QA, and review gates on the current head.
    A backport with exactly one source commit may be squash-merged after copying
    its exact direct `(cherry picked from commit <source-sha>)` footer into the

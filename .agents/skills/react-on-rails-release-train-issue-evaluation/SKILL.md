@@ -24,6 +24,9 @@ source PR per release backport PR:
 - Process them serially. Merge one backport, fetch the new release tip, then
   update a reused PR onto that tip or branch the next. Rerun validation, QA, and
   review on the updated head before merging.
+- Before updating or branching, confirm each selected source patch is still live
+  on refreshed `origin/main`. A source reverted or superseded on `main` requires
+  renewed maintainer approval before backporting.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
   validation, QA evidence, review cycle, and rollback boundary. Every commit
   created by a `main`-to-release backport and landed on the release branch must
