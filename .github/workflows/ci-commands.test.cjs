@@ -70,6 +70,7 @@ async function runCommand({
   dispatchedRunOverrides = {},
   files,
   labels = [],
+  nowMs,
   pullRequest,
   pullRequests,
   runListError,
@@ -206,14 +207,17 @@ async function runCommand({
   };
 
   const originalSetTimeout = global.setTimeout;
+  const originalDateNow = Date.now;
   global.setTimeout = (callback) => {
     callback();
     return 0;
   };
+  if (nowMs !== undefined) Date.now = () => nowMs;
   try {
     await executeWorkflow(github, context, core);
   } finally {
     global.setTimeout = originalSetTimeout;
+    Date.now = originalDateNow;
   }
   return calls;
 }
@@ -1026,6 +1030,66 @@ test('a proof whose exact run is absent does not suppress a retry', async () => 
   const calls = await runCommand({ body: '+ci-force-full', comments: [proof] });
 
   assert.equal(calls.dispatches.length, 9);
+});
+
+test('a delayed command gives its just-completed dispatch proof the full visibility grace period', async () => {
+  const dispatchCompletedAt = '2026-07-16T08:05:00.000Z';
+  const firstCalls = await runCommand({
+    body: '+ci-run-hosted',
+    nowMs: Date.parse(dispatchCompletedAt),
+  });
+  const resultComment = firstCalls.comments.at(-1);
+  const marker = coverageMarkerFrom(resultComment);
+
+  assert.equal(marker.requested_at, dispatchCompletedAt);
+  assert.equal(firstCalls.dispatches.length, 9);
+
+  const priorProof = {
+    body: resultComment,
+    created_at: dispatchCompletedAt,
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const repeatedCalls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [priorProof],
+    nowMs: Date.parse(dispatchCompletedAt),
+  });
+
+  assert.equal(repeatedCalls.dispatches.length, 0);
+  assert.match(repeatedCalls.comments.at(-1), /Skipped 9 workflow\(s\) with equivalent exact-head coverage/);
+});
+
+test('a just-created future-skewed proof remains pending without duplicate dispatches', async () => {
+  const nowMs = Date.parse('2026-07-16T08:05:00.000Z');
+  const requestedAt = '2026-07-16T08:05:30.000Z';
+  const runIds = Object.fromEntries(
+    hostedWorkflowFiles.map((workflowFile, index) => [workflowFile, 700 + index]),
+  );
+  const proof = {
+    body: `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+      head_sha: 'current-head-sha',
+      pull_request_number: 42,
+      base_ref: 'release/17.0.0',
+      base_sha: 'base-sha',
+      requested_mode: 'force-full',
+      requested_at: requestedAt,
+      workflows: hostedWorkflowFiles,
+      run_ids: runIds,
+    })} -->`,
+    created_at: requestedAt,
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+
+  const calls = await runCommand({
+    body: '+ci-force-full',
+    comments: [proof],
+    nowMs,
+  });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.match(calls.comments.at(-1), /Skipped 9 workflow\(s\) with equivalent exact-head coverage/);
 });
 
 test('a newly recorded exact run ID gets a bounded visibility grace period', async () => {

@@ -203,8 +203,8 @@ jobs:
                 return observedRunState([exactRun]);
               }
 
-              const proofAgeMs = Date.now() - Date.parse(proof.requested_at);
-              return proofAgeMs >= 0 && proofAgeMs <= dispatchRunVisibilityGraceMs
+              const proofAgeMs = Math.max(0, Date.now() - Date.parse(proof.requested_at));
+              return proofAgeMs <= dispatchRunVisibilityGraceMs
                 ? 'pending'
                 : 'missing';
             }
@@ -230,7 +230,7 @@ jobs:
                 base_ref: baseRef,
                 base_sha: baseSha,
                 requested_mode: requestedMode,
-                requested_at: commentCreatedAt,
+                requested_at: new Date(Date.now()).toISOString(),
                 workflows,
                 run_ids: runIds,
                 reused,
