@@ -42,6 +42,7 @@ jobs:
             const ciCommandSerializationVisibilityDelayMs = 5000;
             const ciCommandSerializationPollDelayMs = 5000;
             const ciCommandSerializationMaxAttempts = 12;
+            const ciCommandSerializationLookbackMs = 24 * 60 * 60 * 1000;
             const dispatchRunVisibilityGraceMs = 2 * 60 * 1000;
             const dispatchRunValidationPollDelayMs = 2000;
             const dispatchRunValidationMaxAttempts = 3;
@@ -567,6 +568,8 @@ jobs:
                 return { status: 'UNKNOWN', reason: 'Current CI Commands workflow run ID is unavailable.' };
               }
 
+              const createdLowerBound =
+                `>=${new Date(Date.now() - ciCommandSerializationLookbackMs).toISOString()}`;
               await sleep(ciCommandSerializationVisibilityDelayMs);
               for (let attempt = 1; attempt <= ciCommandSerializationMaxAttempts; attempt += 1) {
                 let runs;
@@ -576,6 +579,7 @@ jobs:
                     repo,
                     workflow_id: 'ci-commands.yml',
                     event: 'issue_comment',
+                    created: createdLowerBound,
                     per_page: 100
                   });
                 } catch (error) {

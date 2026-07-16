@@ -84,6 +84,7 @@ async function runCommand({
     failures: [],
     labels: [],
     reactions: [],
+    serializationQueries: [],
     workflowRunReads: [],
   };
   const pr = pullRequest || defaultPullRequest();
@@ -143,6 +144,7 @@ async function runCommand({
       if (endpoint === endpoints.listFiles) return files || [{ filename: 'app/models/example.rb' }];
       if (endpoint === endpoints.listLabelsOnIssue) return labels.map((name) => ({ name }));
       if (endpoint === endpoints.listWorkflowRuns) {
+        calls.serializationQueries.push(options);
         assert.equal(options.workflow_id, 'ci-commands.yml');
         assert.equal(options.event, 'issue_comment');
         if (serializationRunListError) throw serializationRunListError;
@@ -330,6 +332,35 @@ test('a simultaneous same-head command waits for the older command proof before 
 
   assert.equal(calls.dispatches.length, 0);
   assert.match(calls.comments.at(-1), /Skipped 9 workflow\(s\) with equivalent exact-head coverage/);
+});
+
+test('every serialization poll queries only recent CI command runs', async () => {
+  const nowMs = Date.parse('2026-07-16T08:05:00.000Z');
+  const olderCommandRun = {
+    event: 'issue_comment',
+    id: 99,
+    path: '.github/workflows/ci-commands.yml',
+  };
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    ciCommandRunSnapshots: [
+      [{ ...olderCommandRun, status: 'in_progress' }],
+      [{ ...olderCommandRun, status: 'queued' }],
+      [{ ...olderCommandRun, status: 'completed' }],
+    ],
+    nowMs,
+  });
+  const expectedQuery = {
+    owner: 'shakacode',
+    repo: 'react_on_rails',
+    workflow_id: 'ci-commands.yml',
+    event: 'issue_comment',
+    created: '>=2026-07-15T08:05:00.000Z',
+    per_page: 100,
+  };
+
+  assert.equal(calls.serializationQueries.length, 3);
+  for (const query of calls.serializationQueries) assert.deepEqual(query, expectedQuery);
 });
 
 test('a force-full command waits for older optimized coverage without treating it as force-full', async () => {
