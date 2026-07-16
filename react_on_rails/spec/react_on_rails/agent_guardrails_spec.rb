@@ -235,6 +235,21 @@ module ReactOnRails
       expect(additional_context(stdout)).to include("shows no before_action/authentication")
     end
 
+    it "still warns when a callback only has an authentication-like prefix" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+
+      %w[authenticate_analytics_session authorize_for_metrics].each do |callback|
+        File.write(controller_path, "before_action :#{callback}\ninclude RSCPayloadRenderer\n")
+
+        stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+        expect(status).to be_success
+        expect(additional_context(stdout)).to include("shows no before_action/authentication")
+      end
+    end
+
     it "still warns when authentication only appears in a Ruby block comment" do
       described_class.install(@app_root)
       controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
@@ -464,6 +479,22 @@ module ReactOnRails
       expect(status).to be_success
       expect(stdout).to be_empty
       expect(stderr).to be_empty
+    end
+
+    it "accepts common exact authentication and authorization callback names" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+
+      %w[authenticate_admin! authorize! authorize_request require_login].each do |callback|
+        File.write(controller_path, "before_action :#{callback}\ninclude RSCPayloadRenderer\n")
+
+        stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+        expect(status).to be_success
+        expect(stdout).to be_empty
+        expect(stderr).to be_empty
+      end
     end
 
     it "accepts prepended and appended authentication callbacks" do

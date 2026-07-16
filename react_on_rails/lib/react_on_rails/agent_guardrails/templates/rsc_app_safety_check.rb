@@ -5,11 +5,18 @@
 # NON-BLOCKING advisory (always exits 0). Warns when React on Rails Pro RSC endpoints are wired
 # without visible authentication. The RSC payload route renders any registered server component
 # with caller-supplied props and has NO built-in auth — see the `rsc-app-safety` skill.
+# Callback detection is a conservative name/scope heuristic; silence does not prove authorization.
 
 require "json"
 require "ripper"
 
-AUTH_NAME = /(?:authenticate\w*[!?]?|authorize\w*[!?]?|require_(?:login|user)\w*[!?]?)/
+AUTH_NAME = /
+  (?:
+    authenticate(?:_(?:user|account|admin|member|session))? |
+    authorize(?:_(?:request|access|user))? |
+    require_(?:login|user)
+  )[!?]?
+/x
 AUTH_CALLBACK_NAME = "(?:prepend_|append_)?before_action"
 COMMENT_EVENTS = %i[on_comment on_embdoc_beg on_embdoc on_embdoc_end].freeze
 SCOPE_SYNTAX = /(?:%[iw](?:\[[^\]]*\]|\([^)]*\)|\{[^}]*\})|\[[^\]]*\]|:[A-Za-z_]\w*[!?]?|["'][^"']+["'])/
@@ -34,7 +41,7 @@ end
 
 def parse_callback(statement, callback_name)
   callback = statement.match(
-    /\A#{callback_name}\s*(?<parenthesized>\()?\s*:?(?<auth>#{AUTH_NAME})(?<rest>.*)\z/
+    /\A#{callback_name}\s*(?<parenthesized>\()?\s*:?(?<auth>#{AUTH_NAME})(?=\s*(?:,|\)|\z))(?<rest>.*)\z/
   )
   return unless callback
 
