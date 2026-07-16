@@ -110,7 +110,12 @@ const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
 
 // Oversized maps are re-checked on every VM build and on error-path lookups, so
-// warn once per map path to keep rolling deploys from flooding the log.
+// warn once per map path to keep rolling deploys from flooding the log. Bundle
+// paths are per-deploy, so this is bounded as an insertion-ordered FIFO rather
+// than tied to registration lifetime: evicting the oldest entry only risks a
+// duplicate warning, while unregistering a bundle would re-warn on every VM
+// rebuild and defeat the throttle.
+const MAX_WARNED_OVERSIZED_SOURCE_MAP_PATHS = 256;
 const warnedOversizedSourceMapPaths = new Set<string>();
 
 function warnOversizedSourceMap(sourceMapPath: string, sizeInBytes: number) {
@@ -118,9 +123,16 @@ function warnOversizedSourceMap(sourceMapPath: string, sizeInBytes: number) {
     return;
   }
 
+  if (warnedOversizedSourceMapPaths.size >= MAX_WARNED_OVERSIZED_SOURCE_MAP_PATHS) {
+    const oldestPath = warnedOversizedSourceMapPaths.values().next().value;
+    if (oldestPath !== undefined) {
+      warnedOversizedSourceMapPaths.delete(oldestPath);
+    }
+  }
+
   warnedOversizedSourceMapPaths.add(sourceMapPath);
   log.warn(
-    'Skipping source map %s: %d bytes exceeds the %d byte limit. Stack frames for this bundle will keep their bundled locations.',
+    'Skipping source map %s: size of %d bytes exceeds the %d byte limit. Stack frames for this bundle will keep their bundled locations.',
     sourceMapPath,
     sizeInBytes,
     MAX_EXTERNAL_SOURCE_MAP_BYTES,
@@ -349,69 +361,86 @@ function resolveReadableSourceMapPath(
 }
 
 /**
- * Resolves a readable, within-limit map path, warning once when the map is
- * oversized. Returns undefined for both "no usable map" and "map too large";
- * callers treat the two identically (frames keep their bundled locations).
+ * `unusable` means no readable map at this candidate path (missing, outside the
+ * bundle directory, not a file) and callers may try the next candidate.
+ * `oversized` means a real map is there but exceeds the cap — a terminal answer
+ * that must stop candidate resolution rather than look like a miss.
  */
+type ResolvedSourceMapCandidate =
+  | { status: 'usable'; sourceMapPath: string }
+  | { status: 'oversized' }
+  | { status: 'unusable' };
+
 function resolveSourceMapPathWithinSizeLimit(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-) {
+): ResolvedSourceMapCandidate {
   const resolved = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
   if (!resolved) {
-    return undefined;
+    return { status: 'unusable' };
   }
 
   if (resolved.sizeInBytes > MAX_EXTERNAL_SOURCE_MAP_BYTES) {
     warnOversizedSourceMap(resolved.sourceMapPath, resolved.sizeInBytes);
-    return undefined;
+    return { status: 'oversized' };
   }
 
-  return resolved.sourceMapPath;
+  return { status: 'usable', sourceMapPath: resolved.sourceMapPath };
 }
 
-function readSourceMapFile(bundleFilePath: string, candidatePath: string, realBundleDirectory: string) {
-  const sourceMapPath = resolveSourceMapPathWithinSizeLimit(
-    bundleFilePath,
-    candidatePath,
-    realBundleDirectory,
-  );
-  if (!sourceMapPath) {
+/** Distinguishes "a map is here but too large" from "nothing readable here". */
+const OVERSIZED_SOURCE_MAP = Symbol('oversizedSourceMap');
+type SourceMapFileReadResult = string | typeof OVERSIZED_SOURCE_MAP | undefined;
+
+function readSourceMapFile(
+  bundleFilePath: string,
+  candidatePath: string,
+  realBundleDirectory: string,
+): SourceMapFileReadResult {
+  const candidate = resolveSourceMapPathWithinSizeLimit(bundleFilePath, candidatePath, realBundleDirectory);
+  if (candidate.status === 'oversized') {
+    return OVERSIZED_SOURCE_MAP;
+  }
+  if (candidate.status === 'unusable') {
     return undefined;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
   // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
-  return fs.readFileSync(sourceMapPath, 'utf8');
+  return fs.readFileSync(candidate.sourceMapPath, 'utf8');
 }
 
 async function readSourceMapFileAsync(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-) {
-  const sourceMapPath = resolveSourceMapPathWithinSizeLimit(
-    bundleFilePath,
-    candidatePath,
-    realBundleDirectory,
-  );
-  if (!sourceMapPath) {
+): Promise<SourceMapFileReadResult> {
+  const candidate = resolveSourceMapPathWithinSizeLimit(bundleFilePath, candidatePath, realBundleDirectory);
+  if (candidate.status === 'oversized') {
+    return OVERSIZED_SOURCE_MAP;
+  }
+  if (candidate.status === 'unusable') {
     return undefined;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
   // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
-  return fs.promises.readFile(sourceMapPath, 'utf8');
+  return fs.promises.readFile(candidate.sourceMapPath, 'utf8');
 }
 
+/**
+ * Returns the source-map JSON for a bundle, `null` when a map was found but is
+ * unusable for good (oversized), or `undefined` when no map was found and one
+ * may still appear later.
+ */
 function readSourceMapJsonForBundle(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
   realBundleDirectory: string,
-): string | undefined {
+): string | null | undefined {
   try {
     // Stack formatting is synchronous, so source-map discovery stays sync and
     // is cached per bundle registration.
@@ -424,6 +453,12 @@ function readSourceMapJsonForBundle(
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
     for (const candidatePath of candidatePaths) {
       const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath, realBundleDirectory);
+      // An oversized map is terminal. Continuing to the next candidate would
+      // remap frames through a map the bundle never named, which is worse than
+      // keeping the bundled location.
+      if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
+        return null;
+      }
       if (sourceMapJson) {
         return sourceMapJson;
       }
@@ -435,11 +470,12 @@ function readSourceMapJsonForBundle(
   }
 }
 
+/** Async counterpart of {@link readSourceMapJsonForBundle}; same tri-state result. */
 async function readSourceMapJsonForBundleAsync(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
   realBundleDirectory: string,
-): Promise<string | undefined> {
+): Promise<string | null | undefined> {
   try {
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
       return parseDataUrlSourceMap(sourceMappingUrl);
@@ -449,6 +485,10 @@ async function readSourceMapJsonForBundleAsync(
     for (const candidatePath of candidatePaths) {
       // eslint-disable-next-line no-await-in-loop
       const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath, realBundleDirectory);
+      // Terminal — see the comment in the sync variant.
+      if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
+        return null;
+      }
       if (sourceMapJson) {
         return sourceMapJson;
       }
@@ -481,6 +521,12 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
     sourceMappingUrl,
     realBundleDirectory,
   );
+  if (sourceMapJson === null) {
+    // A map is present but over the cap. Retrying cannot fix that, and leaving
+    // the miss retryable would let a later same-path map remap this VM
+    // generation, so settle it now.
+    return { retryMissingSourceMap: false, sourceMapJson: null };
+  }
   if (sourceMapJson !== undefined && !isValidJson(sourceMapJson)) {
     log.debug('Preloaded source map for bundle %s is not valid JSON yet; retrying lazily.', bundleFilePath);
     return { retryMissingSourceMap: true, sourceMapJson: undefined };

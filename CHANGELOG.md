@@ -41,8 +41,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   larger than 50MB are no longer read into memory. Previously only inline (`data:`) source maps were
   size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
   stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
-  remapped to original sources, and the renderer logs a warning naming the map. The 50MB limit matches the
-  pre-existing cap for inline maps. Partially addresses
+  remapped to original sources, and the renderer logs a warning naming the map. An oversized map is terminal:
+  the renderer will not fall back to a differently-named map alongside the bundle, and will not retry the map
+  for that VM generation. The 50MB limit matches the pre-existing cap for inline maps. Partially addresses
   [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
   [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).

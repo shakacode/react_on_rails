@@ -309,12 +309,57 @@ describe('source-mapped stack traces for VM errors', () => {
       return { bundlePath, mapPath };
     }
 
+    test('oversized explicit map does not fall through to the conventional fallback map', async () => {
+      // An oversized map must be terminal, not a miss: falling through to
+      // `<bundle>.js.map` would remap frames with a map that is not the one the
+      // bundle names, which is worse than keeping the bundled location.
+      const bundlePath = vmBundlePath(testName);
+      const explicitMapFileName = 'explicit-oversized.js.map';
+      const explicitMapPath = path.join(path.dirname(bundlePath), explicitMapFileName);
+      const fallbackMapPath = path.join(path.dirname(bundlePath), `${path.basename(bundlePath)}.map`);
+
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${explicitMapFileName}\n`);
+      await fsPromises.writeFile(
+        explicitMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
+      );
+      // A stale map left at the conventional path, pointing at a different source.
+      await fsPromises.writeFile(
+        fallbackMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+
+      const statSyncSpy = mockReportedSourceMapSize(explicitMapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // Must keep the bundled location, not silently remap through the stale map.
+        expect(result.exceptionMessage).not.toContain(REBUILT_SOURCE);
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
     test('oversized external map is skipped on the async preload path and warns', async () => {
       const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
       const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
       const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
       const readFileAsyncSpy = jest.spyOn(fsPromises, 'readFile');
+      // The readers read the realpath, not `mapPath`, so assert on the realpath —
+      // otherwise a regression that reads the map would slip past on platforms
+      // where the two differ (macOS /var -> /private/var).
+      const realMapPath = fs.realpathSync(mapPath);
 
       try {
         const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
@@ -328,8 +373,8 @@ describe('source-mapped stack traces for VM errors', () => {
         expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
         expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
         // The whole point of the cap: the bytes are never read.
-        expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
-        expect(readFileAsyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        expect(readFileAsyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining('exceeds the'),
           expect.stringContaining(path.basename(mapPath)),
@@ -358,6 +403,7 @@ describe('source-mapped stack traces for VM errors', () => {
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
       const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
       const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+      const realMapPath = fs.realpathSync(mapPath);
 
       try {
         const result = await runInVM('global.triggerSsrError()', bundlePath);
@@ -366,7 +412,7 @@ describe('source-mapped stack traces for VM errors', () => {
           throw new Error('expected exceptionMessage result');
         }
         expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
-        expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining('exceeds the'),
           expect.stringContaining(path.basename(mapPath)),
@@ -401,6 +447,33 @@ describe('source-mapped stack traces for VM errors', () => {
           expect.anything(),
           expect.anything(),
         );
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized map found at preload is terminal and is not retried later', async () => {
+      // Retrying cannot make a map smaller, and leaving the miss retryable would
+      // let a later same-path map remap this VM generation.
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+        await runInVM('global.triggerSsrError()', bundlePath);
+
+        // The map is replaced with an under-cap one after the VM was built. The
+        // oversized answer was terminal, so this generation must not pick it up.
+        statSyncSpy.mockRestore();
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
       } finally {
         warnSpy.mockRestore();
         statSyncSpy.mockRestore();
