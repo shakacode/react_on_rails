@@ -39,6 +39,7 @@ jobs:
             const hostedCiLabel = 'ready-for-hosted-ci';
             const forceFullHostedCiLabel = 'force-full-hosted-ci';
             const newerCommandVisibilityDelayMs = 5000;
+            const dispatchRunVisibilityGraceMs = 2 * 60 * 1000;
 
             const validCommands = [
               '+ci-run-hosted',
@@ -120,10 +121,14 @@ jobs:
                     proof.base_sha !== pr.base.sha ||
                     !['optimized', 'force-full'].includes(proof.requested_mode) ||
                     !Array.isArray(proof.workflows) ||
+                    !proof.run_ids ||
+                    !proof.workflows.every((workflowFile) =>
+                      Number.isInteger(proof.run_ids[workflowFile]) && proof.run_ids[workflowFile] > 0
+                    ) ||
                     Number.isNaN(Date.parse(proof.requested_at || ''))) {
                   return null;
                 }
-                return proof;
+                return { ...proof, proof_comment_id: comment.id };
               } catch (error) {
                 core.warning(`Ignoring malformed hosted-CI coverage proof: ${error.message || error}`);
                 return null;
@@ -133,63 +138,29 @@ jobs:
             function latestCoverageProof(proofs, workflowFile, requestedMode) {
               return proofs
                 .filter((proof) => proof.requested_mode === requestedMode && proof.workflows.includes(workflowFile))
-                .sort((left, right) => Date.parse(right.requested_at) - Date.parse(left.requested_at))[0] || null;
+                .sort((left, right) =>
+                  Date.parse(right.requested_at) - Date.parse(left.requested_at) ||
+                  right.proof_comment_id - left.proof_comment_id
+                )[0] || null;
             }
 
-            function observedProofRunState(runs, proof, proofs, workflowFile) {
+            function observedProofRunState(runs, proof, workflowFile) {
               if (!proof) {
                 return 'missing';
               }
 
-              const requestedAt = Date.parse(proof.requested_at);
-              const workflowDispatchRuns = runs.filter((run) => run.event === 'workflow_dispatch');
-              const earlierProofs = proofs.filter((candidate) =>
-                candidate.workflows.includes(workflowFile) &&
-                Date.parse(candidate.requested_at) < requestedAt
+              const exactRunId = proof.run_ids[workflowFile];
+              const exactRun = runs.find((run) =>
+                run.event === 'workflow_dispatch' && run.id === exactRunId
               );
-              const earliestEarlierRequest = earlierProofs
-                .map((candidate) => Date.parse(candidate.requested_at))
-                .sort((left, right) => left - right)[0];
-              const materializedEarlierRuns = earliestEarlierRequest === undefined
-                ? 0
-                : workflowDispatchRuns.filter((run) => {
-                  const createdAt = Date.parse(run.created_at || '');
-                  return createdAt >= earliestEarlierRequest && createdAt < requestedAt;
-                }).length;
-              const ambiguousEarlierRuns = Math.max(0, earlierProofs.length - materializedEarlierRuns);
-              const nextRequestedAt = proofs
-                .filter((candidate) =>
-                  candidate.workflows.includes(workflowFile) &&
-                  Date.parse(candidate.requested_at) > requestedAt
-                )
-                .map((candidate) => Date.parse(candidate.requested_at))
-                .sort((left, right) => left - right)[0];
-              const proofWindowRuns = workflowDispatchRuns.filter((run) => {
-                const createdAt = Date.parse(run.created_at || '');
-                return createdAt >= requestedAt &&
-                  (!nextRequestedAt || createdAt < nextRequestedAt);
-              });
-
-              if (proofWindowRuns.length <= ambiguousEarlierRuns) {
-                return 'pending';
+              if (exactRun) {
+                return observedRunState([exactRun]);
               }
 
-              const successfulRuns = proofWindowRuns.filter((run) =>
-                run.status === 'completed' && run.conclusion === 'success'
-              ).length;
-              if (successfulRuns > ambiguousEarlierRuns) {
-                return 'successful';
-              }
-
-              const pendingRuns = proofWindowRuns.filter((run) => activeWorkflowStatuses.has(run.status)).length;
-              if (pendingRuns > ambiguousEarlierRuns) {
-                return 'pending';
-              }
-
-              // If an earlier dispatch can account for every successful or active run in this
-              // window, this request's outcome is not proven. Retry rather than attributing a
-              // run that materialized late to the wrong request mode.
-              return 'failed';
+              const proofAgeMs = Date.now() - Date.parse(proof.requested_at);
+              return proofAgeMs >= 0 && proofAgeMs <= dispatchRunVisibilityGraceMs
+                ? 'pending'
+                : 'missing';
             }
 
             function coverageMarker(payload) {
@@ -204,6 +175,7 @@ jobs:
               observed,
               requestedMode,
               reused,
+              runIds,
               workflows
             }) {
               return coverageMarker({
@@ -214,6 +186,7 @@ jobs:
                 requested_mode: requestedMode,
                 requested_at: commentCreatedAt,
                 workflows,
+                run_ids: runIds,
                 reused,
                 observed,
                 dispatched
@@ -252,14 +225,12 @@ jobs:
                   const forceFullState = observedProofRunState(
                     workflowRuns,
                     forceFullProof,
-                    proofs,
                     workflowFile
                   );
                   const optimizedProof = latestCoverageProof(proofs, workflowFile, 'optimized');
                   const optimizedProofState = observedProofRunState(
                     workflowRuns,
                     optimizedProof,
-                    proofs,
                     workflowFile
                   );
                   const automaticReleaseRuns = automaticReleaseTarget
@@ -717,16 +688,33 @@ jobs:
               }
 
               async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
-                try {
-                  await github.rest.actions.createWorkflowDispatch({
-                    owner,
-                    repo,
-                    workflow_id: workflowFile,
-                    ref: pr.head.ref,
-                    inputs: workflowInputs
-                  });
+                const dispatchOptions = (inputs) => ({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: pr.head.ref,
+                  inputs,
+                  return_run_details: true,
+                  headers: { 'x-github-api-version': '2026-03-10' }
+                });
+                const dispatchedWorkflow = (response, usedLegacyInputsFallback) => {
+                  const runId = response?.data?.workflow_run_id;
+                  if (!Number.isInteger(runId) || runId <= 0) {
+                    throw new Error(`${workflowFile} dispatch did not return an exact workflow run ID.`);
+                  }
+                  return {
+                    file: workflowFile,
+                    name: workflowName,
+                    runId,
+                    usedLegacyInputsFallback
+                  };
+                };
 
-                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: false };
+                try {
+                  const response = await github.rest.actions.createWorkflowDispatch(
+                    dispatchOptions(workflowInputs)
+                  );
+                  return dispatchedWorkflow(response, false);
                 } catch (error) {
                   if (!isUnexpectedInputError(error)) {
                     throw error;
@@ -735,15 +723,10 @@ jobs:
                   core.warning(
                     `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
                   );
-                  await github.rest.actions.createWorkflowDispatch({
-                    owner,
-                    repo,
-                    workflow_id: workflowFile,
-                    ref: pr.head.ref,
-                    inputs: legacyCompatibleInputs(workflowInputs)
-                  });
-
-                  return { file: workflowFile, name: workflowName, usedLegacyInputsFallback: true };
+                  const response = await github.rest.actions.createWorkflowDispatch(
+                    dispatchOptions(legacyCompatibleInputs(workflowInputs))
+                  );
+                  return dispatchedWorkflow(response, true);
                 }
               }
 
@@ -848,6 +831,9 @@ jobs:
                   headSha: pr.head.sha,
                   requestedMode: forceFull ? 'force-full' : 'optimized',
                   workflows: succeeded.map((workflow) => workflow.file),
+                  runIds: Object.fromEntries(
+                    succeeded.map((workflow) => [workflow.file, workflow.runId])
+                  ),
                   reused: coveredWorkflows.map(([, workflowFile]) => workflowFile),
                   observed: coverage.workflows,
                   dispatched: succeeded.map((workflow) => workflow.file)

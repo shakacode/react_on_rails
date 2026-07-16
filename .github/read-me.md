@@ -18,14 +18,16 @@ confirmation:
 ```
 
 The command first inventories workflow runs and auditable dispatch proofs bound
-to the exact head SHA, PR number, base ref, and base SHA. It skips equivalent
-optimized, queued, running, or successful coverage; dispatches only missing
-workflows; creates `ready-for-hosted-ci` if needed; and adds it so future pushes
-keep running optimized hosted CI. Selector-only `pull_request` workflow shells
-do not count as hosted coverage. The exception is a base-matched automatic run
-for a same-repository, non-Dependabot release-target PR, where release policy
-already runs the hosted jobs. Hosted CI is still path-selected by
-`script/ci-changes-detector`; it does not automatically run every hosted suite.
+to the exact head SHA, PR number, base ref, base SHA, and workflow run ID. It
+skips equivalent optimized, queued, running, or successful coverage; dispatches
+only missing workflows; creates `ready-for-hosted-ci` if needed; and adds it so
+future pushes keep running optimized hosted CI. Dispatches use GitHub's
+`return_run_details` API response and fail closed if an exact run ID is not
+returned. Selector-only `pull_request` workflow shells do not count as hosted
+coverage. The exception is a base-matched automatic run for a same-repository,
+non-Dependabot release-target PR, where release policy already runs the hosted
+jobs. Hosted CI is still path-selected by `script/ci-changes-detector`; it does
+not automatically run every hosted suite.
 
 ### `+ci-force-full` - Request Force-Full Hosted CI
 
@@ -41,9 +43,11 @@ coverage, with `force_full_hosted: true`; creates `ready-for-hosted-ci` and
 `force-full-hosted-ci`; and keeps future pushes in force-full mode until
 `+ci-stop-full` removes the override. An optimized or automatic release-target
 run is not force-full evidence merely because it has the same workflow name.
-When concurrent dispatch timing makes a successful run attributable to an
-earlier optimized request, the command retries missing force-full coverage
-rather than treating the ambiguous run as force-full proof.
+Optimized and force-full proofs identify their exact returned workflow run IDs,
+so concurrent or same-second dispatches cannot be attributed to the wrong mode.
+If an exact run is temporarily absent from the run inventory, it receives a
+two-minute visibility grace period; after that, the workflow is missing and can
+be retried instead of remaining pending forever.
 
 ### Stop And Waiver Commands
 

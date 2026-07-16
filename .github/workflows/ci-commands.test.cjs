@@ -61,7 +61,16 @@ function coverageMarkerFrom(comment) {
   return JSON.parse(match[1]);
 }
 
-async function runCommand({ body, comments = [], files, labels = [], pullRequest, runListError, runs = [] }) {
+async function runCommand({
+  body,
+  comments = [],
+  dispatchReturnsNoRunDetails = false,
+  files,
+  labels = [],
+  pullRequest,
+  runListError,
+  runs = [],
+}) {
   const calls = {
     comments: [],
     dispatches: [],
@@ -74,7 +83,11 @@ async function runCommand({ body, comments = [], files, labels = [], pullRequest
     addLabels: async ({ labels: addedLabels }) => calls.labels.push(...addedLabels),
     createComment: async ({ body: commentBody }) => calls.comments.push(commentBody),
     createLabel: async () => {},
-    createWorkflowDispatch: async (options) => calls.dispatches.push(options),
+    createWorkflowDispatch: async (options) => {
+      calls.dispatches.push(options);
+      if (dispatchReturnsNoRunDetails) return { data: '', status: 204 };
+      return { data: { workflow_run_id: 1000 + calls.dispatches.length } };
+    },
     getCollaboratorPermissionLevel: async () => ({ data: { permission: 'write' } }),
     getPullRequest: async () => ({ data: pr }),
     listComments: async () => {},
@@ -224,11 +237,12 @@ test('+ci-force-full dispatches only force-full coverage proven missing', async 
     created_at: '2026-07-16T08:01:00Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 501,
     path: `.github/workflows/${forceFullWorkflow}`,
     status: 'completed',
   };
   const proof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -253,6 +267,9 @@ test('+ci-force-full dispatches only force-full coverage proven missing', async 
   assert.equal(marker.observed.length, 9);
   assert.deepEqual([...marker.dispatched].sort(), hostedWorkflowFiles.slice(1).sort());
   assert.deepEqual(marker.workflows, marker.dispatched);
+  assert.deepEqual(Object.keys(marker.run_ids).sort(), hostedWorkflowFiles.slice(1).sort());
+  assert.ok(calls.dispatches.every((dispatch) => dispatch.return_run_details === true));
+  assert.ok(calls.dispatches.every((dispatch) => dispatch.headers['x-github-api-version'] === '2026-03-10'));
 });
 
 test('+ci-status records exact-head coverage API uncertainty as UNKNOWN', async () => {
@@ -282,6 +299,22 @@ test('+ci-force-full fails closed without dispatch when exact-head coverage is U
   assert.equal(marker.requested_mode, 'force-full');
   assert.equal(marker.coverage_status, 'UNKNOWN');
   assert.deepEqual(marker.dispatched, []);
+});
+
+test('+ci-run-hosted fails closed when dispatch does not return exact run details', async () => {
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchReturnsNoRunDetails: true,
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.equal(calls.failures.length, 1);
+  assert.match(calls.failures[0], /Failed to trigger: Lint JS and Ruby/);
+  assert.equal(calls.labels.length, 0);
+  assert.match(calls.comments.at(-1), /dispatch did not return an exact workflow run ID/);
+  const marker = coverageMarkerFrom(calls.comments.at(-1));
+  assert.deepEqual(marker.workflows, []);
+  assert.deepEqual(marker.run_ids, {});
 });
 
 test('+ci-run-hosted does not reuse old-head, failed, or cancelled workflow runs', async () => {
@@ -321,7 +354,7 @@ test('+ci-run-hosted does not reuse old-head, failed, or cancelled workflow runs
 test('+ci-run-hosted does not reuse dispatch coverage from an old PR base', async () => {
   const workflowFile = hostedWorkflowFiles[0];
   const oldBaseProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"main","base_sha":"old-base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"main","base_sha":"old-base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
     created_at: '2026-07-16T08:00:30Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -331,6 +364,7 @@ test('+ci-run-hosted does not reuse dispatch coverage from an old PR base', asyn
     created_at: '2026-07-16T08:00:10Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 501,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   };
@@ -354,7 +388,7 @@ test('+ci-force-full retries a force-full proof whose exact-head run was cancell
     status: 'completed',
   }));
   const proof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -364,6 +398,7 @@ test('+ci-force-full retries a force-full proof whose exact-head run was cancell
     created_at: '2026-07-16T08:01:00Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 501,
     path: `.github/workflows/${hostedWorkflowFiles[0]}`,
     status: 'completed',
   };
@@ -381,13 +416,13 @@ test('+ci-force-full retries a force-full proof whose exact-head run was cancell
 test('a later optimized success does not satisfy an earlier failed force-full proof', async () => {
   const workflowFile = hostedWorkflowFiles[0];
   const forceFullProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
   };
   const optimizedProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:02:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:02:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":502}} -->',
     created_at: '2026-07-16T08:02:35Z',
     id: 91,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -404,6 +439,7 @@ test('a later optimized success does not satisfy an earlier failed force-full pr
     created_at: '2026-07-16T08:01:00Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 501,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   };
@@ -412,6 +448,7 @@ test('a later optimized success does not satisfy an earlier failed force-full pr
     created_at: '2026-07-16T08:02:30Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 502,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   };
@@ -429,13 +466,13 @@ test('a later optimized success does not satisfy an earlier failed force-full pr
 test('a late optimized run does not satisfy a newer failed force-full proof', async () => {
   const workflowFile = hostedWorkflowFiles[0];
   const optimizedProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
     created_at: '2026-07-16T08:00:30Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
   };
   const forceFullProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:01:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:01:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":502}} -->',
     created_at: '2026-07-16T08:01:30Z',
     id: 91,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -445,6 +482,7 @@ test('a late optimized run does not satisfy a newer failed force-full proof', as
     created_at: '2026-07-16T08:01:10Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 501,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   };
@@ -453,6 +491,7 @@ test('a late optimized run does not satisfy a newer failed force-full proof', as
     created_at: '2026-07-16T08:01:20Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 502,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   };
@@ -465,6 +504,129 @@ test('a late optimized run does not satisfy a newer failed force-full proof', as
 
   assert.equal(calls.dispatches.length, 9);
   assert.ok(calls.dispatches.some((dispatch) => dispatch.workflow_id === workflowFile));
+});
+
+test('exact run IDs separate same-second optimized and force-full requests', async () => {
+  const workflowFile = hostedWorkflowFiles[0];
+  const optimizedProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const forceFullProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":502}} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 91,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const runs = [
+    {
+      conclusion: 'success',
+      created_at: '2026-07-16T08:00:10Z',
+      event: 'workflow_dispatch',
+      head_sha: 'current-head-sha',
+      id: 501,
+      path: `.github/workflows/${workflowFile}`,
+      status: 'completed',
+    },
+    {
+      conclusion: 'cancelled',
+      created_at: '2026-07-16T08:00:20Z',
+      event: 'workflow_dispatch',
+      head_sha: 'current-head-sha',
+      id: 502,
+      path: `.github/workflows/${workflowFile}`,
+      status: 'completed',
+    },
+  ];
+
+  const calls = await runCommand({
+    body: '+ci-force-full',
+    comments: [optimizedProof, forceFullProof],
+    runs,
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+});
+
+test('the newer same-second proof wins within one request mode', async () => {
+  const workflowFile = hostedWorkflowFiles[0];
+  const successfulProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":501}} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const failedProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":502}} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 91,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const runs = [
+    {
+      conclusion: 'success',
+      event: 'workflow_dispatch',
+      head_sha: 'current-head-sha',
+      id: 501,
+      path: `.github/workflows/${workflowFile}`,
+      status: 'completed',
+    },
+    {
+      conclusion: 'cancelled',
+      event: 'workflow_dispatch',
+      head_sha: 'current-head-sha',
+      id: 502,
+      path: `.github/workflows/${workflowFile}`,
+      status: 'completed',
+    },
+  ];
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [successfulProof, failedProof],
+    runs,
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+});
+
+test('a proof whose exact run is absent does not suppress a retry', async () => {
+  const proof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"],"run_ids":{"lint-js-and-ruby.yml":502}} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+
+  const calls = await runCommand({ body: '+ci-force-full', comments: [proof] });
+
+  assert.equal(calls.dispatches.length, 9);
+});
+
+test('a newly recorded exact run ID gets a bounded visibility grace period', async () => {
+  const requestedAt = new Date().toISOString();
+  const proof = {
+    body: `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+      head_sha: 'current-head-sha',
+      pull_request_number: 42,
+      base_ref: 'release/17.0.0',
+      base_sha: 'base-sha',
+      requested_mode: 'force-full',
+      requested_at: requestedAt,
+      workflows: ['lint-js-and-ruby.yml'],
+      run_ids: { 'lint-js-and-ruby.yml': 502 },
+    })} -->`,
+    created_at: requestedAt,
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+
+  const calls = await runCommand({ body: '+ci-force-full', comments: [proof] });
+
+  assert.equal(calls.dispatches.length, 8);
+  assert.ok(calls.dispatches.every((dispatch) => dispatch.workflow_id !== 'lint-js-and-ruby.yml'));
 });
 
 test('Dependabot release-target selector shells do not satisfy hosted coverage', async () => {
@@ -510,16 +672,20 @@ test('repeated all-covered Dependabot command preserves a nonzero trusted dispat
       requested_mode: 'optimized',
       requested_at: '2026-07-16T07:59:00Z',
       workflows: dependabotWorkflowFiles,
+      run_ids: Object.fromEntries(
+        dependabotWorkflowFiles.map((workflowFile, index) => [workflowFile, 700 + index]),
+      ),
     })} -->`,
     created_at: '2026-07-16T07:59:30Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
   };
-  const completedRuns = dependabotWorkflowFiles.map((workflowFile) => ({
+  const completedRuns = dependabotWorkflowFiles.map((workflowFile, index) => ({
     conclusion: 'success',
     created_at: '2026-07-16T07:59:10Z',
     event: 'workflow_dispatch',
     head_sha: 'current-head-sha',
+    id: 700 + index,
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   }));
