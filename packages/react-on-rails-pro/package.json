@@ -8,10 +8,12 @@
     "build": "pnpm run clean && tsc",
     "build-watch": "pnpm run clean && tsc --watch",
     "clean": "rm -rf ./lib",
-    "test": "pnpm run test:non-rsc && pnpm run test:streaming && pnpm run test:rsc",
-    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(\\\\.rsc\\\\.test\\\\.|streamServerRenderedReactComponent|streamBackpressure|injectRSCPayload|parseLengthPrefixedStream|registerServerComponent|SuspenseHydration).*\"",
-    "test:streaming": "node scripts/check-react-version.cjs || jest tests/streamServerRenderedReactComponent.test.jsx tests/streamBackpressure.e2e.test.tsx tests/injectRSCPayload.test.ts tests/SuspenseHydration.test.tsx tests/parseLengthPrefixedStream.test.ts --runInBand",
+    "test": "pnpm run test:suite-selection && pnpm run test:non-rsc && pnpm run test:streaming && pnpm run test:rsc && pnpm run test:packed-react-compatibility",
+    "test:suite-selection": "node --test scripts/check-jest-suite-selection.test.mjs && node scripts/check-jest-suite-selection.mjs",
+    "test:non-rsc": "jest tests --testPathIgnorePatterns=\"tests/.*(\\\\.rsc\\\\.test\\\\.|streamServerRenderedReactComponent|streamBackpressure|injectRSCPayload|parseLengthPrefixedStream|SuspenseHydration|registerServerComponent).*\"",
+    "test:streaming": "node scripts/check-react-version.cjs || jest tests/streamServerRenderedReactComponent.test.jsx tests/streamBackpressure.e2e.test.tsx tests/injectRSCPayload.test.ts tests/SuspenseHydration.test.tsx tests/parseLengthPrefixedStream.test.ts tests/registerServerComponent.client.test.jsx --runInBand",
     "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
+    "test:packed-react-compatibility": "node --test scripts/packed-react-compatibility-cases.test.mjs && node scripts/packed-react-compatibility-smoke.mjs",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
     "prepublishOnly": "pnpm run build"
@@ -30,7 +32,7 @@
     "pro"
   ],
   "author": "justin@shakacode.com",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE.md",
   "exports": {
     ".": {
       "react-server": "./lib/ReactOnRailsRSC.js",
@@ -84,7 +86,7 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">=19.2.1-rc.0 <20.0.0",
+    "react-on-rails-rsc": ">=19.2.1 <20.0.0",
     "@tanstack/react-router": ">=1.139.0 <2.0.0",
     "ioredis": ">= 5"
   },
@@ -100,6 +102,7 @@
     }
   },
   "files": [
+    "LICENSE.md",
     "README.md",
     "lib/**/*.js",
     "lib/**/*.d.ts"
@@ -115,7 +118,7 @@
     "mock-fs": "^5.5.0",
     "react": "~19.2.7",
     "react-dom": "~19.2.7",
-    "react-on-rails-rsc": "19.2.1-rc.0",
+    "react-on-rails-rsc": "19.2.1",
     "ioredis": "5.11.1"
   }
 }

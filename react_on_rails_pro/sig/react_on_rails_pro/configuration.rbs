@@ -82,6 +82,7 @@ module ReactOnRailsPro
     attr_accessor raise_non_shell_server_rendering_errors: bool?
     attr_accessor enable_rsc_support: bool?
     attr_accessor rsc_payload_generation_url_path: String?
+    attr_accessor rsc_payload_authorizer: untyped
     attr_accessor rsc_bundle_js_file: String?
     attr_accessor react_client_manifest_file: String?
     attr_accessor react_server_client_manifest_file: String?
@@ -119,6 +120,7 @@ module ReactOnRailsPro
       ?raise_non_shell_server_rendering_errors: bool?,
       ?enable_rsc_support: bool?,
       ?rsc_payload_generation_url_path: String?,
+      ?rsc_payload_authorizer: untyped,
       ?rsc_bundle_js_file: String?,
       ?react_client_manifest_file: String?,
       ?react_server_client_manifest_file: String?,

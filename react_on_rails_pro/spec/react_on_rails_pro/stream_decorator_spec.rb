@@ -164,7 +164,8 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
     end
 
     it "can convert the error into another error" do
-      allow(mock_component).to receive(:each_chunk).and_raise(StandardError.new("Fake Error"))
+      original_error = StandardError.new("Fake Error")
+      allow(mock_component).to receive(:each_chunk).and_raise(original_error)
       mocked_block = mock_block do |error|
         expect(error).to be_a(StandardError)
         expect(error.message).to eq("Fake Error")
@@ -173,8 +174,24 @@ RSpec.describe ReactOnRailsPro::StreamDecorator do
 
       stream_decorator.rescue(&mocked_block.block)
       chunks = []
-      expect { stream_decorator.each_chunk { |chunk| chunks << chunk } }.to raise_error(ArgumentError, "Another Error")
+      expect { stream_decorator.each_chunk { |chunk| chunks << chunk } }.to raise_error(ArgumentError) do |error|
+        expect(error.message).to eq("Another Error")
+        expect(error.cause).to equal(original_error)
+      end
       expect(chunks).to eq([])
+    end
+
+    it "preserves an explicitly suppressed cause on a converted error" do
+      original_error = StandardError.new("sensitive parser error")
+      allow(mock_component).to receive(:each_chunk).and_raise(original_error)
+      stream_decorator.rescue do
+        raise ArgumentError.new("safe wrapper"), cause: nil
+      end
+
+      expect { stream_decorator.each_chunk { |_| nil } }.to raise_error(ArgumentError) do |error|
+        expect(error.message).to eq("safe wrapper")
+        expect(error.cause).to be_nil
+      end
     end
 
     it "chains multiple rescue blocks" do

@@ -18,8 +18,15 @@ describe "Server Rendering", :server_rendering do
     allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
       .to receive(:eval_js).and_return(invalid_json)
     expect { get server_side_hello_world_with_options_path }.to(raise_error do |error|
-      expect(error.raven_context[:json]).to eq(invalid_json)
-      expect(error.raven_context[:original_error]).to be_a(JSON::ParserError)
+      context = error.raven_context
+
+      expect(context).not_to have_key(:json)
+      expect(context).not_to have_key(:original_error)
+      expect(context[:err]).to be_a(String)
+      expect(context.inspect).not_to include(invalid_json)
+      expect(JSON.generate(context)).not_to include(invalid_json)
+      expect(error.message).not_to include(invalid_json)
+      expect(error.cause).to be_nil
     end)
   end
 

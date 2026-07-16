@@ -73,6 +73,47 @@ RSpec.describe "bin/ci-switch-config" do
     expect(stdout).to include("latest Ruby/Node may be under-reported")
   end
 
+  it "reports configured runtimes without executing runtime shims" do
+    Dir.mktmpdir do |tmpdir|
+      fake_script_path = install_ci_switch_scripts(tmpdir)
+      fake_bin_path = File.join(tmpdir, "fake-bin")
+      marker_path = File.join(tmpdir, "runtime-shim-called")
+      tool_versions_path = File.join(tmpdir, ".tool-versions")
+      expected_tool_versions = File.read(File.join(repo_root, ".tool-versions"))
+      expected_ruby = expected_tool_versions[/^ruby\s+(\S+)/, 1]
+      expected_node = expected_tool_versions[/^nodejs\s+(\S+)/, 1]
+
+      FileUtils.cp(File.join(repo_root, ".tool-versions"), tool_versions_path)
+      FileUtils.cp(File.join(repo_root, ".minimum.tool-versions"), File.join(tmpdir, ".minimum.tool-versions"))
+      FileUtils.mkdir_p(fake_bin_path)
+
+      %w[ruby node].each do |runtime|
+        shim_path = File.join(fake_bin_path, runtime)
+        File.write(
+          shim_path,
+          <<~BASH
+            #!/usr/bin/env bash
+            echo #{Shellwords.escape(runtime)} >> #{Shellwords.escape(marker_path)}
+            exit 99
+          BASH
+        )
+        FileUtils.chmod("+x", shim_path)
+      end
+
+      stdout, stderr, status = Open3.capture3(
+        { "PATH" => "#{fake_bin_path}:#{ENV.fetch('PATH')}" },
+        fake_script_path,
+        "status",
+        chdir: tmpdir
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Ruby: #{expected_ruby} (configured)")
+      expect(stdout).to include("Node: #{expected_node} (configured)")
+      expect(File).not_to exist(marker_path)
+    end
+  end
+
   it "restores the committed latest tool-version profile saved from the current git head" do
     with_ci_switch_tool_versions_repo do |tmpdir, harness_path|
       committed_versions = File.read(File.join(tmpdir, ".tool-versions"))

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pro app buildability agent report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "commands",
+    "checks",
+    "friction",
+    "human_interventions",
+    "blockers"
+  ],
+  "properties": {
+    "status": { "enum": ["completed", "blocked", "failed"] },
+    "summary": { "type": "string" },
+    "commands": { "type": "array", "items": { "type": "string" } },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exit_code", "result"],
+        "properties": {
+          "command": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "result": { "enum": ["pass", "fail"] }
+        }
+      }
+    },
+    "friction": { "type": "array", "items": { "type": "string" } },
+    "human_interventions": { "type": "integer", "minimum": 0 },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  }
+}

@@ -24,12 +24,47 @@ import { screen, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import * as path from 'path';
 import * as fs from 'fs';
-import { createNodeReadableStream, getNodeVersion } from './testUtils.js';
+import { getNodeVersion } from './testUtils.ts';
 import ReactOnRails from '../src/ReactOnRails.client.ts';
 import registerServerComponent from '../src/registerServerComponent/client.tsx';
 import { clear as clearComponentRegistry } from '../src/ComponentRegistry.ts';
+import { createEmbeddedPayloadKey } from '../src/utils.ts';
 
 enableFetchMocks();
+
+const streamEncoder = new TextEncoder();
+
+const createRSCResponseStream = () => {
+  let controller;
+  const stream = new ReadableStream({
+    start(streamController) {
+      controller = streamController;
+    },
+  });
+
+  const push = (chunk) => {
+    if (chunk === null) {
+      controller.close();
+      return;
+    }
+
+    const content = streamEncoder.encode(chunk.html);
+    const metadata = chunk.consoleReplayScript ? { consoleReplayScript: chunk.consoleReplayScript } : {};
+    const header = `${JSON.stringify(metadata)}\t${content.byteLength.toString(16)}\n`;
+    controller.enqueue(streamEncoder.encode(header));
+    controller.enqueue(content);
+  };
+
+  return {
+    response: {
+      body: stream,
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+    },
+    push,
+  };
+};
 
 // React Server Components tests require React 19 and only run with Node version 18 (`newest` in our CI matrix)
 (getNodeVersion() >= 18 ? describe : describe.skip)('registerServerComponent', () => {
@@ -73,8 +108,8 @@ enableFetchMocks();
     const chunk1 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8'));
     const chunk2 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8'));
 
-    const { stream, push } = createNodeReadableStream();
-    window.fetchMock.mockResolvedValue(new Response(stream));
+    const { response, push } = createRSCResponseStream();
+    window.fetchMock.mockResolvedValue(response);
 
     registerServerComponent('TestComponent');
     const railsContext = {
@@ -89,9 +124,8 @@ enableFetchMocks();
 
     return {
       render,
-      pushFirstChunk: () => push(`${JSON.stringify(chunk1)}\n`),
-      pushSecondChunk: () => push(`${JSON.stringify(chunk2)}\n`),
-      pushCustomChunk: (chunk) => push(`${chunk}\n`),
+      pushFirstChunk: () => push(chunk1),
+      pushSecondChunk: () => push(chunk2),
       endStream: () => push(null),
     };
   };
@@ -179,8 +213,8 @@ enableFetchMocks();
         'rsc-payloads',
         'simple-shell-with-async-component',
       );
-      chunk1 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8')));
-      chunk2 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8')));
+      chunk1 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8'));
+      chunk2 = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8'));
 
       registerServerComponent('TestComponent');
       railsContext = {
@@ -199,7 +233,7 @@ enableFetchMocks();
     it('uses preloaded RSC payloads without making a fetch request', async () => {
       // Mock the global window.REACT_ON_RAILS_RSC_PAYLOADS
       window.REACT_ON_RAILS_RSC_PAYLOADS = {
-        'TestComponent-fun4a7ngv9-test-container': [`${chunk1}\n`, `${chunk2}\n`],
+        [createEmbeddedPayloadKey('TestComponent', {}, mockDomNodeId)]: [chunk1.html, chunk2.html],
       };
 
       await act(async () => {
@@ -223,7 +257,7 @@ enableFetchMocks();
 
       // Mock the global window.REACT_ON_RAILS_RSC_PAYLOADS with only the first chunk initially
       window.REACT_ON_RAILS_RSC_PAYLOADS = {
-        'TestComponent-fun4a7ngv9-test-container': [`${chunk1}\n`],
+        [createEmbeddedPayloadKey('TestComponent', {}, mockDomNodeId)]: [chunk1.html],
       };
 
       await act(async () => {
@@ -241,7 +275,8 @@ enableFetchMocks();
 
       // Now push the second chunk to the preloaded array and set document to complete
       await act(async () => {
-        window.REACT_ON_RAILS_RSC_PAYLOADS['TestComponent-fun4a7ngv9-test-container'].push(`${chunk2}\n`);
+        const payloadKey = createEmbeddedPayloadKey('TestComponent', {}, mockDomNodeId);
+        window.REACT_ON_RAILS_RSC_PAYLOADS[payloadKey].push(chunk2.html);
 
         // Set document.readyState to 'complete' and dispatch readystatechange event
         Object.defineProperty(document, 'readyState', { value: 'complete', writable: true });

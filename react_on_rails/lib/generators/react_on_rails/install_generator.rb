@@ -86,16 +86,22 @@ module ReactOnRails
                    desc: "Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true"
 
       # --pro
+      # No static default: prompt suppression needs to distinguish an omitted flag from --no-pro.
       class_option :pro,
                    type: :boolean,
-                   default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer"
 
       # --rsc
+      # No static default: prompt suppression needs to distinguish an omitted flag from --no-rsc.
       class_option :rsc,
                    type: :boolean,
+                   desc: "Install React Server Components support (includes Pro)"
+
+      # --standard-only
+      class_option :standard_only,
+                   type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). Default: false"
+                   desc: "Install only the open-source package; cannot be combined with --pro or --rsc"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -196,6 +202,7 @@ module ReactOnRails
         # This is inherited by all invoked generators and persists through Rails initialization
         # See lib/react_on_rails/engine.rb for the validation skip logic
         ENV["REACT_ON_RAILS_SKIP_VALIDATION"] = "true"
+        prompt_for_pro_features_if_applicable
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
@@ -229,6 +236,40 @@ module ReactOnRails
       # Everything here is not run automatically b/c it's private
 
       private
+
+      def use_pro?
+        return @interactive_pro_selection if defined?(@interactive_pro_selection)
+
+        !!super
+      end
+
+      def prompt_for_pro_features_if_applicable
+        validate_product_stack_choice!
+        return if options.new_app? || explicit_product_stack_choice? || !interactive_install_session?
+
+        say "React on Rails Pro is free for evaluation; production use requires a subscription."
+        say "Learn more: https://reactonrails.com/docs/pro/upgrading-to-pro/"
+        answer = ask(
+          "Enable React on Rails Pro features (Node Renderer and streaming SSR; RSC available separately)? [Y/n]",
+          :cyan
+        )
+        normalized_answer = answer.to_s.strip
+        @interactive_pro_selection = normalized_answer.empty? || normalized_answer.match?(/\A(?:y|yes)\z/i)
+      end
+
+      def explicit_product_stack_choice?
+        options.key?(:pro) || options.key?(:rsc) || options.standard_only?
+      end
+
+      def interactive_install_session?
+        !ReactOnRails::GitUtils.truthy_env?(ENV.fetch("CI", nil)) && $stdin.tty? && $stdout.tty?
+      end
+
+      def validate_product_stack_choice!
+        return unless options.standard_only? && (options.pro? || options.rsc?)
+
+        raise Thor::Error, "--standard-only cannot be combined with --pro or --rsc"
+      end
 
       # Fresh-install context: default to Rspack (when Shakapacker supports it) unless the
       # app already declares a bundler. See GeneratorHelper#fresh_install_rspack_default.
@@ -866,8 +907,12 @@ module ReactOnRails
       end
 
       def product_stack_install_flag
-        return "--rsc" if options.rsc?
-        return "--pro" if options.pro?
+        return "--rsc" if use_rsc?
+        return "--pro" if use_pro?
+        return "--standard-only" if options.standard_only?
+        return "--no-rsc" if options.key?(:rsc)
+        return "--no-pro" if options.key?(:pro)
+        return "--standard-only" if defined?(@interactive_pro_selection)
 
         nil
       end

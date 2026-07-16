@@ -30,6 +30,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "LICENSE.md",
     "README.md",
     "lib/**/*.js",
     "lib/**/*.d.ts"
@@ -72,7 +73,7 @@
     "react": "~19.2.7",
     "react-dom": "~19.2.7",
     "react-on-rails": "workspace:*",
-    "react-on-rails-rsc": "19.2.1-rc.0",
+    "react-on-rails-rsc": "19.2.1",
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
@@ -154,7 +155,7 @@
     "Rails"
   ],
   "author": "justin@shakacode.com",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE.md",
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },

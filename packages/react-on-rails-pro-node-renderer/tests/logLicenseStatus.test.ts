@@ -53,22 +53,61 @@ describe('logLicenseStatus', () => {
     expect(getLicenseStatus).toHaveBeenCalledWith('configured-license-token');
   });
 
-  it('logs missing licenses as warnings in production', () => {
-    process.env.NODE_ENV = 'production';
+  it.each([
+    ['missing', 'No license found', 'get a license'],
+    ['expired', 'License has expired', 'renew your license'],
+    ['invalid', 'Invalid license', 'get a license'],
+  ] as const)(
+    'conditions the %s warning and remediation on Production Use',
+    (licenseStatus, statusMessage, action) => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.RAILS_ENV;
+      const { logLicenseStatus, warn } = loadLogger(licenseStatus);
+
+      logLicenseStatus();
+
+      expect(warn).toHaveBeenCalledWith(
+        `[React on Rails Pro] ${statusMessage}. ` +
+          'Production Use of React on Rails Pro requires an appropriate license. ' +
+          `If this deployment is Production Use, ${action} at https://pro.reactonrails.com/`,
+      );
+    },
+  );
+
+  it.each([
+    ['missing', 'No license found'],
+    ['expired', 'License has expired'],
+    ['invalid', 'Invalid license'],
+  ] as const)('reports %s status without implying a license is required', (licenseStatus, statusMessage) => {
+    process.env.NODE_ENV = 'development';
+    process.env.RAILS_ENV = 'test';
+    const { info, logLicenseStatus, warn } = loadLogger(licenseStatus);
+
+    logLicenseStatus();
+
+    expect(info).toHaveBeenCalledWith(
+      `[React on Rails Pro] ${statusMessage}. No license required for development/test environments.`,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('uses the production warning path when Rails declares production', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.RAILS_ENV = 'production';
     const { logLicenseStatus, warn } = loadLogger('missing');
 
     logLicenseStatus();
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('No license found'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Production Use'));
   });
 
-  it('logs missing licenses as information outside production', () => {
-    process.env.NODE_ENV = 'development';
-    const { info, logLicenseStatus, warn } = loadLogger('missing');
+  it('logs valid licenses as information', () => {
+    process.env.NODE_ENV = 'production';
+    const { info, logLicenseStatus, warn } = loadLogger('valid');
 
     logLicenseStatus();
 
-    expect(info).toHaveBeenCalledWith(expect.stringContaining('No license found'));
+    expect(info).toHaveBeenCalledWith('[React on Rails Pro] License validated successfully.');
     expect(warn).not.toHaveBeenCalled();
   });
 });

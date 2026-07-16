@@ -1,0 +1,26 @@
+{
+  "command": "codex exec",
+  "model": "gpt-5.4",
+  "scaffold_timeout_seconds": 900,
+  "probe_timeout_seconds": 120,
+  "maximum_agent_call_wall_clock_seconds": 1020,
+  "sandbox": "workspace-write",
+  "ephemeral": true,
+  "ignore_user_config": true,
+  "ignore_rules": true,
+  "strict_config": true,
+  "multi_agent": false,
+  "sandbox_network_access": false,
+  "isolated_host_attestation": false,
+  "capability_probe": {
+    "npm": "npm view create-react-on-rails-app version --json",
+    "rubygems": "gem search --remote --exact '^rails$'"
+  },
+  "credential_store": "file",
+  "auth_material_available": false,
+  "human_followups_sent": 0,
+  "shell_environment_policy": {
+    "inherit": "none",
+    "allowlist": ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SHELL", "CODEX_EVAL"]
+  }
+}

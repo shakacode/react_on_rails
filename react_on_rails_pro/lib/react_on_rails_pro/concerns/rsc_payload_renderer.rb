@@ -24,6 +24,8 @@ module ReactOnRailsPro
 
     def rsc_payload
       @rsc_payload_component_name = rsc_payload_component_name
+      return head :forbidden unless rsc_payload_authorized?(@rsc_payload_component_name)
+
       @rsc_payload_component_props =
         begin
           rsc_payload_component_props
@@ -57,6 +59,11 @@ module ReactOnRailsPro
     end
 
     private
+
+    def rsc_payload_authorized?(component_name)
+      authorizer = ReactOnRailsPro.configuration.rsc_payload_authorizer
+      authorizer.nil? || authorizer.call(self, component_name)
+    end
 
     def rsc_payload_component_props
       return {} if params[:props].blank?

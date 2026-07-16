@@ -1,0 +1,11 @@
+{
+  "name": "react-on-rails-pro-app-buildability-eval",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "dependencies": {
+    "ajv": "8.18.0",
+    "ajv-formats": "3.0.1",
+    "prettier": "3.6.2"
+  }
+}

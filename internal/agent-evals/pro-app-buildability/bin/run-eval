@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+usage() {
+  echo "usage: $0 --agent codex --model MODEL --timeout SECONDS --workspace ABSOLUTE_PATH --output PATH [--ack-disposable-secret-free-host]" >&2
+}
+
+agent=""
+model=""
+timeout_seconds=""
+workspace=""
+output=""
+isolated_host_attestation=false
+while (($#)); do
+  case "$1" in
+    --agent) agent="${2:-}"; shift 2 ;;
+    --model) model="${2:-}"; shift 2 ;;
+    --timeout) timeout_seconds="${2:-}"; shift 2 ;;
+    --workspace) workspace="${2:-}"; shift 2 ;;
+    --output) output="${2:-}"; shift 2 ;;
+    --ack-disposable-secret-free-host) isolated_host_attestation=true; shift ;;
+    *) usage; exit 64 ;;
+  esac
+done
+
+[[ "$agent" == codex && -n "$model" && "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$workspace" = /* && -n "$output" ]] || {
+  usage
+  exit 64
+}
+
+root="$(git rev-parse --show-toplevel)"
+eval_dir="$root/internal/agent-evals/pro-app-buildability"
+if command -v timeout >/dev/null; then
+  timeout_name=timeout
+elif command -v gtimeout >/dev/null; then
+  timeout_name=gtimeout
+else
+  echo "GNU timeout or gtimeout is required; refusing an unbounded run" >&2
+  exit 69
+fi
+safe_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null "$eval_dir/bin/build-safe-path" \
+  codex curl env git jq node npm perl pnpm realpath ruby shasum "$timeout_name")"
+
+resolve_future_path() {
+  local requested="$1"
+  local parent
+  parent="$(dirname "$requested")"
+  [[ -d "$parent" ]] || { echo "parent directory must exist: $parent" >&2; return 1; }
+  printf '%s/%s\n' "$(cd "$parent" && pwd -P)" "$(basename "$requested")"
+}
+
+if [[ "$output" != /* ]]; then output="$root/$output"; fi
+[[ ! -L "$workspace" ]] || { echo "workspace symlink inputs are forbidden" >&2; exit 65; }
+[[ ! -L "$output" ]] || { echo "output symlink inputs are forbidden" >&2; exit 65; }
+workspace="$(resolve_future_path "$workspace")"
+output="$(resolve_future_path "$output")"
+case "$workspace/" in "$output/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
+case "$output/" in "$workspace/"*) echo "workspace and output overlap" >&2; exit 65 ;; esac
+case "$workspace/" in "$root/"*) echo "workspace must be outside the repository" >&2; exit 65 ;; esac
+[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
+  echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
+  exit 65
+}
+[[ ! -e "$output" ]] || { echo "output already exists: $output" >&2; exit 65; }
+if [[ -e "$workspace" && -n "$(find "$workspace" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+  echo "workspace must be absent or empty: $workspace" >&2
+  exit 65
+fi
+
+private_dir="$(mktemp -d "${TMPDIR:-/tmp}/ror-pro-agent-eval.XXXXXX")"
+chmod 700 "$private_dir"
+cleanup() {
+  rm -rf "$private_dir"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+mkdir -m 700 "$private_dir/runner-home" "$private_dir/agent-home" "$private_dir/codex-home" "$private_dir/tmp"
+
+minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh)
+for command_name in codex curl env git jq node npm perl pnpm realpath ruby shasum "$timeout_name"; do
+  expected_executable="$(realpath "$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" --resolve "$command_name")")"
+  # The positional parameter expands inside the stripped child shell.
+  # shellcheck disable=SC2016
+  runtime_executable="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$command_name")" || {
+    echo "required command unavailable in stripped runtime: $command_name" >&2
+    exit 69
+  }
+  runtime_executable="$(realpath "$runtime_executable")"
+  [[ "$runtime_executable" == "$expected_executable" ]] || {
+    echo "stripped runtime resolves a different executable: $command_name" >&2
+    exit 69
+  }
+done
+# The positional parameter expands inside the stripped child shell.
+# shellcheck disable=SC2016
+timeout_command="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$timeout_name")"
+network_json='[]'
+for endpoint in https://registry.npmjs.org/ https://rubygems.org/; do
+  if "${minimal_env[@]}" curl --fail --silent --show-error --head --max-time 10 "$endpoint" >/dev/null; then
+    network_json="$(jq --arg endpoint "$endpoint" '. + [{endpoint:$endpoint,status:"pass"}]' <<<"$network_json")"
+  else
+    echo "required network preflight failed: $endpoint" >&2
+    exit 69
+  fi
+done
+
+stripped_categories='[]'
+while IFS= read -r variable; do
+  case "$variable" in
+    *TOKEN*|*token*) category=token ;;
+    *PASSWORD*|*password*|*PASSWD*|*passwd*) category=password ;;
+    *AUTH*|*auth*) category=auth ;;
+    *COOKIE*|*cookie*) category=cookie ;;
+    *CREDENTIAL*|*credential*) category=credential ;;
+    *SECRET*|*secret*|*API_KEY*|*api_key*|*LICENSE*|*license*) category=secret ;;
+    *) continue ;;
+  esac
+  stripped_categories="$(jq --arg category "$category" '. + [$category] | unique | sort' \
+    <<<"$stripped_categories")"
+done < <(compgen -e)
+
+mkdir -p "$workspace" "$output"
+chmod 700 "$workspace" "$output"
+git -C "$workspace" init --quiet
+started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+revision="$(git -C "$root" rev-parse HEAD)"
+
+cp "$eval_dir/prompt.md" "$eval_dir/scenario.md" "$eval_dir/rubric.md" "$output/"
+input_hashes='[]'
+while IFS= read -r file; do
+  relative="${file#"$eval_dir/"}"
+  executable=false
+  [[ -x "$file" ]] && executable=true
+  input_hashes="$(jq --arg path "$relative" --arg sha "$(shasum -a 256 "$file" | awk '{print $1}')" \
+    --argjson executable "$executable" '. + [{path:$path,sha256:$sha,executable:$executable}]' <<<"$input_hashes")"
+done < <(find "$eval_dir/bin" "$eval_dir/schemas" -type f -print | LC_ALL=C sort)
+for file in network-probe-prompt.md package.json pnpm-lock.yaml prompt.md rubric.md scenario.md; do
+  input_hashes="$(jq --arg path "$file" --arg sha "$(shasum -a 256 "$eval_dir/$file" | awk '{print $1}')" \
+    '. + [{path:$path,sha256:$sha,executable:false}]' <<<"$input_hashes")"
+done
+
+sandbox_network_access="$isolated_host_attestation"
+shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
+npm_probe_command='npm view create-react-on-rails-app version --json'
+rubygems_probe_command="gem search --remote --exact '^rails$'"
+codex_args=(exec --ephemeral --ignore-user-config --ignore-rules --strict-config --sandbox workspace-write --model "$model")
+codex_args+=(-c 'features.multi_agent=false' -c "sandbox_workspace_write.network_access=$sandbox_network_access")
+codex_args+=(-c 'cli_auth_credentials_store="file"')
+codex_args+=(-c 'shell_environment_policy.inherit="none"' -c "$shell_policy")
+codex_args+=(--output-schema "$eval_dir/schemas/agent-report.schema.json" --json -C "$workspace" -)
+
+probe_timeout_seconds="$timeout_seconds"
+((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
+maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
+
+jq -n --arg model "$model" --argjson scaffold_timeout "$timeout_seconds" \
+  --argjson probe_timeout "$probe_timeout_seconds" \
+  --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" \
+  --arg npm_probe "$npm_probe_command" --arg rubygems_probe "$rubygems_probe_command" \
+  --argjson sandbox_network_access "$sandbox_network_access" \
+  --argjson isolated_host_attestation "$isolated_host_attestation" \
+  '{command:"codex exec",model:$model,scaffold_timeout_seconds:$scaffold_timeout,
+    probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+    sandbox:"workspace-write",ephemeral:true,
+    ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
+    sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
+    capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
+    credential_store:"file",auth_material_available:false,human_followups_sent:0,
+    shell_environment_policy:{inherit:"none",allowlist:["PATH","HOME","TMPDIR","LANG","LC_ALL","SHELL","CODEX_EVAL"]}}' \
+  >"$output/invocation.json"
+
+raw_probe_events="$private_dir/probe-events.jsonl"
+raw_probe_stderr="$private_dir/probe-stderr.log"
+safe_probe_events="$private_dir/probe-events.safe.jsonl"
+safe_probe_stderr="$private_dir/probe-stderr.safe.log"
+set +e
+"$timeout_command" "$probe_timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
+  codex "${codex_args[@]}" <"$eval_dir/network-probe-prompt.md" >"$raw_probe_events" 2>"$raw_probe_stderr"
+probe_exit=$?
+set -e
+EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+  perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_events" >"$safe_probe_events"
+EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+  perl "$eval_dir/bin/sanitize-events.pl" "$raw_probe_stderr" >"$safe_probe_stderr"
+node "$eval_dir/bin/derive-network-probe.mjs" "$safe_probe_events" "$output/sandbox-network-probe.json" \
+  "$sandbox_network_access"
+probe_result="$(jq -r .overall "$output/sandbox-network-probe.json")"
+
+safe_events="$private_dir/events.safe.jsonl"
+safe_stderr="$private_dir/stderr.safe.log"
+scaffold_invoked=false
+runner_exit="$probe_exit"
+timed_out=false
+[[ "$probe_exit" == 124 ]] && timed_out=true
+if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox_network_access"; then
+  scaffold_invoked=true
+  raw_scaffold_events="$private_dir/scaffold-events.jsonl"
+  raw_scaffold_stderr="$private_dir/scaffold-stderr.log"
+  safe_scaffold_events="$private_dir/scaffold-events.safe.jsonl"
+  safe_scaffold_stderr="$private_dir/scaffold-stderr.safe.log"
+  set +e
+  "$timeout_command" "$timeout_seconds" "${minimal_env[@]}" "CODEX_HOME=$private_dir/codex-home" \
+    codex "${codex_args[@]}" <"$eval_dir/prompt.md" >"$raw_scaffold_events" 2>"$raw_scaffold_stderr"
+  runner_exit=$?
+  set -e
+  [[ "$runner_exit" == 124 ]] && timed_out=true
+  EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+    perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_events" >"$safe_scaffold_events"
+  EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
+    perl "$eval_dir/bin/sanitize-events.pl" "$raw_scaffold_stderr" >"$safe_scaffold_stderr"
+  cat "$safe_probe_events" "$safe_scaffold_events" >"$safe_events"
+  cat "$safe_probe_stderr" "$safe_scaffold_stderr" >"$safe_stderr"
+  if ! jq -s '[.[] | select(.type == "item.completed" and .item.type == "agent_message") | .item.text] | last // empty | fromjson' \
+    "$safe_scaffold_events" >"$output/agent-report.json" || [[ ! -s "$output/agent-report.json" ]]; then
+    jq -n --arg reason "Codex scaffold runner exited without a schema-constrained final report (exit $runner_exit)" \
+      '{status:"failed",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
+      >"$output/agent-report.json"
+  fi
+else
+  cp "$safe_probe_events" "$safe_events"
+  cp "$safe_probe_stderr" "$safe_stderr"
+  jq -n --arg reason "In-sandbox npm/RubyGems capability probe failed; scaffold was not started" \
+    '{status:"blocked",summary:$reason,commands:[],checks:[],friction:[$reason],human_interventions:0,blockers:[$reason]}' \
+    >"$output/agent-report.json"
+fi
+
+TMPDIR="$private_dir/tmp" "$eval_dir/bin/build-runner-diagnostics" \
+  "$safe_stderr" "$output/runner-diagnostics.json"
+
+node "$eval_dir/bin/derive-evidence.mjs" "$safe_events" "$workspace" "$output" \
+  "$output/agent-report.json" "$output/invocation.json"
+git -C "$workspace" status --short --untracked-files=normal >"$output/workspace-status.txt"
+
+finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+classification="$(jq -r .overall "$output/rubric-results.json")"
+reason="Machine-derived rubric result: $classification; see rubric-results.json"
+
+jq -n \
+  --arg run_id "$(basename "$output")" --arg started "$started_at" --arg finished "$finished_at" \
+  --arg revision "$revision" --arg version "$(codex --version)" --arg model "$model" \
+  --arg os "$(uname -srm)" --arg ruby "$(ruby --version 2>&1)" --arg node "$(node --version)" \
+  --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
+  --argjson inputs "$input_hashes" --argjson stripped "$stripped_categories" --argjson network "$network_json" \
+  --argjson sandbox_network_access "$sandbox_network_access" \
+  --argjson isolated_host_attestation "$isolated_host_attestation" \
+  --arg timeout_command "$timeout_command" --argjson scaffold_timeout "$timeout_seconds" \
+  --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" --argjson exit_code "$runner_exit" \
+  --argjson probe_timeout "$probe_timeout_seconds" --argjson scaffold_invoked "$scaffold_invoked" \
+  --argjson timed_out "$timed_out" --arg classification "$classification" --arg reason "$reason" \
+  '{schema_version:"2.0",run_id:$run_id,started_at:$started,finished_at:$finished,
+    repository:{revision:$revision,dirty:false},definition:{inputs:$inputs},
+    agent:{name:"codex",version:$version,model:$model,probe_invoked:true,scaffold_invoked:$scaffold_invoked},
+    environment:{os:$os,ruby:$ruby,node:$node,npm:$npm,pnpm:$pnpm,git:$git},
+    security:{umask:"077",process_environment:"env -i",shell_environment_inherit:"none",
+      credential_store:"file",auth_material_available:false,stripped_sensitive_variable_categories:$stripped,
+      raw_cleanup:"EXIT/INT/TERM",auth_material_persisted:false},
+    network_preflight:$network,
+    runner:{timeout_command:$timeout_command,scaffold_timeout_seconds:$scaffold_timeout,
+      probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
+      sandbox_network_access:$sandbox_network_access,
+      isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
+      exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json"},
+    result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"
+
+checksum_files="$private_dir/checksum-files"
+(cd "$output" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print | LC_ALL=C sort | sed 's#^./##') \
+  >"$checksum_files"
+"${minimal_env[@]}" node "$eval_dir/node_modules/prettier/bin/prettier.cjs" --write "$output"/*.json >/dev/null
+(cd "$output" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
+
+echo "recorded run: $output"
+echo "runner exit: $runner_exit; classification: $classification"

@@ -81,6 +81,13 @@ See [License Configuration](#license-configuration-production-only) below for ot
 
 ## Adding React Server Components
 
+> **Using React 18, or not using RSC?** Skip this section and do not install
+> `react-on-rails-rsc` — it is an **optional** peer dependency needed only when RSC
+> support is enabled. React on Rails Pro works with React 18, including non-RSC
+> `stream_react_component` with synchronous props. Async props and React Server
+> Components require React 19, and RSC stays disabled unless you set
+> `config.enable_rsc_support = true` (the default is `false`).
+
 RSC requires React on Rails Pro and React 19 with a compatible `react-on-rails-rsc` version. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash

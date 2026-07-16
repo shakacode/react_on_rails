@@ -97,7 +97,7 @@ module TrackBenchmarks
     end
 
     # The confirmation rerun (BENCHMARK_MODE=confirm). Owns its own exit code:
-    #   confirmed   -> write the confirmed hand-off, exit 0 (report-regressions fails the run)
+    #   confirmed   -> write the confirmed hand-off, exit 0 for downstream reporting
     #   cleared     -> exit 0 (the first-run alert was noise)
     #   inconclusive-> exit 1 (operational failure: fail the workflow, file nothing)
     def run(report, bencher_exit_code, confirmation_markdown, suite_name)

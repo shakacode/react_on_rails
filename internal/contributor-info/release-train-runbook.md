@@ -181,6 +181,48 @@ stops before tagging. If `release/X.Y.Z` already exists, the task stops and tell
 > the current branch ref. If the release branch was just pushed, wait for at least one CI run on that
 > branch before cutting the first RC; otherwise the branch-tip gate can stop with a `no_checks` result.
 
+#### Automatic ShakaPerf pre-run after changelog preparation
+
+Pushing a prepared next-version `CHANGELOG.md` section to `release/X.Y.Z` automatically starts the
+ShakaPerf release gate for that branch tip. The lightweight dispatcher runs only for `CHANGELOG.md`
+pushes on `release/**`, then verifies that the first non-`Unreleased` changelog section is non-empty,
+newer than the checked-in gem version, and belongs to the branch's `X.Y.Z` release line. An arbitrary
+documentation edit or an unchanged/stale version therefore does not start the long-running gate.
+
+The dispatched Actions run names the target version, release branch, and exact candidate SHA. On
+completion it uploads `shakaperf-release-evidence.json` in the `shakaperf-release-evidence` artifact,
+containing the branch, target version, candidate SHA, conclusion, run URL, completion time, and runtime
+tree fingerprint, plus the workflow run attempt that produced the evidence. Open that run URL from the
+later `rake release` output to inspect the gate and its
+artifacts. The sequential validation, ShakaPerf, and evidence jobs are bounded to 60 minutes in total;
+the release task allows 65 minutes after finding a run so the workflow can reach that bound cleanly.
+Per-release-branch concurrency cancels an obsolete in-progress run when a newer prepared
+candidate is dispatched; the newest branch candidate is authoritative, so a failed or cancelled newer
+run never causes fallback to an older success.
+
+When `bundle exec rake release[...]` later pushes the version-bump commit, it first watches the latest
+prepared-candidate pre-run if that run is still active. A failed or otherwise non-reusable exact-head run
+does not prevent the task from considering the latest pre-run. The task reuses completed pre-run evidence
+only when all of these checks succeed:
+
+- the run and artifact report success for the same branch, target version, candidate SHA, run ID, run
+  attempt, and run URL;
+- the evidence is no more than seven days old, and both its recorded completion and the workflow's
+  update occurred before this release command started, unless the task found that same pre-run already
+  active with a provable earlier current-attempt start and watched that same attempt to successful
+  completion itself;
+- the tested candidate is an ancestor of the version-bump commit;
+- the candidate and version-bump commits have the same exact Git-tree fingerprint after excluding only
+  `CHANGELOG.md` and the existing release-finalization metadata paths; and
+- every intervening commit is either an existing content-validated version-finalization metadata commit
+  or a canonical CI-detector-confirmed `CHANGELOG.md`-only commit.
+
+Missing, malformed, stale, wrong-version, wrong-branch, failed, cancelled, superseded, non-ancestor, or
+runtime-different evidence is never a waiver. The task falls back to dispatching the gate on the exact
+version-bump commit and waits for that run plus its verified evidence exactly as before. If the fresh
+gate or its evidence fails, tagging and package publication remain blocked. Final promotion keeps the
+same strict final-release gates and cannot use the prerelease-only CI override.
+
 A maintainer opens (or updates) the release tracker per [`rc-testing-plan.md`](rc-testing-plan.md) and
 sets the mode to `accelerated-rc` or `strict-rc`. Publish the phase as `rc` for this release line so
 agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase-tiered-merge-gating)).
@@ -245,8 +287,35 @@ PR; do not defer all entry curation to the final changelog pass.
 
 Before branching, search open PRs targeting the release branch for an aggregate
 that already contains the selected source commits. Do not extend that aggregate
-by default. Close it only with explicit authorization, retain its branch unless
-deletion is separately authorized, and replace it with the source-atomic PRs.
+by default. Close it only with explicit write authorization, retain its branch
+unless deletion is separately authorized, and replace it with the source-atomic PRs.
+
+#### Promote prerelease dependencies before final
+
+Do not promote a React on Rails RC to final while it still pins a prerelease of a coordinated
+dependency. For `17.0.0` and `react-on-rails-rsc@19.2.1`, use this order:
+
+1. Follow the
+   [`react-on-rails-rsc` release guide](https://github.com/shakacode/react_on_rails_rsc/blob/main/internal/docs/releasing.md),
+   complete its downstream release gate, and accept the exact commit behind the tested
+   `19.2.1-rc.N`. If any code changes, publish and test another RSC RC instead of promoting an
+   untested commit.
+2. Publish that same accepted commit as stable `react-on-rails-rsc@19.2.1`, and verify the registry
+   package and `latest` dist-tag before changing React on Rails.
+3. Complete [#4357](https://github.com/shakacode/react_on_rails/issues/4357) on
+   `release/17.0.0`: update the Ruby generator's RSC pin and the Pro peer/dev dependency metadata,
+   node-renderer and dummy/override pins, and affected lockfiles. This is a dependency update, not a
+   manual bump of React on Rails' own gem/npm product version.
+4. Forward-port the dependency-pin fix to `main` with `git cherry-pick -x`, as for every other release
+   branch fix.
+5. Cut a new React on Rails RC that contains the stable RSC pin. Do not treat an earlier React on Rails
+   RC that still points at `19.2.1-rc.N` as the final candidate.
+6. Run the RC hard gates and demo-fleet QA against the newly published artifacts. Include a scratch
+   non-RSC smoke test that installs or copies the published `react-on-rails-pro@<rc>` tarball while
+   leaving `react-on-rails-rsc` absent; a monorepo/workspace symlink is not valid evidence because it
+   can mask package-resolution leaks.
+7. Only after that new RC is accepted should [#4569](https://github.com/shakacode/react_on_rails/issues/4569)
+   promote `17.0.0` final.
 
 ### 3. Forward-port stabilizing fixes back to `main`
 
@@ -331,8 +400,10 @@ git rev-parse HEAD            # confirm it equals the tag of the good RC
 git diff --stat v17.0.0.rc.3  # expect: empty (no drift since the good RC)
 ```
 
-Collapse the RC CHANGELOG sections into the final section and bump to the final version, then release —
-this is the only code change between the good RC and the final:
+Collapse the RC CHANGELOG sections into the final section, then release. Do not manually bump the
+React on Rails gem/npm product-version files; the release task owns that coordinated change. The
+CHANGELOG edit plus the task-generated version metadata is the only difference between the good RC
+and the final:
 
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
@@ -365,6 +436,13 @@ git diff --name-only v17.0.0.rc.3 v17.0.0
 be re-spun, and an explicit human sign-off on the promotion itself (see
 [Phase-tiered merge gating](#phase-tiered-merge-gating)). Set the mode to `final-release` on the tracker
 and publish phase `final` for the release line during the promotion freeze.
+
+Final promotion must fail closed. Do not set `RELEASE_CI_STATUS_OVERRIDE=true`, pass the fourth
+`override_ci_status` argument, or use an accelerated asynchronous/deferred-gate option when publishing
+the stable version. Successful gate evidence from the accepted RC may be reused only when the final
+release policy and release tooling validate that evidence. A narrowly scoped, documented final waiver
+remains possible only where the existing final-release policy explicitly permits it, with its required
+evidence and maintainer sign-off; it must not become a global skip of CI, ShakaPerf, or any other gate.
 
 ### 5. Close out the release line
 

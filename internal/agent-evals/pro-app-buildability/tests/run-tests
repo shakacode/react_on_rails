@@ -1,0 +1,574 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+eval_dir="$root/internal/agent-evals/pro-app-buildability"
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-tests.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT INT TERM
+
+node "$eval_dir/bin/validate-json.mjs" --schemas-only
+
+printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
+  'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
+  'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  'RAILS_MASTER_KEY=rails-master-key-value-567' \
+  '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' \
+  '/tmp/private/place' '/private/tmp/agent-cache' '/home/runner/private/place' '/root/private/place' \
+  'file:///home/runner/private/file' \
+  'https://example.com/home/runner/guide' 'https://example.com/Users/public/guide' \
+  'https://home/runner/guide' 'https://root/private' 'https://tmp/example' \
+  'https://Users/public/guide' \
+  '-----BEGIN PRIVATE KEY-----' 'line-one' 'line-two' '-----END PRIVATE KEY-----' >"$tmp/unsafe"
+EVAL_PRIVATE_DIR="$tmp" perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unsafe" >"$tmp/safe"
+rg -q '\[REDACTED\]' "$tmp/safe"
+rg -q '<LOCAL_PATH>' "$tmp/safe"
+if rg -q 'super-sensitive-value|multi-word-secret|base-secret-value-123|aws-secret-value-456|aws-access-key-01234|rails-master-key-value-567|stripe-secret-value-789|/tmp/private/place|/private/tmp/agent-cache|/home/runner/private/place|/root/private/place|file:///home/runner/private/file|line-one|line-two' \
+  "$tmp/safe"; then
+  echo "sanitizer negative test failed" >&2
+  exit 1
+fi
+rg -q 'https://example.com/home/runner/guide' "$tmp/safe"
+rg -q 'https://example.com/Users/public/guide' "$tmp/safe"
+rg -q 'https://home/runner/guide' "$tmp/safe"
+rg -q 'https://root/private' "$tmp/safe"
+rg -q 'https://tmp/example' "$tmp/safe"
+rg -q 'https://Users/public/guide' "$tmp/safe"
+
+printf '%s\n' \
+  'https://home/runner/guide' 'https://root/private' 'https://tmp/example' \
+  'https://Users/public/guide' >"$tmp/reserved-host-urls"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactLocalPaths } = await import(pathToFileURL(helper));
+   process.stdout.write(redactLocalPaths(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/local-paths.mjs" "$tmp/reserved-host-urls" >"$tmp/reserved-host-urls-js"
+cmp "$tmp/reserved-host-urls" "$tmp/reserved-host-urls-js"
+set +e
+node "$eval_dir/bin/scan-local-paths.mjs" "$tmp/reserved-host-urls" >/dev/null
+reserved_url_scan_exit=$?
+set -e
+test "$reserved_url_scan_exit" = 1
+
+printf '%s\n' \
+  '/home/runner/guide' '/root/private' '/tmp/example' '/Users/public/guide' \
+  'file:///home/runner/private' >"$tmp/local-path-counterparts"
+set +e
+node "$eval_dir/bin/scan-local-paths.mjs" "$tmp/local-path-counterparts" >/dev/null
+local_counterpart_scan_exit=$?
+set -e
+test "$local_counterpart_scan_exit" = 0
+test "$(rg -o '\[REDACTED\]' "$tmp/safe" | wc -l | tr -d ' ')" -ge 2
+printf '%s\n' 'SECRET_KEY_BASE=base-secret-value-123' \
+  'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
+  'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
+  'RAILS_MASTER_KEY=rails-master-key-value-567' \
+  'STRIPE_SECRET_KEY=x' \
+  '{"STRIPE_SECRET_KEY":"stripe-secret-value-789"}' >"$tmp/sensitive-names-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/sensitive-names-unsafe" >"$tmp/sensitive-names-safe"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-unsafe" >/dev/null
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/sensitive-names-safe" >/dev/null
+sensitive_clean_exit=$?
+set -e
+if [[ "$sensitive_clean_exit" != 1 ]]; then
+  echo "final sensitive-artifact scan rejected sanitized output" >&2
+  exit 1
+fi
+
+printf '%s\n' \
+  'Authorization Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature' \
+  'token: "abc,secret123"' \
+  "password: 'p@ss,word'" \
+  'SECRET_KEY_BASE="abc\"def,ghi"' \
+  'AWS_SECRET_ACCESS_KEY=abc,def' \
+  'RAILS_MASTER_KEY=rails-master-parity-secret' \
+  'https://alice:s3cr3t-credential@example.com/private' \
+  'https://example.com/path?token=query-secret-value-123&page=2' \
+  'https://example.com/path?api_key=query-api-secret-456' \
+  'https://example.com/path?RAILS_MASTER_KEY=query-rails-secret-789' \
+  'https://example.com/path#token=fragment-secret-012&section=ok' \
+  'https://example.com/path?%61pi%5Fkey=encoded-query-secret-345' \
+  'https://example.com/path#RAILS%5FMASTER%5FKEY=encoded-fragment-secret-678' \
+  'https://example.com/path?%74oken%ZZ=malformed-query-secret-901&page=2' \
+  'https://example.com/path#%54%4fKEN%zz=malformed-fragment-secret-234&section=ok' \
+  'https://example.com/path?api%5fkey=lowercase-hex-secret-567' \
+  'https://example.com/path#RAILS%5FMASTER%5fKEY=encoded-delimiter-secret-890' \
+  'https://home/runner/guide?page=2#section' \
+  'api_key: ["array-secret-value-123"]' \
+  'credential: {"value":"object-secret-value-456"}' \
+  'api_key: {' \
+  '  "value": "multiline-object-secret-789",' \
+  '  "nested": [{"value":"nested-object-secret"}],' \
+  '  "closing": "quoted }] delimiters"' \
+  '}' \
+  'credentials: [' \
+  '  {"value":"multiline-array-secret-012"},' \
+  '  ["nested-array-secret"]' \
+  ']' \
+  'credential_store:"file"' \
+  '-----BEGIN PRIVATE KEY-----' 'complete-key-material' '-----END PRIVATE KEY-----' \
+  '-----BEGIN OPENSSH PRIVATE KEY-----' 'truncated-key-material' >"$tmp/parity-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/parity-unsafe" >"$tmp/parity-perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/parity-unsafe" >"$tmp/parity-js-safe"
+cmp "$tmp/parity-perl-safe" "$tmp/parity-js-safe"
+if rg -q 'eyJhbGci|secret123|p@ss,word|abc\\"def,ghi|abc,def|rails-master-parity-secret|s3cr3t-credential|query-secret-value-123|query-api-secret-456|query-rails-secret-789|fragment-secret-012|encoded-query-secret-345|encoded-fragment-secret-678|malformed-query-secret-901|malformed-fragment-secret-234|lowercase-hex-secret-567|encoded-delimiter-secret-890|array-secret-value-123|object-secret-value-456|multiline-object-secret-789|nested-object-secret|quoted \}\] delimiters|multiline-array-secret-012|nested-array-secret|complete-key-material|truncated-key-material|BEGIN .*PRIVATE KEY' \
+  "$tmp/parity-perl-safe"; then
+  echo "cross-language sanitizer parity fixture leaked a sensitive value" >&2
+  exit 1
+fi
+rg -Fq 'https://alice:[REDACTED]@example.com/private' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?token=[REDACTED]&page=2' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?%61pi%5Fkey=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path#RAILS%5FMASTER%5FKEY=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?%74oken%ZZ=[REDACTED]&page=2' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path#%54%4fKEN%zz=[REDACTED]&section=ok' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path?api%5fkey=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://example.com/path#RAILS%5FMASTER%5fKEY=[REDACTED]' "$tmp/parity-perl-safe"
+rg -Fq 'https://home/runner/guide?page=2#section' "$tmp/parity-perl-safe"
+
+printf '%s\n' 'api_key: [' '{"value":"unclosed-structured-secret"}' \
+  >"$tmp/unclosed-structured-unsafe"
+perl "$eval_dir/bin/sanitize-events.pl" "$tmp/unclosed-structured-unsafe" \
+  >"$tmp/unclosed-structured-perl-safe"
+node --input-type=module -e \
+  'import fs from "node:fs"; import { pathToFileURL } from "node:url";
+   const [helper, input] = process.argv.slice(1);
+   const { redactSensitiveValues } = await import(pathToFileURL(helper));
+   process.stdout.write(redactSensitiveValues(fs.readFileSync(input, "utf8")));' \
+  "$eval_dir/bin/sensitive-values.mjs" "$tmp/unclosed-structured-unsafe" \
+  >"$tmp/unclosed-structured-js-safe"
+cmp "$tmp/unclosed-structured-perl-safe" "$tmp/unclosed-structured-js-safe"
+test "$(cat "$tmp/unclosed-structured-perl-safe")" = 'api_key: [REDACTED]'
+if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/unclosed-structured-perl-safe" >/dev/null; then
+  echo "final scanner rejected fail-closed unclosed structured redaction" >&2
+  exit 1
+fi
+rg -q 'credential_store:"file"' "$tmp/parity-perl-safe"
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-unsafe" >/dev/null
+if "$eval_dir/bin/scan-sensitive-artifacts" "$tmp/parity-perl-safe" >/dev/null; then
+  echo "final scanner disagreed with cross-language sanitized output" >&2
+  exit 1
+fi
+
+mkdir -p "$tmp/scanner-cycle/a"
+ln -s ../a "$tmp/scanner-cycle/a/loop"
+printf '%s\n' 'ordinary content' >"$tmp/scanner-cycle/a/clean"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-cycle" >/dev/null
+scanner_cycle_exit=$?
+set -e
+test "$scanner_cycle_exit" = 1
+
+printf '%s\n' 'ordinary content' >"$tmp/scanner-unreadable"
+chmod 000 "$tmp/scanner-unreadable"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-unreadable" >/dev/null 2>&1
+scanner_error_exit=$?
+set -e
+chmod 600 "$tmp/scanner-unreadable"
+test "$scanner_error_exit" = 2
+rg -q 'sensitive_scan_exit' "$eval_dir/bin/validate-run"
+
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/does-not-exist" >/dev/null 2>&1
+scanner_missing_exit=$?
+"$eval_dir/bin/scan-sensitive-artifacts" >/dev/null 2>&1
+scanner_usage_exit=$?
+set -e
+test "$scanner_missing_exit" = 2
+test "$scanner_usage_exit" = 2
+
+mkdir -p "$tmp/scanner-depth"
+scanner_depth="$tmp/scanner-depth"
+for ((depth_index = 0; depth_index <= 64; depth_index += 1)); do
+  scanner_depth="$scanner_depth/level"
+  mkdir "$scanner_depth"
+done
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-depth" >/dev/null 2>&1
+scanner_depth_exit=$?
+set -e
+test "$scanner_depth_exit" = 2
+
+mkdir "$tmp/scanner-entries"
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); const directory = process.argv[1];
+   for (let index = 0; index < 5001; index += 1) fs.closeSync(fs.openSync(`${directory}/entry-${index}`, "w"));' \
+  "$tmp/scanner-entries"
+set +e
+"$eval_dir/bin/scan-sensitive-artifacts" "$tmp/scanner-entries" >/dev/null 2>&1
+scanner_entries_exit=$?
+set -e
+test "$scanner_entries_exit" = 2
+
+head -c 1048577 /dev/zero >"$tmp/oversized-raw-events"
+if perl "$eval_dir/bin/sanitize-events.pl" "$tmp/oversized-raw-events" \
+  >"$tmp/oversized-raw-events.safe" 2>"$tmp/oversized-raw-events.stderr"; then
+  echo "oversized raw event stream was not rejected" >&2
+  exit 1
+fi
+test ! -s "$tmp/oversized-raw-events.safe"
+rg -q 'exceeds 1048576-byte limit' "$tmp/oversized-raw-events.stderr"
+
+rg -q '^umask 077$' "$eval_dir/bin/run-eval"
+rg -q '^trap cleanup EXIT$' "$eval_dir/bin/run-eval"
+rg -q "^trap 'exit 130' INT TERM$" "$eval_dir/bin/run-eval"
+rg -q 'minimal_env=\(env -i' "$eval_dir/bin/run-eval"
+rg -q "shell_environment_policy.inherit='?\\\"none\\\"'?" "$eval_dir/bin/run-eval"
+rg -q 'sandbox_workspace_write.network_access=\$sandbox_network_access' "$eval_dir/bin/run-eval"
+rg -q '^isolated_host_attestation=false$' "$eval_dir/bin/run-eval"
+rg -q -- '--ack-disposable-secret-free-host' "$eval_dir/bin/run-eval"
+rg -Fq 'maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))' \
+  "$eval_dir/bin/run-eval"
+rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
+rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
+rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
+rg -q 'run/invocation timeout budgets disagree' "$eval_dir/bin/validate-run"
+rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
+rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
+rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
+rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
+rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
+rg -q 'stripped_sensitive_variable_categories' "$eval_dir/bin/run-eval"
+if rg -q 'stripped_sensitive_names|--arg name "\$variable"' "$eval_dir/bin/run-eval"; then
+  echo "runner must not record operator-specific sensitive variable names" >&2
+  exit 1
+fi
+if rg -q 'host_home|CODEX_EVAL_HOME|CODEX_AUTH_FILE' "$eval_dir/bin/run-eval"; then
+  echo "runner must not expose host home or credential paths to Codex" >&2
+  exit 1
+fi
+if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
+  echo "runner must not copy authentication into the sandbox filesystem" >&2
+  exit 1
+fi
+
+printf '%013000d' 0 >"$tmp/long-stderr"
+"$eval_dir/bin/build-runner-diagnostics" "$tmp/long-stderr" "$tmp/long-diagnostics.json"
+test "$(jq -r .stderr_line_count "$tmp/long-diagnostics.json")" = 0
+test "$(jq -r .excerpt_truncated "$tmp/long-diagnostics.json")" = true
+test "$(jq -r '.excerpt | length' "$tmp/long-diagnostics.json")" = 12000
+"$eval_dir/bin/probe-allows-scaffold" 0 pass true
+if "$eval_dir/bin/probe-allows-scaffold" 0 pass false; then
+  echo "network-disabled run incorrectly allows scaffold" >&2
+  exit 1
+fi
+if "$eval_dir/bin/probe-allows-scaffold" 1 pass true; then
+  echo "nonzero probe exit incorrectly allows scaffold" >&2
+  exit 1
+fi
+
+mkdir "$tmp/user-bin"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/user-bin/user-tool"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/user-bin/node"
+chmod +x "$tmp/user-bin/user-tool"
+chmod +x "$tmp/user-bin/node"
+test_path="$tmp/user-bin:/opt/homebrew/bin:/usr/bin:/bin"
+resolved_path="$(SAFE_PATH_SOURCE="$test_path" BASH_ENV=/dev/null PATH="$test_path" \
+  "$eval_dir/bin/build-safe-path" user-tool node sh)"
+env -i PATH="$resolved_path" /bin/sh -c 'command -v user-tool >/dev/null'
+test "$(realpath "$(env -i PATH="$resolved_path" /bin/sh -c 'command -v node')")" = \
+  "$(realpath "$tmp/user-bin/node")"
+
+mise_node="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+  "$eval_dir/bin/build-safe-path" --resolve node)"
+if [[ "$(basename "$(realpath "$(command -v node)")")" == mise ]]; then
+  test "$(realpath "$mise_node")" != "$(realpath "$(command -v node)")"
+  test "$(env -i PATH="$(dirname "$mise_node"):/usr/bin:/bin" node --version)" = "$(node --version)"
+  mise_ruby="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" --resolve ruby)"
+  mise_path="$(SAFE_PATH_SOURCE="$PATH" BASH_ENV=/dev/null \
+    "$eval_dir/bin/build-safe-path" node ruby sh)"
+  test "$(realpath "$(env -i PATH="$mise_path" /bin/sh -c 'command -v node')")" = "$(realpath "$mise_node")"
+  test "$(realpath "$(env -i PATH="$mise_path" /bin/sh -c 'command -v ruby')")" = "$(realpath "$mise_ruby")"
+fi
+
+mkdir "$tmp/world-writable-bin"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$tmp/world-writable-bin/unsafe-tool"
+chmod +x "$tmp/world-writable-bin/unsafe-tool"
+chmod 777 "$tmp/world-writable-bin"
+unsafe_path="$tmp/world-writable-bin:/usr/bin:/bin"
+if SAFE_PATH_SOURCE="$unsafe_path" BASH_ENV=/dev/null PATH="$unsafe_path" \
+  "$eval_dir/bin/build-safe-path" unsafe-tool \
+  2>"$tmp/unsafe-path-error"; then
+  echo "world-writable command directory was retained" >&2
+  exit 1
+fi
+rg -q 'world-writable' "$tmp/unsafe-path-error"
+
+mkdir "$tmp/real-workspace"
+ln -s "$tmp/real-workspace" "$tmp/workspace-link"
+if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
+  --workspace "$tmp/workspace-link" --output "$tmp/output" 2>"$tmp/symlink-error"; then
+  echo "symlink workspace negative test failed" >&2
+  exit 1
+fi
+rg -q 'symlink inputs are forbidden' "$tmp/symlink-error"
+
+if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
+  --workspace "$root/nested-eval-workspace" --output "$tmp/nested-output" 2>"$tmp/nested-error"; then
+  echo "workspace inside repository negative test failed" >&2
+  exit 1
+fi
+rg -q 'workspace must be outside the repository' "$tmp/nested-error"
+
+printf '%s\n' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":1}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"pass"}' \
+  >"$tmp/contradictory-probe.json"
+printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view","exit_code":1,"status":"failed","output":"","output_truncated":false}]}' \
+  >"$tmp/probe-commands.json"
+if node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/contradictory-probe.json" "$tmp/probe-commands.json" 2>"$tmp/probe-error"; then
+  echo "contradictory network probe negative test failed" >&2
+  exit 1
+fi
+rg -q 'contradicts' "$tmp/probe-error"
+
+printf '%s\n' \
+  '{"schema_version":"1.0","sandbox_network_access":true,"limits":{"max_bytes":1048576,"max_events":5000,"observed_bytes":1,"observed_events":1,"exceeded":false,"reason":null},"npm":{"attempts":[{"command_id":"command-1","exit_code":0}],"status":"pass"},"rubygems":{"attempts":[],"status":"fail"},"overall":"fail"}' \
+  >"$tmp/wrong-command-probe.json"
+printf '%s\n' '{"schema_version":"1.0","commands":[{"id":"command-1","command":"npm view unrelated-package version --json","exit_code":0,"status":"completed","output":"1.0.0","output_truncated":false}]}' \
+  >"$tmp/wrong-command-evidence.json"
+if node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/wrong-command-probe.json" "$tmp/wrong-command-evidence.json" 2>"$tmp/wrong-command-error"; then
+  echo "wrong probe command text was accepted" >&2
+  exit 1
+fi
+rg -q 'exact required probe' "$tmp/wrong-command-error"
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm view create-react-on-rails-app version --json","exit_code":1}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npm view create-react-on-rails-app version --json","exit_code":0}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"gem search --remote --exact '\''^rails$'\''","exit_code":0}}' \
+  >"$tmp/retried-probe-events.jsonl"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/retried-probe-events.jsonl" "$tmp/retried-probe.json" true
+test "$(jq -r '.npm.attempts | length' "$tmp/retried-probe.json")" = 2
+test "$(jq -r '.npm.status' "$tmp/retried-probe.json")" = fail
+test "$(jq -r '.overall' "$tmp/retried-probe.json")" = fail
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":["npm","view","create-react-on-rails-app","version","--json"],"exit_code":0}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":["gem","search","--remote","--exact","^rails$"],"exit_code":0}}' \
+  >"$tmp/argv-probe-events.jsonl"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/argv-probe-events.jsonl" "$tmp/argv-probe.json" true
+test "$(jq -r '.npm.status' "$tmp/argv-probe.json")" = pass
+test "$(jq -r '.rubygems.status' "$tmp/argv-probe.json")" = pass
+test "$(jq -r '.overall' "$tmp/argv-probe.json")" = pass
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/argv-probe-events.jsonl" \
+  "$tmp/network-disabled-probe.json" false
+test "$(jq -r '.sandbox_network_access' "$tmp/network-disabled-probe.json")" = false
+test "$(jq -r '.overall' "$tmp/network-disabled-probe.json")" = fail
+
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc '\''npm view create-react-on-rails-app version --json'\''","exit_code":0}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"/usr/bin/bash -lc \"gem search --remote --exact '\''^rails$'\''\"","exit_code":0}}' \
+  >"$tmp/linux-shell-probe-events.jsonl"
+node "$eval_dir/bin/derive-network-probe.mjs" "$tmp/linux-shell-probe-events.jsonl" \
+  "$tmp/linux-shell-probe.json" true
+test "$(jq -r '.overall' "$tmp/linux-shell-probe.json")" = pass
+
+mkdir "$tmp/evidence-workspace" "$tmp/evidence-output"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"bin/rails assets:precompile --help","exit_code":0,"status":"completed","aggregated_output":"Usage: assets:precompile [options] - assets compiled successfully"}}' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"npx create-react-on-rails-app --help","exit_code":0,"status":"completed","aggregated_output":"Usage: create-react-on-rails-app APP"}}' \
+  >"$tmp/generic-build-events.jsonl"
+mkdir "$tmp/evidence-workspace/eval_app"
+printf '%s\n' "gem 'react_on_rails_pro'" >"$tmp/evidence-workspace/eval_app/Gemfile"
+printf '%s\n' '{"dependencies":{"react-on-rails-pro":"1.0.0"}}' >"$tmp/evidence-workspace/eval_app/package.json"
+mkdir -p "$tmp/evidence-workspace/eval_app/app/components"
+printf '%s\n' \
+  "workspace=$tmp/evidence-workspace" \
+  "output=$tmp/secret-output" \
+  'linux=/home/runner/private/project' \
+  'mac=/Users/runner/private/project' \
+  'url=https://example.com/home/runner/guide' \
+  'reserved=https://home/runner/guide https://root/private https://tmp/example https://Users/public/guide' \
+  >"$tmp/evidence-workspace/eval_app/app/components/paths.server.tsx"
+printf '%070000d' 0 >"$tmp/evidence-workspace/eval_app/app/components/oversized.server.tsx"
+printf '%s\n' '{"status":"completed","summary":"fixture","commands":[],"checks":[],"friction":[],"human_interventions":99,"blockers":[]}' \
+  >"$tmp/fixture-report.json"
+printf '%s\n' '{"human_followups_sent":0}' >"$tmp/fixture-invocation.json"
+printf '%s\n' '{}' >"$tmp/missing-followup-invocation.json"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"printenv","exit_code":0,"status":"completed","aggregated_output":"SECRET_KEY_BASE=base-secret-value-123\nAWS_SECRET_ACCESS_KEY=aws-secret-value-456\nSTRIPE_SECRET_KEY=stripe-secret-value-789"}}' \
+  >"$tmp/secret-events.jsonl"
+mkdir "$tmp/secret-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/secret-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/secret-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+if rg -q "base-secret-value-123|aws-secret-value-456|stripe-secret-value-789|$tmp/evidence-workspace|$tmp/secret-output|/home/runner/private/project|/Users/runner/private/project" \
+  "$tmp/secret-output"; then
+  echo "JavaScript evidence sanitizer leaked compound secret names" >&2
+  exit 1
+fi
+rg -q 'https://example.com/home/runner/guide' "$tmp/secret-output/artifact-evidence.json"
+rg -q 'https://home/runner/guide' "$tmp/secret-output/artifact-evidence.json"
+rg -q 'https://root/private' "$tmp/secret-output/artifact-evidence.json"
+rg -q 'https://tmp/example' "$tmp/secret-output/artifact-evidence.json"
+rg -q 'https://Users/public/guide' "$tmp/secret-output/artifact-evidence.json"
+adversarial_command="jest --$(printf '!=! --%.0s' {1..4000})"
+jq -cn --arg command "$adversarial_command" \
+  '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"1 test passed"}}' \
+  >"$tmp/adversarial-events.jsonl"
+mkdir "$tmp/adversarial-output"
+if command -v timeout >/dev/null; then
+  test_timeout=timeout
+else
+  test_timeout=gtimeout
+fi
+"$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/adversarial-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/adversarial-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+mkdir "$tmp/argv-evidence-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/argv-probe-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/argv-evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/argv-probe.json" "$tmp/argv-evidence-output/command-evidence.json"
+mkdir "$tmp/linux-shell-evidence-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/linux-shell-probe-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/linux-shell-evidence-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+node "$eval_dir/bin/validate-network-probe.mjs" \
+  "$tmp/linux-shell-probe.json" "$tmp/linux-shell-evidence-output/command-evidence.json"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/evidence-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+if jq -e '.artifacts[] | select(.path | endswith("oversized.server.tsx"))' \
+  "$tmp/evidence-output/artifact-evidence.json" >/dev/null; then
+  echo "oversized agent-controlled artifact was read into evidence" >&2
+  exit 1
+fi
+test "$(jq -r '.limits.exceeded' "$tmp/evidence-output/artifact-evidence.json")" = true
+test "$(jq -r '.limits.reasons | index("file_bytes") != null' \
+  "$tmp/evidence-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/evidence-output/rubric-results.json")" = incomplete
+test "$(jq -r '.items[] | select(.id == "build.production") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+test "$(jq -r '.items[] | select(.id == "install.pro") | .status' "$tmp/evidence-output/rubric-results.json")" = unknown
+test "$(jq -r '.items[] | select(.id == "unaided") | .status' "$tmp/evidence-output/rubric-results.json")" = pass
+mkdir "$tmp/missing-followup-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/evidence-workspace" "$tmp/missing-followup-output" "$tmp/fixture-report.json" \
+  "$tmp/missing-followup-invocation.json"
+test "$(jq -r '.items[] | select(.id == "unaided") | .status' \
+  "$tmp/missing-followup-output/rubric-results.json")" = unknown
+
+mkdir "$tmp/limit-workspace"
+printf '%01050000d' 0 >"$tmp/oversized-events.jsonl"
+mkdir "$tmp/events-bytes-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/oversized-events.jsonl" \
+  "$tmp/limit-workspace" "$tmp/events-bytes-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reason' "$tmp/events-bytes-output/command-evidence.json")" = events_bytes
+test "$(jq -r '.overall' "$tmp/events-bytes-output/rubric-results.json")" = incomplete
+
+for ((event_index = 1; event_index <= 5001; event_index += 1)); do
+  printf '%s\n' '{}' >>"$tmp/many-events.jsonl"
+done
+mkdir "$tmp/events-count-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/many-events.jsonl" \
+  "$tmp/limit-workspace" "$tmp/events-count-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reason' "$tmp/events-count-output/command-evidence.json")" = events_count
+test "$(jq -r '.overall' "$tmp/events-count-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/many-files-workspace/eval_app/app/components" "$tmp/many-files-output"
+for ((file_index = 1; file_index <= 257; file_index += 1)); do
+  printf '%s\n' 'export default null' \
+    >"$tmp/many-files-workspace/eval_app/app/components/file-$file_index.ts"
+done
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/many-files-workspace" "$tmp/many-files-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("selected_files") != null' \
+  "$tmp/many-files-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/many-files-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/huge-directory-workspace/unselected" "$tmp/huge-directory-output"
+# The template expression is evaluated by Node, not the shell.
+# shellcheck disable=SC2016
+node -e \
+  'const fs = require("node:fs"); const directory = process.argv[1];
+   for (let index = 0; index <= 5000; index += 1) fs.closeSync(fs.openSync(`${directory}/entry-${index}`, "w"));' \
+  "$tmp/huge-directory-workspace/unselected"
+"$test_timeout" 5 node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/huge-directory-workspace" "$tmp/huge-directory-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("visited_entries") != null' \
+  "$tmp/huge-directory-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/huge-directory-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/total-bytes-workspace/eval_app/app/components" "$tmp/total-bytes-output"
+yes 'export default null' | head -c 65000 >"$tmp/artifact-payload" || true
+for ((file_index = 1; file_index <= 33; file_index += 1)); do
+  cp "$tmp/artifact-payload" "$tmp/total-bytes-workspace/eval_app/app/components/file-$file_index.ts"
+done
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/generic-build-events.jsonl" \
+  "$tmp/total-bytes-workspace" "$tmp/total-bytes-output" "$tmp/fixture-report.json" \
+  "$tmp/fixture-invocation.json"
+test "$(jq -r '.limits.reasons | index("total_bytes") != null' \
+  "$tmp/total-bytes-output/artifact-evidence.json")" = true
+test "$(jq -r '.overall' "$tmp/total-bytes-output/rubric-results.json")" = incomplete
+
+mkdir -p "$tmp/correlation-workspace/eval_app/app/components" \
+  "$tmp/correlation-workspace/eval_app/app/models" \
+  "$tmp/correlation-workspace/eval_app/app/controllers" \
+  "$tmp/correlation-workspace/eval_app/config" \
+  "$tmp/correlation-workspace/eval_app/spec/pages" \
+  "$tmp/correlation-workspace/eval_app/spec/requests"
+printf '%s\n' 'rsc_route server_component' >"$tmp/correlation-workspace/eval_app/config/routes.rb"
+printf '%s\n' 'export const Page = () => null' >"$tmp/correlation-workspace/eval_app/app/components/page.server.tsx"
+printf '%s\n' 'it { expect(page).to be_present }' >"$tmp/correlation-workspace/eval_app/spec/pages/rsc_page_spec.rb"
+printf '%s\n' 'validates :name, presence: true' >"$tmp/correlation-workspace/eval_app/app/models/form.rb"
+printf '%s\n' 'render errors, status: :unprocessable_entity' \
+  >"$tmp/correlation-workspace/eval_app/app/controllers/forms_controller.rb"
+printf '%s\n' 'it tests invalid and valid form outcomes' \
+  >"$tmp/correlation-workspace/eval_app/spec/requests/form_spec.rb"
+printf '%s\n' \
+  '{"type":"item.completed","item":{"type":"command_execution","command":"bundle exec rspec spec/unrelated_spec.rb","exit_code":0,"status":"completed","aggregated_output":"1 example, 0 failures"}}' \
+  >"$tmp/unrelated-test-events.jsonl"
+mkdir "$tmp/correlation-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/unrelated-test-events.jsonl" \
+  "$tmp/correlation-workspace" "$tmp/correlation-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/correlation-output/rubric-results.json")" = unknown
+done
+
+selector_commands=(
+  'bundle exec rspec --tag=focus'
+  'jest --testNamePattern=unrelated'
+  'bin/rails test --name=test_unrelated'
+)
+selector_index=0
+for selector_command in "${selector_commands[@]}"; do
+  selector_index=$((selector_index + 1))
+  jq -cn --arg command "$selector_command" \
+    '{type:"item.completed",item:{type:"command_execution",command:$command,exit_code:0,status:"completed",aggregated_output:"2 tests passed, 0 failures"}}' \
+    >"$tmp/selector-events-$selector_index.jsonl"
+  mkdir "$tmp/selector-output-$selector_index"
+  node "$eval_dir/bin/derive-evidence.mjs" "$tmp/selector-events-$selector_index.jsonl" \
+    "$tmp/correlation-workspace" "$tmp/selector-output-$selector_index" "$tmp/fixture-report.json" \
+    "$tmp/fixture-invocation.json"
+  for row in rsc.route form.validation tests.page tests.form; do
+    test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+      "$tmp/selector-output-$selector_index/rubric-results.json")" = unknown
+  done
+done
+
+jq -cn \
+  '{type:"item.completed",item:{type:"command_execution",command:"bundle exec rspec",exit_code:0,status:"completed",aggregated_output:"2 examples, 0 failures"}}' \
+  >"$tmp/full-suite-events.jsonl"
+mkdir "$tmp/full-suite-output"
+node "$eval_dir/bin/derive-evidence.mjs" "$tmp/full-suite-events.jsonl" \
+  "$tmp/correlation-workspace" "$tmp/full-suite-output" "$tmp/fixture-report.json" "$tmp/fixture-invocation.json"
+for row in rsc.route form.validation tests.page tests.form; do
+  test "$(jq -r --arg row "$row" '.items[] | select(.id == $row) | .status' \
+    "$tmp/full-suite-output/rubric-results.json")" = pass
+done
+
+echo "focused harness tests passed"

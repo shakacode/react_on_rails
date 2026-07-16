@@ -96,24 +96,16 @@ rescue JSON::ParserError => e
   raise "BENCHMARK_PULL_REQUEST_LABELS must be JSON array: #{e.message}"
 end
 
-def suite_requested_by_event?(suite, labels)
+def suite_requested_by_event?(_suite, _labels)
   event_name = ENV.fetch("BENCHMARK_EVENT_NAME")
 
-  return true if event_name == "push"
   return true if event_name == "workflow_dispatch"
-  return false unless event_name == "pull_request"
 
-  # PRs are opt-in: a benchmark run on a PR is informational only (the regression
-  # gate, confirmation rerun, and issue filing are all main-push only), and
-  # single-run deltas on shared CI runners are noise-dominated, so auto-running the
-  # full ~20-min/shard suite on every code change cost far more than it informed
-  # (#4012). Require an explicit benchmark* label instead. Change-detection no
-  # longer selects suites on PRs — only the event and labels do.
-  # Fork PRs never run: their labels aren't trusted. GITHUB_REPOSITORY is always
-  # set by Actions, so a blank/forked head repo can't match it.
-  return false unless ENV.fetch("BENCHMARK_PULL_REQUEST_HEAD_REPO", "") == ENV.fetch("GITHUB_REPOSITORY")
-
-  suite.fetch(:labels).intersect?(labels)
+  # Shared GitHub-hosted runners are too noisy for a trusted Bencher trend. The
+  # automatic push/PR paths are intentionally disabled; dedicated local hardware
+  # uploads the real trend via benchmarks/run-local-benchmark.rb. Keep workflow_dispatch
+  # as an explicit hosted diagnostic escape hatch only.
+  false
 end
 
 def suite_selected_by_input?(suite)
@@ -219,7 +211,9 @@ end
 
 def build_matrix
   labels = pull_request_labels
-  rows = if truthy_env?("BENCHMARK_NON_RUNTIME_ONLY") || labels.include?(BENCHMARK_SUPPRESS_LABEL)
+  event_name = ENV.fetch("BENCHMARK_EVENT_NAME")
+  rows = if event_name != "workflow_dispatch" &&
+            (truthy_env?("BENCHMARK_NON_RUNTIME_ONLY") || labels.include?(BENCHMARK_SUPPRESS_LABEL))
            []
          else
            SUITES.select { |suite| suite_enabled?(suite, labels) }.flat_map { |suite| suite_rows(suite) }

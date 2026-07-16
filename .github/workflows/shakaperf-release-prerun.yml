@@ -1,0 +1,80 @@
+name: Pre-run ShakaPerf Release Gates
+
+permissions:
+  actions: write
+  contents: read
+
+on:
+  push:
+    branches:
+      - 'release/**'
+    paths:
+      - CHANGELOG.md
+
+concurrency:
+  group: shakaperf-release-prerun-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    name: Dispatch prepared release candidate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
+      - name: Inspect changelog candidate
+        id: candidate
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          ruby -rrake <<'RUBY'
+          load "rakelib/release.rake"
+
+          candidate = shakaperf_prerun_candidate(
+            monorepo_root: Dir.pwd,
+            ref: ENV.fetch("RELEASE_BRANCH"),
+            head_sha: ENV.fetch("CANDIDATE_SHA")
+          )
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |output|
+            output.puts "eligible=#{!candidate.nil?}"
+            next unless candidate
+
+            output.puts "target_version=#{candidate.fetch(:target_version)}"
+            output.puts "candidate_sha=#{candidate.fetch(:candidate_sha)}"
+          end
+
+          summary = if candidate
+                      "Prepared #{candidate.fetch(:target_version)} on #{candidate.fetch(:branch)} " \
+                        "at #{candidate.fetch(:candidate_sha)}; dispatching ShakaPerf."
+                    else
+                      "CHANGELOG.md does not prepare the next version for this release branch; no gate dispatched."
+                    end
+          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") { |file| file.puts summary }
+          RUBY
+
+      - name: Dispatch ShakaPerf release gate
+        if: steps.candidate.outputs.eligible == 'true'
+        env:
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.candidate_sha }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          TARGET_VERSION: ${{ steps.candidate.outputs.target_version }}
+        run: |
+          gh workflow run shakaperf-release-gates.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_BRANCH" \
+            -f "target_version=$TARGET_VERSION" \
+            -f "candidate_sha=$CANDIDATE_SHA"
