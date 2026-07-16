@@ -141,19 +141,36 @@ participate in this lease, stop. The repository's merge-group CI does not rerun
 release-specific source-liveness, provenance, attribution, manual QA, or review
 gates and is not an alternative.
 
-Use the same stable coordinator id for the claim and heartbeat. The bounded
-status and claim operations fail closed on timeout, `UNKNOWN`, or
-`CLAIM_REFUSED`:
+Use one non-reusable identity for the lifetime of the coordinator process and
+its supervised child processes. Generate a fresh UUID-backed agent id on every
+restart or handoff; never copy an old process's id into its replacement. This
+makes a resumed stale process a different claim holder that is refused after the
+replacement takes over. Carry the same instance id in the claim and heartbeat
+as defense in depth. The bounded status and claim operations fail closed on
+timeout, `UNKNOWN`, or `CLAIM_REFUSED`:
 
 ```bash
 RELEASE_VERSION=17.0.0
-RELEASE_COORDINATOR_ID="${RELEASE_COORDINATOR_ID:?set a stable coordinator agent id}"
+RELEASE_COORDINATOR_INSTANCE_ID="$(
+  ruby -rsecurerandom -e 'print SecureRandom.uuid'
+)" || {
+  echo "could not generate a release coordinator process identity" >&2
+  return 1 2>/dev/null || exit 1
+}
+test -n "${RELEASE_COORDINATOR_INSTANCE_ID}" || {
+  echo "empty release coordinator process identity" >&2
+  return 1 2>/dev/null || exit 1
+}
+RELEASE_COORDINATOR_ID="release-${RELEASE_VERSION}-${RELEASE_COORDINATOR_INSTANCE_ID}"
+readonly RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
+export RELEASE_COORDINATOR_INSTANCE_ID RELEASE_COORDINATOR_ID
 RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
 PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
 
 heartbeat_release_line_lease() {
   agent-coord heartbeat \
     --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --repo shakacode/react_on_rails \
     --target "${RELEASE_LINE_TARGET}" \
     --branch "release/${RELEASE_VERSION}" \
@@ -170,14 +187,17 @@ require_live_release_line_lease() {
   )" || return 1
   jq -e \
     --arg holder "${RELEASE_COORDINATOR_ID}" \
+    --arg instance "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
     '(.claims | length == 1) and
      (.claims[0].status == "active") and
      (.claims[0].agent_id == $holder) and
+     (.claims[0].instance_id == $instance) and
      (.claims[0].expires_at != "UNKNOWN") and
      ((.claims[0].expires_at | fromdateiso8601) > now) and
      (.heartbeats | length == 1) and
      (.heartbeats[0].agent_id == $holder) and
+     (.heartbeats[0].instance_id == $instance) and
      (.heartbeats[0].target == $target) and
      (.heartbeats[0].liveness == "live")' \
     >/dev/null <<<"${lease_json}"
@@ -189,6 +209,7 @@ acquire_release_line_lease() {
     >/dev/null || return 1
   "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
     --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
     --repo shakacode/react_on_rails \
     --target "${RELEASE_LINE_TARGET}" \
     --branch "release/${RELEASE_VERSION}" \
@@ -225,11 +246,12 @@ the interrupted release step.
 
 Immediately before each write or merge, rerun `require_live_release_line_lease`
 in the shell where the functions above are defined. It must prove that the
-canonical claim is active, unexpired, and owned by `RELEASE_COORDINATOR_ID`, and
-that its matching heartbeat is live and bound to the canonical target. Identity
-alone is insufficient because released and expired records retain their last
-holder. In a batch, chain each later release-targeted lane with `depends_on` and
-do not launch it until the preceding merge is terminal. A merge queue that
+canonical claim is active, unexpired, and owned by the process-unique
+`RELEASE_COORDINATOR_ID`, and that both the claim and its matching live heartbeat
+carry `RELEASE_COORDINATOR_INSTANCE_ID` and bind to the canonical target. Agent
+identity alone is insufficient because released and expired records retain their
+last holder. In a batch, chain each later release-targeted lane with `depends_on`
+and do not launch it until the preceding merge is terminal. A merge queue that
 reruns only the repository's current merge-group CI is not an alternative. If
 the lease guard is unavailable, or its state is `UNKNOWN`, stop rather than let
 two release writers race from the same release tip.
@@ -241,12 +263,16 @@ cancellation/handoff is durably recorded:
 ```bash
 agent-coord release \
   --agent-id "${RELEASE_COORDINATOR_ID}" \
+  --instance-id "${RELEASE_COORDINATOR_INSTANCE_ID}" \
   --repo shakacode/react_on_rails \
   --target "${RELEASE_LINE_TARGET}"
 ```
 
-On handoff, the replacement must acquire this same canonical target after the
-old release is visible; it must not invent another target or bypass a refusal.
+On handoff, the replacement must generate a fresh process identity and acquire
+this same canonical target after the old release is visible; it must not reuse
+the old id, invent another target, or bypass a refusal. If the old process
+crashed, wait until the backend permits takeover. Once the fresh holder is
+active, any resumed old process is refused because its agent id differs.
 
 ### 1. Cut the RC onto `release/X.Y.Z`
 
