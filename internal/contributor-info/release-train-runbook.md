@@ -258,8 +258,9 @@ fixed by republishing.
 
 #### Backport merged `main` PRs one at a time
 
-When maintainers select more than one merged `main` PR for the release train,
-use **one source PR -> one release PR** and serialize the sequence:
+When maintainers select one or more merged `main` PRs for the release train,
+use **one source PR -> one release PR**. When there are multiple selections,
+serialize the sequence:
 
 1. Search open PRs targeting the release branch for the selected source commits.
    If a valid source-atomic backport PR or an explicitly maintainer-approved
@@ -269,17 +270,26 @@ use **one source PR -> one release PR** and serialize the sequence:
    unapproved, shape-violating aggregate. Close it only with explicit write
    authorization, retain its branch unless deletion is separately authorized,
    and replace it with source-atomic PRs.
-2. Verify the source PR is merged, is a release stabilizer, and is not already
-   present or superseded on `release/X.Y.Z`.
-3. When no valid backport PR exists under step 1, fetch the release branch and
-   create a branch from its current tip.
-4. Cherry-pick that source PR's single-parent squash commit with
+2. Fetch the target release branch. Using that refreshed ref, verify the source
+   PR is merged, is a release stabilizer, and is not already present or
+   superseded on `release/X.Y.Z`.
+3. If step 1 found a valid backport PR, update its branch onto the current
+   release tip under the repository's branch-rewrite policy. Repeat the
+   presence and supersession checks, then rerun validation, QA, and review on
+   the updated current head. Otherwise, create a branch from the fetched tip.
+4. On a new branch, cherry-pick that source PR's single-parent squash commit with
    `git cherry-pick -x`. For a true multi-parent merge commit, use
    `git cherry-pick -m 1 -x` and record the mainline-parent choice.
 5. Preserve release-only divergence while resolving conflicts; record the
    source SHA and every non-mechanical resolution in the PR.
-6. Run the release-phase validation, QA, and review gates, then merge the PR.
-7. Fetch the new release tip before starting the next selected source PR.
+6. Run the release-phase validation, QA, and review gates on the current head.
+   Before a squash merge, copy each exact
+   `(cherry picked from commit <source-sha>)` footer into the final squash commit
+   body. After any merge method, verify those footers are present in the commit
+   that landed on the release branch; do not proceed to the next backport if
+   provenance was lost.
+7. Fetch the new release tip before updating or branching the next selected
+   source PR.
 8. After every backport retained in the final release set lands, reconcile the
    changelog entries and stamp or regenerate the RC changelog.
 
