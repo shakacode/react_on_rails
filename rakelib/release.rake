@@ -3270,6 +3270,59 @@ def accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag:)
   provenance
 end
 
+def capture_accelerated_rc_tag_object_output!(monorepo_root:, arguments:, error:)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, *arguments)
+  abort error unless status.success?
+
+  output
+end
+
+def release_tag_object_type_for_object!(monorepo_root:, tag:, tag_object_sha:)
+  unless tag_object_sha.is_a?(String) && tag_object_sha.match?(/\A[0-9a-f]{40}\z/)
+    abort "❌ Captured RC tag object for #{tag} is malformed."
+  end
+
+  type = capture_accelerated_rc_tag_object_output!(
+    monorepo_root:,
+    arguments: ["cat-file", "-t", tag_object_sha],
+    error: "❌ Captured RC tag object for #{tag} is unavailable."
+  ).strip
+  return type if %w[commit tag].include?(type)
+
+  abort "❌ Captured RC tag object for #{tag} has an unexpected git object type."
+end
+
+def accelerated_rc_tag_identity_for_object!(monorepo_root:, tag:, tag_object_sha:)
+  unless release_tag_object_type_for_object!(monorepo_root:, tag:, tag_object_sha:) == "tag"
+    abort "❌ Captured RC tag object for #{tag} is unavailable or is not an annotated tag; " \
+          "refusing publication recovery."
+  end
+
+  contents = capture_accelerated_rc_tag_object_output!(
+    monorepo_root:,
+    arguments: ["cat-file", "-p", tag_object_sha],
+    error: "❌ Unable to inspect captured RC tag object for #{tag}."
+  )
+
+  _headers, separator, message = contents.partition("\n\n")
+  abort "❌ Captured RC tag object for #{tag} is malformed." if separator.empty?
+
+  provenance = accelerated_rc_tag_provenance_from_message(message)
+  abort "❌ Captured annotated RC tag object for #{tag} lacks canonical accelerated provenance." unless provenance
+
+  candidate_output = capture_accelerated_rc_tag_object_output!(
+    monorepo_root:,
+    arguments: ["rev-parse", "--verify", "--quiet", "#{tag_object_sha}^{}"],
+    error: "❌ Unable to peel captured RC tag object for #{tag} to its candidate."
+  )
+  candidate_sha = candidate_output.strip
+  unless candidate_sha.match?(/\A[0-9a-f]{40}\z/)
+    abort "❌ Unable to peel captured RC tag object for #{tag} to its candidate."
+  end
+
+  { tag_object_sha:, candidate_sha:, provenance: }
+end
+
 def create_accelerated_rc_tag!(monorepo_root:, tag:, record:)
   candidate_sha = record.fetch("candidate_sha")
   head_sha = current_git_sha!(monorepo_root)
@@ -3334,7 +3387,7 @@ def parse_remote_release_tag_refs!(output:, tag_ref:, peeled_ref:, tag:, phase:)
   refs
 end
 
-def remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
+def remote_release_tag_refs!(monorepo_root:, tag:, phase:)
   tag_ref = "refs/tags/#{tag}"
   peeled_ref = "#{tag_ref}^{}"
   output, status = Open3.capture2e(
@@ -3344,9 +3397,65 @@ def remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
     abort "❌ Unable to verify remote release tag #{tag.inspect} before #{phase}.\n\n#{output.strip}"
   end
 
-  refs = parse_remote_release_tag_refs!(output:, tag_ref:, peeled_ref:, tag:, phase:)
+  parse_remote_release_tag_refs!(output:, tag_ref:, peeled_ref:, tag:, phase:)
+end
+
+def remote_release_tag_candidate_sha!(monorepo_root:, tag:, phase:)
+  tag_ref = "refs/tags/#{tag}"
+  peeled_ref = "#{tag_ref}^{}"
+  refs = remote_release_tag_refs!(monorepo_root:, tag:, phase:)
 
   refs.fetch(peeled_ref, refs.fetch(tag_ref))
+end
+
+def local_release_tag_object_sha!(monorepo_root:, tag:, phase:)
+  output, status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}"
+  )
+  object_sha = output.strip
+  return object_sha if status.success? && object_sha.match?(/\A[0-9a-f]{40}\z/)
+
+  abort "❌ Unable to inspect the fetched local tag object for #{tag} before #{phase}."
+end
+
+def remote_annotated_release_tag_identity!(monorepo_root:, tag:, phase:)
+  tag_ref = "refs/tags/#{tag}"
+  peeled_ref = "#{tag_ref}^{}"
+  refs = remote_release_tag_refs!(monorepo_root:, tag:, phase:)
+  unless refs.key?(peeled_ref)
+    abort "❌ Remote release tag #{tag} is not an annotated tag before #{phase}; refusing to continue."
+  end
+
+  { tag_object_sha: refs.fetch(tag_ref), candidate_sha: refs.fetch(peeled_ref) }
+end
+
+def live_annotated_release_tag_identity!(monorepo_root:, tag:, phase:, tag_object_sha: nil)
+  captured_tag_object_sha = tag_object_sha || local_release_tag_object_sha!(monorepo_root:, tag:, phase:)
+  identity = accelerated_rc_tag_identity_for_object!(
+    monorepo_root:, tag:, tag_object_sha: captured_tag_object_sha
+  )
+  unless local_release_tag_object_sha!(monorepo_root:, tag:, phase:) == captured_tag_object_sha
+    abort "❌ Fetched local annotated tag ref for #{tag} changed while validating provenance before #{phase}."
+  end
+
+  remote_identity = remote_annotated_release_tag_identity!(monorepo_root:, tag:, phase:)
+  unless remote_identity.fetch(:tag_object_sha) == captured_tag_object_sha
+    abort "❌ Live remote annotated tag object for #{tag} does not match the fetched provenance object " \
+          "before #{phase}."
+  end
+  unless remote_identity.fetch(:candidate_sha) == identity.fetch(:candidate_sha)
+    abort "❌ Remote release tag #{tag} moved away from the captured annotated tag candidate before #{phase}."
+  end
+
+  identity
+end
+
+def valid_accelerated_rc_tag_object_identity?(identity)
+  accelerated_rc_exact_keys?(identity, %i[tag_object_sha candidate_sha provenance]) &&
+    identity[:tag_object_sha].is_a?(String) && identity[:tag_object_sha].match?(/\A[0-9a-f]{40}\z/) &&
+    identity[:candidate_sha].is_a?(String) && identity[:candidate_sha].match?(/\A[0-9a-f]{40}\z/) &&
+    valid_accelerated_rc_tag_provenance?(identity[:provenance]) &&
+    identity[:provenance]["candidate_sha"] == identity[:candidate_sha]
 end
 
 def validate_remote_release_tag_candidate_sha!(monorepo_root:, tag:, candidate_sha:, phase:)
@@ -3416,7 +3525,8 @@ def accelerated_repository_boundary_context!(accelerated_publication_record:, ac
 end
 
 def valid_final_promotion_context_identity?(context:, candidate_sha:,
-                                            expected_strict_final_shakaperf_identity_anchor:)
+                                            expected_strict_final_shakaperf_identity_anchor:,
+                                            expected_source_rc_tag_object_sha: nil)
   context_record = context.fetch(:record)
   ci_branch = context.fetch(:ci_branch)
   ci_snapshot = context.fetch(:ci_snapshot)
@@ -3433,7 +3543,9 @@ def valid_final_promotion_context_identity?(context:, candidate_sha:,
       shakaperf_record:, ci_branch:, context_record:, candidate_sha:, final_target_version:, shakaperf_evidence_mode:,
       strict_final_shakaperf_identity_anchor:
     ) &&
-    valid_final_promotion_source_rc_context_identity?(context:, context_record:)
+    valid_final_promotion_source_rc_context_identity?(
+      context:, context_record:, expected_source_rc_tag_object_sha:
+    )
 end
 
 def valid_final_promotion_shakaperf_context_identity?(shakaperf_record:, ci_branch:, context_record:, candidate_sha:,
@@ -3511,9 +3623,12 @@ def final_promotion_shakaperf_identity_anchor(shakaperf_record)
   canonical_accelerated_rc_json(shakaperf_record).freeze
 end
 
-def valid_final_promotion_source_rc_context_identity?(context:, context_record:)
+def valid_final_promotion_source_rc_context_identity?(context:, context_record:, expected_source_rc_tag_object_sha:)
   source_rc_tag_provenance = context.fetch(:source_rc_tag_provenance)
+  source_rc_tag_object_sha = context.fetch(:source_rc_tag_object_sha)
   context.fetch(:source_rc_tag) == "v#{context_record.fetch('target_version')}" &&
+    source_rc_tag_object_sha.is_a?(String) && source_rc_tag_object_sha.match?(/\A[0-9a-f]{40}\z/) &&
+    (expected_source_rc_tag_object_sha.nil? || source_rc_tag_object_sha == expected_source_rc_tag_object_sha) &&
     context.fetch(:source_rc_candidate_sha) == context_record.fetch("candidate_sha") &&
     valid_accelerated_rc_tag_provenance?(source_rc_tag_provenance) &&
     source_rc_tag_provenance.values_at("target_version", "candidate_sha", "release_tracker") ==
@@ -3521,7 +3636,8 @@ def valid_final_promotion_source_rc_context_identity?(context:, context_record:)
 end
 
 def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:,
-                                      expected_strict_final_shakaperf_identity_anchor: nil)
+                                      expected_strict_final_shakaperf_identity_anchor: nil,
+                                      expected_source_rc_tag_object_sha: nil)
   unless context
     if boundary_record&.fetch("status", nil) == "candidate-accepted"
       abort "❌ Release tag handling is missing accelerated final-promotion context."
@@ -3534,7 +3650,8 @@ def validate_final_promotion_context!(boundary_record:, context:, candidate_sha:
   valid = boundary_record&.fetch("status", nil) == "candidate-accepted" &&
           accelerated_rc_retry_equivalent?(boundary_record, context_record) &&
           valid_final_promotion_context_identity?(
-            context:, candidate_sha:, expected_strict_final_shakaperf_identity_anchor:
+            context:, candidate_sha:, expected_strict_final_shakaperf_identity_anchor:,
+            expected_source_rc_tag_object_sha:
           )
   return if valid
 
@@ -3545,11 +3662,11 @@ end
 
 def validate_accelerated_tag_publication_boundary!(
   monorepo_root:, record:, final_promotion_context:, candidate_sha:,
-  expected_strict_final_shakaperf_identity_anchor:, phase:
+  expected_strict_final_shakaperf_identity_anchor:, expected_source_rc_tag_object_sha:, phase:
 )
   validate_final_promotion_context!(
     boundary_record: record, context: final_promotion_context, candidate_sha:,
-    expected_strict_final_shakaperf_identity_anchor:
+    expected_strict_final_shakaperf_identity_anchor:, expected_source_rc_tag_object_sha:
   )
   validate_accelerated_repository_publication_boundary!(monorepo_root:, record:, phase:)
   validate_final_promotion_ci_publication_boundary!(
@@ -3559,7 +3676,7 @@ def validate_accelerated_tag_publication_boundary!(
     monorepo_root:, context: final_promotion_context, phase:
   )
   validate_final_promotion_source_rc_tag_boundary!(
-    monorepo_root:, context: final_promotion_context, phase:
+    monorepo_root:, context: final_promotion_context, expected_source_rc_tag_object_sha:, phase:
   )
 end
 
@@ -3568,24 +3685,56 @@ def retain_final_promotion_shakaperf_identity_anchor(context)
   identity_anchor.is_a?(String) ? identity_anchor.dup.freeze : identity_anchor
 end
 
-def validate_final_promotion_source_rc_tag_boundary!(monorepo_root:, context:, phase:)
+def retain_final_promotion_source_rc_tag_object_anchor(context)
+  tag_object_sha = context&.fetch(:source_rc_tag_object_sha, nil)
+  tag_object_sha.is_a?(String) ? tag_object_sha.dup.freeze : tag_object_sha
+end
+
+def final_promotion_publication_identity_anchors(context)
+  {
+    shakaperf: retain_final_promotion_shakaperf_identity_anchor(context),
+    source_rc_tag_object: retain_final_promotion_source_rc_tag_object_anchor(context)
+  }
+end
+
+def validate_accelerated_tag_publication_phase!(monorepo_root:, record:, final_promotion_context:, candidate_sha:,
+                                                identity_anchors:, phase:)
+  validate_accelerated_tag_publication_boundary!(
+    monorepo_root:, record:, final_promotion_context:, candidate_sha:,
+    expected_strict_final_shakaperf_identity_anchor: identity_anchors.fetch(:shakaperf),
+    expected_source_rc_tag_object_sha: identity_anchors.fetch(:source_rc_tag_object),
+    phase:
+  )
+end
+
+def validate_final_promotion_source_rc_tag_boundary!(
+  monorepo_root:, context:, expected_source_rc_tag_object_sha:, phase:
+)
   return unless context
 
   source_rc_tag = context.fetch(:source_rc_tag)
   expected_candidate_sha = context.fetch(:source_rc_candidate_sha)
   expected_provenance = context.fetch(:source_rc_tag_provenance)
+  unless expected_source_rc_tag_object_sha == context.fetch(:source_rc_tag_object_sha)
+    abort "❌ Final promotion source RC tag object identity changed before #{phase}; refusing to continue."
+  end
   unless remote_git_tag_exists?(monorepo_root:, tag: source_rc_tag)
     abort "❌ Final promotion source RC tag #{source_rc_tag} disappeared before #{phase}; refusing to continue."
   end
 
   fetch_remote_rc_tag!(monorepo_root:, rc_tag: source_rc_tag)
-  actual_provenance = accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag: source_rc_tag)
-  unless actual_provenance == expected_provenance
+  actual_identity = live_annotated_release_tag_identity!(
+    monorepo_root:,
+    tag: source_rc_tag,
+    phase: "final promotion source RC #{phase}",
+    tag_object_sha: expected_source_rc_tag_object_sha
+  )
+  unless actual_identity.fetch(:provenance) == expected_provenance
     abort "❌ Final promotion source RC tag #{source_rc_tag} lost or changed its canonical annotated " \
           "authorization provenance before #{phase}; refusing to continue."
   end
 
-  actual_candidate_sha = peeled_git_tag_sha(monorepo_root:, tag: source_rc_tag)
+  actual_candidate_sha = actual_identity.fetch(:candidate_sha)
   return actual_candidate_sha if actual_candidate_sha == expected_candidate_sha
 
   abort "❌ Final promotion source RC tag #{source_rc_tag} moved before #{phase}; refusing to continue."
@@ -3617,35 +3766,28 @@ def push_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, accele
   )
   boundary_record = boundary_context.fetch(:record)
   tag_authorization = boundary_context.fetch(:tag_authorization)
-  strict_final_shakaperf_identity_anchor = retain_final_promotion_shakaperf_identity_anchor(
-    accelerated_final_promotion_context
-  )
+  identity_anchors = final_promotion_publication_identity_anchors(accelerated_final_promotion_context)
   validate_final_promotion_context!(
     boundary_record:, context: accelerated_final_promotion_context, candidate_sha:,
-    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor
+    expected_strict_final_shakaperf_identity_anchor: identity_anchors.fetch(:shakaperf),
+    expected_source_rc_tag_object_sha: identity_anchors.fetch(:source_rc_tag_object)
   )
-  validate_accelerated_tag_publication_boundary!(
-    monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
-    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
-    phase: "tag handling"
+  validate_accelerated_tag_publication_phase!(
+    monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
+    candidate_sha:, identity_anchors:, phase: "tag handling"
   )
   ensure_release_tag_for_candidate!(monorepo_root:, tag:, candidate_sha:, tag_authorization:)
-  validate_accelerated_tag_publication_boundary!(
-    monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
-    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
-    phase: "git tag push"
+  validate_accelerated_tag_publication_phase!(
+    monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
+    candidate_sha:, identity_anchors:, phase: "git tag push"
   )
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "git tag push"
   )
   sh_in_dir_for_release(monorepo_root, "LEFTHOOK=0 git push --tags")
-  validate_accelerated_tag_publication_boundary!(
-    monorepo_root:, record: boundary_record,
-    final_promotion_context: accelerated_final_promotion_context, candidate_sha:,
-    expected_strict_final_shakaperf_identity_anchor: strict_final_shakaperf_identity_anchor,
-    phase: "package publication"
+  validate_accelerated_tag_publication_phase!(
+    monorepo_root:, record: boundary_record, final_promotion_context: accelerated_final_promotion_context,
+    candidate_sha:, identity_anchors:, phase: "package publication"
   )
   validate_release_candidate_publication_boundary!(
     monorepo_root:, tag:, candidate_sha:, phase: "package publication"
@@ -4471,6 +4613,82 @@ def accelerated_rc_reconciliation_context!(records:, target_version:)
   { published_record:, authorization: }
 end
 
+def validate_accelerated_rc_publication_recovery_tag!(monorepo_root:, tag:, authorization:, candidate_sha:)
+  phase = "accelerated RC publication recovery"
+  fetch_remote_release_tag!(monorepo_root:, tag:, tag_type: "accelerated RC publication recovery")
+  local_tag_object_sha = local_release_tag_object_sha!(monorepo_root:, tag:, phase:)
+  local_identity = live_annotated_release_tag_identity!(
+    monorepo_root:, tag:, phase:, tag_object_sha: local_tag_object_sha
+  )
+  expected_provenance = accelerated_rc_tag_provenance(authorization)
+  unless local_identity.fetch(:provenance) == expected_provenance &&
+         candidate_sha == expected_provenance.fetch("candidate_sha")
+    abort "❌ Captured annotated tag object for #{tag} does not match the persisted accelerated publication " \
+          "authorization."
+  end
+  unless local_identity.fetch(:candidate_sha) == candidate_sha
+    abort "❌ Remote release tag #{tag} moved away from the validated release candidate before #{phase}; " \
+          "refusing to continue."
+  end
+
+  local_identity.slice(:tag_object_sha, :candidate_sha)
+end
+
+def validate_accelerated_rc_complete_publication_evidence!(
+  monorepo_root:, tag:, authorization:, candidate_sha:, target_version:
+)
+  initial_tag_identity = validate_accelerated_rc_publication_recovery_tag!(
+    monorepo_root:, tag:, authorization:, candidate_sha:
+  )
+  verify_complete_release_registry_publication!(gem_version: target_version)
+  final_tag_identity = validate_accelerated_rc_publication_recovery_tag!(
+    monorepo_root:, tag:, authorization:, candidate_sha:
+  )
+  return if final_tag_identity == initial_tag_identity
+
+  abort "❌ Live remote annotated tag object for #{tag} changed during registry verification; " \
+        "refusing publication recovery."
+end
+
+def recover_accelerated_rc_publication_for_reconciliation!(
+  repo_slug:, monorepo_root:, tracker:, target_version:, records:, approved_by:
+)
+  matching = accelerated_rc_records_for_target(records, target_version)
+  return records if matching.any? { |record| record["status"] == "published-awaiting-gates" }
+
+  candidate_shas = matching.map { |record| record["candidate_sha"] }.uniq
+  unless candidate_shas.one?
+    abort "❌ Missing accelerated RC publication cannot be recovered from absent or ambiguous candidate history."
+  end
+
+  candidate_sha = candidate_shas.first
+  candidate_records = accelerated_rc_records_for_candidate(
+    matching, target_version:, candidate_sha:
+  )
+  authorization = validated_accelerated_rc_candidate_chain!(candidate_records).fetch(:authorization)
+  history = validated_repository_accelerated_rc_publication_completion_history!(
+    repo_slug:, tracker:, authorization:
+  )
+  unless history.dig(:chain, :publications).any?
+    validate_canonical_accelerated_rc_target!(target_version)
+    tag = "v#{target_version}"
+    validate_accelerated_rc_complete_publication_evidence!(
+      monorepo_root:, tag:, authorization:, candidate_sha:, target_version:
+    )
+    record_accelerated_rc_publication_complete!(
+      repo_slug:,
+      tracker:,
+      authorized_record: authorization,
+      approved_by:,
+      recorded_at: Time.now.utc
+    )
+  end
+
+  refreshed_records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
+  accelerated_rc_published_record!(records: refreshed_records, target_version:)
+  refreshed_records
+end
+
 def existing_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, context:)
   terminal_record = context.fetch(:published_record)
   return nil unless ACCELERATED_RC_TERMINAL_STATUSES.include?(terminal_record["status"])
@@ -4515,6 +4733,9 @@ def run_accelerated_rc_reconciliation!(repo_slug:, monorepo_root:, tracker:, tar
   fetch_release_tracker_issue!(repo_slug:, tracker:)
   approved_by = current_release_approver!(repo_slug:)
   records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
+  records = recover_accelerated_rc_publication_for_reconciliation!(
+    repo_slug:, monorepo_root:, tracker:, target_version:, records:, approved_by:
+  )
   context = accelerated_rc_reconciliation_context!(records:, target_version:)
   terminal_record = existing_accelerated_rc_reconciliation_record!(repo_slug:, tracker:, context:)
   return terminal_record if terminal_record
@@ -4553,26 +4774,64 @@ def terminal_accelerated_rc_reconciliation_record!(record)
   record
 end
 
-def accepted_accelerated_rc_record_for_release_branch_promotion!(monorepo_root:, rc_tag:, final_head_sha:,
-                                                                 tracker_input:)
-  tag_provenance = accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag: rc_tag)
-  unless tag_provenance
-    if tracker_input
-      abort "❌ Final promotion is blocked: explicit RELEASE_TRACKER was supplied, but the RC tag lacks " \
-            "canonical accelerated provenance."
+def release_branch_promotion_tag_selection!(monorepo_root:, rc_tag:, source_rc_tag_identity:)
+  phase = "accepted accelerated RC selection"
+  if source_rc_tag_identity
+    unless valid_accelerated_rc_tag_object_identity?(source_rc_tag_identity)
+      abort "❌ Final promotion is blocked: supplied source RC tag identity is malformed."
+    end
+    tag_identity = live_annotated_release_tag_identity!(
+      monorepo_root:, tag: rc_tag, phase:, tag_object_sha: source_rc_tag_identity.fetch(:tag_object_sha)
+    )
+    unless tag_identity == source_rc_tag_identity
+      abort "❌ Final promotion is blocked: source RC tag identity changed during accepted-record selection."
     end
 
-    repo_slug = github_repo_slug(monorepo_root)
-    rc_version = parse_release_tag_to_gem_version(rc_tag)
-    rc_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
-    history = fetch_repository_accelerated_rc_records_for_candidate!(
-      repo_slug:, target_version: rc_version, candidate_sha: rc_sha
-    )
-    return nil if history.empty?
-
-    abort "❌ Final promotion is blocked: lightweight RC tag #{rc_tag} has durable accelerated history " \
-          "but lacks canonical accelerated provenance."
+    return { tag_identity: }
   end
+
+  tag_object_sha = local_release_tag_object_sha!(monorepo_root:, tag: rc_tag, phase:)
+  tag_object_type = release_tag_object_type_for_object!(monorepo_root:, tag: rc_tag, tag_object_sha:)
+  return { ordinary_candidate_sha: tag_object_sha } if tag_object_type == "commit"
+
+  {
+    tag_identity: live_annotated_release_tag_identity!(
+      monorepo_root:, tag: rc_tag, phase:, tag_object_sha:
+    )
+  }
+end
+
+def ordinary_rc_record_for_release_branch_promotion!(monorepo_root:, rc_tag:, tracker_input:, candidate_sha:)
+  if tracker_input
+    abort "❌ Final promotion is blocked: explicit RELEASE_TRACKER was supplied, but the RC tag lacks " \
+          "canonical accelerated provenance."
+  end
+
+  repo_slug = github_repo_slug(monorepo_root)
+  rc_version = parse_release_tag_to_gem_version(rc_tag)
+  history = fetch_repository_accelerated_rc_records_for_candidate!(
+    repo_slug:, target_version: rc_version, candidate_sha:
+  )
+  return nil if history.empty?
+
+  abort "❌ Final promotion is blocked: lightweight RC tag #{rc_tag} has durable accelerated history " \
+        "but lacks canonical accelerated provenance."
+end
+
+def accepted_accelerated_rc_record_for_release_branch_promotion!(monorepo_root:, rc_tag:, final_head_sha:,
+                                                                 tracker_input:, source_rc_tag_identity: nil)
+  tag_selection = release_branch_promotion_tag_selection!(monorepo_root:, rc_tag:, source_rc_tag_identity:)
+  if tag_selection.key?(:ordinary_candidate_sha)
+    return ordinary_rc_record_for_release_branch_promotion!(
+      monorepo_root:,
+      rc_tag:,
+      tracker_input:,
+      candidate_sha: tag_selection.fetch(:ordinary_candidate_sha)
+    )
+  end
+
+  tag_identity = tag_selection.fetch(:tag_identity)
+  tag_provenance = tag_identity.fetch(:provenance)
 
   validate_literal_accelerated_rc_tag_name!(rc_tag:, tag_provenance:)
 
@@ -4585,7 +4844,7 @@ def accepted_accelerated_rc_record_for_release_branch_promotion!(monorepo_root:,
   repo_slug = github_repo_slug(monorepo_root)
   fetch_release_tracker_issue!(repo_slug:, tracker:)
   rc_version = tag_provenance.fetch("target_version")
-  rc_sha = peeled_git_tag_sha(monorepo_root:, tag: rc_tag)
+  rc_sha = tag_identity.fetch(:candidate_sha)
   history = validated_repository_accelerated_rc_candidate_history!(
     repo_slug:, target_version: rc_version, candidate_sha: rc_sha, expected_tracker: tracker
   )
@@ -4769,8 +5028,14 @@ def accepted_rc_record_at_publication_boundary!(monorepo_root:, rc_tag:, final_h
   end
   fetch_remote_rc_tag!(monorepo_root:, rc_tag:)
 
+  phase = "final promotion accepted-record publication boundary"
+  tag_object_sha = local_release_tag_object_sha!(monorepo_root:, tag: rc_tag, phase:)
+  source_rc_tag_identity = live_annotated_release_tag_identity!(
+    monorepo_root:, tag: rc_tag, phase:, tag_object_sha:
+  )
+
   boundary_record = accepted_accelerated_rc_record_for_release_branch_promotion!(
-    monorepo_root:, rc_tag:, final_head_sha:, tracker_input:
+    monorepo_root:, rc_tag:, final_head_sha:, tracker_input:, source_rc_tag_identity:
   )
   abort "❌ Final promotion is blocked: accelerated RC evidence disappeared at the publication boundary." unless
     boundary_record
@@ -4778,7 +5043,7 @@ def accepted_rc_record_at_publication_boundary!(monorepo_root:, rc_tag:, final_h
     abort "❌ Final promotion is blocked: the accepted RC record changed at the publication boundary."
   end
 
-  boundary_record
+  { record: boundary_record, source_rc_tag_identity: }
 end
 
 def validate_final_promotion_boundary_head!(monorepo_root:, final_head_sha:)
@@ -4842,15 +5107,28 @@ def final_promotion_boundary_context(final_head_sha:, current_branch:, record:, 
   context.merge(source_rc_context)
 end
 
-def final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record:)
-  provenance = accelerated_rc_tag_provenance_for_tag!(monorepo_root:, tag: rc_tag)
+def final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record:, source_rc_tag_identity:)
+  unless valid_accelerated_rc_tag_object_identity?(source_rc_tag_identity)
+    abort "❌ Final promotion is blocked: source RC tag identity is missing or malformed."
+  end
+  phase = "final-promotion context construction"
+  identity = live_annotated_release_tag_identity!(
+    monorepo_root:,
+    tag: rc_tag,
+    phase:,
+    tag_object_sha: source_rc_tag_identity.fetch(:tag_object_sha)
+  )
+  provenance = identity.fetch(:provenance)
   expected_identity = record.values_at("target_version", "candidate_sha", "release_tracker")
   valid = provenance && rc_tag == "v#{record.fetch('target_version')}" &&
-          provenance.values_at("target_version", "candidate_sha", "release_tracker") == expected_identity
+          identity == source_rc_tag_identity &&
+          provenance.values_at("target_version", "candidate_sha", "release_tracker") == expected_identity &&
+          identity.fetch(:candidate_sha) == record.fetch("candidate_sha")
   abort "❌ Final promotion is blocked: source RC tag lacks matching canonical accelerated provenance." unless valid
 
   {
     source_rc_tag: rc_tag,
+    source_rc_tag_object_sha: identity.fetch(:tag_object_sha),
     source_rc_candidate_sha: record.fetch("candidate_sha"),
     source_rc_tag_provenance: provenance
   }
@@ -4882,6 +5160,36 @@ def final_promotion_shakaperf_snapshot!(repo_slug:, monorepo_root:, current_bran
   }
 end
 
+def final_promotion_context_after_boundary!(repo_slug:, monorepo_root:, current_branch:, rc_tag:, final_head_sha:,
+                                            target_version:, ci_snapshot:, shakaperf_evidence:,
+                                            boundary_selection:)
+  boundary_record = boundary_selection.fetch(:record)
+  boundary_ci_snapshot = refresh_accepted_rc_ci_evidence_for_promotion!(
+    repo_slug:, monorepo_root:, ci_branch: current_branch, record: boundary_record
+  )
+  unless canonical_accelerated_rc_ci_snapshot_for_comparison(boundary_ci_snapshot) ==
+         canonical_accelerated_rc_ci_snapshot_for_comparison(ci_snapshot)
+    abort "❌ Final promotion is blocked: exact-candidate CI evidence changed at the publication boundary."
+  end
+  validate_final_promotion_boundary_head!(monorepo_root:, final_head_sha:)
+  source_rc_context = final_promotion_source_rc_context!(
+    monorepo_root:,
+    rc_tag:,
+    record: boundary_record,
+    source_rc_tag_identity: boundary_selection.fetch(:source_rc_tag_identity)
+  )
+
+  final_promotion_boundary_context(
+    final_head_sha:,
+    current_branch:,
+    record: boundary_record,
+    ci_snapshot: boundary_ci_snapshot,
+    shakaperf_evidence:,
+    final_target_version: target_version,
+    source_rc_context:
+  )
+end
+
 def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_branch:, rc_tag:, tracker_input:,
                                            final_head_sha:, record:, target_version:, release_started_at:,
                                            allow_ci_override:, dry_run:)
@@ -4907,28 +5215,12 @@ def run_accepted_rc_final_promotion_gates!(repo_slug:, monorepo_root:, current_b
     dry_run:
   )
 
-  boundary_record = accepted_rc_record_at_publication_boundary!(
+  boundary_selection = accepted_rc_record_at_publication_boundary!(
     monorepo_root:, rc_tag:, final_head_sha:, tracker_input:, record:
   )
-
-  boundary_ci_snapshot = refresh_accepted_rc_ci_evidence_for_promotion!(
-    repo_slug:, monorepo_root:, ci_branch: current_branch, record: boundary_record
-  )
-  unless canonical_accelerated_rc_ci_snapshot_for_comparison(boundary_ci_snapshot) ==
-         canonical_accelerated_rc_ci_snapshot_for_comparison(ci_snapshot)
-    abort "❌ Final promotion is blocked: exact-candidate CI evidence changed at the publication boundary."
-  end
-  validate_final_promotion_boundary_head!(monorepo_root:, final_head_sha:)
-  source_rc_context = final_promotion_source_rc_context!(monorepo_root:, rc_tag:, record: boundary_record)
-
-  final_promotion_boundary_context(
-    final_head_sha:,
-    current_branch:,
-    record: boundary_record,
-    ci_snapshot: boundary_ci_snapshot,
-    shakaperf_evidence:,
-    final_target_version: target_version,
-    source_rc_context:
+  final_promotion_context_after_boundary!(
+    repo_slug:, monorepo_root:, current_branch:, rc_tag:, final_head_sha:, target_version:, ci_snapshot:,
+    shakaperf_evidence:, boundary_selection:
   )
 end
 
@@ -6610,6 +6902,43 @@ rescue JSON::ParserError => e
 rescue StandardError => e
   warn "⚠️  Unable to check RubyGems metadata for #{gem_name}: #{e.class}: #{e.message}; attempting publish."
   false
+end
+
+def valid_rubygems_version_metadata?(versions)
+  versions.is_a?(Array) && versions.all? do |metadata|
+    metadata.is_a?(Hash) && metadata["number"].is_a?(String) && !metadata["number"].empty?
+  end
+end
+
+def verify_rubygem_version_published!(gem_name, expected_version, api_url: RUBYGEMS_VERSIONS_API_URL)
+  output, response = fetch_rubygems_versions(gem_name, api_url:)
+  unless response.is_a?(Net::HTTPSuccess)
+    abort "❌ Unable to verify exact RubyGem #{gem_name} #{expected_version} for publication recovery."
+  end
+
+  versions = JSON.parse(output)
+  unless valid_rubygems_version_metadata?(versions)
+    abort "❌ RubyGems returned malformed version metadata for #{gem_name}; publication recovery is unknown."
+  end
+  unless versions.any? { |metadata| metadata["number"] == expected_version }
+    abort "❌ Exact RubyGem #{gem_name} #{expected_version} is not visible; publication recovery is incomplete."
+  end
+
+  puts "✓ Verified RubyGem #{gem_name} #{expected_version}"
+rescue JSON::ParserError => e
+  abort "❌ Unable to parse RubyGems metadata for #{gem_name} during publication recovery: #{e.message}"
+rescue StandardError => e
+  abort "❌ Unable to verify RubyGem #{gem_name} during publication recovery: #{e.class}: #{e.message}"
+end
+
+def verify_complete_release_registry_publication!(gem_version:)
+  npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+  NPM_RELEASE_PACKAGE_NAMES.each do |package_name|
+    verify_npm_package_published!(package_name, npm_version)
+  end
+  RUBYGEMS_RELEASE_GEM_NAMES.each do |gem_name|
+    verify_rubygem_version_published!(gem_name, gem_version)
+  end
 end
 
 def abort_existing_registry_artifact_without_retry!(artifact_ref:, registry_name:)

@@ -249,6 +249,14 @@ At that completion boundary, the task first proves that the tracker is still eli
 repository-wide history has one canonical tracker and authorization with no absorbing rejection. It repeats
 that repository-wide proof after append or idempotent reuse, so a concurrent cross-tracker or terminal conflict
 cannot be reported as a successful completion.
+If all six artifacts became public but that completion append was interrupted, the reconciliation task can
+recover the missing transition before it evaluates the deferred gates. Recovery requires the canonical
+authorization-only repository history, the exact remote annotated RC tag object, its peeled candidate SHA and
+authorization provenance, and exact registry metadata for all four npm packages and both RubyGems. It
+revalidates the complete remote tag-object/candidate identity after the registry reads and then uses the normal
+repository-wide completion append. Partial, mismatched, malformed, ambiguous,
+or unavailable registry/tag/history evidence blocks, and a GitHub outage still blocks durable recovery; there
+is no offline or unaudited completion bypass.
 Retries reuse the same candidate without appending duplicate status records. Accelerated RCs use an annotated
 tag containing canonical tracker and
 authorization provenance; retries load and reuse that persisted authorization instead of refreshing
@@ -433,10 +441,12 @@ retry source-selection route, regardless of alias ordering or which alias carrie
 After existing-tag validation or explicit-SHA tag creation, the task revalidates both local `HEAD` and the
 tag against the carried candidate SHA immediately before `git push --tags`. After the push it repeats the local
 validation and resolves the live remote stable tag's peeled SHA immediately before package publication. Accelerated
-final promotion additionally carries the canonical source RC tag, its candidate SHA, and its exact annotated-tag
-authorization provenance. It force-fetches and revalidates that live source tag at final tag handling, immediately
-before stable-tag push, and after stable-tag push before packages; deletion, movement, lost provenance, or an
-unclassifiable tag blocks. This source-tag check is additional to the live stable-tag peeled-SHA validation. For
+final promotion additionally carries the canonical source RC tag, its exact annotated tag-object SHA, its peeled
+candidate SHA, and its authorization provenance. At final tag handling, immediately before stable-tag push, and
+after stable-tag push before packages, it requires the local ref and one live remote direct/peeled snapshot to match
+that same captured object and candidate; deletion, movement, replacement by another same-candidate tag object or a
+lightweight tag, lost provenance, or an unclassifiable tag blocks. This source-tag check is additional to the live
+stable-tag peeled-SHA validation. For
 accelerated RC publication and accelerated-RC
 final promotion, both boundaries also re-fetch all trusted repository history for the exact RC candidate
 and require the same unique tracker and canonical, retry-equivalent authorization/terminal chain. A new

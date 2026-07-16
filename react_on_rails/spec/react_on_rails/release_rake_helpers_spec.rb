@@ -93,6 +93,91 @@ RSpec.describe "release.rake helper methods" do
     [authorization, publication, rejected]
   end
 
+  def stub_accelerated_rc_publication_recovery_tag(
+    authorization:, candidate_sha: "f" * 40, tag_object_sha: "a" * 40
+  )
+    allow(self).to receive_messages(
+      fetch_remote_release_tag!: nil,
+      local_release_tag_object_sha!: tag_object_sha,
+      accelerated_rc_tag_identity_for_object!: {
+        tag_object_sha:,
+        candidate_sha:,
+        provenance: accelerated_rc_tag_provenance(authorization)
+      },
+      remote_annotated_release_tag_identity!: {
+        tag_object_sha:,
+        candidate_sha:
+      }
+    )
+  end
+
+  def stub_accelerated_rc_tag_object_commands(
+    authorization:, status:, tag_object_sha: "a" * 40, candidate_sha: "f" * 40
+  )
+    contents = <<~TAG_OBJECT
+      object #{candidate_sha}
+      type commit
+      tag v#{authorization.fetch('target_version')}
+      tagger Maintainer <maintainer@example.com> 1784000000 +0000
+
+      #{accelerated_rc_tag_message(authorization)}
+    TAG_OBJECT
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "cat-file", "-t", tag_object_sha
+    ).and_return(["tag\n", status])
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "cat-file", "-p", tag_object_sha
+    ).and_return([contents, status])
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "#{tag_object_sha}^{}"
+    ).and_return(["#{candidate_sha}\n", status])
+  end
+
+  def accelerated_rc_remote_tag_output(tag:, tag_object_sha:, candidate_sha:, annotated:)
+    return "#{candidate_sha}\trefs/tags/#{tag}\n" unless annotated
+
+    "#{tag_object_sha}\trefs/tags/#{tag}\n#{candidate_sha}\trefs/tags/#{tag}^{}\n"
+  end
+
+  def stub_final_promotion_source_rc_ref_commands(
+    authorization:, tag:, tag_object_sha:, candidate_sha:, status:
+  )
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}"
+    ).and_return(["#{tag_object_sha}\n", status])
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/#{tag}"
+    ).and_return(["tag\n", status])
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/#{tag}"
+    ).and_return([accelerated_rc_tag_message(authorization), status])
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/#{tag}^{}"
+    ).and_return(["#{candidate_sha}\n", status])
+  end
+
+  def stub_final_promotion_source_rc_tag_commands(
+    object_authorization:, ref_authorization: object_authorization, tag_object_sha: "a" * 40,
+    candidate_sha: "f" * 40, remote_tag_object_sha: tag_object_sha,
+    remote_candidate_sha: candidate_sha, remote_annotated: true,
+    tag: "v#{ref_authorization.fetch('target_version')}"
+  )
+    status = instance_double(Process::Status, success?: true)
+    stub_accelerated_rc_tag_object_commands(
+      authorization: object_authorization, status:, tag_object_sha:, candidate_sha:
+    )
+    stub_final_promotion_source_rc_ref_commands(
+      authorization: ref_authorization, tag:, tag_object_sha:, candidate_sha:, status:
+    )
+    remote_output = accelerated_rc_remote_tag_output(
+      tag:, tag_object_sha: remote_tag_object_sha, candidate_sha: remote_candidate_sha, annotated: remote_annotated
+    )
+    allow(Open3).to receive(:capture2e).with(
+      "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+      "refs/tags/#{tag}", "refs/tags/#{tag}^{}"
+    ).and_return([remote_output, status])
+  end
+
   def accelerated_final_promotion_test_context(record:, ci_snapshot:, ci_branch: "release/17.0.0",
                                                final_candidate_sha: "e" * 40)
     authorization = accelerated_rc_test_authorization(tracker: record.fetch("release_tracker"))
@@ -102,6 +187,7 @@ RSpec.describe "release.rake helper methods" do
       final_target_version: Gem::Version.new(record.fetch("target_version")).release.to_s,
       record:,
       source_rc_tag: "v#{record.fetch('target_version')}",
+      source_rc_tag_object_sha: "a" * 40,
       source_rc_candidate_sha: record.fetch("candidate_sha"),
       source_rc_tag_provenance: accelerated_rc_tag_provenance(authorization),
       ci_snapshot: json_compatible_release_value(ci_snapshot),
@@ -9588,6 +9674,473 @@ RSpec.describe "release.rake helper methods" do
       end.to raise_error(SystemExit, /No published-awaiting-gates record exists/)
     end
 
+    it "recovers complete immutable publication before recording a late rejection" do
+      tracker_records = [authorization_record]
+      repository_records = [authorization_record]
+      npm_refs = []
+      rubygem_refs = []
+      tag_object_sha = "a" * 40
+      success_status = instance_double(Process::Status, success?: true)
+      rubygems_response = Net::HTTPOK.new("1.1", "200", "OK")
+      stub_accelerated_rc_tag_object_commands(
+        authorization: authorization_record, status: success_status, tag_object_sha:
+      )
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!) { tracker_records }
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!) { repository_records }
+      allow(self).to receive_messages(
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization_record),
+        peeled_git_tag_sha: "f" * 40,
+        fetch_accelerated_rc_ci_snapshot!: {
+          status: "failed",
+          sha: "f" * 40,
+          checks_url: "https://github.com/shakacode/react_on_rails/commit/#{'f' * 40}/checks",
+          non_success: [{
+            name: "generator",
+            state: "failure",
+            url: "https://github.com/shakacode/react_on_rails/actions/runs/999"
+          }]
+        }
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10"
+      ).and_return(["#{tag_object_sha}\n", success_status])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(
+        [
+          "#{tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{'f' * 40}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success_status
+        ]
+      )
+      allow(self).to receive(:fetch_npm_package_metadata_with_retries) do |package_ref, **|
+        npm_refs << package_ref
+        metadata = { "version" => "17.0.0-rc.10" }
+        [JSON.generate(metadata), success_status]
+      end
+      allow(self).to receive(:fetch_rubygems_versions) do |gem_name, **|
+        rubygem_refs << gem_name
+        [JSON.generate([{ "number" => "17.0.0.rc.10" }]), rubygems_response]
+      end
+      allow(self).to receive(:append_accelerated_rc_tracker_record!) do |record:, **|
+        tracker_records << record
+        repository_records << record
+        record
+      end
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Exact-head generator CI failed after publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /candidate was rejected/i)
+
+      aggregate_failures do
+        expect(tracker_records.map { |record| record.fetch("status") }).to eq(
+          %w[publication-authorized published-awaiting-gates candidate-rejected]
+        )
+        expect(npm_refs).to contain_exactly(
+          "react-on-rails@17.0.0-rc.10",
+          "react-on-rails-pro@17.0.0-rc.10",
+          "react-on-rails-pro-node-renderer@17.0.0-rc.10",
+          "create-react-on-rails-app@17.0.0-rc.10"
+        )
+        expect(rubygem_refs).to contain_exactly("react_on_rails", "react_on_rails_pro")
+      end
+    end
+
+    it "blocks missing, mismatched, malformed, or unknown registry evidence before recovery append" do
+      success_status = instance_double(Process::Status, success?: true)
+      failed_status = instance_double(Process::Status, success?: false)
+      rubygems_success = Net::HTTPOK.new("1.1", "200", "OK")
+      rubygems_unknown = Net::HTTPServiceUnavailable.new("1.1", "503", "Unavailable")
+      variants = {
+        "missing npm artifact" => {
+          npm: ->(ref) { ref.start_with?("react-on-rails-pro@") ? ["not found", failed_status] : nil }
+        },
+        "mismatched RubyGem version" => {
+          rubygems: ->(_name) { [JSON.generate([{ "number" => "17.0.0.rc.9" }]), rubygems_success] }
+        },
+        "malformed RubyGems metadata" => {
+          rubygems: ->(_name) { [JSON.generate([{ "number" => nil }]), rubygems_success] }
+        },
+        "unknown RubyGems response" => {
+          rubygems: ->(_name) { ["service unavailable", rubygems_unknown] }
+        }
+      }
+
+      aggregate_failures do
+        variants.each do |name, behavior|
+          tracker_records = [authorization_record]
+          repository_records = [authorization_record]
+          appended = false
+          allow(self).to receive(:fetch_accelerated_rc_tracker_records!) { tracker_records }
+          allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!) { repository_records }
+          stub_accelerated_rc_publication_recovery_tag(authorization: authorization_record)
+          allow(self).to receive(:fetch_npm_package_metadata_with_retries) do |package_ref, **|
+            behavior.fetch(:npm, ->(_ref) {}).call(package_ref) ||
+              [JSON.generate({ "version" => "17.0.0-rc.10" }), success_status]
+          end
+          allow(self).to receive(:fetch_rubygems_versions) do |gem_name, **|
+            behavior.fetch(
+              :rubygems,
+              ->(_name) { [JSON.generate([{ "number" => "17.0.0.rc.10" }]), rubygems_success] }
+            ).call(gem_name)
+          end
+          allow(self).to receive(:append_accelerated_rc_tracker_record!) { appended = true }
+
+          expect do
+            run_accelerated_rc_reconciliation!(
+              repo_slug: "shakacode/react_on_rails",
+              monorepo_root: "/tmp/repo",
+              tracker: 3823,
+              target_version: "17.0.0.rc.10",
+              reason: "Recover publication",
+              evidence: {}
+            )
+          end.to raise_error(SystemExit), name
+          expect(appended).to be(false), name
+        end
+      end
+    end
+
+    it "blocks recovery when the remote annotated tag loses provenance or moves candidates" do
+      variants = {
+        "changed provenance" => [
+          accelerated_rc_tag_provenance(authorization_record).merge("authorization_digest" => "0" * 64),
+          "f" * 40,
+          /does not match.*authorization/i
+        ],
+        "moved candidate" => [
+          accelerated_rc_tag_provenance(authorization_record),
+          "e" * 40,
+          /moved away.*candidate/i
+        ]
+      }
+
+      aggregate_failures do
+        variants.each do |name, (provenance, remote_sha, expected_error)|
+          allow(self).to receive_messages(
+            fetch_accelerated_rc_tracker_records!: [authorization_record],
+            fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+            fetch_remote_release_tag!: nil,
+            local_release_tag_object_sha!: "a" * 40,
+            accelerated_rc_tag_identity_for_object!: {
+              tag_object_sha: "a" * 40,
+              candidate_sha: "f" * 40,
+              provenance:
+            },
+            remote_annotated_release_tag_identity!: {
+              tag_object_sha: "a" * 40,
+              candidate_sha: remote_sha
+            }
+          )
+          expect(self).not_to receive(:verify_complete_release_registry_publication!)
+          expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+          expect do
+            run_accelerated_rc_reconciliation!(
+              repo_slug: "shakacode/react_on_rails",
+              monorepo_root: "/tmp/repo",
+              tracker: 3823,
+              target_version: "17.0.0.rc.10",
+              reason: "Recover publication",
+              evidence: {}
+            )
+          end.to raise_error(SystemExit, expected_error), name
+        end
+      end
+    end
+
+    it "binds recovery provenance to the captured object across a local A-to-B-to-A ref race" do
+      candidate_sha = "f" * 40
+      captured_tag_object_sha = "a" * 40
+      success = instance_double(Process::Status, success?: true)
+      wrong_authorization = authorization_record.merge("reason" => "Different authorization for object A")
+      captured_object = <<~TAG_OBJECT
+        object #{candidate_sha}
+        type commit
+        tag v17.0.0.rc.10
+        tagger Maintainer <maintainer@example.com> 1784000000 +0000
+
+        #{accelerated_rc_tag_message(wrong_authorization)}
+      TAG_OBJECT
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        fetch_remote_release_tag!: nil
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10"
+      ).and_return(["#{captured_tag_object_sha}\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10"
+      ).and_return(["tag\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/v17.0.0.rc.10"
+      ).and_return([accelerated_rc_tag_message(authorization_record), success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(["#{candidate_sha}\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "cat-file", "-t", captured_tag_object_sha
+      ).and_return(["tag\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "cat-file", "-p", captured_tag_object_sha
+      ).and_return([captured_object, success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "#{captured_tag_object_sha}^{}"
+      ).and_return(["#{candidate_sha}\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(
+        [
+          "#{captured_tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{candidate_sha}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success
+        ]
+      )
+      expect(self).not_to receive(:verify_complete_release_registry_publication!)
+      expect(self).not_to receive(:record_accelerated_rc_publication_complete!)
+      expect(self).not_to receive(:fetch_accelerated_rc_ci_snapshot!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /captured annotated tag object.*persisted.*authorization/i)
+    end
+
+    it "blocks recovery when the live remote annotated object differs from the fetched provenance object" do
+      candidate_sha = "f" * 40
+      fetched_tag_object_sha = "a" * 40
+      replacement_tag_object_sha = "b" * 40
+      success = instance_double(Process::Status, success?: true)
+      stub_accelerated_rc_tag_object_commands(
+        authorization: authorization_record, status: success, tag_object_sha: fetched_tag_object_sha,
+        candidate_sha:
+      )
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization_record),
+        peeled_git_tag_sha: candidate_sha
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10"
+      ).and_return(["#{fetched_tag_object_sha}\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(
+        [
+          "#{replacement_tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{candidate_sha}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success
+        ]
+      )
+      expect(self).not_to receive(:verify_complete_release_registry_publication!)
+      expect(self).not_to receive(:record_accelerated_rc_publication_complete!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /remote annotated tag object.*fetched provenance object/i)
+    end
+
+    it "blocks recovery when the live remote tag becomes lightweight at the same candidate" do
+      candidate_sha = "f" * 40
+      fetched_tag_object_sha = "a" * 40
+      success = instance_double(Process::Status, success?: true)
+      stub_accelerated_rc_tag_object_commands(
+        authorization: authorization_record, status: success, tag_object_sha: fetched_tag_object_sha,
+        candidate_sha:
+      )
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization_record),
+        peeled_git_tag_sha: candidate_sha
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10"
+      ).and_return(["#{fetched_tag_object_sha}\n", success])
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(["#{candidate_sha}\trefs/tags/v17.0.0.rc.10\n", success])
+      expect(self).not_to receive(:verify_complete_release_registry_publication!)
+      expect(self).not_to receive(:record_accelerated_rc_publication_complete!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /remote release tag.*not an annotated tag/i)
+    end
+
+    it "blocks a same-candidate annotated object substitution during registry verification" do
+      candidate_sha = "f" * 40
+      original_tag_object_sha = "a" * 40
+      replacement_tag_object_sha = "b" * 40
+      success = instance_double(Process::Status, success?: true)
+      stub_accelerated_rc_tag_object_commands(
+        authorization: authorization_record, status: success, tag_object_sha: original_tag_object_sha,
+        candidate_sha:
+      )
+      stub_accelerated_rc_tag_object_commands(
+        authorization: authorization_record, status: success, tag_object_sha: replacement_tag_object_sha,
+        candidate_sha:
+      )
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        fetch_remote_release_tag!: nil,
+        accelerated_rc_tag_provenance_for_tag!: accelerated_rc_tag_provenance(authorization_record),
+        peeled_git_tag_sha: candidate_sha,
+        verify_complete_release_registry_publication!: nil
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10"
+      ).and_return(
+        ["#{original_tag_object_sha}\n", success],
+        ["#{original_tag_object_sha}\n", success],
+        ["#{replacement_tag_object_sha}\n", success],
+        ["#{replacement_tag_object_sha}\n", success]
+      )
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).and_return(
+        [
+          "#{original_tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{candidate_sha}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success
+        ],
+        [
+          "#{replacement_tag_object_sha}\trefs/tags/v17.0.0.rc.10\n" \
+          "#{candidate_sha}\trefs/tags/v17.0.0.rc.10^{}\n",
+          success
+        ]
+      )
+      expect(self).not_to receive(:record_accelerated_rc_publication_complete!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /remote annotated tag object.*changed during registry verification/i)
+    end
+
+    it "revalidates the remote annotated tag after registry proof before completion append" do
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        fetch_remote_release_tag!: nil,
+        local_release_tag_object_sha!: "a" * 40,
+        accelerated_rc_tag_identity_for_object!: {
+          tag_object_sha: "a" * 40,
+          candidate_sha: "f" * 40,
+          provenance: accelerated_rc_tag_provenance(authorization_record)
+        },
+        verify_complete_release_registry_publication!: nil
+      )
+      allow(self).to receive(:remote_annotated_release_tag_identity!).and_return(
+        { tag_object_sha: "a" * 40, candidate_sha: "f" * 40 },
+        { tag_object_sha: "a" * 40, candidate_sha: "e" * 40 }
+      )
+      expect(self).not_to receive(:record_accelerated_rc_publication_complete!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /moved away.*candidate/i)
+    end
+
+    it "blocks ambiguous candidate history before registry verification" do
+      other_authorization = authorization_record.merge(
+        "candidate_sha" => "e" * 40,
+        "ci" => authorization_record.fetch("ci").merge("sha" => "e" * 40),
+        "shakaperf" => authorization_record.fetch("shakaperf").merge("candidate_sha" => "e" * 40)
+      )
+      expect(validate_accelerated_rc_tracker_record!(other_authorization)).to eq(other_authorization)
+      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
+        .and_return([authorization_record, other_authorization])
+      expect(self).not_to receive(:verify_complete_release_registry_publication!)
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /absent or ambiguous candidate history/i)
+    end
+
+    it "blocks gate reconciliation when the durable completion append fails" do
+      stub_accelerated_rc_publication_recovery_tag(authorization: authorization_record)
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization_record],
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization_record],
+        verify_complete_release_registry_publication!: nil
+      )
+      allow(self).to receive(:record_accelerated_rc_publication_complete!) do
+        abort "V80 simulated GitHub completion append outage"
+      end
+      expect(self).not_to receive(:fetch_accelerated_rc_ci_snapshot!)
+
+      expect do
+        run_accelerated_rc_reconciliation!(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          tracker: 3823,
+          target_version: "17.0.0.rc.10",
+          reason: "Recover publication",
+          evidence: {}
+        )
+      end.to raise_error(SystemExit, /completion append outage/i)
+    end
+
     it "blocks reconciliation when a later authorization contradicts the canonical first" do
       conflicting_authorization = authorization_record.merge(
         "shakaperf" => authorization_record.fetch("shakaperf").merge(
@@ -9755,10 +10308,36 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "#accepted_accelerated_rc_record_for_release_branch_promotion!" do
+    it "binds accepted accelerated selection provenance and candidate to one tag object" do
+      authorization, publication, accepted = accelerated_rc_test_accepted_history
+      wrong_object_authorization = authorization.merge("reason" => "Different authorization on object A")
+      stub_final_promotion_source_rc_tag_commands(
+        object_authorization: wrong_object_authorization,
+        ref_authorization: authorization
+      )
+      allow(self).to receive_messages(
+        github_repo_slug: "shakacode/react_on_rails",
+        fetch_release_tracker_issue!: nil,
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, publication, accepted],
+        fetch_accelerated_rc_tracker_records!: [authorization, publication, accepted],
+        shakaperf_runtime_tree_fingerprint: "a" * 64
+      )
+
+      expect do
+        accepted_accelerated_rc_record_for_release_branch_promotion!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          final_head_sha: "f" * 40,
+          tracker_input: "3823"
+        )
+      end.to raise_error(SystemExit, /does not match.*tag provenance|provenance.*authorization/i)
+    end
+
     it "rejects cross-tracker exact-candidate history during final promotion" do
       authorization, publication, accepted = accelerated_rc_test_accepted_history
       conflicting_authorization = accelerated_rc_test_authorization(tracker: 3824)
       provenance = accelerated_rc_tag_provenance(authorization)
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
       allow(self).to receive_messages(
         accelerated_rc_tag_provenance_for_tag!: provenance,
         github_repo_slug: "shakacode/react_on_rails",
@@ -9784,6 +10363,9 @@ RSpec.describe "release.rake helper methods" do
     it "requires the literal canonical tag name for accelerated provenance" do
       authorization, publication, accepted = accelerated_rc_test_accepted_history
       provenance = accelerated_rc_tag_provenance(authorization)
+      ["v17.0.0-rc.10", "v17.0.0.RC.10", "v17.0.0.rc.10"].each do |tag|
+        stub_final_promotion_source_rc_tag_commands(object_authorization: authorization, tag:)
+      end
       allow(self).to receive_messages(
         accelerated_rc_tag_provenance_for_tag!: provenance,
         github_repo_slug: "shakacode/react_on_rails",
@@ -9820,6 +10402,12 @@ RSpec.describe "release.rake helper methods" do
     it "does not require a tracker for an ordinary lightweight RC tag" do
       status = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10")
+        .and_return(["#{'f' * 40}\n", status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "f" * 40)
+        .and_return(["commit\n", status])
+      allow(Open3).to receive(:capture2e)
         .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
         .and_return(["commit\n", status])
       allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
@@ -9832,6 +10420,7 @@ RSpec.describe "release.rake helper methods" do
       ).and_return([])
       expect(self).not_to receive(:fetch_release_tracker_issue!)
       expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
+      expect(self).not_to receive(:remote_annotated_release_tag_identity!)
 
       result = accepted_accelerated_rc_record_for_release_branch_promotion!(
         monorepo_root: "/tmp/repo",
@@ -9851,8 +10440,10 @@ RSpec.describe "release.rake helper methods" do
     it "blocks a lightweight RC tag when durable accelerated history exists for the exact candidate" do
       status = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
-        .and_return(["commit\n", status])
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10")
+        .and_return(["#{'f' * 40}\n", status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "f" * 40).and_return(["commit\n", status])
       allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
       allow(self).to receive(:peeled_git_tag_sha)
         .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10").and_return("f" * 40)
@@ -9879,12 +10470,15 @@ RSpec.describe "release.rake helper methods" do
     it "blocks a markerless annotated RC tag even when no tracker is supplied" do
       status = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
-        .and_return(["tag\n", status])
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10")
+        .and_return(["#{'a' * 40}\n", status])
       allow(Open3).to receive(:capture2e)
-        .with(
-          "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/v17.0.0.rc.10"
-        ).and_return(["Ordinary-looking annotation without canonical provenance\n", status])
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "a" * 40).and_return(["tag\n", status])
+      contents = "object #{'f' * 40}\ntype commit\ntag v17.0.0.rc.10\n\n" \
+                 "Ordinary-looking annotation without canonical provenance\n"
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "cat-file", "-p", "a" * 40
+      ).and_return([contents, status])
       expect(self).not_to receive(:github_repo_slug)
 
       expect do
@@ -9900,12 +10494,15 @@ RSpec.describe "release.rake helper methods" do
     it "blocks a markerless annotated RC tag when an explicit tracker is supplied" do
       status = instance_double(Process::Status, success?: true)
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
-        .and_return(["tag\n", status])
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10")
+        .and_return(["#{'a' * 40}\n", status])
       allow(Open3).to receive(:capture2e)
-        .with(
-          "git", "-C", "/tmp/repo", "for-each-ref", "--format=%(contents)", "refs/tags/v17.0.0.rc.10"
-        ).and_return(["Ordinary-looking annotation without canonical provenance\n", status])
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "a" * 40).and_return(["tag\n", status])
+      contents = "object #{'f' * 40}\ntype commit\ntag v17.0.0.rc.10\n\n" \
+                 "Ordinary-looking annotation without canonical provenance\n"
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "cat-file", "-p", "a" * 40
+      ).and_return([contents, status])
       expect(self).not_to receive(:github_repo_slug)
       expect(self).not_to receive(:fetch_release_tracker_issue!)
       expect(self).not_to receive(:fetch_accelerated_rc_tracker_records!)
@@ -9921,10 +10518,14 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "blocks when the RC tag object type cannot be determined" do
-      status = instance_double(Process::Status, success?: false)
+      success = instance_double(Process::Status, success?: true)
+      failure = instance_double(Process::Status, success?: false)
       allow(Open3).to receive(:capture2e)
-        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "refs/tags/v17.0.0.rc.10")
-        .and_return(["fatal: object unavailable\n", status])
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--verify", "--quiet", "refs/tags/v17.0.0.rc.10")
+        .and_return(["#{'a' * 40}\n", success])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "cat-file", "-t", "a" * 40)
+        .and_return(["fatal: object unavailable\n", failure])
       expect(self).not_to receive(:github_repo_slug)
 
       expect do
@@ -9934,14 +10535,12 @@ RSpec.describe "release.rake helper methods" do
           final_head_sha: "f" * 40,
           tracker_input: nil
         )
-      end.to raise_error(SystemExit, /Unable to inspect RC tag provenance.*object unavailable/i)
+      end.to raise_error(SystemExit, /Captured RC tag object.*unavailable/i)
     end
 
     it "requires the tracker encoded by an accelerated RC tag" do
-      allow(self).to receive(:accelerated_rc_tag_provenance_for_tag!).and_return(
-        "target_version" => "17.0.0.rc.10",
-        "release_tracker" => 3823
-      )
+      authorization = accelerated_rc_test_authorization
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
       expect(self).not_to receive(:github_repo_slug)
 
       expect do
@@ -9952,6 +10551,30 @@ RSpec.describe "release.rake helper methods" do
           tracker_input: "3824"
         )
       end.to raise_error(SystemExit, /RELEASE_TRACKER must match the canonical tracker/)
+    end
+  end
+
+  describe "#final_promotion_source_rc_context!" do
+    it "binds context provenance to the captured object across a local A-to-B-to-A ref race" do
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      wrong_object_authorization = authorization.merge("reason" => "Different authorization on object A")
+      stub_final_promotion_source_rc_tag_commands(
+        object_authorization: wrong_object_authorization,
+        ref_authorization: authorization
+      )
+
+      expect do
+        final_promotion_source_rc_context!(
+          monorepo_root: "/tmp/repo",
+          rc_tag: "v17.0.0.rc.10",
+          record: accepted,
+          source_rc_tag_identity: {
+            tag_object_sha: "a" * 40,
+            candidate_sha: "f" * 40,
+            provenance: accelerated_rc_tag_provenance(authorization)
+          }
+        )
+      end.to raise_error(SystemExit, /source RC tag.*matching canonical accelerated provenance/i)
     end
   end
 
@@ -10611,6 +11234,12 @@ RSpec.describe "release.rake helper methods" do
       allow(self).to receive_messages(
         remote_git_tag_exists?: true,
         fetch_remote_rc_tag!: nil,
+        local_release_tag_object_sha!: "a" * 40,
+        live_annotated_release_tag_identity!: {
+          tag_object_sha: "a" * 40,
+          candidate_sha: "f" * 40,
+          provenance: source_rc_tag_provenance
+        },
         current_git_sha!: "e" * 40,
         github_repo_slug: "shakacode/react_on_rails",
         accelerated_shakaperf_snapshot: strict_final_shakaperf_snapshot,
@@ -12235,8 +12864,129 @@ RSpec.describe "release.rake helper methods" do
       end
     end
 
+    it "rejects a live remote same-candidate source RC object replacement before stable-tag push" do
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      candidate_sha = "e" * 40
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      context = accelerated_final_promotion_test_context(
+        record: accepted,
+        ci_snapshot: {
+          status: "success",
+          sha: source_candidate_sha,
+          checks_url: accepted.dig("ci", "checks_url"),
+          non_success: []
+        }
+      )
+      stub_final_promotion_source_rc_tag_commands(
+        object_authorization: authorization,
+        remote_tag_object_sha: "b" * 40
+      )
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      expect(self).not_to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha:,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: context
+        )
+      end.to raise_error(SystemExit, /remote annotated tag object.*source RC|source RC.*tag object/i)
+    end
+
+    it "rejects a live remote lightweight source RC replacement at the accepted candidate" do
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      context = accelerated_final_promotion_test_context(
+        record: accepted,
+        ci_snapshot: {
+          status: "success",
+          sha: source_candidate_sha,
+          checks_url: accepted.dig("ci", "checks_url"),
+          non_success: []
+        }
+      )
+      stub_final_promotion_source_rc_tag_commands(
+        object_authorization: authorization,
+        remote_annotated: false
+      )
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil
+      )
+      expect(self).not_to receive(:ensure_release_tag_for_candidate!)
+      expect(self).not_to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha: "e" * 40,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: context
+        )
+      end.to raise_error(SystemExit, /source RC tag.*not an annotated tag|not an annotated tag.*source RC/i)
+    end
+
+    it "validates one exact source RC tag object through all three irreversible boundaries" do
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      candidate_sha = "e" * 40
+      source_candidate_sha = accepted.fetch("candidate_sha")
+      context = accelerated_final_promotion_test_context(
+        record: accepted,
+        ci_snapshot: {
+          status: "success",
+          sha: source_candidate_sha,
+          checks_url: accepted.dig("ci", "checks_url"),
+          non_success: []
+        }
+      )
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
+      allow(self).to receive_messages(
+        validate_accelerated_repository_publication_boundary!: nil,
+        validate_final_promotion_ci_publication_boundary!: nil,
+        validate_final_promotion_shakaperf_publication_boundary!: nil,
+        remote_git_tag_exists?: true,
+        fetch_remote_rc_tag!: nil,
+        system: true,
+        validate_release_tag_candidate_sha!: candidate_sha,
+        validate_release_candidate_publication_boundary!: candidate_sha,
+        validate_remote_release_tag_candidate_sha!: candidate_sha
+      )
+      allow(self).to receive(:sh_in_dir_for_release)
+
+      expect do
+        push_release_tag_for_candidate!(
+          monorepo_root: "/tmp/repo",
+          tag: "v17.0.0",
+          candidate_sha:,
+          accelerated_boundary_record: accepted,
+          accelerated_final_promotion_context: context
+        )
+      end.not_to raise_error
+      expect(self).to have_received(:fetch_remote_rc_tag!).exactly(3).times
+      expect(Open3).to have_received(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin",
+        "refs/tags/v17.0.0.rc.10", "refs/tags/v17.0.0.rc.10^{}"
+      ).exactly(3).times
+    end
+
     it "blocks stable-tag push when the live source RC tag disappears after initial final gates" do
-      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
       candidate_sha = "e" * 40
       source_candidate_sha = accepted.fetch("candidate_sha")
       successful_ci = {
@@ -12246,6 +12996,7 @@ RSpec.describe "release.rake helper methods" do
         non_success: []
       }
       context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
       allow(self).to receive_messages(
         validate_accelerated_repository_publication_boundary!: nil,
         validate_final_promotion_ci_publication_boundary!: nil,
@@ -12255,8 +13006,6 @@ RSpec.describe "release.rake helper methods" do
         validate_release_candidate_publication_boundary!: candidate_sha,
         remote_git_tag_exists?: true,
         fetch_remote_rc_tag!: nil,
-        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
-        peeled_git_tag_sha: source_candidate_sha,
         validate_remote_release_tag_candidate_sha!: candidate_sha
       )
       allow(self).to receive(:remote_git_tag_exists?).and_return(true, false)
@@ -12274,7 +13023,7 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "blocks packages when the live source RC tag moves after stable-tag push" do
-      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
       candidate_sha = "e" * 40
       source_candidate_sha = accepted.fetch("candidate_sha")
       moved_sha = "d" * 40
@@ -12285,6 +13034,18 @@ RSpec.describe "release.rake helper methods" do
         non_success: []
       }
       context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
+      success_status = instance_double(Process::Status, success?: true)
+      source_tag_ref = "refs/tags/v17.0.0.rc.10"
+      matching_remote = "#{'a' * 40}\t#{source_tag_ref}\n#{source_candidate_sha}\t#{source_tag_ref}^{}\n"
+      moved_remote = "#{'a' * 40}\t#{source_tag_ref}\n#{moved_sha}\t#{source_tag_ref}^{}\n"
+      allow(Open3).to receive(:capture2e).with(
+        "git", "-C", "/tmp/repo", "ls-remote", "--tags", "origin", source_tag_ref, "#{source_tag_ref}^{}"
+      ).and_return(
+        [matching_remote, success_status],
+        [matching_remote, success_status],
+        [moved_remote, success_status]
+      )
       allow(self).to receive_messages(
         validate_accelerated_repository_publication_boundary!: nil,
         validate_final_promotion_ci_publication_boundary!: nil,
@@ -12293,12 +13054,9 @@ RSpec.describe "release.rake helper methods" do
         validate_release_tag_candidate_sha!: candidate_sha,
         remote_git_tag_exists?: true,
         fetch_remote_rc_tag!: nil,
-        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
         validate_release_candidate_publication_boundary!: candidate_sha,
         validate_remote_release_tag_candidate_sha!: candidate_sha
       )
-      allow(self).to receive(:peeled_git_tag_sha)
-        .and_return(source_candidate_sha, source_candidate_sha, moved_sha)
       pushed = false
       package_publication_started = false
       allow(self).to receive(:sh_in_dir_for_release) { pushed = true }
@@ -12312,7 +13070,7 @@ RSpec.describe "release.rake helper methods" do
           accelerated_final_promotion_context: context
         )
         package_publication_started = true
-      end.to raise_error(SystemExit, /source RC tag.*moved.*package publication/i)
+      end.to raise_error(SystemExit, /moved away.*source RC package publication/i)
 
       aggregate_failures do
         expect(pushed).to be(true)
@@ -12321,7 +13079,7 @@ RSpec.describe "release.rake helper methods" do
     end
 
     it "still validates the live stable tag after all source RC boundaries pass" do
-      _authorization, _publication, accepted = accelerated_rc_test_accepted_history
+      authorization, _publication, accepted = accelerated_rc_test_accepted_history
       candidate_sha = "e" * 40
       source_candidate_sha = accepted.fetch("candidate_sha")
       successful_ci = {
@@ -12331,6 +13089,7 @@ RSpec.describe "release.rake helper methods" do
         non_success: []
       }
       context = accelerated_final_promotion_test_context(record: accepted, ci_snapshot: successful_ci)
+      stub_final_promotion_source_rc_tag_commands(object_authorization: authorization)
       allow(self).to receive_messages(
         validate_accelerated_repository_publication_boundary!: nil,
         validate_final_promotion_ci_publication_boundary!: nil,
@@ -12339,9 +13098,7 @@ RSpec.describe "release.rake helper methods" do
         validate_release_tag_candidate_sha!: candidate_sha,
         validate_release_candidate_publication_boundary!: candidate_sha,
         remote_git_tag_exists?: true,
-        fetch_remote_rc_tag!: nil,
-        accelerated_rc_tag_provenance_for_tag!: context.fetch(:source_rc_tag_provenance),
-        peeled_git_tag_sha: source_candidate_sha
+        fetch_remote_rc_tag!: nil
       )
       allow(self).to receive(:sh_in_dir_for_release)
       allow(self).to receive(:validate_remote_release_tag_candidate_sha!).with(
