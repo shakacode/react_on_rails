@@ -2344,6 +2344,7 @@ RSpec.describe "release.rake helper methods" do
         end
 
         results = {
+          "bundle_gemfile" => Bundler.default_gemfile.to_s,
           "array_many" => [].respond_to?(:many?),
           "empty" => capture_case.call([]),
           "single" => capture_case.call([queued_run]),
@@ -2351,26 +2352,44 @@ RSpec.describe "release.rake helper methods" do
         }
         puts "ROOT_RAKE_RESULT=#{JSON.generate(results)}"
       RUBY
-      root_bundle_environment = {
-        "BUNDLE_GEMFILE" => File.join(monorepo_root, "Gemfile"),
-        "BUNDLE_LOCKFILE" => File.join(monorepo_root, "Gemfile.lock")
-      }
-      stdout, stderr, status = Bundler.with_unbundled_env do
-        Open3.capture3(
-          root_bundle_environment,
+      Dir.mktmpdir("ror-v68-empty-root-bundle") do |empty_root_bundle|
+        unavailable_root_bundle_environment = {
+          "BUNDLE_GEMFILE" => File.join(monorepo_root, "Gemfile"),
+          "BUNDLE_LOCKFILE" => File.join(monorepo_root, "Gemfile.lock"),
+          "BUNDLE_PATH" => empty_root_bundle,
+          "BUNDLE_FROZEN" => "true"
+        }
+        unavailable_stdout, unavailable_stderr, unavailable_status = Bundler.with_unbundled_env do
+          Open3.capture3(
+            unavailable_root_bundle_environment,
+            "bundle", "exec", "ruby", "-e", 'puts "OLD_ROOT_BUNDLE_AVAILABLE"', chdir: monorepo_root
+          )
+        end
+        package_gemfile = File.join(monorepo_root, "react_on_rails", "Gemfile")
+        package_bundle_environment = {
+          "BUNDLE_GEMFILE" => package_gemfile,
+          "BUNDLE_LOCKFILE" => File.join(monorepo_root, "react_on_rails", "Gemfile.lock"),
+          "BUNDLE_FROZEN" => "true"
+        }
+        stdout, stderr, status = Open3.capture3(
+          package_bundle_environment,
           "bundle", "exec", "ruby", stdin_data: root_probe, chdir: monorepo_root
         )
-      end
-      result_line = stdout.lines.find { |line| line.start_with?("ROOT_RAKE_RESULT=") }
+        result_line = stdout.lines.find { |line| line.start_with?("ROOT_RAKE_RESULT=") }
 
-      expect(status).to be_success, "root Rake probe failed:\n#{stdout}\n#{stderr}"
-      expect(result_line).not_to be_nil, "root Rake probe produced no result:\n#{stdout}\n#{stderr}"
-      results = JSON.parse(result_line.delete_prefix("ROOT_RAKE_RESULT="))
-      expect(results.fetch("array_many")).to be(false)
-      expect(results.fetch("empty")).to eq("nil_result" => true, "run_id" => nil)
-      expect(results.fetch("single")).to eq("nil_result" => false, "run_id" => 980_001)
-      expect(results.fetch("ambiguous")).to eq("error_class" => "SystemExit", "status" => 1)
-      expect(stderr).to include("ambiguous concurrent fresh runs")
+        expect(unavailable_status).not_to be_success
+        expect(unavailable_stdout).not_to include("OLD_ROOT_BUNDLE_AVAILABLE")
+        expect(unavailable_stderr).to include("Bundler::GemNotFound")
+        expect(status).to be_success, "root Rake probe failed:\n#{stdout}\n#{stderr}"
+        expect(result_line).not_to be_nil, "root Rake probe produced no result:\n#{stdout}\n#{stderr}"
+        results = JSON.parse(result_line.delete_prefix("ROOT_RAKE_RESULT="))
+        expect(results.fetch("bundle_gemfile")).to eq(package_gemfile)
+        expect(results.fetch("array_many")).to be(false)
+        expect(results.fetch("empty")).to eq("nil_result" => true, "run_id" => nil)
+        expect(results.fetch("single")).to eq("nil_result" => false, "run_id" => 980_001)
+        expect(results.fetch("ambiguous")).to eq("error_class" => "SystemExit", "status" => 1)
+        expect(stderr).to include("ambiguous concurrent fresh runs")
+      end
     end
 
     it "rejects every active status when its conclusion is non-nil" do
