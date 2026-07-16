@@ -125,9 +125,127 @@ flowchart TD
 > Substitute your actual target version everywhere you see `17.0.0` / `release/17.0.0` / `v17.0.0*`; the
 > generic form is `X.Y.Z`.
 
+### Serialize every release-line write
+
+Before running **any** step below that creates, updates, tags, promotes, or
+deletes `release/X.Y.Z`, acquire the canonical release-line coordination lease
+and hold it through that write. This includes release-branch creation, every RC
+cut or re-spin, release-first fixes, backports from `main`, changelog and metadata
+PRs, final promotion, and branch deletion. The lease is an `agent-coord` claim
+in `shakacode/react_on_rails` whose target is exactly `release-line:X.Y.Z` (for
+example, `release-line:17.0.0`). One dedicated release coordinator owns this
+synthetic target and is the only actor that dispatches a release-targeted lane
+or performs a release-line write. A claim on an individual issue or PR does not
+serialize writers that target the same release line. If an actor cannot
+participate in this lease, a PR merge must use a merge queue that reruns all
+required gates on the combined merge-group head; branch creation, RC cuts,
+promotion, and deletion have no queue alternative and therefore require the
+lease.
+
+Use the same stable coordinator id for the claim and heartbeat. The bounded
+status and claim operations fail closed on timeout, `UNKNOWN`, or
+`CLAIM_REFUSED`:
+
+```bash
+RELEASE_VERSION=17.0.0
+RELEASE_COORDINATOR_ID="${RELEASE_COORDINATOR_ID:?set a stable coordinator agent id}"
+RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
+PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
+
+heartbeat_release_line_lease() {
+  agent-coord heartbeat \
+    --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --repo shakacode/react_on_rails \
+    --target "${RELEASE_LINE_TARGET}" \
+    --branch "release/${RELEASE_VERSION}" \
+    --phase release-write-serialization \
+    --status in_progress \
+    --ttl 900
+}
+
+require_live_release_line_lease() {
+  command -v jq >/dev/null || return 1
+  lease_json="$(
+    "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+      --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
+  )" || return 1
+  jq -e \
+    --arg holder "${RELEASE_COORDINATOR_ID}" \
+    --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
+    '(.claims | length == 1) and
+     (.claims[0].status == "active") and
+     (.claims[0].agent_id == $holder) and
+     (.claims[0].expires_at != "UNKNOWN") and
+     ((.claims[0].expires_at | fromdateiso8601) > now) and
+     (.heartbeats | length == 1) and
+     (.heartbeats[0].agent_id == $holder) and
+     (.heartbeats[0].target == $target) and
+     (.heartbeats[0].liveness == "live")' \
+    >/dev/null <<<"${lease_json}"
+}
+
+acquire_release_line_lease() {
+  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+    --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json \
+    >/dev/null || return 1
+  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
+    --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --repo shakacode/react_on_rails \
+    --target "${RELEASE_LINE_TARGET}" \
+    --branch "release/${RELEASE_VERSION}" \
+    --ttl 14400 || return 1
+  heartbeat_release_line_lease || return 1
+  require_live_release_line_lease
+}
+
+acquire_release_line_lease
+lease_status=$?
+if [ "${lease_status}" -ne 0 ]; then
+  echo "release-line lease unavailable or UNKNOWN; stop" >&2
+  return "${lease_status}" 2>/dev/null || exit "${lease_status}"
+fi
+```
+
+The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
+the claim at least hourly with the bounded `claim` command from
+`acquire_release_line_lease`, and run `heartbeat_release_line_lease` at every
+release phase transition **and at least every five minutes while CI, validation,
+QA, review, publication, or another gate remains in one phase**. A
+transition-only heartbeat is insufficient. If either refresh fails, stop all
+release-line writes until `acquire_release_line_lease` succeeds and the live
+assertion passes again.
+
+Immediately before each write or merge, rerun `require_live_release_line_lease`
+in the shell where the functions above are defined. It must prove that the
+canonical claim is active, unexpired, and owned by `RELEASE_COORDINATOR_ID`, and
+that its matching heartbeat is live and bound to the canonical target. Identity
+alone is insufficient because released and expired records retain their last
+holder. In a batch, chain each later release-targeted lane with `depends_on` and
+do not launch it until the preceding merge is terminal. A merge queue that
+reruns the gates on the combined merge-group head is the only alternative for a
+PR merge. If neither guard is available, or its state is `UNKNOWN`, stop rather
+than let two release writers race from the same release tip.
+
+Keep the lease across the whole release train when practical. Release it only
+after branch deletion and release-line closeout are complete, or after a
+cancellation/handoff is durably recorded:
+
+```bash
+agent-coord release \
+  --agent-id "${RELEASE_COORDINATOR_ID}" \
+  --repo shakacode/react_on_rails \
+  --target "${RELEASE_LINE_TARGET}"
+```
+
+On handoff, the replacement must acquire this same canonical target after the
+old release is visible; it must not invent another target or bypass a refusal.
+
 ### 1. Cut the RC onto `release/X.Y.Z`
 
 Do this when maintainers decide `main` is feature-complete for the target and want to start stabilizing.
+Acquire the release-line writer lease above before Step 1a, keep its heartbeat
+live while waiting for CI, and rerun `require_live_release_line_lease`
+immediately before the branch push and again before every RC cut or re-spin.
 
 Starting a release line is two steps with a CI run between them — cutting the branch and tagging rc.0
 **cannot** be one command. The release CI gate evaluates the branch tip, and a freshly pushed
@@ -138,6 +256,7 @@ cut rc.0.
 
 ```bash
 git checkout main && git pull --rebase
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 bundle exec rake "release:start[17.0.0]"   # create + push release/17.0.0 from origin/main, then stop for CI
 ```
 
@@ -153,6 +272,7 @@ If you prefer to do it by hand, the equivalent is:
 git fetch origin
 # Cut from the exact main commit you intend to stabilize.
 git checkout -b release/17.0.0 origin/main
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push -u origin release/17.0.0
 ```
 
@@ -163,6 +283,7 @@ bare release — the version is read from CHANGELOG.md, so you do **not** pass `
 
 ```bash
 # On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 bundle exec rake release   # reads 17.0.0.rc.0 from CHANGELOG.md, bumps version.rb, tags v17.0.0.rc.0, publishes
 ```
 
@@ -234,6 +355,10 @@ agents pick up the RC gate automatically (see [Phase-tiered merge gating](#phase
 During the RC phase, **only stabilizing fixes** target `release/X.Y.Z`. New features keep targeting
 `main` and wait for the next version.
 
+The writer lease above remains mandatory: acquire or renew it before creating or
+updating a stabilizer branch, and require it to be live immediately before any
+merge into `release/X.Y.Z`.
+
 Author each stabilizing fix as a PR **targeting `release/X.Y.Z`** (not `main`):
 
 ```bash
@@ -255,118 +380,6 @@ fixed by republishing.
 > Targeting confusion is the most common mistake here. A fix opened against `main` during the RC phase
 > does **not** reach the release unless it is forward-ported in step 3 (run in reverse: cherry-pick
 > `main`→`release/X.Y.Z`). Prefer authoring stabilizing fixes against the release branch first.
-
-#### Serialize every release-branch writer
-
-Before branching, updating, validating, or merging **any** change that targets
-`release/X.Y.Z`, acquire the canonical release-line coordination lease and hold
-it through merge. This includes fixes authored on the release branch, backports
-from `main`, changelog-only PRs, and other release metadata. The lease is an
-`agent-coord` claim in `shakacode/react_on_rails` whose target is exactly
-`release-line:X.Y.Z` (for example, `release-line:17.0.0`). One dedicated release
-coordinator owns this synthetic target and is the only actor that dispatches a
-release-targeted lane or merges it. A claim on an individual source issue or PR
-does not serialize writers that target the same release branch. If an actor
-cannot participate in this lease, its release-targeted PR must use a merge queue
-that reruns all required gates on the combined merge-group head; an ordinary
-direct merge is not an alternative.
-
-Use the same stable coordinator id for the claim and heartbeat. The bounded
-status and claim operations fail closed on timeout, `UNKNOWN`, or
-`CLAIM_REFUSED`:
-
-```bash
-RELEASE_VERSION=17.0.0
-RELEASE_COORDINATOR_ID="${RELEASE_COORDINATOR_ID:?set a stable coordinator agent id}"
-RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
-PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
-
-heartbeat_release_line_lease() {
-  agent-coord heartbeat \
-    --agent-id "${RELEASE_COORDINATOR_ID}" \
-    --repo shakacode/react_on_rails \
-    --target "${RELEASE_LINE_TARGET}" \
-    --branch "release/${RELEASE_VERSION}" \
-    --phase backport-serialization \
-    --status in_progress \
-    --ttl 900
-}
-
-require_live_release_line_lease() {
-  command -v jq >/dev/null || return 1
-  lease_json="$(
-    "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
-      --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
-  )" || return 1
-  jq -e \
-    --arg holder "${RELEASE_COORDINATOR_ID}" \
-    --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
-    '(.claims | length == 1) and
-     (.claims[0].status == "active") and
-     (.claims[0].agent_id == $holder) and
-     (.claims[0].expires_at != "UNKNOWN") and
-     ((.claims[0].expires_at | fromdateiso8601) > now) and
-     (.heartbeats | length == 1) and
-     (.heartbeats[0].agent_id == $holder) and
-     (.heartbeats[0].target == $target) and
-     (.heartbeats[0].liveness == "live")' \
-    >/dev/null <<<"${lease_json}"
-}
-
-acquire_release_line_lease() {
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
-    --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json \
-    >/dev/null || return 1
-  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
-    --agent-id "${RELEASE_COORDINATOR_ID}" \
-    --repo shakacode/react_on_rails \
-    --target "${RELEASE_LINE_TARGET}" \
-    --branch "release/${RELEASE_VERSION}" \
-    --ttl 14400 || return 1
-  heartbeat_release_line_lease || return 1
-  require_live_release_line_lease
-}
-
-acquire_release_line_lease
-lease_status=$?
-if [ "${lease_status}" -ne 0 ]; then
-  echo "release-line lease unavailable or UNKNOWN; stop" >&2
-  return "${lease_status}" 2>/dev/null || exit "${lease_status}"
-fi
-```
-
-The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
-the claim at least hourly with the bounded `claim` command from
-`acquire_release_line_lease`, and run `heartbeat_release_line_lease` at every
-release-lane phase transition **and at least every five minutes while validation,
-QA, review, CI, or another gate remains in one phase**. A transition-only
-heartbeat is insufficient. If either refresh fails, stop merge activity until
-`acquire_release_line_lease` succeeds and the live assertion passes again.
-
-In a batch, chain each later release-targeted lane with `depends_on` and do not
-launch it until the preceding merge is terminal. Immediately before merge, rerun
-`require_live_release_line_lease` in the shell where the functions above are
-defined. It must prove that the canonical claim is active, unexpired, and owned
-by `RELEASE_COORDINATOR_ID`, and that its matching heartbeat is live and bound
-to the canonical target. Identity alone is insufficient because released and
-expired records retain their last holder. A merge queue that reruns the gates on
-the combined merge-group head is the only alternative to this assertion. If
-neither guard is available, or its state is `UNKNOWN`, stop rather than let two
-release writers validate against and race to merge from the same release tip.
-
-Release the lease only after all selected release-targeted changes are terminal
-and the final release tip has been fetched, or after cancellation/handoff is
-durably recorded:
-
-```bash
-agent-coord release \
-  --agent-id "${RELEASE_COORDINATOR_ID}" \
-  --repo shakacode/react_on_rails \
-  --target "${RELEASE_LINE_TARGET}"
-```
-
-On handoff, the replacement must acquire this same canonical target after the
-old release is visible; it must not invent another target or bypass a refusal.
 
 #### Backport merged `main` PRs one at a time
 
@@ -424,9 +437,12 @@ above; when there are multiple selections, serialize the sequence:
    beyond the tip incorporated into the backport branch, update the branch and
    rerun validation, QA, and review; merge only when the evidence covers the
    exact refreshed refs.
-   A backport with exactly one source commit may be squash-merged after copying
-   its exact direct `(cherry picked from commit <source-sha>)` footer into the
-   final squash commit body. For a multi-commit rebase-merged source PR or an
+   A backport with exactly one source commit must be squash-merged. Set the final
+   squash subject to end in `(#<backport-pr-number>)` and copy its exact direct
+   `(cherry picked from commit <source-sha>)` footer into the final squash commit
+   body; a rebase merge is not supported because an unattributed source subject
+   can make the changelog sweep report `UNKNOWN`. For a multi-commit
+   rebase-merged source PR or an
    approved inseparable aggregate, retain one normalized commit per source
    commit and never squash them into a multi-footer commit. The current
    repository cannot close that shape safely: merge commits are disabled, while
@@ -546,6 +562,10 @@ git push   # or open a PR if main is protected / the fix needs review on main
 
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
+Acquire or renew the release-line writer lease before promotion, keep its
+heartbeat live through publication, and rerun `require_live_release_line_lease`
+immediately before the release task writes the final version commit and tag.
+
 Before promotion, fetch `origin/main` and repeat the retained-source audit from
 the backport workflow. Enumerate every main-origin backport retained in the
 accepted RC from its direct `git cherry-pick -x` provenance and confirm that
@@ -562,6 +582,7 @@ replace — the rake promotion guards (`stable_release_branch_allowed?`,
 
 ```bash
 script/release-finish promote 17.0.0 --dry-run   # prints every command, executes nothing
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 script/release-finish promote 17.0.0             # runs it, with a confirmation before rake release
 ```
 
@@ -583,6 +604,7 @@ and the final:
 
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
 ```
 
@@ -622,6 +644,11 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 
 ### 5. Close out the release line
 
+Acquire or renew the release-line writer lease before closeout and hold it
+through guarded branch deletion. Rerun `require_live_release_line_lease`
+immediately before deleting the release ref; release the lease only after the
+closeout and phase clear are durable.
+
 Before running the closeout helper, fetch `origin/main` and repeat the
 retained-source audit. If a retained backport's main origin was reverted,
 superseded, or is `UNKNOWN`, stop for explicit manual disposition. Do not let
@@ -642,6 +669,7 @@ git fetch origin
 git checkout main
 git pull --rebase
 script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 script/release-finish close-out 17.0.0             # applies, with confirmations before each outward op
 # Then `git push` the forward-ported commits to main (or open a PR if main is protected).
 ```
@@ -661,6 +689,7 @@ script/release-forward-port --source origin/release/17.0.0 --target main --dry-r
 script/release-forward-port --source origin/release/17.0.0 --target main
 git push   # or open a PR if main is protected
 # 2. Delete the ephemeral branch — the tags are the durable record.
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push origin --delete release/17.0.0
 ```
 
@@ -673,15 +702,48 @@ replacement already live on `main`, do not run normal-mode
 `script/release-forward-port` or `script/release-finish close-out`. Use this
 audited manual path instead:
 
-1. Set `RELEASE_VERSION`, fetch both `origin/main` and the exact release ref,
-   require a clean local `main` exactly equal to `origin/main`, save the complete
-   dry-run plan as release-tracker evidence, and record the audited release tip:
+1. Set `RELEASE_VERSION` and `PLAN_FILE`, fetch both `origin/main` and the exact
+   release ref, require a clean local `main` exactly equal to `origin/main`, save
+   the complete dry-run plan as release-tracker evidence, and record the audited
+   release tip. Every stated precondition is executable and fails closed:
 
    ```bash
    RELEASE_VERSION=17.0.0
-   git fetch --prune origin main \
-     "+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
-   AUDITED_RELEASE_TIP="$(git rev-parse "origin/release/${RELEASE_VERSION}")"
+   PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
+   release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
+   git fetch --prune origin main "${release_refspec}" || {
+   echo "could not refresh main and the release ref; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   git switch main || { return 1 2>/dev/null || exit 1; }
+   worktree_state="$(git status --porcelain)" || {
+   echo "could not inspect the worktree; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   test -z "${worktree_state}" || {
+   echo "main is dirty; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   local_main="$(git rev-parse HEAD)" || {
+   echo "could not resolve local main; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   remote_main="$(git rev-parse origin/main)" || {
+   echo "could not resolve origin/main; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   test "${local_main}" = "${remote_main}" || {
+   echo "local main differs from origin/main; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   AUDITED_RELEASE_TIP="$(git rev-parse "origin/release/${RELEASE_VERSION}")" || {
+   echo "could not resolve the release tip; stop selective closeout" >&2
+   return 1 2>/dev/null || exit 1
+   }
+   script/release-forward-port \
+   --source "origin/release/${RELEASE_VERSION}" --target main --dry-run \
+   >"${PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
+   cat "${PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
    ```
 
 2. Record the omitted release commit SHA, its direct main-origin SHA, the proof
@@ -706,10 +768,21 @@ audited manual path instead:
    an atomic expected-old-OID guard:
 
    ```bash
-   git fetch --prune origin \
-     "+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
-   test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${AUDITED_RELEASE_TIP}" || {
+   release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
+   git fetch --prune origin "${release_refspec}" || {
+     echo "could not refresh the release ref; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   current_release_tip="$(git rev-parse "origin/release/${RELEASE_VERSION}")" || {
+     echo "could not resolve the release tip; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "${current_release_tip}" = "${AUDITED_RELEASE_TIP}" || {
      echo "release tip changed; restart the closeout audit" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   require_live_release_line_lease || {
+     echo "release-line lease unavailable or UNKNOWN; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
    git push \

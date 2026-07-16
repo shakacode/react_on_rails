@@ -57,8 +57,11 @@ source PR per release backport PR:
   have exactly one direct
   `(cherry picked from commit <source-sha>)` footer; record inherited provenance
   from a source commit in the PR instead of copying another footer. A backport
-  with exactly one source commit may preserve that footer in a squash commit.
-  For a multi-commit rebase-merged source PR or approved aggregate, stop for a
+  with exactly one source commit must be squash-merged with a final subject
+  ending in `(#<backport-pr-number>)` and that footer in the commit body; rebase
+  merge is unsupported because an unattributed source subject can make the
+  changelog sweep report `UNKNOWN`. For a multi-commit rebase-merged source PR
+  or approved aggregate, stop for a
   maintainer-approved merge plan until the repository can preserve both one
   normalized release commit per source commit and changelog-sweep PR
   attribution; never create a multi-footer commit.
