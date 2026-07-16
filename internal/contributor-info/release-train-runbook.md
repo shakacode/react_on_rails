@@ -261,17 +261,24 @@ fixed by republishing.
 When maintainers select more than one merged `main` PR for the release train,
 use **one source PR -> one release PR** and serialize the sequence:
 
-1. Verify the source PR is merged, is a release stabilizer, and is not already
+1. Search open PRs targeting the release branch for the selected source commits.
+   If a valid source-atomic backport PR already exists, treat that lane as
+   started and reuse it (or skip it when another owner holds it); do not create
+   a duplicate branch or PR. Do not extend an aggregate PR by default. Close an
+   aggregate only with explicit write authorization, retain its branch unless
+   deletion is separately authorized, and replace it with source-atomic PRs.
+2. Verify the source PR is merged, is a release stabilizer, and is not already
    present or superseded on `release/X.Y.Z`.
-2. Fetch the release branch and create a branch from its current tip.
-3. Cherry-pick that source PR's single-parent squash commit with
+3. When no source-atomic backport PR exists, fetch the release branch and create
+   a branch from its current tip.
+4. Cherry-pick that source PR's single-parent squash commit with
    `git cherry-pick -x`. For a true multi-parent merge commit, use
    `git cherry-pick -m 1 -x` and record the mainline-parent choice.
-4. Preserve release-only divergence while resolving conflicts; record the
+5. Preserve release-only divergence while resolving conflicts; record the
    source SHA and every non-mechanical resolution in the PR.
-5. Run the release-phase validation, QA, and review gates, then merge the PR.
-6. Fetch the new release tip before starting the next selected source PR.
-7. After every backport retained in the final release set lands, reconcile the
+6. Run the release-phase validation, QA, and review gates, then merge the PR.
+7. Fetch the new release tip before starting the next selected source PR.
+8. After every backport retained in the final release set lands, reconcile the
    changelog entries and stamp or regenerate the RC changelog.
 
 Do not combine independent source PRs merely because they target the same
@@ -284,11 +291,6 @@ and cannot be reviewed, tested, or reverted safely on their own.
 Each backport PR retains its source PR's applicable changelog entry. Resolve an
 equivalent, obsolete, or conflicting release-branch entry explicitly in that
 PR; do not defer all entry curation to the final changelog pass.
-
-Before branching, search open PRs targeting the release branch for an aggregate
-that already contains the selected source commits. Do not extend that aggregate
-by default. Close it only with explicit write authorization, retain its branch
-unless deletion is separately authorized, and replace it with the source-atomic PRs.
 
 #### Promote prerelease dependencies before final
 
