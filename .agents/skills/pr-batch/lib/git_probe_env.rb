@@ -28,8 +28,19 @@ module PrBatchGitProbeEnv
     GIT_WORK_TREE
   ].freeze
 
+  # These explicit overrides are not reported by `git rev-parse --local-env-vars`,
+  # but they can redirect config/attribute sources or change pathspec semantics.
   EXTRA_ENV_VARS = %w[
+    GIT_ATTR_NOSYSTEM
+    GIT_ATTR_SOURCE
     GIT_CEILING_DIRECTORIES
+    GIT_CONFIG_GLOBAL
+    GIT_CONFIG_NOSYSTEM
+    GIT_CONFIG_SYSTEM
+    GIT_GLOB_PATHSPECS
+    GIT_ICASE_PATHSPECS
+    GIT_LITERAL_PATHSPECS
+    GIT_NOGLOB_PATHSPECS
   ].freeze
 
   module_function

@@ -16,7 +16,8 @@ class FetchPrReviewDataTest < Minitest::Test
       {"id":1,"node_id":"IC_1","body":"first","user":{"login":"alice"},"created_at":"2026-01-01T00:00:00Z"},
       {"id":2,"node_id":"IC_2","body":"<!-- address-review-summary -->\\nold","user":{"login":"bot"},"created_at":"2026-01-02T00:00:00Z"}
     ],[
-      {"id":3,"node_id":"IC_3","body":"<!-- address-review-summary -->\\nnew \\ud83c\\udf89","user":{"login":"bot"},"created_at":"2026-01-03T00:00:00Z"}
+      {"id":3,"node_id":"IC_3","body":"<!-- address-review-summary -->\\nnew \\ud83c\\udf89","user":{"login":"bot"},"created_at":"2026-01-03T00:00:00Z"},
+      {"id":4,"node_id":"IC_4","body":"<!-- address-review-status -->\\nnot a cutoff","user":{"login":"bot"},"created_at":"2026-01-04T00:00:00Z"}
     ]]
   JSON
 
@@ -49,7 +50,7 @@ class FetchPrReviewDataTest < Minitest::Test
     )
   end
 
-  def test_cutoff_is_latest_summary_marker
+  def test_cutoff_is_latest_summary_marker_and_ignores_newer_status
     assert_equal "2026-01-03T00:00:00Z", assembled["review_cutoff_at"]
   end
 
@@ -69,7 +70,7 @@ class FetchPrReviewDataTest < Minitest::Test
   end
 
   def test_issue_comments_include_markers
-    assert_equal 3, assembled["issue_comments"].length
+    assert_equal 4, assembled["issue_comments"].length
   end
 
   def test_handles_empty_and_blank_inputs

@@ -6,16 +6,17 @@
 # Encapsulates the repeated "is this PR's CI ready?" rule that is otherwise
 # restated in prose across pr-batch, adversarial-pr-review, and pr-processing:
 #
-#   1. Run `gh pr checks <PR> --required`. If it reports no required checks,
+#   1. Run `gh pr checks <PR> --required`. If it reports no usable required
+#      checks -- either no JSON at all, or only cancelled/superseded rows --
 #      fall back to the full `gh pr checks <PR>` list.
 #   2. An empty check list => UNKNOWN / not ready.
-#   3. Treat cancelled rows as non-ready unless the list contains no active rows,
-#      in which case the verdict is UNKNOWN.
-#   4. When required rows exist, cross-check them against the full list. A
-#      missing or non-ready matching required check blocks readiness; advisory
-#      rows outside the required set do not block required readiness.
-#   5. Otherwise READY only when no failing (bucket "fail") and no pending
-#      (bucket "pending" or "cancel") rows remain. Passing and skipping rows are fine.
+#   3. Ignore superseded/cancelled rows (bucket "cancel").
+#   4. Otherwise READY only when no failing (bucket "fail") and no pending
+#      (bucket "pending") rows remain. Passing and skipping rows are fine.
+#   5. Inventory current-head PENDING review drafts visible to the current
+#      authenticated viewer. READY requires a complete viewer-scoped inventory
+#      with no drafts; other reviewers' unsubmitted drafts are not observable
+#      or covered, and an unavailable inventory is UNKNOWN.
 #
 # `gh pr checks` exits non-zero when checks are failing or pending, so this
 # captures stdout and inspects the rows rather than trusting the exit status.
@@ -44,47 +45,18 @@ module PrCiReadiness
     []
   end
 
-  # True when the raw payload holds a JSON array with at least one row.
+  # True when the raw payload holds a JSON array with at least one row that
+  # counts toward the gate. A required-check list made up entirely of cancelled
+  # rows would otherwise short-circuit the full-list fallback and then drop to
+  # zero active rows, producing a spurious UNKNOWN; treating it as "no usable
+  # checks" lets the caller fall back to the full list instead.
   def usable_checks?(raw)
-    !parse_rows(raw).empty?
+    !active_rows(parse_rows(raw)).empty?
   end
 
-  # Rows that count toward READY/NOT_READY. Cancel-only is UNKNOWN, but a cancel
-  # row alongside active rows keeps the PR out of READY.
+  # Rows that count toward the gate: cancelled/superseded rows are dropped.
   def active_rows(rows)
     rows.reject { |row| row["bucket"].to_s == "cancel" }
-  end
-
-  def cancelled_rows(rows)
-    rows.select { |row| row["bucket"].to_s == "cancel" }
-  end
-
-  def non_ready_row?(row)
-    %w[cancel fail pending].include?(row["bucket"].to_s)
-  end
-
-  def row_key(row)
-    name = row["name"].to_s
-    return name unless name.empty?
-
-    link = row["link"].to_s
-    link.empty? ? row.to_s : link
-  end
-
-  def required_rows_complete?(required_rows, full_rows)
-    required_keys = required_rows.map { |row| row_key(row) }
-    return false if required_keys.empty?
-
-    return false unless missing_required_keys(required_rows, full_rows).empty?
-
-    matching_full_rows = full_rows.select { |row| required_keys.include?(row_key(row)) }
-    matching_full_rows.none? { |row| non_ready_row?(row) }
-  end
-
-  def missing_required_keys(required_rows, full_rows)
-    required_keys = required_rows.map { |row| row_key(row) }
-    full_keys = full_rows.map { |row| row_key(row) }
-    required_keys - full_keys
   end
 
   def failing_names(rows)
@@ -95,12 +67,8 @@ module PrCiReadiness
     rows.select { |row| row["bucket"].to_s == "pending" }.map { |row| row["name"].to_s }
   end
 
-  def cancelled_names(rows)
-    cancelled_rows(rows).map { |row| row["name"].to_s }
-  end
-
-  def verdict_for(active, failing, pending)
-    if active.empty?
+  def verdict_for(rows, failing, pending)
+    if rows.empty?
       "UNKNOWN"
     elsif failing.empty? && pending.empty?
       "READY"
@@ -111,14 +79,13 @@ module PrCiReadiness
 
   # Build the normalized result hash from the captured check rows.
   def assess(pr_number:, required_used:, rows:)
-    active = active_rows(rows)
-    failing = failing_names(active)
-    pending = pending_names(active)
-    pending += cancelled_names(rows) unless active.empty?
+    rows = active_rows(rows)
+    failing = failing_names(rows)
+    pending = pending_names(rows)
 
     {
       "pr" => pr_number.to_i,
-      "verdict" => verdict_for(active, failing, pending),
+      "verdict" => verdict_for(rows, failing, pending),
       "required_used" => required_used,
       "failing" => failing,
       "pending" => pending
@@ -128,33 +95,73 @@ module PrCiReadiness
   def text_summary(result)
     failing = result["failing"]
     pending = result["pending"]
-    [
+    lines = [
       result["verdict"],
       "required_used: #{result['required_used']}",
       "failing: #{failing.empty? ? '(none)' : failing.join(', ')}",
       "pending: #{pending.empty? ? '(none)' : pending.join(', ')}"
-    ].join("\n")
+    ]
+    requested = result.fetch("requested_hosted", {})
+    if requested_hosted_present?(requested)
+      lines.concat([
+                     "requested_hosted_pending: #{requested_names(requested, 'pending')}",
+                     "requested_hosted_failing: #{requested_names(requested, 'failing')}",
+                     "requested_hosted_stale: #{requested_names(requested, 'stale')}",
+                     "requested_hosted_unknown: #{requested_unknown(requested)}"
+                   ])
+    end
+    reviews = result.fetch("viewer_pending_review_drafts", [])
+    lines << "viewer_pending_review_drafts: #{reviews.empty? ? '(none)' : reviews.map { |review| review['id'] }.join(', ')}" if result.key?("viewer_pending_review_drafts")
+    inventory = result["viewer_review_inventory"]
+    lines << "viewer_review_inventory: #{inventory['complete'] ? 'complete' : 'incomplete'} (scope: #{inventory['scope']})" if inventory
+    lines.join("\n")
+  end
+
+  def requested_hosted_present?(requested)
+    %w[run_ids pending failing stale unknown].any? { |bucket| requested.fetch(bucket, []).any? }
+  end
+
+  def requested_names(requested, bucket)
+    rows = requested.fetch(bucket, [])
+    return "(none)" if rows.empty?
+
+    rows.map { |row| row.fetch("name", row.fetch("run_id", "unknown")).to_s }.join(", ")
+  end
+
+  def requested_unknown(requested)
+    rows = requested.fetch("unknown", [])
+    return "(none)" if rows.empty?
+
+    rows.map { |row| "#{row.fetch('run_id', 'unknown')}: #{row.fetch('reason', 'unknown')}" }.join(", ")
   end
 
   USAGE = <<~USAGE
     Usage: pr-ci-readiness <pr-number> [options]
 
     Decide whether a PR's CI is ready to merge. Runs `gh pr checks <PR> --required`
-    first; when no required checks exist, falls back to the full `gh pr checks <PR>`
-    list. An empty or cancel-only list is UNKNOWN/not-ready. When required rows
-    exist, the helper cross-checks the full list for the same required check
-    identities. The PR is READY when no required check is missing, failing, or
-    pending; advisory full-list rows do not block required readiness.
+    first; when no usable required checks exist (no rows, or only cancelled rows),
+    falls back to the full `gh pr checks <PR>` list. An empty list is
+    UNKNOWN/not-ready. Cancelled/superseded rows are ignored.
+    The PR is READY only when no failing or pending checks remain.
+    Current-head PENDING review drafts visible to the current authenticated
+    viewer also block readiness. The viewer-scoped inventory is paginated;
+    complete means pagination completed only in that scope. Other reviewers'
+    unsubmitted drafts are not observable or covered.
 
     Arguments:
       <pr-number>        PR number to inspect (integer).
 
     Options:
-          --repo REPO    GitHub repo in OWNER/REPO form. Defaults to gh repo view.
-          --json         Print JSON (default).
-          --text         Print a human-readable verdict instead of JSON.
-          --self-check   Run parser checks plus a read-only gh smoke check.
-      -h, --help         Show this help.
+          --repo REPO                         GitHub repo in OWNER/REPO form. Defaults to gh repo view.
+          --requested-hosted-run RUN_ID_OR_URL
+                                              Require this explicit current-head hosted run to finish.
+                                              Repeat for multiple maintainer-requested runs.
+                                              With no usable required checks, requested runs replace
+                                              the full advisory-list fallback gate.
+          --json                              Print JSON (default).
+          --text                              Print a human-readable verdict instead of JSON.
+          --self-check                        Run parser checks plus a read-only gh smoke check.
+      -h, --help                              Show this help.
 
     Output JSON shape:
       {
@@ -162,12 +169,27 @@ module PrCiReadiness
         "verdict": "READY" | "NOT_READY" | "UNKNOWN",
         "required_used": true | false,
         "failing": [ "check name", ... ],
-        "pending": [ "check name", ... ]
+        "pending": [ "check name", ... ],
+        "viewer_pending_review_drafts": [ { "id": "PRR_...", "commit_oid": "..." }, ... ],
+        "viewer_review_inventory": {
+          "scope": "authenticated_viewer",
+          "complete": true | false,
+          "pages": 1
+        },
+        "requested_hosted": {
+          "run_ids": [ "1234567890", ... ],
+          "pending": [ { "run_id": "1234567890", "name": "job", "url": "..." }, ... ],
+          "failing": [ { "run_id": "1234567890", "name": "job", "url": "..." }, ... ],
+          "stale": [ { "run_id": "1234567890", "head_sha": "old", "expected_head_sha": "new" }, ... ],
+          "unknown": [ { "run_id": "1234567890", "reason": "..." }, ... ]
+        }
       }
 
     verdict is UNKNOWN when neither the required nor the full check list reports any
-    active non-cancelled checks. required_used is true when the required check list
-    was complete and used as the readiness gate.
+    checks (cancelled rows do not count). required_used is true when the required
+    check list was non-empty and was used as the readiness gate.
+    With --requested-hosted-run and no usable required checks, the requested
+    current-head runs are the gate instead of the full advisory check list.
 
     Requires: gh (GitHub CLI)
   USAGE
@@ -185,7 +207,7 @@ module PrCiReadiness
 
       pr_number = validate_pr!(opts[:pr])
       repo = resolve_repo!(opts[:repo])
-      print_result(assess(repo, pr_number), opts[:format])
+      print_result(assess(repo, pr_number, requested_hosted_runs: opts[:requested_hosted_runs]), opts[:format])
       0
     rescue Error => e
       warn "Error: #{e.message}"
@@ -195,12 +217,13 @@ module PrCiReadiness
     private
 
     def parse_args(argv)
-      opts = { format: "json", help: false, self_check: false, pr: nil, repo: nil }
+      opts = { format: "json", help: false, self_check: false, pr: nil, repo: nil, requested_hosted_runs: [] }
       args = argv.dup
       until args.empty?
         arg = args.shift
         case arg
         when "--repo" then opts[:repo] = take_value!(args, "--repo")
+        when "--requested-hosted-run" then opts[:requested_hosted_runs] << take_value!(args, "--requested-hosted-run")
         when "--json" then opts[:format] = "json"
         when "--text" then opts[:format] = "text"
         when "--self-check" then opts[:self_check] = true
@@ -242,29 +265,30 @@ module PrCiReadiness
     end
 
     # Fetch the required-check list first; fall back to the full list when the
-    # required form yields no rows or when the full list has matching required
-    # rows that are missing or non-ready. Advisory full-list rows do not block.
-    # required_used flips to false on fallback.
-    def assess(repo, pr_number)
+    # required form yields no rows. required_used flips to false on fallback.
+    def assess(repo, pr_number, requested_hosted_runs:)
       required_raw = fetch_checks(repo, pr_number, required: true)
-      required_rows = PrCiReadiness.parse_rows(required_raw)
-      if required_rows.empty?
+      if PrCiReadiness.usable_checks?(required_raw)
+        rows = PrCiReadiness.parse_rows(required_raw)
+        required_used = true
+        requested_hosted_only = false
+      elsif requested_hosted_runs.any?
+        rows = []
+        required_used = false
+        requested_hosted_only = true
+      else
         rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
         required_used = false
-      else
-        full_rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
-        if !PrCiReadiness.missing_required_keys(required_rows, full_rows).empty?
-          rows = []
-          required_used = false
-        elsif PrCiReadiness.required_rows_complete?(required_rows, full_rows)
-          rows = required_rows
-          required_used = true
-        else
-          rows = full_rows
-          required_used = false
-        end
+        requested_hosted_only = false
       end
-      PrCiReadiness.assess(pr_number:, required_used:, rows:)
+      result =
+        if requested_hosted_only
+          requested_hosted_base_result(pr_number)
+        else
+          PrCiReadiness.assess(pr_number:, required_used:, rows:)
+        end
+      result = apply_requested_hosted_runs(result, repo, pr_number, requested_hosted_runs)
+      apply_viewer_review_inventory(result, repo, pr_number)
     end
 
     # `gh pr checks` exits non-zero when checks are failing/pending and also when
@@ -278,6 +302,208 @@ module PrCiReadiness
       # inspect stdout only, so discard stderr to keep our output clean.
       out, _status = Open3.capture2(*cmd, err: File::NULL)
       out.to_s.force_encoding("UTF-8")
+    end
+
+    def apply_requested_hosted_runs(result, repo, pr_number, requested_hosted_runs)
+      result["requested_hosted"] = empty_requested_hosted
+      return result if requested_hosted_runs.empty?
+
+      requested = requested_hosted_summary(repo, pr_number, requested_hosted_runs)
+      result["requested_hosted"] = requested
+      if requested["pending"].any? || requested["failing"].any?
+        result["verdict"] = "NOT_READY"
+      elsif result["verdict"] == "READY" && (requested["stale"].any? || requested["unknown"].any?)
+        result["verdict"] = "UNKNOWN"
+      end
+      result
+    end
+
+    def empty_requested_hosted
+      {
+        "run_ids" => [],
+        "pending" => [],
+        "failing" => [],
+        "stale" => [],
+        "unknown" => []
+      }
+    end
+
+    def requested_hosted_base_result(pr_number)
+      {
+        "pr" => pr_number.to_i,
+        "verdict" => "READY",
+        "required_used" => false,
+        "failing" => [],
+        "pending" => []
+      }
+    end
+
+    def apply_viewer_review_inventory(result, repo, pr_number)
+      inventory = viewer_pending_review_draft_inventory(repo, pr_number)
+      result["viewer_pending_review_drafts"] = inventory.fetch("viewer_pending_review_drafts")
+      result["viewer_review_inventory"] = inventory.reject { |key, _value| key == "viewer_pending_review_drafts" }
+      if inventory.fetch("viewer_pending_review_drafts").any?
+        result["verdict"] = "NOT_READY"
+      elsif !inventory.fetch("complete") && result["verdict"] == "READY"
+        result["verdict"] = "UNKNOWN"
+      end
+      result
+    end
+
+    REVIEW_DRAFTS_QUERY = <<~GRAPHQL
+      query($owner:String!, $name:String!, $pr:Int!, $endCursor:String) {
+        repository(owner:$owner, name:$name) {
+          pullRequest(number:$pr) {
+            reviews(first:100, after:$endCursor) {
+              nodes { id state submittedAt commit { oid } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }
+    GRAPHQL
+
+    def viewer_pending_review_draft_inventory(repo, pr_number)
+      owner, name = repo.split("/", 2)
+      expected_head_sha = fetch_pr_head_oid(repo, pr_number)
+      viewer_pending_review_drafts = []
+      cursor = nil
+      pages = 0
+
+      loop do
+        reviews = fetch_reviews_page(owner, name, pr_number, cursor)
+        nodes = reviews.fetch("nodes")
+        page_info = reviews.fetch("pageInfo")
+        raise Error, "review inventory returned non-array nodes" unless nodes.is_a?(Array)
+        raise Error, "review inventory returned incomplete page info" unless page_info.is_a?(Hash)
+
+        pending_reviews = nodes.select do |review|
+          review["state"] == "PENDING" && review["submittedAt"].nil? &&
+            review.dig("commit", "oid") == expected_head_sha
+        end
+        viewer_pending_review_drafts.concat(pending_reviews.map do |review|
+          { "id" => review.fetch("id"), "commit_oid" => expected_head_sha }
+        end)
+        pages += 1
+        break unless page_info["hasNextPage"]
+
+        cursor = page_info["endCursor"]
+        raise Error, "review inventory pagination cursor was missing" if cursor.to_s.empty?
+      end
+
+      { "scope" => "authenticated_viewer", "complete" => true, "pages" => pages,
+        "viewer_pending_review_drafts" => viewer_pending_review_drafts }
+    rescue StandardError => e
+      { "scope" => "authenticated_viewer", "complete" => false, "pages" => pages || 0,
+        "viewer_pending_review_drafts" => viewer_pending_review_drafts || [], "error" => e.message }
+    end
+
+    def fetch_reviews_page(owner, name, pr_number, cursor)
+      cmd = ["gh", "api", "graphql", "-f", "owner=#{owner}", "-f", "name=#{name}", "-F", "pr=#{pr_number}"]
+      cmd += ["-f", "endCursor=#{cursor}"] unless cursor.nil?
+      cmd += ["-f", "query=#{REVIEW_DRAFTS_QUERY}"]
+      data = capture_json!(*cmd)
+      data.dig("data", "repository", "pullRequest", "reviews") ||
+        raise(Error, "review inventory response was incomplete")
+    end
+
+    def requested_hosted_summary(repo, pr_number, requested_hosted_runs)
+      expected_head_sha = fetch_pr_head_oid(repo, pr_number)
+      requested_hosted_runs.each_with_object(empty_requested_hosted) do |input, summary|
+        run_id = requested_hosted_run_id(input)
+        summary["run_ids"] << run_id
+        run = fetch_actions_run(repo, run_id)
+        classify_requested_run(summary, repo, run_id, run, expected_head_sha)
+      rescue Error => e
+        summary["unknown"] << { "run_id" => run_id || input.to_s, "reason" => e.message }
+      end
+    end
+
+    def requested_hosted_run_id(input)
+      value = input.to_s.strip
+      run_id = value[%r{/actions/runs/(\d+)}, 1] || value[/\A\d+\z/]
+      raise Error, "requested hosted run must be a run id or Actions run URL (got: '#{input}')" if run_id.nil?
+
+      run_id
+    end
+
+    def classify_requested_run(summary, repo, run_id, run, expected_head_sha)
+      actual_head_sha = run.fetch("head_sha", "").to_s
+      if actual_head_sha.empty? || actual_head_sha != expected_head_sha
+        summary["stale"] << run_record(run_id, run).merge(
+          "head_sha" => actual_head_sha,
+          "expected_head_sha" => expected_head_sha
+        )
+        return
+      end
+
+      classify_status_row(summary, "run", run_id, run_record(run_id, run))
+      return if run.fetch("status", "").to_s == "completed" && successful_conclusion?(run.fetch("conclusion", "").to_s)
+
+      fetch_actions_jobs(repo, run_id).each do |job|
+        classify_status_row(summary, "job", run_id, run_record(run_id, job))
+      end
+    end
+
+    def classify_status_row(summary, kind, run_id, row)
+      status = row["status"].to_s
+      conclusion = row["conclusion"].to_s
+      record = row.merge("kind" => kind, "run_id" => run_id)
+      if status != "completed"
+        summary["pending"] << record
+      elsif successful_conclusion?(conclusion)
+        nil
+      else
+        summary["failing"] << record
+      end
+    end
+
+    def successful_conclusion?(conclusion)
+      %w[success neutral skipped].include?(conclusion)
+    end
+
+    def run_record(run_id, payload)
+      {
+        "run_id" => run_id,
+        "name" => payload["name"].to_s.empty? ? "run #{run_id}" : payload["name"].to_s,
+        "status" => payload["status"].to_s,
+        "conclusion" => payload["conclusion"],
+        "url" => payload["html_url"].to_s
+      }
+    end
+
+    def fetch_pr_head_oid(repo, pr_number)
+      data = capture_json!("gh", "pr", "view", pr_number.to_s, "--repo", repo, "--json", "headRefOid")
+      head = data.fetch("headRefOid", "").to_s
+      raise Error, "could not resolve PR headRefOid for ##{pr_number}" if head.empty?
+
+      head
+    end
+
+    def fetch_actions_run(repo, run_id)
+      capture_json!("gh", "api", "repos/#{repo}/actions/runs/#{run_id}")
+    end
+
+    def fetch_actions_jobs(repo, run_id)
+      per_page = 100
+      jobs = []
+      page = 1
+      loop do
+        data = capture_json!("gh", "api", "repos/#{repo}/actions/runs/#{run_id}/jobs?per_page=#{per_page}&page=#{page}")
+        page_jobs = data.fetch("jobs", [])
+        jobs.concat(page_jobs)
+        break if page_jobs.length < per_page
+
+        page += 1
+      end
+      jobs
+    end
+
+    def capture_json!(*cmd)
+      raw = capture_required!(*cmd)
+      JSON.parse(raw)
+    rescue JSON::ParserError => e
+      raise Error, "command returned invalid JSON: #{cmd.first(3).join(' ')} (#{e.message})"
     end
 
     # Run a command with no shell (array args) and return UTF-8 stdout, raising
@@ -336,7 +562,7 @@ module PrCiReadiness
                                    { "name" => "lint", "bucket" => "fail" },
                                    { "name" => "stale", "bucket" => "cancel" }
                                  ])
-      ok = out["verdict"] == "NOT_READY" && out["failing"] == ["lint"] && out["pending"] == ["stale"]
+      ok = out["verdict"] == "NOT_READY" && out["failing"] == ["lint"] && out["pending"].empty?
       ok ? [] : ["failing did not yield NOT_READY (lint)"]
     end
 
@@ -358,6 +584,9 @@ module PrCiReadiness
       errors << "usable_checks? treated [] as usable" if PrCiReadiness.usable_checks?("[]")
       errors << "usable_checks? treated blank as usable" if PrCiReadiness.usable_checks?("")
       errors << "usable_checks? treated non-JSON as usable" if PrCiReadiness.usable_checks?("no required checks")
+      if PrCiReadiness.usable_checks?('[{"name":"stale","bucket":"cancel"}]')
+        errors << "usable_checks? treated cancel-only as usable"
+      end
       errors
     end
 

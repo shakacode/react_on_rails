@@ -1,0 +1,771 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "json"
+
+ACCEPTED_BINDING_EVIDENCE = %w[operator-selected dispatcher-bound].freeze
+NEGATIVE_BINDING_EVIDENCE = %w[unbound binding-rejected binding-failed].freeze
+ACCEPTED_ATTESTATION_EVIDENCE = %w[instance-bound dispatcher-attested].freeze
+NEGATIVE_ATTESTATION_EVIDENCE = %w[unattested attestation-rejected attestation-failed].freeze
+
+def fail_input(message)
+  puts JSON.generate("status" => "invalid-input", "reason" => message)
+  exit
+end
+
+def route_equal?(left, right)
+  left.is_a?(Hash) && right.is_a?(Hash) && left == right
+end
+
+def canonicalize(value)
+  case value
+  when Hash
+    value.keys.sort.each_with_object({}) { |key, canonical| canonical[key] = canonicalize(value[key]) }
+  when Array
+    value.map { |entry| canonicalize(entry) }
+  else
+    value
+  end
+end
+
+def canonical_requested_policy(requested)
+  return requested unless requested.is_a?(Hash)
+
+  canonical = canonicalize(requested)
+  canonical["hard_route"] = false unless canonical.key?("hard_route")
+  canonical
+end
+
+def requested_policy_equal?(left, right)
+  canonical_requested_policy(left) == canonical_requested_policy(right)
+end
+
+def stable_digest(value)
+  Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+end
+
+def nonempty_string?(value)
+  value.is_a?(String) && !value.strip.empty?
+end
+
+def unknown_sentinel?(value)
+  value.is_a?(String) && value.strip.casecmp?("UNKNOWN")
+end
+
+def route_shape?(route)
+  route.is_a?(Hash) && nonempty_string?(route["model"]) && nonempty_string?(route["effort"])
+end
+
+def unusable_reason(candidate)
+  return "candidate-invalid" unless candidate.is_a?(Hash)
+  return "candidate-invalid" unless route_shape?(candidate["route"]) && nonempty_string?(candidate["dispatcher"])
+  return "candidate-tuple-unknown" if [candidate.dig("route", "model"), candidate.dig("route", "effort"), candidate["dispatcher"]].any? { |value| unknown_sentinel?(value) }
+  return "binding-missing" unless nonempty_string?(candidate["binding"])
+  return "binding-unknown" if unknown_sentinel?(candidate["binding"])
+  return "binding-negative" if NEGATIVE_BINDING_EVIDENCE.include?(candidate["binding"])
+  return "binding-unaccepted" unless ACCEPTED_BINDING_EVIDENCE.include?(candidate["binding"])
+  return "attestation-missing" unless nonempty_string?(candidate["attestation"])
+  return "attestation-unknown" if unknown_sentinel?(candidate["attestation"])
+  return "attestation-negative" if NEGATIVE_ATTESTATION_EVIDENCE.include?(candidate["attestation"])
+  return "attestation-unaccepted" unless ACCEPTED_ATTESTATION_EVIDENCE.include?(candidate["attestation"])
+  return "instance-identity-missing" unless nonempty_string?(candidate["instance_id"])
+  return "instance-id-unknown" if unknown_sentinel?(candidate["instance_id"])
+
+  nil
+end
+
+def requested_tuple?(candidate, requested)
+  candidate.is_a?(Hash) && route_equal?(candidate["route"], requested["route"]) &&
+    candidate["dispatcher"] == requested["dispatcher"]
+end
+
+def selection_reason(candidate, requested)
+  return "requested-tuple-bound-and-attested" if requested_tuple?(candidate, requested)
+  return "authorized-exact-route-dispatcher-fallback" if route_equal?(candidate["route"], requested["route"])
+
+  "authorized-fallback-bound-and-attested"
+end
+
+def fallback_authority_sufficient?(candidate, requested, authority)
+  exact_route = route_equal?(candidate["route"], requested["route"])
+  return false if requested["hard_route"] && !exact_route
+
+  dispatcher_changed = candidate["dispatcher"] != requested["dispatcher"]
+  route_changed = !exact_route
+  (!dispatcher_changed || authority["dispatch"] == true) && (!route_changed || authority["route"] == true)
+end
+
+def fallback_authorized?(candidate, requested, authority)
+  candidate["fallback_authorized"] == true && fallback_authority_sufficient?(candidate, requested, authority)
+end
+
+def select_candidate(candidate_inputs, requested, authority)
+  rejections = []
+  requested_candidates, fallback_candidates = candidate_inputs.each_with_index.partition do |entry, _index|
+    requested_tuple?(entry, requested)
+  end
+  selected = (requested_candidates + fallback_candidates).find do |entry, _index|
+    next false unless entry.is_a?(Hash)
+    next false unless requested_tuple?(entry, requested) || fallback_authorized?(entry, requested, authority)
+
+    candidate_reason = unusable_reason(entry)
+    if candidate_reason
+      rejections << { "dispatcher" => entry["dispatcher"], "reason" => candidate_reason }
+      next false
+    end
+
+    true
+  end
+  candidate, candidate_index = selected if selected
+  [candidate, candidate_index, rejections]
+end
+
+def prospective_assignment(lane_id:, candidate:, candidate_index:, requested:, history_resolution:)
+  token = "dispatch-#{stable_digest([lane_id, candidate['route'], candidate['dispatcher'], candidate['instance_id'], candidate['attestation']])[0, 16]}"
+  selection_provenance = if requested_tuple?(candidate, requested)
+                           "requested-tuple"
+                         elsif history_resolution&.dig("action") == "dispatch-decision"
+                           "dispatch-decision-fallback"
+                         else
+                           "top-level-authorized-fallback"
+                         end
+  {
+    "lane_id" => lane_id,
+    "route" => candidate["route"],
+    "dispatcher" => candidate["dispatcher"],
+    "instance_id" => candidate["instance_id"],
+    "launch_token" => token,
+    "lifecycle" => "launch-pending",
+    "requested" => requested,
+    "selection_provenance" => selection_provenance,
+    # Discovery metadata only: a replay identity is the lane/route/dispatcher/instance/token tuple.
+    "candidate_index" => candidate_index
+  }
+end
+
+def assignment_identity_matches?(persisted, canonical)
+  persisted.is_a?(Hash) && %w[lane_id route dispatcher instance_id launch_token].all? do |field|
+    persisted[field] == canonical[field]
+  end
+end
+
+def assignment_identity?(assignment)
+  assignment.is_a?(Hash) && route_shape?(assignment["route"]) &&
+    %w[lane_id dispatcher instance_id launch_token].all? do |field|
+      nonempty_string?(assignment[field]) && !unknown_sentinel?(assignment[field])
+    end &&
+    !unknown_sentinel?(assignment.dig("route", "model")) &&
+    !unknown_sentinel?(assignment.dig("route", "effort"))
+end
+
+def persisted_assignment?(assignment)
+  assignment_identity?(assignment) && assignment_provenance_valid?(assignment) &&
+    %w[launch-pending confirmed-active].include?(assignment["lifecycle"])
+end
+
+def canonical_assignment(assignment)
+  assignment.slice(
+    "lane_id", "route", "dispatcher", "instance_id", "launch_token", "lifecycle", "candidate_index",
+    "requested", "selection_provenance"
+  )
+end
+
+def assignment_provenance_valid?(assignment)
+  has_requested = assignment.key?("requested")
+  has_provenance = assignment.key?("selection_provenance")
+  return true unless has_requested || has_provenance
+  return false unless has_requested && has_provenance && requested_shape?(assignment["requested"])
+  return false unless %w[requested-tuple top-level-authorized-fallback dispatch-decision-fallback].include?(assignment["selection_provenance"])
+
+  matches_requested = route_equal?(assignment["route"], assignment.dig("requested", "route")) &&
+                      assignment["dispatcher"] == assignment.dig("requested", "dispatcher")
+  (assignment["selection_provenance"] == "requested-tuple") == matches_requested
+end
+
+def authority_shape?(authority)
+  authority.is_a?(Hash) && authority.all? do |key, value|
+    %w[dispatch route].include?(key) && [true, false].include?(value)
+  end
+end
+
+def requested_shape?(requested)
+  requested.is_a?(Hash) && route_shape?(requested["route"]) && nonempty_string?(requested["dispatcher"]) &&
+    (!requested.key?("hard_route") || [true, false].include?(requested["hard_route"]))
+end
+
+def confirmation_shape?(confirmation)
+  confirmation.is_a?(Hash) &&
+    confirmation["type"] == "launch-confirmation" &&
+    confirmation["version"] == 1 &&
+    nonempty_string?(confirmation["id"]) &&
+    assignment_identity?(confirmation["assignment"])
+end
+
+def replacement_proof_authorizes?(replacement, active_assignment, replacement_assignment)
+  replacement.is_a?(Hash) &&
+    replacement["type"] == "replacement-proof" &&
+    replacement["version"] == 1 &&
+    nonempty_string?(replacement["id"]) &&
+    replacement["consumed"] != true &&
+    replacement["stop_attestation"] == "stopped" &&
+    replacement["reconciliation_attestation"] == "reconciled" &&
+    assignment_identity?(replacement["prior_assignment"]) &&
+    assignment_identity_matches?(replacement["prior_assignment"], active_assignment) &&
+    assignment_identity?(replacement["replacement_assignment"]) &&
+    replacement["prior_assignment"]["lane_id"] == replacement_assignment["lane_id"] &&
+    replacement["replacement_assignment"]["lane_id"] == replacement_assignment["lane_id"] &&
+    assignment_identity_matches?(replacement["replacement_assignment"], replacement_assignment)
+end
+
+def replacement_proof_shape?(replacement)
+  replacement.is_a?(Hash) &&
+    replacement["type"] == "replacement-proof" &&
+    replacement["version"] == 1 &&
+    nonempty_string?(replacement["id"]) &&
+    [true, false].include?(replacement["consumed"]) &&
+    %w[stopped].include?(replacement["stop_attestation"]) &&
+    %w[reconciled].include?(replacement["reconciliation_attestation"]) &&
+    assignment_identity?(replacement["prior_assignment"]) &&
+    assignment_identity?(replacement["replacement_assignment"])
+end
+
+def persistence(record)
+  {
+    "required_before" => "before-goal-resume-or-worker-launch",
+    "record" => record
+  }
+end
+
+def replacement_consumption_persistence(replacement, assignment)
+  persistence("active_assignments-and-replacement-proof-consumption").merge(
+    "replacement_proof_consumption" => {
+      "proof_id" => replacement["id"],
+      "replacement_assignment" => assignment.slice("lane_id", "route", "dispatcher", "instance_id", "launch_token"),
+      "consumed" => true
+    }
+  )
+end
+
+def choice_id(lane_id, candidate)
+  "choice-#{stable_digest([lane_id, candidate.slice('route', 'dispatcher', 'binding', 'attestation', 'instance_id')])[0, 16]}"
+end
+
+def canonical_viable_fallback_choices(candidates, requested, lane_id)
+  candidates.filter_map do |candidate|
+    next unless candidate.is_a?(Hash) && candidate["fallback_authorized"] == true
+    next if requested["hard_route"] && !route_equal?(candidate["route"], requested["route"])
+    next if requested_tuple?(candidate, requested) || unusable_reason(candidate)
+
+    {
+      "choice_id" => choice_id(lane_id, candidate),
+      "route" => candidate["route"],
+      "dispatcher" => candidate["dispatcher"],
+      "binding" => candidate["binding"],
+      "attestation" => candidate["attestation"],
+      "instance_id" => candidate["instance_id"],
+      "required_authority" => {
+        "dispatch" => candidate["dispatcher"] != requested["dispatcher"],
+        "route" => !route_equal?(candidate["route"], requested["route"])
+      }
+    }
+  end
+end
+
+def blocked_output(input:, requested:, authority:, reason:, rejections:, viable_fallback_choices:)
+  output = {
+    "status" => "blocked-user-input",
+    "requested_route" => requested["route"],
+    "requested_dispatcher" => requested["dispatcher"],
+    "actual_route" => nil,
+    "actual_dispatcher" => nil,
+    "reason" => reason,
+    "authority" => authority,
+    "resume_goal" => false,
+    "lane_state" => input.fetch("lane_state", {}),
+    "active_assignments" => input.fetch("active_assignments", []),
+    "rejections" => rejections,
+    "persistence" => persistence("dispatch_decision_request")
+  }
+  output["dispatch_decision_request"] = {
+    "type" => "dispatch-decision-request",
+    "version" => 1,
+    "id" => "ddr-#{stable_digest([input['lane_id'], requested])[0, 16]}",
+    "revision" => 1,
+    "lane_id" => input["lane_id"],
+    "requested" => requested,
+    "authority" => authority,
+    "reason" => reason,
+    "viable_fallback_choices" => viable_fallback_choices,
+    "question" => "Which bound, attested requested tuple or explicitly authorized fallback should dispatch lane #{input['lane_id']}?"
+  }
+  output
+end
+
+def refresh_operator_decision?(decision, request, lane_id)
+  decision.is_a?(Hash) &&
+    decision["type"] == "dispatch-decision-refresh" &&
+    decision["version"] == 1 &&
+    nonempty_string?(decision["id"]) &&
+    decision["request_id"] == request["id"] &&
+    decision["lane_id"] == lane_id
+end
+
+def decision_resolution(request, decision)
+  {
+    "type" => "dispatch-decision-resolution",
+    "version" => 1,
+    "request_id" => request["id"],
+    "request_revision" => request["revision"],
+    "lane_id" => request["lane_id"],
+    "decision_id" => decision["id"],
+    "choice_id" => decision["choice_id"],
+    "action" => decision["type"],
+    "updated_authority" => decision["updated_authority"]
+  }.compact
+end
+
+def revised_decision_request(output, prior_request, decision)
+  request = output.fetch("dispatch_decision_request")
+  revision = prior_request.fetch("revision", 1) + 1
+  request["id"] = "ddr-#{stable_digest([prior_request['id'], decision['id'], revision])[0, 16]}"
+  request["revision"] = revision
+  request["prior_request"] = prior_request
+  output["decision_resolution"] = decision_resolution(prior_request, decision)
+  output
+end
+
+def with_decision_history(output, request, decision = nil, resolution: nil)
+  return output unless request
+
+  output["dispatch_decision_request"] = request
+  resolved_resolution = resolution || (decision_resolution(request, decision) if decision)
+  output["decision_resolution"] = resolved_resolution if resolved_resolution
+  output
+end
+
+def replacement_fencing_output(input:, requested:, authority:, candidate:, rejections:, prospective_assignment: nil)
+  output = {
+    "status" => "blocked-replacement-fencing",
+    "requested_route" => requested["route"],
+    "requested_dispatcher" => requested["dispatcher"],
+    "actual_route" => candidate["route"],
+    "actual_dispatcher" => candidate["dispatcher"],
+    "reason" => "prior-instance-stop-and-reconciliation-required",
+    "required_action" => "stop-and-reconcile-prior-instance",
+    "authority" => authority,
+    "resume_goal" => false,
+    "lane_state" => input.fetch("lane_state", {}),
+    "active_assignments" => input.fetch("active_assignments", []),
+    "rejections" => rejections,
+    "persistence" => persistence("replacement_fence")
+  }
+  output["prospective_replacement_assignment"] = canonical_assignment(prospective_assignment) if prospective_assignment
+  output
+end
+
+def decision_choice_valid?(choice, lane_id, requested)
+  choice.is_a?(Hash) && route_shape?(choice["route"]) &&
+    %w[dispatcher binding attestation instance_id choice_id].all? { |field| nonempty_string?(choice[field]) } &&
+    choice["choice_id"] == choice_id(lane_id, choice) &&
+    choice["required_authority"].is_a?(Hash) &&
+    [true, false].include?(choice.dig("required_authority", "dispatch")) &&
+    [true, false].include?(choice.dig("required_authority", "route")) &&
+    choice.dig("required_authority", "dispatch") == (choice["dispatcher"] != requested["dispatcher"]) &&
+    choice.dig("required_authority", "route") == !route_equal?(choice["route"], requested["route"]) &&
+    unusable_reason(choice).nil?
+end
+
+def approved_operator_decision?(decision, request, choice, lane_id)
+  decision.is_a?(Hash) &&
+    decision["type"] == "dispatch-decision" &&
+    decision["version"] == 1 &&
+    nonempty_string?(decision["id"]) &&
+    decision["request_id"] == request["id"] &&
+    decision["lane_id"] == lane_id &&
+    decision["choice_id"] == choice["choice_id"] &&
+    authority_shape?(decision["updated_authority"]) &&
+    choice.fetch("required_authority").all? { |key, required| !required || decision.dig("updated_authority", key) == true }
+end
+
+def persisted_request_shape?(request, lane_id)
+  current = request
+  expected_revision = nil
+  seen_ids = {}
+
+  while current
+    return false unless current.is_a?(Hash) &&
+                        current["type"] == "dispatch-decision-request" &&
+                        current["version"] == 1 &&
+                        nonempty_string?(current["id"]) &&
+                        current["revision"].is_a?(Integer) && current["revision"].positive? &&
+                        current["lane_id"] == lane_id &&
+                        requested_shape?(current["requested"]) &&
+                        authority_shape?(current["authority"]) &&
+                        nonempty_string?(current["reason"]) &&
+                        nonempty_string?(current["question"]) &&
+                        current["viable_fallback_choices"].is_a?(Array)
+    return false if seen_ids[current["id"]]
+    return false if expected_revision && current["revision"] != expected_revision
+    return false unless current["viable_fallback_choices"].all? do |choice|
+      decision_choice_valid?(choice, lane_id, current["requested"])
+    end
+
+    seen_ids[current["id"]] = true
+    prior = current["prior_request"]
+    return current["revision"] == 1 if prior.nil?
+    return false unless prior.is_a?(Hash)
+
+    expected_revision = current["revision"] - 1
+    current = prior
+  end
+end
+
+def persisted_resolution_valid?(resolution, request, lane_id)
+  return false unless resolution.is_a?(Hash) &&
+                      resolution["type"] == "dispatch-decision-resolution" &&
+                      resolution["version"] == 1 &&
+                      resolution["lane_id"] == lane_id &&
+                      nonempty_string?(resolution["request_id"]) &&
+                      resolution["request_revision"].is_a?(Integer) &&
+                      nonempty_string?(resolution["decision_id"]) &&
+                      %w[dispatch-decision dispatch-decision-refresh].include?(resolution["action"])
+
+  resolved_request = request
+  resolved_request = resolved_request["prior_request"] while resolved_request && resolved_request["id"] != resolution["request_id"]
+  return false unless resolved_request && resolved_request["revision"] == resolution["request_revision"]
+
+  if resolution["action"] == "dispatch-decision"
+    return false unless resolution["request_id"] == request["id"] &&
+                        resolution["request_revision"] == request["revision"]
+    return false unless nonempty_string?(resolution["choice_id"]) && authority_shape?(resolution["updated_authority"])
+
+    choice = resolved_request["viable_fallback_choices"].find { |entry| entry["choice_id"] == resolution["choice_id"] }
+    return false unless choice && decision_choice_valid?(choice, lane_id, resolved_request["requested"])
+
+    choice.fetch("required_authority").all? { |key, required| !required || resolution.dig("updated_authority", key) == true }
+  else
+    resolution["choice_id"].nil? && resolution["updated_authority"].nil?
+  end
+end
+
+def pending_replay_output(input:, requested:, authority:, assignment:, request: nil, resolution: nil)
+  output = {
+    "status" => "launch-pending",
+    "requested_route" => requested["route"],
+    "requested_dispatcher" => requested["dispatcher"],
+    "actual_route" => assignment["route"],
+    "actual_dispatcher" => assignment["dispatcher"],
+    "reason" => "matching-persisted-launch-pending",
+    "authority" => authority,
+    "resume_goal" => true,
+    "lane_state" => input.fetch("lane_state", {}),
+    "active_assignments" => [canonical_assignment(assignment)],
+    "rejections" => [],
+    "persistence" => persistence("active_assignments"),
+    "dispatch" => canonical_assignment(assignment)
+  }
+  output["dispatch_decision_request"] = request if request
+  output["decision_resolution"] = resolution if resolution
+  output
+end
+
+def active_replay_output(input:, requested:, authority:, assignment:, confirmation: nil, request: nil, resolution: nil)
+  output = {
+    "status" => "replay-already-active",
+    "requested_route" => requested["route"],
+    "requested_dispatcher" => requested["dispatcher"],
+    "actual_route" => assignment["route"],
+    "actual_dispatcher" => assignment["dispatcher"],
+    "reason" => "matching-persisted-confirmed-active-assignment",
+    "authority" => authority,
+    "resume_goal" => false,
+    "lane_state" => input.fetch("lane_state", {}),
+    "active_assignments" => [canonical_assignment(assignment)],
+    "rejections" => [],
+    "persistence" => persistence("active_assignments")
+  }
+  output["launch_confirmation"] = confirmation if confirmation
+  output["dispatch_decision_request"] = request if request
+  output["decision_resolution"] = resolution if resolution
+  output
+end
+
+begin
+  input = JSON.parse($stdin.read)
+rescue JSON::ParserError
+  fail_input("malformed-json")
+end
+fail_input("JSON object is required") unless input.is_a?(Hash)
+fail_input("lane_id is required") unless input["lane_id"].is_a?(String) && !input["lane_id"].empty?
+
+requested = input["requested"]
+fail_input("requested route and dispatcher are required") unless requested_shape?(requested)
+if [requested.dig("route", "model"), requested.dig("route", "effort"), requested["dispatcher"]].any? { |value| unknown_sentinel?(value) }
+  fail_input("requested model, effort, and dispatcher cannot be UNKNOWN")
+end
+hard_route_invalid = requested.key?("hard_route") && ![true, false].include?(requested["hard_route"])
+fail_input("requested hard_route must be boolean") if hard_route_invalid
+
+fail_input("authority must contain only boolean dispatch/route fields") if
+  input.key?("authority") && !authority_shape?(input["authority"])
+fail_input("candidates must be an array") if input.key?("candidates") && !input["candidates"].is_a?(Array)
+fail_input("lane_state must be an object") if input.key?("lane_state") && !input["lane_state"].is_a?(Hash)
+active_assignments_invalid = input.key?("active_assignments") &&
+                             (!input["active_assignments"].is_a?(Array) || input["active_assignments"].length > 1 ||
+                              !input["active_assignments"].all? { |entry| persisted_assignment?(entry) })
+fail_input("active_assignments must contain at most one well-formed persisted assignment") if active_assignments_invalid
+if input.fetch("active_assignments", []).any? { |entry| entry["lane_id"] != input["lane_id"] }
+  fail_input("active_assignments lane_id must match input lane_id")
+end
+fail_input("replacement must be a well-formed replacement proof") if input.key?("replacement") && !replacement_proof_shape?(input["replacement"])
+fail_input("launch_confirmation must be a well-formed identity-bound confirmation") if input.key?("launch_confirmation") && !confirmation_shape?(input["launch_confirmation"])
+if input.key?("launch_confirmation")
+  confirmed_assignment = input.fetch("active_assignments", []).find do |entry|
+    entry["lane_id"] == input["lane_id"] && assignment_identity_matches?(input.dig("launch_confirmation", "assignment"), entry)
+  end
+  fail_input("launch_confirmation requires a matching active assignment identity") unless confirmed_assignment
+end
+fail_input("decision_resolution requires a persisted dispatch_decision_request") if input.key?("decision_resolution") && !input.key?("dispatch_decision_request")
+
+authority = input.fetch("authority", {})
+persisted_decision_history = nil
+resolved_operator_decision = nil
+refreshing_persisted_decision = false
+candidate_inputs = input.fetch("candidates", [])
+persisted_resolution = input["decision_resolution"]
+
+if input.key?("dispatch_decision_request") &&
+   !persisted_request_shape?(input["dispatch_decision_request"], input["lane_id"])
+  fail_input("dispatch_decision_request must be a well-formed persisted request history for this lane")
+end
+if input.key?("dispatch_decision_request") &&
+   !requested_policy_equal?(input["requested"], input.dig("dispatch_decision_request", "requested"))
+  fail_input("dispatch_decision_request requested tuple must match current requested tuple; refresh persisted decision state")
+end
+
+if (persisted_decision = input["dispatch_decision_request"])
+  persisted_requested = persisted_decision["requested"]
+  persisted_authority = persisted_decision.fetch("authority", {})
+  fail_input("decision_resolution must be a well-formed persisted resolution for this request") if
+    input.key?("decision_resolution") &&
+    !persisted_resolution_valid?(persisted_resolution, persisted_decision, input["lane_id"])
+
+  persisted_choices = persisted_decision.fetch("viable_fallback_choices", [])
+  valid_choices = persisted_choices.select { |choice| decision_choice_valid?(choice, input["lane_id"], persisted_requested) }
+  selected_choice = if persisted_resolution&.fetch("action") == "dispatch-decision"
+                      valid_choices.find { |choice| choice["choice_id"] == persisted_resolution["choice_id"] }
+                    else
+                      valid_choices.find do |choice|
+                        approved_operator_decision?(input["operator_decision"], persisted_decision, choice, input["lane_id"])
+                      end
+                    end
+
+  if selected_choice
+    requested = persisted_requested
+    authority = if persisted_resolution&.dig("action") == "dispatch-decision"
+                  persisted_resolution.fetch("updated_authority")
+                else
+                  input.fetch("operator_decision").fetch("updated_authority")
+                end
+    candidate_inputs = [selected_choice.merge("fallback_authorized" => true)]
+    persisted_decision_history = persisted_decision
+    resolved_operator_decision = input["operator_decision"]
+  elsif refresh_operator_decision?(input["operator_decision"], persisted_decision, input["lane_id"])
+    requested = persisted_requested
+    authority = persisted_authority
+    persisted_decision_history = persisted_decision
+    resolved_operator_decision = input.fetch("operator_decision")
+    refreshing_persisted_decision = true
+  else
+    output = blocked_output(
+      input:,
+      requested: persisted_requested,
+      authority: persisted_authority,
+      reason: persisted_decision.fetch("reason", "no-authorized-bound-attested-candidate"),
+      rejections: [],
+      viable_fallback_choices: persisted_choices
+    )
+    output["dispatch_decision_request"] = persisted_decision
+    output["decision_resolution"] = persisted_resolution if persisted_resolution
+    puts JSON.generate(output)
+    exit
+  end
+end
+
+existing_assignments = input.fetch("active_assignments", [])
+persisted_assignment = existing_assignments.first
+history_resolution = persisted_resolution ||
+                     (decision_resolution(persisted_decision_history, resolved_operator_decision) if persisted_decision_history && resolved_operator_decision)
+if persisted_assignment && persisted_assignment["lane_id"] == input["lane_id"] && !input.key?("replacement")
+  confirmation = input["launch_confirmation"]
+  if confirmation && !assignment_identity_matches?(confirmation["assignment"], persisted_assignment)
+    fail_input("launch_confirmation must match the persisted assignment identity")
+  end
+  same_requested_identity = route_equal?(requested["route"], persisted_assignment["route"]) &&
+                            requested["dispatcher"] == persisted_assignment["dispatcher"]
+  current_candidate_matches = candidate_inputs.any? do |entry|
+    entry.is_a?(Hash) && unusable_reason(entry).nil? &&
+      route_equal?(entry["route"], persisted_assignment["route"]) &&
+      entry["dispatcher"] == persisted_assignment["dispatcher"] &&
+      entry["instance_id"] == persisted_assignment["instance_id"]
+  end
+  current_fallback_candidate_matches = candidate_inputs.any? do |entry|
+    entry.is_a?(Hash) && unusable_reason(entry).nil? && fallback_authorized?(entry, requested, authority) &&
+      route_equal?(entry["route"], persisted_assignment["route"]) &&
+      entry["dispatcher"] == persisted_assignment["dispatcher"] &&
+      entry["instance_id"] == persisted_assignment["instance_id"]
+  end
+  assignment_requested_unchanged = !persisted_assignment.key?("requested") ||
+                                   requested_policy_equal?(persisted_assignment["requested"], input["requested"])
+  requested_identity_replayable = same_requested_identity && assignment_requested_unchanged &&
+                                  (candidate_inputs.empty? || current_candidate_matches)
+  persisted_request_unchanged = persisted_decision_history &&
+                                requested_policy_equal?(input["requested"], persisted_decision_history["requested"])
+  resolved_identity_replayable = history_resolution&.dig("action") == "dispatch-decision" &&
+                                 persisted_request_unchanged && current_candidate_matches
+  provenance_identity_replayable = persisted_assignment["selection_provenance"] == "top-level-authorized-fallback" &&
+                                   requested_policy_equal?(persisted_assignment["requested"], input["requested"]) &&
+                                   fallback_authority_sufficient?(persisted_assignment, requested, authority) &&
+                                   (candidate_inputs.empty? || current_fallback_candidate_matches)
+  unless requested_identity_replayable || resolved_identity_replayable || provenance_identity_replayable
+    prospective_candidate, prospective_index, prospective_rejections = select_candidate(candidate_inputs, requested, authority)
+    prospective = if prospective_candidate
+                    prospective_assignment(
+                      lane_id: input["lane_id"], candidate: prospective_candidate,
+                      candidate_index: prospective_index, requested:, history_resolution:
+                    )
+                  end
+    puts JSON.generate(
+      replacement_fencing_output(
+        input:,
+        requested:,
+        authority:,
+        candidate: prospective_candidate || { "route" => requested["route"], "dispatcher" => requested["dispatcher"] },
+        rejections: prospective_rejections,
+        prospective_assignment: prospective
+      )
+    )
+    exit
+  end
+
+  output = if persisted_assignment["lifecycle"] == "confirmed-active" || confirmation
+             active_replay_output(
+               input:,
+               requested:,
+               authority:,
+               assignment: persisted_assignment.merge("lifecycle" => "confirmed-active"),
+               confirmation:,
+               request: persisted_decision_history,
+               resolution: history_resolution
+             )
+           else
+             pending_replay_output(
+               input:,
+               requested:,
+               authority:,
+               assignment: persisted_assignment,
+               request: persisted_decision_history,
+               resolution: history_resolution
+             )
+           end
+  puts JSON.generate(output)
+  exit
+end
+
+candidate, candidate_index, rejections = select_candidate(candidate_inputs, requested, authority)
+reason = nil
+
+unless candidate
+  if requested["hard_route"] && candidate_inputs.any? do |entry|
+       entry.is_a?(Hash) && entry["fallback_authorized"] == true &&
+       !route_equal?(entry["route"], requested["route"]) && unusable_reason(entry).nil?
+     end
+    reason = "hard-route-restriction"
+  end
+  reason ||= "no-authorized-bound-attested-candidate"
+  output = blocked_output(
+    input:,
+    requested:,
+    authority:,
+    reason:,
+    rejections:,
+    viable_fallback_choices: canonical_viable_fallback_choices(input.fetch("candidates", []), requested, input["lane_id"])
+  )
+  output = revised_decision_request(output, persisted_decision_history, resolved_operator_decision) if refreshing_persisted_decision
+  puts JSON.generate(output)
+  exit
+end
+
+assignment = prospective_assignment(
+  lane_id: input["lane_id"], candidate:, candidate_index:, requested:, history_resolution:
+)
+matching_assignment = existing_assignments.find { |entry| assignment_identity_matches?(entry, assignment) }
+replacement = input["replacement"].is_a?(Hash) ? input["replacement"] : {}
+if !existing_assignments.empty? && !matching_assignment &&
+   !replacement_proof_authorizes?(replacement, existing_assignments.first, assignment)
+  puts JSON.generate(
+    replacement_fencing_output(input:, requested:, authority:, candidate:, rejections:, prospective_assignment: assignment)
+  )
+  exit
+end
+
+if matching_assignment
+  if matching_assignment.key?("requested") &&
+     !requested_policy_equal?(matching_assignment["requested"], input["requested"])
+    puts JSON.generate(
+      replacement_fencing_output(input:, requested:, authority:, candidate:, rejections:, prospective_assignment: assignment)
+    )
+    exit
+  end
+  confirmation = input["launch_confirmation"]
+  if confirmation && !assignment_identity_matches?(confirmation["assignment"], matching_assignment)
+    fail_input("launch_confirmation must match the persisted assignment identity")
+  end
+  output = if confirmation
+             active_replay_output(
+               input:,
+               requested:,
+               authority:,
+               assignment: matching_assignment.merge("lifecycle" => "confirmed-active"),
+               confirmation:
+             )
+           elsif matching_assignment["lifecycle"] == "confirmed-active"
+             active_replay_output(input:, requested:, authority:, assignment: matching_assignment)
+           else
+             pending_replay_output(input:, requested:, authority:, assignment: matching_assignment)
+           end
+  puts JSON.generate(with_decision_history(output, persisted_decision_history, resolved_operator_decision, resolution: history_resolution))
+  exit
+end
+
+output = {
+  "status" => "selected",
+  "requested_route" => requested["route"],
+  "requested_dispatcher" => requested["dispatcher"],
+  "actual_route" => candidate["route"],
+  "actual_dispatcher" => candidate["dispatcher"],
+  "reason" => selection_reason(candidate, requested),
+  "authority" => authority,
+  "resume_goal" => true,
+  "lane_state" => input.fetch("lane_state", {}),
+  "active_assignments" => [assignment],
+  "rejections" => rejections,
+  "persistence" => persistence("active_assignments"),
+  "dispatch" => assignment
+}
+if !existing_assignments.empty? && !matching_assignment
+  output["persistence"] = replacement_consumption_persistence(replacement, assignment)
+  output["replacement_transition"] = {
+    "type" => "replacement-transition",
+    "version" => 1,
+    "proof_id" => replacement["id"],
+    "prior_assignment" => existing_assignments.first.slice("lane_id", "route", "dispatcher", "instance_id", "launch_token"),
+    "replacement_assignment" => assignment,
+    "consumed" => true
+  }
+end
+if persisted_decision_history
+  output = with_decision_history(output, persisted_decision_history, resolved_operator_decision, resolution: history_resolution)
+end
+puts JSON.generate(output)

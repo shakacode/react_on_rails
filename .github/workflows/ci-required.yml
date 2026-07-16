@@ -57,6 +57,23 @@ jobs:
           fetch-depth: 50
           persist-credentials: false
 
+      - name: Check out pinned agent workflows
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: shakacode/agent-workflows
+          ref: 4bb0c1e4944276e271799fd179e0c166b54ef4dc
+          path: .agent-workflows-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate pinned agent workflow copies
+        run: |
+          ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root .agent-workflows-source
+          .agent-workflows-source/bin/check-agent-workflow-drift \
+            --manifest .agents/agent-workflow-drift.yml \
+            --source-root .agent-workflows-source \
+            --consumer-root .
+
       - name: Validate workflow YAML
         run: |
           ruby -e "require 'yaml'; Dir['.github/workflows/*.{yml,yaml}'].sort.each { |f| YAML.safe_load_file(f, permitted_classes: [], aliases: false); puts f }"
@@ -82,6 +99,7 @@ jobs:
           node --test .github/workflows/ci-commands.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
+          ruby .agents/bin/agent_workflow_drift_manifest_test_test.rb
           ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb
 
       - name: Check mirrored blocks

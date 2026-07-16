@@ -37,6 +37,11 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - `.agents/.rubocop.yml`: lint seam for repo-local agent helper scripts. Keep it
   aligned with `shakacode/agent-workflows/.rubocop.yml`, with only local
   toolchain compatibility adjustments such as this repo's supported Ruby target.
+- `.agents/agent-workflow-drift.yml`: immutable source revision and reviewed
+  exact/overlay mapping for repo-pinned shared workflow files. Required CI checks
+  out that revision, runs the consumer-owned completeness test, then runs the
+  source pack's read-only drift checker. Update the manifest and hashes only as
+  part of a reviewed shared-workflow reconciliation.
 - If a tool or skill picker only exposes installed/global skills, treat those
   skills as launchers. Installed/global skills never override this repo's
   `AGENTS.md`; repo-local files win only when this repo explicitly names or
@@ -48,6 +53,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `bin/validate` expects the shared pack root. Pass
   `--shared <agent-workflows-root>` when checking user-installed skills outside
   this checkout.
+- `.agents/bin/agent-workflow-drift-manifest-test.rb`: the consumer-owned
+  completeness boundary for pinned shared files. It governs explicit files and
+  whole source-pack prefixes, including reviewed source-only exclusions, so a
+  new upstream helper cannot silently escape the drift manifest.
 - `internal/contributor-info/agent-workflow-adoption.md`: guide for sharing
   these agent workflows with other repositories through user-installed skills
   plus a repo-local seam

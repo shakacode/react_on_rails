@@ -10,6 +10,7 @@ require "minitest/autorun"
 require "open3"
 require "shellwords"
 require "tmpdir"
+require "yaml"
 
 require_relative "../lib/git_probe_env"
 
@@ -570,6 +571,44 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
+  def test_repo_option_mismatch_fails_closed
+    with_fake_gh("repo-view-mismatch") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer-mismatch")
+      FileUtils.mkdir_p(consumer_root)
+
+      out, status = run_script(
+        env.merge("GH_HOST" => "github.company.example"),
+        "--repo",
+        "owner/repo",
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_includes out, 'gh repo view resolved "other/repo", expected "owner/repo"'
+      refute_includes out, "SECURITY_PREFLIGHT_OK"
+    end
+  end
+
+  def test_repo_option_resolution_failure_with_explicit_host_fails_closed
+    with_fake_gh("repo-view-failure") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer-explicit-host-failure")
+      FileUtils.mkdir_p(consumer_root)
+
+      out, status = run_script(
+        env.merge("GH_HOST" => "github.company.example"),
+        "--repo",
+        "owner/repo",
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_includes out, 'Refusing to continue: could not verify "owner/repo" on explicit GH_HOST "github.company.example"'
+      refute_includes out, "SECURITY_PREFLIGHT_OK"
+    end
+  end
+
   def test_repo_option_host_resolution_failure_infers_enterprise_host_from_local_git
     with_fake_gh("repo-view-failure") do |env, _trust_config_path, _log_path, dir|
       consumer_root = File.join(dir, "consumer-ghes-fallback")
@@ -592,28 +631,6 @@ class PrSecurityPreflightTest < Minitest::Test
       assert_includes out, "WARN: could not resolve GitHub host via gh repo view for \"owner/repo\""
       assert_includes out, "SECURITY_PREFLIGHT_OK"
       refute_includes out, "WARN: global trust config ignores unqualified team slug"
-    end
-  end
-
-  def test_current_repo_resolution_failure_exits_with_actionable_error
-    with_fake_gh("repo-view-failure") do |env, trust_config_path, _log_path, dir|
-      consumer_root = File.join(dir, "consumer-current-repo-fallback")
-      FileUtils.mkdir_p(consumer_root)
-      init_git_root(consumer_root)
-
-      out, status = run_script(
-        env,
-        "--trust-config",
-        trust_config_path,
-        "123",
-        chdir: consumer_root
-      )
-
-      refute status.success?, out
-      assert_includes out, "Could not resolve current repository via gh repo view:"
-      assert_includes out, "gh repo view --json nameWithOwner,url failed:"
-      assert_includes out, "simulated repo view failure"
-      refute_match(/pr-security-preflight:\d+:in /, out)
     end
   end
 
@@ -899,11 +916,18 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_git_probe_env_preserves_protected_config_sources_for_safe_directory
+  def test_git_probe_env_clears_explicit_overrides_while_preserving_safe_directory
     env = PrBatchGitProbeEnv.probe_env(
+      "GIT_ATTR_NOSYSTEM" => "1",
+      "GIT_ATTR_SOURCE" => "injected-attributes",
+      "GIT_CEILING_DIRECTORIES" => "/tmp",
       "GIT_CONFIG_GLOBAL" => "/tmp/global-gitconfig",
       "GIT_CONFIG_SYSTEM" => "/tmp/system-gitconfig",
       "GIT_CONFIG_NOSYSTEM" => "1",
+      "GIT_LITERAL_PATHSPECS" => "1",
+      "GIT_GLOB_PATHSPECS" => "1",
+      "GIT_NOGLOB_PATHSPECS" => "1",
+      "GIT_ICASE_PATHSPECS" => "1",
       "GIT_CONFIG_COUNT" => "4",
       "GIT_CONFIG_KEY_0" => "safe.directory",
       "GIT_CONFIG_VALUE_0" => "*",
@@ -915,9 +939,21 @@ class PrSecurityPreflightTest < Minitest::Test
       "GIT_CONFIG_VALUE_3" => "https://github.com/owner/repo.git"
     )
 
-    refute env.key?("GIT_CONFIG_GLOBAL")
-    refute env.key?("GIT_CONFIG_SYSTEM")
-    refute env.key?("GIT_CONFIG_NOSYSTEM")
+    %w[
+      GIT_ATTR_NOSYSTEM
+      GIT_ATTR_SOURCE
+      GIT_CEILING_DIRECTORIES
+      GIT_CONFIG_GLOBAL
+      GIT_CONFIG_SYSTEM
+      GIT_CONFIG_NOSYSTEM
+      GIT_LITERAL_PATHSPECS
+      GIT_GLOB_PATHSPECS
+      GIT_NOGLOB_PATHSPECS
+      GIT_ICASE_PATHSPECS
+    ].each do |name|
+      assert env.key?(name), "expected #{name} to be explicitly overridden"
+      assert_nil env[name]
+    end
     assert_equal "3", env["GIT_CONFIG_COUNT"]
     assert_equal "safe.directory", env["GIT_CONFIG_KEY_0"]
     assert_equal "*", env["GIT_CONFIG_VALUE_0"]
@@ -927,6 +963,16 @@ class PrSecurityPreflightTest < Minitest::Test
     assert_equal "/worktree", env["GIT_CONFIG_VALUE_2"]
     assert_nil env["GIT_CONFIG_KEY_3"]
     assert_nil env["GIT_CONFIG_VALUE_3"]
+  end
+
+  def test_git_probe_env_preserves_caller_network_restrictions
+    env = PrBatchGitProbeEnv.probe_env(
+      "GIT_ALLOW_PROTOCOL" => "https",
+      "GIT_NO_LAZY_FETCH" => "1"
+    )
+
+    refute env.key?("GIT_ALLOW_PROTOCOL")
+    refute env.key?("GIT_NO_LAZY_FETCH")
   end
 
   def test_git_probe_env_preserves_git_config_parameters_safe_directory_entries
@@ -1253,7 +1299,7 @@ class PrSecurityPreflightTest < Minitest::Test
     end
   end
 
-  def test_missing_user_configs_use_empty_packaged_default_and_fail_closed_in_strict_trust
+  def test_missing_user_configs_use_metadata_only_packaged_default_and_fail_closed_for_humans
     with_fake_gh("warning-issue") do |env, _trust_config_path, _log_path, dir|
       consumer_root = File.join(dir, "consumer")
       home = File.join(dir, "home")
@@ -1271,6 +1317,147 @@ class PrSecurityPreflightTest < Minitest::Test
       refute status.success?, out
       assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
       assert_includes out, "not in trusted actor allowlist"
+    end
+  end
+
+  def test_repo_local_fixture_trust_allows_maintainer_targets_in_strict_trust
+    with_fake_gh("repo-local-maintainer-targets") do |env, _trust_config_path, _log_path, dir|
+      trust_config_path = File.join(dir, "widgets-trusted-github-actors.yml")
+      write_trust_config(trust_config_path, users: ["maintainer-login"])
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "acme/widgets",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "701",
+        "702",
+        "703",
+        "704"
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      refute_includes out, "untrusted, hidden, or unidentifiable participant(s)"
+      refute_includes out, "untrusted comment/review author(s)"
+      assert_equal 4, out.scan("Untrusted or hidden participant findings: none").length
+      assert_equal 4, out.scan("Untrusted comment/review queue: none").length
+    end
+  end
+
+  def test_temp_fixture_allows_requested_exact_target_command_shape
+    with_fake_gh("repo-local-maintainer-targets") do |env, _trust_config_path, _log_path, dir|
+      trust_config_path = File.join(dir, "requested-widgets-trust.yml")
+      write_trust_config(trust_config_path, users: ["maintainer-login"])
+
+      out, status = run_script(
+        env,
+        "--repo",
+        "acme/widgets",
+        "--trust-config",
+        trust_config_path,
+        "--strict-trust",
+        "701",
+        "702",
+        "703",
+        "704"
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      refute_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_equal 4, out.scan("Untrusted or hidden participant findings: none").length
+      assert_equal 4, out.scan("Untrusted comment/review queue: none").length
+    end
+  end
+
+  def test_packaged_fallback_only_trusts_github_actions_as_metadata_and_blocks_maintainer_targets
+    with_fake_gh("repo-local-maintainer-targets") do |env, _trust_config_path, _log_path, dir|
+      packaged_config = YAML.safe_load_file(
+        File.expand_path("../trusted-github-actors.yml", __dir__),
+        aliases: false
+      )
+      assert_equal [], packaged_config.fetch("trusted_users")
+      assert_equal [], packaged_config.fetch("trusted_bots")
+      assert_equal ["github-actions"], packaged_config.fetch("trusted_metadata_bots")
+      assert_equal [], packaged_config.fetch("trusted_teams")
+
+      consumer_root = File.join(dir, "consumer")
+      home = File.join(dir, "home")
+      FileUtils.mkdir_p([consumer_root, home])
+
+      out, status = run_script(
+        env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => nil, "HOME" => home),
+        "--repo",
+        "acme/widgets",
+        "--strict-trust",
+        "701",
+        "702",
+        "703",
+        "704",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_equal 2, status.exitstatus
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "- #701: untrusted, hidden, or unidentifiable participant(s)"
+      assert_includes out, "- #701: untrusted comment/review author(s)"
+      assert_includes out, "maintainer-login issue comment"
+    end
+  end
+
+  def test_packaged_fallback_treats_github_actions_comments_as_metadata_only
+    with_fake_gh("metadata-bot-comment") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer")
+      home = File.join(dir, "home")
+      FileUtils.mkdir_p([consumer_root, home])
+
+      out, status = run_script(
+        env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => nil, "HOME" => home),
+        "--repo",
+        "owner/repo",
+        "--strict-trust",
+        "123",
+        chdir: consumer_root
+      )
+
+      refute status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_BLOCKED"
+      assert_includes out, "justin808: not in trusted actor allowlist"
+      assert_includes out, "Untrusted comment/review queue: none"
+      assert_includes out, "Metadata-only comment/review queue:"
+      assert_includes out, "github-actions[bot] issue comment"
+      assert_includes out, "Suspicious text findings: none"
+      assert_includes out, "Suspicious text warnings:"
+      assert_includes out, "issue comment 701 by github-actions[bot]"
+    end
+  end
+
+  def test_repo_local_config_inherits_packaged_metadata_only_bots
+    with_fake_gh("metadata-bot-comment") do |env, _trust_config_path, _log_path, dir|
+      consumer_root = File.join(dir, "consumer")
+      repo_config = File.join(consumer_root, ".agents", "trusted-github-actors.yml")
+      FileUtils.mkdir_p(consumer_root)
+      init_git_remote(consumer_root, "owner/repo")
+      write_trust_config(repo_config, users: ["justin808"], metadata_bots: [])
+
+      out, status = run_script(
+        env.merge("AGENT_WORKFLOWS_TRUST_CONFIG" => nil, "HOME" => File.join(dir, "home")),
+        "--repo",
+        "owner/repo",
+        "123",
+        chdir: consumer_root
+      )
+
+      assert status.success?, out
+      assert_includes out, "SECURITY_PREFLIGHT_OK"
+      assert_includes out, "Untrusted comment/review queue: none"
+      assert_includes out, "Metadata-only comment/review queue:"
+      assert_includes out, "github-actions[bot] issue comment"
     end
   end
 
@@ -2132,7 +2319,6 @@ class PrSecurityPreflightTest < Minitest::Test
   end
 
   def with_env(values)
-    previous = {}
     previous = values.to_h { |key, _value| [key, ENV.fetch(key, nil)] }
     values.each do |key, value|
       value.nil? ? ENV.delete(key) : ENV[key] = value
@@ -2340,6 +2526,17 @@ class PrSecurityPreflightTest < Minitest::Test
         esac
       }
 
+      repo_local_target_number() {
+        case "$1" in
+          701|702|703|704)
+            return 0
+            ;;
+          *)
+            return 1
+            ;;
+        esac
+      }
+
       if [ "$1" = "repo" ] && [ "$2" = "view" ]; then
         if [ "$mode" = "repo-view-failure" ]; then
           printf 'simulated repo view failure\\n' >&2
@@ -2349,9 +2546,23 @@ class PrSecurityPreflightTest < Minitest::Test
           printf 'fake gh saw inherited git env\\n' >&2
           exit 1
         fi
+        if [ "$mode" = "repo-view-mismatch" ]; then
+          printf '{"nameWithOwner":"other/repo","url":"https://github.company.example/other/repo"}\\n'
+          exit 0
+        fi
         repo_url="${PREFLIGHT_TEST_REPO_URL:-https://github.com/owner/repo}"
         printf '{"nameWithOwner":"owner/repo","url":"%s"}\\n' "$repo_url"
         exit 0
+      fi
+
+      if [ "$mode" = "repo-local-maintainer-targets" ] && [ "$1" = "api" ] && [[ "$2" == repos/acme/widgets/issues/* ]]; then
+        number="${2##*/}"
+        if repo_local_target_number "$number"; then
+          cat <<JSON
+      {"number":${number},"title":"Maintainer target ${number}","html_url":"https://github.com/acme/widgets/issues/${number}","body":"Maintainer-scoped batch target.","user":{"login":"maintainer-login"}}
+      JSON
+          exit 0
+        fi
       fi
 
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/issues/123" ]; then
@@ -2400,7 +2611,15 @@ class PrSecurityPreflightTest < Minitest::Test
       fi
 
       if [ "$1" = "api" ] && [ "$2" = "graphql" ]; then
-        if [[ "$*" == *"reviewThreads"* ]]; then
+        if [ "$mode" = "repo-local-maintainer-targets" ]; then
+          number="$(printf '%s\\n' "$*" | sed -n 's/.*number=\\([0-9][0-9]*\\).*/\\1/p')"
+          if repo_local_target_number "$number"; then
+            cat <<JSON
+      {"data":{"repository":{"issue":{"number":${number},"title":"Maintainer target ${number}","url":"https://github.com/acme/widgets/issues/${number}","author":{"login":"maintainer-login"},"participants":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"login":"maintainer-login","url":"https://github.com/maintainer-login","__typename":"User"}]},"timelineItems":{"totalCount":1,"pageInfo":{"hasNextPage":false},"nodes":[{"__typename":"IssueComment","author":{"login":"maintainer-login"}}]}}}}}
+      JSON
+            exit 0
+          fi
+        elif [[ "$*" == *"reviewThreads"* ]]; then
           if [ "$mode" = "resolved-trusted-bot-review-comment" ] || [ "$mode" = "resolved-metadata-bot-warning-review-comment" ]; then
             cat <<'JSON'
       {"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"isResolved":true,"resolvedBy":{"login":"justin808"},"comments":{"nodes":[{"databaseId":901}]}}]}}}}}
@@ -2550,6 +2769,17 @@ class PrSecurityPreflightTest < Minitest::Test
 
       # These fake responses model `gh api --paginate --slurp`, which wraps
       # raw GitHub REST pages in an outer array. An empty first page is `[[]]`.
+      if [ "$mode" = "repo-local-maintainer-targets" ] && [ "$1" = "api" ] && [[ "$2" == repos/acme/widgets/issues/*/comments?per_page=100 ]]; then
+        comments_path="${2%/comments?per_page=100}"
+        number="${comments_path##*/}"
+        if repo_local_target_number "$number"; then
+          cat <<JSON
+      [[{"id":${number}01,"html_url":"https://github.com/acme/widgets/issues/${number}#issuecomment-${number}01","user":{"login":"maintainer-login"},"body":"Maintainer follow-up for ${number}."}]]
+      JSON
+          exit 0
+        fi
+      fi
+
       if [ "$1" = "api" ] && [ "$2" = "repos/owner/repo/issues/123/comments?per_page=100" ]; then
         if [ "$mode" = "metadata-bot-comment" ]; then
           cat <<JSON
@@ -2593,6 +2823,11 @@ class PrSecurityPreflightTest < Minitest::Test
         else
           printf '[[]]'
         fi
+        exit 0
+      fi
+
+      if [ "$mode" = "repo-local-maintainer-targets" ] && [ "$1" = "api" ] && [ "$2" = "repos/acme/widgets/collaborators/maintainer-login/permission" ]; then
+        printf '{"permission":"admin"}'
         exit 0
       fi
 

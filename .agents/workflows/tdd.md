@@ -5,6 +5,14 @@ companion skill is at `skills/tdd/SKILL.md` in the source pack.
 
 <!-- Keep this workflow in sync with `skills/tdd/SKILL.md`. -->
 
+This React on Rails copy deliberately names the repo-owned `.agents/bin/test`
+and `.agents/bin/validate` seams; shared process changes remain pinned and
+reviewed through `.agents/agent-workflow-drift.yml`.
+
+For narrow loops, follow `AGENTS.md`: run targeted RSpec files with the owning
+bundle and targeted JavaScript tests through `pnpm`; reserve `.agents/bin/test`
+for the broader repository default.
+
 Use this workflow to move in small, verified behavior slices:
 
 ```text
@@ -18,7 +26,7 @@ RED -> GREEN -> REFACTOR -> repeat
    - For a feature or behavior change, start with the smallest user-visible or public-interface behavior.
    - Prefer tests through public interfaces and real code paths over tests coupled to private implementation details.
 2. RED: write one failing test.
-   - Run the new test with the repo's narrowest relevant test invocation. Start from `.agents/bin/test` for the repo default, then narrow it using the repo's test framework convention when possible.
+   - Run the new test with the repo's narrowest relevant test invocation. Start from `.agents/bin/test` when present, then narrow using the repo's test framework convention.
    - Confirm the test fails for the right reason: the missing behavior or reproduced bug.
    - If it fails because of a typo, missing import, bad fixture, or harness problem, fix the test setup before touching production code.
    - If it passes immediately, do not proceed to GREEN: the test describes existing behavior; tighten or replace it until you have watched the intended failure.
@@ -38,12 +46,12 @@ RED -> GREEN -> REFACTOR -> repeat
 - Never refactor while RED.
 - Never batch-write all tests before implementation; use vertical slices.
 - Never claim a bug is fixed without evidence: prefer a regression test that failed before the fix and passes after it.
-- Only when a direct automated regression test is not practical, document why, then use the closest useful local verification from `.agents/bin/test` or the relevant package test command to capture before and after behavior.
+- Only when a direct automated regression test is not practical, document why, then use the closest useful local verification through `.agents/bin/test` or the repo's documented manual surface to capture before and after behavior.
 - Before handoff or PR creation, run `.agents/bin/validate` in addition to the targeted tests used during the loop.
 
 ## Before Pushing
 
-- If the change affects a developer workflow, exercise that workflow with the repo's relevant local verification rather than relying only on unit tests.
+- If the change affects a developer workflow, exercise that workflow with `.agents/bin/test` or the repo's relevant local verification rather than relying only on unit tests.
 - If the change affects app-facing behavior, do minimal manual verification through the repo's relevant local app or manual-test surface when appropriate.
 - Try to run the same relevant local tests that CI would run for the changed area before pushing, then run `.agents/bin/validate`.
 
