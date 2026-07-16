@@ -799,6 +799,7 @@ describe ReactOnRailsHelper do
     it "does not leak state into a reused html_options hash across calls" do
       shared_opts = { class: "widget", tag: "span" }
       react_component("App", html_options: shared_opts)
+      react_component("App", html_options: shared_opts)
       expect(shared_opts).to eq({ class: "widget", tag: "span" })
     end
 
