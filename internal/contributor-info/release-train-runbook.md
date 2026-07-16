@@ -277,24 +277,33 @@ serialize the sequence:
    release tip under the repository's branch-rewrite policy. Repeat the
    presence and supersession checks, then rerun validation, QA, and review on
    the updated current head. Otherwise, create a branch from the fetched tip.
-4. On a new branch, cherry-pick that source PR's single-parent squash commit with
-   `git cherry-pick -x`. For a true multi-parent merge commit, use
-   `git cherry-pick -m 1 -x` and record the mainline-parent choice. Normalize
-   the release commit message to exactly one direct
-   `(cherry picked from commit <source-sha>)` footer. If the source commit
-   already has inherited `-x` provenance, record that deeper lineage in the PR
-   and remove its footer from the release commit message.
+4. On a new branch, resolve the complete source shape before cherry-picking:
+   - For a single-parent squash commit, use `git cherry-pick -x <source-sha>`.
+   - For a true multi-parent merge commit, use
+     `git cherry-pick -m 1 -x <source-sha>` and record the mainline-parent
+     choice.
+   - For a multi-commit rebase merge, identify the complete ordered set of
+     commits that landed from the PR on `main`, mapping the PR commits to landed
+     commits with merge metadata and stable patch IDs. Cherry-pick every landed
+     commit oldest-first with `git cherry-pick -x <source-sha>`. Stop if the
+     complete mapping cannot be proven.
+     Normalize every release commit message to exactly one direct
+     `(cherry picked from commit <source-sha>)` footer. If a source commit already
+     has inherited `-x` provenance, record that deeper lineage in the PR and
+     remove its footer from the release commit message.
 5. Preserve release-only divergence while resolving conflicts; record the
    source SHA and every non-mechanical resolution in the PR.
 6. Run the release-phase validation, QA, and review gates on the current head.
-   Before a source-atomic squash merge, copy its exact single direct
-   `(cherry picked from commit <source-sha>)` footer into the final squash commit
-   body. For an approved inseparable aggregate, retain one normalized commit per
-   source and use a merge method that preserves those commits; never squash the
-   aggregate into a multi-footer commit. If repository settings cannot preserve
-   those commits, split the aggregate into source-atomic PRs. After any merge
-   method, verify each landed release commit has exactly one direct source
-   footer; do not proceed to the next backport if provenance was lost.
+   A backport with exactly one source commit may be squash-merged after copying
+   its exact direct `(cherry picked from commit <source-sha>)` footer into the
+   final squash commit body. For a multi-commit rebase-merged source PR or an
+   approved inseparable aggregate, retain one normalized commit per source
+   commit and use rebase merge so those commits survive; never squash them into
+   a multi-footer commit. If repository settings cannot preserve those commits,
+   split an aggregate into source-atomic PRs or stop a multi-commit source
+   backport for a maintainer-approved merge plan. After any merge method, verify
+   each landed release commit has exactly one direct source footer; do not
+   proceed to the next backport if provenance was lost.
 7. Fetch the new release tip before updating or branching the next selected
    source PR.
 8. After every backport retained in the final release set lands, reconcile the
