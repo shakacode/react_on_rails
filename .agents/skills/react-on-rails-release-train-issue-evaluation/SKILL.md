@@ -30,7 +30,10 @@ source PR per release backport PR:
   not provide this serialization. Chain later batch lanes with `depends_on`, and
   do not launch them until the preceding merge is terminal. A merge queue that
   reruns the gates on the combined merge-group head is the only alternative to
-  holding the lease through merge; stop if neither guard is available or its
+  holding the lease through merge. Refresh the dedicated heartbeat at the
+  runbook cadence during long gates, and immediately before merge require the
+  canonical claim to be active, unexpired, and owned by the expected coordinator
+  with a live matching heartbeat. Stop if either guard is unavailable or its
   state is `UNKNOWN`. Merge one backport, fetch the new release tip, then update
   a reused PR onto that tip or branch the next. Rerun validation, QA, and review
   on the updated head before merging.

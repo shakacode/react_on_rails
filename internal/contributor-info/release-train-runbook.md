@@ -280,31 +280,78 @@ RELEASE_COORDINATOR_ID="${RELEASE_COORDINATOR_ID:?set a stable coordinator agent
 RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
 PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
 
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
-  --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
-"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
-  --agent-id "${RELEASE_COORDINATOR_ID}" \
-  --repo shakacode/react_on_rails \
-  --target "${RELEASE_LINE_TARGET}" \
-  --branch "release/${RELEASE_VERSION}"
-agent-coord heartbeat \
-  --agent-id "${RELEASE_COORDINATOR_ID}" \
-  --repo shakacode/react_on_rails \
-  --target "${RELEASE_LINE_TARGET}" \
-  --branch "release/${RELEASE_VERSION}" \
-  --phase backport-serialization \
-  --status in_progress
+heartbeat_release_line_lease() {
+  agent-coord heartbeat \
+    --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --repo shakacode/react_on_rails \
+    --target "${RELEASE_LINE_TARGET}" \
+    --branch "release/${RELEASE_VERSION}" \
+    --phase backport-serialization \
+    --status in_progress \
+    --ttl 900
+}
+
+require_live_release_line_lease() {
+  command -v jq >/dev/null || return 1
+  lease_json="$(
+    "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+      --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
+  )" || return 1
+  jq -e \
+    --arg holder "${RELEASE_COORDINATOR_ID}" \
+    --arg target "shakacode/react_on_rails#${RELEASE_LINE_TARGET}" \
+    '(.claims | length == 1) and
+     (.claims[0].status == "active") and
+     (.claims[0].agent_id == $holder) and
+     (.claims[0].expires_at != "UNKNOWN") and
+     ((.claims[0].expires_at | fromdateiso8601) > now) and
+     (.heartbeats | length == 1) and
+     (.heartbeats[0].agent_id == $holder) and
+     (.heartbeats[0].target == $target) and
+     (.heartbeats[0].liveness == "live")' \
+    >/dev/null <<<"${lease_json}"
+}
+
+acquire_release_line_lease() {
+  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+    --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json \
+    >/dev/null || return 1
+  "${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
+    --agent-id "${RELEASE_COORDINATOR_ID}" \
+    --repo shakacode/react_on_rails \
+    --target "${RELEASE_LINE_TARGET}" \
+    --branch "release/${RELEASE_VERSION}" \
+    --ttl 14400 || return 1
+  heartbeat_release_line_lease || return 1
+  require_live_release_line_lease
+}
+
+acquire_release_line_lease
+lease_status=$?
+if [ "${lease_status}" -ne 0 ]; then
+  echo "release-line lease unavailable or UNKNOWN; stop" >&2
+  return "${lease_status}" 2>/dev/null || exit "${lease_status}"
+fi
 ```
 
-Renew the lease with the same bounded `claim` command before its expiry and
-heartbeat it at every source-lane phase transition. In a batch, chain each later
-lane with `depends_on` and do not launch it until the preceding merge is
-terminal. Immediately before merge, re-read the canonical target and require
-the holder id to match `RELEASE_COORDINATOR_ID`. A merge queue that reruns the
-gates on the combined merge-group head is the only alternative to holding this
-lease through merge. If neither guard is available, or its state is `UNKNOWN`,
-stop rather than let two backports validate against and race to merge from the
-same release tip.
+The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
+the claim at least hourly with the bounded `claim` command from
+`acquire_release_line_lease`, and run `heartbeat_release_line_lease` at every
+source-lane phase transition **and at least every five minutes while validation,
+QA, review, CI, or another gate remains in one phase**. A transition-only
+heartbeat is insufficient. If either refresh fails, stop merge activity until
+`acquire_release_line_lease` succeeds and the live assertion passes again.
+
+In a batch, chain each later lane with `depends_on` and do not launch it until
+the preceding merge is terminal. Immediately before merge, rerun
+`require_live_release_line_lease` in the shell where the functions above are
+defined. It must prove that the canonical claim is active, unexpired, and owned
+by `RELEASE_COORDINATOR_ID`, and that its matching heartbeat is live and bound
+to the canonical target. Identity alone is insufficient because released and
+expired records retain their last holder. A merge queue that reruns the gates on
+the combined merge-group head is the only alternative to this assertion. If
+neither guard is available, or its state is `UNKNOWN`, stop rather than let two
+backports validate against and race to merge from the same release tip.
 
 Release the lease only after all selected backports are terminal and the final
 release tip has been fetched, or after cancellation/handoff is durably recorded:
@@ -634,7 +681,8 @@ audited manual path instead:
    changed, or `UNKNOWN` evidence stops closeout.
 5. Re-run the dry-run. It may list only the explicitly omitted `PICK` plus
    already-dispositioned `MANUAL` entries; reconcile every row to the recorded
-   evidence. Only then delete `origin/release/X.Y.Z` manually and clear the
+   evidence. Only then, with the repository's required destructive-operation
+   confirmation, delete `origin/release/X.Y.Z` manually and clear the
    release-line phase. The release tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
