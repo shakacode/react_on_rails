@@ -49,6 +49,39 @@ emit_warning() {
   fi
 }
 
+exclude_exact_source_line() {
+  local safe_line="$1"
+  local match
+  local source_line
+
+  while IFS= read -r match; do
+    source_line="${match#*:}"
+    source_line="${source_line#"${source_line%%[![:space:]]*}"}"
+    source_line="${source_line%"${source_line##*[![:space:]]}"}"
+    if [ "$source_line" != "$safe_line" ]; then
+      printf '%s\n' "$match"
+    fi
+  done
+}
+
+exclude_parser_only_replace_line() {
+  local match
+  local script_token_count
+  local source_line
+
+  while IFS= read -r match; do
+    source_line="${match#*:}"
+    if printf '%s\n' "$source_line" \
+      | grep -Eq -- "\.replace\(/\^<script\[\^>\]\*>/i, ''\);?[[:space:]]*$"; then
+      script_token_count="$(printf '%s\n' "$source_line" | grep -oiF -- '<script' | wc -l)"
+      if [ "$script_token_count" -eq 1 ]; then
+        continue
+      fi
+    fi
+    printf '%s\n' "$match"
+  done
+}
+
 # The Ruby streaming concern has one sanctioned inline observability script. Editing that file
 # should still surface the escaping contract because its safety relies on Rails escaping helpers,
 # not createScriptTag()/escapeScript().
@@ -73,16 +106,37 @@ EOF
   *) exit 0 ;;
 esac
 
-# Sanctioned emitters that are allowed (and regression-tested) to build inline script tags.
+# Scan script-tag text separately so parser-only and exact sanctioned shapes can be excluded without
+# ever suppressing a raw-HTML sink that happens to share the same line.
+SAFE_LAST_INDEX_LINE="const scriptStartIndex = htmlString.lastIndexOf('<script', revealCallIndex);"
+SAFE_DOUBLE_ESCAPE_PATTERN_LINE='const SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN = /<script(?=[\s>/])/gi;'
+SAFE_SCAN_OVERLAP_LINE="const SCRIPT_SCAN_OVERLAP_LENGTH = Math.max('<!--'.length, '-->'.length, '<script'.length, '</script'.length);"
+SAFE_CREATE_SCRIPT_TAG_LINE="return \`<script\${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}\${nonceAttribute(sanitizedNonce)}>\${escapeScript(script)}</script>\`;"
+SCRIPT_MATCHES="$(grep -niF -- '<script' "$FILE" 2>/dev/null \
+  | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' \
+  | exclude_parser_only_replace_line \
+  | exclude_exact_source_line "$SAFE_LAST_INDEX_LINE" \
+  | exclude_exact_source_line "$SAFE_DOUBLE_ESCAPE_PATTERN_LINE" \
+  | exclude_exact_source_line "$SAFE_SCAN_OVERLAP_LINE" || true)"
+
+# This exact emitter is sanctioned only at its definition site. Applying the exemption to another
+# file would trust a potentially shadowed escapeScript implementation.
 case "$FILE" in
-  */injectRSCPayload.ts | */browserPerformanceMarks.ts | */browserPerformanceMarks.tsx) exit 0 ;;
+  */injectRSCPayload.ts)
+    SCRIPT_MATCHES="$(printf '%s\n' "$SCRIPT_MATCHES" \
+      | exclude_exact_source_line "$SAFE_CREATE_SCRIPT_TAG_LINE" || true)"
+    ;;
 esac
 
-# Anti-patterns: a string/template literal that opens a <script> tag, or a raw-HTML sink.
-PATTERN='<script|dangerouslySetInnerHTML|\.innerHTML[[:space:]]*=|insertAdjacentHTML|document\.write\('
+# Raw-HTML sinks are never allowlisted. Keep this scan independent from script/parser filtering.
+SINK_PATTERN='dangerouslySetInnerHTML|\.innerHTML[[:space:]]*=|insertAdjacentHTML|document\.write\('
+SINK_MATCHES="$(grep -nE -- "$SINK_PATTERN" "$FILE" 2>/dev/null \
+  | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
 
-# Match, then drop comment lines (JSDoc `*`, `//`, `/*`) to keep the signal high.
-MATCHES="$(grep -nE -- "$PATTERN" "$FILE" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
+# A line may match both scans; merge in line order and remove exact duplicates.
+MATCHES="$(printf '%s\n%s\n' "$SCRIPT_MATCHES" "$SINK_MATCHES" \
+  | grep -vE '^$' \
+  | LC_ALL=C sort -t: -k1,1n -u || true)"
 
 if [ -n "$MATCHES" ]; then
   MATCH_LINES="$(printf '%s\n' "$MATCHES" | cut -d: -f1 | paste -sd, -)"

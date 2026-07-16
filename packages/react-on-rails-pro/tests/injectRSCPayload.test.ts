@@ -13,6 +13,10 @@
  * https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
+import { execFileSync } from 'child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { Readable, PassThrough } from 'stream';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
@@ -213,6 +217,110 @@ const setupTestWithStreams = (
 };
 
 const setupTest = (mockRSC: Readable) => setupTestWithStreams([{ stream: mockRSC }]);
+
+const repositoryRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+const rscGuardrailsHook = join(repositoryRoot, '.claude', 'hooks', 'rsc-guardrails-check.sh');
+
+const runRSCGuardrailsHook = (fileName: string, source: string): string => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'rsc-guardrails-hook-'));
+  const fixtureSourceDirectory = join(fixtureRoot, 'packages', 'react-on-rails-pro', 'src');
+  const fixturePath = join(fixtureSourceDirectory, fileName);
+
+  try {
+    mkdirSync(fixtureSourceDirectory, { recursive: true });
+    writeFileSync(fixturePath, source);
+
+    return execFileSync('/bin/bash', [rscGuardrailsHook, fixturePath], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      input: '',
+    });
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+};
+
+const guardrailWarningContext = (output: string): string => {
+  if (!output.trimStart().startsWith('{')) {
+    return output.trim();
+  }
+
+  const parsed = JSON.parse(output) as {
+    hookSpecificOutput: { additionalContext: string; hookEventName: string };
+  };
+
+  expect(parsed.hookSpecificOutput.hookEventName).toBe('PostToolUse');
+  return parsed.hookSpecificOutput.additionalContext;
+};
+
+describe('rsc-guardrails hook', () => {
+  it('accepts the documented plain-text warning fallback when jq is unavailable', () => {
+    expect(guardrailWarningContext('plain warning\n')).toBe('plain warning');
+  });
+
+  it('retains a raw sink match when the same line contains parser-only script text', () => {
+    const output = runRSCGuardrailsHook(
+      'collision.ts',
+      "element.innerHTML = html.replace(/^<script[^>]*>/i, '');\n",
+    );
+
+    expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+  });
+
+  it('retains a raw sink match when the same line contains a sanctioned helper fragment', () => {
+    const output = runRSCGuardrailsHook('collision.ts', 'element.innerHTML = escapeScript(script);\n');
+
+    expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+  });
+
+  it('does not warn for parser-only script text', () => {
+    const output = runRSCGuardrailsHook(
+      'parserOnly.ts',
+      "const body = html.replace(/^<script[^>]*>/i, '');\n",
+    );
+
+    expect(output).toBe('');
+  });
+
+  it('retains script emission before or after parser-only script text on the same line', () => {
+    const trailingEmissionOutput = runRSCGuardrailsHook(
+      'collision.ts',
+      "const output = html.replace(/^<script[^>]*>/i, '') + `<script>${userControlled}</script>`;\n",
+    );
+    const leadingEmissionOutput = runRSCGuardrailsHook(
+      'collision.ts',
+      "const output = `<script>${userControlled}</script>` + html.replace(/^<script[^>]*>/i, '');\n",
+    );
+
+    expect(guardrailWarningContext(trailingEmissionOutput)).toContain('Matched line(s): 1');
+    expect(guardrailWarningContext(leadingEmissionOutput)).toContain('Matched line(s): 1');
+  });
+
+  it('allows only the exact createScriptTag shape in injectRSCPayload', () => {
+    const sanctionedOutput = runRSCGuardrailsHook(
+      'injectRSCPayload.ts',
+      'return `<script${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;\n',
+    );
+    const newBuilderOutput = runRSCGuardrailsHook(
+      'injectRSCPayload.ts',
+      'return `<script${userControlled}${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;\n',
+    );
+    const shadowedHelperOutput = runRSCGuardrailsHook(
+      'otherEmitter.ts',
+      'return `<script${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;\n',
+    );
+
+    expect(sanctionedOutput).toBe('');
+    expect(guardrailWarningContext(newBuilderOutput)).toContain('Matched line(s): 1');
+    expect(guardrailWarningContext(shadowedHelperOutput)).toContain('Matched line(s): 1');
+  });
+
+  it('deduplicates a line matched by both script and raw-sink scans', () => {
+    const output = runRSCGuardrailsHook('collision.ts', "element.innerHTML = '<script>';\n");
+
+    expect(guardrailWarningContext(output)).toMatch(/Matched line\(s\): 1$/);
+  });
+});
 
 describe('injectRSCPayload', () => {
   it('should inject RSC payload as script tags', async () => {
