@@ -16,6 +16,8 @@
 export const REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE = 'REACT_ON_RAILS_PERFORMANCE_MARKS';
 export const RSC_STREAM_PERFORMANCE_MARK_PREFIX = 'react-on-rails:rsc';
 
+const MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES = 200;
+
 export type BrowserPerformanceMarkDetail = Record<string, unknown>;
 export type BrowserPerformanceMarkFallback = 'mark-detail-unavailable' | 'performance-mark-unavailable';
 
@@ -91,8 +93,12 @@ export function markBrowserPerformance(markName: string, detail: BrowserPerforma
     entry.fallback = 'performance-mark-unavailable';
   }
 
-  (markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] =
-    markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] || []).push(entry);
+  const queue = markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] || [];
+  markGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] = queue;
+  queue.push(entry);
+  if (queue.length > MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES) {
+    queue.splice(0, queue.length - MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES);
+  }
 }
 
 // Keep this inline script in sync with
@@ -116,6 +122,9 @@ export function createBrowserPerformanceMarkScript(
     `try{perf.mark(${markNameJson});entry.fallback="mark-detail-unavailable";}` +
     'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
     '}else{entry.fallback="performance-mark-unavailable";}' +
-    `(self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}=self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}||[]).push(entry);})()`
+    `var queue=self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}=` +
+    `self.${REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE}||[];queue.push(entry);` +
+    `if(queue.length>${MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES}){` +
+    `queue.splice(0,queue.length-${MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES});}})()`
   );
 }

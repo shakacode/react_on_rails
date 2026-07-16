@@ -26,6 +26,7 @@ import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import * as StoreRegistry from '../src/StoreRegistry.ts';
 import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
 import { PAGE_UNLOAD_REGISTRY_ERROR_NAME } from '../src/CallbackRegistry.ts';
+import { REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE } from '../src/browserPerformanceMarks.ts';
 import {
   clearDefaultRSCProviderFactory,
   setDefaultRSCProviderFactory,
@@ -795,6 +796,23 @@ describe('ClientSideRenderer', () => {
     expect(window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey]).toEqual(['page2-chunk-a']);
     (window.REACT_ON_RAILS_RSC_ERRORS ||= {})[rscPayloadKey] = { hasErrors: true };
     expect(window.REACT_ON_RAILS_RSC_ERRORS[rscPayloadKey]).toEqual({ hasErrors: true });
+  });
+
+  it('clears queued browser performance mark fallbacks on page unload', () => {
+    const performanceMarksGlobal = globalThis as typeof globalThis &
+      Partial<Record<typeof REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE, unknown[]>>;
+
+    try {
+      performanceMarksGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE] = [
+        { name: 'react-on-rails:rsc:payload', detail: { source: 'react-on-rails-pro' } },
+      ];
+
+      unmountAll();
+
+      expect(performanceMarksGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE]).toBeUndefined();
+    } finally {
+      delete performanceMarksGlobal[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE];
+    }
   });
 
   it('runs a teardown returned asynchronously by a renderer on unmount', async () => {
