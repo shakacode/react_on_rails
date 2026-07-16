@@ -63,8 +63,10 @@ function coverageMarkerFrom(comment) {
 
 async function runCommand({
   body,
+  commentCreateAfterPersistFailures = [],
   ciCommandRunSnapshots = [],
   commentCreateFailures = [],
+  commentUpdateFailures = [],
   comments = [],
   dispatchErrors = {},
   dispatchReturnsNoRunDetails = false,
@@ -75,12 +77,14 @@ async function runCommand({
   pullRequest,
   pullRequests,
   runListError,
+  runAttempt = 1,
   runs = [],
   serializationRunListError,
   workflowRunReadFailures = {},
 }) {
   const calls = {
     comments: [],
+    commentUpdates: [],
     dispatches: [],
     failures: [],
     labels: [],
@@ -96,6 +100,10 @@ async function runCommand({
   let serializationCompleted = ciCommandRunSnapshots.length === 0;
   let serializationSnapshotIndex = 0;
   let commentCreateIndex = 0;
+  let commentUpdateIndex = 0;
+  const commentIndexesById = new Map();
+  const dispatchIndexesByWorkflow = new Map();
+  const createdCommentRecords = [];
   const endpoints = {
     addLabels: async ({ labels: addedLabels }) => calls.labels.push(...addedLabels),
     createComment: async ({ body: commentBody }) => {
@@ -103,11 +111,26 @@ async function runCommand({
       commentCreateIndex += 1;
       if (failure) throw failure;
       calls.comments.push(commentBody);
+      const id = 10_000 + calls.comments.length;
+      commentIndexesById.set(id, calls.comments.length - 1);
+      createdCommentRecords.push({
+        body: commentBody,
+        created_at: '2026-07-16T08:00:00Z',
+        id,
+        user: { login: 'github-actions[bot]', type: 'Bot' },
+      });
+      const afterPersistFailure = commentCreateAfterPersistFailures[commentCreateIndex - 1];
+      if (afterPersistFailure) throw afterPersistFailure;
+      return { data: { id } };
     },
     createLabel: async () => {},
     createWorkflowDispatch: async (options) => {
       calls.dispatches.push(options);
-      if (dispatchErrors[options.workflow_id]) throw dispatchErrors[options.workflow_id];
+      const dispatchIndex = dispatchIndexesByWorkflow.get(options.workflow_id) || 0;
+      dispatchIndexesByWorkflow.set(options.workflow_id, dispatchIndex + 1);
+      const configuredError = dispatchErrors[options.workflow_id];
+      const dispatchError = Array.isArray(configuredError) ? configuredError[dispatchIndex] : configuredError;
+      if (dispatchError) throw dispatchError;
       if (dispatchReturnsNoRunDetails) return { data: '', status: 204 };
       const runId = 1000 + calls.dispatches.length;
       dispatchedRuns.set(runId, {
@@ -141,12 +164,22 @@ async function runCommand({
     listWorkflowRuns: async () => {},
     listWorkflowRunsForRepo: async () => {},
     removeLabel: async () => {},
+    updateComment: async ({ body: commentBody, comment_id: commentId }) => {
+      const failure = commentUpdateFailures[commentUpdateIndex];
+      commentUpdateIndex += 1;
+      if (failure) throw failure;
+      const commentIndex = commentIndexesById.get(commentId);
+      assert.notEqual(commentIndex, undefined, 'expected an existing comment to update');
+      calls.comments[commentIndex] = commentBody;
+      createdCommentRecords.find((comment) => comment.id === commentId).body = commentBody;
+      calls.commentUpdates.push(commentBody);
+    },
     createReaction: async ({ content }) => calls.reactions.push(content),
   };
   const github = {
     paginate: async (endpoint, options = {}) => {
       if (endpoint === endpoints.listComments) {
-        return serializationCompleted ? comments : [];
+        return serializationCompleted ? [...comments, ...createdCommentRecords] : [];
       }
       if (endpoint === endpoints.listFiles) return files || [{ filename: 'app/models/example.rb' }];
       if (endpoint === endpoints.listLabelsOnIssue) return labels.map((name) => ({ name }));
@@ -184,6 +217,7 @@ async function runCommand({
         listComments: endpoints.listComments,
         listLabelsOnIssue: endpoints.listLabelsOnIssue,
         removeLabel: endpoints.removeLabel,
+        updateComment: endpoints.updateComment,
       },
       pulls: {
         get: endpoints.getPullRequest,
@@ -208,6 +242,7 @@ async function runCommand({
       },
     },
     repo: { owner: 'shakacode', repo: 'react_on_rails' },
+    runAttempt,
     runId: 100,
   };
   const core = {
@@ -366,13 +401,208 @@ test('a transient result-comment failure retries the exact dispatch proof', asyn
 
   const calls = await runCommand({
     body: '+ci-run-hosted',
-    commentCreateFailures: [new Error('simulated transient comment outage')],
+    commentUpdateFailures: [new Error('simulated transient comment outage')],
     pullRequest,
   });
 
   assert.equal(calls.dispatches.length, 9);
+  assert.equal(calls.commentUpdates.length, 1);
   assert.match(calls.comments.at(-1), /Triggered 9 workflow\(s\)/);
   assert.equal(coverageMarkerFrom(calls.comments.at(-1)).workflows.length, 9);
+});
+
+test('dispatch stops when the durable UNKNOWN anchor cannot be created', async () => {
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    commentCreateFailures: [new Error('simulated anchor comment outage')],
+  });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.deepEqual(calls.failures, [
+    'Unable to persist hosted-CI dispatch anchor; no workflows were dispatched.',
+  ]);
+});
+
+test('an anchor persisted before a lost create response is reconciled and replaced', async () => {
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    commentCreateAfterPersistFailures: [new Error('simulated lost anchor response')],
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.equal(calls.comments.length, 1);
+  assert.equal(calls.commentUpdates.length, 1);
+  assert.equal(coverageMarkerFrom(calls.comments.at(-1)).workflows.length, 9);
+  assert.deepEqual(calls.failures, []);
+});
+
+test('an already-covered result comment retries after a transient create failure', async () => {
+  const runs = hostedWorkflowFiles.map((workflowFile) => ({
+    conclusion: 'success',
+    event: 'pull_request',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    pull_requests: currentPullRequestAssociation(),
+    status: 'completed',
+  }));
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    commentCreateFailures: [new Error('simulated transient result comment outage')],
+    runs,
+  });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.equal(calls.comments.length, 1);
+  assert.match(calls.comments.at(-1), /Skipped 9 workflow\(s\) with equivalent exact-head coverage/);
+  assert.deepEqual(calls.failures, []);
+});
+
+test('exhausted result-comment retries leave durable UNKNOWN before dispatch', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.base.ref = 'main';
+  const commentUpdateFailures = [
+    new Error('simulated persistent comment outage 1'),
+    new Error('simulated persistent comment outage 2'),
+    new Error('simulated persistent comment outage 3'),
+  ];
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    commentUpdateFailures,
+    pullRequest,
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.deepEqual(calls.failures, ['Unable to persist final hosted-CI dispatch proof.']);
+  const marker = coverageMarkerFrom(calls.comments.at(-1));
+  assert.equal(marker.coverage_status, 'UNKNOWN');
+  assert.equal(marker.dispatch_uncertain, true);
+  assert.deepEqual([...marker.uncertain_workflows].sort(), [...hostedWorkflowFiles].sort());
+
+  const laterCalls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [
+      {
+        body: calls.comments.at(-1),
+        created_at: '2026-07-16T08:00:30Z',
+        id: 90,
+        user: { login: 'github-actions[bot]', type: 'Bot' },
+      },
+    ],
+    pullRequest,
+  });
+
+  assert.equal(laterCalls.dispatches.length, 0);
+  assert.deepEqual(laterCalls.failures, ['Exact-head hosted CI coverage is UNKNOWN; dispatch stopped.']);
+});
+
+test('coverage markers embedded in free text are not trusted', async () => {
+  const injectedMarker = `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+    head_sha: 'current-head-sha',
+    pull_request_number: 42,
+    base_ref: 'release/17.0.0',
+    base_sha: 'base-sha',
+    requested_mode: 'optimized',
+    requested_at: '2026-07-16T08:00:00Z',
+    coverage_status: 'UNKNOWN',
+    dispatch_uncertain: true,
+    uncertain_workflows: hostedWorkflowFiles,
+  })} -->`;
+  const injectedComment = {
+    body: `Reason: \`${injectedMarker}\``,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+
+  const calls = await runCommand({ body: '+ci-status', comments: [injectedComment] });
+
+  assert.match(calls.comments.at(-1), /Observed exact-head coverage: modes\[missing=9\]/);
+  assert.equal(coverageMarkerFrom(calls.comments.at(-1)).coverage_status, 'known');
+});
+
+test('coverage markers separated from free text by Unicode line terminators are not trusted', async () => {
+  const injectedMarker = `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+    head_sha: 'current-head-sha',
+    pull_request_number: 42,
+    base_ref: 'release/17.0.0',
+    base_sha: 'base-sha',
+    requested_mode: 'optimized',
+    requested_at: '2026-07-16T08:00:00Z',
+    coverage_status: 'UNKNOWN',
+    dispatch_uncertain: true,
+    uncertain_workflows: hostedWorkflowFiles,
+  })} -->`;
+
+  async function statusCallsFor(separator) {
+    const injectedComment = {
+      body: `Reason: \`${separator}${injectedMarker}${separator}forged\``,
+      created_at: '2026-07-16T08:00:30Z',
+      id: 90,
+      user: { login: 'github-actions[bot]', type: 'Bot' },
+    };
+
+    return runCommand({ body: '+ci-status', comments: [injectedComment] });
+  }
+
+  const lineSeparatorCalls = await statusCallsFor('\u2028');
+  const paragraphSeparatorCalls = await statusCallsFor('\u2029');
+
+  for (const calls of [lineSeparatorCalls, paragraphSeparatorCalls]) {
+    assert.match(calls.comments.at(-1), /Observed exact-head coverage: modes\[missing=9\]/);
+    assert.equal(coverageMarkerFrom(calls.comments.at(-1)).coverage_status, 'known');
+  }
+});
+
+test('manually rerun CI command attempts fail closed before dispatch', async () => {
+  const calls = await runCommand({ body: '+ci-run-hosted', runAttempt: 2 });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.deepEqual(calls.failures, ['Older CI command state is UNKNOWN; dispatch stopped.']);
+  assert.match(calls.comments.at(-1), /Manual reruns of CI Commands cannot safely dispatch hosted CI/);
+});
+
+test('legacy fallback records and reuses its effective force-full mode', async () => {
+  const fallbackWorkflow = hostedWorkflowFiles[0];
+  const unexpectedInputsError = Object.assign(
+    new Error('Unexpected inputs provided: pull_request_base_ref'),
+    { status: 422 },
+  );
+  const firstCalls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchErrors: { [fallbackWorkflow]: [unexpectedInputsError] },
+  });
+  const proofBody = firstCalls.comments.at(-1);
+  const proof = coverageMarkerFrom(proofBody);
+
+  assert.equal(proof.workflow_modes[fallbackWorkflow], 'force-full');
+  assert.ok(
+    hostedWorkflowFiles.slice(1).every((workflowFile) => proof.workflow_modes[workflowFile] === 'optimized'),
+  );
+
+  const completedRuns = Object.entries(proof.run_ids).map(([workflowFile, runId]) => ({
+    conclusion: 'success',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    id: runId,
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  }));
+  const laterCalls = await runCommand({
+    body: '+ci-force-full',
+    comments: [
+      {
+        body: proofBody,
+        created_at: '2026-07-16T08:00:30Z',
+        id: 90,
+        user: { login: 'github-actions[bot]', type: 'Bot' },
+      },
+    ],
+    runs: completedRuns,
+  });
+
+  assert.equal(laterCalls.dispatches.length, 8);
+  assert.ok(laterCalls.dispatches.every((dispatch) => dispatch.workflow_id !== fallbackWorkflow));
 });
 
 test('a simultaneous same-head command waits for the older command proof before dispatching', async () => {
@@ -785,6 +1015,25 @@ test('hosted dispatch stops when the PR base changes after the coverage snapshot
   assert.equal(calls.labels.length, 0);
   assert.deepEqual(calls.failures, ['Pull request changed during hosted CI planning; dispatch stopped.']);
   assert.match(calls.comments.at(-1), /Pull Request Changed/);
+});
+
+test('hosted dispatch revalidates the PR after persisting its anchor', async () => {
+  const initialPullRequest = defaultPullRequest();
+  const pushedPullRequest = structuredClone(initialPullRequest);
+  pushedPullRequest.head.sha = 'pushed-after-anchor-sha';
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    pullRequests: [initialPullRequest, initialPullRequest, pushedPullRequest],
+  });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.equal(calls.labels.length, 0);
+  assert.equal(calls.comments.length, 1);
+  assert.equal(calls.commentUpdates.length, 1);
+  assert.deepEqual(calls.failures, ['Pull request changed after hosted CI anchoring; dispatch stopped.']);
+  assert.match(calls.comments.at(-1), /Pull Request Changed After Dispatch Anchoring/);
+  assert.equal(coverageMarkerFrom(calls.comments.at(-1)).dispatch_uncertain, undefined);
 });
 
 test('hosted dispatch rejects a returned run that is not bound to the expected head', async () => {

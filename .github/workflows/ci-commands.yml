@@ -126,7 +126,9 @@ jobs:
                 return null;
               }
 
-              const match = (comment.body || '').match(/<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->/);
+              const match = (comment.body || '').match(
+                /(?:^|[\r\n])<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->(?=[\r\n]|$)/
+              );
               if (!match) {
                 return null;
               }
@@ -143,6 +145,11 @@ jobs:
                     !proof.workflows.every((workflowFile) =>
                       Number.isInteger(proof.run_ids[workflowFile]) && proof.run_ids[workflowFile] > 0
                     ) ||
+                    (proof.workflow_modes !== undefined &&
+                      (typeof proof.workflow_modes !== 'object' ||
+                        !proof.workflows.every((workflowFile) =>
+                          ['optimized', 'force-full'].includes(proof.workflow_modes[workflowFile])
+                        ))) ||
                     Number.isNaN(Date.parse(proof.requested_at || ''))) {
                   return null;
                 }
@@ -158,7 +165,9 @@ jobs:
                 return null;
               }
 
-              const match = (comment.body || '').match(/<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->/);
+              const match = (comment.body || '').match(
+                /(?:^|[\r\n])<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->(?=[\r\n]|$)/
+              );
               if (!match) {
                 return null;
               }
@@ -186,7 +195,10 @@ jobs:
 
             function latestCoverageProof(proofs, workflowFile, requestedMode) {
               return proofs
-                .filter((proof) => proof.requested_mode === requestedMode && proof.workflows.includes(workflowFile))
+                .filter((proof) =>
+                  proof.workflows.includes(workflowFile) &&
+                  (proof.workflow_modes?.[workflowFile] || proof.requested_mode) === requestedMode
+                )
                 .sort((left, right) =>
                   Date.parse(right.requested_at) - Date.parse(left.requested_at) ||
                   right.proof_comment_id - left.proof_comment_id
@@ -225,6 +237,7 @@ jobs:
               requestedMode,
               reused,
               runIds,
+              workflowModes,
               workflows
             }) {
               return coverageMarker({
@@ -236,6 +249,7 @@ jobs:
                 requested_at: new Date(Date.now()).toISOString(),
                 workflows,
                 run_ids: runIds,
+                workflow_modes: workflowModes,
                 reused,
                 observed,
                 dispatched
@@ -357,14 +371,17 @@ jobs:
               });
             }
 
-            async function postDispatchResultComment(body) {
-              let lastError;
+            async function updateDispatchResultComment(commentId, body) {
               for (let attempt = 1; attempt <= dispatchResultCommentMaxAttempts; attempt += 1) {
                 try {
-                  await postComment(body);
-                  return;
+                  await github.rest.issues.updateComment({
+                    owner,
+                    repo,
+                    comment_id: commentId,
+                    body
+                  });
+                  return true;
                 } catch (error) {
-                  lastError = error;
                   core.warning(
                     `Unable to persist hosted-CI dispatch proof (attempt ${attempt}/` +
                     `${dispatchResultCommentMaxAttempts}): ${error.message || error}`
@@ -375,7 +392,59 @@ jobs:
                 }
               }
 
-              throw lastError;
+              return false;
+            }
+
+            async function createDispatchResultComment(body) {
+              for (let attempt = 1; attempt <= dispatchResultCommentMaxAttempts; attempt += 1) {
+                try {
+                  await postComment(body);
+                  return true;
+                } catch (error) {
+                  core.warning(
+                    `Unable to persist hosted-CI result (attempt ${attempt}/` +
+                    `${dispatchResultCommentMaxAttempts}): ${error.message || error}`
+                  );
+                  if (attempt < dispatchResultCommentMaxAttempts) {
+                    await sleep(dispatchResultCommentRetryDelayMs);
+                  }
+                }
+              }
+
+              return false;
+            }
+
+            async function reconcileDispatchAnchor(pr) {
+              for (let attempt = 1; attempt <= dispatchResultCommentMaxAttempts; attempt += 1) {
+                try {
+                  const comments = await github.paginate(github.rest.issues.listComments, {
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    per_page: 100
+                  });
+                  const anchor = comments.find((comment) => {
+                    const marker = parseDispatchUncertainty(comment, pr);
+                    return marker?.source_comment_id === commentId &&
+                      marker.source_run_id === context.runId &&
+                      marker.requested_at === commentCreatedAt;
+                  });
+                  if (Number.isInteger(anchor?.id) && anchor.id > 0) {
+                    return anchor.id;
+                  }
+                } catch (error) {
+                  core.warning(
+                    `Unable to reconcile hosted-CI dispatch anchor (attempt ${attempt}/` +
+                    `${dispatchResultCommentMaxAttempts}): ${error.message || error}`
+                  );
+                }
+
+                if (attempt < dispatchResultCommentMaxAttempts) {
+                  await sleep(dispatchResultCommentRetryDelayMs);
+                }
+              }
+
+              return null;
             }
 
             async function addReaction(content) {
@@ -579,7 +648,7 @@ jobs:
             }
 
             function oneLine(value) {
-              return value.replace(/[\r\n]+/g, ' ').replace(/`+/g, "'").trim();
+              return value.replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/`+/g, "'").trim();
             }
 
             function sleep(ms) {
@@ -589,6 +658,12 @@ jobs:
             async function waitForOlderCiCommands() {
               if (!Number.isInteger(context.runId) || context.runId <= 0) {
                 return { status: 'UNKNOWN', reason: 'Current CI Commands workflow run ID is unavailable.' };
+              }
+              if (context.runAttempt !== 1) {
+                return {
+                  status: 'UNKNOWN',
+                  reason: 'Manual reruns of CI Commands cannot safely dispatch hosted CI; post a new command instead.'
+                };
               }
 
               const createdLowerBound =
@@ -840,6 +915,97 @@ jobs:
                 return;
               }
 
+              let dispatchResultCommentId;
+              if (workflowsToDispatch.length > 0) {
+                const plannedWorkflowFiles = workflowsToDispatch.map(([, workflowFile]) => workflowFile);
+                const dispatchAnchorBody = [
+                  coverageMarker({
+                    head_sha: pr.head.sha,
+                    pull_request_number: issueNumber,
+                    base_ref: pr.base.ref,
+                    base_sha: pr.base.sha,
+                    requested_mode: forceFull ? 'force-full' : 'optimized',
+                    requested_at: commentCreatedAt,
+                    source_comment_id: commentId,
+                    source_run_id: context.runId,
+                    coverage_status: 'UNKNOWN',
+                    dispatch_uncertain: true,
+                    uncertain_workflows: plannedWorkflowFiles,
+                    workflows: [],
+                    run_ids: {},
+                    reused: coveredWorkflows.map(([, workflowFile]) => workflowFile),
+                    observed: coverage.workflows,
+                    dispatched: []
+                  }),
+                  '## Hosted CI Dispatch In Progress',
+                  '',
+                  'This head-bound UNKNOWN marker is replaced with exact-run proof after dispatch validation.',
+                  'If the final update cannot be persisted, later same-head commands remain fail-closed.'
+                ].join('\n');
+
+                try {
+                  const { data: anchorComment } = await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    body: dispatchAnchorBody
+                  });
+                  dispatchResultCommentId = anchorComment?.id;
+                } catch (error) {
+                  core.warning(`Unable to create hosted-CI dispatch anchor: ${error.message || error}`);
+                }
+
+                if (!Number.isInteger(dispatchResultCommentId) || dispatchResultCommentId <= 0) {
+                  dispatchResultCommentId = await reconcileDispatchAnchor(pr);
+                }
+
+                if (!Number.isInteger(dispatchResultCommentId) || dispatchResultCommentId <= 0) {
+                  await addReaction('confused');
+                  core.setFailed('Unable to persist hosted-CI dispatch anchor; no workflows were dispatched.');
+                  return;
+                }
+
+                let anchoredPr;
+                try {
+                  anchoredPr = await getPullRequest();
+                } catch (error) {
+                  core.warning(
+                    `Unable to re-read the pull request after hosted-CI anchoring: ${error.message || error}`
+                  );
+                }
+                if (!anchoredPr || !samePullRequestSnapshot(pr, anchoredPr)) {
+                  await addReaction('confused');
+                  const stoppedBody = [
+                    '## Pull Request Changed After Dispatch Anchoring',
+                    coverageMarker({
+                      head_sha: pr.head.sha,
+                      pull_request_number: issueNumber,
+                      base_ref: pr.base.ref,
+                      base_sha: pr.base.sha,
+                      requested_mode: forceFull ? 'force-full' : 'optimized',
+                      requested_at: commentCreatedAt,
+                      coverage_status: 'known',
+                      observed: coverage.workflows,
+                      dispatched: []
+                    }),
+                    '',
+                    'The pull request head, base, repository, or state changed after the dispatch anchor was persisted.',
+                    'No workflow or hosted-CI label was requested. Post a new command for the current pull request state.'
+                  ].join('\n');
+                  const stoppedResultPersisted = await updateDispatchResultComment(
+                    dispatchResultCommentId,
+                    stoppedBody
+                  );
+                  if (!stoppedResultPersisted) {
+                    core.warning(
+                      'Unable to replace the pre-dispatch UNKNOWN anchor after the pull request changed.'
+                    );
+                  }
+                  core.setFailed('Pull request changed after hosted CI anchoring; dispatch stopped.');
+                  return;
+                }
+              }
+
               function legacyCompatibleInputs(workflowInputs) {
                 const legacyInputs = Object.fromEntries(
                   Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
@@ -927,6 +1093,9 @@ jobs:
                     );
                   }
                   return {
+                    effectiveMode: usedLegacyInputsFallback && pr.base.ref !== 'main'
+                      ? 'force-full'
+                      : forceFull ? 'force-full' : 'optimized',
                     file: workflowFile,
                     name: workflowName,
                     runId,
@@ -1090,12 +1259,15 @@ jobs:
                   runIds: Object.fromEntries(
                     succeeded.map((workflow) => [workflow.file, workflow.runId])
                   ),
+                  workflowModes: Object.fromEntries(
+                    succeeded.map((workflow) => [workflow.file, workflow.effectiveMode])
+                  ),
                   reused: coveredWorkflows.map(([, workflowFile]) => workflowFile),
                   observed: coverage.workflows,
                   dispatched: succeeded.map((workflow) => workflow.file)
                 });
 
-              await postDispatchResultComment([
+              const resultBody = [
                 dispatchIsUncertain
                   ? '## Hosted CI Dispatch UNKNOWN'
                   : forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
@@ -1114,7 +1286,23 @@ jobs:
                 '',
                 'View progress in the Actions tab.',
                 failedList
-              ].join('\n'));
+              ].join('\n');
+              if (dispatchResultCommentId) {
+                const proofPersisted = await updateDispatchResultComment(
+                  dispatchResultCommentId,
+                  resultBody
+                );
+                if (!proofPersisted) {
+                  core.setFailed('Unable to persist final hosted-CI dispatch proof.');
+                  return;
+                }
+              } else {
+                const resultPersisted = await createDispatchResultComment(resultBody);
+                if (!resultPersisted) {
+                  core.setFailed('Unable to persist final hosted-CI result.');
+                  return;
+                }
+              }
 
               if (failed.length > 0) {
                 core.setFailed(`Failed to trigger: ${failed.map((failure) => failure.workflow).join(', ')}`);

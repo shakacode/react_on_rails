@@ -30,11 +30,22 @@ It skips equivalent optimized,
 queued, running, or successful coverage; dispatches only missing workflows;
 creates `ready-for-hosted-ci` if needed; and adds it so future pushes keep
 running optimized hosted CI. Before dispatch, it re-reads the PR and rejects a
-changed head or base. Dispatches use the versioned `2026-03-10` API's `200`
+changed head or base. It then creates a head/base-bound `UNKNOWN` anchor comment;
+if that durable anchor cannot be created, no workflow is dispatched. Dispatches
+use the versioned `2026-03-10` API's `200`
 response workflow run ID, then verify that exact run's workflow path, event, and
 head SHA. A newly returned run gets up to three reads over four seconds when
 GitHub reports a transient `404` or server error; an unavailable or mismatched
-run then fails closed without recording trusted dispatch proof. Selector-only
+run then fails closed without recording trusted dispatch proof. Validated run
+IDs replace the anchor in place. The final update is retried; if every update
+fails, the original `UNKNOWN` anchor remains and blocks blind same-head retry.
+If GitHub persists an anchor but its create response is lost, the command
+reconciles it by source comment and workflow-run identity before dispatching.
+It revalidates the PR snapshot again after anchoring and replaces the anchor
+with a stopped audit result if the head or base moved.
+No-dispatch audit results retain the same bounded comment retry behavior.
+Manual reruns of a `CI Commands` workflow fail closed; post a new `+ci-*` comment
+to create a safely ordered command run. Selector-only
 `pull_request` workflow shells do not
 count as hosted coverage. The exception is a base-matched automatic run for a
 same-repository, non-Dependabot release-target PR, where release policy already
@@ -58,6 +69,9 @@ coverage, with `force_full_hosted: true`; creates `ready-for-hosted-ci` and
 run is not force-full evidence merely because it has the same workflow name.
 Optimized and force-full proofs identify their exact returned workflow run IDs,
 so concurrent or same-second dispatches cannot be attributed to the wrong mode.
+If an older release branch rejects the new base-context inputs, the legacy
+fallback records each workflow's effective mode; a fallback that adds
+`force_full_hosted: true` is reusable as force-full evidence.
 If an exact run is temporarily absent from the run inventory, it receives a
 two-minute visibility grace period; after that, the workflow is missing and can
 be retried instead of remaining pending forever.
@@ -86,7 +100,8 @@ workflow run and does not apply after another push.
 
 `+ci-status` summarizes labels, the current SHA, the docs-only heuristic,
 automatic same-repository release-target mode, exact-head per-workflow coverage,
-and whether a waiver exists for the current SHA. Status and dispatch comments
+the actual per-workflow mode counts, and whether a waiver exists for the current
+SHA. Status and dispatch comments
 include a machine-readable coverage marker. If Actions coverage cannot be read,
 the result is `UNKNOWN` and start commands dispatch nothing rather than guessing.
 An uncorrelated dispatch writes a durable `UNKNOWN` marker bound to the PR head
