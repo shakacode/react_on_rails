@@ -837,6 +837,14 @@ jobs:
                 return error;
               }
 
+              function classifyDispatchFailure(error, unknownMessage) {
+                if (Number.isInteger(error?.status) && error.status >= 400 && error.status <= 499) {
+                  return error;
+                }
+
+                return dispatchUncertainty(unknownMessage, error);
+              }
+
               function isRetryableWorkflowRunReadError(error) {
                 return error?.status === 404 || (error?.status >= 500 && error?.status <= 599);
               }
@@ -907,9 +915,9 @@ jobs:
                   );
                 } catch (error) {
                   if (!isUnexpectedInputError(error)) {
-                    throw dispatchUncertainty(
-                      `${workflowFile} dispatch result is UNKNOWN: ${error.message || error}`,
-                      error
+                    throw classifyDispatchFailure(
+                      error,
+                      `${workflowFile} dispatch result is UNKNOWN: ${error.message || error}`
                     );
                   }
 
@@ -922,9 +930,9 @@ jobs:
                       dispatchOptions(legacyCompatibleInputs(workflowInputs))
                     );
                   } catch (fallbackError) {
-                    throw dispatchUncertainty(
-                      `${workflowFile} legacy dispatch result is UNKNOWN: ${fallbackError.message || fallbackError}`,
-                      fallbackError
+                    throw classifyDispatchFailure(
+                      fallbackError,
+                      `${workflowFile} legacy dispatch result is UNKNOWN: ${fallbackError.message || fallbackError}`
                     );
                   }
                 }

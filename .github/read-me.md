@@ -17,9 +17,12 @@ confirmation:
 +ci-run-hosted
 ```
 
-The command first waits for older active CI-command runs, then inventories
-workflow runs and auditable dispatch proofs bound to the exact head SHA, PR
-number, base ref, base SHA, and workflow run ID. It skips equivalent optimized,
+Start commands intentionally serialize across the repository. A command may
+wait about 65 seconds for older active CI-command runs before failing closed;
+this global mutex trades a bounded repository-wide delay for exact-head proof
+safety. The command then inventories workflow runs and auditable dispatch proofs
+bound to the exact head SHA, PR number, base ref, base SHA, and workflow run ID.
+It skips equivalent optimized,
 queued, running, or successful coverage; dispatches only missing workflows;
 creates `ready-for-hosted-ci` if needed; and adds it so future pushes keep
 running optimized hosted CI. Before dispatch, it re-reads the PR and rejects a
@@ -83,7 +86,10 @@ and whether a waiver exists for the current SHA. Status and dispatch comments
 include a machine-readable coverage marker. If Actions coverage cannot be read,
 the result is `UNKNOWN` and start commands dispatch nothing rather than guessing.
 An uncorrelated dispatch writes a durable `UNKNOWN` marker bound to the PR head
-and base; later commands do not redispatch that coverage blindly.
+and base. This intentionally blocks same-head retries because workflow
+acceptance cannot be proven. The operator must inspect and cancel any uncertain
+exact-head runs or let them finish, then push a new commit and retry against the
+new head; there is no same-head reset.
 Repeated all-covered Dependabot requests retain a nonzero trusted current-base
 dispatch proof so selector trust remains idempotent.
 `+ci-help` prints the command list.

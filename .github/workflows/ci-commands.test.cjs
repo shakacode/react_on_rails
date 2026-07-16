@@ -517,6 +517,78 @@ test('+ci-run-hosted fails closed when dispatch does not return exact run detail
   assert.match(retryCalls.comments.at(-1), /Hosted CI Coverage UNKNOWN/);
 });
 
+test('a definitive dispatch rejection records no proof and lets a later command retry the missing workflow', async () => {
+  const rejection = Object.assign(new Error('workflow is disabled'), { status: 404 });
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchErrors: { 'lint-js-and-ruby.yml': rejection },
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.equal(calls.labels.length, 0);
+  assert.equal(calls.failures.length, 1);
+  const resultComment = calls.comments.at(-1);
+  assert.match(resultComment, /workflow is disabled/);
+  const marker = coverageMarkerFrom(resultComment);
+  assert.equal(marker.dispatch_uncertain, undefined);
+  assert.equal(marker.workflows.includes('lint-js-and-ruby.yml'), false);
+  assert.equal(marker.run_ids['lint-js-and-ruby.yml'], undefined);
+
+  const successfulRuns = Object.entries(marker.run_ids).map(([workflowFile, runId]) => ({
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    id: runId,
+    path: `.github/workflows/${workflowFile}`,
+    status: 'queued',
+  }));
+  const priorProof = {
+    body: resultComment,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const retryCalls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [priorProof],
+    runs: successfulRuns,
+  });
+
+  assert.deepEqual(
+    retryCalls.dispatches.map((dispatch) => dispatch.workflow_id),
+    ['lint-js-and-ruby.yml'],
+  );
+});
+
+test('a dispatch server error remains durable UNKNOWN', async () => {
+  const serverError = Object.assign(new Error('service unavailable'), { status: 503 });
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchErrors: { 'lint-js-and-ruby.yml': serverError },
+  });
+
+  assert.equal(calls.labels.length, 0);
+  assert.equal(calls.failures.length, 1);
+  const resultComment = calls.comments.at(-1);
+  assert.match(resultComment, /dispatch result is UNKNOWN: service unavailable/);
+  const marker = coverageMarkerFrom(resultComment);
+  assert.equal(marker.coverage_status, 'UNKNOWN');
+  assert.equal(marker.dispatch_uncertain, true);
+  assert.deepEqual(marker.uncertain_workflows, ['lint-js-and-ruby.yml']);
+
+  const priorUnknownComment = {
+    body: resultComment,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const laterStart = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [priorUnknownComment],
+  });
+  assert.equal(laterStart.dispatches.length, 0);
+  assert.match(laterStart.comments.at(-1), /Hosted CI Coverage UNKNOWN/);
+});
+
 test('a dispatch transport error records durable UNKNOWN and blocks later start and status guesses', async () => {
   const timeout = Object.assign(new Error('request timed out after dispatch submission'), {
     code: 'ETIMEDOUT',
