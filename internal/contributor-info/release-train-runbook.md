@@ -287,13 +287,13 @@ serialize the sequence:
      commits with merge metadata and stable patch IDs. Cherry-pick every landed
      commit oldest-first with `git cherry-pick -x <source-sha>`. Stop if the
      complete mapping cannot be proven.
-     Normalize every release commit message to exactly one direct
-     `(cherry picked from commit <source-sha>)` footer. If a source commit already
-     has inherited `-x` provenance, record that deeper lineage in the PR and
-     remove its footer from the release commit message.
-5. Preserve release-only divergence while resolving conflicts; record the
+5. After any source-shape path, normalize every release commit message to
+   exactly one direct `(cherry picked from commit <source-sha>)` footer. If a
+   source commit already has inherited `-x` provenance, record that deeper
+   lineage in the PR and remove its footer from the release commit message.
+6. Preserve release-only divergence while resolving conflicts; record the
    source SHA and every non-mechanical resolution in the PR.
-6. Run the release-phase validation, QA, and review gates on the current head.
+7. Run the release-phase validation, QA, and review gates on the current head.
    A backport with exactly one source commit may be squash-merged after copying
    its exact direct `(cherry picked from commit <source-sha>)` footer into the
    final squash commit body. For a multi-commit rebase-merged source PR or an
@@ -304,9 +304,9 @@ serialize the sequence:
    backport for a maintainer-approved merge plan. After any merge method, verify
    each landed release commit has exactly one direct source footer; do not
    proceed to the next backport if provenance was lost.
-7. Fetch the new release tip before updating or branching the next selected
+8. Fetch the new release tip before updating or branching the next selected
    source PR.
-8. After every backport retained in the final release set lands, reconcile the
+9. After every backport retained in the final release set lands, reconcile the
    changelog entries and stamp or regenerate the RC changelog.
 
 Do not combine independent source PRs merely because they target the same
