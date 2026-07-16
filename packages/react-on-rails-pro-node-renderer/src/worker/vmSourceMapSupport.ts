@@ -652,10 +652,21 @@ function readRegisteredBundleContentsForSourceMapLookup(bundleFilePath: string) 
   return fs.readFileSync(bundleFilePath, 'utf8');
 }
 
+/**
+ * `terminal` means a map was found but can never be used for this generation
+ * (oversized), so retrying is pointless and would risk remapping this generation
+ * with a different file. `missing` means nothing usable was found yet and a map
+ * may still appear, so the existing retry budget applies.
+ */
+type SourceMapLoadResult =
+  | { status: 'loaded'; sourceMap: LoadedSourceMap }
+  | { status: 'terminal' }
+  | { status: 'missing' };
+
 function loadSourceMapForBundle(
   bundleFilePath: string,
   registration: BundleSourceMapRegistration,
-): LoadedSourceMap | null {
+): SourceMapLoadResult {
   try {
     const sourceMappingUrl =
       registration.sourceMappingUrl === undefined
@@ -667,27 +678,38 @@ function loadSourceMapForBundle(
         ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl, registration.realBundleDirectory)
         : (registration.sourceMapJson ?? undefined);
 
+    // Only the reader returns null, and only for an oversized map. A
+    // registration's own null ("confirmed no usable map") is coerced to
+    // undefined above and settles through the `missing` path as before.
+    if (sourceMapJson === null) {
+      return { status: 'terminal' };
+    }
     if (!sourceMapJson) {
-      return null;
+      return { status: 'missing' };
     }
     const payload = JSON.parse(sourceMapJson) as ConstructorParameters<typeof SourceMap>[0];
     const sourceMap = createSourceMap(payload);
     if (!sourceMap) {
-      return null;
+      return { status: 'missing' };
     }
     const sourceRoot = typeof payload.sourceRoot === 'string' ? payload.sourceRoot : undefined;
     return {
-      sourceMap,
-      sourceRoot,
-      sources: Array.isArray(payload.sources)
-        ? payload.sources
-            .filter((source): source is string => typeof source === 'string')
-            .map((source) => applySourceRoot(sourceRoot, source))
-        : [],
+      status: 'loaded',
+      sourceMap: {
+        sourceMap,
+        sourceRoot,
+        sources: Array.isArray(payload.sources)
+          ? payload.sources
+              .filter((source): source is string => typeof source === 'string')
+              .map((source) => applySourceRoot(sourceRoot, source))
+          : [],
+      },
     };
   } catch (error) {
+    // Includes JSON.parse failures on a partially-written map, which stay
+    // retryable so the completed map can be picked up.
     log.debug('Failed to load source map for bundle %s: %s', bundleFilePath, error);
-    return null;
+    return { status: 'missing' };
   }
 }
 
@@ -701,17 +723,22 @@ function sourceMapForRegistration(
       return null;
     }
 
-    sourceMap = loadSourceMapForBundle(registration.bundleFilePath, registration);
-    if (sourceMap) {
+    const loadResult = loadSourceMapForBundle(registration.bundleFilePath, registration);
+    if (loadResult.status === 'loaded') {
+      sourceMap = loadResult.sourceMap;
       sourceMapCache.set(registration, sourceMap);
       missingSourceMapRetryCounts.delete(registration);
-    } else if (
-      !shouldRetryMissingSourceMap(registration) ||
-      (registration.sourceMappingUrl === null && !registration.retryMissingSourceMap)
-    ) {
-      sourceMapCache.set(registration, sourceMap);
     } else {
-      recordMissingSourceMapRetry(registration, lookupAttempt);
+      sourceMap = null;
+      if (
+        loadResult.status === 'terminal' ||
+        !shouldRetryMissingSourceMap(registration) ||
+        (registration.sourceMappingUrl === null && !registration.retryMissingSourceMap)
+      ) {
+        sourceMapCache.set(registration, sourceMap);
+      } else {
+        recordMissingSourceMapRetry(registration, lookupAttempt);
+      }
     }
   }
   return sourceMap;

@@ -480,6 +480,40 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
+    test('oversized map found on the lazy path is terminal and is not retried later', async () => {
+      // The retryable-miss path must not resurrect a generation: once this VM has
+      // seen an oversized map, a later under-cap map at the same path must not
+      // remap it.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+      // Missing at build, so the registration stays lazy and retryable.
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        await runInVM('global.triggerSsrError()', bundlePath);
+
+        // Map is now under the cap; the earlier oversized answer was terminal.
+        statSyncSpy.mockRestore();
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
     test('oversized external map warns once per map path across repeated lookups', async () => {
       const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
