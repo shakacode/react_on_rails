@@ -26,17 +26,19 @@ source PR per release backport PR:
   authorization and retain its branch unless deletion is also authorized.
 - Process them serially under the canonical `release-line:X.Y.Z` coordination
   lease defined in the release-train runbook, held by one dedicated release
-  coordinator across discovery, validation, and merge. Source-scoped claims do
-  not provide this serialization. Chain later batch lanes with `depends_on`, and
-  do not launch them until the preceding merge is terminal. A merge queue that
-  reruns the gates on the combined merge-group head is the only alternative to
-  holding the lease through merge. Refresh the dedicated heartbeat at the
-  runbook cadence during long gates, and immediately before merge require the
-  canonical claim to be active, unexpired, and owned by the expected coordinator
-  with a live matching heartbeat. Stop if either guard is unavailable or its
-  state is `UNKNOWN`. Merge one backport, fetch the new release tip, then update
-  a reused PR onto that tip or branch the next. Rerun validation, QA, and review
-  on the updated head before merging.
+  coordinator across discovery, validation, and merge. Every writer targeting
+  that release branch, including a release-first stabilizing fix or metadata PR,
+  must participate in the same lease; source-scoped claims do not provide this
+  serialization. Chain later batch lanes with `depends_on`, and do not launch
+  them until the preceding merge is terminal. A writer that cannot participate
+  must use a merge queue that reruns the gates on the combined merge-group head;
+  an ordinary direct merge is not an alternative. Refresh the dedicated
+  heartbeat at the runbook cadence during long gates, and immediately before
+  merge require the canonical claim to be active, unexpired, and owned by the
+  expected coordinator with a live matching heartbeat. Stop if either guard is
+  unavailable or its state is `UNKNOWN`. Merge one release-targeted change,
+  fetch the new release tip, then update a reused PR onto that tip or branch the
+  next. Rerun validation, QA, and review on the updated head before merging.
 - Before updating or branching, confirm each selected source patch is still live
   on explicitly fetched `origin/main`. A source reverted or superseded on `main`
   requires renewed maintainer approval before backporting. Repeat this check and

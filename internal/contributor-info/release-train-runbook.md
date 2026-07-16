@@ -256,19 +256,20 @@ fixed by republishing.
 > does **not** reach the release unless it is forward-ported in step 3 (run in reverse: cherry-pick
 > `main`→`release/X.Y.Z`). Prefer authoring stabilizing fixes against the release branch first.
 
-#### Backport merged `main` PRs one at a time
+#### Serialize every release-branch writer
 
-When maintainers select one or more merged `main` PRs for the release train,
-use **one source PR -> one release PR**. When there are multiple selections,
-serialize the sequence:
-
-Before any source-specific work, acquire the canonical release-line coordination
-lease and hold it across discovery, validation, and merge. The lease is an
+Before branching, updating, validating, or merging **any** change that targets
+`release/X.Y.Z`, acquire the canonical release-line coordination lease and hold
+it through merge. This includes fixes authored on the release branch, backports
+from `main`, changelog-only PRs, and other release metadata. The lease is an
 `agent-coord` claim in `shakacode/react_on_rails` whose target is exactly
 `release-line:X.Y.Z` (for example, `release-line:17.0.0`). One dedicated release
 coordinator owns this synthetic target and is the only actor that dispatches a
-backport lane or merges it. A claim on an individual source issue or PR does not
-serialize different backports.
+release-targeted lane or merges it. A claim on an individual source issue or PR
+does not serialize writers that target the same release branch. If an actor
+cannot participate in this lease, its release-targeted PR must use a merge queue
+that reruns all required gates on the combined merge-group head; an ordinary
+direct merge is not an alternative.
 
 Use the same stable coordinator id for the claim and heartbeat. The bounded
 status and claim operations fail closed on timeout, `UNKNOWN`, or
@@ -337,13 +338,13 @@ fi
 The explicit claim TTL is four hours and the heartbeat TTL is 15 minutes. Renew
 the claim at least hourly with the bounded `claim` command from
 `acquire_release_line_lease`, and run `heartbeat_release_line_lease` at every
-source-lane phase transition **and at least every five minutes while validation,
+release-lane phase transition **and at least every five minutes while validation,
 QA, review, CI, or another gate remains in one phase**. A transition-only
 heartbeat is insufficient. If either refresh fails, stop merge activity until
 `acquire_release_line_lease` succeeds and the live assertion passes again.
 
-In a batch, chain each later lane with `depends_on` and do not launch it until
-the preceding merge is terminal. Immediately before merge, rerun
+In a batch, chain each later release-targeted lane with `depends_on` and do not
+launch it until the preceding merge is terminal. Immediately before merge, rerun
 `require_live_release_line_lease` in the shell where the functions above are
 defined. It must prove that the canonical claim is active, unexpired, and owned
 by `RELEASE_COORDINATOR_ID`, and that its matching heartbeat is live and bound
@@ -351,10 +352,11 @@ to the canonical target. Identity alone is insufficient because released and
 expired records retain their last holder. A merge queue that reruns the gates on
 the combined merge-group head is the only alternative to this assertion. If
 neither guard is available, or its state is `UNKNOWN`, stop rather than let two
-backports validate against and race to merge from the same release tip.
+release writers validate against and race to merge from the same release tip.
 
-Release the lease only after all selected backports are terminal and the final
-release tip has been fetched, or after cancellation/handoff is durably recorded:
+Release the lease only after all selected release-targeted changes are terminal
+and the final release tip has been fetched, or after cancellation/handoff is
+durably recorded:
 
 ```bash
 agent-coord release \
@@ -365,6 +367,12 @@ agent-coord release \
 
 On handoff, the replacement must acquire this same canonical target after the
 old release is visible; it must not invent another target or bypass a refusal.
+
+#### Backport merged `main` PRs one at a time
+
+When maintainers select one or more merged `main` PRs for the release train,
+use **one source PR -> one release PR**. Process them under the writer lease
+above; when there are multiple selections, serialize the sequence:
 
 1. Search open PRs targeting the release branch, targeted private coordination
    for the selected source, and remote branches with verified ownership and
@@ -665,8 +673,17 @@ replacement already live on `main`, do not run normal-mode
 `script/release-forward-port` or `script/release-finish close-out`. Use this
 audited manual path instead:
 
-1. Fetch `origin`, require a clean local `main` exactly equal to `origin/main`,
-   and save the complete dry-run plan as release-tracker evidence.
+1. Set `RELEASE_VERSION`, fetch both `origin/main` and the exact release ref,
+   require a clean local `main` exactly equal to `origin/main`, save the complete
+   dry-run plan as release-tracker evidence, and record the audited release tip:
+
+   ```bash
+   RELEASE_VERSION=17.0.0
+   git fetch --prune origin main \
+     "+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
+   AUDITED_RELEASE_TIP="$(git rev-parse "origin/release/${RELEASE_VERSION}")"
+   ```
+
 2. Record the omitted release commit SHA, its direct main-origin SHA, the proof
    that the origin is reverted or superseded, the replacement SHA when one
    exists, and explicit maintainer approval for the disposition.
@@ -674,16 +691,35 @@ audited manual path instead:
    other `PICK`. Preserve the plan's `SKIP` entries and resolve each `MANUAL`
    entry with the existing manual fallback. Do not cherry-pick the approved
    omitted release commit.
-4. Push the resulting `main` branch or merge its PR. Refetch `origin/main`, then
-   verify every non-omitted `PICK` is live with auditable `-x` provenance, every
-   `SKIP`/`MANUAL` entry has its recorded disposition, the replacement (if any)
-   is live, and the omitted origin remains reverted or superseded. Any missing,
-   changed, or `UNKNOWN` evidence stops closeout.
+4. Push the resulting `main` branch or merge its PR. Refetch `origin/main` and
+   the exact release ref. Require the release ref to still equal
+   `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit against the
+   new tip. Then verify every non-omitted `PICK` is live with auditable `-x`
+   provenance, every `SKIP`/`MANUAL` entry has its recorded disposition, the
+   replacement (if any) is live, and the omitted origin remains reverted or
+   superseded. Any missing, changed, or `UNKNOWN` evidence stops closeout.
 5. Re-run the dry-run. It may list only the explicitly omitted `PICK` plus
    already-dispositioned `MANUAL` entries; reconcile every row to the recorded
-   evidence. Only then, with the repository's required destructive-operation
-   confirmation, delete `origin/release/X.Y.Z` manually and clear the
-   release-line phase. The release tags remain the durable record.
+   evidence. Immediately before deletion, refetch the exact release ref again
+   and require it to equal `AUDITED_RELEASE_TIP`. Only then, with the
+   repository's required destructive-operation confirmation, delete it using
+   an atomic expected-old-OID guard:
+
+   ```bash
+   git fetch --prune origin \
+     "+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
+   test "$(git rev-parse "origin/release/${RELEASE_VERSION}")" = "${AUDITED_RELEASE_TIP}" || {
+     echo "release tip changed; restart the closeout audit" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   git push \
+     --force-with-lease="refs/heads/release/${RELEASE_VERSION}:${AUDITED_RELEASE_TIP}" \
+     origin ":refs/heads/release/${RELEASE_VERSION}"
+   ```
+
+   If the lease rejects the deletion because the branch advanced after the last
+   fetch, preserve the branch and restart the audit. After guarded deletion,
+   clear the release-line phase. The release tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
