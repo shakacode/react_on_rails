@@ -273,6 +273,18 @@ describe('rsc-guardrails hook', () => {
     expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
   });
 
+  it('warns for compound raw-HTML assignments', () => {
+    const output = runRSCGuardrailsHook('compoundAssignment.ts', 'element.innerHTML += userControlled;\n');
+
+    expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+  });
+
+  it('does not warn for raw-HTML equality checks', () => {
+    const output = runRSCGuardrailsHook('equalityCheck.ts', 'if (element.innerHTML === expected) return;\n');
+
+    expect(output).toBe('');
+  });
+
   it('does not warn for parser-only script text', () => {
     const output = runRSCGuardrailsHook(
       'parserOnly.ts',
