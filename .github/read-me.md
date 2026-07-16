@@ -17,16 +17,22 @@ confirmation:
 +ci-run-hosted
 ```
 
-The command first inventories workflow runs and auditable dispatch proofs bound
-to the exact head SHA, PR number, base ref, base SHA, and workflow run ID. It
-skips equivalent optimized, queued, running, or successful coverage; dispatches
-only missing workflows; creates `ready-for-hosted-ci` if needed; and adds it so
-future pushes keep running optimized hosted CI. Dispatches use GitHub's
-`return_run_details` API response and fail closed if an exact run ID is not
-returned. Selector-only `pull_request` workflow shells do not count as hosted
-coverage. The exception is a base-matched automatic run for a same-repository,
-non-Dependabot release-target PR, where release policy already runs the hosted
-jobs. Hosted CI is still path-selected by `script/ci-changes-detector`; it does
+The command first waits for older active CI-command runs, then inventories
+workflow runs and auditable dispatch proofs bound to the exact head SHA, PR
+number, base ref, base SHA, and workflow run ID. It skips equivalent optimized,
+queued, running, or successful coverage; dispatches only missing workflows;
+creates `ready-for-hosted-ci` if needed; and adds it so future pushes keep
+running optimized hosted CI. Before dispatch, it re-reads the PR and rejects a
+changed head or base. Dispatches use the versioned `2026-03-10` API's `200`
+response workflow run ID, then verify that exact run's workflow path, event, and
+head SHA. A newly returned run gets up to three reads over four seconds when
+GitHub reports a transient `404` or server error; an unavailable or mismatched
+run then fails closed without recording trusted dispatch proof. Selector-only
+`pull_request` workflow shells do not
+count as hosted coverage. The exception is a base-matched automatic run for a
+same-repository, non-Dependabot release-target PR, where release policy already
+runs the hosted jobs. Hosted CI is still path-selected by
+`script/ci-changes-detector`; it does
 not automatically run every hosted suite.
 
 ### `+ci-force-full` - Request Force-Full Hosted CI
@@ -76,6 +82,8 @@ automatic same-repository release-target mode, exact-head per-workflow coverage,
 and whether a waiver exists for the current SHA. Status and dispatch comments
 include a machine-readable coverage marker. If Actions coverage cannot be read,
 the result is `UNKNOWN` and start commands dispatch nothing rather than guessing.
+An uncorrelated dispatch writes a durable `UNKNOWN` marker bound to the PR head
+and base; later commands do not redispatch that coverage blindly.
 Repeated all-covered Dependabot requests retain a nonzero trusted current-base
 dispatch proof so selector trust remains idempotent.
 `+ci-help` prints the command list.

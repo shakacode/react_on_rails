@@ -39,7 +39,12 @@ jobs:
             const hostedCiLabel = 'ready-for-hosted-ci';
             const forceFullHostedCiLabel = 'force-full-hosted-ci';
             const newerCommandVisibilityDelayMs = 5000;
+            const ciCommandSerializationVisibilityDelayMs = 5000;
+            const ciCommandSerializationPollDelayMs = 5000;
+            const ciCommandSerializationMaxAttempts = 12;
             const dispatchRunVisibilityGraceMs = 2 * 60 * 1000;
+            const dispatchRunValidationPollDelayMs = 2000;
+            const dispatchRunValidationMaxAttempts = 3;
 
             const validCommands = [
               '+ci-run-hosted',
@@ -57,6 +62,16 @@ jobs:
 
             function isSameRepositoryPullRequest(pr) {
               return pr.head.repo?.full_name === repoFullName;
+            }
+
+            function samePullRequestSnapshot(left, right) {
+              return left.state === right.state &&
+                left.merged === right.merged &&
+                left.head.sha === right.head.sha &&
+                left.head.ref === right.head.ref &&
+                left.head.repo?.full_name === right.head.repo?.full_name &&
+                left.base.ref === right.base.ref &&
+                left.base.sha === right.base.sha;
             }
 
             function isReleaseTargetPullRequest(pr) {
@@ -131,6 +146,37 @@ jobs:
                 return { ...proof, proof_comment_id: comment.id };
               } catch (error) {
                 core.warning(`Ignoring malformed hosted-CI coverage proof: ${error.message || error}`);
+                return null;
+              }
+            }
+
+            function parseDispatchUncertainty(comment, pr) {
+              if (comment.user?.login !== 'github-actions[bot]' || comment.user?.type !== 'Bot') {
+                return null;
+              }
+
+              const match = (comment.body || '').match(/<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->/);
+              if (!match) {
+                return null;
+              }
+
+              try {
+                const marker = JSON.parse(match[1]);
+                if (marker.head_sha !== pr.head.sha ||
+                    marker.pull_request_number !== issueNumber ||
+                    marker.base_ref !== pr.base.ref ||
+                    marker.base_sha !== pr.base.sha ||
+                    !['optimized', 'force-full'].includes(marker.requested_mode) ||
+                    marker.coverage_status !== 'UNKNOWN' ||
+                    marker.dispatch_uncertain !== true ||
+                    !Array.isArray(marker.uncertain_workflows) ||
+                    marker.uncertain_workflows.length === 0 ||
+                    Number.isNaN(Date.parse(marker.requested_at || ''))) {
+                  return null;
+                }
+                return marker;
+              } catch (error) {
+                core.warning(`Ignoring malformed hosted-CI dispatch uncertainty: ${error.message || error}`);
                 return null;
               }
             }
@@ -212,6 +258,15 @@ jobs:
                   })
                 ]);
                 const exactHeadRuns = runs.filter((run) => run.head_sha === pr.head.sha);
+                const dispatchUncertainties = comments
+                  .map((comment) => parseDispatchUncertainty(comment, pr))
+                  .filter(Boolean);
+                if (dispatchUncertainties.length > 0) {
+                  core.warning(
+                    'Exact-head hosted-CI coverage is UNKNOWN because a prior dispatch could not be correlated.'
+                  );
+                  return { status: 'UNKNOWN', workflows: [] };
+                }
                 const proofs = comments
                   .map((comment) => parseCoverageProof(comment, pr))
                   .filter(Boolean);
@@ -507,6 +562,45 @@ jobs:
               return new Promise((resolve) => setTimeout(resolve, ms));
             }
 
+            async function waitForOlderCiCommands() {
+              if (!Number.isInteger(context.runId) || context.runId <= 0) {
+                return { status: 'UNKNOWN', reason: 'Current CI Commands workflow run ID is unavailable.' };
+              }
+
+              await sleep(ciCommandSerializationVisibilityDelayMs);
+              for (let attempt = 1; attempt <= ciCommandSerializationMaxAttempts; attempt += 1) {
+                let runs;
+                try {
+                  runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                    owner,
+                    repo,
+                    workflow_id: 'ci-commands.yml',
+                    event: 'issue_comment',
+                    per_page: 100
+                  });
+                } catch (error) {
+                  core.warning(`Unable to serialize CI Commands workflow runs: ${error.message || error}`);
+                  return { status: 'UNKNOWN', reason: 'Unable to read older CI Commands workflow runs.' };
+                }
+
+                const olderActiveRuns = runs.filter((run) =>
+                  run.id < context.runId &&
+                  activeWorkflowStatuses.has(run.status)
+                );
+                if (olderActiveRuns.length === 0) {
+                  return { status: 'known' };
+                }
+                if (attempt < ciCommandSerializationMaxAttempts) {
+                  await sleep(ciCommandSerializationPollDelayMs);
+                }
+              }
+
+              return {
+                status: 'UNKNOWN',
+                reason: 'An older CI Commands workflow did not finish within the bounded wait.'
+              };
+            }
+
             function newerCommandScanSince() {
               const createdAt = Date.parse(commentCreatedAt);
               if (Number.isNaN(createdAt)) {
@@ -630,6 +724,29 @@ jobs:
                 return;
               }
 
+              const serialization = await waitForOlderCiCommands();
+              if (serialization.status === 'UNKNOWN') {
+                await addReaction('confused');
+                await postComment([
+                  '## Hosted CI Command Serialization UNKNOWN',
+                  coverageMarker({
+                    head_sha: pr.head.sha,
+                    pull_request_number: issueNumber,
+                    base_ref: pr.base.ref,
+                    base_sha: pr.base.sha,
+                    requested_mode: forceFull ? 'force-full' : 'optimized',
+                    coverage_status: 'UNKNOWN',
+                    observed: [],
+                    dispatched: []
+                  }),
+                  '',
+                  serialization.reason,
+                  'No workflows were dispatched because an older CI command may still mutate hosted coverage.'
+                ].join('\n'));
+                core.setFailed('Older CI command state is UNKNOWN; dispatch stopped.');
+                return;
+              }
+
               const inputs = {
                 pull_request_base_ref: pr.base.ref,
                 pull_request_base_sha: pr.base.sha,
@@ -669,6 +786,35 @@ jobs:
               });
               workflowsToDispatch = workflows.filter((workflow) => !coveredWorkflows.includes(workflow));
 
+              let currentPr;
+              try {
+                currentPr = await getPullRequest();
+              } catch (error) {
+                core.warning(`Unable to re-read the pull request before hosted-CI dispatch: ${error.message || error}`);
+              }
+              if (!currentPr || !samePullRequestSnapshot(pr, currentPr)) {
+                await addReaction('confused');
+                await postComment([
+                  '## Pull Request Changed - Hosted CI Stopped',
+                  coverageMarker({
+                    head_sha: pr.head.sha,
+                    pull_request_number: issueNumber,
+                    base_ref: pr.base.ref,
+                    base_sha: pr.base.sha,
+                    requested_mode: forceFull ? 'force-full' : 'optimized',
+                    requested_at: commentCreatedAt,
+                    coverage_status: 'UNKNOWN',
+                    observed: coverage.workflows,
+                    dispatched: []
+                  }),
+                  '',
+                  'The pull request head, base, repository, or state changed after hosted-CI coverage was planned.',
+                  'No workflows or labels were requested. Retry the command against the current pull request state.'
+                ].join('\n'));
+                core.setFailed('Pull request changed during hosted CI planning; dispatch stopped.');
+                return;
+              }
+
               function legacyCompatibleInputs(workflowInputs) {
                 const legacyInputs = Object.fromEntries(
                   Object.entries(workflowInputs).filter(([name]) => !baseContextInputNames.has(name))
@@ -687,6 +833,16 @@ jobs:
                   [...baseContextInputNames].some((name) => message.includes(name));
               }
 
+              function dispatchUncertainty(message, cause) {
+                const error = new Error(message, cause ? { cause } : undefined);
+                error.dispatchUncertain = true;
+                return error;
+              }
+
+              function isRetryableWorkflowRunReadError(error) {
+                return error?.status === 404 || (error?.status >= 500 && error?.status <= 599);
+              }
+
               async function createWorkflowDispatchWithFallback(workflowName, workflowFile, workflowInputs) {
                 const dispatchOptions = (inputs) => ({
                   owner,
@@ -694,13 +850,48 @@ jobs:
                   workflow_id: workflowFile,
                   ref: pr.head.ref,
                   inputs,
-                  return_run_details: true,
                   headers: { 'x-github-api-version': '2026-03-10' }
                 });
-                const dispatchedWorkflow = (response, usedLegacyInputsFallback) => {
+                const dispatchedWorkflow = async (response, usedLegacyInputsFallback) => {
                   const runId = response?.data?.workflow_run_id;
-                  if (!Number.isInteger(runId) || runId <= 0) {
-                    throw new Error(`${workflowFile} dispatch did not return an exact workflow run ID.`);
+                  if (response?.status !== 200 || !Number.isInteger(runId) || runId <= 0) {
+                    throw dispatchUncertainty(
+                      `${workflowFile} dispatch did not return an exact workflow run ID in a 200 response.`
+                    );
+                  }
+
+                  let run;
+                  for (let attempt = 1; attempt <= dispatchRunValidationMaxAttempts; attempt += 1) {
+                    try {
+                      ({ data: run } = await github.rest.actions.getWorkflowRun({
+                        owner,
+                        repo,
+                        run_id: runId,
+                        headers: { 'x-github-api-version': '2026-03-10' }
+                      }));
+                      break;
+                    } catch (error) {
+                      if (isRetryableWorkflowRunReadError(error) &&
+                          attempt < dispatchRunValidationMaxAttempts) {
+                        await sleep(dispatchRunValidationPollDelayMs);
+                        continue;
+                      }
+                      throw dispatchUncertainty(
+                        `${workflowFile} returned run ${runId}, but the exact workflow run could not be validated.`,
+                        error
+                      );
+                    }
+                  }
+
+                  const expectedPath = `.github/workflows/${workflowFile}`;
+                  const runPath = (run?.path || '').split('@')[0];
+                  if (run?.id !== runId ||
+                      run?.event !== 'workflow_dispatch' ||
+                      run?.head_sha !== pr.head.sha ||
+                      runPath !== expectedPath) {
+                    throw dispatchUncertainty(
+                      `${workflowFile} returned run did not match the expected workflow and head.`
+                    );
                   }
                   return {
                     file: workflowFile,
@@ -710,24 +901,37 @@ jobs:
                   };
                 };
 
+                let response;
+                let usedLegacyInputsFallback = false;
                 try {
-                  const response = await github.rest.actions.createWorkflowDispatch(
+                  response = await github.rest.actions.createWorkflowDispatch(
                     dispatchOptions(workflowInputs)
                   );
-                  return dispatchedWorkflow(response, false);
                 } catch (error) {
                   if (!isUnexpectedInputError(error)) {
-                    throw error;
+                    throw dispatchUncertainty(
+                      `${workflowFile} dispatch result is UNKNOWN: ${error.message || error}`,
+                      error
+                    );
                   }
 
                   core.warning(
                     `${workflowFile} rejected PR base context inputs; retrying with legacy workflow_dispatch inputs.`
                   );
-                  const response = await github.rest.actions.createWorkflowDispatch(
-                    dispatchOptions(legacyCompatibleInputs(workflowInputs))
-                  );
-                  return dispatchedWorkflow(response, true);
+                  usedLegacyInputsFallback = true;
+                  try {
+                    response = await github.rest.actions.createWorkflowDispatch(
+                      dispatchOptions(legacyCompatibleInputs(workflowInputs))
+                    );
+                  } catch (fallbackError) {
+                    throw dispatchUncertainty(
+                      `${workflowFile} legacy dispatch result is UNKNOWN: ${fallbackError.message || fallbackError}`,
+                      fallbackError
+                    );
+                  }
                 }
+
+                return dispatchedWorkflow(response, usedLegacyInputsFallback);
               }
 
               const dispatchResults = await Promise.allSettled(
@@ -745,7 +949,9 @@ jobs:
                 } else {
                   failed.push({
                     workflow: workflowsToDispatch[index][0],
-                    error: result.reason?.message || String(result.reason)
+                    workflowFile: workflowsToDispatch[index][1],
+                    error: result.reason?.message || String(result.reason),
+                    dispatchUncertain: result.reason?.dispatchUncertain === true
                   });
                 }
               }
@@ -753,8 +959,7 @@ jobs:
               let labelAdded = false;
               let forceFullLabelAdded = false;
               let labelMessageOverride = '';
-              const requestedCoverageSatisfied = coveredWorkflows.length + succeeded.length === workflows.length;
-              if (requestedCoverageSatisfied && failed.length === 0) {
+              if (failed.length === 0) {
                 const labelControlCommands = [
                   '+ci-stop-hosted',
                   '+ci-skip-hosted',
@@ -806,12 +1011,16 @@ jobs:
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
                 : '';
+              const uncertainWorkflows = failed
+                .filter((failure) => failure.dispatchUncertain)
+                .map((failure) => failure.workflowFile);
+              const dispatchIsUncertain = uncertainWorkflows.length > 0;
               const fallbackCount = succeeded.filter((workflow) => workflow.usedLegacyInputsFallback).length;
               const fallbackMessage = fallbackCount > 0
                 ? `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
                 : '';
               const dependabotTrustProof = pr.user?.login === 'dependabot[bot]' &&
-                succeeded.length === 0 && coveredWorkflows.length > 0
+                succeeded.length === 0 && coveredWorkflows.length > 0 && failed.length === 0
                 ? `Trusted dispatch proof retained: Triggered ${coveredWorkflows.length} workflow(s) for ` +
                   `\`${pr.head.sha.slice(0, 12)}\` by current-base prior requests.`
                 : '';
@@ -822,10 +1031,24 @@ jobs:
                   : succeeded.length > 0
                     ? 'The workflows were triggered, but the hosted CI labels were not added. See the failure details below.'
                   : 'Hosted CI labels were not added because no workflows were triggered.');
-
-              await postComment([
-                forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
-                coverageProofMarker({
+              const resultMarker = dispatchIsUncertain
+                ? coverageMarker({
+                  head_sha: pr.head.sha,
+                  pull_request_number: issueNumber,
+                  base_ref: pr.base.ref,
+                  base_sha: pr.base.sha,
+                  requested_mode: forceFull ? 'force-full' : 'optimized',
+                  requested_at: commentCreatedAt,
+                  coverage_status: 'UNKNOWN',
+                  dispatch_uncertain: true,
+                  uncertain_workflows: uncertainWorkflows,
+                  workflows: [],
+                  run_ids: {},
+                  reused: [],
+                  observed: coverage.workflows,
+                  dispatched: []
+                })
+                : coverageProofMarker({
                   baseRef: pr.base.ref,
                   baseSha: pr.base.sha,
                   headSha: pr.head.sha,
@@ -837,9 +1060,17 @@ jobs:
                   reused: coveredWorkflows.map(([, workflowFile]) => workflowFile),
                   observed: coverage.workflows,
                   dispatched: succeeded.map((workflow) => workflow.file)
-                }),
+                });
+
+              await postComment([
+                dispatchIsUncertain
+                  ? '## Hosted CI Dispatch UNKNOWN'
+                  : forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
+                resultMarker,
                 '',
-                `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
+                dispatchIsUncertain
+                  ? `Dispatch outcome is UNKNOWN for ${uncertainWorkflows.length} workflow(s); no exact-head dispatch proof was recorded.`
+                  : `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
                 `Skipped ${coveredWorkflows.length} workflow(s) with equivalent exact-head coverage.`,
                 ...(dependabotTrustProof ? [dependabotTrustProof] : []),
                 forceFull
