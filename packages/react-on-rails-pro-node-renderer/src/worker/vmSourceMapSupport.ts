@@ -115,9 +115,12 @@ const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 // inline unit predates this constant and is left alone here.
 const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
 
-// Oversized maps are re-checked on every VM build and on error-path lookups, so
-// warn once per map path to keep rolling deploys from flooding the log. Bundle
-// paths are per-deploy, so this is bounded as an insertion-ordered FIFO rather
+// `preloadSourceMapJsonForBundle` re-checks the map on every VM build, and with
+// `maxVMPoolSize` defaulting to 2 an app with more bundles than that rebuilds
+// per request — so an unthrottled warning is a flood at request rate. (The
+// error-path lookup can also repeat, but only until the miss retires, bounded by
+// MAX_MISSING_SOURCE_MAP_RETRIES.) Warn once per map path instead. Bundle paths
+// are per-deploy, so this is bounded as an insertion-ordered FIFO rather
 // than tied to registration lifetime: evicting the oldest entry only risks a
 // duplicate warning, while unregistering a bundle would re-warn on every VM
 // rebuild and defeat the throttle.
@@ -340,15 +343,24 @@ function candidateSourceMapPaths(bundleFilePath: string, sourceMappingUrl: strin
 }
 
 /**
- * Resolves a candidate map path to a readable file inside the real bundle
- * directory. Returns the size alongside the path so callers can apply
- * {@link MAX_EXTERNAL_SOURCE_MAP_BYTES} without a second `stat`.
+ * Distinguishes "a map is here but too large" from "nothing readable here" — a
+ * distinction the candidate loops depend on, since an oversized candidate must
+ * stop resolution while an absent one may simply not have arrived yet.
+ */
+const OVERSIZED_SOURCE_MAP = Symbol('oversizedSourceMap');
+type SourceMapCandidateResult = string | typeof OVERSIZED_SOURCE_MAP | undefined;
+
+/**
+ * Resolves a candidate map path to a readable, within-cap file inside the real
+ * bundle directory, warning once when the map is oversized. The size check is
+ * last, so it only ever runs on a realpath already proven contained, and reuses
+ * the `stat` the `isFile` check already needs.
  */
 function resolveReadableSourceMapPath(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-): { sourceMapPath: string; sizeInBytes: number } | undefined {
+): SourceMapCandidateResult {
   const bundleDirectory = path.dirname(bundleFilePath);
   try {
     const resolvedPath = path.resolve(candidatePath);
@@ -366,81 +378,47 @@ function resolveReadableSourceMapPath(
       return undefined;
     }
 
-    return { sourceMapPath: realSourceMapPath, sizeInBytes: stats.size };
+    if (stats.size > MAX_EXTERNAL_SOURCE_MAP_BYTES) {
+      warnOversizedSourceMap(realSourceMapPath, stats.size);
+      return OVERSIZED_SOURCE_MAP;
+    }
+
+    return realSourceMapPath;
   } catch {
     return undefined;
   }
 }
 
-/**
- * `unusable` means no readable map at this candidate path (missing, outside the
- * bundle directory, not a file) and callers may try the next candidate.
- * `oversized` means a real map is there but exceeds the cap — a terminal answer
- * that must stop candidate resolution rather than look like a miss.
- */
-type ResolvedSourceMapCandidate =
-  | { status: 'usable'; sourceMapPath: string }
-  | { status: 'oversized' }
-  | { status: 'unusable' };
-
-function resolveSourceMapPathWithinSizeLimit(
-  bundleFilePath: string,
-  candidatePath: string,
-  realBundleDirectory: string,
-): ResolvedSourceMapCandidate {
-  const resolved = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
-  if (!resolved) {
-    return { status: 'unusable' };
-  }
-
-  if (resolved.sizeInBytes > MAX_EXTERNAL_SOURCE_MAP_BYTES) {
-    warnOversizedSourceMap(resolved.sourceMapPath, resolved.sizeInBytes);
-    return { status: 'oversized' };
-  }
-
-  return { status: 'usable', sourceMapPath: resolved.sourceMapPath };
-}
-
-/** Distinguishes "a map is here but too large" from "nothing readable here". */
-const OVERSIZED_SOURCE_MAP = Symbol('oversizedSourceMap');
-type SourceMapFileReadResult = string | typeof OVERSIZED_SOURCE_MAP | undefined;
-
 function readSourceMapFile(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-): SourceMapFileReadResult {
-  const candidate = resolveSourceMapPathWithinSizeLimit(bundleFilePath, candidatePath, realBundleDirectory);
-  if (candidate.status === 'oversized') {
-    return OVERSIZED_SOURCE_MAP;
-  }
-  if (candidate.status === 'unusable') {
-    return undefined;
+): SourceMapCandidateResult {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
+  if (sourceMapPath === OVERSIZED_SOURCE_MAP || sourceMapPath === undefined) {
+    return sourceMapPath;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
   // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
-  return fs.readFileSync(candidate.sourceMapPath, 'utf8');
+  return fs.readFileSync(sourceMapPath, 'utf8');
 }
 
 async function readSourceMapFileAsync(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-): Promise<SourceMapFileReadResult> {
-  const candidate = resolveSourceMapPathWithinSizeLimit(bundleFilePath, candidatePath, realBundleDirectory);
-  if (candidate.status === 'oversized') {
-    return OVERSIZED_SOURCE_MAP;
-  }
-  if (candidate.status === 'unusable') {
-    return undefined;
+): Promise<SourceMapCandidateResult> {
+  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
+  if (sourceMapPath === OVERSIZED_SOURCE_MAP || sourceMapPath === undefined) {
+    return sourceMapPath;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
   // stay inside the real bundle directory, closing symlink-swap races.
   // codeql[js/path-injection]
-  return fs.promises.readFile(candidate.sourceMapPath, 'utf8');
+  return fs.promises.readFile(sourceMapPath, 'utf8');
 }
 
 /**
@@ -753,11 +731,7 @@ function sourceMapForRegistration(
       missingSourceMapRetryCounts.delete(registration);
     } else {
       sourceMap = null;
-      if (
-        loadResult.status === 'terminal' ||
-        !shouldRetryMissingSourceMap(registration) ||
-        (registration.sourceMappingUrl === null && !registration.retryMissingSourceMap)
-      ) {
+      if (loadResult.status === 'terminal' || !shouldRetryMissingSourceMap(registration)) {
         sourceMapCache.set(registration, sourceMap);
       } else {
         recordMissingSourceMapRetry(registration, lookupAttempt);
