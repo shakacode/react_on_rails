@@ -4060,28 +4060,39 @@ def accelerated_rc_published_record(authorized_record:, recorded_at:, approved_b
   )
 end
 
-def record_accelerated_rc_publication_complete!(repo_slug:, tracker:, authorized_record:, approved_by:, recorded_at:)
-  records = fetch_accelerated_rc_tracker_records!(repo_slug:, tracker:)
-  candidate_records = accelerated_rc_records_for_candidate(
-    records,
-    target_version: authorized_record.fetch("target_version"),
-    candidate_sha: authorized_record.fetch("candidate_sha")
+def validated_repository_accelerated_rc_publication_completion_history!(repo_slug:, tracker:, authorization:)
+  history = validated_repository_accelerated_rc_candidate_history!(
+    repo_slug:,
+    target_version: authorization.fetch("target_version"),
+    candidate_sha: authorization.fetch("candidate_sha"),
+    expected_tracker: tracker,
+    selected_authorization: authorization
   )
-  chain = validated_accelerated_rc_candidate_chain!(
-    candidate_records, selected_authorization: authorized_record
-  )
-  terminal = chain.fetch(:terminal)
-  if terminal && terminal["status"] == "candidate-rejected"
-    abort "❌ Accelerated RC publication completion is blocked because this candidate was permanently rejected."
-  end
-  canonical_authorization = chain.fetch(:authorization)
-  publications = chain.fetch(:publications)
-  return publications.first unless publications.empty?
+  abort_if_accelerated_rc_retry_rejected!(history.fetch(:records))
+  history
+end
 
-  published_record = accelerated_rc_published_record(
-    authorized_record: canonical_authorization, recorded_at:, approved_by:
+def record_accelerated_rc_publication_complete!(repo_slug:, tracker:, authorized_record:, approved_by:, recorded_at:)
+  fetch_release_tracker_issue!(repo_slug:, tracker:)
+  history = validated_repository_accelerated_rc_publication_completion_history!(
+    repo_slug:, tracker:, authorization: authorized_record
   )
-  append_accelerated_rc_tracker_record!(repo_slug:, tracker:, record: published_record)
+  publications = history.dig(:chain, :publications)
+  if publications.empty?
+    published_record = accelerated_rc_published_record(
+      authorized_record: history.dig(:chain, :authorization), recorded_at:, approved_by:
+    )
+    append_accelerated_rc_tracker_record!(repo_slug:, tracker:, record: published_record)
+  end
+
+  refreshed_history = validated_repository_accelerated_rc_publication_completion_history!(
+    repo_slug:, tracker:, authorization: authorized_record
+  )
+  canonical_publication = refreshed_history.dig(:chain, :publications).first
+  abort "❌ Canonical published-awaiting-gates transition is missing after publication completion." unless
+    canonical_publication
+
+  canonical_publication
 end
 
 def accelerated_rc_publication_completion_equivalent?(existing, expected)
@@ -6653,8 +6664,18 @@ def skip_existing_rubygem_publish?(gem_name:, published_version:, idempotent_ret
   true
 end
 
+def validated_gem_release_max_retries!(value)
+  max_retries = value.is_a?(String) ? Integer(value, 10) : value
+  return max_retries if max_retries.is_a?(Integer) && max_retries.positive?
+
+  abort "❌ GEM_RELEASE_MAX_RETRIES must be a positive base-10 integer; got #{value.inspect}."
+rescue ArgumentError, TypeError
+  abort "❌ GEM_RELEASE_MAX_RETRIES must be a positive base-10 integer; got #{value.inspect}."
+end
+
 def publish_gem_with_retry(dir, gem_name, otp: nil, published_version: nil, idempotent_retry: false,
-                           max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
+                           max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3"))
+  max_retries = validated_gem_release_max_retries!(max_retries)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
   current_otp = normalize_otp_code(otp, service_name: "RubyGems")
 
@@ -7048,7 +7069,7 @@ Environment variables:
   RELEASE_ACCELERATED_RC=true           # Enable audited pending-gate publication from matching release/X.Y.Z
   RELEASE_TRACKER=<issue>               # Active release tracker (required for accelerated RC/final promotion)
   RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer rationale for accelerated publication
-  GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
+  GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 
 Examples:
   rake release                                  # Auto-detect version; stable targets require changelog
@@ -7073,6 +7094,9 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
   allow_version_policy_override = version_policy_override_enabled?(args_hash[:override_version_policy])
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
+  gem_release_max_retries = unless is_dry_run
+                              validated_gem_release_max_retries!(ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3"))
+                            end
 
   current_branch_output, current_branch_status = Open3.capture2e(
     "git", "-C", monorepo_root, "rev-parse", "--abbrev-ref", "HEAD"
@@ -7478,7 +7502,8 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "react_on_rails",
         otp: current_rubygems_otp,
         published_version: actual_gem_version,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        max_retries: gem_release_max_retries
       )
 
       publish_gem_with_retry(
@@ -7486,8 +7511,23 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
         "react_on_rails_pro",
         otp: current_rubygems_otp,
         published_version: actual_gem_version,
-        idempotent_retry: idempotent_publish_retry
+        idempotent_retry: idempotent_publish_retry,
+        max_retries: gem_release_max_retries
       )
+
+      if accelerated_publication_record
+        tracker = accelerated_publication_record.fetch("release_tracker")
+        record_accelerated_rc_publication_complete!(
+          repo_slug:,
+          tracker:,
+          authorized_record: accelerated_publication_record,
+          recorded_at: Time.now.utc,
+          approved_by: accelerated_approver
+        )
+        puts "⚠️ RC published with gates still reconciling. Before final promotion, run:"
+        puts "  RELEASE_TRACKER=#{tracker} bundle exec rake " \
+             "\"release:reconcile_accelerated_rc[#{actual_gem_version}]\""
+      end
     end
   end
 
@@ -7510,21 +7550,6 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
     puts "\nTo actually release, run: rake release[#{released_gem_version}]"
   else
     sync_github_release_after_publish(monorepo_root:, gem_version: released_gem_version, dry_run: false)
-    if accelerated_publication_record
-      repo_slug = github_repo_slug(monorepo_root)
-      tracker = accelerated_publication_record.fetch("release_tracker")
-      fetch_release_tracker_issue!(repo_slug:, tracker:)
-      record_accelerated_rc_publication_complete!(
-        repo_slug:,
-        tracker:,
-        authorized_record: accelerated_publication_record,
-        recorded_at: Time.now.utc,
-        approved_by: accelerated_approver
-      )
-      puts "⚠️ RC published with gates still reconciling. Before final promotion, run:"
-      puts "  RELEASE_TRACKER=#{tracker} bundle exec rake " \
-           "\"release:reconcile_accelerated_rc[#{released_gem_version}]\""
-    end
 
     changelog_path = File.join(monorepo_root, "CHANGELOG.md")
     has_changelog_section = extract_changelog_section(changelog_path:, version: released_gem_version)

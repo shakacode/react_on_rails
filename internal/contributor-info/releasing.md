@@ -161,7 +161,7 @@ RELEASE_CI_STATUS_OVERRIDE=true # DANGEROUS last-resort waiver for the release C
 RELEASE_ACCELERATED_RC=true # Explicit RC only: publish while named pending gates finish
 RELEASE_TRACKER=<issue> # Active release tracker for accelerated RC records and final promotion
 RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer reason for accelerated publication
-GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
+GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer max retry attempts (default: 3)
 ```
 
 #### Release CI evidence and strict HEAD evaluation
@@ -241,10 +241,16 @@ state aborts before authorization is recorded. If refreshed evidence is still de
 differs from what the prompt displayed, the task displays the new snapshot and requires confirmation again;
 continually changing evidence eventually aborts rather than authorizing an unstable snapshot. It then
 appends the refreshed machine-readable `publication-authorized` record before
-creating the tag or publishing any package. After immutable artifacts and the GitHub release are
-available, it appends `published-awaiting-gates`. An interrupted attempt therefore remains visibly
-blocking even if publication partly succeeds, and retries reuse the same candidate without appending
-duplicate status records. Accelerated RCs use an annotated tag containing canonical tracker and
+creating the tag or publishing any package. After all six immutable npm and RubyGem artifacts are
+confirmed, it immediately appends `published-awaiting-gates` before fallible GitHub-release synchronization
+or other post-publish work. Partial package publication never appends that transition; once every package
+is published, a later GitHub-release sync failure still leaves the candidate durably awaiting reconciliation.
+At that completion boundary, the task first proves that the tracker is still eligible and that bounded
+repository-wide history has one canonical tracker and authorization with no absorbing rejection. It repeats
+that repository-wide proof after append or idempotent reuse, so a concurrent cross-tracker or terminal conflict
+cannot be reported as a successful completion.
+Retries reuse the same candidate without appending duplicate status records. Accelerated RCs use an annotated
+tag containing canonical tracker and
 authorization provenance; retries load and reuse that persisted authorization instead of refreshing
 it into a conflicting record. Persisted authorization is not permission to reuse stale pending evidence:
 before retrying any tag or immutable publication, the task refreshes exact-candidate CI and the exact

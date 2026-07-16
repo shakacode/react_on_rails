@@ -4339,6 +4339,21 @@ RSpec.describe "release.rake helper methods" do
         )
       end.to output(/already visible on RubyGems\.org/).to_stdout
     end
+
+    [0, -1, "not-a-number", "1.5"].each do |invalid_max_retries|
+      it "rejects invalid max retries #{invalid_max_retries.inspect} before invoking RubyGems" do
+        expect(self).not_to receive(:sh_args_in_dir_for_release)
+
+        expect do
+          publish_gem_with_retry(
+            "/tmp/gem",
+            "react_on_rails",
+            otp: "123456",
+            max_retries: invalid_max_retries
+          )
+        end.to raise_error(SystemExit, /GEM_RELEASE_MAX_RETRIES.*positive.*integer/i)
+      end
+    end
   end
 
   describe "#publish_npm_with_retry" do
@@ -8452,7 +8467,10 @@ RSpec.describe "release.rake helper methods" do
         authorized_record: authorization,
         recorded_at: Time.utc(2026, 7, 14, 14)
       ).merge("reason" => "Mutated after authorization")
-      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization, existing])
+      allow(self).to receive_messages(
+        fetch_release_tracker_issue!: {},
+        fetch_repository_accelerated_rc_records_for_candidate!: [authorization, existing]
+      )
       expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
 
       expect do
@@ -8482,7 +8500,110 @@ RSpec.describe "release.rake helper methods" do
         approved_by: "first-completing-maintainer",
         recorded_at: Time.utc(2026, 7, 14, 14)
       )
-      allow(self).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization, existing])
+      allow(self).to receive(:fetch_release_tracker_issue!).and_return({})
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!)
+        .and_return([authorization, existing], [authorization, existing])
+      expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+      expect(
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      ).to eq(existing)
+    end
+
+    it "revalidates tracker eligibility before recording publication completion" do
+      authorization = accelerated_rc_test_authorization
+      allow(self).to receive(:fetch_release_tracker_issue!) do
+        abort "V78 simulated closed release tracker"
+      end
+      allow(self).to receive_messages(
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        append_accelerated_rc_tracker_record!: accelerated_rc_published_record(
+          authorized_record: authorization,
+          recorded_at: Time.utc(2026, 7, 14, 14)
+        )
+      )
+
+      expect do
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      end.to raise_error(SystemExit, /closed release tracker/)
+    end
+
+    [
+      ["authorization", -> { accelerated_rc_test_authorization(tracker: 999) }],
+      ["rejection", -> { accelerated_rc_test_rejected_history(tracker: 999).last }]
+    ].each do |conflict_name, conflicting_record|
+      it "rejects a cross-tracker #{conflict_name} before publication completion append" do
+        authorization = accelerated_rc_test_authorization
+        allow(self).to receive_messages(
+          fetch_release_tracker_issue!: {},
+          fetch_repository_accelerated_rc_records_for_candidate!: [
+            authorization, instance_exec(&conflicting_record)
+          ],
+          fetch_accelerated_rc_tracker_records!: [authorization]
+        )
+        expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
+
+        expect do
+          record_accelerated_rc_publication_complete!(
+            repo_slug: "shakacode/react_on_rails",
+            tracker: 3823,
+            authorized_record: authorization,
+            approved_by: "retrying-maintainer",
+            recorded_at: Time.utc(2026, 7, 14, 15)
+          )
+        end.to raise_error(SystemExit, /conflicting release trackers/)
+      end
+    end
+
+    it "rejects a repository conflict introduced between append and completion re-fetch" do
+      authorization = accelerated_rc_test_authorization
+      conflicting_authorization = accelerated_rc_test_authorization(tracker: 999)
+      published = accelerated_rc_published_record(
+        authorized_record: authorization,
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      allow(self).to receive_messages(
+        fetch_release_tracker_issue!: {},
+        fetch_accelerated_rc_tracker_records!: [authorization],
+        append_accelerated_rc_tracker_record!: published
+      )
+      allow(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!)
+        .and_return([authorization], [authorization, conflicting_authorization])
+
+      expect do
+        record_accelerated_rc_publication_complete!(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          approved_by: "retrying-maintainer",
+          recorded_at: Time.utc(2026, 7, 14, 15)
+        )
+      end.to raise_error(SystemExit, /conflicting release trackers/)
+    end
+
+    it "revalidates clean repository history when reusing completion across approvers" do
+      authorization = accelerated_rc_test_authorization
+      existing = accelerated_rc_published_record(
+        authorized_record: authorization,
+        approved_by: "first-completing-maintainer",
+        recorded_at: Time.utc(2026, 7, 14, 14)
+      )
+      allow(self).to receive(:fetch_release_tracker_issue!).and_return({})
+      expect(self).to receive(:fetch_repository_accelerated_rc_records_for_candidate!)
+        .twice
+        .and_return([authorization, existing], [authorization, existing])
       expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
 
       expect(
@@ -8515,8 +8636,12 @@ RSpec.describe "release.rake helper methods" do
       mutated_publication = canonical_publication.merge(
         "reason" => "Mutated after the canonical publication record"
       )
-      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
-        .and_return([authorization, canonical_publication, mutated_publication])
+      allow(self).to receive_messages(
+        fetch_release_tracker_issue!: {},
+        fetch_repository_accelerated_rc_records_for_candidate!: [
+          authorization, canonical_publication, mutated_publication
+        ]
+      )
       expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
 
       expect do
@@ -8546,8 +8671,12 @@ RSpec.describe "release.rake helper methods" do
         authorized_record: authorization,
         recorded_at: Time.utc(2026, 7, 14, 14)
       )
-      allow(self).to receive(:fetch_accelerated_rc_tracker_records!)
-        .and_return([authorization, conflicting_authorization, canonical_publication])
+      allow(self).to receive_messages(
+        fetch_release_tracker_issue!: {},
+        fetch_repository_accelerated_rc_records_for_candidate!: [
+          authorization, conflicting_authorization, canonical_publication
+        ]
+      )
       expect(self).not_to receive(:append_accelerated_rc_tracker_record!)
 
       expect do
@@ -11178,7 +11307,8 @@ RSpec.describe "release.rake helper methods" do
         "RELEASE_ACCELERATED_RC=true",
         "RELEASE_TRACKER=<issue>",
         "RELEASE_ACCELERATED_RC_REASON=<reason>",
-        "from matching release/X.Y.Z"
+        "from matching release/X.Y.Z",
+        "GEM_RELEASE_MAX_RETRIES=<n>  # Positive base-10 integer"
       )
       expect(Rake::Task.task_defined?("release:reconcile_accelerated_rc")).to be(true)
     end
@@ -11581,6 +11711,228 @@ RSpec.describe "release.rake helper methods" do
           .with(monorepo_root: "/tmp/repo", tag: "v17.0.0.rc.10", tag_type: "accelerated RC")
         expect(task_receiver).not_to have_received(:confirm_release!)
         expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+  end
+
+  describe "release task accelerated RC publication completion" do
+    let(:release_task) { Rake::Task["release"] }
+    let(:task_receiver) { release_task.actions.first.binding.receiver }
+    let(:release_root) { "/tmp/v76-release" }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:events) { [] }
+    let(:authorization) { accelerated_rc_test_authorization }
+
+    before do
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", release_root, "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.0.0\n", success_status])
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", release_root, "diff", "--cached", "--quiet")
+        .and_return(["", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NPM_OTP", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RUBYGEMS_OTP", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return("true")
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil)
+                                   .and_return("Start published-artifact QA while exact-head checks finish")
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call(release_root) }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: release_root,
+        verbose: nil,
+        release_paths: {
+          monorepo_root: release_root,
+          gem_root: "#{release_root}/react_on_rails",
+          pro_gem_root: "#{release_root}/react_on_rails_pro",
+          dummy_app_dir: "#{release_root}/react_on_rails/spec/dummy",
+          pro_dummy_app_dir: "#{release_root}/missing-pro-dummy",
+          pro_execjs_dummy_app_dir: "#{release_root}/missing-pro-execjs-dummy"
+        },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        release_tag_retry_state_for_current_head: :none,
+        github_repo_slug: "shakacode/react_on_rails",
+        resolve_accelerated_rc_options_for_release!: {
+          target_gem_version: "17.0.0.rc.10",
+          tracker: 3823,
+          reason: "Start published-artifact QA while exact-head checks finish"
+        },
+        ensure_accelerated_rc_release_branch!: nil,
+        preflight_explicit_accelerated_rc_target_tag!: nil,
+        fetch_release_tracker_issue!: nil,
+        current_release_approver!: "justin808",
+        maybe_offer_release_branch_cut!: nil,
+        ensure_release_branch_matches_target_base!: nil,
+        release_tag_at_current_head?: false,
+        remote_release_tag_retry?: false,
+        validate_main_ci_status!: nil,
+        validate_release_version_policy!: nil,
+        preflight_registry_publish_conflicts!: nil,
+        confirm_release!: nil,
+        sh_in_dir_for_release: nil,
+        unbundled_sh_in_dir_for_release: nil,
+        current_git_sha!: "f" * 40,
+        authorize_accelerated_rc_publication!: authorization,
+        push_release_tag_for_candidate!: nil,
+        resolve_rubygems_otp_for_publish: nil
+      )
+      allow(task_receiver).to receive(:current_gem_version).and_return("16.9.0", "17.0.0.rc.10")
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read)
+        .with("#{release_root}/react_on_rails_pro/lib/react_on_rails_pro/version.rb")
+        .and_return(+"VERSION = \"16.9.0\"\n")
+      [
+        "#{release_root}/package.json",
+        "#{release_root}/packages/react-on-rails/package.json",
+        "#{release_root}/packages/react-on-rails-pro/package.json",
+        "#{release_root}/packages/react-on-rails-pro-node-renderer/package.json",
+        "#{release_root}/packages/create-react-on-rails-app/package.json"
+      ].each do |package_json|
+        allow(File).to receive(:read).with(package_json).and_return("{\"version\":\"16.9.0\"}\n")
+      end
+      allow(File).to receive(:write)
+      allow(task_receiver).to receive(:publish_npm_with_retry) do |_dir, package, **_options|
+        events << [:npm, package]
+        nil
+      end
+      allow(task_receiver).to receive(:publish_gem_with_retry) do |_dir, package, **_options|
+        events << [:gem, package]
+        nil
+      end
+      allow(task_receiver).to receive(:record_accelerated_rc_publication_complete!) do
+        events << :publication_complete
+      end
+      allow(task_receiver).to receive(:sync_github_release_after_publish)
+    end
+
+    after { release_task.reenable }
+
+    def invoke_accelerated_release_task(release_task)
+      release_task.reenable
+      release_task.invoke("17.0.0.rc.10", false, true, false)
+      nil
+    rescue SystemExit => error
+      error
+    end
+
+    it "records complete package publication before fallible GitHub release sync" do
+      repository_history_reads = 0
+      persisted_publication = nil
+      allow(task_receiver).to receive(:fetch_repository_accelerated_rc_records_for_candidate!) do
+        repository_history_reads += 1
+        persisted_publication ? [authorization, persisted_publication] : [authorization]
+      end
+      allow(task_receiver).to receive(:fetch_accelerated_rc_tracker_records!).and_return([authorization])
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) do |record:, **_options|
+        persisted_publication = record
+      end
+      allow(task_receiver).to receive(:record_accelerated_rc_publication_complete!)
+        .and_wrap_original do |method, **args|
+        events << :publication_complete
+        method.call(**args)
+      end
+      allow(task_receiver).to receive(:sync_github_release_after_publish) do
+        events << :github_release_sync
+        abort "V76 simulated post-publish GitHub release sync failure"
+      end
+
+      failure = invoke_accelerated_release_task(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to eq("V76 simulated post-publish GitHub release sync failure")
+        expect(events).to eq(
+          [
+            [:npm, "react-on-rails@17.0.0-rc.10"],
+            [:npm, "react-on-rails-pro@17.0.0-rc.10"],
+            [:npm, "react-on-rails-pro-node-renderer@17.0.0-rc.10"],
+            [:npm, "create-react-on-rails-app@17.0.0-rc.10"],
+            [:gem, "react_on_rails"],
+            [:gem, "react_on_rails_pro"],
+            :publication_complete,
+            :github_release_sync
+          ]
+        )
+        expect(task_receiver).to have_received(:record_accelerated_rc_publication_complete!).with(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823,
+          authorized_record: authorization,
+          recorded_at: a_kind_of(Time),
+          approved_by: "justin808"
+        ).once
+        expect(repository_history_reads).to eq(2)
+      end
+    end
+
+    ["0", "-1", "not-a-number", "1.5"].each do |invalid_max_retries|
+      it "rejects GEM_RELEASE_MAX_RETRIES=#{invalid_max_retries.inspect} before any package publication" do
+        allow(ENV).to receive(:fetch)
+          .with("GEM_RELEASE_MAX_RETRIES", "3")
+          .and_return(invalid_max_retries)
+        allow(task_receiver).to receive(:publish_npm_with_retry) do |*_args|
+          events << :npm_publisher_reached
+          abort "V78 npm publisher reached with invalid retry configuration"
+        end
+
+        failure = invoke_accelerated_release_task(release_task)
+
+        aggregate_failures do
+          expect(failure&.message).to match(/GEM_RELEASE_MAX_RETRIES.*positive.*integer/i)
+          expect(events).to be_empty
+          expect(task_receiver).not_to have_received(:publish_gem_with_retry)
+          expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
+          expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
+        end
+      end
+    end
+
+    it "does not record publication completion when npm publication stops partway through" do
+      allow(task_receiver).to receive(:publish_npm_with_retry) do |_dir, package, **_options|
+        events << [:npm, package]
+        abort "V76 simulated partial npm publication failure" if package.start_with?("react-on-rails-pro@")
+
+        nil
+      end
+
+      failure = invoke_accelerated_release_task(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to eq("V76 simulated partial npm publication failure")
+        expect(events).to eq(
+          [
+            [:npm, "react-on-rails@17.0.0-rc.10"],
+            [:npm, "react-on-rails-pro@17.0.0-rc.10"]
+          ]
+        )
+        expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
+        expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
+      end
+    end
+
+    it "does not record publication completion when the final gem publication fails" do
+      allow(task_receiver).to receive(:publish_gem_with_retry) do |_dir, package, **_options|
+        events << [:gem, package]
+        abort "V76 simulated final gem publication failure" if package == "react_on_rails_pro"
+
+        nil
+      end
+
+      failure = invoke_accelerated_release_task(release_task)
+
+      aggregate_failures do
+        expect(failure&.message).to eq("V76 simulated final gem publication failure")
+        expect(events).to eq(
+          [
+            [:npm, "react-on-rails@17.0.0-rc.10"],
+            [:npm, "react-on-rails-pro@17.0.0-rc.10"],
+            [:npm, "react-on-rails-pro-node-renderer@17.0.0-rc.10"],
+            [:npm, "create-react-on-rails-app@17.0.0-rc.10"],
+            [:gem, "react_on_rails"],
+            [:gem, "react_on_rails_pro"]
+          ]
+        )
+        expect(task_receiver).not_to have_received(:record_accelerated_rc_publication_complete!)
+        expect(task_receiver).not_to have_received(:sync_github_release_after_publish)
       end
     end
   end
