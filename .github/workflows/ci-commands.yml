@@ -62,6 +62,12 @@ jobs:
               return releaseBranchPrefixes.some((prefix) => pr.base.ref.startsWith(prefix));
             }
 
+            function hasAutomaticReleaseTargetCoverage(pr) {
+              return isSameRepositoryPullRequest(pr) &&
+                isReleaseTargetPullRequest(pr) &&
+                pr.user?.login !== 'dependabot[bot]';
+            }
+
             function hostedWorkflows(pr, inputs = {}) {
               return [
                 ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
@@ -96,7 +102,7 @@ jobs:
               return runs.length > 0 ? 'failed' : 'missing';
             }
 
-            function parseCoverageProof(comment, headSha) {
+            function parseCoverageProof(comment, pr) {
               if (comment.user?.login !== 'github-actions[bot]' || comment.user?.type !== 'Bot') {
                 return null;
               }
@@ -108,7 +114,10 @@ jobs:
 
               try {
                 const proof = JSON.parse(match[1]);
-                if (proof.head_sha !== headSha ||
+                if (proof.head_sha !== pr.head.sha ||
+                    proof.pull_request_number !== issueNumber ||
+                    proof.base_ref !== pr.base.ref ||
+                    proof.base_sha !== pr.base.sha ||
                     !['optimized', 'force-full'].includes(proof.requested_mode) ||
                     !Array.isArray(proof.workflows) ||
                     Number.isNaN(Date.parse(proof.requested_at || ''))) {
@@ -127,12 +136,27 @@ jobs:
                 .sort((left, right) => Date.parse(right.requested_at) - Date.parse(left.requested_at))[0] || null;
             }
 
-            function runsForProof(runs, proof, proofs, workflowFile) {
+            function observedProofRunState(runs, proof, proofs, workflowFile) {
               if (!proof) {
-                return [];
+                return 'missing';
               }
 
               const requestedAt = Date.parse(proof.requested_at);
+              const workflowDispatchRuns = runs.filter((run) => run.event === 'workflow_dispatch');
+              const earlierProofs = proofs.filter((candidate) =>
+                candidate.workflows.includes(workflowFile) &&
+                Date.parse(candidate.requested_at) < requestedAt
+              );
+              const earliestEarlierRequest = earlierProofs
+                .map((candidate) => Date.parse(candidate.requested_at))
+                .sort((left, right) => left - right)[0];
+              const materializedEarlierRuns = earliestEarlierRequest === undefined
+                ? 0
+                : workflowDispatchRuns.filter((run) => {
+                  const createdAt = Date.parse(run.created_at || '');
+                  return createdAt >= earliestEarlierRequest && createdAt < requestedAt;
+                }).length;
+              const ambiguousEarlierRuns = Math.max(0, earlierProofs.length - materializedEarlierRuns);
               const nextRequestedAt = proofs
                 .filter((candidate) =>
                   candidate.workflows.includes(workflowFile) &&
@@ -140,25 +164,57 @@ jobs:
                 )
                 .map((candidate) => Date.parse(candidate.requested_at))
                 .sort((left, right) => left - right)[0];
-              return runs.filter((run) =>
-                run.event === 'workflow_dispatch' &&
-                (!run.created_at || (
-                  Date.parse(run.created_at) >= requestedAt &&
-                  (!nextRequestedAt || Date.parse(run.created_at) < nextRequestedAt)
-                ))
-              );
+              const proofWindowRuns = workflowDispatchRuns.filter((run) => {
+                const createdAt = Date.parse(run.created_at || '');
+                return createdAt >= requestedAt &&
+                  (!nextRequestedAt || createdAt < nextRequestedAt);
+              });
+
+              if (proofWindowRuns.length <= ambiguousEarlierRuns) {
+                return 'pending';
+              }
+
+              const successfulRuns = proofWindowRuns.filter((run) =>
+                run.status === 'completed' && run.conclusion === 'success'
+              ).length;
+              if (successfulRuns > ambiguousEarlierRuns) {
+                return 'successful';
+              }
+
+              const pendingRuns = proofWindowRuns.filter((run) => activeWorkflowStatuses.has(run.status)).length;
+              if (pendingRuns > ambiguousEarlierRuns) {
+                return 'pending';
+              }
+
+              // If an earlier dispatch can account for every successful or active run in this
+              // window, this request's outcome is not proven. Retry rather than attributing a
+              // run that materialized late to the wrong request mode.
+              return 'failed';
             }
 
             function coverageMarker(payload) {
               return `<!-- hosted-ci-coverage:v1 ${JSON.stringify(payload)} -->`;
             }
 
-            function coverageProofMarker({ dispatched, headSha, observed, requestedMode, workflows }) {
+            function coverageProofMarker({
+              baseRef,
+              baseSha,
+              dispatched,
+              headSha,
+              observed,
+              requestedMode,
+              reused,
+              workflows
+            }) {
               return coverageMarker({
                 head_sha: headSha,
+                pull_request_number: issueNumber,
+                base_ref: baseRef,
+                base_sha: baseSha,
                 requested_mode: requestedMode,
                 requested_at: commentCreatedAt,
                 workflows,
+                reused,
                 observed,
                 dispatched
               });
@@ -184,25 +240,38 @@ jobs:
                 ]);
                 const exactHeadRuns = runs.filter((run) => run.head_sha === pr.head.sha);
                 const proofs = comments
-                  .map((comment) => parseCoverageProof(comment, pr.head.sha))
+                  .map((comment) => parseCoverageProof(comment, pr))
                   .filter(Boolean);
-                const automaticReleaseTarget = isSameRepositoryPullRequest(pr) && isReleaseTargetPullRequest(pr);
+                const automaticReleaseTarget = hasAutomaticReleaseTargetCoverage(pr);
                 const workflows = hostedWorkflowFiles(pr).map((workflowFile) => {
                   const workflowRuns = exactHeadRuns.filter((run) => workflowFileForRun(run) === workflowFile);
+                  // Non-release pull_request runs can be successful selector-only shells. Only
+                  // workflow_dispatch runs, or explicitly trusted release-target runs below,
+                  // prove that the hosted jobs actually ran.
                   const forceFullProof = latestCoverageProof(proofs, workflowFile, 'force-full');
-                  const forceFullProofRuns = runsForProof(workflowRuns, forceFullProof, proofs, workflowFile);
-                  const forceFullState = forceFullProof
-                    ? (forceFullProofRuns.length > 0 ? observedRunState(forceFullProofRuns) : 'pending')
-                    : 'missing';
+                  const forceFullState = observedProofRunState(
+                    workflowRuns,
+                    forceFullProof,
+                    proofs,
+                    workflowFile
+                  );
                   const optimizedProof = latestCoverageProof(proofs, workflowFile, 'optimized');
-                  const optimizedProofRuns = runsForProof(workflowRuns, optimizedProof, proofs, workflowFile);
+                  const optimizedProofState = observedProofRunState(
+                    workflowRuns,
+                    optimizedProof,
+                    proofs,
+                    workflowFile
+                  );
                   const automaticReleaseRuns = automaticReleaseTarget
-                    ? workflowRuns.filter((run) => run.event === 'pull_request')
+                    ? workflowRuns.filter((run) =>
+                      run.event === 'pull_request' &&
+                      (run.pull_requests || []).some((associatedPullRequest) =>
+                        associatedPullRequest.number === issueNumber &&
+                        associatedPullRequest.base?.ref === pr.base.ref &&
+                        associatedPullRequest.base?.sha === pr.base.sha
+                      )
+                    )
                     : [];
-                  const ordinaryState = observedRunState([
-                    ...workflowRuns,
-                    ...(optimizedProof && optimizedProofRuns.length === 0 ? [{ status: 'pending' }] : [])
-                  ]);
                   const releaseState = observedRunState(automaticReleaseRuns);
 
                   if (['pending', 'successful'].includes(forceFullState)) {
@@ -214,13 +283,13 @@ jobs:
 
                   return {
                     file: workflowFile,
-                    mode: ordinaryState === 'missing' ? 'missing' : 'optimized',
-                    state: ordinaryState,
+                    mode: optimizedProofState === 'missing' ? 'missing' : 'optimized',
+                    state: optimizedProofState,
                     force_full_state: forceFullState
                   };
                 });
 
-                return { status: 'known', workflows };
+                return { status: 'known', baseRef: pr.base.ref, baseSha: pr.base.sha, workflows };
               } catch (error) {
                 core.warning(`Unable to read exact-head workflow runs: ${error.message || error}`);
                 return { status: 'UNKNOWN', workflows: [] };
@@ -758,6 +827,11 @@ jobs:
               const fallbackMessage = fallbackCount > 0
                 ? `Retried ${fallbackCount} workflow(s) without PR base context inputs because the PR branch has older workflow files.`
                 : '';
+              const dependabotTrustProof = pr.user?.login === 'dependabot[bot]' &&
+                succeeded.length === 0 && coveredWorkflows.length > 0
+                ? `Trusted dispatch proof retained: Triggered ${coveredWorkflows.length} workflow(s) for ` +
+                  `\`${pr.head.sha.slice(0, 12)}\` by current-base prior requests.`
+                : '';
               const labelMessage = labelMessageOverride || (labelAdded && forceFullLabelAdded
                 ? 'Added `ready-for-hosted-ci` and `force-full-hosted-ci`, so future commits will bypass optimized hosted CI selection until `+ci-stop-full` is used.'
                 : labelAdded
@@ -769,15 +843,19 @@ jobs:
               await postComment([
                 forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
                 coverageProofMarker({
+                  baseRef: pr.base.ref,
+                  baseSha: pr.base.sha,
                   headSha: pr.head.sha,
                   requestedMode: forceFull ? 'force-full' : 'optimized',
                   workflows: succeeded.map((workflow) => workflow.file),
+                  reused: coveredWorkflows.map(([, workflowFile]) => workflowFile),
                   observed: coverage.workflows,
                   dispatched: succeeded.map((workflow) => workflow.file)
                 }),
                 '',
                 `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
                 `Skipped ${coveredWorkflows.length} workflow(s) with equivalent exact-head coverage.`,
+                ...(dependabotTrustProof ? [dependabotTrustProof] : []),
                 forceFull
                   ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
@@ -878,7 +956,7 @@ jobs:
               const docsOnly = isDocsOnly(files);
               const hasReadyForHostedCi = labels.includes(hostedCiLabel);
               const hasForceFullHostedCi = labels.includes(forceFullHostedCiLabel);
-              const automaticReleaseTarget = isSameRepositoryPullRequest(pr) && isReleaseTargetPullRequest(pr);
+              const automaticReleaseTarget = hasAutomaticReleaseTargetCoverage(pr);
               const coverageCounts = coverage.workflows.reduce((counts, workflow) => {
                 counts[workflow.state] += 1;
                 return counts;

@@ -45,6 +45,16 @@ function defaultPullRequest() {
   };
 }
 
+function currentPullRequestAssociation() {
+  return [
+    {
+      base: { ref: 'release/17.0.0', sha: 'base-sha' },
+      head: { ref: 'verify-release-ci', sha: 'current-head-sha' },
+      number: 42,
+    },
+  ];
+}
+
 function coverageMarkerFrom(comment) {
   const match = comment.match(/<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->/);
   assert.ok(match, 'expected a machine-readable hosted-CI coverage marker');
@@ -146,6 +156,7 @@ test('+ci-status reports automatic exact-head release-target coverage', async ()
     event: 'pull_request',
     head_sha: 'current-head-sha',
     path: `.github/workflows/${workflowFile}`,
+    pull_requests: currentPullRequestAssociation(),
     status: index === 0 ? 'in_progress' : 'completed',
   }));
 
@@ -170,6 +181,7 @@ test('+ci-run-hosted skips equivalent automatic exact-head release coverage', as
     event: 'pull_request',
     head_sha: 'current-head-sha',
     path: `.github/workflows/${workflowFile}`,
+    pull_requests: currentPullRequestAssociation(),
     status: index === 0 ? 'queued' : 'completed',
   }));
 
@@ -179,6 +191,23 @@ test('+ci-run-hosted skips equivalent automatic exact-head release coverage', as
   assert.deepEqual(calls.reactions, ['eyes']);
   assert.ok(calls.labels.includes('ready-for-hosted-ci'));
   assert.match(calls.comments.at(-1), /Skipped 9 workflow\(s\) with equivalent exact-head coverage/);
+});
+
+test('+ci-run-hosted does not reuse detector-only pull_request shells', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.base.ref = 'main';
+  const runs = hostedWorkflowFiles.map((workflowFile) => ({
+    conclusion: 'success',
+    event: 'pull_request',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  }));
+
+  const calls = await runCommand({ body: '+ci-run-hosted', pullRequest, runs });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.match(calls.comments.at(-1), /Triggered 9 workflow\(s\)/);
 });
 
 test('+ci-force-full dispatches only force-full coverage proven missing', async () => {
@@ -199,7 +228,7 @@ test('+ci-force-full dispatches only force-full coverage proven missing', async 
     status: 'completed',
   };
   const proof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -217,6 +246,9 @@ test('+ci-force-full dispatches only force-full coverage proven missing', async 
   assert.match(resultComment, /Skipped 1 workflow\(s\) with equivalent exact-head coverage/);
 
   const marker = coverageMarkerFrom(resultComment);
+  assert.equal(marker.pull_request_number, 42);
+  assert.equal(marker.base_ref, 'release/17.0.0');
+  assert.equal(marker.base_sha, 'base-sha');
   assert.equal(marker.requested_mode, 'force-full');
   assert.equal(marker.observed.length, 9);
   assert.deepEqual([...marker.dispatched].sort(), hostedWorkflowFiles.slice(1).sort());
@@ -286,6 +318,33 @@ test('+ci-run-hosted does not reuse old-head, failed, or cancelled workflow runs
   assert.match(calls.comments.at(-1), /Skipped 0 workflow\(s\) with equivalent exact-head coverage/);
 });
 
+test('+ci-run-hosted does not reuse dispatch coverage from an old PR base', async () => {
+  const workflowFile = hostedWorkflowFiles[0];
+  const oldBaseProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"main","base_sha":"old-base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const oldBaseRun = {
+    conclusion: 'success',
+    created_at: '2026-07-16T08:00:10Z',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  };
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [oldBaseProof],
+    runs: [oldBaseRun],
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.match(calls.comments.at(-1), /Skipped 0 workflow\(s\)/);
+});
+
 test('+ci-force-full retries a force-full proof whose exact-head run was cancelled', async () => {
   const automaticRuns = hostedWorkflowFiles.map((workflowFile) => ({
     conclusion: 'success',
@@ -295,7 +354,7 @@ test('+ci-force-full retries a force-full proof whose exact-head run was cancell
     status: 'completed',
   }));
   const proof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -322,13 +381,13 @@ test('+ci-force-full retries a force-full proof whose exact-head run was cancell
 test('a later optimized success does not satisfy an earlier failed force-full proof', async () => {
   const workflowFile = hostedWorkflowFiles[0];
   const forceFullProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:00:30Z","workflows":["lint-js-and-ruby.yml"]} -->',
     created_at: '2026-07-16T08:01:05Z',
     id: 90,
     user: { login: 'github-actions[bot]', type: 'Bot' },
   };
   const optimizedProof = {
-    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:02:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:02:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
     created_at: '2026-07-16T08:02:35Z',
     id: 91,
     user: { login: 'github-actions[bot]', type: 'Bot' },
@@ -367,13 +426,48 @@ test('a later optimized success does not satisfy an earlier failed force-full pr
   assert.ok(calls.dispatches.some((dispatch) => dispatch.workflow_id === workflowFile));
 });
 
-test('fork safety, Dependabot scope, and one-command parsing remain intact', async () => {
-  const forkPr = defaultPullRequest();
-  forkPr.head.repo.full_name = 'external/fork';
-  const forkCalls = await runCommand({ body: '+ci-run-hosted', pullRequest: forkPr });
-  assert.equal(forkCalls.dispatches.length, 0);
-  assert.match(forkCalls.comments.at(-1), /PR branch is from a fork/);
+test('a late optimized run does not satisfy a newer failed force-full proof', async () => {
+  const workflowFile = hostedWorkflowFiles[0];
+  const optimizedProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"optimized","requested_at":"2026-07-16T08:00:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const forceFullProof = {
+    body: '<!-- hosted-ci-coverage:v1 {"head_sha":"current-head-sha","pull_request_number":42,"base_ref":"release/17.0.0","base_sha":"base-sha","requested_mode":"force-full","requested_at":"2026-07-16T08:01:00Z","workflows":["lint-js-and-ruby.yml"]} -->',
+    created_at: '2026-07-16T08:01:30Z',
+    id: 91,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const lateOptimizedSuccess = {
+    conclusion: 'success',
+    created_at: '2026-07-16T08:01:10Z',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  };
+  const failedForceFullRun = {
+    conclusion: 'cancelled',
+    created_at: '2026-07-16T08:01:20Z',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  };
 
+  const calls = await runCommand({
+    body: '+ci-force-full',
+    comments: [optimizedProof, forceFullProof],
+    runs: [lateOptimizedSuccess, failedForceFullRun],
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.ok(calls.dispatches.some((dispatch) => dispatch.workflow_id === workflowFile));
+});
+
+test('Dependabot release-target selector shells do not satisfy hosted coverage', async () => {
   const dependabotPr = defaultPullRequest();
   dependabotPr.user.login = 'dependabot[bot]';
   const dependabotRuns = hostedWorkflowFiles.slice(0, 7).map((workflowFile) => ({
@@ -383,13 +477,71 @@ test('fork safety, Dependabot scope, and one-command parsing remain intact', asy
     path: `.github/workflows/${workflowFile}`,
     status: 'completed',
   }));
-  const dependabotCalls = await runCommand({
+
+  const calls = await runCommand({
     body: '+ci-run-hosted',
     pullRequest: dependabotPr,
     runs: dependabotRuns,
   });
-  assert.equal(dependabotCalls.dispatches.length, 0);
-  assert.match(dependabotCalls.comments.at(-1), /Skipped 7 workflow\(s\)/);
+
+  assert.equal(calls.dispatches.length, 7);
+  assert.match(calls.comments.at(-1), /Triggered 7 workflow\(s\)/);
+});
+
+test('+ci-status does not report pre-trust Dependabot release mode as automatic coverage', async () => {
+  const dependabotPr = defaultPullRequest();
+  dependabotPr.user.login = 'dependabot[bot]';
+
+  const calls = await runCommand({ body: '+ci-status', pullRequest: dependabotPr });
+
+  assert.match(calls.comments.at(-1), /Automatic release-target hosted mode: inactive/);
+});
+
+test('repeated all-covered Dependabot command preserves a nonzero trusted dispatch proof', async () => {
+  const dependabotPr = defaultPullRequest();
+  dependabotPr.user.login = 'dependabot[bot]';
+  const dependabotWorkflowFiles = hostedWorkflowFiles.slice(0, 7);
+  const priorProof = {
+    body: `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+      head_sha: 'current-head-sha',
+      pull_request_number: 42,
+      base_ref: 'release/17.0.0',
+      base_sha: 'base-sha',
+      requested_mode: 'optimized',
+      requested_at: '2026-07-16T07:59:00Z',
+      workflows: dependabotWorkflowFiles,
+    })} -->`,
+    created_at: '2026-07-16T07:59:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const completedRuns = dependabotWorkflowFiles.map((workflowFile) => ({
+    conclusion: 'success',
+    created_at: '2026-07-16T07:59:10Z',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  }));
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    comments: [priorProof],
+    pullRequest: dependabotPr,
+    runs: completedRuns,
+  });
+
+  assert.equal(calls.dispatches.length, 0);
+  assert.match(calls.comments.at(-1), /Triggered [1-9][0-9]* workflow\(s\) for `current-head`/);
+  assert.deepEqual(coverageMarkerFrom(calls.comments.at(-1)).reused, dependabotWorkflowFiles);
+});
+
+test('fork safety and one-command parsing remain intact', async () => {
+  const forkPr = defaultPullRequest();
+  forkPr.head.repo.full_name = 'external/fork';
+  const forkCalls = await runCommand({ body: '+ci-run-hosted', pullRequest: forkPr });
+  assert.equal(forkCalls.dispatches.length, 0);
+  assert.match(forkCalls.comments.at(-1), /PR branch is from a fork/);
 
   const statusRuns = hostedWorkflowFiles.map((workflowFile) => ({
     conclusion: 'success',
