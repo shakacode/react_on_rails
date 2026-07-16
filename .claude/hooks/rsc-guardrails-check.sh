@@ -129,9 +129,10 @@ case "$FILE" in
 esac
 
 # Raw-HTML sinks are never allowlisted. Keep this scan independent from script/parser filtering.
-INNER_HTML_PROPERTY_PATTERN="(\\.innerHTML|\\[[[:space:]]*['\"]innerHTML['\"][[:space:]]*\\])"
+DANGEROUSLY_SET_INNER_HTML_PATTERN="dangerouslySetInnerHTML[[:space:]]*(=([^=]|\$)|:)"
+RAW_HTML_PROPERTY_PATTERN="(\\.(inner|outer)HTML|\\[[[:space:]]*['\"](inner|outer)HTML['\"][[:space:]]*\\])"
 ASSIGNMENT_OPERATOR_PATTERN='([-+*/%&|^?]|[*][*]|<<|>>|>>>|&&|[|][|]|[?][?])?='
-SINK_PATTERN="dangerouslySetInnerHTML|${INNER_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write\\("
+SINK_PATTERN="${DANGEROUSLY_SET_INNER_HTML_PATTERN}|${RAW_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write\\("
 SINK_MATCHES="$(grep -nE -- "$SINK_PATTERN" "$FILE" 2>/dev/null \
   | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
 

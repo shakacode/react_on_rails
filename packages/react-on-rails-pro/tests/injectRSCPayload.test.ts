@@ -273,6 +273,30 @@ describe('rsc-guardrails hook', () => {
     expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
   });
 
+  it('does not warn when dangerouslySetInnerHTML is only read or forwarded', () => {
+    [
+      'const value = props.dangerouslySetInnerHTML;\n',
+      'const forwardValue = () => props.dangerouslySetInnerHTML;\n',
+      'const forwardedProps = { dangerouslySetInnerHTML };\n',
+      'const sameValue = props.dangerouslySetInnerHTML === expected;\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('dangerousPropertyRead.ts', source);
+
+      expect(output).toBe('');
+    });
+  });
+
+  it('warns for dangerouslySetInnerHTML JSX and object-property sinks', () => {
+    [
+      'const element = <div dangerouslySetInnerHTML={{ __html: userControlled }} />;\n',
+      'const elementProps = { dangerouslySetInnerHTML: { __html: userControlled } };\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('dangerousPropertySink.tsx', source);
+
+      expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+    });
+  });
+
   it('warns for compound raw-HTML assignments', () => {
     ['+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '^=', '|='].forEach((operator) => {
       const output = runRSCGuardrailsHook(
@@ -299,6 +323,16 @@ describe('rsc-guardrails hook', () => {
     ["element['innerHTML'] = userControlled;\n", 'element["innerHTML"] += userControlled;\n'].forEach(
       (source) => {
         const output = runRSCGuardrailsHook('computedAssignment.ts', source);
+
+        expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+      },
+    );
+  });
+
+  it('warns for direct and computed outerHTML assignments', () => {
+    ['element.outerHTML = userControlled;\n', "element['outerHTML'] ||= userControlled;\n"].forEach(
+      (source) => {
+        const output = runRSCGuardrailsHook('outerHTMLAssignment.ts', source);
 
         expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
       },
