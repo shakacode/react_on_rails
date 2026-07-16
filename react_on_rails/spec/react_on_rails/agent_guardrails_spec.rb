@@ -216,7 +216,8 @@ module ReactOnRails
       stdout, _stderr, status = run_hook("app/controllers/api/rsc_payload_controller.rb")
 
       expect(status).to be_success
-      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+      expect(additional_context(stdout)).to include("edited file shows no before_action/authentication locally")
+      expect(additional_context(stdout)).to include("Inherited callbacks are not inspected")
     end
 
     it "still warns when an RSC controller only has an unrelated callback" do
@@ -492,6 +493,8 @@ module ReactOnRails
       expect(skill).to include("allowed_rsc_components.include?(component_name)")
       expect(skill).to include("does not inherit from your app's `ApplicationController`")
       expect(skill).to include("app-owned controller")
+      expect(skill).to include("redacts SSR props and generated JavaScript")
+      expect(skill).not_to include("Props passed to SSR can reach your error tracker")
     end
 
     it "registers the project hook in exec form so paths with spaces are not shell-split" do

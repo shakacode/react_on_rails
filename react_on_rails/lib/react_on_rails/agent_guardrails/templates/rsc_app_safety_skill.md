@@ -46,9 +46,10 @@ whenever you add or change RSC in this app.
    the renderer refuses to boot without one), and never expose its port publicly.
    (Ref: `shakacode/react_on_rails#4596`.)
 
-4. **Don't leak secrets or PII.** Don't embed the renderer password in a `renderer_url` that also
-   gets logged. Props passed to SSR can reach your error tracker (Sentry/Honeybadger) through
-   render-error context — redact or minimize sensitive props. (Ref: `shakacode/react_on_rails#4597`.)
+4. **Minimize secrets or PII.** Don't embed the renderer password in a `renderer_url` that also gets
+   logged. React on Rails redacts SSR props and generated JavaScript from `PrerenderError` messages
+   and error-tracker context, but still minimize sensitive props and avoid logging them in application
+   code. (Ref: `shakacode/react_on_rails#4597`.)
 
 5. **Don't hand-build inline scripts around RSC output.** Let React on Rails serialize props and RSC
    payloads — it HTML-escapes them (`ERB::Util.json_escape`). Never wrap RSC data in your own
@@ -60,7 +61,7 @@ whenever you add or change RSC in this app.
       an authenticated, app-owned controller.
 - [ ] Server components read identity from session / `railsContext`, not from props.
 - [ ] Node renderer is private and `RENDERER_PASSWORD` is set; its port is not publicly exposed.
-- [ ] No secrets in logged URLs; sensitive props kept out of error-tracker context.
+- [ ] No secrets in logged URLs; sensitive props minimized and not logged by application code.
 - [ ] No custom `<script>` / `html_safe` / `raw` wrapping of props or RSC payloads.
 
 ## More

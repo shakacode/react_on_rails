@@ -141,7 +141,8 @@ detail = case file
            tokens = ruby_tokens(content) if content
            lines = uncommented_ruby_lines(tokens) if tokens&.any?
            if lines && renderer_evidence?(tokens) && !authentication_evidence?(lines)
-             "This controller wires an RSC payload renderer but shows no before_action/authentication."
+             "This controller wires an RSC payload renderer, but the edited file shows no " \
+               "before_action/authentication locally. Inherited callbacks are not inspected."
            end
          end
 
