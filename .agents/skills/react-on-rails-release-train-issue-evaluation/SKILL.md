@@ -24,14 +24,26 @@ source PR per release backport PR:
   source binding is `UNKNOWN`. If an unapproved aggregate violates this shape,
   recommend separate replacements; close it only with explicit write
   authorization and retain its branch unless deletion is also authorized.
-- Process them serially. Merge one backport, fetch the new release tip, then
-  update a reused PR onto that tip or branch the next. Rerun validation, QA, and
-  review on the updated head before merging.
+- Process them serially under a release-line-scoped coordination lease held
+  across discovery, validation, and merge. Source-scoped claims do not provide
+  this serialization. Chain later batch lanes with `depends_on`, and do not
+  launch them until the preceding merge is terminal. A merge queue that reruns
+  the gates on the combined merge-group head is the only alternative to holding
+  the lease through merge; stop if neither guard is available or its state is
+  `UNKNOWN`. Merge one backport, fetch the new release tip, then update a reused
+  PR onto that tip or branch the next. Rerun validation, QA, and review on the
+  updated head before merging.
 - Before updating or branching, confirm each selected source patch is still live
   on explicitly fetched `origin/main`. A source reverted or superseded on `main`
   requires renewed maintainer approval before backporting. Repeat this check and
   the release-tip check immediately before merge; update and rerun validation,
   QA, and review if either relevant ref changed.
+- Before every RC cut or re-spin, final promotion, and release closeout, fetch
+  `origin/main` and revalidate every retained main-origin backport. A source
+  patch that is no longer live is a blocker until a maintainer explicitly
+  reapproves retaining it in the release. During closeout, do not let the
+  forward-port helper automatically reapply a reverted or superseded origin;
+  stop for explicit manual disposition.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
   validation, QA evidence, review cycle, and rollback boundary. Every commit
   created by a `main`-to-release backport and landed on the release branch must

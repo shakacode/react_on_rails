@@ -262,6 +262,15 @@ When maintainers select one or more merged `main` PRs for the release train,
 use **one source PR -> one release PR**. When there are multiple selections,
 serialize the sequence:
 
+Before any source-specific work, acquire a release-line-scoped coordination
+lease and hold it across discovery, validation, and merge. A claim on an
+individual source issue or PR does not serialize different backports. In a
+batch, chain each later lane with `depends_on` and do not launch it until the
+preceding merge is terminal. A merge queue that reruns the gates on the combined
+merge-group head is the only alternative to holding the lease through merge.
+If neither guard is available, or its state is `UNKNOWN`, stop rather than let
+two backports validate against and race to merge from the same release tip.
+
 1. Search open PRs targeting the release branch, targeted private coordination
    for the selected source, and remote branches with verified ownership and
    source-commit binding. If a valid source-atomic lane or an explicitly
@@ -306,6 +315,8 @@ serialize the sequence:
 7. Run the release-phase validation, QA, and review gates on the current head.
    Immediately before merge, fetch and prune `origin/main` and the target release
    branch again. Repeat the source-liveness, presence, and supersession checks.
+   Confirm that the release-line lease is still held, or that the merge queue
+   will rerun the required gates on the combined merge-group head.
    If the source's relevant `main` state changed, or the release tip advanced
    beyond the tip incorporated into the backport branch, update the branch and
    rerun validation, QA, and review; merge only when the evidence covers the
@@ -328,6 +339,11 @@ serialize the sequence:
    source PR.
 9. After every backport retained in the final release set lands, reconcile the
    changelog entries and stamp or regenerate the RC changelog.
+10. Before every RC cut or re-spin, fetch `origin/main`, enumerate every
+    main-origin backport retained on the release branch from its direct
+    `git cherry-pick -x` provenance, and confirm that each source patch is still
+    live. A reverted, superseded, or `UNKNOWN` source blocks the cut until a
+    maintainer explicitly reapproves retaining it with the current evidence.
 
 Do not combine independent source PRs merely because they target the same
 release, touch related code, or conflict in `CHANGELOG.md`. Separate PRs preserve
@@ -427,6 +443,13 @@ git push   # or open a PR if main is protected / the fix needs review on main
 
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
+Before promotion, fetch `origin/main` and repeat the retained-source audit from
+the backport workflow. Enumerate every main-origin backport retained in the
+accepted RC from its direct `git cherry-pick -x` provenance and confirm that
+each source patch is still live. A reverted, superseded, or `UNKNOWN` source
+blocks promotion until a maintainer explicitly reapproves retaining it with the
+current evidence.
+
 **Scripted path (recommended).** `script/release-finish promote X.Y.Z` orchestrates this whole step:
 it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verifies the tip equals the
 accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
@@ -495,6 +518,13 @@ remains possible only where the existing final-release policy explicitly permits
 evidence and maintainer sign-off; it must not become a global skip of CI, ShakaPerf, or any other gate.
 
 ### 5. Close out the release line
+
+Before running the closeout helper, fetch `origin/main` and repeat the
+retained-source audit. If a retained backport's main origin was reverted,
+superseded, or is `UNKNOWN`, stop for explicit manual disposition. Do not let
+`script/release-forward-port` automatically reapply that origin merely because
+its current plan classifies the commit as `PICK`; record whether to omit it,
+replace it, or reapply it before proceeding.
 
 **Scripted path (recommended).** `script/release-finish close-out X.Y.Z` orchestrates this step: it runs
 `git fetch`, asserts you are on `main` with a clean tree, shows the real `script/release-forward-port`
