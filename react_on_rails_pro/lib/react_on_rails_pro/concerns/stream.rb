@@ -429,7 +429,8 @@ module ReactOnRailsPro
         try{perf.mark(#{mark_name_json});entry.fallback="mark-detail-unavailable";}
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
-        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];
+        queue.push(entry);if(queue.length>200){queue.splice(0,queue.length-200);}
         })()</script>
       HTML
     end

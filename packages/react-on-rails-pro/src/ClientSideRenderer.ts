@@ -37,6 +37,7 @@ import {
   buildRootErrorCallbackOptionsWithInternalRecoverableErrorReporting,
 } from 'react-on-rails/@internal/rootErrorHandlers';
 import { isThenable } from 'react-on-rails/@internal/isThenable';
+import { REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE } from './browserPerformanceMarks.ts';
 import { maybeWrapWithDefaultRSCProviderWithStatus } from './defaultRSCProviderRegistry.ts';
 import { chainRecoverableErrorHandlers } from './handleRecoverableError.client.ts';
 import type { RSCPreloadedPayloadGlobals } from './rscPayloadGlobals.ts';
@@ -644,6 +645,10 @@ function clearRSCPreloadedPayloadGlobals(): void {
   delete rscGlobal.REACT_ON_RAILS_RSC_ERRORS;
 }
 
+function clearBrowserPerformanceMarkFallbacks(): void {
+  Reflect.deleteProperty(globalThis, REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE);
+}
+
 export function unmountAll(): void {
   unmountAllComponents();
   unmountAllStores();
@@ -651,4 +656,5 @@ export function unmountAll(): void {
   // scripts use `||=`, so moving or delaying cleanup could let previous-page writes recreate
   // these globals and land in the next page's state.
   clearRSCPreloadedPayloadGlobals();
+  clearBrowserPerformanceMarkFallbacks();
 }

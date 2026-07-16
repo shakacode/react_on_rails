@@ -192,6 +192,7 @@ RSpec.describe ReactOnRailsPro::Stream do
       expect(written_chunks.second).to include(
         "self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]"
       )
+      expect(written_chunks.second).to include("if(queue.length>200){queue.splice(0,queue.length-200);}")
       expect(written_chunks.second).not_to include("||=")
       expect(written_chunks.second).to include('perf.mark("react-on-rails:rsc:stream"')
       expect(written_chunks.second).to include('"phase":"stream-complete"')
@@ -410,7 +411,8 @@ RSpec.describe ReactOnRailsPro::Stream do
         try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
-        (self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);
+        var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];
+        queue.push(entry);if(queue.length>200){queue.splice(0,queue.length-200);}
         })()
       JAVASCRIPT
 
