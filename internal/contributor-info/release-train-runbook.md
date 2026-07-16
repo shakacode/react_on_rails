@@ -291,28 +291,33 @@ Starting a release line is two steps with a CI run between them — cutting the 
 `release/X.Y.Z` has no checks yet (`no_checks`), so you create + push the branch, wait for CI, then
 cut rc.0.
 
-**Step 1a — create and push the release branch.** From `main`, run:
+**Step 1a — create and push the release branch.** Use `release:start` only to
+preview its checks, then perform the single outward write with the individually
+guarded commands below:
 
 ```bash
 git checkout main && git pull --rebase
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-bundle exec rake "release:start[17.0.0]"   # create + push release/17.0.0 from origin/main, then stop for CI
+bundle exec rake "release:start[17.0.0,true]"   # dry-run only; no branch or remote write
 ```
 
-`release:start` fetches `origin`, refuses if `release/17.0.0` already exists (local or remote), creates
-the branch from `origin/main`, pushes it, and prints the next steps. With no version argument it derives
-the release line from the top `### [X.Y.Z.rc.N]` CHANGELOG.md header. Pass the **stable base**
-(`17.0.0`), never `17.0.0.rc.0` — the rc index lives in the changelog, not the branch name. Add a
-second `true` argument for a dry run (`rake "release:start[17.0.0,true]"`).
+Live `release:start` is an unfenced compound helper: it fetches, creates, and
+pushes the branch after only an outer lease check. Do not run it until the
+wrapper contract above is implemented. With no version argument the helper
+derives the release line from the top `### [X.Y.Z.rc.N]` CHANGELOG.md header.
+Pass the **stable base** (`17.0.0`), never `17.0.0.rc.0` — the rc index lives in
+the changelog, not the branch name.
 
-If you prefer to do it by hand, the equivalent is:
+After the dry-run succeeds, create the branch from an explicitly refreshed
+`origin/main` and publish it only if the remote release ref is still absent:
 
 ```bash
-git fetch origin
+git fetch --prune origin "+refs/heads/main:refs/remotes/origin/main"
 # Cut from the exact main commit you intend to stabilize.
-git checkout -b release/17.0.0 origin/main
+git switch -c release/17.0.0 origin/main
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-git push -u origin release/17.0.0
+git push \
+  --force-with-lease="refs/heads/release/17.0.0:" \
+  -u origin "release/17.0.0:refs/heads/release/17.0.0"
 ```
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
@@ -728,7 +733,12 @@ git pull --rebase
 # It reports stable final version bumps as MANUAL so CHANGELOG extraction is explicit.
 script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
 script/release-forward-port --source origin/release/17.0.0 --target main
-git push   # or open a PR if main is protected
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+git push   # push main directly or push the exact forward-port PR branch
+# If a PR is required, complete its exact-head gates, then in the merger's shell:
+FORWARD_PORT_PR="${FORWARD_PORT_PR:?set the forward-port PR number or URL}"
+require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+gh pr merge "${FORWARD_PORT_PR}" --merge   # stop if this would queue or defer the merge
 # 2. Delete the ephemeral branch — the tags are the durable record.
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push origin --delete release/17.0.0
@@ -806,8 +816,23 @@ audited manual path instead:
    a merge method that preserves every manually cherry-picked commit and its
    direct `-x` footer; do not squash a multi-commit selective closeout. For the
    single-pick case, a squash merge is supported only when its final body copies
-   that pick's exact direct footer. Refetch `origin/main` and the exact release
-   ref with the explicit tracking refspecs above. Require the release ref to
+   that pick's exact direct footer. Guard the PR-branch or direct-main push and,
+   after the exact-head PR gates finish, guard the merge separately in the
+   merger's shell. Do not put validation, review, or another long-running action
+   between either guard and its outward operation. The merge command must merge
+   immediately; stop if branch protection would queue or defer it:
+
+   ```bash
+   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+   git push   # push main directly or push the exact selective-closeout PR branch
+   # If a PR is required, complete its exact-head gates, then:
+   SELECTIVE_CLOSEOUT_PR="${SELECTIVE_CLOSEOUT_PR:?set the selective-closeout PR number or URL}"
+   require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
+   gh pr merge "${SELECTIVE_CLOSEOUT_PR}" --merge   # stop if this would queue or defer the merge
+   ```
+
+   Refetch `origin/main` and the exact release ref with the explicit tracking
+   refspecs above. Require the release ref to
    still equal `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit
    against the new tip. Then verify every non-omitted `PICK` is live with
    auditable `-x` provenance, every `SKIP`/`MANUAL` entry has its recorded
