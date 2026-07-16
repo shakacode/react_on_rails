@@ -97,7 +97,7 @@ SHAKAPERF_RELEASE_GATE_TERMINAL_CONCLUSIONS = %w[
 ].freeze
 SHAKAPERF_RELEASE_GATE_ACTIVE_STATUSES = %w[queued in_progress requested waiting pending].freeze
 SHAKAPERF_RELEASE_GATE_CANONICAL_VERSION_PATTERN =
-  /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\.rc\.(?:0|[1-9]\d*))?\z/
+  /\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\.(?:test|beta|alpha|rc|pre)\.(?:0|[1-9]\d*))?\z/
 SHAKAPERF_RELEASE_GATE_DISPLAY_TITLE_PATTERN =
   /\AShakaPerf Release Gates — (?<target_version>.+) on (?<ref>.+) @ (?<head_sha>[0-9a-f]{40})\z/
 SHAKAPERF_RELEASE_GATE_EVIDENCE_KEYS = %w[

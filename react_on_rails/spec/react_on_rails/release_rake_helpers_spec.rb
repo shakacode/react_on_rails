@@ -2546,6 +2546,95 @@ RSpec.describe "release.rake helper methods" do
       expect(result).to include(status: "pending", run_id: 123_456)
     end
 
+    it "ignores canonical workflow-supported non-RC runs but rejects invalid target identities" do
+      target_version = "17.0.0.rc.10"
+      ref = "release/17.0.0"
+      head_sha = "d" * 40
+      build_run = lambda do |run_id:, candidate_sha:, run_target:, status:, conclusion:|
+        {
+          "databaseId" => run_id,
+          "attempt" => 1,
+          "displayTitle" => shakaperf_release_gate_display_title(
+            ref:, head_sha: candidate_sha, target_version: run_target
+          ),
+          "headSha" => candidate_sha,
+          "status" => status,
+          "conclusion" => conclusion,
+          "createdAt" => "2026-07-14T12:00:00Z",
+          "startedAt" => "2026-07-14T12:00:05Z",
+          "updatedAt" => "2026-07-14T12:30:00Z",
+          "url" => "https://github.com/shakacode/react_on_rails/actions/runs/#{run_id}"
+        }
+      end
+      active_exact_run = build_run.call(
+        run_id: 123_456,
+        candidate_sha: head_sha,
+        run_target: target_version,
+        status: "in_progress",
+        conclusion: nil
+      )
+      allow(self).to receive(:github_repo_slug).with("/tmp/repo").and_return("shakacode/react_on_rails")
+      expect(self).not_to receive(:dispatch_shakaperf_release_gate_workflow!)
+
+      aggregate_failures do
+        %w[test beta alpha pre].each_with_index do |prerelease_type, index|
+          unrelated_run = build_run.call(
+            run_id: 200_000 + index,
+            candidate_sha: "e" * 40,
+            run_target: "17.0.0.#{prerelease_type}.1",
+            status: "completed",
+            conclusion: "success"
+          )
+          [[active_exact_run, unrelated_run], [unrelated_run, active_exact_run]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            result = nil
+            expect do
+              result = run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.not_to raise_error, "#{prerelease_type}, order #{order}"
+            expect(result).to include(status: "pending", run_id: 123_456),
+                              "#{prerelease_type}, order #{order}"
+          end
+        end
+
+        invalid_targets = {
+          "malformed" => "17.0.0.beta",
+          "ambiguous" => "17.0.0.beta.1.rc.2",
+          "unsupported" => "17.0.0.preview.1"
+        }
+        invalid_targets.each do |label, invalid_target|
+          invalid_run = build_run.call(
+            run_id: 300_000 + invalid_targets.keys.index(label),
+            candidate_sha: "e" * 40,
+            run_target: invalid_target,
+            status: "completed",
+            conclusion: "success"
+          )
+          [[active_exact_run, invalid_run], [invalid_run, active_exact_run]].each_with_index do |runs, order|
+            allow(self).to receive(:fetch_shakaperf_release_gate_runs)
+              .with(repo_slug: "shakacode/react_on_rails", ref:).and_return(runs)
+
+            expect do
+              run_accelerated_shakaperf_release_gate!(
+                monorepo_root: "/tmp/repo",
+                ref:,
+                head_sha:,
+                target_version:,
+                release_started_at: Time.iso8601("2026-07-14T12:59:00Z")
+              )
+            end.to raise_error(SystemExit, /target identity.*(?:unknown|malformed)/i), "#{label}, order #{order}"
+          end
+        end
+      end
+    end
+
     it "classifies a selected terminal pre-run before reusing an active exact-head run (V62)" do
       target_version = "17.0.0.rc.10"
       ref = "release/17.0.0"
