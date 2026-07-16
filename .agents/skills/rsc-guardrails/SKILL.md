@@ -25,6 +25,11 @@ examples.
    A payload chunk is user-controlled (usernames, comments). Regression test:
    `packages/react-on-rails-pro/tests/injectRSCPayload.test.ts` (breakout-escaping case).
    Nonces must pass through `sanitizeNonce` before landing in an attribute.
+   The sanctioned Ruby stream emitter in
+   `react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb` uses the language-specific
+   equivalent: `ERB::Util.json_escape` for JavaScript values and `ERB::Util.html_escape` for the
+   CSP nonce. Preserve those helpers and their stream specs rather than replacing them with the
+   TypeScript helpers.
 
 2. **No per-request data in module scope on server-render paths.** On the Node SSR server, a
    module-level `let`/`Map`/`Set`/object is shared across _all_ concurrent users' requests. Per-request
@@ -56,7 +61,9 @@ examples.
 
 ## PR review checklist
 
-- [ ] New inline script/markup emission routes through `createScriptTag`/`escapeScript` (and nonce via `sanitizeNonce`).
+- [ ] New TypeScript inline script/markup emission routes through `createScriptTag`/`escapeScript`
+      (and nonce via `sanitizeNonce`); the sanctioned Ruby stream emitter preserves its Rails
+      escaping helpers.
 - [ ] No new module-level mutable state holds per-request/per-user data on a server-render path.
 - [ ] No `require`/`import` of a payload- or request-derived module id/path.
 - [ ] New render route/controller has an auth story; server components don't trust props for authz.
@@ -74,8 +81,12 @@ examples.
 ## Reference
 
 - Escaping: `packages/react-on-rails-pro/src/injectRSCPayload.ts` (`escapeScript`, `createScriptTag`), `packages/react-on-rails/src/sanitizeNonce.ts`.
+- Ruby stream escaping: `react_on_rails_pro/lib/react_on_rails_pro/concerns/stream.rb`
+  (`ERB::Util.json_escape`, `ERB::Util.html_escape`).
 - Request-scoping: `packages/react-on-rails-pro/src/RSCRequestTracker.ts`, `RSCProvider.tsx`, `RSCPrefetchStore.ts`.
-- Reference resolution: the `react_on_rails_rsc` package (`clientReferences.ts`, `flight-server.node*.ts`).
+- Reference resolution: the separate `react-on-rails-rsc` npm package/repository (`WebpackLoader`,
+  `WebpackPlugin`, `RspackPlugin`, and the manifest-backed client/server runtime). This monorepo
+  consumes that package rather than vendoring its source.
 - Node renderer: `packages/react-on-rails-pro-node-renderer/src/worker/authHandler.ts`, `worker.ts`, `worker/vm.ts`, `shared/configBuilder.ts`.
 - Ruby serialization: `react_on_rails/lib/react_on_rails/json_output.rb` (`ERB::Util.json_escape`), `helper.rb`.
 
