@@ -285,8 +285,9 @@ serialize the sequence:
    - For a multi-commit rebase merge, identify the complete ordered set of
      commits that landed from the PR on `main`, mapping the PR commits to landed
      commits with merge metadata and stable patch IDs. Cherry-pick every landed
-     commit oldest-first with `git cherry-pick -x <source-sha>`. Stop if the
-     complete mapping cannot be proven.
+     commit oldest-first with `git cherry-pick -x <source-sha>` only after the
+     maintainer-approved merge plan required by step 7 exists. Stop if the
+     complete mapping cannot be proven or that merge plan is absent.
 5. After any source-shape path, normalize every release commit message to
    exactly one direct `(cherry picked from commit <source-sha>)` footer. If a
    source commit already has inherited `-x` provenance, record that deeper
@@ -298,12 +299,16 @@ serialize the sequence:
    its exact direct `(cherry picked from commit <source-sha>)` footer into the
    final squash commit body. For a multi-commit rebase-merged source PR or an
    approved inseparable aggregate, retain one normalized commit per source
-   commit and use rebase merge so those commits survive; never squash them into
-   a multi-footer commit. If repository settings cannot preserve those commits,
-   split an aggregate into source-atomic PRs or stop a multi-commit source
-   backport for a maintainer-approved merge plan. After any merge method, verify
-   each landed release commit has exactly one direct source footer; do not
-   proceed to the next backport if provenance was lost.
+   commit and never squash them into a multi-footer commit. The current
+   repository cannot close that shape safely: merge commits are disabled, while
+   a rebase merge preserves the commits but the changelog sweep classifies each
+   release-targeted commit as `UNKNOWN`. Stop for a maintainer-approved merge
+   plan until the merge settings or changelog classifier can preserve both the
+   commits and one PR attribution. Split an aggregate into source-atomic PRs
+   when that resolves the shape; otherwise do not merge the backport. After any
+   supported merge method, verify each backport-created release commit has
+   exactly one direct source footer; do not proceed to the next backport if
+   provenance was lost.
 8. Fetch the new release tip before updating or branching the next selected
    source PR.
 9. After every backport retained in the final release set lands, reconcile the
