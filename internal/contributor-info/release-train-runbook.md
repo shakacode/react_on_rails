@@ -779,13 +779,14 @@ audited manual path instead:
    }
    ```
 
-5. Re-run the dry-run. It may list only the explicitly omitted `PICK` plus
-   already-dispositioned `MANUAL` entries; reconcile every row to the recorded
-   evidence. Immediately before deletion, refetch the exact main and release
-   refs again and require them to equal `AUDITED_MAIN_TIP` and
-   `AUDITED_RELEASE_TIP`. Only then, with the
-   repository's required destructive-operation confirmation, delete it using
-   an atomic expected-old-OID guard:
+5. Immediately before final reconciliation and deletion, refetch the exact main
+   and release refs and require them to equal `AUDITED_MAIN_TIP` and
+   `AUDITED_RELEASE_TIP`. Re-run the dry-run against that audited
+   `origin/main`, not a possibly stale local `main`. The final plan may list only
+   the explicitly omitted `PICK` plus already-dispositioned `MANUAL` entries;
+   reconcile every row to the recorded evidence. Only then, with the
+   repository's required destructive-operation confirmation, delete the release
+   branch using an atomic expected-old-OID guard:
 
    ```bash
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
@@ -810,6 +811,11 @@ audited manual path instead:
      echo "release tip changed; restart the closeout audit" >&2
      return 1 2>/dev/null || exit 1
    }
+   FINAL_PLAN_FILE="${PLAN_FILE}.final"
+   script/release-forward-port \
+     --source "origin/release/${RELEASE_VERSION}" --target origin/main --dry-run \
+     >"${FINAL_PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
+   cat "${FINAL_PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
    require_live_release_line_lease || {
      echo "release-line lease unavailable or UNKNOWN; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
