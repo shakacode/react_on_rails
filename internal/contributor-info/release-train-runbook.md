@@ -262,15 +262,17 @@ When maintainers select more than one merged `main` PR for the release train,
 use **one source PR -> one release PR** and serialize the sequence:
 
 1. Search open PRs targeting the release branch for the selected source commits.
-   If a valid source-atomic backport PR already exists, treat that lane as
-   started and reuse it (or skip it when another owner holds it); do not create
-   a duplicate branch or PR. Do not extend an aggregate PR by default. Close an
-   aggregate only with explicit write authorization, retain its branch unless
-   deletion is separately authorized, and replace it with source-atomic PRs.
+   If a valid source-atomic backport PR or an explicitly maintainer-approved
+   aggregate whose sources meet the inseparability exception below already
+   exists, treat that lane as started and reuse it (or skip it when another
+   owner holds it); do not create a duplicate branch or PR. Do not extend an
+   unapproved, shape-violating aggregate. Close it only with explicit write
+   authorization, retain its branch unless deletion is separately authorized,
+   and replace it with source-atomic PRs.
 2. Verify the source PR is merged, is a release stabilizer, and is not already
    present or superseded on `release/X.Y.Z`.
-3. When no source-atomic backport PR exists, fetch the release branch and create
-   a branch from its current tip.
+3. When no valid backport PR exists under step 1, fetch the release branch and
+   create a branch from its current tip.
 4. Cherry-pick that source PR's single-parent squash commit with
    `git cherry-pick -x`. For a true multi-parent merge commit, use
    `git cherry-pick -m 1 -x` and record the mainline-parent choice.

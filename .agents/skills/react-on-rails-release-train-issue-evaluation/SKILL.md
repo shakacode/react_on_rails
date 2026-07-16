@@ -16,10 +16,11 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
 When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
 source PR per release backport PR:
 
-- Search open release-targeted PRs before branching. If an aggregate PR already
-  violates this shape, recommend separate replacements; close it only with
-  explicit write authorization and retain its branch unless deletion is also
-  authorized.
+- Search open release-targeted PRs before branching. Reuse a valid source-atomic
+  PR or an explicitly maintainer-approved aggregate whose sources meet the
+  inseparability exception below. If an unapproved aggregate violates this
+  shape, recommend separate replacements; close it only with explicit write
+  authorization and retain its branch unless deletion is also authorized.
 - Process them serially. Merge one backport, fetch the new release tip, then
   branch the next.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
@@ -43,11 +44,13 @@ source PR per release backport PR:
    is completed input, not a started release-backport lane: its linked issue,
    assignee, merged implementation PR, and generic source coordination state do
    not exclude it. Its backport lane is started by a valid source-atomic
-   release-targeted implementation PR or branch, a source-atomic backport
-   implementation comment, or private coordination state that explicitly
-   identifies its release/backport lane. An aggregate release PR does not
-   exclude its source candidates; keep them eligible so the **Backport Shape**
-   replacement can be recommended.
+   release-targeted implementation PR or branch; an explicitly
+   maintainer-approved aggregate whose sources are behaviorally inseparable; a
+   backport implementation comment for either valid shape; or private
+   coordination state that explicitly identifies that valid release/backport
+   lane. An unapproved, shape-violating aggregate does not exclude its source
+   candidates; keep them eligible so the **Backport Shape** replacement can be
+   recommended.
    Run `agent-coord doctor --json`, then run
    `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`
    for each candidate. Dead or expired ordinary-issue claims and explicitly
