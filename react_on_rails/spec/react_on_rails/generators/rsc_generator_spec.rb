@@ -60,6 +60,38 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  describe "#install_agent_guardrails" do
+    subject(:install_agent_guardrails) { generator.send(:install_agent_guardrails) }
+
+    let(:generator) { described_class.new }
+
+    before do
+      allow(generator).to receive(:options).and_return(generator_options)
+      allow(ReactOnRails::AgentGuardrails).to receive(:install).and_return([])
+    end
+
+    context "when the generator is in pretend mode" do
+      let(:generator_options) { { pretend: true, skip: false } }
+
+      it "does not write guardrail files" do
+        install_agent_guardrails
+
+        expect(ReactOnRails::AgentGuardrails).not_to have_received(:install)
+      end
+    end
+
+    context "when the generator is in skip mode" do
+      let(:generator_options) { { pretend: false, skip: true } }
+
+      it "creates missing guardrails while preserving existing files" do
+        install_agent_guardrails
+
+        expect(ReactOnRails::AgentGuardrails).to have_received(:install)
+          .with(generator.destination_root, skip_existing: true)
+      end
+    end
+  end
+
   # Integration test for standalone happy path
 
   context "when Pro is installed" do

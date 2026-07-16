@@ -4,7 +4,10 @@ require_relative "spec_helper"
 require "react_on_rails/agent_guardrails"
 require "tmpdir"
 require "json"
+require "open3"
+require "rbconfig"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   RSpec.describe AgentGuardrails do
     around do |example|
@@ -24,6 +27,32 @@ module ReactOnRails
               .select { |command| command.include?("rsc-app-safety-check.sh") }
     end
 
+    def isolated_hook_path
+      bin_dir = File.join(@app_root, "hook-bin")
+      FileUtils.mkdir_p(bin_dir)
+      %w[bash cat git grep].each do |command|
+        source = ENV.fetch("PATH").split(File::PATH_SEPARATOR)
+                    .map { |dir| File.join(dir, command) }
+                    .find { |path| File.file?(path) && File.executable?(path) }
+        raise "Could not locate #{command}" unless source
+
+        FileUtils.ln_s(source, File.join(bin_dir, command))
+      end
+      FileUtils.ln_s(RbConfig.ruby, File.join(bin_dir, "ruby"))
+      bin_dir
+    end
+
+    def run_hook(*args, stdin_data: "")
+      environment = { "PATH" => isolated_hook_path, "BASH_ENV" => "/dev/null", "ENV" => "/dev/null" }
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+
+      Dir.chdir(@app_root) { Open3.capture3(environment, hook_path, *args, stdin_data:) }
+    end
+
+    def additional_context(stdout)
+      JSON.parse(stdout).dig("hookSpecificOutput", "additionalContext")
+    end
+
     it "creates the skill and hook and registers the hook" do
       actions = described_class.install(@app_root)
 
@@ -41,6 +70,330 @@ module ReactOnRails
 
       expect(actions).to all(match(/unchanged/))
       expect(rsc_hook_commands.size).to eq(1)
+    end
+
+    it "creates missing guardrails when skipping existing files" do
+      actions = described_class.install(@app_root, skip_existing: true)
+
+      expect(File.file?(File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md"))).to be true
+      expect(File.file?(File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh"))).to be true
+      expect(rsc_hook_commands.size).to eq(1)
+      expect(actions).to all(match(/created/))
+    end
+
+    it "preserves guardrail files and settings that already exist when skipping" do
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      [skill_path, hook_path, settings_path].each { |path| FileUtils.mkdir_p(File.dirname(path)) }
+      File.write(skill_path, "custom skill\n")
+      File.write(hook_path, "custom hook\n")
+      File.write(settings_path, "custom settings\n")
+
+      actions = described_class.install(@app_root, skip_existing: true)
+
+      expect(File.read(skill_path)).to eq("custom skill\n")
+      expect(File.read(hook_path)).to eq("custom hook\n")
+      expect(File.read(settings_path)).to eq("custom settings\n")
+      expect(actions).to all(match(/skipped/))
+    end
+
+    it "restores executable permissions when an unchanged hook is reinstalled" do
+      described_class.install(@app_root)
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      File.chmod(0o644, hook_path)
+
+      actions = described_class.install(@app_root)
+
+      expect(File.stat(hook_path).mode & 0o111).not_to eq(0)
+      expect(actions).to include("unchanged  .claude/hooks/rsc-app-safety-check.sh")
+    end
+
+    it "parses Claude hook input without requiring jq" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+
+      stdout, _stderr, status = run_hook(
+        stdin_data: JSON.generate("tool_input" => { "file_path" => routes_path })
+      )
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
+      expect(additional_context(stdout)).to include("config.rsc_payload_authorizer")
+    end
+
+    it "warns for the bare relative routes path used by the manual smoke command" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+
+      stdout, _stderr, status = run_hook("config/routes.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
+    end
+
+    it "does not warn for a commented payload route" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "# rsc_payload_route\n")
+
+      stdout, stderr, status = run_hook("config/routes.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "warns for a namespaced controller supplied as a bare relative path" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/api/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(controller_path, "include RSCPayloadRenderer\n")
+
+      stdout, _stderr, status = run_hook("app/controllers/api/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when an RSC controller only has an unrelated callback" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "# before_action :authenticate_user!\nbefore_action :set_locale\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when an authentication callback excludes the RSC payload action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, except: :rsc_payload\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when an authentication callback is limited to another action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, only: :index\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when direct authentication only appears in another action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "def index\n  authenticate_user!\nend\n\ndef rsc_payload\nend\n\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns for legacy callback scope syntax" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, :except => :rsc_payload\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns for a conditional authentication callback" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, unless: :skip_auth?\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when the payload action skips an otherwise applicable authentication callback" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          before_action :authenticate_user!
+          skip_before_action :authenticate_user!, only: :rsc_payload
+          include RSCPayloadRenderer
+        RUBY
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "accepts authentication when a matching skip excludes the payload action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          before_action :authenticate_user!
+          skip_before_action :authenticate_user!, except: :rsc_payload
+          include RSCPayloadRenderer
+        RUBY
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "accepts an authentication callback explicitly limited to the RSC payload action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, only: :rsc_payload\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "accepts an authentication callback that excludes a different action" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, except: :health_check\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "accepts a multiline authentication callback whose action list includes the RSC payload" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!,\n              only: %i[index rsc_payload]\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "does not warn when an RSC controller has an authentication callback" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(controller_path, "before_action :authenticate_user!\ninclude RSCPayloadRenderer\n")
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "installs guidance for authorizing the default Pro payload controller" do
+      described_class.install(@app_root)
+      skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
+      skill = File.read(skill_path)
+
+      expect(skill).to include("config.rsc_payload_authorizer")
+      expect(skill).to include("does not inherit from your app's `ApplicationController`")
+      expect(skill).to include("app-owned controller")
+    end
+
+    it "registers the project hook in exec form so paths with spaces are not shell-split" do
+      described_class.install(@app_root)
+
+      hook = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry.fetch("hooks") }
+                     .find { |entry| entry["command"] == described_class::HOOK_COMMAND }
+
+      expect(hook).to include("type" => "command", "command" => described_class::HOOK_COMMAND, "args" => [])
+    end
+
+    it "upgrades a previously registered shell-form project hook to exec form" do
+      claude_dir = File.join(@app_root, ".claude")
+      FileUtils.mkdir_p(claude_dir)
+      File.write(
+        File.join(claude_dir, "settings.json"),
+        JSON.pretty_generate(
+          "hooks" => {
+            "PostToolUse" => [
+              {
+                "matcher" => "Edit|Write",
+                "hooks" => [{ "type" => "command", "command" => described_class::HOOK_COMMAND }]
+              }
+            ]
+          }
+        )
+      )
+
+      described_class.install(@app_root)
+
+      project_hooks = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry.fetch("hooks") }
+                              .select { |entry| entry["command"] == described_class::HOOK_COMMAND }
+      expect(project_hooks).to contain_exactly(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => []
+      )
     end
 
     it "merges into an existing settings.json without clobbering other hooks" do
@@ -71,5 +424,20 @@ module ReactOnRails
 
       expect { described_class.install(@app_root) }.to raise_error(described_class::Error, /not valid JSON/)
     end
+
+    it "raises rather than clobbering valid JSON with an unsupported settings shape" do
+      claude_dir = File.join(@app_root, ".claude")
+      settings_path = File.join(claude_dir, "settings.json")
+      FileUtils.mkdir_p(claude_dir)
+
+      [[], { "hooks" => [] }, { "hooks" => { "PostToolUse" => "invalid" } }].each do |invalid_settings|
+        File.write(settings_path, JSON.pretty_generate(invalid_settings))
+
+        expect { described_class.install(@app_root) }
+          .to raise_error(described_class::Error, /not valid JSON/)
+        expect(JSON.parse(File.read(settings_path))).to eq(invalid_settings)
+      end
+    end
   end
 end
+# rubocop:enable Metrics/ModuleLength

@@ -123,8 +123,15 @@ module ReactOnRails
       end
 
       def install_agent_guardrails
+        if options[:pretend]
+          say_status :pretend, ".claude/ (RSC agent guardrails)", :yellow
+          return
+        end
+
         say "🛡️  Installing RSC agent guardrails (rsc-app-safety skill + advisory hook)...", :yellow
-        ReactOnRails::AgentGuardrails.install(destination_root).each { |action| say "   #{action}" }
+        ReactOnRails::AgentGuardrails.install(destination_root, skip_existing: options[:skip]).each do |action|
+          say "   #{action}"
+        end
         say "✅ RSC agent guardrails installed", :green
       rescue ReactOnRails::AgentGuardrails::Error => e
         say "⚠️  Skipped RSC agent guardrails: #{e.message}", :yellow

@@ -18,9 +18,12 @@ whenever you add or change RSC in this app.
 
 1. **Authenticate the RSC payload route.** `rsc_payload_route` mounts a public endpoint that renders
    **any registered server component** with **caller-supplied props**
-   (`GET <path>/<Component>?props=…`). It ships with no built-in authentication. Put it behind your
-   app's auth (a `before_action` on the controller) and authorize it like any data-returning
-   endpoint. (Ref: `shakacode/react_on_rails#4595`.)
+   (`GET <path>/<Component>?props=…`). It ships with no built-in authentication. The default
+   `ReactOnRailsPro::RscPayloadController` does not inherit from your app's `ApplicationController`,
+   so an application-wide `before_action` does not protect it. Configure
+   `config.rsc_payload_authorizer` to check the Rails session and component name before props are
+   parsed or rendered. Alternatively, explicitly route to an app-owned controller that applies the
+   required authentication and authorization callbacks. (Ref: `shakacode/react_on_rails#4595`.)
 
 2. **Treat server-component props as untrusted input.** A server component must derive the current
    user and permissions from the Rails session / `railsContext`, never from its props — props on the
@@ -41,7 +44,8 @@ whenever you add or change RSC in this app.
 
 ## Quick checklist for an RSC change
 
-- [ ] Any `rsc_payload_route` / RSC controller is behind authentication.
+- [ ] Any `rsc_payload_route` is protected by `config.rsc_payload_authorizer` or explicitly targets
+      an authenticated, app-owned controller.
 - [ ] Server components read identity from session / `railsContext`, not from props.
 - [ ] Node renderer is private and `RENDERER_PASSWORD` is set; its port is not publicly exposed.
 - [ ] No secrets in logged URLs; sensitive props kept out of error-tracker context.
@@ -51,3 +55,4 @@ whenever you add or change RSC in this app.
 
 - React on Rails Pro RSC docs: https://www.shakacode.com/react-on-rails-pro
 - Update this skill anytime with `rake react_on_rails:install_rsc_agent_guardrails`.
+- This skill and its hook are managed copies; reinstalling replaces local edits to either file.

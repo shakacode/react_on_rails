@@ -26,18 +26,19 @@ module ReactOnRails
 
     # Copies the guardrail files and registers the advisory hook. Idempotent: re-running only
     # writes what changed. Returns an array of human-readable action strings.
-    def self.install(destination_root)
-      new_installer(destination_root).install
+    def self.install(destination_root, skip_existing: false)
+      new_installer(destination_root, skip_existing:).install
     end
 
-    def self.new_installer(destination_root)
-      Installer.new(destination_root)
+    def self.new_installer(destination_root, skip_existing: false)
+      Installer.new(destination_root, skip_existing:)
     end
 
     # Encapsulates a single install run against one app root.
     class Installer
-      def initialize(destination_root)
+      def initialize(destination_root, skip_existing: false)
         @destination_root = File.expand_path(destination_root.to_s)
+        @skip_existing = skip_existing
       end
 
       def install
@@ -48,24 +49,32 @@ module ReactOnRails
 
       private
 
-      attr_reader :destination_root
+      attr_reader :destination_root, :skip_existing
 
       def copy_file(source, dest_rel)
         source_path = File.join(TEMPLATES_DIR, source)
         dest_path = File.join(destination_root, dest_rel)
-        new_content = File.read(source_path)
-
-        return "unchanged  #{dest_rel}" if File.exist?(dest_path) && File.read(dest_path) == new_content
-
         existed = File.exist?(dest_path)
-        FileUtils.mkdir_p(File.dirname(dest_path))
-        File.write(dest_path, new_content)
+        return "skipped    #{dest_rel} (already exists)" if skip_existing && existed
+
+        new_content = File.read(source_path)
+        unchanged = existed && File.read(dest_path) == new_content
+
+        unless unchanged
+          FileUtils.mkdir_p(File.dirname(dest_path))
+          File.write(dest_path, new_content)
+        end
         File.chmod(0o755, dest_path) if dest_path.end_with?(".sh")
+
+        return "unchanged  #{dest_rel}" if unchanged
+
         existed ? "updated    #{dest_rel}" : "created    #{dest_rel}"
       end
 
       def register_hook
         settings_path = File.join(destination_root, SETTINGS_REL)
+        return "skipped    #{SETTINGS_REL} (already exists)" if skip_existing && File.exist?(settings_path)
+
         settings = read_settings(settings_path)
         return "unchanged  #{SETTINGS_REL} (hook already registered)" if hook_registered?(settings)
 
@@ -82,27 +91,64 @@ module ReactOnRails
         content = File.read(path).strip
         return {} if content.empty?
 
-        JSON.parse(content)
+        settings = JSON.parse(content)
+        raise Error, invalid_settings_message unless valid_settings_shape?(settings)
+
+        settings
       rescue JSON::ParserError
-        raise Error, "#{SETTINGS_REL} is not valid JSON, so it was left untouched. Add this " \
-                     "PostToolUse (#{HOOK_MATCHER}) command hook manually: #{HOOK_COMMAND}"
+        raise Error, invalid_settings_message
+      end
+
+      def valid_settings_shape?(settings)
+        return false unless settings.is_a?(Hash)
+
+        hooks = settings["hooks"]
+        return true if hooks.nil?
+        return false unless hooks.is_a?(Hash)
+
+        valid_post_tool_use?(hooks["PostToolUse"])
+      end
+
+      def valid_post_tool_use?(entries)
+        return true if entries.nil?
+
+        entries.is_a?(Array) && entries.all? { |entry| valid_hook_group?(entry) }
+      end
+
+      def valid_hook_group?(entry)
+        return false unless entry.is_a?(Hash)
+
+        hooks = entry["hooks"]
+        hooks.nil? || (hooks.is_a?(Array) && hooks.all?(Hash))
+      end
+
+      def invalid_settings_message
+        "#{SETTINGS_REL} is not valid JSON for Claude settings, so it was left untouched. Add this " \
+          "PostToolUse (#{HOOK_MATCHER}) command hook manually: #{HOOK_COMMAND}"
       end
 
       def hook_registered?(settings)
         Array(settings.dig("hooks", "PostToolUse")).any? do |entry|
-          Array(entry["hooks"]).any? { |hook| hook["command"].to_s.include?("rsc-app-safety-check.sh") }
+          entry["matcher"] == HOOK_MATCHER && Array(entry["hooks"]).any? { |hook| registered_hook?(hook) }
         end
       end
 
       def add_hook(settings)
         hooks = (settings["hooks"] ||= {})
         post_tool_use = (hooks["PostToolUse"] ||= [])
+        post_tool_use.each do |candidate|
+          Array(candidate["hooks"]).reject! { |hook| hook["command"] == HOOK_COMMAND }
+        end
         entry = post_tool_use.find { |candidate| candidate["matcher"] == HOOK_MATCHER }
         unless entry
           entry = { "matcher" => HOOK_MATCHER, "hooks" => [] }
           post_tool_use << entry
         end
-        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND }
+        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => [] }
+      end
+
+      def registered_hook?(hook)
+        hook["type"] == "command" && hook["command"] == HOOK_COMMAND && hook["args"] == []
       end
     end
   end

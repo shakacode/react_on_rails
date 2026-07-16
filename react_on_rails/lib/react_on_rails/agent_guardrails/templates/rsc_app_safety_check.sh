@@ -12,7 +12,8 @@ if [ -t 0 ]; then
   FILE="${1:-}"
 else
   INPUT="$(cat)"
-  FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
+  FILE="$(printf '%s' "$INPUT" | ruby -rjson -e \
+    'puts(JSON.parse($stdin.read).dig("tool_input", "file_path").to_s)' 2>/dev/null || true)"
   [ -z "$FILE" ] && FILE="${1:-}"
 fi
 
@@ -25,25 +26,103 @@ ROOT="$(git rev-parse --show-toplevel 2> /dev/null || pwd)"
 REL="${FILE#"$ROOT/"}"
 
 warn() {
-  cat >&2 <<EOF
-⚠️  rsc-app-safety: $REL
-$1
-The React on Rails Pro RSC payload route renders any registered server component with
-caller-supplied props and has NO built-in authentication. Confirm this endpoint is behind your
-app's auth (a before_action) and that server components derive identity from the session, not
-props. Read the \`rsc-app-safety\` skill before shipping.
-EOF
+  local message
+  message="$(printf '%s\n' \
+    "⚠️  rsc-app-safety: $REL" \
+    "$1" \
+    "The React on Rails Pro RSC payload route renders any registered server component with" \
+    "caller-supplied props and has NO built-in authentication. Confirm this endpoint is behind your" \
+    "app's auth via config.rsc_payload_authorizer or an app-owned controller's before_action, and" \
+    "that server components derive identity from the session, not props. Read the rsc-app-safety" \
+    "skill before shipping.")"
+  ruby -rjson -e 'puts JSON.generate(
+    "hookSpecificOutput" => { "hookEventName" => "PostToolUse", "additionalContext" => ARGV.fetch(0) }
+  )' "$message"
+}
+
+has_authentication_evidence() {
+  ruby - "$FILE" <<'RUBY'
+auth_name = /(?:authenticate\w*[!?]?|authorize\w*[!?]?|require_(?:login|user)\w*[!?]?)/
+lines = File.readlines(ARGV.fetch(0))
+uncommented = lines.map { |line| line.sub(/#.*/, "") }
+scope_syntax = /(?:%[iw](?:\[[^\]]*\]|\([^)]*\)|\{[^}]*\})|\[[^\]]*\]|:[A-Za-z_]\w*[!?]?|["'][^"']+["'])/
+authenticated_callbacks = []
+
+uncommented.each_with_index do |line, index|
+  next unless line.match?(/^\s*before_action\b/)
+
+  statement = line.dup
+  while index + 1 < uncommented.length &&
+        (statement.rstrip.end_with?(",", "\\") ||
+         statement.count("(") > statement.count(")") ||
+         statement.count("[") > statement.count("]"))
+    index += 1
+    statement << uncommented[index]
+  end
+
+  statement = statement.gsub(/\s+/, " ").strip
+  callback = statement.match(
+    /\Abefore_action\s*(?<parenthesized>\()?\s*:?(?<auth>#{auth_name})(?<rest>.*)\z/
+  )
+  next unless callback
+
+  rest = callback[:rest].strip
+  rest = rest.sub(/\)\z/, "").strip if callback[:parenthesized]
+  if rest.empty?
+    authenticated_callbacks << callback[:auth]
+  elsif (scope = rest.match(/\A,\s*only:\s*(#{scope_syntax})\z/))
+    authenticated_callbacks << callback[:auth] if scope[1].match?(/\brsc_payload\b/)
+  elsif (scope = rest.match(/\A,\s*except:\s*(#{scope_syntax})\z/))
+    authenticated_callbacks << callback[:auth] unless scope[1].match?(/\brsc_payload\b/)
+  end
+end
+
+uncommented.each_with_index do |line, index|
+  next unless line.match?(/^\s*skip_before_action\b/)
+
+  statement = line.dup
+  while index + 1 < uncommented.length &&
+        (statement.rstrip.end_with?(",", "\\") ||
+         statement.count("(") > statement.count(")") ||
+         statement.count("[") > statement.count("]"))
+    index += 1
+    statement << uncommented[index]
+  end
+
+  statement = statement.gsub(/\s+/, " ").strip
+  callback = statement.match(
+    /\Askip_before_action\s*(?<parenthesized>\()?\s*:?(?<auth>#{auth_name})(?<rest>.*)\z/
+  )
+  next unless callback && authenticated_callbacks.include?(callback[:auth])
+
+  rest = callback[:rest].strip
+  rest = rest.sub(/\)\z/, "").strip if callback[:parenthesized]
+  skip_applies = if rest.empty?
+                   true
+                 elsif (scope = rest.match(/\A,\s*only:\s*(#{scope_syntax})\z/))
+                   scope[1].match?(/\brsc_payload\b/)
+                 elsif (scope = rest.match(/\A,\s*except:\s*(#{scope_syntax})\z/))
+                   !scope[1].match?(/\brsc_payload\b/)
+                 else
+                   true
+                 end
+  authenticated_callbacks.delete(callback[:auth]) if skip_applies
+end
+
+exit(authenticated_callbacks.empty? ? 1 : 0)
+RUBY
 }
 
 case "$FILE" in
-  */config/routes.rb | */config/routes/*.rb)
-    if grep -qE 'rsc_payload_route' "$FILE" 2> /dev/null; then
+  config/routes.rb | */config/routes.rb | config/routes/*.rb | */config/routes/*.rb)
+    if ruby -e 'exit(File.foreach(ARGV.fetch(0)).any? { |line| line.sub(/#.*/, "").include?("rsc_payload_route") } ? 0 : 1)' \
+      "$FILE"; then
       warn "This routes file mounts rsc_payload_route (a public RSC endpoint)."
     fi
     ;;
-  */app/controllers/*.rb)
+  app/controllers/*.rb | */app/controllers/*.rb)
     if grep -qE 'RSCPayloadRenderer|rsc_payload' "$FILE" 2> /dev/null &&
-      ! grep -qE 'before_action|authenticate|authorize|require_(login|user)' "$FILE" 2> /dev/null; then
+      ! has_authentication_evidence; then
       warn "This controller wires an RSC payload renderer but shows no before_action/authentication."
     fi
     ;;

@@ -13,7 +13,7 @@ namespace :react_on_rails do
     actions.each { |action| puts "  #{action}" }
     puts ""
     puts "The rsc-app-safety skill and its advisory hook are now active for Claude Code in this app."
-    puts "Re-run this task after upgrading React on Rails to pick up guardrail updates."
+    puts "Re-run this task after upgrading React on Rails to pick up guardrail updates; managed files are replaced."
   rescue ReactOnRails::AgentGuardrails::Error => e
     warn "React on Rails: #{e.message}"
     exit 1
