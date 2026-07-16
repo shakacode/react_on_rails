@@ -66,8 +66,10 @@ module ReactOnRailsPro
     extend ActiveSupport::Concern
     RENDERER_SERVER_TIMING_COLLECTOR_KEY = :react_on_rails_pro_rsc_stream_renderer_server_timing_entries
     RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY = :react_on_rails_pro_rsc_stream_renderer_server_timing_attempt
+    MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES = 200
     private_constant :RENDERER_SERVER_TIMING_COLLECTOR_KEY
     private_constant :RENDERER_SERVER_TIMING_ATTEMPT_COLLECTOR_KEY
+    private_constant :MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES
 
     included do
       include ActionController::Live
@@ -430,7 +432,8 @@ module ReactOnRailsPro
         catch(fallbackError){entry.fallback="performance-mark-unavailable";}}
         else{entry.fallback="performance-mark-unavailable";}
         var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];
-        queue.push(entry);if(queue.length>200){queue.splice(0,queue.length-200);}
+        queue.push(entry);if(queue.length>#{MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES}){
+        queue.splice(0,queue.length-#{MAX_BROWSER_PERFORMANCE_MARK_FALLBACK_ENTRIES});}
         })()</script>
       HTML
     end
