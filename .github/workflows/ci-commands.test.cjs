@@ -64,6 +64,7 @@ function coverageMarkerFrom(comment) {
 async function runCommand({
   body,
   ciCommandRunSnapshots = [],
+  commentCreateFailures = [],
   comments = [],
   dispatchErrors = {},
   dispatchReturnsNoRunDetails = false,
@@ -94,9 +95,15 @@ async function runCommand({
   const workflowRunReadIndexes = new Map();
   let serializationCompleted = ciCommandRunSnapshots.length === 0;
   let serializationSnapshotIndex = 0;
+  let commentCreateIndex = 0;
   const endpoints = {
     addLabels: async ({ labels: addedLabels }) => calls.labels.push(...addedLabels),
-    createComment: async ({ body: commentBody }) => calls.comments.push(commentBody),
+    createComment: async ({ body: commentBody }) => {
+      const failure = commentCreateFailures[commentCreateIndex];
+      commentCreateIndex += 1;
+      if (failure) throw failure;
+      calls.comments.push(commentBody);
+    },
     createLabel: async () => {},
     createWorkflowDispatch: async (options) => {
       calls.dispatches.push(options);
@@ -282,6 +289,21 @@ test('+ci-run-hosted does not reuse detector-only pull_request shells', async ()
 
   assert.equal(calls.dispatches.length, 9);
   assert.match(calls.comments.at(-1), /Triggered 9 workflow\(s\)/);
+});
+
+test('a transient result-comment failure retries the exact dispatch proof', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.base.ref = 'main';
+
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    commentCreateFailures: [new Error('simulated transient comment outage')],
+    pullRequest,
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.match(calls.comments.at(-1), /Triggered 9 workflow\(s\)/);
+  assert.equal(coverageMarkerFrom(calls.comments.at(-1)).workflows.length, 9);
 });
 
 test('a simultaneous same-head command waits for the older command proof before dispatching', async () => {

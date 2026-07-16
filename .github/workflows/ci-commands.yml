@@ -46,6 +46,8 @@ jobs:
             const dispatchRunVisibilityGraceMs = 2 * 60 * 1000;
             const dispatchRunValidationPollDelayMs = 2000;
             const dispatchRunValidationMaxAttempts = 3;
+            const dispatchResultCommentRetryDelayMs = 2000;
+            const dispatchResultCommentMaxAttempts = 3;
 
             const validCommands = [
               '+ci-run-hosted',
@@ -353,6 +355,27 @@ jobs:
                 issue_number: issueNumber,
                 body
               });
+            }
+
+            async function postDispatchResultComment(body) {
+              let lastError;
+              for (let attempt = 1; attempt <= dispatchResultCommentMaxAttempts; attempt += 1) {
+                try {
+                  await postComment(body);
+                  return;
+                } catch (error) {
+                  lastError = error;
+                  core.warning(
+                    `Unable to persist hosted-CI dispatch proof (attempt ${attempt}/` +
+                    `${dispatchResultCommentMaxAttempts}): ${error.message || error}`
+                  );
+                  if (attempt < dispatchResultCommentMaxAttempts) {
+                    await sleep(dispatchResultCommentRetryDelayMs);
+                  }
+                }
+              }
+
+              throw lastError;
             }
 
             async function addReaction(content) {
@@ -1072,7 +1095,7 @@ jobs:
                   dispatched: succeeded.map((workflow) => workflow.file)
                 });
 
-              await postComment([
+              await postDispatchResultComment([
                 dispatchIsUncertain
                   ? '## Hosted CI Dispatch UNKNOWN'
                   : forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
