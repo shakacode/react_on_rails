@@ -6,6 +6,7 @@ require "tmpdir"
 require "json"
 require "open3"
 require "rbconfig"
+require "rake"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -617,6 +618,23 @@ module ReactOnRails
         expect(File.exist?(File.join(claude_dir, "skills/rsc-app-safety/SKILL.md"))).to be false
         expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
       end
+    end
+
+    it "reports filesystem errors from the install task without a raw backtrace" do
+      original_rake_application = Rake.application
+      Rake.application = Rake::Application.new
+      load File.expand_path("../../lib/tasks/agent_guardrails.rake", __dir__)
+      allow(described_class).to receive(:install).and_raise(Errno::EACCES, ".claude/settings.json")
+      exit_status = nil
+
+      expect do
+        Rake::Task["react_on_rails:install_rsc_agent_guardrails"].invoke
+      rescue SystemExit => e
+        exit_status = e.status
+      end.to output(a_string_including("React on Rails:", "Permission denied", ".claude/settings.json")).to_stderr
+      expect(exit_status).to eq(1)
+    ensure
+      Rake.application = original_rake_application
     end
   end
 end
