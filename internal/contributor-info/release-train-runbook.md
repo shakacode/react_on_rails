@@ -214,6 +214,15 @@ transition-only heartbeat is insufficient. If either refresh fails, stop all
 release-line writes until `acquire_release_line_lease` succeeds and the live
 assertion passes again.
 
+Treat a helper that performs several outward operations, such as
+`script/release-finish` or `bundle exec rake release`, as one compound writer.
+Those helpers do not embed the coordination client, so run them only while a
+separate supervisor maintains the renewal and heartbeat cadence above and can
+terminate the helper. The coordinator must not release or transfer the claim
+while the helper is running. If a refresh fails, terminate the helper before
+its next outward operation; reacquire and revalidate the lease before restarting
+the interrupted release step.
+
 Immediately before each write or merge, rerun `require_live_release_line_lease`
 in the shell where the functions above are defined. It must prove that the
 canonical claim is active, unexpired, and owned by `RELEASE_COORDINATOR_ID`, and
@@ -709,8 +718,9 @@ audited manual path instead:
    ```bash
    RELEASE_VERSION=17.0.0
    PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
+   main_refspec="+refs/heads/main:refs/remotes/origin/main"
    release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
-   git fetch --prune origin main "${release_refspec}" || {
+   git fetch --prune origin "${main_refspec}" "${release_refspec}" || {
    echo "could not refresh main and the release ref; stop selective closeout" >&2
    return 1 2>/dev/null || exit 1
    }
@@ -727,11 +737,11 @@ audited manual path instead:
    echo "could not resolve local main; stop selective closeout" >&2
    return 1 2>/dev/null || exit 1
    }
-   remote_main="$(git rev-parse origin/main)" || {
+   AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
    echo "could not resolve origin/main; stop selective closeout" >&2
    return 1 2>/dev/null || exit 1
    }
-   test "${local_main}" = "${remote_main}" || {
+   test "${local_main}" = "${AUDITED_MAIN_TIP}" || {
    echo "local main differs from origin/main; stop selective closeout" >&2
    return 1 2>/dev/null || exit 1
    }
@@ -753,23 +763,43 @@ audited manual path instead:
    entry with the existing manual fallback. Do not cherry-pick the approved
    omitted release commit.
 4. Push the resulting `main` branch or merge its PR. Refetch `origin/main` and
-   the exact release ref. Require the release ref to still equal
+   the exact release ref with the explicit tracking refspecs above. Require the release ref to still equal
    `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit against the
    new tip. Then verify every non-omitted `PICK` is live with auditable `-x`
    provenance, every `SKIP`/`MANUAL` entry has its recorded disposition, the
    replacement (if any) is live, and the omitted origin remains reverted or
-   superseded. Any missing, changed, or `UNKNOWN` evidence stops closeout.
+   superseded. Any missing, changed, or `UNKNOWN` evidence stops closeout. After
+   that audit passes, reset `AUDITED_MAIN_TIP` to the exact audited
+   `origin/main` SHA and preserve it with `AUDITED_RELEASE_TIP`:
+
+   ```bash
+   AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
+     echo "could not record the audited main tip; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   ```
+
 5. Re-run the dry-run. It may list only the explicitly omitted `PICK` plus
    already-dispositioned `MANUAL` entries; reconcile every row to the recorded
-   evidence. Immediately before deletion, refetch the exact release ref again
-   and require it to equal `AUDITED_RELEASE_TIP`. Only then, with the
+   evidence. Immediately before deletion, refetch the exact main and release
+   refs again and require them to equal `AUDITED_MAIN_TIP` and
+   `AUDITED_RELEASE_TIP`. Only then, with the
    repository's required destructive-operation confirmation, delete it using
    an atomic expected-old-OID guard:
 
    ```bash
+   main_refspec="+refs/heads/main:refs/remotes/origin/main"
    release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
-   git fetch --prune origin "${release_refspec}" || {
-     echo "could not refresh the release ref; stop selective closeout" >&2
+   git fetch --prune origin "${main_refspec}" "${release_refspec}" || {
+     echo "could not refresh main and the release ref; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   current_main_tip="$(git rev-parse origin/main)" || {
+     echo "could not resolve the main tip; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test "${current_main_tip}" = "${AUDITED_MAIN_TIP}" || {
+     echo "main advanced; restart the closeout audit" >&2
      return 1 2>/dev/null || exit 1
    }
    current_release_tip="$(git rev-parse "origin/release/${RELEASE_VERSION}")" || {
