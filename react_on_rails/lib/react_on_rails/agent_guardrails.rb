@@ -46,6 +46,7 @@ module ReactOnRails
       end
 
       def install
+        validate_settings_before_copy
         actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel) }
         actions << register_hook
         actions << remove_legacy_hook
@@ -55,6 +56,13 @@ module ReactOnRails
       private
 
       attr_reader :destination_root, :skip_existing
+
+      def validate_settings_before_copy
+        settings_path = File.join(destination_root, SETTINGS_REL)
+        return if skip_existing && File.exist?(settings_path)
+
+        read_settings(settings_path)
+      end
 
       def copy_file(source, dest_rel)
         source_path = File.join(TEMPLATES_DIR, source)

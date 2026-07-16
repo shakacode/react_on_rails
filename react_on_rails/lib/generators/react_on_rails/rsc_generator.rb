@@ -134,7 +134,7 @@ module ReactOnRails
         end
         say "✅ RSC agent guardrails installed", :green
       rescue ReactOnRails::AgentGuardrails::Error, SystemCallError => e
-        say "⚠️  Skipped RSC agent guardrails: #{e.message}", :yellow
+        say "⚠️  RSC agent guardrail installation incomplete: #{e.message}", :yellow
       end
 
       def print_success_message

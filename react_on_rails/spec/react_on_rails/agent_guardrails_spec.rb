@@ -28,10 +28,10 @@ module ReactOnRails
       end
     end
 
-    def run_hook(*args, stdin_data: "")
+    def run_hook(*args, stdin_data: "", env: {})
       hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
 
-      Dir.chdir(@app_root) { Open3.capture3(RbConfig.ruby, hook_path, *args, stdin_data:) }
+      Dir.chdir(@app_root) { Open3.capture3(env, RbConfig.ruby, hook_path, *args, stdin_data:) }
     end
 
     def additional_context(stdout)
@@ -107,6 +107,7 @@ module ReactOnRails
 
       expect(status).to be_success
       expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
+      expect(additional_context(stdout)).to include("ReactOnRailsPro.configure")
       expect(additional_context(stdout)).to include("config.rsc_payload_authorizer")
     end
 
@@ -163,8 +164,7 @@ module ReactOnRails
       described_class.install(@app_root)
       unrelated_path = File.join(@app_root, "tmp/generated-output.rb")
       FileUtils.mkdir_p(File.dirname(unrelated_path))
-      File.write(unrelated_path, "unrelated\n")
-      File.chmod(0o000, unrelated_path)
+      File.write(unrelated_path, "rsc_payload_route\ninclude RSCPayloadRenderer\n")
 
       stdout, stderr, status = run_hook("tmp/generated-output.rb")
 
@@ -178,9 +178,28 @@ module ReactOnRails
       routes_path = File.join(@app_root, "config/routes.rb")
       FileUtils.mkdir_p(File.dirname(routes_path))
       File.write(routes_path, "rsc_payload_route\n")
-      File.chmod(0o000, routes_path)
+      read_failure_path = File.join(@app_root, "inject_read_failure.rb")
+      File.write(
+        read_failure_path,
+        <<~'RUBY'
+          module InjectReadFailure
+            def read(path, *)
+              raise Errno::EACCES, path if path.to_s.tr("\\", "/").end_with?("config/routes.rb")
 
-      stdout, stderr, status = run_hook("config/routes.rb")
+              super
+            end
+          end
+
+          File.singleton_class.prepend(InjectReadFailure)
+        RUBY
+      )
+
+      stdout, stderr, status = run_hook(
+        "config/routes.rb",
+        env: {
+          "RUBYOPT" => "-r#{read_failure_path}"
+        }
+      )
 
       expect(status).to be_success
       expect(stdout).to be_empty
@@ -212,6 +231,62 @@ module ReactOnRails
 
       expect(status).to be_success
       expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "still warns when authentication only appears in a Ruby block comment" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          =begin
+          before_action :authenticate_user!
+          =end
+          include RSCPayloadRenderer
+        RUBY
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "does not warn when renderer evidence only appears in Ruby comments or strings" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/ordinary_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          # include RSCPayloadRenderer
+          route_note = "rsc_payload"
+          =begin
+          def rsc_payload
+          end
+          =end
+        RUBY
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/ordinary_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "remains non-blocking when a controller contains invalidly encoded bytes" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.binwrite(controller_path, "include RSCPayloadRenderer\n# ".b + "\xFF\n".b)
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
     end
 
     it "still warns when an authentication callback excludes the RSC payload action" do
@@ -389,12 +464,31 @@ module ReactOnRails
       expect(stderr).to be_empty
     end
 
-    it "installs guidance for authorizing the default Pro payload controller" do
+    it "accepts prepended and appended authentication callbacks" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+
+      %w[prepend_before_action append_before_action].each do |callback|
+        File.write(controller_path, "#{callback} :authenticate_user!\ninclude RSCPayloadRenderer\n")
+
+        stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+        expect(status).to be_success
+        expect(stdout).to be_empty
+        expect(stderr).to be_empty
+      end
+    end
+
+    it "installs guidance for the two supported payload authorization approaches" do
       described_class.install(@app_root)
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
       skill = File.read(skill_path)
 
+      expect(skill).to include("ReactOnRailsPro.configure do |config|")
       expect(skill).to include("config.rsc_payload_authorizer")
+      expect(skill).to include("controller.session[:user_id].present?")
+      expect(skill).to include("allowed_rsc_components.include?(component_name)")
       expect(skill).to include("does not inherit from your app's `ApplicationController`")
       expect(skill).to include("app-owned controller")
     end
@@ -505,6 +599,8 @@ module ReactOnRails
 
       expect { described_class.install(@app_root) }.to raise_error(described_class::Error, /not valid JSON/)
       expect(File.read(legacy_hook_path)).to eq("custom legacy hook\n")
+      expect(File.exist?(File.join(claude_dir, "skills/rsc-app-safety/SKILL.md"))).to be false
+      expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
     end
 
     it "raises rather than clobbering valid JSON with an unsupported settings shape" do
@@ -518,6 +614,8 @@ module ReactOnRails
         expect { described_class.install(@app_root) }
           .to raise_error(described_class::Error, /not valid JSON/)
         expect(JSON.parse(File.read(settings_path))).to eq(invalid_settings)
+        expect(File.exist?(File.join(claude_dir, "skills/rsc-app-safety/SKILL.md"))).to be false
+        expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
       end
     end
   end

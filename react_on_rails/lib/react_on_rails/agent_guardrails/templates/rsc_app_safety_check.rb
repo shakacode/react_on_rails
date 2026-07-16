@@ -7,8 +7,11 @@
 # with caller-supplied props and has NO built-in auth — see the `rsc-app-safety` skill.
 
 require "json"
+require "ripper"
 
 AUTH_NAME = /(?:authenticate\w*[!?]?|authorize\w*[!?]?|require_(?:login|user)\w*[!?]?)/
+AUTH_CALLBACK_NAME = "(?:prepend_|append_)?before_action"
+COMMENT_EVENTS = %i[on_comment on_embdoc_beg on_embdoc on_embdoc_end].freeze
 SCOPE_SYNTAX = /(?:%[iw](?:\[[^\]]*\]|\([^)]*\)|\{[^}]*\})|\[[^\]]*\]|:[A-Za-z_]\w*[!?]?|["'][^"']+["'])/
 ONLY_SCOPE = /\A,\s*only:\s*(#{SCOPE_SYNTAX})\z/o
 EXCEPT_SCOPE = /\A,\s*except:\s*(#{SCOPE_SYNTAX})\z/o
@@ -53,8 +56,8 @@ def applies_to_payload?(rest, unknown:)
 end
 
 def authenticated_callback_names(lines)
-  logical_statements(lines, "before_action").filter_map do |statement|
-    parsed = parse_callback(statement, "before_action")
+  logical_statements(lines, AUTH_CALLBACK_NAME).filter_map do |statement|
+    parsed = parse_callback(statement, AUTH_CALLBACK_NAME)
     parsed&.first if parsed && applies_to_payload?(parsed.last, unknown: false)
   end
 end
@@ -68,8 +71,27 @@ def remove_skipped_callbacks(lines, authenticated_callbacks)
   end
 end
 
-def authentication_evidence?(content)
-  lines = content.lines.map { |line| line.sub(/#.*/, "") }
+def ruby_tokens(content)
+  return [] unless content.valid_encoding?
+
+  Ripper.lex(content)
+rescue ArgumentError
+  []
+end
+
+def uncommented_ruby_lines(tokens)
+  tokens.each_with_object(+"") do |(_position, event, token, _state), uncommented|
+    uncommented << (COMMENT_EVENTS.include?(event) ? token.gsub(/[^\n]/, " ") : token)
+  end.lines
+end
+
+def renderer_evidence?(tokens)
+  tokens.any? do |_position, event, token, _state|
+    (event == :on_const && token == "RSCPayloadRenderer") || (event == :on_ident && token == "rsc_payload")
+  end
+end
+
+def authentication_evidence?(lines)
   authenticated_callbacks = authenticated_callback_names(lines)
   remove_skipped_callbacks(lines, authenticated_callbacks)
   authenticated_callbacks.any?
@@ -90,7 +112,8 @@ def warning_context(relative_path, detail)
     detail,
     "The React on Rails Pro RSC payload route renders any registered server component with",
     "caller-supplied props and has NO built-in authentication. Confirm this endpoint is behind your",
-    "app's auth via config.rsc_payload_authorizer or an app-owned controller's before_action, and",
+    "app's auth via ReactOnRailsPro.configure { |config| config.rsc_payload_authorizer = ... } or",
+    "an authenticated, app-owned controller's before_action, and",
     "that server components derive identity from the session, not props. Read the rsc-app-safety",
     "skill before shipping."
   ].join("\n")
@@ -115,7 +138,9 @@ detail = case file
            end
          when %r{\A(?:.*/)?app/controllers/.+\.rb\z}
            content = read_file(file)
-           if content&.match?(/RSCPayloadRenderer|rsc_payload/) && !authentication_evidence?(content)
+           tokens = ruby_tokens(content) if content
+           lines = uncommented_ruby_lines(tokens) if tokens&.any?
+           if lines && renderer_evidence?(tokens) && !authentication_evidence?(lines)
              "This controller wires an RSC payload renderer but shows no before_action/authentication."
            end
          end

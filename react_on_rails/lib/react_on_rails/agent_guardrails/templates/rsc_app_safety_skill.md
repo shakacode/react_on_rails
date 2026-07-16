@@ -20,10 +20,22 @@ whenever you add or change RSC in this app.
    **any registered server component** with **caller-supplied props**
    (`GET <path>/<Component>?props=…`). It ships with no built-in authentication. The default
    `ReactOnRailsPro::RscPayloadController` does not inherit from your app's `ApplicationController`,
-   so an application-wide `before_action` does not protect it. Configure
-   `config.rsc_payload_authorizer` to check the Rails session and component name before props are
-   parsed or rendered. Alternatively, explicitly route to an app-owned controller that applies the
-   required authentication and authorization callbacks. (Ref: `shakacode/react_on_rails#4595`.)
+   so an application-wide `before_action` does not protect it. Configure its supported authorizer in
+   `config/initializers/react_on_rails_pro.rb` to check the Rails session and component name before
+   props are parsed or rendered:
+
+   ```ruby
+   allowed_rsc_components = %w[AccountPage DashboardPage].freeze
+
+   ReactOnRailsPro.configure do |config|
+     config.rsc_payload_authorizer = lambda do |controller, component_name|
+       controller.session[:user_id].present? && allowed_rsc_components.include?(component_name)
+     end
+   end
+   ```
+
+   Alternatively, explicitly route to an app-owned controller that applies the required
+   authentication and authorization callbacks. (Ref: `shakacode/react_on_rails#4595`.)
 
 2. **Treat server-component props as untrusted input.** A server component must derive the current
    user and permissions from the Rails session / `railsContext`, never from its props — props on the

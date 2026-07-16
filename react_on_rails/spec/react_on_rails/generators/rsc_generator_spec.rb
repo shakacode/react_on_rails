@@ -102,7 +102,7 @@ describe RscGenerator, type: :generator do
       it "warns and allows RSC generation to continue" do
         expect { install_agent_guardrails }.not_to raise_error
         expect(generator).to have_received(:say)
-          .with(a_string_including("Skipped RSC agent guardrails", ".claude/settings.json"), :yellow)
+          .with(a_string_including("RSC agent guardrail installation incomplete", ".claude/settings.json"), :yellow)
       end
     end
   end
