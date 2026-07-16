@@ -137,10 +137,9 @@ example, `release-line:17.0.0`). One dedicated release coordinator owns this
 synthetic target and is the only actor that dispatches a release-targeted lane
 or performs a release-line write. A claim on an individual issue or PR does not
 serialize writers that target the same release line. If an actor cannot
-participate in this lease, a PR merge must use a merge queue that reruns all
-required gates on the combined merge-group head; branch creation, RC cuts,
-promotion, and deletion have no queue alternative and therefore require the
-lease.
+participate in this lease, stop. The repository's merge-group CI does not rerun
+release-specific source-liveness, provenance, attribution, manual QA, or review
+gates and is not an alternative.
 
 Use the same stable coordinator id for the claim and heartbeat. The bounded
 status and claim operations fail closed on timeout, `UNKNOWN`, or
@@ -222,9 +221,9 @@ that its matching heartbeat is live and bound to the canonical target. Identity
 alone is insufficient because released and expired records retain their last
 holder. In a batch, chain each later release-targeted lane with `depends_on` and
 do not launch it until the preceding merge is terminal. A merge queue that
-reruns the gates on the combined merge-group head is the only alternative for a
-PR merge. If neither guard is available, or its state is `UNKNOWN`, stop rather
-than let two release writers race from the same release tip.
+reruns only the repository's current merge-group CI is not an alternative. If
+the lease guard is unavailable, or its state is `UNKNOWN`, stop rather than let
+two release writers race from the same release tip.
 
 Keep the lease across the whole release train when practical. Release it only
 after branch deletion and release-line closeout are complete, or after a
@@ -431,8 +430,8 @@ above; when there are multiple selections, serialize the sequence:
 7. Run the release-phase validation, QA, and review gates on the current head.
    Immediately before merge, fetch and prune `origin/main` and the target release
    branch again. Repeat the source-liveness, presence, and supersession checks.
-   Confirm that the release-line lease is still held, or that the merge queue
-   will rerun the required gates on the combined merge-group head.
+   Confirm that the release-line lease is still held. Merge-group CI is not an
+   alternative because it does not rerun the release-specific gates.
    If the source's relevant `main` state changed, or the release tip advanced
    beyond the tip incorporated into the backport branch, update the branch and
    rerun validation, QA, and review; merge only when the evidence covers the

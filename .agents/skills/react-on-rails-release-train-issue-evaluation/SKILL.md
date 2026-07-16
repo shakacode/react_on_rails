@@ -31,12 +31,13 @@ source PR per release backport PR:
   must participate in the same lease; source-scoped claims do not provide this
   serialization. Chain later batch lanes with `depends_on`, and do not launch
   them until the preceding merge is terminal. A writer that cannot participate
-  must use a merge queue that reruns the gates on the combined merge-group head;
-  an ordinary direct merge is not an alternative. Refresh the dedicated
-  heartbeat at the runbook cadence during long gates, and immediately before
-  merge require the canonical claim to be active, unexpired, and owned by the
-  expected coordinator with a live matching heartbeat. Stop if either guard is
-  unavailable or its state is `UNKNOWN`. Merge one release-targeted change,
+  in the canonical lease must stop; the repository's merge-group CI does not
+  rerun source-liveness, provenance, attribution, manual QA, or review gates and
+  is not an alternative. Refresh the dedicated heartbeat at the runbook cadence
+  during long gates, and immediately before merge require the canonical claim to
+  be active, unexpired, and owned by the expected coordinator with a live
+  matching heartbeat. Stop if the guard is unavailable or its state is
+  `UNKNOWN`. Merge one release-targeted change,
   fetch the new release tip, then update a reused PR onto that tip or branch the
   next. Rerun validation, QA, and review on the updated head before merging.
 - Before updating or branching, confirm each selected source patch is still live
