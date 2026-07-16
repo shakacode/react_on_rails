@@ -16,7 +16,7 @@
 import { execFileSync } from 'child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { Readable, PassThrough } from 'stream';
 import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import injectRSCPayload from '../src/injectRSCPayload.ts';
@@ -227,7 +227,7 @@ const runRSCGuardrailsHook = (fileName: string, source: string): string => {
   const fixturePath = join(fixtureSourceDirectory, fileName);
 
   try {
-    mkdirSync(fixtureSourceDirectory, { recursive: true });
+    mkdirSync(dirname(fixturePath), { recursive: true });
     writeFileSync(fixturePath, source);
 
     return execFileSync('/bin/bash', [rscGuardrailsHook, fixturePath], {
@@ -274,9 +274,35 @@ describe('rsc-guardrails hook', () => {
   });
 
   it('warns for compound raw-HTML assignments', () => {
-    const output = runRSCGuardrailsHook('compoundAssignment.ts', 'element.innerHTML += userControlled;\n');
+    ['+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '^=', '|='].forEach((operator) => {
+      const output = runRSCGuardrailsHook(
+        'compoundAssignment.ts',
+        `element.innerHTML ${operator} userControlled;\n`,
+      );
 
-    expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+      expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+    });
+  });
+
+  it('warns for logical raw-HTML assignments', () => {
+    ['||=', '??=', '&&='].forEach((operator) => {
+      const output = runRSCGuardrailsHook(
+        'logicalAssignment.ts',
+        `element.innerHTML ${operator} userControlled;\n`,
+      );
+
+      expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+    });
+  });
+
+  it('warns for computed raw-HTML assignments', () => {
+    ["element['innerHTML'] = userControlled;\n", 'element["innerHTML"] += userControlled;\n'].forEach(
+      (source) => {
+        const output = runRSCGuardrailsHook('computedAssignment.ts', source);
+
+        expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+      },
+    );
   });
 
   it('does not warn for raw-HTML equality checks', () => {
@@ -321,10 +347,15 @@ describe('rsc-guardrails hook', () => {
       'otherEmitter.ts',
       'return `<script${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;\n',
     );
+    const nestedShadowedHelperOutput = runRSCGuardrailsHook(
+      'nested/injectRSCPayload.ts',
+      'return `<script${rscPayloadScriptMarkerAttribute(markAsRSCPayload)}${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;\n',
+    );
 
     expect(sanctionedOutput).toBe('');
     expect(guardrailWarningContext(newBuilderOutput)).toContain('Matched line(s): 1');
     expect(guardrailWarningContext(shadowedHelperOutput)).toContain('Matched line(s): 1');
+    expect(guardrailWarningContext(nestedShadowedHelperOutput)).toContain('Matched line(s): 1');
   });
 
   it('deduplicates a line matched by both script and raw-sink scans', () => {

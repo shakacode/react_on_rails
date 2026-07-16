@@ -122,14 +122,16 @@ SCRIPT_MATCHES="$(grep -niF -- '<script' "$FILE" 2>/dev/null \
 # This exact emitter is sanctioned only at its definition site. Applying the exemption to another
 # file would trust a potentially shadowed escapeScript implementation.
 case "$FILE" in
-  */injectRSCPayload.ts)
+  */packages/react-on-rails-pro/src/injectRSCPayload.ts)
     SCRIPT_MATCHES="$(printf '%s\n' "$SCRIPT_MATCHES" \
       | exclude_exact_source_line "$SAFE_CREATE_SCRIPT_TAG_LINE" || true)"
     ;;
 esac
 
 # Raw-HTML sinks are never allowlisted. Keep this scan independent from script/parser filtering.
-SINK_PATTERN='dangerouslySetInnerHTML|\.innerHTML[[:space:]]*[+]?=([^=]|$)|insertAdjacentHTML|document\.write\('
+INNER_HTML_PROPERTY_PATTERN="(\\.innerHTML|\\[[[:space:]]*['\"]innerHTML['\"][[:space:]]*\\])"
+ASSIGNMENT_OPERATOR_PATTERN='([-+*/%&|^?]|[*][*]|<<|>>|>>>|&&|[|][|]|[?][?])?='
+SINK_PATTERN="dangerouslySetInnerHTML|${INNER_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write\\("
 SINK_MATCHES="$(grep -nE -- "$SINK_PATTERN" "$FILE" 2>/dev/null \
   | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
 
