@@ -754,8 +754,6 @@ jobs:
               };
               const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
               const workflows = hostedWorkflows(pr, inputs);
-              let workflowsToDispatch = workflows;
-              let coveredWorkflows = [];
               const coverage = await observeExactHeadRuns(pr);
               if (coverage.status === 'UNKNOWN') {
                 await addReaction('confused');
@@ -779,12 +777,12 @@ jobs:
               const coverageByFile = new Map(
                 coverage.workflows.map((workflow) => [workflow.file, workflow])
               );
-              coveredWorkflows = workflows.filter(([, workflowFile]) => {
+              const coveredWorkflows = workflows.filter(([, workflowFile]) => {
                 const observed = coverageByFile.get(workflowFile);
                 const state = forceFull ? observed?.force_full_state : observed?.state;
                 return ['pending', 'successful'].includes(state);
               });
-              workflowsToDispatch = workflows.filter((workflow) => !coveredWorkflows.includes(workflow));
+              const workflowsToDispatch = workflows.filter((workflow) => !coveredWorkflows.includes(workflow));
 
               let currentPr;
               try {

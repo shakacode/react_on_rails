@@ -65,6 +65,7 @@ async function runCommand({
   body,
   ciCommandRunSnapshots = [],
   comments = [],
+  dispatchErrors = {},
   dispatchReturnsNoRunDetails = false,
   dispatchedRunOverrides = {},
   files,
@@ -97,6 +98,7 @@ async function runCommand({
     createLabel: async () => {},
     createWorkflowDispatch: async (options) => {
       calls.dispatches.push(options);
+      if (dispatchErrors[options.workflow_id]) throw dispatchErrors[options.workflow_id];
       if (dispatchReturnsNoRunDetails) return { data: '', status: 204 };
       const runId = 1000 + calls.dispatches.length;
       dispatchedRuns.set(runId, {
@@ -513,6 +515,46 @@ test('+ci-run-hosted fails closed when dispatch does not return exact run detail
   });
   assert.equal(retryCalls.dispatches.length, 0);
   assert.match(retryCalls.comments.at(-1), /Hosted CI Coverage UNKNOWN/);
+});
+
+test('a dispatch transport error records durable UNKNOWN and blocks later start and status guesses', async () => {
+  const timeout = Object.assign(new Error('request timed out after dispatch submission'), {
+    code: 'ETIMEDOUT',
+  });
+  const calls = await runCommand({
+    body: '+ci-run-hosted',
+    dispatchErrors: { 'lint-js-and-ruby.yml': timeout },
+  });
+
+  assert.equal(calls.dispatches.length, 9);
+  assert.equal(calls.labels.length, 0);
+  assert.equal(calls.failures.length, 1);
+  const resultComment = calls.comments.at(-1);
+  assert.match(resultComment, /dispatch result is UNKNOWN: request timed out/);
+  const marker = coverageMarkerFrom(resultComment);
+  assert.equal(marker.dispatch_uncertain, true);
+  assert.deepEqual(marker.uncertain_workflows, ['lint-js-and-ruby.yml']);
+
+  const priorUnknownComment = {
+    body: resultComment,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const laterStart = await runCommand({
+    body: '+ci-force-full',
+    comments: [priorUnknownComment],
+  });
+  assert.equal(laterStart.dispatches.length, 0);
+  assert.match(laterStart.comments.at(-1), /Hosted CI Coverage UNKNOWN/);
+
+  const laterStatus = await runCommand({
+    body: '+ci-status',
+    comments: [priorUnknownComment],
+  });
+  assert.equal(laterStatus.dispatches.length, 0);
+  assert.match(laterStatus.comments.at(-1), /Observed exact-head coverage: UNKNOWN/);
+  assert.equal(coverageMarkerFrom(laterStatus.comments.at(-1)).coverage_status, 'UNKNOWN');
 });
 
 test('hosted dispatch stops when the PR head changes after the coverage snapshot', async () => {
