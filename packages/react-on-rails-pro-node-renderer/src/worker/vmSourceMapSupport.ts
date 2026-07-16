@@ -36,7 +36,10 @@
  * Performance: `prepareStackTrace` only runs when an error's `.stack` is first
  * accessed. External source map text is captured asynchronously while building
  * the VM so same-path rebuilds stay generation-isolated; SourceMap parsing and
- * position lookups stay lazy and cached per bundle registration.
+ * position lookups stay lazy and cached per bundle registration. Inline and
+ * external maps are both size-capped: an oversized map is skipped and its frames
+ * keep their bundled locations rather than paying its bytes for the life of the
+ * pooled VM.
  */
 
 import fs from 'fs';
@@ -101,6 +104,28 @@ let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
 const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
+// External `.map` files get the same ceiling as inline maps. This is a pre-read
+// size gate, not a hard memory bound: a map that grows between the `statSync` in
+// `resolveReadableSourceMapPath` and the read below still gets read in full.
+const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
+
+// Oversized maps are re-checked on every VM build and on error-path lookups, so
+// warn once per map path to keep rolling deploys from flooding the log.
+const warnedOversizedSourceMapPaths = new Set<string>();
+
+function warnOversizedSourceMap(sourceMapPath: string, sizeInBytes: number) {
+  if (warnedOversizedSourceMapPaths.has(sourceMapPath)) {
+    return;
+  }
+
+  warnedOversizedSourceMapPaths.add(sourceMapPath);
+  log.warn(
+    'Skipping source map %s: %d bytes exceeds the %d byte limit. Stack frames for this bundle will keep their bundled locations.',
+    sourceMapPath,
+    sizeInBytes,
+    MAX_EXTERNAL_SOURCE_MAP_BYTES,
+  );
+}
 
 function shouldRetryMissingSourceMap(registration: BundleSourceMapRegistration) {
   return registration.retryMissingSourceMap === true && !retiredMissingSourceMapRetries.has(registration);
@@ -290,11 +315,16 @@ function candidateSourceMapPaths(bundleFilePath: string, sourceMappingUrl: strin
   return Array.from(new Set(candidatePaths));
 }
 
+/**
+ * Resolves a candidate map path to a readable file inside the real bundle
+ * directory. Returns the size alongside the path so callers can apply
+ * {@link MAX_EXTERNAL_SOURCE_MAP_BYTES} without a second `stat`.
+ */
 function resolveReadableSourceMapPath(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-) {
+): { sourceMapPath: string; sizeInBytes: number } | undefined {
   const bundleDirectory = path.dirname(bundleFilePath);
   try {
     const resolvedPath = path.resolve(candidatePath);
@@ -307,18 +337,46 @@ function resolveReadableSourceMapPath(
       return undefined;
     }
 
-    if (!fs.statSync(realSourceMapPath).isFile()) {
+    const stats = fs.statSync(realSourceMapPath);
+    if (!stats.isFile()) {
       return undefined;
     }
 
-    return realSourceMapPath;
+    return { sourceMapPath: realSourceMapPath, sizeInBytes: stats.size };
   } catch {
     return undefined;
   }
 }
 
+/**
+ * Resolves a readable, within-limit map path, warning once when the map is
+ * oversized. Returns undefined for both "no usable map" and "map too large";
+ * callers treat the two identically (frames keep their bundled locations).
+ */
+function resolveSourceMapPathWithinSizeLimit(
+  bundleFilePath: string,
+  candidatePath: string,
+  realBundleDirectory: string,
+) {
+  const resolved = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
+  if (!resolved) {
+    return undefined;
+  }
+
+  if (resolved.sizeInBytes > MAX_EXTERNAL_SOURCE_MAP_BYTES) {
+    warnOversizedSourceMap(resolved.sourceMapPath, resolved.sizeInBytes);
+    return undefined;
+  }
+
+  return resolved.sourceMapPath;
+}
+
 function readSourceMapFile(bundleFilePath: string, candidatePath: string, realBundleDirectory: string) {
-  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
+  const sourceMapPath = resolveSourceMapPathWithinSizeLimit(
+    bundleFilePath,
+    candidatePath,
+    realBundleDirectory,
+  );
   if (!sourceMapPath) {
     return undefined;
   }
@@ -334,7 +392,11 @@ async function readSourceMapFileAsync(
   candidatePath: string,
   realBundleDirectory: string,
 ) {
-  const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
+  const sourceMapPath = resolveSourceMapPathWithinSizeLimit(
+    bundleFilePath,
+    candidatePath,
+    realBundleDirectory,
+  );
   if (!sourceMapPath) {
     return undefined;
   }
@@ -505,6 +567,7 @@ export function resetSourceMapSupport() {
   retiredMissingSourceMapRetries = new WeakSet<BundleSourceMapRegistration>();
   missingSourceMapRetryCounts = new WeakMap<BundleSourceMapRegistration, number>();
   warnedMissingSourceMapConstructor = false;
+  warnedOversizedSourceMapPaths.clear();
 }
 
 function createSourceMap(payload: ConstructorParameters<typeof SourceMap>[0]): SourceMap | null {

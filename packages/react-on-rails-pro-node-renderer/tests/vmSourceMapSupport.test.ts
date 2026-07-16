@@ -276,6 +276,158 @@ describe('source-mapped stack traces for VM errors', () => {
     }
   });
 
+  describe('external source map size cap', () => {
+    // Mirrors MAX_EXTERNAL_SOURCE_MAP_BYTES in vmSourceMapSupport.ts, which is not
+    // exported. Reporting the size via a `statSync` spy keeps these tests fast:
+    // writing a genuinely oversized map would mean a 50MB+ disk write per test.
+    const MAX_EXTERNAL_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
+
+    function mockReportedSourceMapSize(mapPath: string, sizeInBytes: number) {
+      const realStatSync = fs.statSync.bind(fs);
+      // The production code stats the *realpath*, which differs from `mapPath` on
+      // macOS (/var -> /private/var), so compare against the resolved path.
+      const realMapPath = fs.realpathSync(mapPath);
+
+      return jest.spyOn(fs, 'statSync').mockImplementation(((target: fs.PathLike, options?: never) => {
+        const stats = realStatSync(target as string, options) as fs.Stats;
+        if (String(target) !== realMapPath) {
+          return stats;
+        }
+        // Preserve the prototype so `isFile()` keeps working.
+        return Object.assign(Object.create(Object.getPrototypeOf(stats) as object), stats, {
+          size: sizeInBytes,
+        }) as fs.Stats;
+      }) as typeof fs.statSync);
+    }
+
+    async function writeThrowingBundleWithExternalMap() {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      return { bundlePath, mapPath };
+    }
+
+    test('oversized external map is skipped on the async preload path and warns', async () => {
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+      const readFileAsyncSpy = jest.spyOn(fsPromises, 'readFile');
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // No remap: the frame keeps its bundled location instead of Boom.ts.
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+        // The whole point of the cap: the bytes are never read.
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+        expect(readFileAsyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('exceeds the'),
+          expect.stringContaining(path.basename(mapPath)),
+          MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
+          MAX_EXTERNAL_SOURCE_MAP_BYTES,
+        );
+      } finally {
+        readFileAsyncSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized external map is skipped on the sync lazy path when the map lands after build', async () => {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+      // No map at build time, so the preload misses and the registration stays
+      // lazy — the first error drives the synchronous read inside prepareStackTrace.
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(mapPath, 'utf8');
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('exceeds the'),
+          expect.stringContaining(path.basename(mapPath)),
+          MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
+          MAX_EXTERNAL_SOURCE_MAP_BYTES,
+        );
+      } finally {
+        readFileSyncSpy.mockRestore();
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('external map exactly at the cap still remaps', async () => {
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      // Boundary guard: the check is `size > cap`, so `size === cap` must be read.
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        expect(warnSpy).not.toHaveBeenCalledWith(
+          expect.stringContaining('exceeds the'),
+          expect.anything(),
+          expect.anything(),
+          expect.anything(),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized external map warns once per map path across repeated lookups', async () => {
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+        await runInVM('global.triggerSsrError()', bundlePath);
+        await runInVM('global.triggerSsrError()', bundlePath);
+
+        const oversizedWarnings = warnSpy.mock.calls.filter(
+          ([message]) => typeof message === 'string' && message.includes('exceeds the'),
+        );
+        expect(oversizedWarnings).toHaveLength(1);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+  });
+
   test('external source map lookup retries when the map appears after VM build', async () => {
     const bundlePath = vmBundlePath(testName);
     const mapFileName = `${path.basename(bundlePath)}.map`;

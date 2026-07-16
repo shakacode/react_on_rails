@@ -37,6 +37,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
+  larger than 50MB are no longer read into memory. Previously only inline (`data:`) source maps were
+  size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
+  stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
+  remapped to original sources, and the renderer logs a warning naming the map. The 50MB limit matches the
+  pre-existing cap for inline maps. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR TBD](https://github.com/shakacode/react_on_rails/pull/TBD) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
   17.0.0.rc.9 made webpack fail with `Module not found: Can't resolve 'react-on-rails-rsc/client.node'`
   (and `server.node`) unless the optional `react-on-rails-rsc` peer dependency was installed, because the
