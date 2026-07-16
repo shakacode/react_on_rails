@@ -17,10 +17,14 @@ module ReactOnRails
     # source template (under TEMPLATES_DIR) => destination path relative to the app root
     FILES = {
       "rsc_app_safety_skill.md" => ".claude/skills/rsc-app-safety/SKILL.md",
-      "rsc_app_safety_check.sh" => ".claude/hooks/rsc-app-safety-check.sh"
+      "rsc_app_safety_check.rb" => ".claude/hooks/rsc-app-safety-check.rb"
     }.freeze
 
-    HOOK_COMMAND = "${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.sh"
+    HOOK_COMMAND = "ruby"
+    HOOK_ARGS = ["${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.rb"].freeze
+    LEGACY_HOOK_COMMAND = "${CLAUDE_PROJECT_DIR}/.claude/hooks/rsc-app-safety-check.sh"
+    LEGACY_HOOK_REL = ".claude/hooks/rsc-app-safety-check.sh"
+    HOOK_REL = ".claude/hooks/rsc-app-safety-check.rb"
     HOOK_MATCHER = "Edit|Write"
     SETTINGS_REL = ".claude/settings.json"
 
@@ -44,7 +48,8 @@ module ReactOnRails
       def install
         actions = FILES.map { |source, dest_rel| copy_file(source, dest_rel) }
         actions << register_hook
-        actions
+        actions << remove_legacy_hook
+        actions.compact
       end
 
       private
@@ -64,7 +69,7 @@ module ReactOnRails
           FileUtils.mkdir_p(File.dirname(dest_path))
           File.write(dest_path, new_content)
         end
-        File.chmod(0o755, dest_path) if dest_path.end_with?(".sh")
+        File.chmod(0o755, dest_path) if dest_rel == HOOK_REL
 
         return "unchanged  #{dest_rel}" if unchanged
 
@@ -83,6 +88,15 @@ module ReactOnRails
         existed = File.exist?(settings_path)
         File.write(settings_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
+      end
+
+      def remove_legacy_hook
+        legacy_path = File.join(destination_root, LEGACY_HOOK_REL)
+        return unless File.exist?(legacy_path)
+        return "skipped    #{LEGACY_HOOK_REL} (already exists)" if skip_existing
+
+        FileUtils.rm_f(legacy_path)
+        "removed    #{LEGACY_HOOK_REL} (replaced by #{HOOK_REL})"
       end
 
       def read_settings(path)
@@ -124,12 +138,16 @@ module ReactOnRails
 
       def invalid_settings_message
         "#{SETTINGS_REL} is not valid JSON for Claude settings, so it was left untouched. Add this " \
-          "PostToolUse (#{HOOK_MATCHER}) command hook manually: #{HOOK_COMMAND}"
+          "PostToolUse (#{HOOK_MATCHER}) command hook manually: #{HOOK_COMMAND} #{HOOK_ARGS.join(' ')}"
       end
 
       def hook_registered?(settings)
-        Array(settings.dig("hooks", "PostToolUse")).any? do |entry|
-          entry["matcher"] == HOOK_MATCHER && Array(entry["hooks"]).any? { |hook| registered_hook?(hook) }
+        entries = Array(settings.dig("hooks", "PostToolUse"))
+        managed_hooks = entries.flat_map { |entry| Array(entry["hooks"]) }.select { |hook| managed_hook?(hook) }
+        return false unless managed_hooks.one? && registered_hook?(managed_hooks.first)
+
+        entries.any? do |entry|
+          entry["matcher"] == HOOK_MATCHER && Array(entry["hooks"]).include?(managed_hooks.first)
         end
       end
 
@@ -137,18 +155,22 @@ module ReactOnRails
         hooks = (settings["hooks"] ||= {})
         post_tool_use = (hooks["PostToolUse"] ||= [])
         post_tool_use.each do |candidate|
-          Array(candidate["hooks"]).reject! { |hook| hook["command"] == HOOK_COMMAND }
+          Array(candidate["hooks"]).reject! { |hook| managed_hook?(hook) }
         end
         entry = post_tool_use.find { |candidate| candidate["matcher"] == HOOK_MATCHER }
         unless entry
           entry = { "matcher" => HOOK_MATCHER, "hooks" => [] }
           post_tool_use << entry
         end
-        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => [] }
+        (entry["hooks"] ||= []) << { "type" => "command", "command" => HOOK_COMMAND, "args" => HOOK_ARGS }
       end
 
       def registered_hook?(hook)
-        hook["type"] == "command" && hook["command"] == HOOK_COMMAND && hook["args"] == []
+        hook["type"] == "command" && hook["command"] == HOOK_COMMAND && hook["args"] == HOOK_ARGS
+      end
+
+      def managed_hook?(hook)
+        registered_hook?(hook) || hook["command"] == LEGACY_HOOK_COMMAND
       end
     end
   end

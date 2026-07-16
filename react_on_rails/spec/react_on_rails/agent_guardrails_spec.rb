@@ -21,32 +21,17 @@ module ReactOnRails
       JSON.parse(File.read(File.join(@app_root, ".claude/settings.json")))
     end
 
-    def rsc_hook_commands
+    def rsc_hooks
       settings.dig("hooks", "PostToolUse").flat_map { |entry| entry["hooks"] }
-              .map { |hook| hook["command"] }
-              .select { |command| command.include?("rsc-app-safety-check.sh") }
-    end
-
-    def isolated_hook_path
-      bin_dir = File.join(@app_root, "hook-bin")
-      FileUtils.mkdir_p(bin_dir)
-      %w[bash cat git grep].each do |command|
-        source = ENV.fetch("PATH").split(File::PATH_SEPARATOR)
-                    .map { |dir| File.join(dir, command) }
-                    .find { |path| File.file?(path) && File.executable?(path) }
-        raise "Could not locate #{command}" unless source
-
-        FileUtils.ln_s(source, File.join(bin_dir, command))
+              .select do |hook|
+        hook["args"] == described_class::HOOK_ARGS || hook["command"] == described_class::LEGACY_HOOK_COMMAND
       end
-      FileUtils.ln_s(RbConfig.ruby, File.join(bin_dir, "ruby"))
-      bin_dir
     end
 
     def run_hook(*args, stdin_data: "")
-      environment = { "PATH" => isolated_hook_path, "BASH_ENV" => "/dev/null", "ENV" => "/dev/null" }
-      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
 
-      Dir.chdir(@app_root) { Open3.capture3(environment, hook_path, *args, stdin_data:) }
+      Dir.chdir(@app_root) { Open3.capture3(RbConfig.ruby, hook_path, *args, stdin_data:) }
     end
 
     def additional_context(stdout)
@@ -57,10 +42,11 @@ module ReactOnRails
       actions = described_class.install(@app_root)
 
       expect(File.file?(File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md"))).to be true
-      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
       expect(File.file?(hook_path)).to be true
+      expect(File.read(hook_path)).to start_with("#!/usr/bin/env ruby")
       expect(File.stat(hook_path).mode & 0o111).not_to eq(0) # executable
-      expect(rsc_hook_commands.size).to eq(1)
+      expect(rsc_hooks.size).to eq(1)
       expect(actions).to include(a_string_matching(/created.*SKILL\.md/))
     end
 
@@ -69,21 +55,21 @@ module ReactOnRails
       actions = described_class.install(@app_root)
 
       expect(actions).to all(match(/unchanged/))
-      expect(rsc_hook_commands.size).to eq(1)
+      expect(rsc_hooks.size).to eq(1)
     end
 
     it "creates missing guardrails when skipping existing files" do
       actions = described_class.install(@app_root, skip_existing: true)
 
       expect(File.file?(File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md"))).to be true
-      expect(File.file?(File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh"))).to be true
-      expect(rsc_hook_commands.size).to eq(1)
+      expect(File.file?(File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb"))).to be true
+      expect(rsc_hooks.size).to eq(1)
       expect(actions).to all(match(/created/))
     end
 
     it "preserves guardrail files and settings that already exist when skipping" do
       skill_path = File.join(@app_root, ".claude/skills/rsc-app-safety/SKILL.md")
-      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
       settings_path = File.join(@app_root, ".claude/settings.json")
       [skill_path, hook_path, settings_path].each { |path| FileUtils.mkdir_p(File.dirname(path)) }
       File.write(skill_path, "custom skill\n")
@@ -100,13 +86,13 @@ module ReactOnRails
 
     it "restores executable permissions when an unchanged hook is reinstalled" do
       described_class.install(@app_root)
-      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.sh")
+      hook_path = File.join(@app_root, ".claude/hooks/rsc-app-safety-check.rb")
       File.chmod(0o644, hook_path)
 
       actions = described_class.install(@app_root)
 
       expect(File.stat(hook_path).mode & 0o111).not_to eq(0)
-      expect(actions).to include("unchanged  .claude/hooks/rsc-app-safety-check.sh")
+      expect(actions).to include("unchanged  .claude/hooks/rsc-app-safety-check.rb")
     end
 
     it "parses Claude hook input without requiring jq" do
@@ -124,13 +110,37 @@ module ReactOnRails
       expect(additional_context(stdout)).to include("config.rsc_payload_authorizer")
     end
 
-    it "warns for the bare relative routes path used by the manual smoke command" do
+    it "supports manual invocation through Ruby with a bare relative routes path" do
       described_class.install(@app_root)
       routes_path = File.join(@app_root, "config/routes.rb")
       FileUtils.mkdir_p(File.dirname(routes_path))
       File.write(routes_path, "rsc_payload_route\n")
 
       stdout, _stderr, status = run_hook("config/routes.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
+    end
+
+    it "falls back to the manual path for valid non-object JSON input" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+
+      stdout, _stderr, status = run_hook("config/routes.rb", stdin_data: "[]")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
+    end
+
+    it "normalizes Windows path separators without requiring Bash" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+
+      stdout, _stderr, status = run_hook("config\\routes.rb")
 
       expect(status).to be_success
       expect(additional_context(stdout)).to include("This routes file mounts rsc_payload_route")
@@ -367,10 +377,45 @@ module ReactOnRails
       hook = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry.fetch("hooks") }
                      .find { |entry| entry["command"] == described_class::HOOK_COMMAND }
 
-      expect(hook).to include("type" => "command", "command" => described_class::HOOK_COMMAND, "args" => [])
+      expect(hook).to include(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+      )
     end
 
-    it "upgrades a previously registered shell-form project hook to exec form" do
+    it "removes the legacy shell hook file and upgrades its settings registration" do
+      claude_dir = File.join(@app_root, ".claude")
+      legacy_hook_path = File.join(claude_dir, "hooks/rsc-app-safety-check.sh")
+      FileUtils.mkdir_p(claude_dir)
+      FileUtils.mkdir_p(File.dirname(legacy_hook_path))
+      File.write(legacy_hook_path, "#!/usr/bin/env bash\n")
+      File.write(
+        File.join(claude_dir, "settings.json"),
+        JSON.pretty_generate(
+          "hooks" => {
+            "PostToolUse" => [
+              {
+                "matcher" => "Edit|Write",
+                "hooks" => [{ "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND }]
+              }
+            ]
+          }
+        )
+      )
+
+      actions = described_class.install(@app_root)
+
+      project_hooks = rsc_hooks
+      expect(File.exist?(legacy_hook_path)).to be false
+      expect(File.file?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be true
+      expect(actions).to include(
+        "removed    .claude/hooks/rsc-app-safety-check.sh (replaced by .claude/hooks/rsc-app-safety-check.rb)"
+      )
+      expect(project_hooks).to contain_exactly(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
+      )
+    end
+
+    it "removes duplicate managed legacy settings when the Ruby hook is already registered" do
       claude_dir = File.join(@app_root, ".claude")
       FileUtils.mkdir_p(claude_dir)
       File.write(
@@ -380,7 +425,14 @@ module ReactOnRails
             "PostToolUse" => [
               {
                 "matcher" => "Edit|Write",
-                "hooks" => [{ "type" => "command", "command" => described_class::HOOK_COMMAND }]
+                "hooks" => [
+                  {
+                    "type" => "command",
+                    "command" => described_class::HOOK_COMMAND,
+                    "args" => described_class::HOOK_ARGS
+                  },
+                  { "type" => "command", "command" => described_class::LEGACY_HOOK_COMMAND }
+                ]
               }
             ]
           }
@@ -389,10 +441,8 @@ module ReactOnRails
 
       described_class.install(@app_root)
 
-      project_hooks = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry.fetch("hooks") }
-                              .select { |entry| entry["command"] == described_class::HOOK_COMMAND }
-      expect(project_hooks).to contain_exactly(
-        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => []
+      expect(rsc_hooks).to contain_exactly(
+        "type" => "command", "command" => described_class::HOOK_COMMAND, "args" => described_class::HOOK_ARGS
       )
     end
 
@@ -412,17 +462,21 @@ module ReactOnRails
 
       all_commands = settings.dig("hooks", "PostToolUse").flat_map { |entry| entry["hooks"] }.map { |h| h["command"] }
       expect(all_commands).to include("bin/existing-hook")
-      expect(rsc_hook_commands.size).to eq(1)
+      expect(rsc_hooks.size).to eq(1)
       # Both hooks share the single Edit|Write matcher entry rather than duplicating it.
       expect(settings.dig("hooks", "PostToolUse").size).to eq(1)
     end
 
     it "raises rather than clobbering an unparseable settings.json" do
       claude_dir = File.join(@app_root, ".claude")
+      legacy_hook_path = File.join(claude_dir, "hooks/rsc-app-safety-check.sh")
       FileUtils.mkdir_p(claude_dir)
+      FileUtils.mkdir_p(File.dirname(legacy_hook_path))
+      File.write(legacy_hook_path, "custom legacy hook\n")
       File.write(File.join(claude_dir, "settings.json"), "{ not valid json ")
 
       expect { described_class.install(@app_root) }.to raise_error(described_class::Error, /not valid JSON/)
+      expect(File.read(legacy_hook_path)).to eq("custom legacy hook\n")
     end
 
     it "raises rather than clobbering valid JSON with an unsupported settings shape" do
