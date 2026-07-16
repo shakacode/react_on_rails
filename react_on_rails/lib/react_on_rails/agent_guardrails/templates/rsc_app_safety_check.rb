@@ -96,19 +96,26 @@ def warning_context(relative_path, detail)
   ].join("\n")
 end
 
+def read_file(path)
+  File.read(path)
+rescue SystemCallError
+  nil
+end
+
 file = input_file.tr("\\", "/")
 exit 0 if file.empty? || !File.file?(file)
 
 root = ENV.fetch("CLAUDE_PROJECT_DIR", Dir.pwd).tr("\\", "/").delete_suffix("/")
 relative_path = file.delete_prefix("#{root}/")
-content = File.read(file)
 detail = case file
          when %r{\A(?:.*/)?config/routes(?:/[^/]+)?\.rb\z}
-           if content.lines.any? { |line| line.sub(/#.*/, "").include?("rsc_payload_route") }
+           content = read_file(file)
+           if content&.lines&.any? { |line| line.sub(/#.*/, "").include?("rsc_payload_route") }
              "This routes file mounts rsc_payload_route (a public RSC endpoint)."
            end
          when %r{\A(?:.*/)?app/controllers/.+\.rb\z}
-           if content.match?(/RSCPayloadRenderer|rsc_payload/) && !authentication_evidence?(content)
+           content = read_file(file)
+           if content&.match?(/RSCPayloadRenderer|rsc_payload/) && !authentication_evidence?(content)
              "This controller wires an RSC payload renderer but shows no before_action/authentication."
            end
          end

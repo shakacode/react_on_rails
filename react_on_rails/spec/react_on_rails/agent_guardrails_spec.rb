@@ -159,6 +159,34 @@ module ReactOnRails
       expect(stderr).to be_empty
     end
 
+    it "does not read unrelated edited files" do
+      described_class.install(@app_root)
+      unrelated_path = File.join(@app_root, "tmp/generated-output.rb")
+      FileUtils.mkdir_p(File.dirname(unrelated_path))
+      File.write(unrelated_path, "unrelated\n")
+      File.chmod(0o000, unrelated_path)
+
+      stdout, stderr, status = run_hook("tmp/generated-output.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "remains non-blocking when a matching file cannot be read" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "rsc_payload_route\n")
+      File.chmod(0o000, routes_path)
+
+      stdout, stderr, status = run_hook("config/routes.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
     it "warns for a namespaced controller supplied as a bare relative path" do
       described_class.install(@app_root)
       controller_path = File.join(@app_root, "app/controllers/api/rsc_payload_controller.rb")

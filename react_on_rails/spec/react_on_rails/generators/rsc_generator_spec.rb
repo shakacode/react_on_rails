@@ -90,6 +90,21 @@ describe RscGenerator, type: :generator do
           .with(generator.destination_root, skip_existing: true)
       end
     end
+
+    context "when guardrail files cannot be written" do
+      let(:generator_options) { { pretend: false, skip: false } }
+
+      before do
+        allow(generator).to receive(:say)
+        allow(ReactOnRails::AgentGuardrails).to receive(:install).and_raise(Errno::EACCES, ".claude/settings.json")
+      end
+
+      it "warns and allows RSC generation to continue" do
+        expect { install_agent_guardrails }.not_to raise_error
+        expect(generator).to have_received(:say)
+          .with(a_string_including("Skipped RSC agent guardrails", ".claude/settings.json"), :yellow)
+      end
+    end
   end
 
   # Integration test for standalone happy path
