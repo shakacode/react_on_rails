@@ -51,6 +51,181 @@ jobs:
             ];
             const trustedCommandAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
             const permissionByLogin = new Map();
+            const releaseBranchPrefixes = ['release/', 'releases/', 'release-'];
+            const activeWorkflowStatuses = new Set(['queued', 'in_progress', 'pending', 'requested', 'waiting']);
+
+            function isSameRepositoryPullRequest(pr) {
+              return pr.head.repo?.full_name === repoFullName;
+            }
+
+            function isReleaseTargetPullRequest(pr) {
+              return releaseBranchPrefixes.some((prefix) => pr.base.ref.startsWith(prefix));
+            }
+
+            function hostedWorkflows(pr, inputs = {}) {
+              return [
+                ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
+                ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
+                ['Rspec test for gem', 'gem-tests.yml', inputs],
+                ['Integration Tests', 'integration-tests.yml', inputs],
+                ['Assets Precompile Check', 'precompile-check.yml', inputs],
+                ['Generator tests', 'examples.yml', inputs],
+                ['Playwright E2E Tests', 'playwright.yml', inputs],
+                ...(pr.user?.login === 'dependabot[bot]' ? [] : [
+                  ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
+                  ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
+                ])
+              ];
+            }
+
+            function hostedWorkflowFiles(pr) {
+              return hostedWorkflows(pr).map(([, workflowFile]) => workflowFile);
+            }
+
+            function workflowFileForRun(run) {
+              return (run.path || '').split('@')[0].split('/').at(-1) || '';
+            }
+
+            function observedRunState(runs) {
+              if (runs.some((run) => run.status === 'completed' && run.conclusion === 'success')) {
+                return 'successful';
+              }
+              if (runs.some((run) => activeWorkflowStatuses.has(run.status))) {
+                return 'pending';
+              }
+              return runs.length > 0 ? 'failed' : 'missing';
+            }
+
+            function parseCoverageProof(comment, headSha) {
+              if (comment.user?.login !== 'github-actions[bot]' || comment.user?.type !== 'Bot') {
+                return null;
+              }
+
+              const match = (comment.body || '').match(/<!-- hosted-ci-coverage:v1 (\{[^\r\n]*\}) -->/);
+              if (!match) {
+                return null;
+              }
+
+              try {
+                const proof = JSON.parse(match[1]);
+                if (proof.head_sha !== headSha ||
+                    !['optimized', 'force-full'].includes(proof.requested_mode) ||
+                    !Array.isArray(proof.workflows) ||
+                    Number.isNaN(Date.parse(proof.requested_at || ''))) {
+                  return null;
+                }
+                return proof;
+              } catch (error) {
+                core.warning(`Ignoring malformed hosted-CI coverage proof: ${error.message || error}`);
+                return null;
+              }
+            }
+
+            function latestCoverageProof(proofs, workflowFile, requestedMode) {
+              return proofs
+                .filter((proof) => proof.requested_mode === requestedMode && proof.workflows.includes(workflowFile))
+                .sort((left, right) => Date.parse(right.requested_at) - Date.parse(left.requested_at))[0] || null;
+            }
+
+            function runsForProof(runs, proof, proofs, workflowFile) {
+              if (!proof) {
+                return [];
+              }
+
+              const requestedAt = Date.parse(proof.requested_at);
+              const nextRequestedAt = proofs
+                .filter((candidate) =>
+                  candidate.workflows.includes(workflowFile) &&
+                  Date.parse(candidate.requested_at) > requestedAt
+                )
+                .map((candidate) => Date.parse(candidate.requested_at))
+                .sort((left, right) => left - right)[0];
+              return runs.filter((run) =>
+                run.event === 'workflow_dispatch' &&
+                (!run.created_at || (
+                  Date.parse(run.created_at) >= requestedAt &&
+                  (!nextRequestedAt || Date.parse(run.created_at) < nextRequestedAt)
+                ))
+              );
+            }
+
+            function coverageMarker(payload) {
+              return `<!-- hosted-ci-coverage:v1 ${JSON.stringify(payload)} -->`;
+            }
+
+            function coverageProofMarker({ dispatched, headSha, observed, requestedMode, workflows }) {
+              return coverageMarker({
+                head_sha: headSha,
+                requested_mode: requestedMode,
+                requested_at: commentCreatedAt,
+                workflows,
+                observed,
+                dispatched
+              });
+            }
+
+            async function observeExactHeadRuns(pr) {
+              try {
+                const [runs, comments] = await Promise.all([
+                  github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                    owner,
+                    repo,
+                    head_sha: pr.head.sha,
+                    per_page: 100
+                  }),
+                  github.paginate(github.rest.issues.listComments, {
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    per_page: 100,
+                    sort: 'created',
+                    direction: 'asc'
+                  })
+                ]);
+                const exactHeadRuns = runs.filter((run) => run.head_sha === pr.head.sha);
+                const proofs = comments
+                  .map((comment) => parseCoverageProof(comment, pr.head.sha))
+                  .filter(Boolean);
+                const automaticReleaseTarget = isSameRepositoryPullRequest(pr) && isReleaseTargetPullRequest(pr);
+                const workflows = hostedWorkflowFiles(pr).map((workflowFile) => {
+                  const workflowRuns = exactHeadRuns.filter((run) => workflowFileForRun(run) === workflowFile);
+                  const forceFullProof = latestCoverageProof(proofs, workflowFile, 'force-full');
+                  const forceFullProofRuns = runsForProof(workflowRuns, forceFullProof, proofs, workflowFile);
+                  const forceFullState = forceFullProof
+                    ? (forceFullProofRuns.length > 0 ? observedRunState(forceFullProofRuns) : 'pending')
+                    : 'missing';
+                  const optimizedProof = latestCoverageProof(proofs, workflowFile, 'optimized');
+                  const optimizedProofRuns = runsForProof(workflowRuns, optimizedProof, proofs, workflowFile);
+                  const automaticReleaseRuns = automaticReleaseTarget
+                    ? workflowRuns.filter((run) => run.event === 'pull_request')
+                    : [];
+                  const ordinaryState = observedRunState([
+                    ...workflowRuns,
+                    ...(optimizedProof && optimizedProofRuns.length === 0 ? [{ status: 'pending' }] : [])
+                  ]);
+                  const releaseState = observedRunState(automaticReleaseRuns);
+
+                  if (['pending', 'successful'].includes(forceFullState)) {
+                    return { file: workflowFile, mode: 'force-full', state: forceFullState, force_full_state: forceFullState };
+                  }
+                  if (['pending', 'successful'].includes(releaseState)) {
+                    return { file: workflowFile, mode: 'release-full', state: releaseState, force_full_state: forceFullState };
+                  }
+
+                  return {
+                    file: workflowFile,
+                    mode: ordinaryState === 'missing' ? 'missing' : 'optimized',
+                    state: ordinaryState,
+                    force_full_state: forceFullState
+                  };
+                });
+
+                return { status: 'known', workflows };
+              } catch (error) {
+                core.warning(`Unable to read exact-head workflow runs: ${error.message || error}`);
+                return { status: 'UNKNOWN', workflows: [] };
+              }
+            }
 
             function commandText(commentBody) {
               return commentBody
@@ -415,26 +590,44 @@ jobs:
                 return;
               }
 
-              const isDependabotPr = pr.user?.login === 'dependabot[bot]';
               const inputs = {
                 pull_request_base_ref: pr.base.ref,
                 pull_request_base_sha: pr.base.sha,
                 ...(forceFull ? { force_full_hosted: 'true' } : {})
               };
               const baseContextInputNames = new Set(['pull_request_base_ref', 'pull_request_base_sha']);
-              const workflows = [
-                ['Lint JS and Ruby', 'lint-js-and-ruby.yml', inputs],
-                ['JS unit tests for Renderer package', 'package-js-tests.yml', inputs],
-                ['Rspec test for gem', 'gem-tests.yml', inputs],
-                ['Integration Tests', 'integration-tests.yml', inputs],
-                ['Assets Precompile Check', 'precompile-check.yml', inputs],
-                ['Generator tests', 'examples.yml', inputs],
-                ['Playwright E2E Tests', 'playwright.yml', inputs],
-                ...(isDependabotPr ? [] : [
-                  ['React on Rails Pro - Integration Tests', 'pro-integration-tests.yml', inputs],
-                  ['React on Rails Pro - Package Tests', 'pro-test-package-and-gem.yml', inputs]
-                ])
-              ];
+              const workflows = hostedWorkflows(pr, inputs);
+              let workflowsToDispatch = workflows;
+              let coveredWorkflows = [];
+              const coverage = await observeExactHeadRuns(pr);
+              if (coverage.status === 'UNKNOWN') {
+                await addReaction('confused');
+                await postComment([
+                  '## Hosted CI Coverage UNKNOWN',
+                  coverageMarker({
+                    head_sha: pr.head.sha,
+                    requested_mode: forceFull ? 'force-full' : 'optimized',
+                    coverage_status: 'UNKNOWN',
+                    observed: [],
+                    dispatched: []
+                  }),
+                  '',
+                  `Unable to prove which hosted workflows are missing for \`${pr.head.sha.slice(0, 12)}\`.`,
+                  'No workflows were dispatched because exact-head coverage could not be read safely.'
+                ].join('\n'));
+                core.setFailed('Exact-head hosted CI coverage is UNKNOWN; dispatch stopped.');
+                return;
+              }
+
+              const coverageByFile = new Map(
+                coverage.workflows.map((workflow) => [workflow.file, workflow])
+              );
+              coveredWorkflows = workflows.filter(([, workflowFile]) => {
+                const observed = coverageByFile.get(workflowFile);
+                const state = forceFull ? observed?.force_full_state : observed?.state;
+                return ['pending', 'successful'].includes(state);
+              });
+              workflowsToDispatch = workflows.filter((workflow) => !coveredWorkflows.includes(workflow));
 
               function legacyCompatibleInputs(workflowInputs) {
                 const legacyInputs = Object.fromEntries(
@@ -486,7 +679,7 @@ jobs:
               }
 
               const dispatchResults = await Promise.allSettled(
-                workflows.map(([workflowName, workflowFile, inputs]) =>
+                workflowsToDispatch.map(([workflowName, workflowFile, inputs]) =>
                   createWorkflowDispatchWithFallback(workflowName, workflowFile, inputs)
                 )
               );
@@ -499,7 +692,7 @@ jobs:
                   succeeded.push(result.value);
                 } else {
                   failed.push({
-                    workflow: workflows[index][0],
+                    workflow: workflowsToDispatch[index][0],
                     error: result.reason?.message || String(result.reason)
                   });
                 }
@@ -508,7 +701,8 @@ jobs:
               let labelAdded = false;
               let forceFullLabelAdded = false;
               let labelMessageOverride = '';
-              if (succeeded.length > 0 && failed.length === 0) {
+              const requestedCoverageSatisfied = coveredWorkflows.length + succeeded.length === workflows.length;
+              if (requestedCoverageSatisfied && failed.length === 0) {
                 const labelControlCommands = [
                   '+ci-stop-hosted',
                   '+ci-skip-hosted',
@@ -555,7 +749,7 @@ jobs:
                 }
               }
 
-              await addReaction(succeeded.length > 0 ? 'rocket' : 'confused');
+              await addReaction(failed.length > 0 ? 'confused' : succeeded.length > 0 ? 'rocket' : 'eyes');
 
               const failedList = failed.length > 0
                 ? `\n\nFailed:\n${failed.map((failure) => `- ${failure.workflow}: ${failure.error}`).join('\n')}`
@@ -574,8 +768,16 @@ jobs:
 
               await postComment([
                 forceFull ? '## Force-Full Hosted CI Requested' : '## Hosted CI Requested',
+                coverageProofMarker({
+                  headSha: pr.head.sha,
+                  requestedMode: forceFull ? 'force-full' : 'optimized',
+                  workflows: succeeded.map((workflow) => workflow.file),
+                  observed: coverage.workflows,
+                  dispatched: succeeded.map((workflow) => workflow.file)
+                }),
                 '',
                 `Triggered ${succeeded.length} workflow(s) for \`${pr.head.sha.slice(0, 12)}\`.`,
+                `Skipped ${coveredWorkflows.length} workflow(s) with equivalent exact-head coverage.`,
                 forceFull
                   ? 'Mode: force-full hosted CI (bypasses optimized change selection).'
                   : 'Mode: optimized hosted CI (path-selected by `script/ci-changes-detector`).',
@@ -666,18 +868,36 @@ jobs:
             }
 
             async function handleStatus(pr) {
-              const [labels, files, waiver] = await Promise.all([
+              const [labels, files, waiver, coverage] = await Promise.all([
                 listPullRequestLabels(),
                 listPullRequestFiles(),
-                findCurrentWaiver(pr.head.sha)
+                findCurrentWaiver(pr.head.sha),
+                observeExactHeadRuns(pr)
               ]);
 
               const docsOnly = isDocsOnly(files);
               const hasReadyForHostedCi = labels.includes(hostedCiLabel);
               const hasForceFullHostedCi = labels.includes(forceFullHostedCiLabel);
+              const automaticReleaseTarget = isSameRepositoryPullRequest(pr) && isReleaseTargetPullRequest(pr);
+              const coverageCounts = coverage.workflows.reduce((counts, workflow) => {
+                counts[workflow.state] += 1;
+                return counts;
+              }, { successful: 0, pending: 0, failed: 0, missing: 0 });
+              const observedCoverage = coverage.status === 'UNKNOWN'
+                ? 'UNKNOWN'
+                : `${automaticReleaseTarget ? 'release-full' : 'optimized'}; ` +
+                  `successful=${coverageCounts.successful}, pending=${coverageCounts.pending}, ` +
+                  `failed=${coverageCounts.failed}, missing=${coverageCounts.missing}`;
 
               await postComment([
                 '## CI Status',
+                coverageMarker({
+                  head_sha: pr.head.sha,
+                  requested_mode: 'status',
+                  automatic_release_target: automaticReleaseTarget,
+                  coverage_status: coverage.status,
+                  observed: coverage.workflows
+                }),
                 '',
                 `Head SHA: \`${pr.head.sha.slice(0, 12)}\``,
                 `Changed files: ${files.length}`,
@@ -685,8 +905,12 @@ jobs:
                 `\`${hostedCiLabel}\` label: ${hasReadyForHostedCi ? 'present' : 'absent'}`,
                 `\`${forceFullHostedCiLabel}\` label: ${hasForceFullHostedCi ? 'present' : 'absent'}`,
                 `Current hosted-CI waiver: ${waiver ? 'present for this SHA' : 'not present for this SHA'}`,
+                `Automatic release-target hosted mode: ${automaticReleaseTarget ? 'active' : 'inactive'}`,
+                `Observed exact-head coverage: ${observedCoverage}`,
                 '',
-                hasForceFullHostedCi
+                automaticReleaseTarget
+                  ? 'Release-target policy already enables hosted CI for this same-repository PR.'
+                  : hasForceFullHostedCi
                   ? 'Force-full hosted CI is enabled for this PR.'
                   : hasReadyForHostedCi
                     ? 'Optimized hosted CI is enabled for this PR.'

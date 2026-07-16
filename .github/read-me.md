@@ -17,10 +17,12 @@ confirmation:
 +ci-run-hosted
 ```
 
-The command dispatches hosted workflows for the current head SHA, creates
-`ready-for-hosted-ci` if needed, and adds it so future pushes on the PR keep
-running optimized hosted CI. Hosted CI is still path-selected by
-`script/ci-changes-detector`; it does not automatically run every hosted suite.
+The command first inventories exact-head workflow runs and prior auditable
+dispatch proofs. It skips equivalent optimized, queued, running, or successful
+coverage; dispatches only missing workflows; creates `ready-for-hosted-ci` if
+needed; and adds it so future pushes keep running optimized hosted CI. Hosted CI
+is still path-selected by `script/ci-changes-detector`; it does not
+automatically run every hosted suite.
 
 ### `+ci-force-full` - Request Force-Full Hosted CI
 
@@ -31,9 +33,11 @@ selection:
 +ci-force-full
 ```
 
-The command dispatches the same hosted workflows with `force_full_hosted: true`,
-creates `ready-for-hosted-ci` and `force-full-hosted-ci`, and keeps future pushes
-in force-full mode until `+ci-stop-full` removes the override.
+The command dispatches only workflows missing proven exact-head force-full
+coverage, with `force_full_hosted: true`; creates `ready-for-hosted-ci` and
+`force-full-hosted-ci`; and keeps future pushes in force-full mode until
+`+ci-stop-full` removes the override. An optimized or automatic release-target
+run is not force-full evidence merely because it has the same workflow name.
 
 ### Stop And Waiver Commands
 
@@ -57,8 +61,12 @@ commits keep running optimized hosted CI.
 Records a SHA-bound hosted-CI waiver. The waiver does not cancel or block any
 workflow run and does not apply after another push.
 
-`+ci-status` summarizes labels, the current SHA, the docs-only heuristic, and
-whether a waiver exists for the current SHA. `+ci-help` prints the command list.
+`+ci-status` summarizes labels, the current SHA, the docs-only heuristic,
+automatic same-repository release-target mode, exact-head per-workflow coverage,
+and whether a waiver exists for the current SHA. Status and dispatch comments
+include a machine-readable coverage marker. If Actions coverage cannot be read,
+the result is `UNKNOWN` and start commands dispatch nothing rather than guessing.
+`+ci-help` prints the command list.
 
 ## Human, Agent, And Workflow-Token Paths
 
@@ -111,8 +119,8 @@ a comment line.
 
 Comment-triggered workflows (`issue_comment`) execute from the default branch
 (`main`), not from the PR branch. When changing `ci-commands.yml`, validate the
-YAML and script locally, merge the workflow change, then test commands on a
-follow-up PR.
+YAML and run `node --test .github/workflows/ci-commands.test.cjs` locally, merge
+the workflow change, then test commands on a follow-up PR.
 
 ## Post-Merge Exercise Follow-Ups
 
