@@ -4,7 +4,7 @@ require "json"
 
 require_relative "bencher_perf_url"
 
-# Parses the report emitted by `bencher run --format json` (Bencher CLI v0.6.2;
+# Parses the report emitted by `bencher run --format json` (Bencher CLI v0.6.8;
 # shape verified stable through current main). Exposes what benchmark reporting
 # needs: active regression alerts, and per benchmark+measure t-test prediction
 # intervals so the summary table can flag values that moved significantly vs

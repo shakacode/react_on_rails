@@ -578,7 +578,7 @@ module ReactOnRails
           missing.concat(stale_inactive_rsc_plugin_messages(content, "serverWebpackConfig.js"))
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: true)
-            missing << "generated scoped clientReferences in serverWebpackConfig.js"
+            missing << "generated manifest-backed clientReferences resolver in serverWebpackConfig.js"
           end
         elsif inactive_rsc_plugin_symbol_in_js_code?(content)
           missing << "#{rsc_plugin_class_name} in serverWebpackConfig.js " \
@@ -600,7 +600,7 @@ module ReactOnRails
           missing.concat(stale_inactive_rsc_plugin_messages(content, "clientWebpackConfig.js"))
           warn_non_object_literal_rsc_plugin_options_for_config(content)
           unless rsc_plugin_client_references_configured?(content, is_server: false)
-            missing << "generated scoped clientReferences in clientWebpackConfig.js"
+            missing << "generated manifest-backed clientReferences resolver in clientWebpackConfig.js"
           end
         elsif inactive_rsc_plugin_symbol_in_js_code?(content)
           missing << "#{rsc_plugin_class_name} in clientWebpackConfig.js " \
@@ -640,7 +640,7 @@ module ReactOnRails
         @non_object_literal_rsc_plugin_options_warned = true
         GeneratorMessages.add_warning(
           "#{rsc_plugin_class_name} calls use non-object-literal options in one or more bundler configs, " \
-          "so the generator cannot verify whether scoped clientReferences are configured. " \
+          "so the generator cannot verify whether the generated manifest-backed resolver is configured. " \
           "Please verify your bundler configs manually."
         )
       end

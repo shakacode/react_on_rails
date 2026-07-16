@@ -1,0 +1,53 @@
+name: Rspack/Vite DX benchmark replay
+
+on:
+  pull_request:
+    paths:
+      - 'benchmarks/rspack-vite-dx/**'
+      - '.github/workflows/rspack-vite-dx.yml'
+      - '.tool-versions'
+  push:
+    branches: [main]
+    paths:
+      - 'benchmarks/rspack-vite-dx/**'
+      - '.github/workflows/rspack-vite-dx.yml'
+      - '.tool-versions'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rspack-vite-dx-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: rspack-vite-dx-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: benchmarks/rspack-vite-dx
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: benchmarks/rspack-vite-dx/package.json
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+          cache-dependency-path: benchmarks/rspack-vite-dx/pnpm-lock.yaml
+
+      - name: Install isolated benchmark dependencies
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
+      - name: Replay benchmark artifact checks
+        run: pnpm run check

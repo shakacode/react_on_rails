@@ -30,7 +30,7 @@ Gem::Specification.new do |s|
   s.summary       = "Rails with react server rendering with webpack. Performance helpers"
   s.description   = "See README.md"
   s.homepage      = "https://reactonrails.com/docs/pro/"
-  s.license       = "UNLICENSED"
+  s.license       = "LicenseRef-LICENSE"
   s.metadata["rubygems_mfa_required"] = "true"
   s.metadata["bug_tracker_uri"] = "https://github.com/shakacode/react_on_rails/issues"
   s.metadata["changelog_uri"] = "https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md"

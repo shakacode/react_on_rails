@@ -3,7 +3,7 @@
 # Builds the public Bencher perf-plot URL for a single benchmark from a parsed
 # `bencher run --format json` report (issue #3601 item 2). The query mirrors the
 # comma-separated lists Bencher's perf view expects — branches/heads/testbeds/benchmarks/
-# measures, then a trailing report= — as of the CLI v0.6.2 pin in bencher_report.rb. That
+# measures, then a trailing report= — as of the CLI v0.6.8 pin in bencher_report.rb. That
 # shape is an external, undocumented contract, so re-verify a real perf link still resolves
 # when bumping the pin (the param order is pinned in-repo by bencher_report_spec.rb).
 #
@@ -11,8 +11,7 @@
 # out — so extraction is lenient: a missing piece yields nil and an unlinked name, never
 # an error. Kept separate from BencherReport's strict regression/boundary parsing.
 class BencherPerfUrl
-  # Public Bencher host; the path is /perf/<project-slug> (public links). Matches the host
-  # report_regressions.rb uses.
+  # Public Bencher host; the path is /perf/<project-slug> (public links).
   BASE = "https://bencher.dev"
 
   def initialize(raw)

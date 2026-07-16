@@ -11,6 +11,8 @@ module ReactOnRails
   # Used by both streaming (Pro) and non-streaming (OSS) paths.
   # Strict protocol parser — any format violation raises an error.
   class LengthPrefixedParser
+    class ParseError < ReactOnRails::Error; end
+
     # Keep aligned with ReactOnRailsPro::StreamRequest::CONTROL_MESSAGE_TYPES,
     # which routes these same control frames during bidirectional streaming.
     # MIRROR VALUES OF: react_on_rails_pro/lib/react_on_rails_pro/stream_request.rb
@@ -28,11 +30,11 @@ module ReactOnRails
       results = []
       parser.feed(str.to_s.b) { |chunk| results << chunk }
       if results.empty?
-        raise ReactOnRails::Error,
+        raise ParseError,
               "Malformed render result: expected exactly one length-prefixed chunk but found none"
       end
       if results.size > 1
-        raise ReactOnRails::Error,
+        raise ParseError,
               "Malformed render result: expected exactly one length-prefixed chunk but found #{results.size}"
       end
       results.first
@@ -98,11 +100,7 @@ module ReactOnRails
       @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1)
 
       tab_idx = header.byteindex("\t".b)
-      unless tab_idx
-        header_str = header.force_encoding(Encoding::UTF_8).inspect
-        raise ReactOnRails::Error,
-              "Malformed length-prefixed header: missing tab separator in: #{header_str}"
-      end
+      raise ParseError, "Malformed length-prefixed header: missing tab separator" unless tab_idx
 
       parse_length_prefixed_header(header, tab_idx)
       true
@@ -115,16 +113,16 @@ module ReactOnRails
       begin
         @content_len = Integer(len_hex, 16)
       rescue ArgumentError
-        raise ReactOnRails::Error, "Invalid content length hex: #{len_hex.force_encoding(Encoding::UTF_8).inspect}"
+        raise ParseError, "Malformed length-prefixed header: invalid content length hex", cause: nil
       end
+      raise ParseError, "Malformed length-prefixed header: negative content length" if @content_len.negative?
 
       begin
         @metadata = JSON.parse(meta_json.force_encoding(Encoding::UTF_8))
-      rescue JSON::ParserError => e
-        meta_str = meta_json.force_encoding(Encoding::UTF_8).inspect
-        raise ReactOnRails::Error,
-              "Malformed length-prefixed header: invalid metadata JSON: #{meta_str} (#{e.message})"
+      rescue JSON::ParserError
+        raise ParseError, "Malformed length-prefixed header: invalid metadata JSON", cause: nil
       end
+      raise ParseError, "Malformed length-prefixed header: metadata JSON must be an object" unless @metadata.is_a?(Hash)
 
       @state = :content
     end
@@ -153,13 +151,19 @@ module ReactOnRails
       #   "object" → JSON-serialized value (ServerRenderHash or null), needs JSON.parse
       #   "string" → raw HTML string, used as-is
       payload_type = @metadata.delete("payloadType")
-      @metadata["html"] = payload_type == "object" ? JSON.parse(raw_content) : raw_content
+      @metadata["html"] = payload_type == "object" ? parse_object_payload(raw_content) : raw_content
 
       result = @metadata
       @metadata = nil
       @state = :header
       yield result
       true
+    end
+
+    def parse_object_payload(raw_content)
+      JSON.parse(raw_content)
+    rescue JSON::ParserError
+      raise ParseError, "Malformed length-prefixed object payload JSON", cause: nil
     end
   end
 end

@@ -22,7 +22,7 @@ import { setManifestFileNames } from '../src/cache/manifestLoader.ts';
 import {
   collectRSCClientManifestStylesheetHrefs,
   getRSCClientManifestStylesheetHrefs,
-} from '../src/cache/manifestLoaderServer.ts';
+} from '../src/cache/manifestStylesheets.ts';
 import loadJsonFile from '../src/loadJsonFile.ts';
 
 jest.mock('../src/loadJsonFile.ts', () => ({

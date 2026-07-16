@@ -12,7 +12,7 @@ The generator supports Rspack — when `assets_bundler: rspack` is detected in `
 The RSC implementation depends on the `react-on-rails-rsc` npm package, which provides bundler-specific manifest plugins plus a shared loader:
 
 - **WebpackPlugin** (`react-on-rails-rsc/WebpackPlugin`) — generates client/server component manifest files under webpack.
-- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by the `react-on-rails-rsc` 19.2.1 package line (`19.2.1-rc.0` during the React on Rails Pro 17 RC soak).
+- **RspackPlugin** (`react-on-rails-rsc/RspackPlugin`) — the rspack-native equivalent (`RSCRspackPlugin`). It emits the **same manifest JSON schema** using only standard rspack public APIs, so the RSC runtime resolves client references identically. Exported by stable `react-on-rails-rsc` 19.2.1 and later on the 19.2.x package line.
 - **WebpackLoader** (`react-on-rails-rsc/WebpackLoader`) — transforms `'use client'` files into client reference proxies in the RSC bundle. Works under both webpack and rspack.
 
 ## React and Package Version Policy
@@ -23,10 +23,8 @@ line in v17 because the generator, peer metadata, and node-renderer startup chec
 now target the coordinated React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
 line.
 
-During the React on Rails Pro 17 release-candidate soak, the generator pins
-`react-on-rails-rsc@19.2.1-rc.0` because the stable `19.2.1` package is not
-published yet. For the 17.0 final release, use a stable `react-on-rails-rsc`
-19.2.x package with patch >= 19.2.1. Keep React, React DOM, and
+The React on Rails Pro 17 generator pins stable `react-on-rails-rsc@19.2.1`
+for both webpack and rspack projects. Keep React, React DOM, and
 `react-on-rails-rsc` upgraded as a coordinated set.
 
 ## Compatibility Matrix
@@ -119,6 +117,35 @@ To test RSC with Rspack in your project:
 3. **No official React Rspack support**: The React team has not officially tested or
    endorsed the `react-server-dom-webpack` runtime with Rspack. The native
    `RSCRspackPlugin` is maintained by ShakaCode in `react-on-rails-rsc`.
+
+## CSS / FOUC Status
+
+The [CSS and Styling guide](./css-and-styling.md) documents the streamed-CSS (FOUC
+prevention) pipeline in full. The Rspack-specific facts, verified against
+`react-on-rails-rsc@19.2.1-rc.0` and a production dummy build (2026-07-09):
+
+- **Manifest `css` arrays require the 19.2.1+ line.** The `RSCRspackPlugin` in the
+  19.2.0 packages has no CSS collection at all. Without `css` arrays there are no
+  stylesheet hints — no preload head start and no browser-side gating.
+- **`output.publicPath` must be a concrete string.** With `'auto'` or a function, CSS
+  files are omitted from the manifest (the build emits a compilation warning but
+  succeeds).
+- **CSS must be extracted via `CssExtractRspackPlugin`** (`css/mini-extract` module
+  type). Rspack's native CSS support (`experiments.css`) is not seen by the plugin's
+  CSS-dependency recovery; split-chunks configs that move CSS outside the client
+  reference's chunk group can also drop entries.
+- **The reviewed default production builds still left the streamed reveal ungated** —
+  this is bundler-independent, not Rspack-specific: numeric chunk ids disable Path B,
+  while Path A then depends on a manifest-listed preload href that arrives before the
+  reveal. The 2026-07-09 production dummy capture under both bundlers still emitted only
+  a non-blocking preload, so a streamed component can paint unstyled until its CSS
+  applies. See
+  [production builds are the primary silent-no-op case](./css-and-styling.md#known-limitations)
+  for details and status.
+
+The end-to-end FOUC e2e gate currently runs only against dev-mode (`NODE_ENV=test`)
+builds; production-posture coverage is tracked in
+[issue #4557](https://github.com/shakacode/react_on_rails/issues/4557).
 
 ## Related Resources
 

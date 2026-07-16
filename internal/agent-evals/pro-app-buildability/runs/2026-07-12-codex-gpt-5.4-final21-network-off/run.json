@@ -1,0 +1,211 @@
+{
+  "schema_version": "2.0",
+  "run_id": "2026-07-12-codex-gpt-5.4-final21-network-off",
+  "started_at": "2026-07-12T16:01:18Z",
+  "finished_at": "2026-07-12T16:01:37Z",
+  "repository": {
+    "revision": "d2ebead3e1642291a6f6f15dba0ee0294ec9e963",
+    "dirty": false
+  },
+  "definition": {
+    "inputs": [
+      {
+        "path": "bin/build-runner-diagnostics",
+        "sha256": "ce306f6d8e0181a7883f000fa4ce3a70d8ce984cf8f994fa34d8f8e31cb5ac84",
+        "executable": true
+      },
+      {
+        "path": "bin/build-safe-path",
+        "sha256": "a28a00d118df0d4d26223922bd20e7b35cfb0b578e79f98bab4929a9d207f292",
+        "executable": true
+      },
+      {
+        "path": "bin/derive-evidence.mjs",
+        "sha256": "a296f84f314acd884e7c8ce4a7e7128d4cc544b12a62fab58cffe95a28bfedec",
+        "executable": true
+      },
+      {
+        "path": "bin/derive-network-probe.mjs",
+        "sha256": "187d9ea8e3ab9ab179fd3ce0de38bb45f045f89521d3abe797705566493bafd3",
+        "executable": true
+      },
+      {
+        "path": "bin/evidence-limits.mjs",
+        "sha256": "529ad4f7e284ecbd1a21c040b0e7dc4da20badbfcb01ac5ed8ff544fef618a8b",
+        "executable": false
+      },
+      {
+        "path": "bin/local-paths.mjs",
+        "sha256": "0c2c004faff9f2fc11c0f7e73b15e666216581568c1129b0383667ab11728aff",
+        "executable": false
+      },
+      {
+        "path": "bin/normalize-command.mjs",
+        "sha256": "f297b4644beb7abdf3885f440442c7ddb17bc9dc89d3f4f34217420993333d34",
+        "executable": false
+      },
+      {
+        "path": "bin/probe-allows-scaffold",
+        "sha256": "0a34be145e275aae7996d0dbbfe56a6ad646ae1445044f93db04942b596b4305",
+        "executable": true
+      },
+      {
+        "path": "bin/run-eval",
+        "sha256": "a966a3abfb49aed3a9239b778ba34b44e16305689e952b06b5bda98cfe812685",
+        "executable": true
+      },
+      {
+        "path": "bin/sanitize-events.pl",
+        "sha256": "b6f7d12dc90e7cc4a1b0df3d1145e2401ac1c457e7acf7eb09dc67eaa3d5ef88",
+        "executable": true
+      },
+      {
+        "path": "bin/scan-local-paths.mjs",
+        "sha256": "5ddc0e5a083c9ad1487014ade004c6bc290ddee33457ee0b7be017cf760055bc",
+        "executable": false
+      },
+      {
+        "path": "bin/scan-sensitive-artifacts",
+        "sha256": "643b57c73792e1a6ef270cf359a53918d0cad985dbd9bb74f52b856dbbb12727",
+        "executable": true
+      },
+      {
+        "path": "bin/sensitive-values.mjs",
+        "sha256": "a0e5bd9894130fc93a0fe31214f89c22a2cfbdadabb436f3610b9c46d0654b6d",
+        "executable": false
+      },
+      {
+        "path": "bin/validate-json.mjs",
+        "sha256": "2f55b835949603ddc0b89f348ae53ded61a776eb150f37fdd7e4ee0cbedcb569",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-network-probe.mjs",
+        "sha256": "ed998c4cb142fe9e565d9a1f19c1a9b89353641a6a71dbed66840a05bd0eb6eb",
+        "executable": true
+      },
+      {
+        "path": "bin/validate-run",
+        "sha256": "6bc8105f805ae37b5a1abfa1257b02ff5995f2b53935ebdadd3047cd2e7266df",
+        "executable": true
+      },
+      {
+        "path": "schemas/agent-report.schema.json",
+        "sha256": "8f3aec5f85373f49716abaca4a65cfee461cbfcec320c51111a88de70ed47e98",
+        "executable": false
+      },
+      {
+        "path": "schemas/artifact-evidence.schema.json",
+        "sha256": "84db73a776fe39fd2c9856ccd6ab0d9249ffb3db98ace522b03b03cf0292e214",
+        "executable": false
+      },
+      {
+        "path": "schemas/command-evidence.schema.json",
+        "sha256": "133c2faa563184c64064ff78e20c5adafdf03bc853d23d0a8792885abd899362",
+        "executable": false
+      },
+      {
+        "path": "schemas/invocation.schema.json",
+        "sha256": "c3fbb2631e37f86a6200bbe5d0550b68a99b68fccf734fc63cee766fefa46ede",
+        "executable": false
+      },
+      {
+        "path": "schemas/network-probe.schema.json",
+        "sha256": "7fbd56094d10cd827f6604e2ae4190675b74bbc7b024f88b405758bb19a81e1c",
+        "executable": false
+      },
+      {
+        "path": "schemas/rubric-results.schema.json",
+        "sha256": "9d5ab41df683ed1d5267b89f032bd86f5fd5c6568e99f65b2305dfbb3eacf16e",
+        "executable": false
+      },
+      {
+        "path": "schemas/run.schema.json",
+        "sha256": "9616c9718eb201070fb7d72811e3d8ca24f5e23b07d6e07c6cf50fe39c77a1ba",
+        "executable": false
+      },
+      {
+        "path": "network-probe-prompt.md",
+        "sha256": "519e69907ee517f88708db0a71930c2f3347b70e64fbe502a0e4922bd1301428",
+        "executable": false
+      },
+      {
+        "path": "package.json",
+        "sha256": "b93ddeb0e52c66f5add7a1f935cd955b42226cedc591e7908f8f6c1a72da55c2",
+        "executable": false
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha256": "87e66136a07fd87215393307c1608430cb7d41732526d6670c3e6aa1b87d7fe5",
+        "executable": false
+      },
+      {
+        "path": "prompt.md",
+        "sha256": "7f6216f958babbdf7a9afcc34a8e5e2f3912af69bc4da14dcb9b571edd88d6ca",
+        "executable": false
+      },
+      {
+        "path": "rubric.md",
+        "sha256": "a27bef599ccfc5891dd6a4e104d4bbb73a4cdbdf56201d569119084ae9cfedb8",
+        "executable": false
+      },
+      {
+        "path": "scenario.md",
+        "sha256": "e50d391e1e57cbc8969473ab35f947ae9362db4cd4b8040fd358bcd62d25a588",
+        "executable": false
+      }
+    ]
+  },
+  "agent": {
+    "name": "codex",
+    "version": "codex-cli 0.136.0",
+    "model": "gpt-5.4",
+    "probe_invoked": true,
+    "scaffold_invoked": false
+  },
+  "environment": {
+    "os": "Darwin 25.5.0 arm64",
+    "ruby": "ruby 4.0.5 (2026-05-20 revision 64336ffd0e) +PRISM [arm64-darwin23]",
+    "node": "v22.12.0",
+    "npm": "10.9.0",
+    "pnpm": "10.33.4",
+    "git": "git version 2.54.0"
+  },
+  "security": {
+    "umask": "077",
+    "process_environment": "env -i",
+    "shell_environment_inherit": "none",
+    "credential_store": "file",
+    "auth_material_available": false,
+    "stripped_sensitive_variable_categories": ["auth", "credential", "token"],
+    "raw_cleanup": "EXIT/INT/TERM",
+    "auth_material_persisted": false
+  },
+  "network_preflight": [
+    {
+      "endpoint": "https://registry.npmjs.org/",
+      "status": "pass"
+    },
+    {
+      "endpoint": "https://rubygems.org/",
+      "status": "pass"
+    }
+  ],
+  "runner": {
+    "timeout_command": "/opt/homebrew/bin/timeout",
+    "scaffold_timeout_seconds": 900,
+    "probe_timeout_seconds": 120,
+    "maximum_agent_call_wall_clock_seconds": 1020,
+    "sandbox_network_access": false,
+    "isolated_host_attestation": false,
+    "network_probe_artifact": "sandbox-network-probe.json",
+    "exit_code": 1,
+    "timed_out": false,
+    "config_artifact": "invocation.json"
+  },
+  "result": {
+    "classification": "incomplete",
+    "reason": "Machine-derived rubric result: incomplete; see rubric-results.json",
+    "tutorial_claims_supported": false
+  }
+}

@@ -90,7 +90,7 @@ module ReactOnRails
         end
 
         def load_config(config_path)
-          YAML.load_file(config_path)
+          YAML.safe_load_file(config_path)
         rescue StandardError => e
           puts Rainbow("⚠️  Failed to load #{config_path}: #{e.message}").yellow
           puts Rainbow("   Continuing without service checks...").yellow

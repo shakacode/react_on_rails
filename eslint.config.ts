@@ -68,6 +68,8 @@ const config = defineConfig([
     '**/public/packs*/',
     '**/gen-examples/',
     '**/bundle/',
+    // Self-contained benchmark with its own pinned toolchain and checks.
+    'benchmarks/rspack-vite-dx/',
     // dependencies
     '**/node_modules/',
     // fixtures
@@ -185,6 +187,14 @@ const config = defineConfig([
     files: ['packages/**/src/**/*'],
     rules: {
       'import/extensions': ['error', 'ignorePackages'],
+    },
+  },
+  {
+    files: ['internal/agent-evals/pro-app-buildability/bin/validate-json.mjs'],
+    rules: {
+      // This eval installs its pinned schema validators from its isolated package,
+      // so root-only CI cannot resolve them even though the replay setup can.
+      'import/no-unresolved': 'off',
     },
   },
   {

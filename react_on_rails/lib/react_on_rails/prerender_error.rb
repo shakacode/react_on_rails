@@ -5,7 +5,8 @@ require "rainbow"
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
-    MAX_ERROR_SNIPPET_TO_LOG = 1000
+    REDACTED_VALUE = "[REDACTED]"
+    SENSITIVE_CONTEXT_KEYS = %w[props js_code json].freeze
     # TODO: Consider remove providing original `err` as already have access to `self.cause`
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
@@ -15,8 +16,8 @@ module ReactOnRails
                    js_code: nil, console_messages: nil)
       @component_name = component_name
       @err = err
-      @props = props
-      @js_code = js_code
+      @props = redacted_value(props)
+      @js_code = redacted_value(js_code)
       @console_messages = console_messages
 
       backtrace, message = calc_message(component_name, console_messages, err, js_code, props)
@@ -35,17 +36,42 @@ module ReactOnRails
     def to_error_context
       result = {
         component_name:,
-        err:,
+        err: error_context_value(err),
         props:,
         js_code:,
         console_messages:
       }
 
-      result.merge!(err.to_error_context) if err.respond_to?(:to_error_context)
+      if err.respond_to?(:to_error_context)
+        nested_context = err.to_error_context.reject { |key, _value| sensitive_nested_context_key?(key) }
+        result.merge!(nested_context)
+      end
       result
     end
 
     private
+
+    def renderer_parse_error?(error)
+      json_parse_error = defined?(JsonParseError) && error.is_a?(JsonParseError)
+      length_prefixed_parse_error = defined?(LengthPrefixedParser::ParseError) &&
+                                    error.is_a?(LengthPrefixedParser::ParseError)
+      json_parse_error || length_prefixed_parse_error
+    end
+
+    def safe_error_details(error)
+      return error.inspect unless renderer_parse_error?(error)
+
+      "#{error.class}: Renderer response could not be parsed"
+    end
+
+    def error_context_value(error)
+      renderer_parse_error?(error) ? safe_error_details(error) : error
+    end
+
+    def sensitive_nested_context_key?(key)
+      SENSITIVE_CONTEXT_KEYS.include?(key.to_s) ||
+        (renderer_parse_error?(err) && key.to_s == "original_error")
+    end
 
     # rubocop:disable Metrics/AbcSize
     def calc_message(component_name, console_messages, err, js_code, props)
@@ -57,7 +83,7 @@ module ReactOnRails
       if err
         message << Rainbow("Error Details:").red.bright << "\n"
         message << <<~MSG
-          #{err.inspect}
+          #{safe_error_details(err)}
 
         MSG
 
@@ -68,11 +94,11 @@ module ReactOnRails
 
       # Add props information
       message << Rainbow("Props:").blue.bright << "\n"
-      message << "#{Utils.smart_trim(props, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
+      message << "#{redacted_value(props)}\n\n"
 
       # Add code snippet
       message << Rainbow("JavaScript Code:").blue.bright << "\n"
-      message << "#{Utils.smart_trim(js_code, MAX_ERROR_SNIPPET_TO_LOG)}\n\n"
+      message << "#{redacted_value(js_code)}\n\n"
 
       if console_messages && console_messages.strip.present?
         message << Rainbow("Console Output:").magenta.bright << "\n"
@@ -88,6 +114,10 @@ module ReactOnRails
 
       [backtrace, message]
       # rubocop:enable Metrics/AbcSize
+    end
+
+    def redacted_value(value)
+      value.nil? ? nil : REDACTED_VALUE
     end
 
     # Formats `err.backtrace` for display, or returns nil when there are no frames.

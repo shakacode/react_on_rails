@@ -1,98 +1,194 @@
-The newer of https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE or this file applies.
+# ShakaCode React on Rails Pro – End User License Agreement (EULA)
 
-React on Rails Pro License
+_Version 2.3 — 2026-07-14_\
+© 2015–2026 ShakaCode, LLC. All rights reserved.
 
-For React on Rails Pro, not the open source version. For open source, see https://github.com/shakacode/react_on_rails/blob/master/LICENSE.md.
+---
 
-Copyright (c) 2018, 2019 Justin Gordon and ShakaCode, http://www.shakacode.com
+## 1. Definitions
 
-All rights reserved.
+- **Organization** – the single legal entity identified in the order (e.g., GitHub Sponsors, invoice).
+- **Licensee** – the Organization or any other person or entity exercising royalty-free rights under Section 4.
+- **Production Use** – any use of the Software in connection with a live application, website, or service accessed by end users **other than**:
+  - evaluation or testing
+  - classroom instruction, tutorials, workshops, coursework
+  - recorded demos, livestreams, or videos
+  - personal/hobby experiments not offered as a service
+- **Complimentary OSS License** – a license issued under Section 4.1 at no charge to a qualifying open-source Organization.
+- **Covered HTML Document** – an HTML document containing output rendered by the integrated React on Rails Pro product.
+- **Attribution Provider** – the part of the integrated React on Rails Pro product that generates and inserts the Generated Attribution on behalf of the product as a whole.
+- **Generated Attribution** – the complete, non-visual HTML comment emitted by the Attribution Provider, including its license-status suffix.
 
+---
 
-END-USER LICENSE AGREEMENT
+## 2. Grant of License (Per-Organization)
 
-------------------------------------------------------------------------------
+Subject to this Agreement, ShakaCode grants the subscribing Organization a **non-exclusive, non-transferable** license, during the applicable license term, to install, internally modify, and use React on Rails Pro (“Software”) in the Organization’s own applications, websites, and services, whether accessed internally or by public end users.
 
-IMPORTANT: THIS SOFTWARE END-USER LICENSE AGREEMENT ("EULA") IS A LEGAL AGREEMENT (“Agreement”) BETWEEN YOU (THE CUSTOMER, EITHER AS AN INDIVIDUAL OR, IF PURCHASED OR OTHERWISE ACQUIRED BY OR FOR AN ENTITY, AS AN ENTITY) AND ShakaCode. READ IT CAREFULLY BEFORE COMPLETING THE INSTALLATION PROCESS AND USING React on Rails Pro AND RELATED SOFTWARE COMPONENTS (“SOFTWARE”). IT PROVIDES A LICENSE TO USE THE SOFTWARE AND CONTAINS WARRANTY INFORMATION AND LIABILITY DISCLAIMERS. BY INSTALLING AND USING THE SOFTWARE, YOU ARE CONFIRMING YOUR ACCEPTANCE OF THE SOFTWARE AND AGREEING TO BECOME BOUND BY THE TERMS OF THIS AGREEMENT.
+This grant does not permit redistribution or sublicensing of the Software, offering the Software itself to third parties, or using one Organization’s license for another Organization or consulting client.
 
-------------------------------------------------------------------------------
+---
 
-In order to use the Software under this Agreement, you must receive a “Source URL” at the time of purchase, in accordance with the scope of use and other terms specified for each type of Software and as set forth in this Section 1 of this Agreement.
+## 3. Consulting Firms and Individual Consultants
 
-1. License Grant
+- **Consulting Firms** – this license covers only the firm’s own applications, websites, and services, whether accessed internally or by public end users. Each client Organization requires its own license for any Production Use.
+- **Individual Consultants** – this license covers only the consultant’s own applications, websites, and services personally operated by them, not client Organizations. Each client Organization must obtain its own license.
 
-1.1 General Use. This Agreement grants you a non-exclusive, non-transferable, limited license to the use rights for the Software, without the right to grant sublicenses, subject to the terms and conditions in this Agreement. The Software is licensed, not sold.
+---
 
-1.2 Unlimited Organization License. You may install the Software on an unlimited number of Hosts. “Host” means any physical or virtual machine which is controlled by you. You may concurrently run the software on an unlimited number of Hosts, with each host running an unlimited number of Workers.
+## 4. Non-Commercial / Educational / Demo Use (Free)
 
-1.3 Archive Copies. You are entitled to make a reasonable amount of copies of the Software for archival purposes. Each copy must reproduce all copyright and other proprietary rights notices on or in the Software Product.
+Free, royalty-free use is permitted for:
 
-1.4 Electronic Delivery. All Software and license documentation shall be delivered by electronic means unless otherwise specified on the applicable invoice or at the time of purchase. Software shall be deemed delivered when it is made available for download by you (“Delivery”).
+- classroom instruction, training, workshops, coursework;
+- tutorials, blog posts, livestreams, or videos;
+- personal/hobby projects not used in production;
+- demo apps showcasing coding techniques.
 
-2. Modifications. ShakaCode shall provide you with source code so that you can create Modifications of the original software. “Modification” means: (a) any addition to or deletion from the contents of a file included in the original Software or previous Modifications created by You, or (b) any new file that contains any part of the original Software or previous Modifications. While you retain all rights to any original work authored by you as part of the Modifications, We continue to own all copyright and other intellectual property rights in the Software.
+**Note:** This clause does **not** permit any Production Use by any entity (commercial, non-profit, or individual). All Production Use requires a paid subscription under this Agreement, except as provided in Section 4.1.
 
-3. Restricted Uses.
+**4.1 Open-Source Project License (Complimentary)**
 
-3.1 You shall not (and shall not allow any third party to): (a) decompile, disassemble, or otherwise reverse engineer the Software or attempt to reconstruct or discover any source code, underlying ideas, algorithms, file formats or programming interfaces of the Software by any means whatsoever (except and only to the extent that applicable law prohibits or restricts reverse engineering restrictions); (b) distribute, sell, sublicense, rent, lease or use the Software for time sharing, hosting, service provider or like purposes, except as expressly permitted under this Agreement; (c) redistribute the Software or Modifications other than by including the Software or a portion thereof within your own product, which must have substantially different functionality than the Software or Modifications and must not allow any third party to use the Software or Modifications, or any portions thereof, for software development or application development purposes; (d) redistribute the Software as part of a product, "appliance" or "virtual server"; (e) redistribute the Software on any server which is not directly under your control; (f) remove any product identification, proprietary, copyright or other notices contained in the Software; (g) modify any part of the Software, create a derivative work of any part of the Software (except as permitted in Section 4), or incorporate the Software, except to the extent expressly authorized in writing by ShakaCode; (h) publicly disseminate performance information or analysis (including, without limitation, benchmarks) from any source relating to the Software; (i) utilize any equipment, device, software, or other means designed to circumvent or remove any form of Source URL or copy protection used by ShakaCode in connection with the Software, or use the Software together with any authorization code, Source URL, serial number, or other copy protection device not supplied by ShakaCode; (j) use the Software to develop a product which is competitive with any ShakaCode product offerings; or (k) use unauthorized Source URLS or keycode(s) or distribute or publish Source URLs or keycode(s), except as may be expressly permitted by ShakaCode in writing. If your unique Source URL is ever published, ShakaCode reserves the right to terminate your access without notice.
+ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an Organization that meets **all** of the following criteria:
 
-3.2 UNDER NO CIRCUMSTANCES MAY YOU USE THE SOFTWARE AS PART OF A PRODUCT OR SERVICE THAT PROVIDES SIMILAR FUNCTIONALITY TO THE SOFTWARE ITSELF.
+1. The Organization deploys the Software as part of a project whose source code is publicly available under an [OSI-approved license](https://opensource.org/licenses).
+2. The Organization's annual revenue (or total funding received, if pre-revenue) does not exceed USD $1,000,000.
+3. The Organization applies by emailing [justin@shakacode.com](mailto:justin@shakacode.com) and provides truthful information about the project and Organization.
 
-4. Ownership. Notwithstanding anything to the contrary contained herein, except for the limited license rights expressly provided herein, ShakaCode and its suppliers have and will retain all rights, title and interest (including, without limitation, all patent, copyright, trademark, trade secret and other intellectual property rights) in and to the Software and all copies, modifications and derivative works thereof (including any changes which incorporate any of your ideas, feedback or suggestions). You acknowledge that you are obtaining only a limited license right to the Software, and that irrespective of any use of the words “purchase”, “sale” or like terms hereunder no ownership rights are being conveyed to you under this Agreement or otherwise.
+**Terms of Complimentary OSS Licenses:**
 
-5. Fees and Payment. The Software license fees will be due and payable in full as set forth in the applicable invoice or at the time of purchase. If the Software does not function properly within two weeks of purchase, please contact us within those two weeks for a refund. You shall be responsible for all taxes, withholdings, duties and levies arising from the order (excluding taxes based on the net income of ShakaCode).
+- The attribution requirement in Section 6 applies and may not be waived.
+- Complimentary OSS Licenses are granted for a fixed term of one (1) year from the date of issuance and may be renewed upon request.
+- ShakaCode may revoke a Complimentary OSS License (i) immediately upon written notice if the Organization violates this Agreement, or (ii) on thirty (30) days' written notice if the Organization no longer meets the eligibility criteria.
+- All other terms of this Agreement apply (including Sections 5, 7, 9, and 12), subject to the modifications for Complimentary OSS Licenses in Section 7.
 
-6. Support, Maintenance and Services. Subject to the terms and conditions of this Agreement, as set forth in your invoice, and as set forth in the attached Master Service Agreement included with the purchase of your license subscription.
+---
 
-7. Term of Agreement.
+## 5. Restrictions
 
-7.1 Term. This Agreement is effective as of the Delivery of the Software and expires at such time as all license and service subscriptions hereunder have expired in accordance with their own terms (the “Term”). For clarification, the term of your license under this Agreement may be perpetual, limited for Evaluation Version, or designated as a fixed-term license in the Invoice, and shall be specified at your time of purchase. Either party may terminate this Agreement (including all related Invoices) if the other party: (a) fails to cure any material breach of this Agreement within thirty (30) days after written notice of such breach, provided that ShakaCode may terminate this Agreement immediately upon any breach of Section 3 or if you exceed any other restrictions contained in Section 1, unless otherwise specified in this agreement; (b) ceases operation without a successor; or (c) seeks protection under any bankruptcy, receivership, trust deed, creditors arrangement, composition or comparable proceeding, or if any such proceeding is instituted against such party (and not dismissed within sixty (60) days)). Termination is not an exclusive remedy and the exercise by either party of any remedy under this Agreement will be without prejudice to any other remedies it may have under this Agreement, by law, or otherwise.
+The Organization shall not:
 
-7.2 Termination. Upon any termination of this Agreement, you shall cease any and all use of any Software and destroy all copies thereof.
+1. redistribute or resell the Software or derivatives;
+2. remove, obfuscate, or disable required attribution;
+3. use the Software to build a directly competing product exposing substantially similar functionality;
+4. **circumvent, bypass, modify, disable, or tamper with any license validation mechanisms, license checks, or authentication systems;**
+5. **reverse engineer, decompile, or disassemble the Software for the purpose of circumventing license restrictions;**
+6. **create, use, or distribute any tools, scripts, patches, or modifications designed to enable unauthorized use of Pro features;**
+7. **access or use the Software outside the rights granted by this Agreement, including any Production Use without a valid, active paid or Complimentary OSS License.**
 
-7.3 Expiration of License. Upon the expiration of any term under this Agreement, (a) all Software updates and services pursuant to the license shall cease, (b) you may only continue to run existing installations of the Software, (c) you may not install the Software on any additional Hosts, and (d) any new installation of the Software shall require the purchase of a new license subscription from ShakaCode.
+---
 
-8. Disclaimer of Warranties. The Software is provided "as is," with all faults, defects and errors, and without warranty of any kind. ShakaCode does not warrant that the Software will be free of bugs, errors, viruses or other defects, and ShakaCode shall have no liability of any kind for the use of or inability to use the Software, the Software content or any associated service, and you acknowledge that it is not technically practicable for ShakaCode to do so.
+## 6. Product-Level Attribution (HTML Source)
 
-To the maximum extent permitted by applicable law, ShakaCode disclaims all warranties, express, implied, arising by law or otherwise, regarding the Software, the Software content and their respective performance or suitability for your intended use, including without limitation any implied warranty of merchantability, fitness for a particular purpose.
+Every Covered HTML Document must retain exactly one complete, unmodified Generated Attribution in its HTML source. The Attribution Provider emits this comment once on behalf of the integrated React on Rails Pro product. A related component, including `react-on-rails-rsc`, has no independent obligation to insert another attribution comment when it does not control the HTML document or generate or insert the Generated Attribution.
 
-9. Limitation of Liability.
+This requirement applies to paid Production Use, Production Use under a Complimentary OSS License, and every royalty-free use permitted by Section 4.
 
-In no event will ShakaCode be liable for any direct, indirect, consequential, incidental, special, exemplary, or punitive damages or liabilities whatsoever arising from or relating to the Software, the Software content or this Agreement, whether based on contract, tort (including negligence), strict liability or other theory, even if ShakaCode has been advised of the possibility of such damages.
+The Generated Attribution uses the following form, where the status suffix is generated by the Software:
 
-In no event will ShakaCode's liability exceed the Software license price as indicated in the invoice. The existence of more than one claim will not enlarge or extend this limit.
+```html
+<!-- Powered by React on Rails Pro (c) ShakaCode | STATUS -->
+```
 
-10. Remedies. Your exclusive remedy and ShakaCode’ entire liability for breach of this Agreement shall be limited, at ShakaCode’ sole and exclusive discretion, to (a) replacement of any defective software or documentation; or (b) refund of the license fee paid to ShakaCode, payable in accordance with ShakaCode's refund policy.
+For a valid license credential, the status suffix is `Licensed` and does not identify the Organization. Expired, invalid, and missing license credentials use `LICENSE EXPIRED`, `INVALID LICENSE`, and `UNLICENSED`, respectively. `UNLICENSED` indicates that no license credential was present; that status alone does not establish a violation because the use may be permitted by Section 4.
 
-11. Acknowledgements.
+The Licensee may not remove, modify, obfuscate, or disable the Generated Attribution.
 
-11.1 Consent to the Use of Data. You agree that ShakaCode and its affiliates may collect and use technical information gathered as part of the product support services. ShakaCode may use this information solely to improve products and services and will not disclose this information in a form that personally identifies you.
+---
 
-11.2 Verification. We or a certified auditor acting on our behalf, may, upon its reasonable request and at its expense, audit you with respect to the use of the Software. Such audit may be conducted by mail, electronic means or through an in-person visit to your place of business. Any such in-person audit shall be conducted during regular business hours at your facilities and shall not unreasonably interfere with your business activities. We shall not remove, copy, or redistribute any electronic material during the course of an audit. If an audit reveals that you are using the Software in a way that is in material violation of the terms of the EULA, then you shall pay our reasonable costs of conducting the audit. In the case of a material violation, you agree to pay Us any amounts owing that are attributable to the unauthorized use. In the alternative, We reserve the right, at our sole option, to terminate the licenses for the Software.
+## 7. Fees; Term; Termination
 
-11.3 Government End Users. If the Software and related documentation are supplied to or purchased by or on behalf of the United States Government, then the Software is deemed to be "commercial software" as that term is used in the Federal Acquisition Regulation system. Rights of the United States shall not exceed the minimum rights set forth in FAR 52.227-19 for "restricted computer software". All other terms and conditions of this Agreement apply.
+Paid subscriptions may be purchased or renewed at [pro.reactonrails.com](https://pro.reactonrails.com/) or through another ShakaCode-approved order channel.
 
-12. Third Party Software.  Examples included in Software may provide links to third party libraries or code (collectively “Third Party Software”) to implement various functions. Third Party Software does not comprise part of the Software. In some cases, access to Third Party Software may be included along with the Software delivery as a convenience for demonstration purposes. Such source code and libraries may be included in the “…/examples” source tree delivered with the Software and do not comprise the Software. Licensee acknowledges (1) that some part of Third Party Software may require additional licensing of copyright and patents from the owners of such, and (2) that distribution of any of the Software referencing or including any portion of a Third Party Software may require appropriate licensing from such third parties.
+Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).\
+For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.\
+Upon termination, lapse, or revocation, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for (a) non-commercial uses explicitly permitted in Section 4, or (b) Complimentary OSS Licenses revoked under Section 4.1(ii) for eligibility changes, in which case the Organization has thirty (30) days from written notice to comply.
 
-13. Miscellaneous
+---
 
-13.1 Entire Agreement. This Agreement sets forth our entire agreement with respect to the Software and the subject matter hereof and supersedes all prior and contemporaneous understandings and agreements whether written or oral.
+## 8. Updates & Support
 
-13.2 Amendment. ShakaCode reserves the right, in its sole discretion, to amend this Agreement from time. Amendments to this Agreement can be located at: https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.
+While subscribed, the Organization receives software updates and reasonable support (email or issue tracker, business hours). No specific response or resolution times are guaranteed unless set out in an order or separate SLA.
 
-13.3 Assignment. You may not assign this Agreement or any of its rights under this Agreement without the prior written consent of ShakaCode and any attempted assignment without such consent shall be void.
+---
 
-13.4 Export Compliance. You agree to comply with all applicable laws and regulations, including laws, regulations, orders or other restrictions on export, re-export or redistribution of software.
+## 9. Verification / Audit
 
-13.5 Indemnification. You agree to defend, indemnify, and hold harmless ShakaCode from and against any lawsuits, claims, losses, damages, fines and expenses (including attorneys' fees and costs) arising out of your use of the Software or breach of this Agreement.
+If ShakaCode reasonably suspects non-compliance, the Organization will cooperate in good faith to verify compliance, including enabling inspection for attribution presence and providing a usage statement. ShakaCode will use commercially reasonable efforts to minimize disruption.
 
-13.6 Governing Law. This Agreement is governed by the laws of the State of Oregon and the United States without regard to conflicts of laws provisions thereof, and without regard to the United Nations Convention on the International Sale of Goods or the Uniform Computer Information Transactions Act, as currently enacted by any jurisdiction or as may be codified or amended from time to time by any jurisdiction. The jurisdiction and venue for actions related to the subject matter hereof shall be the state of Oregon and United States federal courts located in Portland, Oregon, and both parties hereby submit to the personal jurisdiction of such courts.
+**9.1 Detailed Audits**\
+ShakaCode or a certified auditor acting on its behalf may, upon reasonable request and at ShakaCode’s expense, audit the Organization’s use of the Software to verify compliance with this Agreement. Audits may be conducted by mail, electronically, or by in-person visits during regular business hours and shall minimize disruption to the Organization’s business. If the audit reveals a material unauthorized use, the Organization shall reimburse ShakaCode for reasonable audit costs.
 
-13.7 Attorneys’ Fees and Costs. The prevailing party in any action to enforce this Agreement will be entitled to recover its attorneys’ fees and costs in connection with such action.
+---
 
-13.8 Severability. If any provision of this Agreement is held by a court of competent jurisdiction to be invalid, illegal, or unenforceable, the remainder of this Agreement will remain in full force and effect.
+## 10. Feedback & Contributions
 
-13.9 Waiver. Failure or neglect by either party to enforce at any time any of the provisions of this licence Agreement shall not be construed or deemed to be a waiver of that party's rights under this Agreement.
+By submitting feedback or improvements, the Organization grants ShakaCode a worldwide, royalty-free, irrevocable license to use and incorporate them.
 
-13.10 Headings. The headings of sections and paragraphs of this Agreement are for convenience of reference only and are not intended to restrict, affect or be of any weight in the interpretation or construction of the provisions of such sections or paragraphs.
+---
 
-14. Contact Information. If you have any questions about this EULA, or if you want to contact ShakaCode for any reason, please direct correspondence to justin@shakacode.com.
+## 11. Intellectual Property
+
+The Software is **licensed, not sold**. ShakaCode retains all rights, title, and interest, including all intellectual property rights.
+
+---
+
+## 12. Confidentiality
+
+License keys and any non-public materials are ShakaCode confidential information. The Organization will protect them with at least reasonable care.
+
+---
+
+## 13. Warranty Disclaimer
+
+> EXCEPT AS EXPRESSLY PROVIDED IN §8, THE SOFTWARE IS PROVIDED “AS IS,” WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
+
+---
+
+## 14. Limitation of Liability
+
+To the maximum extent permitted by law, ShakaCode is not liable for indirect, incidental, special, consequential, or punitive damages.\
+Direct damages are limited to amounts paid in the 12 months preceding the claim.
+
+---
+
+## 15. Indemnification
+
+The Organization agrees to defend, indemnify, and hold harmless ShakaCode and its affiliates from any claims, losses, damages, liabilities, costs, or expenses (including legal fees) arising out of the Organization’s use of the Software or breach of this Agreement.
+
+---
+
+## 16. Export Compliance
+
+The Organization agrees to comply with all applicable export laws and regulations, including restrictions on export, re-export, or redistribution of the Software.
+
+---
+
+## 17. Attorneys’ Fees and Costs
+
+In any enforcement or legal action arising under this Agreement, the prevailing party shall be entitled to recover reasonable attorneys’ fees and costs.
+
+---
+
+## 18. Governing Law; Venue
+
+This Agreement is governed by the laws of the **State of Hawaii**, USA. Exclusive jurisdiction and venue lie in the courts located therein.
+
+---
+
+## 19. Miscellaneous
+
+- **19.1 Severability**\
+  If any provision is held invalid or unenforceable, the remainder shall continue in full force.
+
+- **19.2 Waiver**\
+  Failure to enforce any provision is not a waiver of rights.
+
+- **19.3 Assignment**\
+  The Organization may not assign this Agreement without prior written consent.
+
+---
+
+## 20. Entire Agreement; Order of Precedence
+
+This EULA and any order (pricing/term) are the entire agreement. If there is a conflict, the order controls.

@@ -48,7 +48,7 @@ The useful React DOM APIs for RSC resource hints are:
 
 > [!NOTE]
 > The generator currently installs the tested React 19.2.7 / `react-on-rails-rsc` 19.2.1 package
-> line (`19.2.1-rc.0` during the React on Rails Pro 17 RC soak). Newer published
+> line (stable `19.2.1` or later). Newer published
 > `react-on-rails-rsc` releases may add automatic package-level hinting, but app-authored resource
 > hints should still use React DOM's public APIs rather than package-private helpers.
 

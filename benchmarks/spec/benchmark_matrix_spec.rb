@@ -21,11 +21,9 @@ RSpec.describe "benchmark matrix generation" do
   end
 
   describe "the empty/skipped placeholder" do
-    it "emits a single 'none' row when no suite is selected (fork PR)" do
+    it "emits a single 'none' row when no suite is selected" do
       rows = rows_for(
         "BENCHMARK_EVENT_NAME" => "pull_request",
-        "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "contributor/react_on_rails",
-        "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
         "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark-pro"]'
       )
 
@@ -41,20 +39,32 @@ RSpec.describe "benchmark matrix generation" do
                "BENCHMARK_NON_RUNTIME_ONLY" => "true"
              )).to eq(["none"])
     end
+
+    it "does not suppress explicit workflow_dispatch runs for non-runtime-only changes" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
+               "BENCHMARK_APP_VERSION" => "core_only",
+               "BENCHMARK_NON_RUNTIME_ONLY" => "true"
+             )).to eq(%w[core])
+    end
   end
 
   describe "event gating" do
-    it "runs every suite on push (app_version 'both')" do
+    it "runs every suite on workflow_dispatch (app_version 'both')" do
       expect(suite_ids_for(
-               "BENCHMARK_EVENT_NAME" => "push",
+               "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
                "BENCHMARK_APP_VERSION" => "both"
              )).to eq(%w[core pro pro pro-node-renderer])
     end
 
-    it "does not select suites on a PR from change-detection alone (label opt-in, #4012)" do
-      # RUN_PRO_BENCHMARKS used to auto-trigger the Pro suite on a same-repo PR.
-      # PRs are now opt-in via a benchmark* label, so change-detection env is
-      # ignored and nothing is selected.
+    it "does not select suites on push" do
+      expect(suite_ids_for(
+               "BENCHMARK_EVENT_NAME" => "push",
+               "BENCHMARK_APP_VERSION" => "both"
+             )).to eq(["none"])
+    end
+
+    it "does not select suites on a PR from change-detection alone" do
       expect(suite_ids_for(
                "BENCHMARK_EVENT_NAME" => "pull_request",
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
@@ -63,14 +73,13 @@ RSpec.describe "benchmark matrix generation" do
              )).to eq(["none"])
     end
 
-    it "selects suites by label intersection on a same-repo PR" do
-      # benchmark-pro is shared by Pro and Pro-Node-Renderer, but not Core.
+    it "does not select suites by label on a same-repo PR" do
       expect(suite_ids_for(
                "BENCHMARK_EVENT_NAME" => "pull_request",
                "BENCHMARK_PULL_REQUEST_HEAD_REPO" => "shakacode/react_on_rails",
                "GITHUB_REPOSITORY" => "shakacode/react_on_rails",
                "BENCHMARK_PULL_REQUEST_LABELS" => '["benchmark-pro"]'
-             )).to eq(%w[pro pro pro-node-renderer])
+             )).to eq(["none"])
     end
 
     it "ignores PR labels from a fork (fork-safety guard)" do
@@ -126,7 +135,7 @@ RSpec.describe "benchmark matrix generation" do
 
     it "restricts to Core only for core_only" do
       expect(suite_ids_for(
-               "BENCHMARK_EVENT_NAME" => "push",
+               "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
                "BENCHMARK_APP_VERSION" => "core_only"
              )).to eq(%w[core])
     end
@@ -137,7 +146,7 @@ RSpec.describe "benchmark matrix generation" do
       # pro_rails_only is exclusive to the Pro suite; pro_only would also pull in
       # Pro-Node-Renderer (its app_versions include pro_only).
       rows = rows_for(
-        "BENCHMARK_EVENT_NAME" => "push",
+        "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
         "BENCHMARK_APP_VERSION" => "pro_rails_only"
       )
 
@@ -158,7 +167,7 @@ RSpec.describe "benchmark matrix generation" do
 
     it "drops the shard suffix and plural naming for a single-shard suite" do
       row = rows_for(
-        "BENCHMARK_EVENT_NAME" => "push",
+        "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
         "BENCHMARK_APP_VERSION" => "core_only"
       ).fetch(0)
 
@@ -172,7 +181,7 @@ RSpec.describe "benchmark matrix generation" do
 
     it "uses the explicit report_marker override when a suite defines one" do
       row = rows_for(
-        "BENCHMARK_EVENT_NAME" => "push",
+        "BENCHMARK_EVENT_NAME" => "workflow_dispatch",
         "BENCHMARK_APP_VERSION" => "pro_node_renderer_only"
       ).fetch(0)
 

@@ -37,6 +37,42 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
+  17.0.0.rc.9 made webpack fail with `Module not found: Can't resolve 'react-on-rails-rsc/client.node'`
+  (and `server.node`) unless the optional `react-on-rails-rsc` peer dependency was installed, because the
+  streaming path imported the RSC manifest loaders and bundlers resolve even lazy `import()` specifiers at
+  build time. The manifest stylesheet helpers now live in a module with no runtime `react-on-rails-rsc`
+  imports, and a regression test keeps every non-RSC entry graph free of them. `react-on-rails-rsc` remains
+  optional: only React Server Components (which require React 19) need it, and React on Rails Pro continues
+  to work with React 18 with RSC disabled.
+  [PR 4641](https://github.com/shakacode/react_on_rails/pull/4641) by
+  [justin808](https://github.com/justin808).
+
+- **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
+  exceptions no longer retain raw component props, generated JavaScript, or renderer parse details in log and
+  error-tracker context.
+  Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
+  Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+  [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
+  clients must now send the password field before file parts; the renderer rejects and discards leading file
+  parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
+  and multipart framing, plus a 1,000-part cap and a matching per-file cap. Password comparisons use fixed-length
+  digests to avoid leaking the configured password length. Fixes
+  [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
+  [PR 4623](https://github.com/shakacode/react_on_rails/pull/4623) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro] RSC migration diagnostics require graph-derived client references**: The RSC generator's
+  doctor now reports custom or legacy `clientReferences` values as missing the generated
+  manifest-backed resolver, and the migration guide shows how to print the canonical CommonJS
+  resolver and run it in custom ESM webpack configs with a tested compatibility prelude. Fixes
+  [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
+  [PR 4625](https://github.com/shakacode/react_on_rails/pull/4625) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Failing RSC payloads no longer cause unbounded browser requests**: `RSCProvider` now
   keeps one cached Promise for a logical payload load and retries a transient network, server, or
   malformed-payload failure once within it. If the retry also fails, React receives the final
@@ -74,7 +110,49 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   mismatches on streamed RSC apps such as the flagship demo. Fixes
   [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
 
+- **[Pro]** **Healthy incremental streams no longer log premature close-hook timeout warnings**: The
+  Pro Node renderer now suppresses the short close-hook timeout warning while an incremental response
+  is still open and finishing normally, while preserving the diagnostic when the close hook remains
+  stalled after the response finishes. Fixes
+  [Issue 4524](https://github.com/shakacode/react_on_rails/issues/4524).
+  [PR 4531](https://github.com/shakacode/react_on_rails/pull/4531) by
+  [justin808](https://github.com/justin808).
+
 #### Added
+
+- **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
+  props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact
+  coverage verifies a production Webpack build and progressive Suspense output on React 18 without
+  installing or bundling `react-on-rails-rsc`; async props and React Server Components remain React
+  19-only. Fixes [Issue 4642](https://github.com/shakacode/react_on_rails/issues/4642).
+  [PR 4658](https://github.com/shakacode/react_on_rails/pull/4658) by
+  [justin808](https://github.com/justin808).
+
+- **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
+  React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
+  to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain
+  the open-source-only default. Explicit `--pro`, `--no-pro`, `--rsc`, `--no-rsc`, and `--standard-only`
+  choices skip the prompt. The doctor and post-install guidance now show the Pro upgrade path when Pro is
+  off. Fixes [Issue 4604](https://github.com/shakacode/react_on_rails/issues/4604) in
+  [PR 4615](https://github.com/shakacode/react_on_rails/pull/4615) by
+  [justin808](https://github.com/justin808).
+
+- **Agent-legible doctor contract**: `bin/rails react_on_rails:doctor FORMAT=json` now includes stable
+  check IDs, explicit severity and documentation fields, a nullable field reserved for diagnosis-specific
+  safe mechanical fix commands,
+  and self-contained remediation prompts. The versioned schema, deterministic ordering, and exit-code
+  behavior are documented for CI and coding-agent integrations. Fixes
+  [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).
+  [PR 4611](https://github.com/shakacode/react_on_rails/pull/4611) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Optional authorization callback for RSC payload routes**: Apps can configure
+  `rsc_payload_authorizer` to reject payload requests before component props are parsed or rendered.
+  Existing behavior remains unchanged when the callback is unset, and the RSC security docs now explain
+  the public endpoint boundary and app-controller authorization seam.
+  Fixes [Issue 4595](https://github.com/shakacode/react_on_rails/issues/4595).
+  [PR 4621](https://github.com/shakacode/react_on_rails/pull/4621) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
   license through `config.license_token`, including from Rails credentials, while standalone Node
@@ -82,6 +160,26 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
   diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
   [ihabadham](https://github.com/ihabadham).
+
+#### Changed
+
+- **[Pro]** **RSC scaffolding now installs stable `react-on-rails-rsc@19.2.1`**: The Pro package,
+  node renderer, generator, dummy app, workspace overrides, and compatibility checks now use the stable
+  package and reject prereleases below the stable peer floor. This keeps React on Rails Pro 17 on the
+  coordinated React 19.2.7 runtime while including the 19.2.1 CSS/FOUC fix. The stable artifact uses the
+  React on Rails Pro commercial terms rather than MIT and reports `SEE LICENSE IN LICENSE.md` in npm metadata.
+  [Issue 4357](https://github.com/shakacode/react_on_rails/issues/4357).
+  [PR 4670](https://github.com/shakacode/react_on_rails/pull/4670) by
+  [justin808](https://github.com/justin808).
+- **[Pro]** **Published artifacts now identify the commercial license accurately**: The Pro gem reports
+  `LicenseRef-LICENSE`, while the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages
+  report `SEE LICENSE IN LICENSE.md`. All three packed artifacts include React on Rails Pro EULA v2.3 instead
+  of presenting the software as `UNLICENSED` or shipping stale terms. EULA v2.3 clarifies organization-owned
+  internal and public use, preserves free educational/demo use, and defines one product-level attribution per
+  covered HTML document. All plan types and permitted free uses now require that attribution; a valid public
+  attribution reports `Licensed` without exposing the Organization, while private server diagnostics retain it.
+  [PR 4660](https://github.com/shakacode/react_on_rails/pull/4660) by
+  [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
 

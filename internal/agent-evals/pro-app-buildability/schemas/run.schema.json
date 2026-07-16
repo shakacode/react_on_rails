@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "started_at",
+    "finished_at",
+    "repository",
+    "definition",
+    "agent",
+    "environment",
+    "security",
+    "network_preflight",
+    "runner",
+    "result"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0" },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "dirty"],
+      "properties": {
+        "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "const": false }
+      }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs"],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "executable"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^(?!/)(?!.*\\.\\.).+$" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "executable": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "model", "probe_invoked", "scaffold_invoked"],
+      "properties": {
+        "name": { "const": "codex" },
+        "version": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "probe_invoked": { "const": true },
+        "scaffold_invoked": { "type": "boolean" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "ruby", "node", "npm", "pnpm", "git"],
+      "properties": {
+        "os": { "type": "string" },
+        "ruby": { "type": "string" },
+        "node": { "type": "string" },
+        "npm": { "type": "string" },
+        "pnpm": { "type": "string" },
+        "git": { "type": "string" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "umask",
+        "process_environment",
+        "shell_environment_inherit",
+        "credential_store",
+        "auth_material_available",
+        "stripped_sensitive_variable_categories",
+        "raw_cleanup",
+        "auth_material_persisted"
+      ],
+      "properties": {
+        "umask": { "const": "077" },
+        "process_environment": { "const": "env -i" },
+        "shell_environment_inherit": { "const": "none" },
+        "credential_store": { "const": "file" },
+        "auth_material_available": { "const": false },
+        "stripped_sensitive_variable_categories": {
+          "type": "array",
+          "items": { "enum": ["auth", "cookie", "credential", "password", "secret", "token"] },
+          "uniqueItems": true
+        },
+        "raw_cleanup": { "const": "EXIT/INT/TERM" },
+        "auth_material_persisted": { "const": false }
+      }
+    },
+    "network_preflight": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["endpoint", "status"],
+        "properties": {
+          "endpoint": { "type": "string", "format": "uri" },
+          "status": { "const": "pass" }
+        }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timeout_command",
+        "scaffold_timeout_seconds",
+        "probe_timeout_seconds",
+        "maximum_agent_call_wall_clock_seconds",
+        "sandbox_network_access",
+        "isolated_host_attestation",
+        "network_probe_artifact",
+        "exit_code",
+        "timed_out",
+        "config_artifact"
+      ],
+      "properties": {
+        "timeout_command": { "type": "string", "minLength": 1 },
+        "scaffold_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "probe_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "maximum_agent_call_wall_clock_seconds": { "type": "integer", "minimum": 2 },
+        "sandbox_network_access": { "type": "boolean" },
+        "isolated_host_attestation": { "type": "boolean" },
+        "network_probe_artifact": { "const": "sandbox-network-probe.json" },
+        "exit_code": { "type": "integer" },
+        "timed_out": { "type": "boolean" },
+        "config_artifact": { "const": "invocation.json" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "sandbox_network_access": { "const": true } } },
+          "then": { "properties": { "isolated_host_attestation": { "const": true } } }
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "reason", "tutorial_claims_supported"],
+      "properties": {
+        "classification": { "enum": ["pass", "fail", "incomplete"] },
+        "reason": { "type": "string" },
+        "tutorial_claims_supported": { "const": false }
+      }
+    }
+  }
+}

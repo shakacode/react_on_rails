@@ -34,6 +34,11 @@ module ReactOnRailsProHelper
   SCRIPT_CLOSE_TAG_LENGTH = 8
   STATIC_RSC_PAYLOAD_SCRIPT_MARKER_ATTRIBUTE = "data-react-on-rails-rsc-payload"
   STATIC_RSC_ASSET_DIAGNOSTIC_CACHE_MUTEX = Mutex.new
+  HTML_COMMENT_OPEN = "<!--"
+  HTML_COMMENT_CLOSE = "-->"
+  PRO_ATTRIBUTION_MARKER = "Powered by React on Rails Pro"
+  PRO_ATTRIBUTION_COMMENT_PREFIX = "Powered by React on Rails Pro (c) ShakaCode"
+  RAILS_CONTEXT_MARKER = "js-react-on-rails-context"
   @static_rsc_asset_diagnostic_cache = {}
 
   class << self
@@ -259,6 +264,12 @@ module ReactOnRailsProHelper
   # @see https://reactonrails.com/docs/pro/react-server-components/how-react-server-components-work
   #   for technical details about the RSC payload format
   def rsc_payload_react_component(component_name, options = {})
+    unless ReactOnRailsPro.configuration.enable_rsc_support
+      raise ReactOnRailsPro::Error,
+            "rsc_payload_react_component requires enable_rsc_support to be true. " \
+            "Set `config.enable_rsc_support = true` in your ReactOnRailsPro configuration."
+    end
+
     # rsc_payload_react_component doesn't have the prerender option
     # Because setting prerender to false will not do anything
     options[:prerender] = true
@@ -452,8 +463,79 @@ module ReactOnRailsProHelper
     end
     ReactOnRailsPro::Cache.register_normalized_tags(normalized_cache_tags, cache_key, cache_options) unless cache_hit
     load_pack_for_cached_react_component(component_name, options) if cache_hit
+    result = normalize_cached_pro_attribution(result) if cache_hit
 
     add_component_cache_metadata(result, cache_key, cache_hit)
+  end
+
+  def normalize_cached_pro_attribution(result)
+    return normalize_cached_pro_attribution_html(result) if result.is_a?(String)
+
+    return result unless result.is_a?(Hash) && result.key?(ReactOnRails::Helper::COMPONENT_HTML_KEY)
+
+    result.merge(
+      ReactOnRails::Helper::COMPONENT_HTML_KEY =>
+        normalize_cached_pro_attribution_html(result[ReactOnRails::Helper::COMPONENT_HTML_KEY])
+    )
+  end
+
+  def normalize_cached_pro_attribution_html(html)
+    return html if @rendered_rails_context && !html.include?(PRO_ATTRIBUTION_MARKER) &&
+                   !html.include?(RAILS_CONTEXT_MARKER)
+
+    was_html_safe = html.html_safe?
+    normalized_html = strip_leading_pro_attribution_comments(html)
+    normalized_html = strip_leading_rails_context_script(normalized_html)
+    normalized_html = prepend_render_rails_context(normalized_html)
+
+    was_html_safe ? normalized_html : String.new(normalized_html)
+  end
+
+  def strip_leading_pro_attribution_comments(html)
+    cursor = 0
+    stripped_comment = false
+
+    loop do
+      comment_start = html_space_end_index(html, cursor)
+      break unless html[comment_start, HTML_COMMENT_OPEN.length] == HTML_COMMENT_OPEN
+
+      content_start = html_space_end_index(html, comment_start + HTML_COMMENT_OPEN.length)
+      prefix_end = content_start + PRO_ATTRIBUTION_COMMENT_PREFIX.length
+      break unless html[content_start, PRO_ATTRIBUTION_COMMENT_PREFIX.length] == PRO_ATTRIBUTION_COMMENT_PREFIX
+
+      comment_end = html.index(HTML_COMMENT_CLOSE, prefix_end)
+      break unless comment_end
+
+      separator_index = html_space_end_index(html, prefix_end)
+      break unless separator_index == comment_end || html[separator_index] == "|"
+
+      cursor = html_space_end_index(html, comment_end + HTML_COMMENT_CLOSE.length)
+      stripped_comment = true
+    end
+
+    stripped_comment ? (html[cursor..] || "") : html
+  end
+
+  def strip_leading_rails_context_script(html)
+    script_start = html_space_end_index(html, 0)
+    return html unless html_ascii_case_insensitive_match?(html, SCRIPT_OPEN_TAG, script_start)
+    return html unless html_tag_name_boundary?(html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+
+    opening_tag_end = html_tag_end_index(html, script_start + SCRIPT_OPEN_TAG_LENGTH)
+    return html unless opening_tag_end
+
+    closing_tag_range = html_script_closing_tag_range(html, opening_tag_end + 1)
+    return html unless closing_tag_range
+
+    script_node = Nokogiri::HTML5.fragment(html[script_start..closing_tag_range.end]).at_css("script")
+    return html unless script_node && script_node["id"] == RAILS_CONTEXT_MARKER
+
+    html[html_space_end_index(html, closing_tag_range.end + 1)..] || ""
+  end
+
+  def html_space_end_index(html, cursor)
+    cursor += 1 while cursor < html.length && HTML_SPACE_CHARACTERS.include?(html[cursor])
+    cursor
   end
 
   def add_component_cache_metadata(result, cache_key, cache_hit)
@@ -596,6 +678,7 @@ module ReactOnRailsProHelper
     load_pack_for_cached_react_component(component_name, render_options) if cache_hit
 
     cache_diagnostics[:hit] = cache_hit
+    result = normalize_cached_pro_attribution(result) if cache_hit
     result
   end
 
@@ -1026,14 +1109,17 @@ module ReactOnRailsProHelper
   def handle_stream_cache_hit(component_name, raw_options, auto_load_bundle, cached_chunks)
     load_pack_for_cached_react_component(component_name, raw_options.merge(auto_load_bundle:))
 
-    initial_result, *rest_chunks = cached_chunks
+    initial_result = normalize_cached_pro_attribution(cached_chunks.first)
 
     # Enqueue remaining chunks asynchronously
-    @async_barrier.async do
-      rest_chunks.each do |chunk|
+    @async_barrier.async do |task|
+      task.yield
+
+      cached_chunks.each_with_index do |chunk, index|
+        next if index.zero?
         break if response.stream.closed?
 
-        @main_output_queue.enqueue(chunk)
+        @main_output_queue.enqueue(normalize_cached_pro_attribution(chunk))
       end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
@@ -1122,7 +1208,8 @@ module ReactOnRailsProHelper
     if cached_result
       Rails.logger.debug { "React on Rails Pro async cache HIT for #{cache_key.inspect}" }
       load_pack_for_cached_react_component(component_name, cache_options)
-      return ReactOnRailsPro::ImmediateAsyncValue.new(cached_result)
+      normalized_result = normalize_cached_pro_attribution(cached_result)
+      return ReactOnRailsPro::ImmediateAsyncValue.new(normalized_result)
     end
 
     Rails.logger.debug { "React on Rails Pro async cache MISS for #{cache_key.inspect}" }

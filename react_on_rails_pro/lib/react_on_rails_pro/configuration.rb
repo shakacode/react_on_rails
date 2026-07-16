@@ -51,6 +51,7 @@ module ReactOnRailsPro
       raise_non_shell_server_rendering_errors: Configuration::DEFAULT_RAISE_NON_SHELL_SERVER_RENDERING_ERRORS,
       enable_rsc_support: Configuration::DEFAULT_ENABLE_RSC_SUPPORT,
       rsc_payload_generation_url_path: Configuration::DEFAULT_RSC_PAYLOAD_GENERATION_URL_PATH,
+      rsc_payload_authorizer: nil,
       rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
       react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
@@ -96,6 +97,7 @@ module ReactOnRailsPro
     DEFAULT_RSC_BUNDLE_JS_FILE = "rsc-bundle.js"
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
+    RSC_PAYLOAD_AUTHORIZER_POSITIONAL_PARAMS = %i[req opt].freeze
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
     # Ceiling TTL for a tag->cache-key index entry when the tagged cache entry
     # has no :expires_in of its own (see ReactOnRailsPro::Cache::TagIndex).
@@ -121,7 +123,8 @@ module ReactOnRailsPro
                   :react_server_client_manifest_file
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout,
-                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys
+                :renderer_http_pool_size, :cache_tag_index_expires_in, :cache_tag_index_max_keys,
+                :rsc_payload_authorizer
 
     # Sets how long tag->key index entries live (see Cache::TagIndex).
     #
@@ -195,6 +198,19 @@ module ReactOnRailsPro
       @renderer_http_keep_alive_timeout = value
     end
 
+    def rsc_payload_authorizer=(value)
+      unless value.nil? || value.respond_to?(:call)
+        raise ReactOnRailsPro::Error, "config.rsc_payload_authorizer must be nil or respond to #call"
+      end
+
+      if value && !rsc_payload_authorizer_signature_valid?(value)
+        raise ReactOnRailsPro::Error,
+              "config.rsc_payload_authorizer must accept call(controller, component_name) without required keywords"
+      end
+
+      @rsc_payload_authorizer = value
+    end
+
     def initialize(renderer_url: nil, renderer_password: nil, license_token: nil, # rubocop:disable Metrics/AbcSize
                    server_renderer: nil,
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
@@ -208,7 +224,7 @@ module ReactOnRailsPro
                    ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
-                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
+                   enable_rsc_support: nil, rsc_payload_generation_url_path: nil, rsc_payload_authorizer: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil,
                    react_server_client_manifest_file: nil,
                    concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
@@ -245,6 +261,7 @@ module ReactOnRailsPro
       self.raise_non_shell_server_rendering_errors = raise_non_shell_server_rendering_errors
       self.enable_rsc_support = enable_rsc_support
       self.rsc_payload_generation_url_path = rsc_payload_generation_url_path
+      self.rsc_payload_authorizer = rsc_payload_authorizer
       self.rsc_bundle_js_file = rsc_bundle_js_file
       self.react_client_manifest_file = react_client_manifest_file
       self.react_server_client_manifest_file = react_server_client_manifest_file
@@ -320,6 +337,33 @@ module ReactOnRailsPro
     end
 
     private
+
+    def rsc_payload_authorizer_signature_valid?(authorizer)
+      parameters = rsc_payload_authorizer_parameters(authorizer)
+      return false if parameters.any? { |type, _name| type == :keyreq }
+
+      # A non-lambda Proc intentionally ignores surplus positional arguments,
+      # unlike lambdas, Methods, and callable service objects.
+      return true if authorizer.is_a?(Proc) && !authorizer.lambda?
+
+      strict_rsc_payload_authorizer_signature_valid?(parameters)
+    end
+
+    def rsc_payload_authorizer_parameters(authorizer)
+      return authorizer.parameters if authorizer.is_a?(Proc) || authorizer.is_a?(Method)
+
+      authorizer.method(:call).parameters
+    end
+
+    def strict_rsc_payload_authorizer_signature_valid?(parameters)
+      required_positionals = parameters.count { |type, _name| type == :req }
+      accepted_positionals = parameters.count do |type, _name|
+        RSC_PAYLOAD_AUTHORIZER_POSITIONAL_PARAMS.include?(type)
+      end
+      accepts_rest = parameters.any? { |type, _name| type == :rest }
+
+      required_positionals <= 2 && (accepted_positionals >= 2 || accepts_rest)
+    end
 
     def assign_initial_renderer_http_pool_size(value)
       validate_renderer_http_pool_size(value)

@@ -48,17 +48,16 @@ module TrackBenchmarks
       BenchmarkTable.new(title: "#{suite_name} Benchmark Summary", rows:, report:).to_markdown
     end
 
-    # Body for the report-regressions hand-off. Normally the rendered table; but if the
-    # display sidecar was missing/corrupt rendered_report returned "" — don't hand off an
-    # empty-bodied regression issue. Substitute a run-URL pointer (and shout via ::error::)
-    # so report-regressions still files something actionable.
+    # Body for regression hand-offs. Normally the rendered table; but if the display
+    # sidecar was missing/corrupt rendered_report returned "" — don't hand off empty
+    # evidence. Substitute a run-URL pointer and shout via ::error::.
     def regression_handoff_summary(report_markdown, failure_context: "on main")
       return report_markdown unless report_markdown.empty?
 
       run_url = Github.run_url
       warn "::error::Bencher flagged a regression #{failure_context} but the summary table could not be " \
-           "rendered (the display sidecar was missing or invalid); the auto-filed issue will link " \
-           "the run instead of showing the table. Investigate: #{run_url}"
+           "rendered (the display sidecar was missing or invalid); the hand-off will link the run " \
+           "instead of showing the table. Investigate: #{run_url}"
       "_Summary table unavailable (the benchmark display sidecar was missing or empty). " \
         "See the Bencher dashboard and the workflow run: #{run_url}_"
     end
@@ -72,9 +71,7 @@ module TrackBenchmarks
 
     # The names of the benchmarks Bencher raised an active alert for, deduped. Read from
     # the same alerts[] as #regression?, so it is exactly the set of rows the summary
-    # table flags red. Handed off to report-regressions so it can decide which benchmarks
-    # regressed without re-parsing the rendered table. Empty when there is no report or no
-    # alert carried a benchmark name.
+    # table flags red. Empty when there is no report or no alert carried a benchmark name.
     def regressed_benchmark_names(report)
       return [] unless report
 
