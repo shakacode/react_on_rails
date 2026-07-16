@@ -49,9 +49,10 @@ source PR per release backport PR:
   `origin/main` and revalidate every retained main-origin backport. A source
   patch that is no longer live is a blocker until a maintainer explicitly
   reapproves retaining it in the release. During closeout, do not let the
-  forward-port helper automatically reapply a reverted or superseded origin;
-  stop for explicit manual disposition and use the runbook's selective manual
-  closeout path when the disposition is to omit or replace that pick.
+  forward-port helper automatically reapply reverted or superseded origins;
+  stop for explicit manual dispositions and use the runbook's selective manual
+  closeout path plus its complete omitted-pick manifest when the disposition is
+  to omit or replace one or more picks.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
   validation, QA evidence, review cycle, and rollback boundary. Every commit
   created by a `main`-to-release backport and landed on the release branch must

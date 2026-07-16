@@ -237,12 +237,17 @@ assertion passes again.
 
 Treat a helper that performs several outward operations, such as
 `script/release-finish` or `bundle exec rake release`, as one compound writer.
-Those helpers do not embed the coordination client, so run them only while a
-separate supervisor maintains the renewal and heartbeat cadence above and can
-terminate the helper. The coordinator must not release or transfer the claim
-while the helper is running. If a refresh fails, terminate the helper before
-its next outward operation; reacquire and revalidate the lease before restarting
-the interrupted release step.
+Those helpers do not embed the coordination client and cannot fence an outward
+operation against a lease refresh failure. A separate supervisor is
+insufficient: it can be killed while its helper remains alive, after which a
+replacement could take the lease and race the orphan. Until a repository-owned
+wrapper both binds the whole helper process group to the supervisor's lifetime
+and checks the live lease immediately before each outward operation, use these
+helpers only in dry-run mode. For a live release, stop and use the runbook's
+individual commands, with `require_live_release_line_lease` immediately before
+each outward write. If an individual command cannot expose that boundary, stop
+rather than run it as an unfenced compound writer. The coordinator must not
+release or transfer the claim while any release subprocess remains alive.
 
 Immediately before each write or merge, rerun `require_live_release_line_lease`
 in the shell where the functions above are defined. It must prove that the
@@ -312,16 +317,18 @@ git push -u origin release/17.0.0
 
 **Step 1b — cut rc.0 from the branch.** After at least one CI run finishes on the `release/17.0.0` tip,
 ensure the rc changelog header is present (`$react-on-rails-update-changelog rc`
-targeting the branch), then cut rc.0 with a
-bare release — the version is read from CHANGELOG.md, so you do **not** pass `17.0.0.rc.0`:
+targeting the branch). The bare release command reads the version from CHANGELOG.md, so you do **not**
+pass `17.0.0.rc.0`. It is currently an unfenced compound writer: preview and prepare the cut, but stop
+before live execution until the wrapper contract above is implemented.
 
 ```bash
 # On release/17.0.0, with CHANGELOG.md stamped ### [17.0.0.rc.0]:
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-bundle exec rake release   # reads 17.0.0.rc.0 from CHANGELOG.md, bumps version.rb, tags v17.0.0.rc.0, publishes
+# BLOCKED: bundle exec rake release would bump, tag, and publish without per-write lease fences.
 ```
 
-**Forgot to start the line first?** If you run `bundle exec rake release` for an rc while still on
+**Forgot to start the line first?** The release task's existing behavior, once the compound-writer
+wrapper exists, is: if you run `bundle exec rake release` for an rc while still on
 `main` and `release/X.Y.Z` does not exist yet, the release task **offers to start the release line for
 you** (`Start the 17.0.0 release line now? [y/N]`); accepting runs the same `release:start` logic and
 stops before tagging. If `release/X.Y.Z` already exists, the task stops and tells you to
@@ -607,17 +614,17 @@ each source patch is still live. A reverted, superseded, or `UNKNOWN` source
 blocks promotion until a maintainer explicitly reapproves retaining it with the
 current evidence.
 
-**Scripted path (recommended).** `script/release-finish promote X.Y.Z` orchestrates this whole step:
+**Scripted preview path.** `script/release-finish promote X.Y.Z` describes this whole step:
 it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verifies the tip equals the
 accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
 asks for explicit confirmation before running `bundle exec rake release[X.Y.Z]`. It wraps — does not
 replace — the rake promotion guards (`stable_release_branch_allowed?`,
-`ensure_release_branch_promotes_tagged_rc!`). Preview the exact commands first with `--dry-run`:
+`ensure_release_branch_promotes_tagged_rc!`). Because normal mode is an unfenced compound writer, use
+only `--dry-run` until the wrapper contract above is implemented:
 
 ```bash
 script/release-finish promote 17.0.0 --dry-run   # prints every command, executes nothing
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-script/release-finish promote 17.0.0             # runs it, with a confirmation before rake release
+# BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
 ```
 
 By default it resolves the highest `v17.0.0.rc.N` tag as the accepted RC; pass `--rc-tag v17.0.0.rc.3`
@@ -631,7 +638,8 @@ git rev-parse HEAD            # confirm it equals the tag of the good RC
 git diff --stat v17.0.0.rc.3  # expect: empty (no drift since the good RC)
 ```
 
-Collapse the RC CHANGELOG sections into the final section, then release. Do not manually bump the
+Collapse the RC CHANGELOG sections into the final section, then stop at the fenced-publication gap.
+Do not manually bump the
 React on Rails gem/npm product-version files; the release task owns that coordinated change. The
 CHANGELOG edit plus the task-generated version metadata is the only difference between the good RC
 and the final:
@@ -639,7 +647,7 @@ and the final:
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
+# BLOCKED: bundle exec rake "release[17.0.0]" would bump, tag, and publish without per-write lease fences.
 ```
 
 > **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
@@ -691,21 +699,20 @@ its current plan classifies the commit as `PICK`; record whether to omit it,
 replace it, or reapply it before proceeding. The ordinary helper path is valid
 only when every `PICK` should be applied.
 
-**Scripted path (recommended).** `script/release-finish close-out X.Y.Z` orchestrates this step: it runs
+**Scripted preview path.** `script/release-finish close-out X.Y.Z` describes this step: it runs
 `git fetch`, asserts you are on `main` with a clean tree, shows the real `script/release-forward-port`
 dry-run plan, then asks for explicit confirmation before applying the forward-port and, separately,
 before deleting the release branch on the remote. It shells out to the existing
 `script/release-forward-port` interface (it does not re-implement forward-porting), so the same plan,
-skips, and `MANUAL` handling described in step 3 apply. Preview everything first with `--dry-run`:
+skips, and `MANUAL` handling described in step 3 apply. Normal mode is an unfenced compound writer; use
+only `--dry-run` until the wrapper contract above is implemented:
 
 ```bash
 git fetch origin
 git checkout main
 git pull --rebase
 script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
-require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-script/release-finish close-out 17.0.0             # applies, with confirmations before each outward op
-# Then `git push` the forward-ported commits to main (or open a PR if main is protected).
+# BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
 ```
 
 The manual equivalent the script wraps is below.
@@ -727,23 +734,25 @@ require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push origin --delete release/17.0.0
 ```
 
-#### Selective manual closeout for an intentionally omitted `PICK`
+#### Selective manual closeout for intentionally omitted `PICK` entries
 
 `script/release-forward-port` intentionally classifies a backport whose
 main-origin commit was later reverted as `PICK`; `--ack-manual` cannot skip a
-`PICK`. When the recorded maintainer disposition is to omit that change or use a
-replacement already live on `main`, do not run normal-mode
+`PICK`. When the recorded maintainer dispositions are to omit one or more such
+changes or use replacements already live on `main`, do not run normal-mode
 `script/release-forward-port` or `script/release-finish close-out`. Use this
 audited manual path instead:
 
-1. Set `RELEASE_VERSION` and `PLAN_FILE`, fetch both `origin/main` and the exact
-   release ref, require a clean local `main` exactly equal to `origin/main`, save
-   the complete dry-run plan as release-tracker evidence, and record the audited
-   release tip. Every stated precondition is executable and fails closed:
+1. Set `RELEASE_VERSION`, `PLAN_FILE`, and `OMITTED_PICKS_FILE`; fetch both
+   `origin/main` and the exact release ref, require a clean local `main` exactly
+   equal to `origin/main`, save the complete dry-run plan as release-tracker
+   evidence, and record the audited release tip. Every stated precondition is
+   executable and fails closed:
 
    ```bash
    RELEASE_VERSION=17.0.0
    PLAN_FILE="${PLAN_FILE:?set a durable path for release-tracker plan evidence}"
+   OMITTED_PICKS_FILE="${OMITTED_PICKS_FILE:?set a durable path for omitted-pick evidence}"
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
    release_refspec="+refs/heads/release/${RELEASE_VERSION}:refs/remotes/origin/release/${RELEASE_VERSION}"
    git fetch --prune origin "${main_refspec}" "${release_refspec}" || {
@@ -781,13 +790,18 @@ audited manual path instead:
    cat "${PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
    ```
 
-2. Record the omitted release commit SHA, its direct main-origin SHA, the proof
-   that the origin is reverted or superseded, the replacement SHA when one
-   exists, and explicit maintainer approval for the disposition.
+2. Create `OMITTED_PICKS_FILE` as the complete, non-empty omitted-pick manifest,
+   with one row per approved omission. For every row, record the omitted release
+   commit SHA, its direct main-origin SHA, the proof that the origin is reverted
+   or superseded, the replacement SHA or explicit `NONE`, and the exact
+   maintainer approval for that disposition. Reject duplicate release or origin
+   SHAs. Cross-check the manifest against the saved plan: every listed release
+   SHA must be a `PICK`, and every approved omitted `PICK` must appear exactly
+   once. Any malformed, incomplete, extra, or `UNKNOWN` row stops closeout.
 3. In dry-run order, manually `git cherry-pick -x <release-commit-sha>` every
-   other `PICK`. Preserve the plan's `SKIP` entries and resolve each `MANUAL`
-   entry with the existing manual fallback. Do not cherry-pick the approved
-   omitted release commit.
+   `PICK` not listed in `OMITTED_PICKS_FILE`. Preserve the plan's `SKIP` entries
+   and resolve each `MANUAL` entry with the existing manual fallback. Do not
+   cherry-pick any release commit in the omitted-pick manifest.
 4. Push the resulting `main` branch or merge its PR. When a PR is required, use
    a merge method that preserves every manually cherry-picked commit and its
    direct `-x` footer; do not squash a multi-commit selective closeout. For the
@@ -797,10 +811,11 @@ audited manual path instead:
    still equal `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit
    against the new tip. Then verify every non-omitted `PICK` is live with
    auditable `-x` provenance, every `SKIP`/`MANUAL` entry has its recorded
-   disposition, the replacement (if any) is live, and the omitted origin remains
-   reverted or superseded. Any missing, changed, or `UNKNOWN` evidence stops
-   closeout. After that audit passes, reset `AUDITED_MAIN_TIP` to the exact
-   audited `origin/main` SHA and preserve it with `AUDITED_RELEASE_TIP`:
+   disposition, every manifest replacement other than `NONE` is live, and every
+   omitted origin remains reverted or superseded. Any missing, changed, or
+   `UNKNOWN` evidence stops closeout. After that audit passes, reset
+   `AUDITED_MAIN_TIP` to the exact audited `origin/main` SHA and preserve it with
+   `AUDITED_RELEASE_TIP`:
 
    ```bash
    AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
@@ -813,15 +828,16 @@ audited manual path instead:
    and release refs and require them to equal `AUDITED_MAIN_TIP` and
    `AUDITED_RELEASE_TIP`. Re-run the dry-run against that audited
    `origin/main`, not a possibly stale local `main`. Reconcile every row to the
-   recorded evidence. The final plan may contain the explicitly omitted `PICK`,
+   recorded evidence and the complete omitted-pick manifest. The final plan may
+   contain only `PICK` entries listed exactly once in `OMITTED_PICKS_FILE`,
    already-dispositioned `MANUAL` entries, and expected `SKIP` rows such as RC
    version bumps or commits already proven live on `origin/main`; no other
    `PICK`, unresolved `MANUAL`, or unexplained `SKIP` may remain. Only then, with
    the repository's required destructive-operation confirmation, atomically
    publish an annotated closeout tag and delete the release branch. The tag
    binds the deletion to the exact audited main and release OIDs plus the final
-   plan digest, establishing a durable cutoff without freezing later `main`
-   development:
+   plan and omitted-pick manifest digests, establishing a durable cutoff without
+   freezing later `main` development:
 
    ```bash
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
@@ -857,6 +873,12 @@ audited manual path instead:
      echo "could not digest the final plan; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
+   OMITTED_PICKS_SHA256="$(
+     ruby -rdigest -e 'puts Digest::SHA256.file(ARGV.fetch(0)).hexdigest' "${OMITTED_PICKS_FILE}"
+   )" || {
+     echo "could not digest the omitted-pick manifest; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
    CLOSEOUT_TAG="release-closeout/${RELEASE_VERSION}"
    git show-ref --verify --quiet "refs/tags/${CLOSEOUT_TAG}" && {
      echo "local closeout tag already exists; inspect it before retrying" >&2
@@ -874,7 +896,8 @@ audited manual path instead:
      -m "Release ${RELEASE_VERSION} selective closeout" \
      -m "Audited-main: ${AUDITED_MAIN_TIP}" \
      -m "Audited-release: ${AUDITED_RELEASE_TIP}" \
-     -m "Final-plan-sha256: ${FINAL_PLAN_SHA256}" || {
+     -m "Final-plan-sha256: ${FINAL_PLAN_SHA256}" \
+     -m "Omitted-picks-sha256: ${OMITTED_PICKS_SHA256}" || {
      echo "could not create the closeout evidence tag" >&2
      return 1 2>/dev/null || exit 1
    }
@@ -893,10 +916,11 @@ audited manual path instead:
    If the atomic push rejects either lease, no remote ref changes: preserve the
    branch, inspect or remove the unpushed local closeout tag, and restart the
    audit. The annotated tag makes the exact audited `main` cutoff and release tip
-   durable in the same remote ref transaction that deletes the branch. Commits
-   merged to `main` after that cutoff belong to later development and do not
-   silently rewrite this closeout evidence. After guarded deletion, clear the
-   release-line phase. The release and closeout tags remain the durable record.
+   and binds the complete omitted-pick manifest in the same remote ref
+   transaction that deletes the branch. Commits merged to `main` after that
+   cutoff belong to later development and do not silently rewrite this closeout
+   evidence. After guarded deletion, clear the release-line phase. The release
+   and closeout tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
