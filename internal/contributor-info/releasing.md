@@ -213,6 +213,15 @@ RELEASE_ACCELERATED_RC_REASON="Start published-artifact fleet testing while the 
 bundle exec rake "release[17.0.0.rc.10]"
 ```
 
+Accelerated publication and same-candidate durable retries must run from the exact matching
+`release/X.Y.Z` branch for the RC target. Before accelerated mode is known, the generic prerelease retry check may
+inspect or fetch exact-target tag state. Same-candidate durable retry resolution may also perform bounded, read-only
+repository-history discovery, author-permission checks, and tracker-eligibility reads before it can establish that
+accelerated options exist. Once options resolve, the branch guard runs before explicit accelerated target-tag
+preflight, post-resolution selected-tracker and approver access, CI confirmation, version mutation, push, workflow
+dispatch, tracker mutation, tag handling, or publication. Ordinary non-accelerated prereleases may still be cut from
+non-release feature branches.
+
 The task rejects the accelerated path when the version is implicit, the target is not a canonical
 lowercase `.rc.` version, the tracker is closed or ineligible, the reason is missing, or
 `RELEASE_CI_STATUS_OVERRIDE` is also set. Case-varied spellings such as `.RC.` are rejected before

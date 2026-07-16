@@ -1597,6 +1597,22 @@ def ensure_release_branch_matches_target_base!(current_branch:, target_gem_versi
   ERROR
 end
 
+def ensure_accelerated_rc_release_branch!(current_branch:, target_gem_version:)
+  expected_release_branch = "release/#{release_base_version(target_gem_version)}"
+  return if current_branch == expected_release_branch
+
+  abort <<~ERROR
+    ❌ Accelerated RC publication must run from the matching release branch.
+
+    Current branch: #{current_branch}
+    Target version: #{target_gem_version}
+    Expected branch: #{expected_release_branch}
+
+    Switch to the matching release branch before requesting or retrying accelerated RC publication.
+    Ordinary non-accelerated prereleases may still run from non-release branches.
+  ERROR
+end
+
 def same_release_base?(first_version, second_version)
   first_components = parse_gem_version_components(first_version)
   second_components = parse_gem_version_components(second_version)
@@ -7029,7 +7045,7 @@ Environment variables:
   RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
   RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
   RELEASE_CI_STATUS_OVERRIDE=true      # DANGEROUS prerelease-only release CI waiver
-  RELEASE_ACCELERATED_RC=true           # Enable audited pending-gate publication for an explicit RC
+  RELEASE_ACCELERATED_RC=true           # Enable audited pending-gate publication from matching release/X.Y.Z
   RELEASE_TRACKER=<issue>               # Active release tracker (required for accelerated RC/final promotion)
   RELEASE_ACCELERATED_RC_REASON=<reason> # Single-line maintainer rationale for accelerated publication
   GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
@@ -7129,6 +7145,12 @@ task :release, %i[version dry_run override_version_policy override_ci_status] do
       current_checkout_version:,
       candidate_sha: accelerated_rc_same_candidate_retry ? current_git_sha!(release_root) : nil
     )
+    if accelerated_rc_options
+      ensure_accelerated_rc_release_branch!(
+        current_branch:,
+        target_gem_version: resolved_target_gem_version
+      )
+    end
     if accelerated_rc_options && accelerated_rc_requested
       preflight_explicit_accelerated_rc_target_tag!(
         monorepo_root: release_root,

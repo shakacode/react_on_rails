@@ -11088,7 +11088,8 @@ RSpec.describe "release.rake helper methods" do
       expect(help).to include(
         "RELEASE_ACCELERATED_RC=true",
         "RELEASE_TRACKER=<issue>",
-        "RELEASE_ACCELERATED_RC_REASON=<reason>"
+        "RELEASE_ACCELERATED_RC_REASON=<reason>",
+        "from matching release/X.Y.Z"
       )
       expect(Rake::Task.task_defined?("release:reconcile_accelerated_rc")).to be(true)
     end
@@ -11099,6 +11100,8 @@ RSpec.describe "release.rake helper methods" do
       tag_push_helper = rakefile.match(/def push_release_tag_for_candidate!.*?^end$/m)[0]
       tag_retry_index = release_task.index("release_tag_retry_state_for_current_head")
       retry_mode_index = release_task.index("resolve_accelerated_rc_options_for_release!")
+      accelerated_branch_guard_index = release_task.index("ensure_accelerated_rc_release_branch!")
+      accelerated_tag_preflight_index = release_task.index("preflight_explicit_accelerated_rc_target_tag!")
       ci_gate_index = release_task.index("validate_main_ci_status!")
       final_refresh_index = release_task.index("run_accepted_rc_final_promotion_gates!")
       tag_push_index = release_task.index("push_release_tag_for_candidate!")
@@ -11110,6 +11113,9 @@ RSpec.describe "release.rake helper methods" do
       package_boundary_index = tag_push_helper.index('phase: "package publication"')
 
       expect(tag_retry_index).to be < retry_mode_index
+      expect(retry_mode_index).to be < accelerated_branch_guard_index
+      expect(accelerated_branch_guard_index).to be < accelerated_tag_preflight_index
+      expect(accelerated_branch_guard_index).to be < ci_gate_index
       expect(retry_mode_index).to be < ci_gate_index
       expect(final_refresh_index).to be < tag_push_index
       expect(tag_push_index).to be < package_publish_index
@@ -11131,6 +11137,299 @@ RSpec.describe "release.rake helper methods" do
   end
 
   describe "release task accelerated RC preflight" do
+    def invoke_release_task_and_capture_exit(release_task, version: "17.0.0.rc.10", dry_run: true)
+      release_task.reenable
+      release_task.invoke(version, dry_run, true, false)
+      nil
+    rescue SystemExit => error
+      error
+    ensure
+      release_task.reenable
+    end
+
+    it "blocks accelerated RCs from feature branches before release side effects" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+      events = []
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["feature/accelerated-cut\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "16.9.0",
+        release_tag_retry_state_for_current_head: :none,
+        github_repo_slug: "shakacode/react_on_rails",
+        validate_release_version_policy!: nil
+      )
+      allow(task_receiver).to receive(:preflight_explicit_accelerated_rc_target_tag!) do
+        events << :target_tag_preflight
+      end
+      allow(task_receiver).to receive(:fetch_release_tracker_issue!) do
+        events << :tracker_read
+        {}
+      end
+      allow(task_receiver).to receive(:current_release_approver!) do
+        events << :approver_read
+        "justin808"
+      end
+      allow(task_receiver).to receive(:validate_main_ci_status!) { events << :ci }
+      allow(task_receiver).to receive(:confirm_release!) { events << :confirmation }
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) { events << :tracker_append }
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |_dir, command|
+        next unless command.include?("gem bump")
+
+        events << :version_mutation
+        abort "V70 regression reached the version-mutation boundary"
+      end
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return("true")
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil)
+                                   .and_return("Start published-artifact QA while exact-head checks finish")
+
+      failure = begin
+        release_task.reenable
+        release_task.invoke("17.0.0.rc.10", true, true, false)
+        nil
+      rescue SystemExit => error
+        error
+      ensure
+        release_task.reenable
+      end
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/accelerated RC.*matching release branch/i)
+        expect(events).to be_empty
+        expect(task_receiver).not_to have_received(:preflight_explicit_accelerated_rc_target_tag!)
+        expect(task_receiver).not_to have_received(:fetch_release_tracker_issue!)
+        expect(task_receiver).not_to have_received(:current_release_approver!)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+
+    it "blocks an unflagged durable retry on a feature branch after read-only history discovery" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+      candidate_sha = "e" * 40
+      reason = "Start published-artifact QA while exact-head checks finish"
+      events = []
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["feature/durable-retry\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "17.0.0.rc.10",
+        release_tag_retry_state_for_current_head: :none,
+        github_repo_slug: "shakacode/react_on_rails",
+        current_git_sha!: candidate_sha
+      )
+      allow(task_receiver).to receive(:accelerated_rc_authorization_for_same_candidate_retry!) do
+        events << :read_only_durable_retry_discovery
+        { "release_tracker" => 3823, "reason" => reason }
+      end
+      allow(task_receiver).to receive(:ensure_accelerated_rc_release_branch!).and_call_original
+      allow(task_receiver).to receive(:preflight_explicit_accelerated_rc_target_tag!) do
+        events << :target_tag_preflight
+      end
+      allow(task_receiver).to receive(:fetch_release_tracker_issue!) do
+        events << :selected_tracker_read
+        {}
+      end
+      allow(task_receiver).to receive(:current_release_approver!) do
+        events << :approver_read
+        "justin808"
+      end
+      allow(task_receiver).to receive(:validate_main_ci_status!) do
+        events << :ci
+        abort "V72 durable retry reached CI without the branch guard"
+      end
+      allow(task_receiver).to receive(:confirm_release!) { events << :confirmation }
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) { events << :tracker_append }
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |_dir, command|
+        events << :push if command.include?("git push")
+        events << :version_mutation if command.include?("gem bump")
+      end
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil).and_return(nil)
+
+      failure = invoke_release_task_and_capture_exit(release_task)
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to match(/accelerated RC.*matching release branch/i)
+        expect(events).to eq([:read_only_durable_retry_discovery])
+        expect(task_receiver).to have_received(:accelerated_rc_authorization_for_same_candidate_retry!).with(
+          repo_slug: "shakacode/react_on_rails",
+          monorepo_root: "/tmp/repo",
+          target_version: "17.0.0.rc.10",
+          candidate_sha:,
+          accelerated_requested: false
+        )
+        expect(task_receiver).to have_received(:ensure_accelerated_rc_release_branch!).with(
+          current_branch: "feature/durable-retry",
+          target_gem_version: "17.0.0.rc.10"
+        )
+        expect(task_receiver).not_to have_received(:preflight_explicit_accelerated_rc_target_tag!)
+        expect(task_receiver).not_to have_received(:fetch_release_tracker_issue!)
+        expect(task_receiver).not_to have_received(:current_release_approver!)
+        expect(task_receiver).not_to have_received(:validate_main_ci_status!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+
+    it "allows an ordinary non-accelerated RC on a feature branch to reach CI" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+      events = []
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["feature/ordinary-rc\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "16.9.0",
+        release_tag_retry_state_for_current_head: :none
+      )
+      allow(task_receiver).to receive(:ensure_accelerated_rc_release_branch!).and_call_original
+      allow(task_receiver).to receive(:preflight_explicit_accelerated_rc_target_tag!)
+      allow(task_receiver).to receive(:fetch_release_tracker_issue!)
+      allow(task_receiver).to receive(:current_release_approver!)
+      allow(task_receiver).to receive(:validate_main_ci_status!) do
+        events << :ci
+        abort "V72 ordinary RC reached the CI boundary"
+      end
+      allow(task_receiver).to receive(:confirm_release!) { events << :confirmation }
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) { events << :tracker_append }
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |_dir, command|
+        events << :push if command.include?("git push")
+        events << :version_mutation if command.include?("gem bump")
+      end
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil).and_return(nil)
+
+      failure = invoke_release_task_and_capture_exit(release_task)
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to eq("V72 ordinary RC reached the CI boundary")
+        expect(events).to eq([:ci])
+        expect(task_receiver).not_to have_received(:ensure_accelerated_rc_release_branch!)
+        expect(task_receiver).not_to have_received(:preflight_explicit_accelerated_rc_target_tag!)
+        expect(task_receiver).not_to have_received(:fetch_release_tracker_issue!)
+        expect(task_receiver).not_to have_received(:current_release_approver!)
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+
+    it "allows explicit acceleration on the matching release branch to reach CI in order" do
+      release_task = Rake::Task["release"]
+      task_receiver = release_task.actions.first.binding.receiver
+      success_status = instance_double(Process::Status, success?: true)
+      events = []
+
+      allow(Open3).to receive(:capture2e)
+        .with("git", "-C", "/tmp/repo", "rev-parse", "--abbrev-ref", "HEAD")
+        .and_return(["release/17.0.0\n", success_status])
+      allow(ReactOnRails::GitUtils).to receive(:uncommitted_changes?)
+      allow(task_receiver).to receive(:with_release_checkout) { |**_, &block| block.call("/tmp/repo") }
+      allow(task_receiver).to receive_messages(
+        current_monorepo_root: "/tmp/repo",
+        verbose: nil,
+        release_paths: { monorepo_root: "/tmp/repo", gem_root: "/tmp/repo/react_on_rails" },
+        resolve_release_version_before_auth!: "17.0.0.rc.10",
+        current_gem_version: "16.9.0",
+        release_tag_retry_state_for_current_head: :none,
+        github_repo_slug: "shakacode/react_on_rails"
+      )
+      allow(task_receiver).to receive(:ensure_accelerated_rc_release_branch!).and_wrap_original do |method, **arguments|
+        events << :accelerated_branch_guard
+        method.call(**arguments)
+      end
+      allow(task_receiver).to receive(:preflight_explicit_accelerated_rc_target_tag!) do
+        events << :target_tag_preflight
+      end
+      allow(task_receiver).to receive(:fetch_release_tracker_issue!) do
+        events << :selected_tracker_read
+        {}
+      end
+      allow(task_receiver).to receive(:current_release_approver!) do
+        events << :approver_read
+        "justin808"
+      end
+      allow(task_receiver).to receive(:validate_main_ci_status!) do
+        events << :ci
+        abort "V72 matching accelerated RC reached the CI boundary"
+      end
+      allow(task_receiver).to receive(:confirm_release!) { events << :confirmation }
+      allow(task_receiver).to receive(:append_accelerated_rc_tracker_record!) { events << :tracker_append }
+      allow(task_receiver).to receive(:sh_in_dir_for_release) do |_dir, command|
+        events << :push if command.include?("git push")
+        events << :version_mutation if command.include?("gem bump")
+      end
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC", nil).and_return("true")
+      allow(ENV).to receive(:fetch).with("RELEASE_TRACKER", nil).and_return("3823")
+      allow(ENV).to receive(:fetch).with("RELEASE_ACCELERATED_RC_REASON", nil)
+                                   .and_return("Start published-artifact QA while exact-head checks finish")
+
+      failure = invoke_release_task_and_capture_exit(release_task)
+
+      aggregate_failures do
+        expect(failure).to be_a(SystemExit)
+        expect(failure&.message).to eq("V72 matching accelerated RC reached the CI boundary")
+        expect(events).to eq(
+          %i[accelerated_branch_guard target_tag_preflight selected_tracker_read approver_read ci]
+        )
+        expect(task_receiver).to have_received(:ensure_accelerated_rc_release_branch!).with(
+          current_branch: "release/17.0.0",
+          target_gem_version: "17.0.0.rc.10"
+        )
+        expect(task_receiver).to have_received(:preflight_explicit_accelerated_rc_target_tag!).with(
+          monorepo_root: "/tmp/repo",
+          target_gem_version: "17.0.0.rc.10",
+          current_checkout_version: "16.9.0"
+        )
+        expect(task_receiver).to have_received(:fetch_release_tracker_issue!).with(
+          repo_slug: "shakacode/react_on_rails",
+          tracker: 3823
+        )
+        expect(task_receiver).to have_received(:current_release_approver!).with(
+          repo_slug: "shakacode/react_on_rails"
+        )
+        expect(task_receiver).not_to have_received(:confirm_release!)
+        expect(task_receiver).not_to have_received(:append_accelerated_rc_tracker_record!)
+      end
+    end
+
     it "blocks a remote-only ordinary target tag before gates or release side effects from a mismatched checkout" do
       release_task = Rake::Task["release"]
       task_receiver = release_task.actions.first.binding.receiver
@@ -16241,6 +16540,35 @@ RSpec.describe "release.rake helper methods" do
           target_gem_version: "17.0.0.rc.0"
         )
       end.to raise_error(SystemExit, /Release branch must match the target release line/)
+    end
+  end
+
+  describe "#ensure_accelerated_rc_release_branch!" do
+    it "allows accelerated publication from the matching release branch" do
+      expect do
+        ensure_accelerated_rc_release_branch!(
+          current_branch: "release/17.0.0",
+          target_gem_version: "17.0.0.rc.10"
+        )
+      end.not_to raise_error
+    end
+
+    it "rejects accelerated publication from a feature branch" do
+      expect do
+        ensure_accelerated_rc_release_branch!(
+          current_branch: "feature/accelerated-cut",
+          target_gem_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, /Accelerated RC publication must run from the matching release branch/)
+    end
+
+    it "rejects accelerated publication from a different release line" do
+      expect do
+        ensure_accelerated_rc_release_branch!(
+          current_branch: "release/16.7.1",
+          target_gem_version: "17.0.0.rc.10"
+        )
+      end.to raise_error(SystemExit, %r{Expected branch: release/17\.0\.0})
     end
   end
 
