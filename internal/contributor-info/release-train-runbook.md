@@ -262,14 +262,62 @@ When maintainers select one or more merged `main` PRs for the release train,
 use **one source PR -> one release PR**. When there are multiple selections,
 serialize the sequence:
 
-Before any source-specific work, acquire a release-line-scoped coordination
-lease and hold it across discovery, validation, and merge. A claim on an
-individual source issue or PR does not serialize different backports. In a
-batch, chain each later lane with `depends_on` and do not launch it until the
-preceding merge is terminal. A merge queue that reruns the gates on the combined
-merge-group head is the only alternative to holding the lease through merge.
-If neither guard is available, or its state is `UNKNOWN`, stop rather than let
-two backports validate against and race to merge from the same release tip.
+Before any source-specific work, acquire the canonical release-line coordination
+lease and hold it across discovery, validation, and merge. The lease is an
+`agent-coord` claim in `shakacode/react_on_rails` whose target is exactly
+`release-line:X.Y.Z` (for example, `release-line:17.0.0`). One dedicated release
+coordinator owns this synthetic target and is the only actor that dispatches a
+backport lane or merges it. A claim on an individual source issue or PR does not
+serialize different backports.
+
+Use the same stable coordinator id for the claim and heartbeat. The bounded
+status and claim operations fail closed on timeout, `UNKNOWN`, or
+`CLAIM_REFUSED`:
+
+```bash
+RELEASE_VERSION=17.0.0
+RELEASE_COORDINATOR_ID="${RELEASE_COORDINATOR_ID:?set a stable coordinator agent id}"
+RELEASE_LINE_TARGET="release-line:${RELEASE_VERSION}"
+PR_BATCH_SKILL_DIR="${PR_BATCH_SKILL_DIR:-$(.agents/bin/shared-skill-dir pr-batch)}"
+
+"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 status \
+  --repo shakacode/react_on_rails --target "${RELEASE_LINE_TARGET}" --json
+"${PR_BATCH_SKILL_DIR}/bin/agent-coord-bounded" --timeout 20 claim \
+  --agent-id "${RELEASE_COORDINATOR_ID}" \
+  --repo shakacode/react_on_rails \
+  --target "${RELEASE_LINE_TARGET}" \
+  --branch "release/${RELEASE_VERSION}"
+agent-coord heartbeat \
+  --agent-id "${RELEASE_COORDINATOR_ID}" \
+  --repo shakacode/react_on_rails \
+  --target "${RELEASE_LINE_TARGET}" \
+  --branch "release/${RELEASE_VERSION}" \
+  --phase backport-serialization \
+  --status in_progress
+```
+
+Renew the lease with the same bounded `claim` command before its expiry and
+heartbeat it at every source-lane phase transition. In a batch, chain each later
+lane with `depends_on` and do not launch it until the preceding merge is
+terminal. Immediately before merge, re-read the canonical target and require
+the holder id to match `RELEASE_COORDINATOR_ID`. A merge queue that reruns the
+gates on the combined merge-group head is the only alternative to holding this
+lease through merge. If neither guard is available, or its state is `UNKNOWN`,
+stop rather than let two backports validate against and race to merge from the
+same release tip.
+
+Release the lease only after all selected backports are terminal and the final
+release tip has been fetched, or after cancellation/handoff is durably recorded:
+
+```bash
+agent-coord release \
+  --agent-id "${RELEASE_COORDINATOR_ID}" \
+  --repo shakacode/react_on_rails \
+  --target "${RELEASE_LINE_TARGET}"
+```
+
+On handoff, the replacement must acquire this same canonical target after the
+old release is visible; it must not invent another target or bypass a refusal.
 
 1. Search open PRs targeting the release branch, targeted private coordination
    for the selected source, and remote branches with verified ownership and
@@ -524,7 +572,8 @@ retained-source audit. If a retained backport's main origin was reverted,
 superseded, or is `UNKNOWN`, stop for explicit manual disposition. Do not let
 `script/release-forward-port` automatically reapply that origin merely because
 its current plan classifies the commit as `PICK`; record whether to omit it,
-replace it, or reapply it before proceeding.
+replace it, or reapply it before proceeding. The ordinary helper path is valid
+only when every `PICK` should be applied.
 
 **Scripted path (recommended).** `script/release-finish close-out X.Y.Z` orchestrates this step: it runs
 `git fetch`, asserts you are on `main` with a clean tree, shows the real `script/release-forward-port`
@@ -559,6 +608,37 @@ git push   # or open a PR if main is protected
 # 2. Delete the ephemeral branch — the tags are the durable record.
 git push origin --delete release/17.0.0
 ```
+
+#### Selective manual closeout for an intentionally omitted `PICK`
+
+`script/release-forward-port` intentionally classifies a backport whose
+main-origin commit was later reverted as `PICK`; `--ack-manual` cannot skip a
+`PICK`. When the recorded maintainer disposition is to omit that change or use a
+replacement already live on `main`, do not run normal-mode
+`script/release-forward-port` or `script/release-finish close-out`. Use this
+audited manual path instead:
+
+1. Fetch `origin`, require a clean local `main` exactly equal to `origin/main`,
+   and save the complete dry-run plan as release-tracker evidence.
+2. Record the omitted release commit SHA, its direct main-origin SHA, the proof
+   that the origin is reverted or superseded, the replacement SHA when one
+   exists, and explicit maintainer approval for the disposition.
+3. In dry-run order, manually `git cherry-pick -x <release-commit-sha>` every
+   other `PICK`. Preserve the plan's `SKIP` entries and resolve each `MANUAL`
+   entry with the existing manual fallback. Do not cherry-pick the approved
+   omitted release commit.
+4. Push the resulting `main` branch or merge its PR. Refetch `origin/main`, then
+   verify every non-omitted `PICK` is live with auditable `-x` provenance, every
+   `SKIP`/`MANUAL` entry has its recorded disposition, the replacement (if any)
+   is live, and the omitted origin remains reverted or superseded. Any missing,
+   changed, or `UNKNOWN` evidence stops closeout.
+5. Re-run the dry-run. It may list only the explicitly omitted `PICK` plus
+   already-dispositioned `MANUAL` entries; reconcile every row to the recorded
+   evidence. Only then delete `origin/release/X.Y.Z` manually and clear the
+   release-line phase. The release tags remain the durable record.
+
+This path is the complete alternative to the helper's apply and branch-delete
+steps; do not mix a partial helper run with an unrecorded selective omission.
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips
 > `Bump version to ...rc.N` commits. For stable non-RC version bumps, the helper always marks the commit
