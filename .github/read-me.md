@@ -17,11 +17,15 @@ confirmation:
 +ci-run-hosted
 ```
 
-Start commands intentionally serialize across the repository. A command may
-wait about 65 seconds for older active CI-command runs before failing closed;
-this global mutex trades a bounded repository-wide delay for exact-head proof
-safety. The command then inventories workflow runs and auditable dispatch proofs
-bound to the exact head SHA, PR number, base ref, base SHA, and workflow run ID.
+Start commands coordinate against older visible active CI-command runs after a
+visibility delay. Polls query only the preceding 24 hours, and a command may
+wait about 65 seconds before failing closed. This prevents routine concurrent
+duplicate dispatches, but it is not an atomic lock: a rare Actions
+list-visibility race can omit a just-queued older run and allow duplicate work.
+Exact run-ID, workflow, head, and mode validation still prevents proof
+misattribution. The command then inventories workflow runs and auditable dispatch
+proofs bound to the exact head SHA, PR number, base ref, base SHA, and workflow
+run ID.
 It skips equivalent optimized,
 queued, running, or successful coverage; dispatches only missing workflows;
 creates `ready-for-hosted-ci` if needed; and adds it so future pushes keep
