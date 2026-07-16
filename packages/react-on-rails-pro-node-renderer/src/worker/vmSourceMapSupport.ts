@@ -107,6 +107,12 @@ const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 // External `.map` files get the same ceiling as inline maps. This is a pre-read
 // size gate, not a hard memory bound: a map that grows between the `statSync` in
 // `resolveReadableSourceMapPath` and the read below still gets read in full.
+//
+// The two ceilings share a number but not a unit: this one is compared against
+// `stats.size` (bytes on disk), while `MAX_INLINE_SOURCE_MAP_BYTES` is compared
+// against a JS string length (UTF-16 code units), so a map with multi-byte
+// characters admits a different amount of data inline than externally. The
+// inline unit predates this constant and is left alone here.
 const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
 
 // Oversized maps are re-checked on every VM build and on error-path lookups, so
@@ -115,6 +121,12 @@ const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
 // than tied to registration lifetime: evicting the oldest entry only risks a
 // duplicate warning, while unregistering a bundle would re-warn on every VM
 // rebuild and defeat the throttle.
+//
+// A warned path is never re-armed, so if a path is reused (contrary to the
+// per-deploy assumption) and its map drops under the cap and later grows back
+// over it, that second regression warns only if the entry has since been
+// evicted. The map is still re-checked and skipped correctly either way; only
+// the warning is suppressed.
 const MAX_WARNED_OVERSIZED_SOURCE_MAP_PATHS = 256;
 const warnedOversizedSourceMapPaths = new Set<string>();
 
@@ -451,17 +463,20 @@ function readSourceMapJsonForBundle(
     // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
     // uploaded alongside it under that name is also worth checking.
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    let higherPriorityCandidateMissing = false;
     for (const candidatePath of candidatePaths) {
       const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath, realBundleDirectory);
-      // An oversized map is terminal. Continuing to the next candidate would
-      // remap frames through a map the bundle never named, which is worse than
-      // keeping the bundled location.
       if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
-        return null;
+        // Never fall through to a lower-priority candidate: remapping through a
+        // map the bundle does not name is worse than keeping bundled locations.
+        // Terminal only if nothing higher-priority was merely missing — if one
+        // was, it can still arrive, so leave the miss retryable.
+        return higherPriorityCandidateMissing ? undefined : null;
       }
       if (sourceMapJson) {
         return sourceMapJson;
       }
+      higherPriorityCandidateMissing = true;
     }
     return undefined;
   } catch (error) {
@@ -482,16 +497,18 @@ async function readSourceMapJsonForBundleAsync(
     }
 
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    let higherPriorityCandidateMissing = false;
     for (const candidatePath of candidatePaths) {
       // eslint-disable-next-line no-await-in-loop
       const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath, realBundleDirectory);
-      // Terminal — see the comment in the sync variant.
+      // See the comment in the sync variant.
       if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
-        return null;
+        return higherPriorityCandidateMissing ? undefined : null;
       }
       if (sourceMapJson) {
         return sourceMapJson;
       }
+      higherPriorityCandidateMissing = true;
     }
     return undefined;
   } catch (error) {

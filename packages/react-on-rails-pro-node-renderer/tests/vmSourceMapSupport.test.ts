@@ -546,6 +546,48 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
+    test('an oversized fallback map does not make a late-arriving named map terminal', async () => {
+      // The named map is missing at build and arrives shortly after — a supported
+      // flow. An oversized map sitting at the conventional fallback path must not
+      // be used, but it also must not retire the retry for the named map.
+      const bundlePath = vmBundlePath(testName);
+      const namedMapFileName = 'named.js.map';
+      const namedMapPath = path.join(path.dirname(bundlePath), namedMapFileName);
+      const fallbackMapPath = path.join(path.dirname(bundlePath), `${path.basename(bundlePath)}.map`);
+
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${namedMapFileName}\n`);
+      // Only the oversized fallback exists at build time.
+      await fsPromises.writeFile(
+        fallbackMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const statSyncSpy = mockReportedSourceMapSize(fallbackMapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        // The named map lands after the VM was built.
+        await fsPromises.writeFile(
+          namedMapPath,
+          JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
+        );
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // The named map must win once it arrives...
+        expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        // ...and the oversized fallback must never be substituted for it.
+        expect(result.exceptionMessage).not.toContain(REBUILT_SOURCE);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
     test('oversized external map warns once per map path across repeated lookups', async () => {
       const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
