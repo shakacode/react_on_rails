@@ -262,19 +262,22 @@ When maintainers select one or more merged `main` PRs for the release train,
 use **one source PR -> one release PR**. When there are multiple selections,
 serialize the sequence:
 
-1. Search open PRs targeting the release branch for the selected source commits.
-   If a valid source-atomic backport PR or an explicitly maintainer-approved
-   aggregate whose sources meet the inseparability exception below already
-   exists, treat that lane as started and reuse it (or skip it when another
-   owner holds it); do not create a duplicate branch or PR. Do not extend an
-   unapproved, shape-violating aggregate. Close it only with explicit write
-   authorization, retain its branch unless deletion is separately authorized,
-   and replace it with source-atomic PRs.
-2. Fetch the target release branch. Using that refreshed ref, verify the source
-   PR is merged, is a release stabilizer, its patch is still live on refreshed
-   `origin/main`, and it is not already present or superseded on
-   `release/X.Y.Z`. If the source was reverted or superseded on `main`, stop
-   unless a maintainer renews the backport approval with that current state.
+1. Search open PRs targeting the release branch, targeted private coordination
+   for the selected source, and remote branches with verified ownership and
+   source-commit binding. If a valid source-atomic lane or an explicitly
+   maintainer-approved aggregate whose sources meet the inseparability exception
+   below already exists, treat that lane as started and reuse it (or skip it when
+   another owner holds it); do not create a duplicate branch or PR. Stop rather
+   than duplicate work when a candidate branch's ownership or source binding is
+   `UNKNOWN`. Do not extend an unapproved, shape-violating aggregate. Close it
+   only with explicit write authorization, retain its branch unless deletion is
+   separately authorized, and replace it with source-atomic PRs.
+2. Fetch and prune both `origin/main` and the target release branch. Using those
+   refreshed refs, verify the source PR is merged, is a release stabilizer, its
+   patch is still live on `origin/main`, and it is not already present or
+   superseded on `release/X.Y.Z`. If the source was reverted or superseded on
+   `main`, stop unless a maintainer renews the backport approval with that
+   current state.
 3. If step 1 found a valid backport PR, update its branch onto the current
    release tip under the repository's branch-rewrite policy. Repeat the
    presence and supersession checks, then rerun validation, QA, and review on
@@ -301,6 +304,12 @@ serialize the sequence:
    source commit already has inherited `-x` provenance, record that deeper
    lineage in the PR and remove its footer from the release commit message.
 7. Run the release-phase validation, QA, and review gates on the current head.
+   Immediately before merge, fetch and prune `origin/main` and the target release
+   branch again. Repeat the source-liveness, presence, and supersession checks.
+   If the source's relevant `main` state changed, or the release tip advanced
+   beyond the tip incorporated into the backport branch, update the branch and
+   rerun validation, QA, and review; merge only when the evidence covers the
+   exact refreshed refs.
    A backport with exactly one source commit may be squash-merged after copying
    its exact direct `(cherry picked from commit <source-sha>)` footer into the
    final squash commit body. For a multi-commit rebase-merged source PR or an

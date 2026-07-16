@@ -16,17 +16,22 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
 When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
 source PR per release backport PR:
 
-- Search open release-targeted PRs before branching. Reuse a valid source-atomic
-  PR or an explicitly maintainer-approved aggregate whose sources meet the
-  inseparability exception below. If an unapproved aggregate violates this
-  shape, recommend separate replacements; close it only with explicit write
+- Before branching, search open release-targeted PRs, targeted private
+  coordination for the source, and remote branches with verified ownership and
+  source binding. Reuse or skip a valid source-atomic lane, or an explicitly
+  maintainer-approved aggregate whose sources meet the inseparability exception
+  below. Stop rather than duplicate work when a candidate branch's ownership or
+  source binding is `UNKNOWN`. If an unapproved aggregate violates this shape,
+  recommend separate replacements; close it only with explicit write
   authorization and retain its branch unless deletion is also authorized.
 - Process them serially. Merge one backport, fetch the new release tip, then
   update a reused PR onto that tip or branch the next. Rerun validation, QA, and
   review on the updated head before merging.
 - Before updating or branching, confirm each selected source patch is still live
-  on refreshed `origin/main`. A source reverted or superseded on `main` requires
-  renewed maintainer approval before backporting.
+  on explicitly fetched `origin/main`. A source reverted or superseded on `main`
+  requires renewed maintainer approval before backporting. Repeat this check and
+  the release-tip check immediately before merge; update and rerun validation,
+  QA, and review if either relevant ref changed.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
   validation, QA evidence, review cycle, and rollback boundary. Every commit
   created by a `main`-to-release backport and landed on the release branch must
