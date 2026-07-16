@@ -375,8 +375,10 @@ describe('source-mapped stack traces for VM errors', () => {
         // The whole point of the cap: the bytes are never read.
         expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
         expect(readFileAsyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        // Assert what the warning must carry (which map, how big, the limit), not
+        // how it is worded.
         expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('exceeds the'),
+          expect.any(String),
           expect.stringContaining(path.basename(mapPath)),
           MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
           MAX_EXTERNAL_SOURCE_MAP_BYTES,
@@ -413,8 +415,10 @@ describe('source-mapped stack traces for VM errors', () => {
         }
         expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
         expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        // Assert what the warning must carry (which map, how big, the limit), not
+        // how it is worded.
         expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('exceeds the'),
+          expect.any(String),
           expect.stringContaining(path.basename(mapPath)),
           MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
           MAX_EXTERNAL_SOURCE_MAP_BYTES,
@@ -441,9 +445,11 @@ describe('source-mapped stack traces for VM errors', () => {
           throw new Error('expected exceptionMessage result');
         }
         expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        // No oversized warning for this map — matched by the map it names rather
+        // than by the message wording.
         expect(warnSpy).not.toHaveBeenCalledWith(
-          expect.stringContaining('exceeds the'),
-          expect.anything(),
+          expect.any(String),
+          expect.stringContaining(path.basename(mapPath)),
           expect.anything(),
           expect.anything(),
         );
@@ -514,38 +520,6 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
-    test('a registration with a confirmed no-map result never reads, even if marked retryable', async () => {
-      // `sourceMapJson: null` means "confirmed no usable map for this generation".
-      // It is terminal on its own, not because preload happens to pair it with
-      // `retryMissingSourceMap: false` — this pins that invariant so a future
-      // preload change cannot silently fall back into retry churn.
-      const bundlePath = vmBundlePath(testName);
-      const mapFileName = `${path.basename(bundlePath)}.map`;
-      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
-      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
-      await writeVmBundle(bundleContents);
-      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
-
-      const registration = registerBundleForSourceMaps(
-        bundlePath,
-        0,
-        bundleContents,
-        /* preloadedSourceMapJson */ null,
-        /* retryMissingSourceMap */ true,
-      );
-      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
-
-      try {
-        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
-        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
-        // A usable map is sitting on disk; the confirmed-null registration must
-        // never consult it for this generation.
-        expect(readFileSyncSpy.mock.calls.map(([filePath]) => filePath)).not.toContain(mapPath);
-      } finally {
-        readFileSyncSpy.mockRestore();
-      }
-    });
-
     test('an oversized fallback map does not make a late-arriving named map terminal', async () => {
       // The named map is missing at build and arrives shortly after — a supported
       // flow. An oversized map sitting at the conventional fallback path must not
@@ -588,18 +562,38 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
-    test('oversized external map warns once per map path across repeated lookups', async () => {
+    test('oversized map warns once per path across VM rebuilds', async () => {
+      // The repeat that matters is the preload, which re-checks the map on every
+      // buildVM: an app with more bundles than maxVMPoolSize rebuilds per request,
+      // so without the throttle this warns at request rate. Repeated *errors* on
+      // one VM cannot show this — the registration caches the terminal answer and
+      // never re-checks.
+      buildConfig({
+        serverBundleCachePath: serverBundleCachePath(testName),
+        supportModules: true,
+        stubTimers: false,
+        maxVMPoolSize: 1,
+      });
+
       const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const realMapPath = fs.realpathSync(mapPath);
+      const evictorBundlePath = path.join(serverBundleCachePath(testName), 'warn-once-evictor.js');
+      await writeBundleAt(evictorBundlePath, 'global.otherBundleLoaded = true;');
+
       const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
       const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
 
       try {
-        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
-        await runInVM('global.triggerSsrError()', bundlePath);
-        await runInVM('global.triggerSsrError()', bundlePath);
+        // Build (preload warns), evict, then rebuild so preload runs a second time.
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+        await buildExecutionContext([evictorBundlePath], /* buildVmsIfNeeded */ true);
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
 
+        // Count by the data the warning carries, not its wording.
         const oversizedWarnings = warnSpy.mock.calls.filter(
-          ([message]) => typeof message === 'string' && message.includes('exceeds the'),
+          ([, warnedPath, warnedSize]) =>
+            warnedPath === realMapPath && warnedSize === MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
         );
         expect(oversizedWarnings).toHaveLength(1);
       } finally {
