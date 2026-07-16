@@ -877,6 +877,13 @@ describe ReactOnRailsHelper do
       end.not_to raise_error
       expect(frozen_opts).to eq({ class: "widget" })
     end
+
+    it "does not leak state into a reused html_options hash across calls" do
+      shared_opts = { class: "widget" }
+      react_component_hash("App", props:, html_options: shared_opts)
+      react_component_hash("App", props:, html_options: shared_opts)
+      expect(shared_opts).to eq({ class: "widget" })
+    end
   end
 
   describe "#create_render_options" do
