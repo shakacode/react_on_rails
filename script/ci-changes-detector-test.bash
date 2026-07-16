@@ -200,6 +200,7 @@ test_docs_changes_are_non_runtime_only() {
   assert_contains "$out" '"docs_only": true' "docs output"
   assert_contains "$out" '"non_runtime_only": true' "docs output"
   assert_contains "$out" '"run_lint": false' "docs output"
+  assert_contains "$out" '"run_gem_generator_specs": false' "docs output"
 }
 
 # Regression for PR #3597: an internal docs/planning YAML (e.g.
@@ -375,6 +376,7 @@ test_agent_bin_change_runs_ci_infrastructure_without_benchmarks() {
   assert_contains "$out" '"non_runtime_only": false' "agent bin output"
   assert_contains "$out" '"run_lint": true' "agent bin output"
   assert_contains "$out" '"run_ruby_tests": true' "agent bin output"
+  assert_contains "$out" '"run_gem_generator_specs": true' "agent bin output"
   assert_contains "$out" '"run_js_tests": true' "agent bin output"
   assert_contains "$out" '"run_dummy_tests": true' "agent bin output"
   assert_contains "$out" '"run_generators": true' "agent bin output"
@@ -480,6 +482,18 @@ test_suite_workflow_file_runs_its_tests_but_no_benchmark() {
   assert_contains "$out" '"run_pro_node_renderer_benchmarks": false' "workflow-only output"
 }
 
+test_gem_tests_workflow_change_keeps_generator_specs_fail_closed() {
+  setup_repo
+  mkdir -p .github/workflows
+  printf 'name: Gem tests\non: [pull_request]\n' > .github/workflows/gem-tests.yml
+  commit_change "tweak gem tests workflow"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "gem workflow output"
+  assert_contains "$out" '"run_gem_generator_specs": true' "gem workflow output"
+}
+
 # A CI-infra change mixed with a real runtime-source change DOES benchmark: the
 # genuine source edit sets the BENCH_* flags the workflow/script changes don't.
 test_ci_infra_plus_runtime_source_still_benchmarks() {
@@ -529,6 +543,7 @@ test_uncategorized_file_runs_tests_but_skips_benchmarks() {
   assert_contains "$out" '"non_runtime_only": false' "uncategorized output"
   # Full test suite still runs (the safety the catch-all is there for).
   assert_contains "$out" '"run_ruby_tests": true' "uncategorized output"
+  assert_contains "$out" '"run_gem_generator_specs": true' "uncategorized output"
   assert_contains "$out" '"run_pro_tests": true' "uncategorized output"
   # ... but no benchmark suite.
   assert_contains "$out" '"run_core_benchmarks": false' "uncategorized output"
@@ -885,8 +900,45 @@ test_rspec_only_changes_do_not_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "rspec-only output"
+  assert_contains "$out" '"run_gem_generator_specs": false' "rspec-only output"
   assert_contains "$out" '"run_dummy_tests": false' "rspec-only output"
   assert_contains "$out" '"run_e2e_tests": false' "rspec-only output"
+}
+
+assert_generator_spec_support_change_routes_generator_shard() {
+  local file="$1"
+  setup_repo
+  write_file_change "$file"
+
+  local out
+  out="$(detector_output)"
+  assert_contains "$out" '"run_ruby_tests": true' "$file output"
+  assert_contains "$out" '"run_gem_generator_specs": true' "$file output"
+}
+
+test_generator_spec_helper_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/support/generator_spec_helper.rb"
+}
+
+test_generator_shared_spec_helper_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/spec_helper.rb"
+}
+
+test_generator_simplecov_helper_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/simplecov_helper.rb"
+}
+
+test_generator_shared_example_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/support/shared_examples/base_generator_examples.rb"
+}
+
+test_generator_version_helper_change_routes_generator_shard() {
+  assert_generator_spec_support_change_routes_generator_shard \
+    "react_on_rails/spec/react_on_rails/support/version_test_helpers.rb"
 }
 
 test_generator_only_changes_do_not_request_e2e() {
@@ -896,6 +948,7 @@ test_generator_only_changes_do_not_request_e2e() {
   local out
   out="$(detector_output)"
   assert_contains "$out" '"run_ruby_tests": true' "generator-only output"
+  assert_contains "$out" '"run_gem_generator_specs": true' "generator-only output"
   assert_contains "$out" '"run_generators": true' "generator-only output"
   assert_contains "$out" '"run_dummy_tests": false' "generator-only output"
   assert_contains "$out" '"run_e2e_tests": false' "generator-only output"
@@ -916,6 +969,7 @@ test_core_ruby_changes_request_e2e() {
 
   local out
   out="$(detector_output)"
+  assert_contains "$out" '"run_gem_generator_specs": true' "core ruby output"
   assert_contains "$out" '"run_dummy_tests": true' "core ruby output"
   assert_contains "$out" '"run_e2e_tests": true' "core ruby output"
 }
@@ -926,6 +980,7 @@ test_core_js_changes_request_e2e() {
 
   local out
   out="$(detector_output)"
+  assert_contains "$out" '"run_gem_generator_specs": true' "core js output"
   assert_contains "$out" '"run_e2e_tests": true' "core js output"
 }
 
@@ -984,6 +1039,7 @@ assert_release_tooling_contract() {
   assert_contains "$out" '"run_ruby_tests": true' "$label"
   # Primary goal: NOT generator-sensitive, so required-pr-gate won't force hosted CI.
   assert_contains "$out" '"run_generators": false' "$label"
+  assert_contains "$out" '"run_gem_generator_specs": false' "$label"
   assert_contains "$out" '"run_js_tests": false' "$label"
   # Release tooling does not exercise the dummy app, E2E, or benchmarks. Assert
   # the FULL benchmark contract so a regression that flips any benchmark suite
@@ -1449,6 +1505,7 @@ test_empty_diff_skips_everything() {
   assert_contains "$out" '"non_runtime_only": true' "empty diff output"
   assert_contains "$out" '"run_lint": false' "empty diff output"
   assert_contains "$out" '"run_ruby_tests": false' "empty diff output"
+  assert_contains "$out" '"run_gem_generator_specs": false' "empty diff output"
   assert_contains "$out" '"benchmarks_changed": false' "empty diff output"
 }
 
@@ -1492,6 +1549,7 @@ run_test test_agent_bin_markdown_change_is_non_runtime_only
 run_test test_agent_workflow_config_change_runs_ci_infrastructure_without_benchmarks
 run_test test_ci_infrastructure_only_change_runs_tests_but_skips_benchmarks
 run_test test_suite_workflow_file_runs_its_tests_but_no_benchmark
+run_test test_gem_tests_workflow_change_keeps_generator_specs_fail_closed
 run_test test_ci_infra_plus_runtime_source_still_benchmarks
 run_test test_node_renderer_source_change_runs_node_renderer_benchmark
 run_test test_uncategorized_file_runs_tests_but_skips_benchmarks
@@ -1523,6 +1581,11 @@ run_test test_pure_annotation_remains_runtime_affecting
 run_test test_block_comment_with_trailing_code_remains_runtime_affecting
 run_test test_pro_only_changes_do_not_request_e2e
 run_test test_rspec_only_changes_do_not_request_e2e
+run_test test_generator_spec_helper_change_routes_generator_shard
+run_test test_generator_shared_spec_helper_change_routes_generator_shard
+run_test test_generator_simplecov_helper_change_routes_generator_shard
+run_test test_generator_shared_example_change_routes_generator_shard
+run_test test_generator_version_helper_change_routes_generator_shard
 run_test test_generator_only_changes_do_not_request_e2e
 run_test test_dummy_app_changes_request_e2e
 run_test test_core_ruby_changes_request_e2e
