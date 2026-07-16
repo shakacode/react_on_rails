@@ -256,6 +256,75 @@ test('+ci-status reports automatic exact-head release-target coverage', async ()
   assert.ok(marker.observed.every((workflow) => workflow.mode === 'release-full'));
 });
 
+test('+ci-status derives force-full mode from exact-head proof', async () => {
+  const pullRequest = defaultPullRequest();
+  pullRequest.base.ref = 'main';
+  const runIds = Object.fromEntries(
+    hostedWorkflowFiles.map((workflowFile, index) => [workflowFile, 500 + index]),
+  );
+  const proof = {
+    body: `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+      head_sha: 'current-head-sha',
+      pull_request_number: 42,
+      base_ref: 'main',
+      base_sha: 'base-sha',
+      requested_mode: 'force-full',
+      requested_at: '2026-07-16T08:00:00Z',
+      workflows: hostedWorkflowFiles,
+      run_ids: runIds,
+    })} -->`,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const runs = hostedWorkflowFiles.map((workflowFile, index) => ({
+    conclusion: 'success',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    id: 500 + index,
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  }));
+
+  const calls = await runCommand({ body: '+ci-status', comments: [proof], pullRequest, runs });
+
+  assert.match(calls.comments.at(-1), /Observed exact-head coverage: modes\[force-full=9\]/);
+});
+
+test('+ci-status does not mislabel optimized proof as release-full', async () => {
+  const runIds = Object.fromEntries(
+    hostedWorkflowFiles.map((workflowFile, index) => [workflowFile, 500 + index]),
+  );
+  const proof = {
+    body: `<!-- hosted-ci-coverage:v1 ${JSON.stringify({
+      head_sha: 'current-head-sha',
+      pull_request_number: 42,
+      base_ref: 'release/17.0.0',
+      base_sha: 'base-sha',
+      requested_mode: 'optimized',
+      requested_at: '2026-07-16T08:00:00Z',
+      workflows: hostedWorkflowFiles,
+      run_ids: runIds,
+    })} -->`,
+    created_at: '2026-07-16T08:00:30Z',
+    id: 90,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  };
+  const runs = hostedWorkflowFiles.map((workflowFile, index) => ({
+    conclusion: 'success',
+    event: 'workflow_dispatch',
+    head_sha: 'current-head-sha',
+    id: 500 + index,
+    path: `.github/workflows/${workflowFile}`,
+    status: 'completed',
+  }));
+
+  const calls = await runCommand({ body: '+ci-status', comments: [proof], runs });
+
+  assert.match(calls.comments.at(-1), /Observed exact-head coverage: modes\[optimized=9\]/);
+  assert.doesNotMatch(calls.comments.at(-1), /Observed exact-head coverage: release-full/);
+});
+
 test('+ci-run-hosted skips equivalent automatic exact-head release coverage', async () => {
   const runs = hostedWorkflowFiles.map((workflowFile, index) => ({
     conclusion: index === 0 ? null : 'success',

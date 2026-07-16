@@ -1211,9 +1211,16 @@ jobs:
                 counts[workflow.state] += 1;
                 return counts;
               }, { successful: 0, pending: 0, failed: 0, missing: 0 });
+              const coverageModeCounts = coverage.workflows.reduce((counts, workflow) => {
+                counts[workflow.mode] = (counts[workflow.mode] || 0) + 1;
+                return counts;
+              }, {});
+              const coverageModeSummary = Object.entries(coverageModeCounts)
+                .map(([mode, count]) => `${mode}=${count}`)
+                .join(', ');
               const observedCoverage = coverage.status === 'UNKNOWN'
                 ? 'UNKNOWN'
-                : `${automaticReleaseTarget ? 'release-full' : 'optimized'}; ` +
+                : `modes[${coverageModeSummary}]; ` +
                   `successful=${coverageCounts.successful}, pending=${coverageCounts.pending}, ` +
                   `failed=${coverageCounts.failed}, missing=${coverageCounts.missing}`;
 
