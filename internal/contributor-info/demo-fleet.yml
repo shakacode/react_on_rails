@@ -239,7 +239,7 @@ repos:
       - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: yarn_berry
-    smoke: [/]
+    smoke: [/hello_world]
     verify: true
 
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
@@ -252,6 +252,7 @@ repos:
       - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: npm
+    ruby_test: RAILS_ENV=test bin/rails db:test:prepare test test:system
     smoke: [/]
     verify: true
 
