@@ -25,9 +25,13 @@ source PR per release backport PR:
   update a reused PR onto that tip or branch the next. Rerun validation, QA, and
   review on the updated head before merging.
 - Give each source PR its own `git cherry-pick -x` provenance, conflict record,
-  validation, QA evidence, review cycle, and rollback boundary. Preserve each
-  exact `(cherry picked from commit <source-sha>)` footer in the commit that
-  lands on the release branch, including when the PR is squash-merged.
+  validation, QA evidence, review cycle, and rollback boundary. The commit that
+  lands on the release branch must have exactly one direct
+  `(cherry picked from commit <source-sha>)` footer; record inherited provenance
+  from the source commit in the PR instead of copying another footer. A
+  source-atomic PR may preserve that footer in a squash commit. An approved
+  aggregate must retain one normalized landed commit per source and use a merge
+  method that preserves those commits; never create a multi-footer commit.
 - Do not bundle independent source PRs because they share a target, component,
   milestone, or `CHANGELOG.md`. Shared changelog edits require serialization;
   retain each source PR's applicable changelog entry, then reconcile the entries
