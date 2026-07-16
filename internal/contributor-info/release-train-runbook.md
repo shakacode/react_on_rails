@@ -762,15 +762,19 @@ audited manual path instead:
    other `PICK`. Preserve the plan's `SKIP` entries and resolve each `MANUAL`
    entry with the existing manual fallback. Do not cherry-pick the approved
    omitted release commit.
-4. Push the resulting `main` branch or merge its PR. Refetch `origin/main` and
-   the exact release ref with the explicit tracking refspecs above. Require the release ref to still equal
-   `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit against the
-   new tip. Then verify every non-omitted `PICK` is live with auditable `-x`
-   provenance, every `SKIP`/`MANUAL` entry has its recorded disposition, the
-   replacement (if any) is live, and the omitted origin remains reverted or
-   superseded. Any missing, changed, or `UNKNOWN` evidence stops closeout. After
-   that audit passes, reset `AUDITED_MAIN_TIP` to the exact audited
-   `origin/main` SHA and preserve it with `AUDITED_RELEASE_TIP`:
+4. Push the resulting `main` branch or merge its PR. When a PR is required, use
+   a merge method that preserves every manually cherry-picked commit and its
+   direct `-x` footer; do not squash a multi-commit selective closeout. For the
+   single-pick case, a squash merge is supported only when its final body copies
+   that pick's exact direct footer. Refetch `origin/main` and the exact release
+   ref with the explicit tracking refspecs above. Require the release ref to
+   still equal `AUDITED_RELEASE_TIP`; if it advanced, restart the entire audit
+   against the new tip. Then verify every non-omitted `PICK` is live with
+   auditable `-x` provenance, every `SKIP`/`MANUAL` entry has its recorded
+   disposition, the replacement (if any) is live, and the omitted origin remains
+   reverted or superseded. Any missing, changed, or `UNKNOWN` evidence stops
+   closeout. After that audit passes, reset `AUDITED_MAIN_TIP` to the exact
+   audited `origin/main` SHA and preserve it with `AUDITED_RELEASE_TIP`:
 
    ```bash
    AUDITED_MAIN_TIP="$(git rev-parse origin/main)" || {
@@ -782,11 +786,16 @@ audited manual path instead:
 5. Immediately before final reconciliation and deletion, refetch the exact main
    and release refs and require them to equal `AUDITED_MAIN_TIP` and
    `AUDITED_RELEASE_TIP`. Re-run the dry-run against that audited
-   `origin/main`, not a possibly stale local `main`. The final plan may list only
-   the explicitly omitted `PICK` plus already-dispositioned `MANUAL` entries;
-   reconcile every row to the recorded evidence. Only then, with the
-   repository's required destructive-operation confirmation, delete the release
-   branch using an atomic expected-old-OID guard:
+   `origin/main`, not a possibly stale local `main`. Reconcile every row to the
+   recorded evidence. The final plan may contain the explicitly omitted `PICK`,
+   already-dispositioned `MANUAL` entries, and expected `SKIP` rows such as RC
+   version bumps or commits already proven live on `origin/main`; no other
+   `PICK`, unresolved `MANUAL`, or unexplained `SKIP` may remain. Only then, with
+   the repository's required destructive-operation confirmation, atomically
+   publish an annotated closeout tag and delete the release branch. The tag
+   binds the deletion to the exact audited main and release OIDs plus the final
+   plan digest, establishing a durable cutoff without freezing later `main`
+   development:
 
    ```bash
    main_refspec="+refs/heads/main:refs/remotes/origin/main"
@@ -816,18 +825,52 @@ audited manual path instead:
      --source "origin/release/${RELEASE_VERSION}" --target origin/main --dry-run \
      >"${FINAL_PLAN_FILE}" 2>&1 || { return 1 2>/dev/null || exit 1; }
    cat "${FINAL_PLAN_FILE}" || { return 1 2>/dev/null || exit 1; }
+   FINAL_PLAN_SHA256="$(
+     ruby -rdigest -e 'puts Digest::SHA256.file(ARGV.fetch(0)).hexdigest' "${FINAL_PLAN_FILE}"
+   )" || {
+     echo "could not digest the final plan; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   CLOSEOUT_TAG="release-closeout/${RELEASE_VERSION}"
+   git show-ref --verify --quiet "refs/tags/${CLOSEOUT_TAG}" && {
+     echo "local closeout tag already exists; inspect it before retrying" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   remote_closeout_tag="$(git ls-remote --tags origin "refs/tags/${CLOSEOUT_TAG}")" || {
+     echo "could not inspect the remote closeout tag; stop selective closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   test -z "${remote_closeout_tag}" || {
+     echo "remote closeout tag already exists; stop rather than overwrite audit evidence" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   git tag -a "${CLOSEOUT_TAG}" "${AUDITED_RELEASE_TIP}" \
+     -m "Release ${RELEASE_VERSION} selective closeout" \
+     -m "Audited-main: ${AUDITED_MAIN_TIP}" \
+     -m "Audited-release: ${AUDITED_RELEASE_TIP}" \
+     -m "Final-plan-sha256: ${FINAL_PLAN_SHA256}" || {
+     echo "could not create the closeout evidence tag" >&2
+     return 1 2>/dev/null || exit 1
+   }
    require_live_release_line_lease || {
      echo "release-line lease unavailable or UNKNOWN; stop selective closeout" >&2
      return 1 2>/dev/null || exit 1
    }
-   git push \
+   git push --atomic \
      --force-with-lease="refs/heads/release/${RELEASE_VERSION}:${AUDITED_RELEASE_TIP}" \
-     origin ":refs/heads/release/${RELEASE_VERSION}"
+     --force-with-lease="refs/tags/${CLOSEOUT_TAG}:" \
+     origin \
+     "refs/tags/${CLOSEOUT_TAG}:refs/tags/${CLOSEOUT_TAG}" \
+     ":refs/heads/release/${RELEASE_VERSION}"
    ```
 
-   If the lease rejects the deletion because the branch advanced after the last
-   fetch, preserve the branch and restart the audit. After guarded deletion,
-   clear the release-line phase. The release tags remain the durable record.
+   If the atomic push rejects either lease, no remote ref changes: preserve the
+   branch, inspect or remove the unpushed local closeout tag, and restart the
+   audit. The annotated tag makes the exact audited `main` cutoff and release tip
+   durable in the same remote ref transaction that deletes the branch. Commits
+   merged to `main` after that cutoff belong to later development and do not
+   silently rewrite this closeout evidence. After guarded deletion, clear the
+   release-line phase. The release and closeout tags remain the durable record.
 
 This path is the complete alternative to the helper's apply and branch-delete
 steps; do not mix a partial helper run with an unrecorded selective omission.
