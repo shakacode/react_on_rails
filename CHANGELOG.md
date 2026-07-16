@@ -24,6 +24,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [17.0.0.rc.12] - 2026-07-15
+
 #### Added
 
 - **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
@@ -2910,7 +2912,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.11...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.12...main
+[17.0.0.rc.12]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.11...v17.0.0.rc.12
 [17.0.0.rc.11]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.10...v17.0.0.rc.11
 [17.0.0.rc.10]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.9...v17.0.0.rc.10
 [17.0.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v17.0.0.rc.8...v17.0.0.rc.9
