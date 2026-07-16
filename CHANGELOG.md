@@ -44,7 +44,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   remapped to original sources, and the renderer logs a warning naming the map. The 50MB limit matches the
   pre-existing cap for inline maps. Partially addresses
   [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
-  [PR TBD](https://github.com/shakacode/react_on_rails/pull/TBD) by
+  [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
