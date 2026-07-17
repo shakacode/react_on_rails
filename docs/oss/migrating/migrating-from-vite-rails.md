@@ -21,6 +21,10 @@ React on Rails is a better fit when you want one or more of these:
 
 If your app is already happy with a Vite-only client-rendered setup, this migration is optional.
 
+If you are weighing the bundler change itself — why React on Rails ships on Rspack rather than Vite — see
+[Why Rspack (and not Vite)?](../getting-started/why-rspack.md) for the recorded decision, the published
+measurements so far, and the revisit triggers.
+
 ## Two different starting points
 
 Not all `vite_rails` + React apps are the same shape, and the migration effort differs for each:

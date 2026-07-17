@@ -177,6 +177,7 @@ In practice:
 - If you want primarily a fast bundler + HMR workflow and you are comfortable managing integration patterns yourself, Vite-centric setups can be appealing.
 - If you want stronger Rails + React integration conventions (for example helper-driven rendering, migration guidance, and integrated SSR paths), React on Rails is the broader framework choice.
 - If your decision depends on Vite performance tradeoffs, review the benchmark and matrix details in [Detailed Feature Matrix and Benchmarks](./comparison-with-alternatives.md).
+- If your question is why React on Rails itself ships on Rspack rather than Vite, that decision is argued in the open in [Why Rspack (and not Vite)?](./why-rspack.md).
 
 Official docs:
 

@@ -37,6 +37,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/oss-vs-pro',
         'getting-started/pro-quick-start',
         'getting-started/comparing-react-on-rails-to-alternatives',
+        'getting-started/why-rspack',
         'getting-started/common-issues',
       ],
     },
