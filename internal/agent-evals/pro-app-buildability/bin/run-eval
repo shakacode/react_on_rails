@@ -181,12 +181,7 @@ if [[ "$auth_material_available" == true ]]; then
     "$eval_dir/bin/canonicalize-model-credential" claude "$brokered_credential"
     chmod 600 "$brokered_credential"
     credential_helper="$private_dir/credential-helper"
-    # The generated helper expands these variables when Claude invokes it.
-    # shellcheck disable=SC2016
-    printf '%s\n' '#!/bin/sh' 'set -eu' 'helper_dir=${0%/*}' \
-      'IFS= read -r credential <"$helper_dir/model-credential"' \
-      'printf "%s" "$credential"' >"$credential_helper"
-    chmod 700 "$credential_helper"
+    "$eval_dir/bin/build-claude-credential-helper" "$credential_helper"
     jq -n --arg helper "$credential_helper" '{apiKeyHelper:$helper}' >"$claude_settings"
   fi
 else

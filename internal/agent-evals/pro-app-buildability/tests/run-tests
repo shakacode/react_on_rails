@@ -63,7 +63,9 @@ fi
 rg -q 'credential bytes found in run output' "$tmp/embedded-credential-error"
 
 for newline_mode in newline no-newline; do
-  claude_credential="$tmp/claude-credential-$newline_mode"
+  claude_helper_dir="$tmp/claude-helper-$newline_mode"
+  mkdir "$claude_helper_dir"
+  claude_credential="$claude_helper_dir/model-credential"
   if [[ "$newline_mode" == newline ]]; then
     printf '%s\n' 'synthetic-claude-key-effective-bytes' >"$claude_credential"
   else
@@ -72,6 +74,9 @@ for newline_mode in newline no-newline; do
   "$eval_dir/bin/canonicalize-model-credential" claude "$claude_credential"
   test "$(wc -c <"$claude_credential" | tr -d ' ')" = 36
   test "$(cat "$claude_credential")" = 'synthetic-claude-key-effective-bytes'
+  "$eval_dir/bin/build-claude-credential-helper" "$claude_helper_dir/credential-helper"
+  "$claude_helper_dir/credential-helper" >"$claude_helper_dir/helper-output"
+  cmp "$claude_credential" "$claude_helper_dir/helper-output"
   printf '%s' 'prefix:synthetic-claude-key-effective-bytes:suffix' \
     >"$tmp/credential-output/claude-$newline_mode.txt"
   if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$claude_credential" \
