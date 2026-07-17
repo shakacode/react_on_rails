@@ -29,8 +29,8 @@ module ReactOnRailsPro
           described_class.instance_variable_set(:@rsc_bundle_hash, nil)
         end
 
-        it "refreshes server and RSC IDs in development and test environments" do
-          allow(Rails.env).to receive_messages(development?: false, test?: true)
+        it "refreshes server and RSC IDs in development mode" do
+          allow(ReactOnRails.configuration).to receive(:development_mode).and_return(true)
           allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
           allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
 
@@ -39,8 +39,8 @@ module ReactOnRailsPro
           expect([described_class.rsc_bundle_hash, described_class.rsc_bundle_hash]).to eq(%w[rsc-one rsc-two])
         end
 
-        it "memoizes server and RSC IDs outside development and test environments" do
-          allow(Rails.env).to receive_messages(development?: false, test?: false)
+        it "memoizes server and RSC IDs when development mode is disabled" do
+          allow(ReactOnRails.configuration).to receive(:development_mode).and_return(false)
           allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
           allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
 

@@ -133,6 +133,8 @@ Each bundle hash ships with the companion assets built alongside it — `loadabl
 
 Current Pro artifact IDs begin with `rorp-v2-` and identify the role, bundle bytes, companion destination names, and companion bytes together. Changing only a manifest or `loadable-stats.json` therefore produces a new ID and invalidates fragment and renderer caches consistently. With multiple previous origins, duplicate legacy/protocol-v1 hashes are omitted because their payload provenance is ambiguous. Duplicate v2 IDs are safe to try in configured order because every downloaded payload is recomputed and rejected unless it matches the requested ID.
 
+Verified v2 previous-deploy payloads are always staged as captured files, even when pre-seeding uses `MODE=symlink`, because the adapter's source paths may change or disappear after their bytes are verified. Legacy/protocol-v1 payloads continue to honor symlink mode.
+
 ## Deploy the renderer before Rails
 
 > [!IMPORTANT]

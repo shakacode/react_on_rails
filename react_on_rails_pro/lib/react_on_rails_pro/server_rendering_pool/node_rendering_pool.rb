@@ -143,7 +143,7 @@ module ReactOnRailsPro
         end
 
         def volatile_artifact_ids?
-          Rails.env.development? || Rails.env.test?
+          ReactOnRails.configuration.development_mode
         end
         private :volatile_artifact_ids?
 

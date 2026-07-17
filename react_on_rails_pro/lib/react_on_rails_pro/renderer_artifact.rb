@@ -26,7 +26,7 @@ module ReactOnRailsPro
     ID_PREFIX = "rorp-v2"
     ROLE_CODES = { server: "s", rsc: "r" }.freeze
     ID_PATTERN = /\Arorp-v2-[sr]-[0-9a-f]{64}\z/
-    COMPANION_NAME_PATTERN = /\A[A-Za-z0-9_][A-Za-z0-9_.\-]*\z/
+    SAFE_COMPANION_NAME_PATTERN = %r{\A(?!\.{1,2}\z)[^/\\:\x00-\x1f\x7f]+\z}
     InlineCompanion = Data.define(:url, :body) do
       def initialize(url:, body:)
         super(url: url.to_s.freeze, body: body.to_s.b.freeze)
@@ -95,7 +95,7 @@ module ReactOnRailsPro
       casefolded_names = {}
       companions.to_h.each_with_object({}) do |(basename, source), mapping|
         name = basename.to_s
-        unless COMPANION_NAME_PATTERN.match?(name)
+        unless safe_companion_name?(name)
           raise ArgumentError, "Renderer artifact companion name must be a safe flat basename: #{name.inspect}"
         end
 
@@ -109,6 +109,10 @@ module ReactOnRailsPro
         casefolded_names[name.downcase] = name
         mapping[name] = source.is_a?(InlineCompanion) ? source : Pathname.new(source.to_s)
       end.freeze
+    end
+
+    def safe_companion_name?(name)
+      SAFE_COMPANION_NAME_PATTERN.match?(name)
     end
 
     def build_id

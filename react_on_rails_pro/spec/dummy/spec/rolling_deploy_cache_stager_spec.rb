@@ -217,6 +217,8 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
         staged_asset = File.join(bundle_dir, "manifest.json")
         expect(File.binread(staged_bundle)).to eq("verified bundle")
         expect(File.binread(staged_asset)).to eq("verified manifest")
+        expect(File.symlink?(staged_bundle)).to be(false)
+        expect(File.symlink?(staged_asset)).to be(false)
       end
     end
   end

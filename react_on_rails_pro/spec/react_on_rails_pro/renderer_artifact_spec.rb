@@ -141,9 +141,41 @@ module ReactOnRailsPro
       bundle = write_file("bundle.js", "bundle")
       manifest = write_file("manifest.json", "manifest")
 
-      expect do
-        described_class.new(role: :server, bundle:, companions: { "../manifest.json" => manifest })
-      end.to raise_error(ArgumentError, /safe flat basename/)
+      unsafe_names = [
+        "",
+        ".",
+        "..",
+        "../manifest.json",
+        "nested/manifest.json",
+        "nested\\manifest.json",
+        "C:manifest.json",
+        "manifest.json:stream",
+        "bad\0name",
+        "bad\nname",
+        "bad\x7fname"
+      ]
+      unsafe_names.each do |name|
+        expect do
+          described_class.new(role: :server, bundle:, companions: { name => manifest })
+        end.to raise_error(ArgumentError, /safe flat basename/)
+      end
+    end
+
+    it "accepts safe flat companion names outside the artifact ID alphabet" do
+      bundle = write_file("bundle.js", "bundle")
+      manifest = write_file("manifest.json", "manifest")
+      names = ["data@2x.json", "my data.json", "manifest%402x.json", "café.json"]
+
+      artifact = described_class.new(
+        role: :server,
+        bundle:,
+        companions: names.to_h { |name| [name, manifest] }
+      )
+
+      artifact.with_materialized_files do |_materialized_bundle, materialized_companions|
+        expect(materialized_companions.keys).to match_array(names)
+        expect(materialized_companions.values).to all(satisfy { |path| File.file?(path) })
+      end
     end
 
     it "rejects a companion that would overwrite the materialized bundle" do
