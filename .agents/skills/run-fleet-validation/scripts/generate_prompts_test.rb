@@ -121,6 +121,20 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "fleet-validation:<resolved-tag>:<stable-target-id>"
   end
 
+  def test_strips_trailing_separators_from_stable_target_ids
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos").find { |repo| repo["tier"] == "hard_gate" }["name"] = "owner/example!"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      pack = build_generator(manifest_path:).render_pack
+
+      assert_includes pack, "- owner/example!: owner-example"
+      refute_includes pack, "fallback_claim_target_template: adhoc:fleet-RESOLVED_TAG-owner-example-"
+    end
+  end
+
   def test_rejects_unsupported_schema
     Dir.mktmpdir do |directory|
       manifest = File.join(directory, "fleet.yml")

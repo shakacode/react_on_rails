@@ -133,7 +133,6 @@ module FleetValidation
 
     def effective_repo(defaults, repo)
       effective = defaults.merge(repo)
-      effective["review_app"] = repo.fetch("review_app", defaults["review_app"])
       effective["kind"] = "repo"
       effective["weight"] = repo_weight(effective)
       effective
@@ -407,7 +406,7 @@ module FleetValidation
     end
 
     def slug(value)
-      value.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|\z/, "")
+      value.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
     end
   end
 

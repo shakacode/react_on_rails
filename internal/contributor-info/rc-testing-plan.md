@@ -77,6 +77,8 @@ candidate into six separate prompts. Its generator reads the hard gates from `de
 adds the monorepo generator/install gate, and emits six self-contained coordinator prompts
 balanced three-per-machine by default:
 
+From the repository root, run:
+
 ```bash
 ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
