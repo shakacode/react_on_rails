@@ -44,6 +44,23 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       expect(server_id).not_to eq(rsc_id)
     end
 
+    it "represents a production render snapshot without retaining artifact bodies" do
+      id = "rorp-v2-s-#{'a' * 64}"
+      identity = described_class::Identity.new(role: :server, id:)
+
+      expect(identity.to_h).to eq(role: :server, id:)
+      expect(identity).not_to respond_to(:bundle_body)
+      expect(identity).to be_frozen
+    end
+
+    it "rejects a lightweight identity whose role does not match its ID" do
+      id = "rorp-v2-r-#{'a' * 64}"
+
+      expect do
+        described_class::Identity.new(role: :server, id:)
+      end.to raise_error(ArgumentError, /does not match role/)
+    end
+
     it "binds companion destination basenames and bytes" do
       bundle = write_file("bundle.js", "bundle")
       first_manifest = write_file("first-manifest.json", '{"chunk":"first"}')

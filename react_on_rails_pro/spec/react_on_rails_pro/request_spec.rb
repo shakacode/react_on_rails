@@ -108,6 +108,72 @@ describe ReactOnRailsPro::Request do
       expect(requested_path).to eq("/bundles/#{artifact.id}/render/digest")
       expect(requested_form).to include("bundle_#{artifact.id}")
     end
+
+    it "hydrates matching lightweight artifact identities only for a bundle-upload retry" do
+      server_artifact = ReactOnRailsPro::RendererArtifact.new(
+        role: :server,
+        bundle: server_bundle_path,
+        companions: {}
+      )
+      rsc_artifact = ReactOnRailsPro::RendererArtifact.new(
+        role: :rsc,
+        bundle: rsc_server_bundle_path,
+        companions: {}
+      )
+      identities = [server_artifact, rsc_artifact].map do |artifact|
+        ReactOnRailsPro::RendererArtifact::Identity.new(role: artifact.role, id: artifact.id)
+      end
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .with(action_description: "uploading requested assets", roles: %i[server rsc])
+        .and_return([server_artifact, rsc_artifact])
+      response = mock_response(status: 200)
+      requested_path = nil
+      requested_form = nil
+      allow(mock_connection).to receive(:post) do |path, form:|
+        requested_path = path
+        requested_form = form
+        response
+      end
+
+      expect(
+        described_class.render_code(
+          "/bundles/#{server_artifact.id}/render/digest",
+          "ReactOnRails.dummy",
+          true,
+          bundle_role: :server,
+          artifacts: identities
+        )
+      ).to be(response)
+      expect(requested_path).to eq("/bundles/#{server_artifact.id}/render/digest")
+      expect(requested_form).to include("bundle_#{server_artifact.id}", "bundle_#{rsc_artifact.id}")
+      expect(requested_form.fetch("dependencyBundleTimestamps")).to eq([rsc_artifact.id, server_artifact.id])
+    end
+
+    it "refuses to upload bytes that no longer match a lightweight artifact identity" do
+      expected_id = "rorp-v2-s-#{'a' * 64}"
+      identity = ReactOnRailsPro::RendererArtifact::Identity.new(role: :server, id: expected_id)
+      changed_artifact = ReactOnRailsPro::RendererArtifact.new(
+        role: :server,
+        bundle: server_bundle_path,
+        companions: {},
+        bundle_body: "changed bundle bytes"
+      )
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .with(action_description: "uploading requested assets", roles: [:server])
+        .and_return([changed_artifact])
+      expect(mock_connection).not_to receive(:post)
+
+      expect do
+        described_class.render_code(
+          "/bundles/#{identity.id}/render/digest",
+          "ReactOnRails.dummy",
+          true,
+          bundle_role: :server,
+          artifacts: [identity]
+        )
+      end.to raise_error(ReactOnRailsPro::Error, /refusing to upload different bytes/)
+    end
   end
 
   describe "render_code_as_stream" do

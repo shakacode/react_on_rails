@@ -88,9 +88,7 @@ module ReactOnRailsPro
 
       def render_code(path, js_code, send_bundle, bundle_role: :server, artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request #{path}" }
-        artifacts ||= if send_bundle
-                        ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
-                      end
+        artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading requested assets") if send_bundle
         request_path = send_bundle ? retarget_render_path(path, artifacts, bundle_role) : path
         form = form_with_code(js_code, send_bundle, artifacts:)
         perform_request(request_path, form:)
@@ -199,7 +197,7 @@ module ReactOnRailsPro
 
       def upload_assets(artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
-        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading assets")
+        artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading assets")
         target_bundles = artifacts.map(&:id)
 
         # Artifact IDs already bind every bundle and companion byte. Keying the
@@ -471,10 +469,44 @@ module ReactOnRailsPro
         return [path, artifacts] unless send_bundle
 
         Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
-        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+        artifacts = resolve_upload_artifacts(artifacts, action_description: "uploading requested assets")
         request_path = retarget_render_path(path, artifacts, bundle_role)
         upload_assets(artifacts:)
         [request_path, artifacts]
+      end
+
+      def resolve_upload_artifacts(artifacts, action_description:)
+        return ReactOnRailsPro::Utils.renderer_artifacts(action_description:) unless artifacts
+
+        artifacts = Array(artifacts)
+        expected_ids = expected_artifact_ids(artifacts)
+        return artifacts unless expected_ids
+
+        current_artifacts = ReactOnRailsPro::Utils.renderer_artifacts(
+          action_description:,
+          roles: expected_ids.keys
+        )
+        current_ids = current_artifacts.to_h { |artifact| [artifact.role, artifact.id] }
+        return current_artifacts if current_ids == expected_ids && current_artifacts.length == expected_ids.length
+
+        raise ReactOnRailsPro::Error,
+              "Renderer artifacts changed after this render request was prepared; refusing to upload different bytes"
+      end
+
+      def expected_artifact_ids(artifacts)
+        identities = artifacts.select { |artifact| artifact.is_a?(RendererArtifact::Identity) }
+        return nil if identities.empty?
+
+        unless identities.length == artifacts.length
+          raise ReactOnRailsPro::Error, "Renderer artifact snapshots cannot mix identities and captured bodies"
+        end
+
+        ids_by_role = identities.to_h { |identity| [identity.role, identity.id] }
+        if ids_by_role.length != identities.length
+          raise ReactOnRailsPro::Error, "Renderer artifact snapshot contains duplicate roles"
+        end
+
+        ids_by_role
       end
 
       def artifact_for_role(artifacts, role)

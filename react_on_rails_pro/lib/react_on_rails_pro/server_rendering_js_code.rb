@@ -16,7 +16,6 @@
 module ReactOnRailsPro
   module ServerRenderingJsCode
     RENDERER_ARTIFACT_SNAPSHOT_OPTION = :renderer_artifact_snapshot
-    STABLE_RENDERER_ARTIFACT_SNAPSHOT_MUTEX = Mutex.new
     PLAIN_STREAMING_RENDER_FUNCTION_NAME =
       "ReactOnRails.isServerStreamingSupported() ? " \
       "'streamServerRenderedReactComponent' : 'serverRenderReactComponent'"
@@ -180,20 +179,21 @@ module ReactOnRailsPro
         config = ReactOnRailsPro.configuration
         return unless config.enable_rsc_support && config.node_renderer?
 
-        artifacts = renderer_artifact_snapshot
+        artifacts = build_renderer_artifact_snapshot
         render_options.set_option(RENDERER_ARTIFACT_SNAPSHOT_OPTION, artifacts)
         artifacts
       end
 
-      def renderer_artifact_snapshot
-        return build_renderer_artifact_snapshot if Rails.env.development? || Rails.env.test?
-
-        STABLE_RENDERER_ARTIFACT_SNAPSHOT_MUTEX.synchronize do
-          @stable_renderer_artifact_snapshot ||= build_renderer_artifact_snapshot
-        end
-      end
-
       def build_renderer_artifact_snapshot
+        unless Rails.env.development? || Rails.env.test?
+          # Production artifact IDs are already memoized as strings. Keep warm renderer requests lightweight;
+          # Request resolves these identities to captured bytes only if the renderer asks for an upload.
+          return [
+            RendererArtifact::Identity.new(role: :server, id: ReactOnRailsPro::Utils.bundle_hash),
+            RendererArtifact::Identity.new(role: :rsc, id: ReactOnRailsPro::Utils.rsc_bundle_hash)
+          ].freeze
+        end
+
         ReactOnRailsPro::Utils.renderer_artifacts(
           action_description: "preparing server render",
           roles: %i[server rsc]

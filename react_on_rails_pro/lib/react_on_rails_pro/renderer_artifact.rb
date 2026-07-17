@@ -27,6 +27,17 @@ module ReactOnRailsPro
     ROLE_CODES = { server: "s", rsc: "r" }.freeze
     ID_PATTERN = /\Arorp-v2-[sr]-[0-9a-f]{64}\z/
     SAFE_COMPANION_NAME_PATTERN = %r{\A(?!\.{1,2}\z)[^/\\:\x00-\x1f\x7f]+\z}
+    Identity = Data.define(:role, :id) do
+      def initialize(role:, id:)
+        normalized_role = role.to_sym
+        normalized_id = id.to_s.freeze
+        unless RendererArtifact.role_from_id(normalized_id) == normalized_role
+          raise ArgumentError, "Renderer artifact identity does not match role #{normalized_role.inspect}"
+        end
+
+        super(role: normalized_role, id: normalized_id)
+      end
+    end
     InlineCompanion = Data.define(:url, :body) do
       def initialize(url:, body:)
         super(url: url.to_s.freeze, body: body.to_s.b.freeze)

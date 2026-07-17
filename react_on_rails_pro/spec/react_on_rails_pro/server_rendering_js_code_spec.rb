@@ -236,9 +236,18 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         expect(result).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
       end
 
-      it "memoizes the full artifact snapshot outside development and test" do
+      it "retains only lightweight artifact identities across production renders" do
+        server_id = "rorp-v2-s-#{'a' * 64}"
+        rsc_id = "rorp-v2-r-#{'b' * 64}"
         allow(Rails.env).to receive_messages(development?: false, test?: false)
-        described_class.instance_variable_set(:@stable_renderer_artifact_snapshot, nil)
+        allow(ReactOnRailsPro::Utils).to receive_messages(
+          bundle_hash: server_id,
+          rsc_bundle_hash: rsc_id
+        )
+        identities = [
+          ReactOnRailsPro::RendererArtifact::Identity.new(role: :server, id: server_id),
+          ReactOnRailsPro::RendererArtifact::Identity.new(role: :rsc, id: rsc_id)
+        ]
 
         2.times do
           described_class.render(
@@ -250,11 +259,9 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           )
         end
 
-        expect(ReactOnRailsPro::Utils).to have_received(:renderer_artifacts).once
+        expect(ReactOnRailsPro::Utils).not_to have_received(:renderer_artifacts)
         expect(render_options).to have_received(:set_option)
-          .with(:renderer_artifact_snapshot, [server_artifact, rsc_artifact]).twice
-      ensure
-        described_class.instance_variable_set(:@stable_renderer_artifact_snapshot, nil)
+          .with(:renderer_artifact_snapshot, identities).twice
       end
     end
   end
