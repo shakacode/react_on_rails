@@ -73,7 +73,7 @@ Rspack configuration is controlled via `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 The `bin/switch-bundler` script automatically updates this configuration when switching bundlers.
