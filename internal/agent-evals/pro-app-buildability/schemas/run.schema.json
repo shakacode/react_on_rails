@@ -56,7 +56,7 @@
       "additionalProperties": false,
       "required": ["name", "version", "model", "probe_invoked", "scaffold_invoked"],
       "properties": {
-        "name": { "const": "codex" },
+        "name": { "enum": ["codex", "claude"] },
         "version": { "type": "string", "minLength": 1 },
         "model": { "type": "string", "minLength": 1 },
         "probe_invoked": { "const": true },
@@ -85,6 +85,7 @@
         "shell_environment_inherit",
         "credential_store",
         "auth_material_available",
+        "auth_source",
         "stripped_sensitive_variable_categories",
         "raw_cleanup",
         "auth_material_persisted"
@@ -94,7 +95,8 @@
         "process_environment": { "const": "env -i" },
         "shell_environment_inherit": { "const": "none" },
         "credential_store": { "const": "file" },
-        "auth_material_available": { "const": false },
+        "auth_material_available": { "type": "boolean" },
+        "auth_source": { "enum": ["none", "operator-attested-file-broker"] },
         "stripped_sensitive_variable_categories": {
           "type": "array",
           "items": { "enum": ["auth", "cookie", "credential", "password", "secret", "token"] },
@@ -161,5 +163,31 @@
         "tutorial_claims_supported": { "const": false }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "auth_material_available": { "const": true } },
+            "required": ["auth_material_available"]
+          }
+        },
+        "required": ["security"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": { "isolated_host_attestation": { "const": true } },
+            "required": ["isolated_host_attestation"]
+          }
+        },
+        "required": ["runner"]
+      }
+    }
+  ]
 }

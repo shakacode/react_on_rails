@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": [
     "command",
+    "agent",
     "model",
     "scaffold_timeout_seconds",
     "probe_timeout_seconds",
@@ -19,11 +20,13 @@
     "capability_probe",
     "credential_store",
     "auth_material_available",
+    "auth_source",
     "human_followups_sent",
     "shell_environment_policy"
   ],
   "properties": {
-    "command": { "const": "codex exec" },
+    "command": { "enum": ["codex exec", "claude -p"] },
+    "agent": { "enum": ["codex", "claude"] },
     "model": { "type": "string", "minLength": 1 },
     "scaffold_timeout_seconds": { "type": "integer", "minimum": 1 },
     "probe_timeout_seconds": { "type": "integer", "minimum": 1 },
@@ -46,7 +49,8 @@
       }
     },
     "credential_store": { "const": "file" },
-    "auth_material_available": { "const": false },
+    "auth_material_available": { "type": "boolean" },
+    "auth_source": { "enum": ["none", "operator-attested-file-broker"] },
     "human_followups_sent": { "const": 0 },
     "shell_environment_policy": {
       "type": "object",
@@ -63,6 +67,10 @@
   "allOf": [
     {
       "if": { "properties": { "sandbox_network_access": { "const": true } } },
+      "then": { "properties": { "isolated_host_attestation": { "const": true } } }
+    },
+    {
+      "if": { "properties": { "auth_material_available": { "const": true } } },
       "then": { "properties": { "isolated_host_attestation": { "const": true } } }
     }
   ]
