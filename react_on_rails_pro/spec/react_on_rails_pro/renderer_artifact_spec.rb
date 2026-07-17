@@ -17,7 +17,7 @@ require_relative "spec_helper"
 require "react_on_rails_pro/renderer_artifact"
 require "tmpdir"
 
-module ReactOnRailsPro
+module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
   RSpec.describe RendererArtifact do
     around do |example|
       Dir.mktmpdir do |directory|
@@ -164,7 +164,7 @@ module ReactOnRailsPro
     it "accepts safe flat companion names outside the artifact ID alphabet" do
       bundle = write_file("bundle.js", "bundle")
       manifest = write_file("manifest.json", "manifest")
-      names = ["data@2x.json", "my data.json", "manifest%402x.json", "café.json"]
+      names = ["data@2x.json", "my data.json", "manifest%402x.json", "café.json", "é" * 51]
 
       artifact = described_class.new(
         role: :server,
@@ -188,7 +188,18 @@ module ReactOnRailsPro
       end.to raise_error(ArgumentError, /safe flat basename/)
     end
 
-    it "rejects a companion that would overwrite the materialized bundle" do
+    it "allows a source-basename collision when the consumer materializes the bundle under a distinct name" do
+      bundle = write_file("server.js", "bundle")
+      companion = write_file("companion.js", "companion")
+      artifact = described_class.new(role: :server, bundle:, companions: { "SERVER.JS" => companion })
+
+      artifact.with_materialized_files(bundle_name: "#{artifact.id}.js") do |materialized_bundle, companions|
+        expect(File.basename(materialized_bundle)).to eq("#{artifact.id}.js")
+        expect(File.basename(companions.fetch("SERVER.JS"))).to eq("SERVER.JS")
+      end
+    end
+
+    it "rejects a companion that collides with a caller-supplied materialized bundle name" do
       bundle = write_file("server.js", "bundle")
       companion = write_file("companion.js", "companion")
       artifact = described_class.new(
@@ -219,4 +230,4 @@ module ReactOnRailsPro
       end.to raise_error(ArgumentError, /unique ignoring case/)
     end
   end
-end
+end # rubocop:enable Metrics/ModuleLength

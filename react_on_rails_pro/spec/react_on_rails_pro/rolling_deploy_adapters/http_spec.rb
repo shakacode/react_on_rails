@@ -31,7 +31,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
         rolling_deploy_previous_urls: [
           "https://first.example.com",
           "https://second.example.com/custom/",
-          "https://first.example.com/"
+          "https://first.example.com"
         ],
         rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy/"
       )
@@ -56,6 +56,31 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
                                                                       "https://first.example.com/rolling",
                                                                       "https://second.example.com/path"
                                                                     ])
+    end
+
+    it "preserves literal commas inside a single URL path" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: "https://example.com/releases,blue",
+        rolling_deploy_mount_path: "/rolling"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq(["https://example.com/releases,blue"])
+    end
+
+    it "still isolates and rejects unsupported schemes in a comma-delimited string" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: "https://valid.example.com/rolling,file:///etc/passwd",
+        rolling_deploy_mount_path: "/rolling"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq(["https://valid.example.com/rolling"])
+      expect(logger).to have_received(:warn).with(/unsupported scheme "file"/)
     end
 
     it "collapses repeated slashes in inherited mounts and explicit paths" do
@@ -98,6 +123,17 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       expect(bases.map { |base| URI("#{base}/bundles/hash123").request_uri }).to all(eq("/bundles/hash123"))
     end
 
+    it "preserves an explicit root path instead of replacing it with the configured mount" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: "https://root.example.com/",
+        rolling_deploy_mount_path: "/rolling"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq(["https://root.example.com"])
+    end
+
     it "rejects unsafe URL components and a bare origin when the mount path is blank" do
       config = instance_double(
         ReactOnRailsPro::Configuration,
@@ -115,6 +151,24 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
 
       expect(described_class.send(:configured_previous_urls)).to eq([])
       expect(logger).to have_received(:warn).at_least(:once)
+    end
+
+    it "skips one URL with an invalid inherited path without discarding later explicit URLs" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [
+          "https://invalid-inherited.example.com",
+          "https://valid-explicit.example.com/rolling"
+        ],
+        rolling_deploy_mount_path: "/invalid path"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq([
+                                                                      "https://valid-explicit.example.com/rolling"
+                                                                    ])
+      expect(logger).to have_received(:warn).with(/is not a valid URI/)
     end
   end
 

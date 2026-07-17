@@ -109,6 +109,20 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(Pathname.new(expected).dirname).to eq(Pathname.new(cache_dir).dirname)
     end
 
+    it "normalizes filesystem symlink aliases to one lock and snapshot root" do
+      Dir.mktmpdir("renderer-cache-alias-test") do |directory|
+        real_cache = File.join(directory, "real-cache")
+        cache_alias = File.join(directory, "cache-alias")
+        FileUtils.mkdir_p(real_cache)
+        File.symlink(real_cache, cache_alias)
+
+        expect(described_class.send(:cache_mutation_lock_path, cache_alias))
+          .to eq(described_class.send(:cache_mutation_lock_path, real_cache))
+        expect(described_class.send(:snapshot_root, cache_alias))
+          .to eq(described_class.send(:snapshot_root, real_cache))
+      end
+    end
+
     it "serializes snapshot staging and pruning across processes" do
       artifact_id = "rorp-v2-s-#{'a' * 64}"
       snapshot = File.join("#{cache_dir}.artifact-snapshots", artifact_id, "#{artifact_id}.js")
@@ -434,6 +448,29 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.binread(immutable_bundle)).to eq("// server bundle content")
       expect(File.binread(immutable_companion)).to eq(File.binread(fixture_path))
     end
+
+    it "keeps the previous live directory intact until the complete artifact is promoted" do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(File.join(bundle_dir, "#{bundle_hash}.js"), "previous bundle")
+      File.write(File.join(bundle_dir, asset_filename), "previous companion")
+      observed_staging_dir = nil
+
+      allow(described_class).to receive(:stage_assets).and_wrap_original do |method, artifact, staging_dir, *args|
+        observed_staging_dir = staging_dir
+        expect(staging_dir).not_to eq(bundle_dir)
+        expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("previous bundle")
+        method.call(artifact, staging_dir, *args)
+        expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("previous bundle")
+        expect(File.read(File.join(bundle_dir, asset_filename))).to eq("previous companion")
+      end
+
+      pre_seed_cache
+
+      expect(File.read(File.join(bundle_dir, "#{bundle_hash}.js"))).to eq("// server bundle content")
+      expect(File.binread(File.join(bundle_dir, asset_filename))).to eq(File.binread(fixture_path))
+      expect(File.binread(File.join(bundle_dir, asset_filename2))).to eq(File.binread(fixture_path2))
+      expect(File.exist?(observed_staging_dir)).to be(false)
+    end
   end
 
   context "when assets don't exist" do
@@ -541,11 +578,12 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     before do
       FileUtils.mkdir_p(bundle_dir)
       File.write(dest_file, "// previous bundle content")
+      staging_dest = %r{\A#{Regexp.escape(bundle_dir)}\.staging-\d+-[0-9a-f]+/#{Regexp.escape(bundle_hash)}\.js\z}
       allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:write_content_atomically).and_call_original
       allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:write_content_atomically)
         .with(
           "// server bundle content",
-          dest_file,
+          a_string_matching(staging_dest),
           log_prefix: "Pre-seeded renderer cache",
           source_label: Pathname.new(server_bundle_path)
         )

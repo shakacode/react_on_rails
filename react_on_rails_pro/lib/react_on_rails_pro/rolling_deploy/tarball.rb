@@ -53,13 +53,22 @@ module ReactOnRailsPro
       EXTRACT_CHUNK_SIZE = 64 * 1024
 
       # Path-safety regex for tar entries. Reuse RendererArtifact's companion
-      # contract so every flat basename accepted into an artifact can cross the
-      # HTTP rolling-deploy transport unchanged. The shared pattern rejects
+      # contract while keeping the transport-specific TarWriter byte limit at
+      # this boundary. The shared pattern rejects
       # slash, backslash, colon, NUL/ASCII controls, and the special `.` / `..`
       # directory entries while permitting ordinary filename characters such
       # as spaces, `@`, `%`, Unicode, and leading dots or hyphens. The `./`
       # prefix permitted by tar is normalised away before this match runs.
+      # RubyGems TarWriter stores a flat name in a 100-byte header field.
       ENTRY_NAME_PATTERN = ReactOnRailsPro::RendererArtifact::SAFE_COMPANION_NAME_PATTERN
+      ENTRY_NAME_MAX_BYTES = 100
+
+      def safe_entry_name?(value)
+        name = value.to_s.dup.force_encoding(Encoding::UTF_8)
+        name.valid_encoding? &&
+          name.bytesize <= ENTRY_NAME_MAX_BYTES &&
+          ReactOnRailsPro::RendererArtifact.safe_companion_name?(name)
+      end
 
       # Compose a gzipped tarball from the given entries and yield the
       # resulting Tempfile. The temp file is removed when the block returns.
@@ -162,11 +171,17 @@ module ReactOnRailsPro
             raise ReactOnRailsPro::Error,
                   "Tarball entry name #{raw_name.inspect} is not valid UTF-8."
           end
+          if utf8_name.bytesize > ENTRY_NAME_MAX_BYTES
+            raise ReactOnRailsPro::Error,
+                  "Tarball entry name #{raw_name.inspect} exceeds the maximum of " \
+                  "#{ENTRY_NAME_MAX_BYTES} UTF-8 bytes."
+          end
 
-          unless ReactOnRailsPro::RendererArtifact.safe_companion_name?(utf8_name)
+          unless safe_entry_name?(utf8_name)
             raise ReactOnRailsPro::Error,
                   "Tarball entry name #{name.inspect} is not a safe basename. " \
-                  "Allowed: flat basenames without slashes, backslashes, colons, or control characters."
+                  "Allowed: flat basenames up to #{ENTRY_NAME_MAX_BYTES} UTF-8 bytes without slashes, " \
+                  "backslashes, colons, or control characters."
           end
 
           raise ReactOnRailsPro::Error, "Tarball source path for #{name.inspect} is blank" if path.to_s.empty?
@@ -210,10 +225,11 @@ module ReactOnRailsPro
                 "Rolling-deploy tarball entry name #{raw.inspect} is not valid UTF-8."
         end
         name = name.delete_prefix("./")
-        unless ReactOnRailsPro::RendererArtifact.safe_companion_name?(name)
+        unless safe_entry_name?(name)
           raise ReactOnRailsPro::Error,
                 "Rolling-deploy tarball entry name #{raw.inspect} is not a safe basename. " \
-                "Allowed: flat basenames without slashes, backslashes, colons, control characters, or `.` / `..`."
+                "Allowed: flat basenames up to #{ENTRY_NAME_MAX_BYTES} UTF-8 bytes without slashes, " \
+                "backslashes, colons, control characters, or `.` / `..`."
         end
         name
       end

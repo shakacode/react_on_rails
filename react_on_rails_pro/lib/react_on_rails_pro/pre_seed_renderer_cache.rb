@@ -17,8 +17,94 @@ require "fileutils"
 require "react_on_rails_pro/renderer_cache_helpers"
 require "react_on_rails_pro/renderer_cache_path"
 require "react_on_rails_pro/rolling_deploy_cache_stager"
+require "securerandom"
 
 module ReactOnRailsPro
+  module PreSeedRendererCacheFilesystem
+    module_function
+
+    def canonical_cache_dir(cache_dir)
+      FileUtils.mkdir_p(cache_dir)
+      File.realpath(cache_dir)
+    end
+
+    # Resolve every existing prefix through the filesystem so separate textual
+    # aliases (for example `/cache-link` and `/real/cache`) share the same lock
+    # and snapshot siblings. Preserve any not-yet-created suffix without
+    # creating it; `canonical_cache_dir` materializes the actual cache root
+    # before the mutation critical section begins.
+    def canonical_cache_path(cache_dir)
+      expanded = Pathname.new(File.expand_path(cache_dir.to_s))
+      unresolved = []
+      cursor = expanded
+
+      until cursor.exist? || cursor.symlink? || cursor.root?
+        unresolved.unshift(cursor.basename.to_s)
+        cursor = cursor.dirname
+      end
+
+      unresolved.reduce(Pathname.new(File.realpath(cursor))) { |path, component| path.join(component) }.to_s
+    rescue Errno::ENOENT
+      expanded.to_s
+    end
+
+    def temporary_artifact_directory(bundle_dir)
+      "#{bundle_dir}.staging-#{Process.pid}-#{SecureRandom.hex(6)}"
+    end
+
+    # Build the complete content-addressed entry off to the side, then rename
+    # it into place. A renderer can therefore observe either the previous
+    # complete entry or a cache miss during replacement, never a new bundle
+    # paired with only some of its companion manifests.
+    def promote_artifact_directory(staging_dir, bundle_dir)
+      backup_dir = nil
+      if path_present?(bundle_dir)
+        backup_dir = "#{bundle_dir}.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
+        File.rename(bundle_dir, backup_dir)
+      end
+
+      if path_present?(bundle_dir)
+        raise ReactOnRailsPro::Error,
+              "Concurrent writer recreated #{bundle_dir} before current artifact promotion"
+      end
+
+      File.rename(staging_dir, bundle_dir)
+      remove_artifact_backup(backup_dir)
+    rescue StandardError
+      restore_artifact_backup(backup_dir, bundle_dir)
+      raise
+    end
+
+    def remove_artifact_backup(backup_dir)
+      return unless backup_dir
+
+      FileUtils.rm_rf(backup_dir)
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not remove stale current-artifact backup directory #{backup_dir}: " \
+           "#{e.class}: #{e.message}."
+    end
+
+    def restore_artifact_backup(backup_dir, bundle_dir)
+      return unless backup_dir && path_present?(backup_dir)
+
+      if path_present?(bundle_dir)
+        warn "[ReactOnRailsPro] Could not restore previous current-artifact directory because #{bundle_dir} " \
+             "already exists; leaving #{backup_dir} for operator cleanup."
+        return
+      end
+
+      File.rename(backup_dir, bundle_dir)
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not restore current-artifact backup #{backup_dir} to #{bundle_dir}: " \
+           "#{e.class}: #{e.message}."
+    end
+
+    def path_present?(path)
+      File.exist?(path) || File.symlink?(path)
+    end
+  end
+  private_constant :PreSeedRendererCacheFilesystem
+
   # Stages the Node Renderer bundle cache in the renderer's expected directory
   # structure (`<cache>/<bundleHash>/<bundleHash>.js`), including any configured
   # assets_to_copy and, when RSC support is enabled, the RSC bundle and manifests.
@@ -51,8 +137,10 @@ module ReactOnRailsPro
       end
 
       cache_dir = resolve_cache_dir(mode)
+      action_description = mode == :copy ? "pre-seeding" : "pre-staging"
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description:)
+      cache_dir = PreSeedRendererCacheFilesystem.canonical_cache_dir(cache_dir)
       puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
-      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: action_description(mode))
 
       current_hashes = with_cache_mutation_lock(cache_dir) do
         stage_artifacts(artifacts, cache_dir, mode)
@@ -72,12 +160,17 @@ module ReactOnRailsPro
       # callers reading the loop should treat the rescue clause below as the
       # iteration body's exception handler — not the surrounding method's.
       artifacts.each do |artifact|
+        staging_dir = nil
         bundle_hash = artifact.id
         bundle_dir = File.join(cache_dir, bundle_hash)
-        stage_bundle(artifact, bundle_dir, bundle_hash, mode, cache_dir)
+        staging_dir = PreSeedRendererCacheFilesystem.temporary_artifact_directory(bundle_dir)
+        FileUtils.mkdir_p(staging_dir)
+        stage_bundle(artifact, staging_dir, bundle_hash, mode, cache_dir)
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
-        stage_assets(artifact, bundle_dir, mode, cache_dir)
+        stage_assets(artifact, staging_dir, mode, cache_dir)
+        PreSeedRendererCacheFilesystem.promote_artifact_directory(staging_dir, bundle_dir)
+        staging_dir = nil
         current_hashes << bundle_hash
       rescue StandardError => e
         # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
@@ -88,6 +181,8 @@ module ReactOnRailsPro
         warn "[ReactOnRailsPro] Renderer cache staging failed for bundle #{bundle_hash}; " \
              "cache may be partially staged: #{e.message}"
         raise
+      ensure
+        FileUtils.rm_rf(staging_dir) if staging_dir
       end
 
       prune_orphaned_artifact_snapshots(cache_dir)
@@ -113,7 +208,7 @@ module ReactOnRailsPro
     private_class_method :with_cache_mutation_lock
 
     def self.cache_mutation_lock_path(cache_dir)
-      cache = Pathname.new(File.expand_path(cache_dir.to_s))
+      cache = Pathname.new(PreSeedRendererCacheFilesystem.canonical_cache_path(cache_dir))
       cache.dirname.join("#{cache.basename}#{CACHE_MUTATION_LOCK_SUFFIX}").to_s
     end
     private_class_method :cache_mutation_lock_path
@@ -165,11 +260,6 @@ module ReactOnRailsPro
     end
     private_class_method :enforce_cache_dir_env_var!
 
-    def self.action_description(mode)
-      mode == :copy ? "pre-seeding" : "pre-staging"
-    end
-    private_class_method :action_description
-
     def self.stage_bundle(artifact, bundle_dir, bundle_hash, mode, cache_dir)
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       log_prefix = mode == :copy ? "Pre-seeded renderer cache" : "Pre-staged renderer cache"
@@ -185,11 +275,6 @@ module ReactOnRailsPro
       )
     end
     private_class_method :stage_bundle
-
-    def self.stage_file(src, dest, mode, log_prefix)
-      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix:)
-    end
-    private_class_method :stage_file
 
     def self.stage_assets(artifact, bundle_dir, mode, cache_dir)
       artifact.companions.each do |basename, source|
@@ -223,7 +308,7 @@ module ReactOnRailsPro
       end
 
       RendererCacheHelpers.write_content_atomically(body, snapshot.fetch(:path), log_prefix: nil)
-      stage_file(snapshot.fetch(:path), destination, :symlink, log_prefix)
+      RendererCacheHelpers.stage_file(snapshot.fetch(:path), destination, :symlink, log_prefix:)
     end
     private_class_method :stage_snapshot_body
 
@@ -238,7 +323,7 @@ module ReactOnRailsPro
     private_class_method :snapshot_path
 
     def self.snapshot_root(cache_dir)
-      cache = Pathname.new(cache_dir)
+      cache = Pathname.new(PreSeedRendererCacheFilesystem.canonical_cache_path(cache_dir))
       cache.dirname.join("#{cache.basename}.artifact-snapshots")
     end
     private_class_method :snapshot_root

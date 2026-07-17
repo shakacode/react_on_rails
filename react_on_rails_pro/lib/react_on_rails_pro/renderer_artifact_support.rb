@@ -141,7 +141,10 @@ module ReactOnRailsPro
       url_loader:,
       companion_bodies: nil
     )
-      return RendererArtifact.new(role:, bundle:, companions:, companion_bodies:) unless cache_helpers.http_url?(bundle)
+      unless cache_helpers.http_url?(bundle)
+        bundle_body = read_local_bundle_body(bundle, action_description)
+        return RendererArtifact.new(role:, bundle:, bundle_body:, companions:, companion_bodies:)
+      end
 
       unless Rails.env.development? || Rails.env.test?
         raise ReactOnRailsPro::Error,
@@ -158,6 +161,15 @@ module ReactOnRailsPro
       )
     end
     private_class_method :build_bundle_artifact
+
+    def read_local_bundle_body(bundle, action_description)
+      File.binread(bundle)
+    rescue Errno::ENOENT, Errno::ENOTDIR
+      raise ReactOnRailsPro::MissingRendererBundleError,
+            "Bundle not found at #{bundle}. " \
+            "Please build your bundles before #{action_description} the renderer cache."
+    end
+    private_class_method :read_local_bundle_body
 
     def stageable_mapping(cache_helpers, assets, required_paths, action_description, url_loader:)
       assets.each_with_object({}) do |asset_path, mapping|

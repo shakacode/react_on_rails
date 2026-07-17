@@ -280,7 +280,11 @@ module ReactOnRailsPro
           config = ReactOnRailsPro.configuration
           singular = config.rolling_deploy_previous_url
           raw = singular.to_s.strip.empty? ? config.rolling_deploy_previous_urls : singular
-          values = Array(raw).flat_map { |entry| entry.to_s.split(",") }.map(&:strip).reject(&:empty?)
+          values = Array(raw).flat_map do |entry|
+            entry.to_s.split(%r{,\s*(?=[a-z][a-z0-9+.-]*://)}i)
+          end
+                             .map(&:strip)
+                             .reject(&:empty?)
           mount_path = normalized_mount_path(config.rolling_deploy_mount_path)
 
           values.filter_map { |value| normalize_previous_url(value, mount_path:) }.uniq
@@ -306,7 +310,7 @@ module ReactOnRailsPro
 
           uri.path = path == "/" ? "" : path.chomp("/")
           uri.to_s
-        rescue URI::InvalidURIError => e
+        rescue URI::InvalidURIError, URI::InvalidComponentError => e
           warn_invalid_previous_url("is not a valid URI: #{e.message}")
         end
 
@@ -323,7 +327,7 @@ module ReactOnRailsPro
 
         def normalized_previous_path(value, mount_path:)
           path = collapse_repeated_slashes(value.to_s)
-          return path unless path.empty? || path == "/"
+          return path unless path.empty?
           return mount_path if mount_path
 
           warn_invalid_previous_url("is a bare origin but rolling_deploy_mount_path is blank")

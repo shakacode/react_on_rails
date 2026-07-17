@@ -468,7 +468,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       expect(adapter).to have_received(:upload)
         .with(
           server_artifact.id,
-          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          bundle: materialized_artifact_path("#{server_artifact.id}.js"),
           assets: []
         ).exactly(5).times
     end
@@ -480,7 +480,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       expect(adapter).to have_received(:upload).with(
         server_artifact.id,
-        bundle: materialized_artifact_path(File.basename(server_bundle)),
+        bundle: materialized_artifact_path("#{server_artifact.id}.js"),
         assets: []
       )
     end
@@ -507,7 +507,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       expect(adapter).to have_received(:upload).with(
         server_artifact.id,
-        bundle: materialized_artifact_path(File.basename(server_bundle)),
+        bundle: materialized_artifact_path("#{server_artifact.id}.js"),
         assets: []
       )
     end
@@ -538,7 +538,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
         .and_raise(Errno::ENOENT, "No such file")
 
       expect(adapter).not_to receive(:upload)
-      warning_pattern = /rolling_deploy_adapter publication failed: Errno::ENOENT: No such file/m
+      warning_pattern = /rolling_deploy_adapter publication failed: server bundle: Errno::ENOENT: No such file/m
       expect { described_class.send(:publish_current_bundle_if_configured) }.to output(warning_pattern).to_stderr
     end
 
@@ -590,12 +590,12 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
         expect(adapter).to have_received(:upload).with(
           server_artifact.id,
-          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          bundle: materialized_artifact_path("#{server_artifact.id}.js"),
           assets: []
         )
         expect(adapter).to have_received(:upload).with(
           rsc_artifact.id,
-          bundle: materialized_artifact_path(File.basename(rsc_bundle)),
+          bundle: materialized_artifact_path("#{rsc_artifact.id}.js"),
           assets: []
         )
       end
@@ -612,12 +612,44 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
         expect(adapter).to have_received(:upload).with(
           server_artifact.id,
-          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          bundle: materialized_artifact_path("#{server_artifact.id}.js"),
           assets: []
         )
         expect(adapter).to have_received(:upload).with(
           rsc_artifact.id,
-          bundle: materialized_artifact_path(File.basename(rsc_bundle)),
+          bundle: materialized_artifact_path("#{rsc_artifact.id}.js"),
+          assets: []
+        )
+      end
+
+      it "still publishes the server artifact when RSC artifact construction fails" do
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts) do |roles:, **|
+          raise ReactOnRailsPro::Error, "RSC artifact failed" if roles == [:rsc]
+
+          [server_artifact]
+        end
+
+        expect { described_class.send(:publish_current_bundle_if_configured) }
+          .to output(/publication failed: RSC bundle.*RSC artifact failed/).to_stderr
+        expect(adapter).to have_received(:upload).with(
+          server_artifact.id,
+          bundle: materialized_artifact_path("#{server_artifact.id}.js"),
+          assets: []
+        )
+      end
+
+      it "still publishes the RSC artifact when server artifact construction fails" do
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts) do |roles:, **|
+          raise ReactOnRailsPro::Error, "server artifact failed" if roles == [:server]
+
+          [rsc_artifact]
+        end
+
+        expect { described_class.send(:publish_current_bundle_if_configured) }
+          .to output(/publication failed: server bundle.*server artifact failed/).to_stderr
+        expect(adapter).to have_received(:upload).with(
+          rsc_artifact.id,
+          bundle: materialized_artifact_path("#{rsc_artifact.id}.js"),
           assets: []
         )
       end

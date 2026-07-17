@@ -42,6 +42,12 @@ describe ReactOnRailsPro::RollingDeploy::Tarball do
       .to equal(ReactOnRailsPro::RendererArtifact::SAFE_COMPANION_NAME_PATTERN)
   end
 
+  it "applies the tar header byte limit without narrowing the general renderer artifact contract" do
+    expect(ReactOnRailsPro::RendererArtifact.safe_companion_name?("é" * 51)).to be(true)
+    expect(described_class.safe_entry_name?("é" * 50)).to be(true)
+    expect(described_class.safe_entry_name?("é" * 51)).to be(false)
+  end
+
   it "round-trips safe flat basenames outside the legacy tar alphabet" do
     Dir.mktmpdir("ror-pro-tarball") do |directory|
       names = ["data@2x.json", "my data.json", "manifest%402x.json", "café.json", ".hidden.json", "-prefixed.json"]
@@ -90,6 +96,28 @@ describe ReactOnRailsPro::RollingDeploy::Tarball do
 
       expect { compose(invalid_name => source) }
         .to raise_error(ReactOnRailsPro::Error, /not valid UTF-8/)
+    end
+  end
+
+  it "rejects flat entry names over the tar header byte limit before invoking TarWriter" do
+    Dir.mktmpdir("ror-pro-tarball") do |directory|
+      source = File.join(directory, "source.json")
+      File.write(source, "payload")
+
+      expect { compose("é" * 51 => source) }
+        .to raise_error(ReactOnRailsPro::Error, /100 UTF-8 bytes/)
+    end
+  end
+
+  it "round-trips a flat entry name at the 100-byte tar header limit" do
+    Dir.mktmpdir("ror-pro-tarball") do |directory|
+      source = File.join(directory, "source.json")
+      File.write(source, "payload")
+      name = "é" * 50
+      destination = File.join(directory, "extracted")
+
+      expect(described_class.extract(compose(name => source), destination)).to eq([name])
+      expect(File.binread(File.join(destination, name))).to eq("payload")
     end
   end
 

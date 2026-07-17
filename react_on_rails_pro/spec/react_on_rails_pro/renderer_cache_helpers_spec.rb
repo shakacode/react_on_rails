@@ -170,6 +170,36 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       end.to raise_error(ReactOnRailsPro::MissingRendererBundleError, /missing-rsc\.js/)
     end
 
+    it "translates a bundle disappearing after path validation into MissingRendererBundleError" do
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([])
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
+      allow(File).to receive(:binread).and_wrap_original do |original, path|
+        FileUtils.rm_f(rsc_bundle) if path.to_s == rsc_bundle.to_s
+        original.call(path)
+      end
+
+      expect do
+        described_class.build_current_artifacts(action_description: "testing", roles: [:rsc])
+      end.to raise_error(
+        ReactOnRailsPro::MissingRendererBundleError,
+        /Bundle not found at .*rsc\.js.*build your bundles before testing the renderer cache/m
+      )
+    end
+
+    it "does not translate a companion disappearing after bundle capture into a missing bundle error" do
+      allow(config).to receive(:assets_to_copy).and_return([second_stats])
+      allow(File).to receive(:binread).and_wrap_original do |original, path|
+        body = original.call(path)
+        FileUtils.rm_f(second_stats) if path.to_s == server_bundle.to_s
+        body
+      end
+
+      expect do
+        described_class.build_current_artifacts(action_description: "testing", roles: [:server])
+      end.to raise_error(Errno::ENOENT, /loadable-stats\.json/)
+    end
+
     it "still requires RSC manifests when building an RSC artifact" do
       missing_manifest = directory.join("missing-react-client-manifest.json")
       allow(config).to receive(:enable_rsc_support).and_return(true)
