@@ -45,7 +45,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   makes an unusable inline (`data:`) source map terminal on the lazy lookup path instead of retried,
   matching registration-time behavior. Partially addresses
   [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
-  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
