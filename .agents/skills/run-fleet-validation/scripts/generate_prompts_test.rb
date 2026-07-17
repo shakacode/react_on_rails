@@ -211,6 +211,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_rejects_an_empty_stable_target_id
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      hard_gate = manifest.fetch("repos").find { |repo| repo["tier"] == "hard_gate" }
+      hard_gate["name"] = "!!!"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "target names must have non-empty stable IDs", error.message
+    end
+  end
+
   def test_pinned_release_ignores_newer_tracker_candidates
     pack = build_generator(release_selector: "v17.0.0.rc.12").render_pack
 

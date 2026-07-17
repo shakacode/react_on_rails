@@ -173,6 +173,8 @@ module FleetValidation
 
     def validate_target_ids!
       ids = @targets.map { |target| stable_target_id(target) }
+      raise ManifestError, "target names must have non-empty stable IDs" if ids.any?(&:empty?)
+
       duplicates = ids.tally.select { |_id, count| count > 1 }.keys
       return if duplicates.empty?
 
