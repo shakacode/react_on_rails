@@ -16,9 +16,18 @@
 import fs from 'node:fs';
 import readline from 'node:readline';
 
-const [inputPath, outputPath] = process.argv.slice(2);
+const [inputPath, outputPath, agentExitCodeArgument] = process.argv.slice(2);
 if (!inputPath || !outputPath) {
-  console.error('usage: normalize-claude-events.mjs INPUT OUTPUT');
+  console.error('usage: normalize-claude-events.mjs INPUT OUTPUT [AGENT_EXIT_CODE]');
+  process.exit(64);
+}
+const agentExitCode =
+  agentExitCodeArgument === undefined || agentExitCodeArgument === '' ? null : Number(agentExitCodeArgument);
+if (
+  agentExitCode !== null &&
+  (!Number.isInteger(agentExitCode) || agentExitCode < 0 || agentExitCode > 255)
+) {
+  console.error('AGENT_EXIT_CODE must be an integer from 0 through 255');
   process.exit(64);
 }
 
@@ -29,6 +38,19 @@ if (!inputPath || !outputPath) {
 const MAX_INPUT_BYTES = 64 * 1024 * 1024;
 const MAX_COMMANDS = 5000;
 const MAX_OUTPUT_BYTES = 16 * 1024;
+
+const inputSize = fs.statSync(inputPath).size;
+let inputEndsWithNewline = true;
+if (inputSize > 0) {
+  const inputFile = fs.openSync(inputPath, 'r');
+  try {
+    const finalByte = Buffer.alloc(1);
+    fs.readSync(inputFile, finalByte, 0, 1, inputSize - 1);
+    inputEndsWithNewline = finalByte[0] === 0x0a;
+  } finally {
+    fs.closeSync(inputFile);
+  }
+}
 
 const extractText = (content) => {
   if (typeof content === 'string') return content;
@@ -56,8 +78,9 @@ let commandCount = 0;
 let bytesRead = 0;
 let resultReport = null;
 let structuredOutputReport = null;
+let truncatedTimeoutTailSeen = false;
 
-const emitCommand = (command, isError, rawOutput) => {
+const emitCommand = (command, exitCode, rawOutput) => {
   if (commandCount >= MAX_COMMANDS) {
     throw new Error(`Claude transcript exceeds ${MAX_COMMANDS}-command normalization limit`);
   }
@@ -65,8 +88,8 @@ const emitCommand = (command, isError, rawOutput) => {
   const item = {
     type: 'command_execution',
     command,
-    exit_code: isError ? 1 : 0,
-    status: isError ? 'failed' : 'completed',
+    exit_code: exitCode,
+    status: exitCode === 0 ? 'completed' : 'failed',
     aggregated_output: truncateOutput(rawOutput),
   };
   output.write(`${JSON.stringify({ type: 'item.completed', item })}\n`);
@@ -82,10 +105,17 @@ for await (const line of rl) {
   }
   const trimmed = line.trim();
   if (!trimmed) continue;
+  if (truncatedTimeoutTailSeen) {
+    throw new Error('Claude stream-json transcript contains a malformed event');
+  }
   let event;
   try {
     event = JSON.parse(trimmed);
   } catch {
+    if (agentExitCode === 124 && !inputEndsWithNewline) {
+      truncatedTimeoutTailSeen = true;
+      continue;
+    }
     throw new Error('Claude stream-json transcript contains a malformed event');
   }
   if (event?.type === 'assistant') {
@@ -111,7 +141,7 @@ for await (const line of rl) {
         if (block?.type === 'tool_result' && pendingBash.has(block.tool_use_id)) {
           const command = pendingBash.get(block.tool_use_id);
           pendingBash.delete(block.tool_use_id);
-          emitCommand(command, block.is_error === true, extractText(block.content));
+          emitCommand(command, block.is_error === true ? 1 : 0, extractText(block.content));
         }
       }
     }
@@ -127,7 +157,10 @@ for await (const line of rl) {
 }
 
 if (pendingBash.size > 0) {
-  throw new Error('Claude transcript ended with incomplete Bash tool calls');
+  if (agentExitCode !== 124) {
+    throw new Error('Claude transcript ended with incomplete Bash tool calls');
+  }
+  for (const command of pendingBash.values()) emitCommand(command, 124, '');
 }
 
 // Prefer the canonical final `result` payload; fall back to the last

@@ -137,6 +137,12 @@ Claude's optional trailing newline is removed before scanning so the effective
 key is checked. Sensitive string leaves from Codex JSON authentication are
 checked separately from the complete JSON document.
 
+If timeout terminates Claude with a Bash call still pending, normalization
+records that call as failed with exit `124` and continues to the incomplete,
+checksummed run evidence. The same unmatched call remains fatal for every
+non-timeout exit. Only an unterminated final JSON fragment may be discarded on
+timeout; malformed complete events remain fatal even when the exit is `124`.
+
 Evidence parsing is bounded before JSON parsing or file reads. Event bytes and
 event count, visited/selected artifact counts, recursion depth, per-file bytes,
 and aggregate artifact bytes are recorded in evidence metadata. Any exceeded

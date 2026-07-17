@@ -19,7 +19,8 @@ native file-backed credential source:
 - Codex expects a complete `auth.json` JSON object.
 - Claude expects a single-line Anthropic API key. The broker removes one
   optional trailing newline before Claude `--bare` reads the effective bytes
-  through the private `apiKeyHelper` script.
+  through the private `apiKeyHelper` script. The private tmpfs remains
+  `noexec`; the reviewed setting invokes that script through `/bin/sh`.
 
 The agent CLI and its tools run under the same container UID. File-backed
 authentication therefore cannot be hidden from a malicious agent or tool while

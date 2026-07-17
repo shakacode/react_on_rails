@@ -182,7 +182,10 @@ if [[ "$auth_material_available" == true ]]; then
     chmod 600 "$brokered_credential"
     credential_helper="$private_dir/credential-helper"
     "$eval_dir/bin/build-claude-credential-helper" "$credential_helper"
-    jq -n --arg helper "$credential_helper" '{apiKeyHelper:$helper}' >"$claude_settings"
+    # TMPDIR expands only when Claude invokes the command under the stripped child environment.
+    # shellcheck disable=SC2016
+    credential_helper_command='/bin/sh "$TMPDIR/../credential-helper"'
+    jq -n --arg helper "$credential_helper_command" '{apiKeyHelper:$helper}' >"$claude_settings"
   fi
 else
   jq -n '{}' >"$claude_settings"
@@ -275,10 +278,12 @@ run_agent() {
 normalize_agent_events() {
   local raw_events="$1"
   local normalized_events="$2"
+  local agent_exit_code="$3"
   if [[ "$agent" == codex ]]; then
     cp "$raw_events" "$normalized_events"
   else
-    node "$eval_dir/bin/normalize-claude-events.mjs" "$raw_events" "$normalized_events"
+    node "$eval_dir/bin/normalize-claude-events.mjs" \
+      "$raw_events" "$normalized_events" "$agent_exit_code"
   fi
 }
 
@@ -316,7 +321,7 @@ run_agent "$eval_dir/network-probe-prompt.md" "$probe_timeout_seconds" \
   >"$raw_probe_events" 2>"$raw_probe_stderr"
 probe_exit=$?
 set -e
-normalize_agent_events "$raw_probe_events" "$normalized_probe_events"
+normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
   "$eval_dir/bin/assert-credential-absent" "$workspace" "$brokered_credential"
 fi
@@ -347,7 +352,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
   runner_exit=$?
   set -e
   [[ "$runner_exit" == 124 ]] && timed_out=true
-  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events"
+  normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
     "$eval_dir/bin/assert-credential-absent" "$workspace" "$brokered_credential"
   fi

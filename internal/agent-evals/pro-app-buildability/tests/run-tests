@@ -75,7 +75,9 @@ for newline_mode in newline no-newline; do
   test "$(wc -c <"$claude_credential" | tr -d ' ')" = 36
   test "$(cat "$claude_credential")" = 'synthetic-claude-key-effective-bytes'
   "$eval_dir/bin/build-claude-credential-helper" "$claude_helper_dir/credential-helper"
-  "$claude_helper_dir/credential-helper" >"$claude_helper_dir/helper-output"
+  mkdir "$claude_helper_dir/tmp"
+  TMPDIR="$claude_helper_dir/tmp" /bin/sh -c \
+    '/bin/sh "$TMPDIR/../credential-helper"' >"$claude_helper_dir/helper-output"
   cmp "$claude_credential" "$claude_helper_dir/helper-output"
   printf '%s' 'prefix:synthetic-claude-key-effective-bytes:suffix' \
     >"$tmp/credential-output/claude-$newline_mode.txt"
@@ -123,6 +125,20 @@ test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
   "$tmp/claude-events.normalized.jsonl")" = 'npm view create-react-on-rails-app version --json'
 test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
   "$tmp/claude-events.normalized.jsonl")" = passed
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"pending-tool","name":"Bash","input":{"command":"sleep 999"}}]}}' \
+  >"$tmp/pending-claude-events.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.rejected.jsonl" \
+  2>"$tmp/pending-claude-events-error"; then
+  echo "non-timeout Claude transcript accepted an incomplete Bash tool call" >&2
+  exit 1
+fi
+rg -q 'incomplete Bash tool calls' "$tmp/pending-claude-events-error"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/pending-claude-events.jsonl" "$tmp/pending-claude-events.timeout.jsonl" 124
+[[ "$(jq -r '.item | [.command,.exit_code,.status,.aggregated_output] | @tsv' \
+  "$tmp/pending-claude-events.timeout.jsonl")" == $'sleep 999\t124\tfailed\t' ]]
 printf '%s\n' 'not-json' >"$tmp/malformed-claude-events.jsonl"
 if node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-claude-events.normalized.jsonl" \
@@ -131,6 +147,18 @@ if node "$eval_dir/bin/normalize-claude-events.mjs" \
   exit 1
 fi
 rg -q 'malformed event' "$tmp/malformed-claude-events-error"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-timeout-claude-events.normalized.jsonl" 124 \
+  2>"$tmp/malformed-timeout-claude-events-error"; then
+  echo "timeout mode accepted a complete malformed Claude event" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-timeout-claude-events-error"
+printf '%s' '{"type":"assistant","message":' >"$tmp/truncated-timeout-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-timeout-claude-events.normalized.jsonl" 124
+test ! -s "$tmp/truncated-timeout-claude-events.normalized.jsonl"
 
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
@@ -363,6 +391,8 @@ rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
 rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
 rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
 rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
+rg -Fq "credential_helper_command='/bin/sh \"\$TMPDIR/../credential-helper\"'" \
+  "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
@@ -459,6 +489,8 @@ test ! -e "$(cat "$tmp/fake-docker-evidence")"
 test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+rg -Fxq -- '/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid='"$(id -u)"',gid='"$(id -g)" \
+  "$tmp/fake-docker-args"
 if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
   echo "wrapper exposed the host credential path to the container command" >&2
   exit 1
