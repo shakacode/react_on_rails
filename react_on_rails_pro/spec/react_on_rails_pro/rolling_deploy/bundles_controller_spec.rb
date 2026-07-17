@@ -125,6 +125,22 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
         hash_including(as: :react_on_rails_pro_rolling_deploy_bundle)
       )
     end
+
+    it "normalizes repeated trailing slashes on a non-root mount" do
+      path = +"/rolling///"
+
+      described_class.draw_routes(mapper, path:)
+
+      expect(mapper).to have_received(:get).with(
+        "/rolling/manifest",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_manifest)
+      )
+      expect(mapper).to have_received(:get).with(
+        "/rolling/bundles/:hash",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_bundle)
+      )
+      expect(path).to eq("/rolling///")
+    end
   end
 
   describe "#set_no_store_headers" do
