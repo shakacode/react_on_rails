@@ -27,14 +27,16 @@ module ReactOnRailsPro
   #
   # * `:copy` - copies bundle and assets. Designed for Docker image
   #   builds where the cache must be baked into an immutable artifact.
-  # * `:symlink` - creates relative symlinks. For same-filesystem workflows
-  #   (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
+  # * `:symlink` - creates relative symlinks to immutable per-ID snapshot
+  #   files. For same-filesystem workflows (local dev, CI, Heroku-style
+  #   same-dyno deploys, bundle-caching restores).
   #
   # Both modes produce the same on-disk cache layout, matching the renderer's
   # runtime contract. The 410->retry cold-start round-trip on first SSR request
   # is eliminated when the pre-seeded bundle is present at renderer startup.
   class PreSeedRendererCache
     VALID_MODES = %i[copy symlink].freeze
+    CACHE_MUTATION_LOCK_SUFFIX = ".preseed.lock"
 
     # `mode:` is required (no default) because the two modes have fundamentally
     # different semantics — `:copy` bakes immutable artifacts for Docker/image
@@ -50,22 +52,27 @@ module ReactOnRailsPro
 
       cache_dir = resolve_cache_dir(mode)
       puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: action_description(mode))
 
-      assets, rsc_required_paths = RendererCacheHelpers.collect_assets_with_required_paths
+      with_cache_mutation_lock(cache_dir) do
+        stage_artifacts(artifacts, cache_dir, mode)
+      end
+    end
 
+    def self.stage_artifacts(artifacts, cache_dir, mode)
       current_hashes = []
       # Block-level `rescue` (Ruby 2.5+): equivalent to wrapping the block body in
       # begin/rescue/end. RuboCop's Style/RedundantBegin enforces this form, so
       # callers reading the loop should treat the rescue clause below as the
       # iteration body's exception handler — not the surrounding method's.
-      RendererCacheHelpers.bundle_sources(pool, action_description(mode)).each do |src_bundle_path, bundle_hash|
-        bundle_dir = File.join(cache_dir, bundle_hash.to_s)
-        stage_bundle(src_bundle_path, bundle_dir, bundle_hash, mode)
+      artifacts.each do |artifact|
+        bundle_hash = artifact.id
+        bundle_dir = File.join(cache_dir, bundle_hash)
+        stage_bundle(artifact, bundle_dir, bundle_hash, mode, cache_dir)
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
-        stage_assets(assets, bundle_dir, rsc_required_paths, mode)
-        current_hashes << bundle_hash.to_s
+        stage_assets(artifact, bundle_dir, mode, cache_dir)
+        current_hashes << bundle_hash
       rescue StandardError => e
         # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
         # aborts before downstream steps assume the cache is complete. Earlier bundles that
@@ -80,7 +87,32 @@ module ReactOnRailsPro
       # Optionally seed previous deploys' bundle hashes for rolling-deploy safety.
       # No-op when neither config.rolling_deploy_adapter nor PREVIOUS_BUNDLE_HASHES is set.
       RollingDeployCacheStager.call(cache_dir:, current_hashes:, mode:)
+      prune_orphaned_artifact_snapshots(cache_dir)
     end
+    private_class_method :stage_artifacts
+
+    # Snapshot staging and orphan pruning must be one cross-process critical
+    # section. Otherwise one pre-seed can remove another pre-seed's newly
+    # written snapshot before its renderer-facing symlink exists. Keep the lock
+    # file outside both cache roots and never unlink it: removing it after
+    # unlock can split waiters and newcomers across different inodes.
+    def self.with_cache_mutation_lock(cache_dir)
+      lock_path = cache_mutation_lock_path(cache_dir)
+      FileUtils.mkdir_p(File.dirname(lock_path))
+      File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
+        lock.flock(File::LOCK_EX)
+        yield
+      ensure
+        lock.flock(File::LOCK_UN)
+      end
+    end
+    private_class_method :with_cache_mutation_lock
+
+    def self.cache_mutation_lock_path(cache_dir)
+      cache = Pathname.new(File.expand_path(cache_dir.to_s))
+      cache.dirname.join("#{cache.basename}#{CACHE_MUTATION_LOCK_SUFFIX}").to_s
+    end
+    private_class_method :cache_mutation_lock_path
 
     # Validates the cache-dir env var (raises in production-like copy mode when
     # unset) before resolving. See enforce_cache_dir_env_var! for the rationale.
@@ -134,10 +166,19 @@ module ReactOnRailsPro
     end
     private_class_method :action_description
 
-    def self.stage_bundle(src_path, bundle_dir, bundle_hash, mode)
+    def self.stage_bundle(artifact, bundle_dir, bundle_hash, mode, cache_dir)
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       log_prefix = mode == :copy ? "Pre-seeded renderer cache" : "Pre-staged renderer cache"
-      stage_file(src_path, dest_file, mode, log_prefix)
+      stage_snapshot_body(
+        artifact.bundle_body,
+        dest_file,
+        mode:,
+        log_prefix:,
+        snapshot: {
+          path: snapshot_path(cache_dir, artifact.id, "#{bundle_hash}.js"),
+          source_label: artifact.bundle
+        }
+      )
     end
     private_class_method :stage_bundle
 
@@ -146,16 +187,76 @@ module ReactOnRailsPro
     end
     private_class_method :stage_file
 
-    # RSC manifests are required when RSC is enabled; user-configured
-    # assets_to_copy are optional and only produce a warning.
-    def self.stage_assets(assets, bundle_dir, rsc_required_paths, mode)
-      action_desc = action_description(mode)
-      RendererCacheHelpers.each_stageable_asset(assets, rsc_required_paths, action_desc) do |expanded|
-        dest = File.join(bundle_dir, File.basename(expanded))
+    def self.stage_assets(artifact, bundle_dir, mode, cache_dir)
+      artifact.companions.each do |basename, source|
+        dest = File.join(bundle_dir, basename)
         log_prefix = mode == :copy ? "Copied asset" : "Symlinked asset"
-        stage_file(expanded, dest, mode, log_prefix)
+        source_label = source.is_a?(RendererArtifact::InlineCompanion) ? source.url : source
+        effective_prefix = source.is_a?(RendererArtifact::InlineCompanion) ? "Materialized URL asset" : log_prefix
+        stage_snapshot_body(
+          artifact.companion_bodies.fetch(basename),
+          dest,
+          mode:,
+          log_prefix: effective_prefix,
+          snapshot: {
+            path: snapshot_path(cache_dir, artifact.id, basename),
+            source_label:
+          }
+        )
       end
     end
     private_class_method :stage_assets
+
+    def self.stage_snapshot_body(body, destination, mode:, log_prefix:, snapshot:)
+      if mode == :copy
+        RendererCacheHelpers.write_content_atomically(
+          body,
+          destination,
+          log_prefix:,
+          source_label: snapshot.fetch(:source_label)
+        )
+        return
+      end
+
+      RendererCacheHelpers.write_content_atomically(body, snapshot.fetch(:path), log_prefix: nil)
+      stage_file(snapshot.fetch(:path), destination, :symlink, log_prefix)
+    end
+    private_class_method :stage_snapshot_body
+
+    # Symlink mode keeps the renderer-facing files as symlinks, but points them
+    # at immutable per-ID snapshots instead of mutable webpack outputs. The
+    # snapshot root is a sibling of the renderer cache so the Node renderer
+    # never mistakes it for a bundle-ID directory while relative links remain
+    # valid across process restarts on the same filesystem.
+    def self.snapshot_path(cache_dir, artifact_id, basename)
+      snapshot_root(cache_dir).join(artifact_id, basename).to_s
+    end
+    private_class_method :snapshot_path
+
+    def self.snapshot_root(cache_dir)
+      cache = Pathname.new(cache_dir)
+      cache.dirname.join("#{cache.basename}.artifact-snapshots")
+    end
+    private_class_method :snapshot_root
+
+    # Snapshot directories have the same lifetime as their renderer-facing
+    # cache entry. Removing an old cache ID makes its immutable symlink target
+    # eligible for cleanup on the next pre-seed, while active links remain
+    # valid across process restarts.
+    def self.prune_orphaned_artifact_snapshots(cache_dir)
+      root = snapshot_root(cache_dir)
+      return unless root.directory?
+
+      root.children.each do |snapshot_dir|
+        next if File.directory?(File.join(cache_dir, snapshot_dir.basename.to_s))
+
+        FileUtils.rm_rf(snapshot_dir)
+      end
+      FileUtils.rmdir(root) if root.children.empty?
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not prune orphaned renderer artifact snapshots in #{root}: " \
+           "#{e.class}: #{e.message}"
+    end
+    private_class_method :prune_orphaned_artifact_snapshots
   end
 end

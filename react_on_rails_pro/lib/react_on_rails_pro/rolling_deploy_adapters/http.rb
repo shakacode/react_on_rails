@@ -18,9 +18,11 @@ require "json"
 require "net/http"
 require "openssl"
 require "tempfile"
+require "timeout"
 require "uri"
 
 require "react_on_rails_pro/error"
+require "react_on_rails_pro/renderer_artifact"
 require "react_on_rails_pro/rolling_deploy/safe_hash_pattern"
 require "react_on_rails_pro/rolling_deploy/tarball"
 
@@ -58,6 +60,8 @@ module ReactOnRailsPro
       DEFAULT_READ_TIMEOUT_SECONDS = 25
       # Manifest discovery is wrapped in a 10s outer budget by RollingDeployCacheStager.
       MANIFEST_READ_TIMEOUT_SECONDS = 4
+      DISCOVERY_DEADLINE_SECONDS = 10
+      FETCH_DEADLINE_SECONDS = 30
 
       # Maximum uncompressed payload accepted from /bundles/:hash. Mirrors the
       # tarball helper default so a misbehaving or malicious server cannot
@@ -81,54 +85,44 @@ module ReactOnRailsPro
 
       class << self
         def previous_bundle_hashes
-          base = configured_previous_url
-          return [] if base.nil?
-
+          bases = configured_previous_urls
+          if bases.empty?
+            @discovery_provenance = nil
+            return []
+          end
           if token_missing?
-            return warn_and_return("rolling_deploy_token is not configured; skipping manifest fetch",
-                                   [])
+            @discovery_provenance = nil
+            return warn_and_return("rolling_deploy_token is not configured; skipping manifest fetch", [])
           end
 
-          response = http_get(
-            URI("#{base}/manifest"),
-            read_timeout: MANIFEST_READ_TIMEOUT_SECONDS
-          )
-          return warn_and_return("manifest returned HTTP #{response.code}", []) unless response.is_a?(Net::HTTPSuccess)
-
-          parsed = JSON.parse(response.body)
-          # Filter manifest hashes through SAFE_HASH_PATTERN before returning
-          # so server-supplied strings never appear verbatim in downstream
-          # warning logs. Each hash is re-validated inside `fetch`, so this is
-          # defense-in-depth — nothing unsafe could reach the filesystem layer
-          # — but it keeps log lines from a misbehaving or compromised server
-          # from echoing arbitrary content.
-          Array(parsed["hashes"])
-            .map(&:to_s)
-            .reject(&:empty?)
-            .grep(ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN)
+          provenance = discover_provenance(bases)
+          @discovery_provenance = provenance
+          provenance.keys.select { |hash| publishable_provenance?(hash, provenance.fetch(hash)) }
         rescue StandardError => e
+          @discovery_provenance = nil
           warn_and_return("previous_bundle_hashes failed: #{e.class}: #{e.message}", [])
         end
 
         def fetch(bundle_hash)
-          base = configured_previous_url
-          return nil if base.nil?
+          bases = configured_previous_urls
+          return nil if bases.empty?
           return nil if hash_invalid?(bundle_hash)
 
           if token_missing?
-            return warn_and_return("rolling_deploy_token is not configured; skipping fetch(#{bundle_hash.inspect})",
-                                   nil)
+            return warn_and_return(
+              "rolling_deploy_token is not configured; skipping fetch(#{bundle_hash.inspect})",
+              nil
+            )
           end
+
+          candidates = fetch_candidates(bundle_hash, bases)
+          return nil if candidates.empty?
 
           dir = bundle_dir(bundle_hash)
-          FileUtils.mkdir_p(dir)
+          result = fetch_from_candidates(bundle_hash, candidates, dir)
+          return result if result
 
-          result = download_bundle_tarball(base, bundle_hash) do |tarball|
-            extract_payload(tarball, dir, bundle_hash)
-          end
-          return cleanup_and_return(dir, nil) if result.nil?
-
-          result
+          cleanup_and_return(dir, nil)
         rescue StandardError => e
           cleanup_and_return(dir, nil) if dir
           warn_and_return("fetch(#{bundle_hash.inspect}) failed: #{e.class}: #{e.message}", nil)
@@ -144,24 +138,199 @@ module ReactOnRailsPro
 
         private
 
-        def configured_previous_url
-          url = ReactOnRailsPro.configuration.rolling_deploy_previous_url.to_s.strip
-          return nil if url.empty?
+        def discover_provenance(bases)
+          deadline = monotonic_now + DISCOVERY_DEADLINE_SECONDS
+          bases.each_with_object({}) do |base, provenance|
+            break provenance unless time_remaining?(deadline)
 
-          uri = URI.parse(url.chomp("/"))
-          unless %w[http https].include?(uri.scheme)
-            Rails.logger.warn(
-              "#{LOG_PREFIX} rolling_deploy_previous_url has unsupported scheme " \
-              "#{uri.scheme.inspect}; expected http or https. Skipping discovery."
-            )
-            return nil
+            manifest = fetch_manifest(base, deadline:)
+            next unless manifest
+
+            v2 = v2_manifest?(manifest)
+            safe_manifest_hashes(manifest).each do |hash|
+              (provenance[hash] ||= []) << { base:, v2: }
+            end
           end
+        end
+
+        def publishable_provenance?(hash, origins)
+          return true if origins.one?
+          return true if RendererArtifact.versioned_id?(hash) && origins.all? { |origin| origin[:v2] }
+
+          Rails.logger.warn(
+            "#{LOG_PREFIX} ambiguous legacy hash was advertised by multiple origins; " \
+            "omitting it because the payload identity cannot be proven."
+          )
+          false
+        end
+
+        def fetch_from_candidates(bundle_hash, candidates, dir)
+          deadline = monotonic_now + FETCH_DEADLINE_SECONDS
+          candidates.each do |candidate|
+            break unless time_remaining?(deadline)
+
+            FileUtils.rm_rf(dir)
+            FileUtils.mkdir_p(dir)
+            result = download_from_origin(candidate[:base], bundle_hash, dir:, deadline:)
+            next unless result
+            next unless acceptable_payload?(candidate, result, bundle_hash)
+
+            return result
+          end
+          nil
+        end
+
+        def acceptable_payload?(candidate, payload, bundle_hash)
+          return true unless candidate[:v2]
+          return true if payload_matches_v2_id?(payload, bundle_hash)
+
+          Rails.logger.warn(
+            "#{LOG_PREFIX} payload identity mismatch for a v2 artifact; rejecting this origin's response."
+          )
+          false
+        end
+
+        def fetch_candidates(bundle_hash, bases)
+          discovered = @discovery_provenance&.fetch(bundle_hash.to_s, nil)
+          if discovered
+            current = discovered.select { |origin| bases.include?(origin[:base]) }
+            return discovered_candidates(current) if current.any?
+          end
+          return direct_legacy_candidates(bases) unless RendererArtifact.versioned_id?(bundle_hash)
+
+          bases.map { |base| { base:, v2: true } }
+        end
+
+        def discovered_candidates(discovered)
+          return discovered unless discovered.many? && !discovered.all? { |origin| origin[:v2] }
+
+          warn_and_return("fetch rejected an ambiguous legacy hash advertised by multiple origins", [])
+        end
+
+        def direct_legacy_candidates(bases)
+          if bases.many?
+            return warn_and_return(
+              "direct fetch without manifest provenance requires exactly one configured origin",
+              []
+            )
+          end
+
+          [{ base: bases.first, v2: false }]
+        end
+
+        def download_from_origin(base, bundle_hash, dir:, deadline:)
+          download_bundle_tarball(base, bundle_hash, deadline:) do |tarball|
+            extract_payload(tarball, dir, bundle_hash)
+          end
+        end
+
+        def payload_matches_v2_id?(payload, expected_id)
+          role = RendererArtifact.role_from_id(expected_id)
+          return false unless role
+
+          companions = Array(payload[:assets]).each_with_object({}) do |path, mapping|
+            mapping[File.basename(path.to_s)] = path
+          end
+          RendererArtifact.new(role:, bundle: payload[:bundle], companions:).id == expected_id
+        rescue StandardError
+          false
+        end
+
+        def fetch_manifest(base, deadline:)
+          response = http_get(
+            URI("#{base}/manifest"),
+            read_timeout: MANIFEST_READ_TIMEOUT_SECONDS,
+            deadline:
+          )
+          return warn_and_return("manifest returned HTTP #{response.code}", nil) unless response.is_a?(Net::HTTPSuccess)
+
+          JSON.parse(response.body)
+        rescue StandardError => e
+          warn_and_return("manifest fetch failed: #{e.class}: #{e.message}", nil)
+        end
+
+        def safe_manifest_hashes(manifest)
+          Array(manifest["hashes"])
+            .map(&:to_s)
+            .reject(&:empty?)
+            .grep(ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN)
+        end
+
+        def v2_manifest?(manifest)
+          identity = manifest["artifact_identity"]
+          manifest["protocol_version"].to_i >= 2 &&
+            identity.is_a?(Hash) &&
+            identity["scheme"] == "rorp-v2-sha256" &&
+            identity["version"].to_i == 2
+        end
+
+        def monotonic_now
+          Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        end
+
+        def time_remaining?(deadline)
+          (deadline - monotonic_now).positive?
+        end
+
+        def configured_previous_url
+          configured_previous_urls.first
+        end
+
+        def configured_previous_urls
+          config = ReactOnRailsPro.configuration
+          singular = config.rolling_deploy_previous_url
+          raw = singular.to_s.strip.empty? ? config.rolling_deploy_previous_urls : singular
+          values = Array(raw).flat_map { |entry| entry.to_s.split(",") }.map(&:strip).reject(&:empty?)
+          mount_path = normalized_mount_path(config.rolling_deploy_mount_path)
+
+          values.filter_map { |value| normalize_previous_url(value, mount_path:) }.uniq
+        end
+
+        def normalized_mount_path(value)
+          path = value.to_s.strip
+          return nil if path.empty?
+
+          path = "/#{path}" unless path.start_with?("/")
+          path = path.chomp("/")
+          path.empty? ? "/" : path
+        end
+
+        def normalize_previous_url(value, mount_path:)
+          uri = URI.parse(value)
+          reason = invalid_previous_url_reason(uri)
+          return warn_invalid_previous_url(reason) if reason
+
+          path = normalized_previous_path(uri.path, mount_path:)
+          return nil unless path
+
+          uri.path = path == "/" ? path : path.chomp("/")
           uri.to_s
         rescue URI::InvalidURIError => e
-          Rails.logger.warn(
-            "#{LOG_PREFIX} rolling_deploy_previous_url is not a valid URI: #{e.message}. " \
-            "Skipping discovery."
-          )
+          warn_invalid_previous_url("is not a valid URI: #{e.message}")
+        end
+
+        def invalid_previous_url_reason(uri)
+          return "has unsupported scheme #{uri.scheme.inspect}; expected http or https" unless
+            %w[http https].include?(uri.scheme)
+          return "is missing a host" if uri.host.to_s.empty?
+          return "must not contain credentials" if uri.userinfo
+          return "must not contain a query" if uri.query
+          return "must not contain a fragment" if uri.fragment
+
+          nil
+        end
+
+        def normalized_previous_path(value, mount_path:)
+          path = value.to_s
+          return path unless path.empty? || path == "/"
+          return mount_path if mount_path
+
+          warn_invalid_previous_url("is a bare origin but rolling_deploy_mount_path is blank")
+          nil
+        end
+
+        def warn_invalid_previous_url(reason)
+          Rails.logger.warn("#{LOG_PREFIX} rolling-deploy previous URL #{reason}. Skipping this origin.")
           nil
         end
 
@@ -191,10 +360,10 @@ module ReactOnRailsPro
           Rails.root.join("tmp/rolling-deploy", bundle_hash.to_s)
         end
 
-        def download_bundle_tarball(base, bundle_hash)
+        def download_bundle_tarball(base, bundle_hash, deadline: nil)
           Tempfile.create(["rolling-deploy-download-", ".tar.gz"]) do |tmp|
             tmp.binmode
-            response = http_stream(URI("#{base}/bundles/#{bundle_hash}")) do |streaming_response|
+            response = http_stream(URI("#{base}/bundles/#{bundle_hash}"), deadline:) do |streaming_response|
               unless streaming_response.is_a?(Net::HTTPSuccess)
                 Rails.logger.warn(
                   "#{LOG_PREFIX} bundles/#{bundle_hash} returned HTTP #{streaming_response.code}; skipping this hash."
@@ -299,12 +468,29 @@ module ReactOnRailsPro
         # build (one /manifest plus one /bundles per previous hash), and
         # connection pooling would force us to manage lifecycle / cleanup
         # across threads.
-        def http_get(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS)
-          http_for(uri, read_timeout:).request(build_request(uri))
+        def http_get(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, deadline: nil)
+          with_deadline(deadline) do
+            http_for(uri, read_timeout:, deadline:).request(build_request(uri))
+          end
         end
 
-        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, &)
-          http_for(uri, read_timeout:).request(build_request(uri), &)
+        def http_stream(uri, read_timeout: DEFAULT_READ_TIMEOUT_SECONDS, deadline: nil, &)
+          with_deadline(deadline) do
+            http_for(uri, read_timeout:, deadline:).request(build_request(uri), &)
+          end
+        end
+
+        # Net::HTTP's read_timeout is an inactivity timeout and restarts for
+        # each read. Wrap the whole request (including streamed response-body
+        # processing) so a peer that sends one small chunk per timeout window
+        # cannot exceed the operation's monotonic wall-clock budget.
+        def with_deadline(deadline, &)
+          return yield unless deadline
+
+          remaining = deadline - monotonic_now
+          raise Timeout::Error, "rolling-deploy HTTP deadline expired" unless remaining.positive?
+
+          Timeout.timeout(remaining, Timeout::Error, "rolling-deploy HTTP deadline expired", &)
         end
 
         def build_request(uri)
@@ -315,13 +501,16 @@ module ReactOnRailsPro
           request
         end
 
-        def http_for(uri, read_timeout:)
+        def http_for(uri, read_timeout:, deadline: nil)
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = (uri.scheme == "https")
           warn_plain_http_token(uri) unless http.use_ssl?
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER if http.use_ssl?
-          http.open_timeout = DEFAULT_OPEN_TIMEOUT_SECONDS
-          http.read_timeout = read_timeout
+          remaining = deadline ? deadline - monotonic_now : nil
+          raise Timeout::Error, "rolling-deploy HTTP deadline expired" if remaining && remaining <= 0
+
+          http.open_timeout = remaining ? [DEFAULT_OPEN_TIMEOUT_SECONDS, remaining].min : DEFAULT_OPEN_TIMEOUT_SECONDS
+          http.read_timeout = remaining ? [read_timeout, remaining].min : read_timeout
           http
         end
 

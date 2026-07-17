@@ -118,15 +118,17 @@ module ReactOnRailsPro
       # bundle file.
       BUNDLE_ENTRY_NAME = "bundle.js"
 
-      PROTOCOL_VERSION = 1
+      PROTOCOL_VERSION = 2
+      ARTIFACT_IDENTITY = { scheme: "rorp-v2-sha256", version: 2 }.freeze
 
       def manifest
-        sources = safe_current_bundle_sources
+        artifacts = safe_current_artifacts
         render json: {
-          hashes: sources.map { |_, hash| hash },
+          hashes: artifacts.map(&:id),
           rsc_enabled: ReactOnRailsPro.configuration.enable_rsc_support,
           generated_at: Time.now.utc.iso8601,
-          protocol_version: PROTOCOL_VERSION
+          protocol_version: PROTOCOL_VERSION,
+          artifact_identity: ARTIFACT_IDENTITY
         }
       end
 
@@ -137,12 +139,10 @@ module ReactOnRailsPro
         # filesystem operation looks at it.
         return head(:not_found) unless SAFE_HASH_PATTERN.match?(hash)
 
-        sources = safe_current_bundle_sources
-        match = sources.find { |_, h| h == hash }
-        return head(:not_found) unless match
+        artifact = safe_current_artifacts.find { |candidate| candidate.id == hash }
+        return head(:not_found) unless artifact
 
-        bundle_path, _matched_hash = match
-        serve_bundle_tarball(bundle_path)
+        serve_bundle_tarball(artifact)
       end
 
       private
@@ -188,13 +188,7 @@ module ReactOnRailsPro
         response.headers["X-Content-Type-Options"] = "nosniff"
       end
 
-      # Wraps bundle_sources to absorb the "bundle file not present yet" case
-      # so the manifest endpoint can still 200 with an empty hashes list during
-      # the brief window after Rails boots but before assets:precompile has
-      # produced the bundle on this dyno. Returns `[]` rather than raising so
-      # the build-CI side sees "this server has nothing to seed" instead of a
-      # 500 that would otherwise show up as a noisy deploy alert.
-      def safe_current_bundle_sources
+      def safe_current_artifacts
         unless ReactOnRailsPro.configuration.node_renderer?
           Rails.logger.warn(
             "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
@@ -205,103 +199,70 @@ module ReactOnRailsPro
           return []
         end
 
-        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-        ReactOnRailsPro::RendererCacheHelpers.bundle_sources(pool, "serving rolling-deploy tarball")
+        artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "serving rolling-deploy tarball")
+        artifacts.select { |artifact| artifact_servable?(artifact) }
       rescue StandardError => e
         Rails.logger.warn(
           "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
-          "bundle source discovery failed: #{e.class}: #{e.message}. " \
+          "artifact discovery failed: #{e.class}: #{e.message}. " \
           "Returning empty manifest — verify bundles have been precompiled."
         )
         []
       end
 
-      def serve_bundle_tarball(bundle_path)
-        entries = tarball_entries(bundle_path)
-
-        ReactOnRailsPro::RollingDeploy::Tarball.compose_to_tempfile(entries) do |io|
-          # We've already buffered the tarball to a Tempfile inside
-          # compose_to_tempfile; send_data reads the contents once. For very
-          # large bundles a streaming send via ActionController::Live would
-          # save memory; that's deferred to a follow-up PR — the current
-          # default ceiling (200 MB) fits comfortably in memory on every
-          # Rails app instance we'd expect to deploy.
-          send_data io.read,
-                    type: "application/gzip",
-                    disposition: "inline",
-                    filename: "#{params[:hash]}.tar.gz"
+      def serve_bundle_tarball(artifact)
+        # artifact_servable? validates the original source provenance before
+        # this point. Materialize only the bytes captured by that validated
+        # artifact, then compose and consume the tarball before both bounded
+        # temp scopes close. Live webpack paths are never read under a stale ID.
+        artifact.with_materialized_files(bundle_name: BUNDLE_ENTRY_NAME) do |bundle, companions|
+          entries = { BUNDLE_ENTRY_NAME => bundle }.merge(companions)
+          ReactOnRailsPro::RollingDeploy::Tarball.compose_to_tempfile(entries) do |io|
+            # Identity correctness requires the operation-scoped artifact byte
+            # snapshots above. `send_data` adds one compressed response String;
+            # none of these bodies are memoized after this request. This is an
+            # explicit peak-memory tradeoff for a simple authenticated endpoint.
+            # Tarball::DEFAULT_MAX_SIZE is an extraction-side safety cap, not a
+            # compose-side memory limit; a future streaming response can lower
+            # peak memory without weakening the immutable-byte contract.
+            send_data io.read,
+                      type: "application/gzip",
+                      disposition: "inline",
+                      filename: "#{params[:hash]}.tar.gz"
+          end
         end
       end
 
-      # Pairs the bundle file (renamed to `bundle.js` on the wire) with the
-      # current build's companion assets. Each tarball carries the full
-      # companion set so the receiver can stage a complete cache entry without
-      # a second round-trip — matching the rolling_deploy_adapter contract
-      # that `fetch(hash)` returns bundle + assets together.
-      #
-      # Companions are skipped (with a warning) when they would shadow the
-      # bundle entry, collide with another companion's basename, or carry a
-      # name that the tarball helper would reject during compose. This
-      # matches the publish-side behavior in AssetsPrecompile where missing
-      # or unsafe assets degrade rather than fail the build.
-      def tarball_entries(bundle_path)
-        entries = { BUNDLE_ENTRY_NAME => bundle_path }
-        companion_assets.each do |asset_path|
-          name = File.basename(asset_path)
-          next if skip_companion?(name, asset_path, entries)
+      def artifact_servable?(artifact)
+        rails_root = File.realpath(File.expand_path(Rails.root.to_s))
+        if artifact.companions.key?(BUNDLE_ENTRY_NAME)
+          Rails.logger.warn(
+            "[ReactOnRailsPro::RollingDeploy::BundlesController] artifact #{artifact.id} cannot be served as a " \
+            "complete artifact because a companion collides with #{BUNDLE_ENTRY_NAME.inspect}."
+          )
+          return false
+        end
 
-          entries[name] = asset_path
+        sources = { BUNDLE_ENTRY_NAME => artifact.bundle }.merge(artifact.companions)
+        invalid = sources.find do |name, source|
+          source.is_a?(RendererArtifact::InlineCompanion) ||
+            !ReactOnRailsPro::RollingDeploy::Tarball::ENTRY_NAME_PATTERN.match?(name) ||
+            !safe_companion_asset_path(source.to_s, rails_root, rails_root)
         end
-        entries
-      end
+        return true unless invalid
 
-      def skip_companion?(name, asset_path, entries)
-        if name == BUNDLE_ENTRY_NAME
-          warn_companion_skipped(
-            "companion #{asset_path.inspect} basename collides with bundle entry #{BUNDLE_ENTRY_NAME.inspect}"
-          )
-          return true
-        end
-        unless ReactOnRailsPro::RollingDeploy::Tarball::ENTRY_NAME_PATTERN.match?(name)
-          warn_companion_skipped(
-            "companion #{asset_path.inspect} basename #{name.inspect} is not a safe tarball entry name"
-          )
-          return true
-        end
-        if entries.key?(name)
-          warn_companion_skipped(
-            "duplicate companion basename #{name.inspect}; " \
-            "keeping #{entries[name].inspect}, dropping #{asset_path.inspect}"
-          )
-          return true
-        end
+        name, source = invalid
+        Rails.logger.warn(
+          "[ReactOnRailsPro::RollingDeploy::BundlesController] artifact #{artifact.id} cannot be served as a " \
+          "complete artifact because #{name.inspect} resolves to unsupported source #{source_label(source)}."
+        )
         false
       end
 
-      def warn_companion_skipped(message)
-        Rails.logger.warn("[ReactOnRailsPro::RollingDeploy::BundlesController] #{message}.")
-      end
+      def source_label(source)
+        return "inline URL #{source.url.inspect}" if source.is_a?(RendererArtifact::InlineCompanion)
 
-      def companion_assets
-        rails_root = File.expand_path(Rails.root.to_s)
-        rails_root_realpath = File.realpath(rails_root)
-
-        # `collect_assets` returns the live build's loadable-stats + RSC
-        # manifests; missing assets are silently dropped to match the
-        # publish-side behavior in AssetsPrecompile.
-        ReactOnRailsPro::RendererCacheHelpers.collect_assets
-                                             .map(&:to_s)
-                                             .reject { |p| ReactOnRailsPro::RendererCacheHelpers.http_url?(p) }
-                                             .filter_map do |path|
-                                               safe_companion_asset_path(path, rails_root, rails_root_realpath)
-                                             end
-      rescue StandardError => e
-        Rails.logger.warn(
-          "[ReactOnRailsPro::RollingDeploy::BundlesController] " \
-          "companion asset discovery failed: #{e.class}: #{e.message}. " \
-          "Serving bundle without companion assets — RSC clients may fall back to runtime 410-retry."
-        )
-        []
+        source.to_s.inspect
       end
 
       def safe_companion_asset_path(path, rails_root, rails_root_realpath)

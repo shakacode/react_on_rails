@@ -83,6 +83,7 @@ module ReactOnRailsPro
               async_props_block:,
               pull_enabled:,
               push_props:,
+              is_rsc_payload:,
               rsc_stream_observability:
             )
           else
@@ -100,7 +101,12 @@ module ReactOnRailsPro
         def eval_js(js_code, render_options, send_bundle: false)
           path = prepare_render_path(js_code, render_options)
 
-          response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle)
+          response = ReactOnRailsPro::Request.render_code(
+            path,
+            js_code,
+            send_bundle,
+            bundle_role: bundle_role_for(render_options)
+          )
 
           case response.status
           when 200
@@ -144,6 +150,14 @@ module ReactOnRailsPro
         end
 
         private
+
+        def bundle_role_for(render_options)
+          if ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
+            :rsc
+          else
+            :server
+          end
+        end
 
         def build_render_path(js_code, render_options, endpoint)
           ReactOnRailsPro::ServerRenderingPool::ProRendering

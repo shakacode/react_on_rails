@@ -19,6 +19,109 @@ require_relative "../spec_helper"
 require "react_on_rails_pro/rolling_deploy_adapters/http"
 
 describe ReactOnRailsPro::RollingDeployAdapters::Http do
+  describe ".configured_previous_urls" do
+    let(:logger) { instance_double(Logger, warn: nil) }
+
+    before { allow(Rails).to receive(:logger).and_return(logger) }
+
+    it "normalizes plural arrays, inherits the mount for bare origins, preserves explicit paths, and deduplicates" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [
+          "https://first.example.com",
+          "https://second.example.com/custom/",
+          "https://first.example.com/"
+        ],
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy/"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq([
+                                                                      "https://first.example.com/react_on_rails_pro/rolling_deploy",
+                                                                      "https://second.example.com/custom"
+                                                                    ])
+    end
+
+    it "accepts a comma-delimited plural string" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: "https://first.example.com, https://second.example.com/path",
+        rolling_deploy_mount_path: "/rolling"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq([
+                                                                      "https://first.example.com/rolling",
+                                                                      "https://second.example.com/path"
+                                                                    ])
+    end
+
+    it "rejects unsafe URL components and a bare origin when the mount path is blank" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [
+          "https://user:pass@example.com/path",
+          "https://example.com/path?query=1",
+          "https://example.com/path#fragment",
+          "https:///missing-host",
+          "https://bare.example.com"
+        ],
+        rolling_deploy_mount_path: ""
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq([])
+      expect(logger).to have_received(:warn).at_least(:once)
+    end
+  end
+
+  describe ".previous_bundle_hashes with multiple origins" do
+    let(:first) { "https://first.example.com/rolling" }
+    let(:second) { "https://second.example.com/rolling" }
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [first, second],
+        rolling_deploy_mount_path: "/rolling",
+        rolling_deploy_token: "token"
+      )
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+    end
+
+    it "omits a duplicate legacy hash because its discovery provenance is ambiguous" do
+      first_manifest = { "hashes" => %w[legacy-shared legacy-first], "protocol_version" => 1 }
+      second_manifest = { "hashes" => %w[legacy-shared legacy-second] }
+      allow(described_class).to receive(:fetch_manifest).with(first, deadline: anything)
+                                                        .and_return(first_manifest)
+      allow(described_class).to receive(:fetch_manifest).with(second, deadline: anything)
+                                                        .and_return(second_manifest)
+
+      expect(described_class.previous_bundle_hashes).to contain_exactly("legacy-first", "legacy-second")
+      expect(Rails.logger).to have_received(:warn).with(/ambiguous legacy hash/)
+    end
+
+    it "retains a duplicate v2 ID because fetched bytes will be recomputed before first-hit acceptance" do
+      v2_id = "rorp-v2-s-#{'a' * 64}"
+      v2_manifest = {
+        "hashes" => [v2_id],
+        "protocol_version" => 2,
+        "artifact_identity" => { "scheme" => "rorp-v2-sha256", "version" => 2 }
+      }
+      allow(described_class).to receive(:fetch_manifest).with(first, deadline: anything).and_return(v2_manifest)
+      allow(described_class).to receive(:fetch_manifest).with(second, deadline: anything).and_return(v2_manifest)
+
+      expect(described_class.previous_bundle_hashes).to eq([v2_id])
+    end
+  end
+
   describe ".extract_payload" do
     it "returns every companion asset extracted from the tarball" do
       Dir.mktmpdir("ror-pro-http-source") do |source_dir|
@@ -55,6 +158,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       instance_double(
         ReactOnRailsPro::Configuration,
         rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
     end
@@ -144,11 +248,106 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     end
   end
 
+  describe ".fetch v2 identity verification" do
+    let(:first) { "https://first.example.com/rolling" }
+    let(:second) { "https://second.example.com/rolling" }
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [first, second],
+        rolling_deploy_mount_path: "/rolling",
+        rolling_deploy_token: "token"
+      )
+    end
+
+    let(:directory) { Dir.mktmpdir("ror-pro-v2-fetch") }
+
+    after do
+      FileUtils.rm_rf(directory)
+      described_class.instance_variable_set(:@discovery_provenance, nil)
+    end
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive_messages(root: Pathname.new(directory), logger: instance_double(Logger, warn: nil))
+    end
+
+    it "rejects a mismatched first origin and accepts the first payload whose bytes recompute to the v2 ID" do
+      good_bundle = File.join(directory, "good.js")
+      bad_bundle = File.join(directory, "bad.js")
+      manifest = File.join(directory, "manifest.json")
+      File.write(good_bundle, "good bundle")
+      File.write(bad_bundle, "bad bundle")
+      File.write(manifest, "{}")
+      expected = ReactOnRailsPro::RendererArtifact.new(
+        role: :server,
+        bundle: good_bundle,
+        companions: { "manifest.json" => manifest }
+      )
+      provenance = [
+        { base: first, v2: true },
+        { base: second, v2: true }
+      ]
+      described_class.instance_variable_set(:@discovery_provenance, { expected.id => provenance })
+      allow(described_class).to receive(:download_from_origin)
+        .with(first, expected.id, dir: anything, deadline: anything)
+        .and_return(bundle: bad_bundle, assets: [manifest])
+      allow(described_class).to receive(:download_from_origin)
+        .with(second, expected.id, dir: anything, deadline: anything)
+        .and_return(bundle: good_bundle, assets: [manifest])
+
+      result = described_class.fetch(expected.id)
+
+      expect(result[:bundle]).to eq(good_bundle)
+      expect(Rails.logger).to have_received(:warn).with(/payload identity mismatch/)
+    end
+
+    it "tries every configured origin for a direct v2 fetch and verifies each payload" do
+      good_bundle = File.join(directory, "direct-good.js")
+      bad_bundle = File.join(directory, "direct-bad.js")
+      File.write(good_bundle, "direct good bundle")
+      File.write(bad_bundle, "direct bad bundle")
+      expected = ReactOnRailsPro::RendererArtifact.new(role: :server, bundle: good_bundle, companions: {})
+
+      allow(described_class).to receive(:download_from_origin)
+        .with(first, expected.id, dir: anything, deadline: anything)
+        .and_return(bundle: bad_bundle, assets: [])
+      allow(described_class).to receive(:download_from_origin)
+        .with(second, expected.id, dir: anything, deadline: anything)
+        .and_return(bundle: good_bundle, assets: [])
+
+      result = described_class.fetch(expected.id)
+
+      expect(result[:bundle]).to eq(good_bundle)
+      expect(Rails.logger).to have_received(:warn).with(/payload identity mismatch/)
+    end
+
+    it "does not reuse discovery provenance from an origin that is no longer configured" do
+      v2_id = "rorp-v2-s-#{'a' * 64}"
+      described_class.instance_variable_set(
+        :@discovery_provenance,
+        { v2_id => [{ base: "https://removed.example.com/rolling", v2: true }] }
+      )
+
+      expect(described_class.send(:fetch_candidates, v2_id, [second]))
+        .to eq([{ base: second, v2: true }])
+    end
+
+    it "rejects a direct legacy fetch when more than one origin is configured" do
+      expect(described_class).not_to receive(:download_from_origin)
+
+      expect(described_class.fetch("legacy-hash")).to be_nil
+      expect(Rails.logger).to have_received(:warn).with(/requires exactly one configured origin/)
+    end
+  end
+
   describe ".http_get" do
     let(:config) do
       instance_double(
         ReactOnRailsPro::Configuration,
         rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
     end
@@ -221,6 +420,16 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
         .to have_received(:read_timeout=)
         .with(described_class::MANIFEST_READ_TIMEOUT_SECONDS)
     end
+
+    it "wraps the complete HTTP request in the remaining monotonic deadline" do
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+
+      expect(Timeout).to receive(:timeout)
+        .with(be_between(0, 5), Timeout::Error, "rolling-deploy HTTP deadline expired")
+        .and_yield
+
+      described_class.send(:http_get, URI("https://example.com/manifest"), deadline:)
+    end
   end
 
   describe "previous_url scheme validation" do
@@ -228,6 +437,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       instance_double(
         ReactOnRailsPro::Configuration,
         rolling_deploy_previous_url: previous_url,
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
     end
@@ -265,6 +475,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       instance_double(
         ReactOnRailsPro::Configuration,
         rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: "token"
       )
     end
@@ -294,6 +505,7 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
       instance_double(
         ReactOnRailsPro::Configuration,
         rolling_deploy_previous_url: "https://example.com",
+        rolling_deploy_mount_path: "/react_on_rails_pro/rolling_deploy",
         rolling_deploy_token: ""
       )
     end

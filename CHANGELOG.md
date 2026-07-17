@@ -77,6 +77,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
   [justin808](https://github.com/justin808).
 
+- **[Pro]** **Made Node renderer cache identities cover complete artifacts and hardened multi-origin rolling deploys**:
+  Renderer IDs now bind the server/RSC role, bundle bytes, and the final companion-file names and bytes, so
+  manifest-only and `loadable-stats.json` changes invalidate fragment, upload, pre-seed, and runtime caches together.
+  The built-in HTTP adapter accepts ordered plural previous URLs, normalizes bare origins through the configured mount,
+  preserves explicit paths, rejects ambiguous legacy hashes across origins, verifies every v2 payload before staging,
+  and enforces monotonic operation deadlines. Fixes
+  [Issue 4620](https://github.com/shakacode/react_on_rails/issues/4620).
+
 - **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
   whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is
   not a hard memory bound: a map that grows between the size check and the read is still read in full).

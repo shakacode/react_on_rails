@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 require "react_on_rails_pro/renderer_cache_path"
+require "react_on_rails_pro/renderer_cache_helpers"
 
 module ReactOnRailsPro
   module Utils
@@ -91,28 +92,37 @@ module ReactOnRailsPro
       digest
     end
 
-    # Returns a string which should be used as a component in any cache key for
-    # react_component or react_component_hash when server rendering. This value is either
-    # the server bundle filename with the hash from webpack or an MD5 digest of the
-    # entire bundle.
+    # Returns a versioned ID for the complete renderer artifact: bundle bytes,
+    # artifact role, and the final flat companion-file mapping. Keep the legacy
+    # method names because they are part of the Ruby/Node wire contract; the
+    # values remain opaque safe directory names to the Node renderer.
     def self.bundle_hash
-      return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
+      return @bundle_hash if @bundle_hash && memoize_artifact_ids?
 
-      server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
-
-      return @bundle_hash if @bundle_hash && bundle_mtime_same?(server_bundle_js_file_path)
-
-      @bundle_hash = calc_bundle_hash(server_bundle_js_file_path)
+      refresh_artifact_ids.fetch(:server)
     end
 
     def self.rsc_bundle_hash
-      return @rsc_bundle_hash if @rsc_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+      return @rsc_bundle_hash if @rsc_bundle_hash && memoize_artifact_ids?
 
-      server_rsc_bundle_js_file_path = rsc_bundle_js_file_path
+      refresh_artifact_ids.fetch(:rsc) do
+        raise ReactOnRailsPro::Error, "No current renderer artifact is configured for role :rsc"
+      end
+    end
 
-      return @rsc_bundle_hash if @rsc_bundle_hash && bundle_mtime_same?(server_rsc_bundle_js_file_path)
+    def self.renderer_artifacts(action_description: "computing current artifact identity")
+      RendererCacheHelpers.build_current_artifacts(action_description:)
+    end
 
-      @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path)
+    def self.refresh_artifact_ids
+      ids = renderer_artifacts.to_h { |artifact| [artifact.role, artifact.id] }
+      @bundle_hash = ids[:server]
+      @rsc_bundle_hash = ids[:rsc]
+      ids
+    end
+
+    def self.memoize_artifact_ids?
+      !Rails.env.development? && !Rails.env.test?
     end
 
     # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.
@@ -171,10 +181,15 @@ module ReactOnRailsPro
       result
     end
 
-    def self.common_form_data
+    def self.common_form_data(artifacts: nil)
       dependencies = if ReactOnRailsPro.configuration.enable_rsc_support
-                       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-                       [pool.rsc_bundle_hash, pool.server_bundle_hash]
+                       if artifacts
+                         ids_by_role = artifacts.to_h { |artifact| [artifact.role, artifact.id] }
+                         [ids_by_role.fetch(:rsc), ids_by_role.fetch(:server)]
+                       else
+                         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+                         [pool.rsc_bundle_hash, pool.server_bundle_hash]
+                       end
                      end
 
       {

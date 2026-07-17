@@ -18,6 +18,25 @@ require_relative "../spec_helper"
 require_relative "../../../app/controllers/react_on_rails_pro/rolling_deploy/bundles_controller"
 
 describe ReactOnRailsPro::RollingDeploy::BundlesController do
+  describe "#manifest" do
+    let(:controller) { described_class.new }
+    let(:artifact) { instance_double(ReactOnRailsPro::RendererArtifact, id: "rorp-v2-s-#{'a' * 64}") }
+
+    it "advertises protocol v2 and the artifact identity scheme while retaining hashes" do
+      allow(controller).to receive(:safe_current_artifacts).and_return([artifact])
+      allow(controller).to receive(:render)
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+
+      controller.manifest
+
+      expect(controller).to have_received(:render).with(json: hash_including(
+        hashes: [artifact.id],
+        protocol_version: 2,
+        artifact_identity: { scheme: "rorp-v2-sha256", version: 2 }
+      ))
+    end
+  end
+
   describe ".forgery protection" do
     # Regression guard: CodeQL flags both `protect_from_forgery with:
     # :null_session` (weakened) and the absence of `protect_from_forgery`
@@ -95,27 +114,6 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
-  describe "#companion_assets" do
-    it "rejects absolute companion asset paths outside Rails.root" do
-      Dir.mktmpdir("ror-pro-rails-root") do |rails_root|
-        Dir.mktmpdir("ror-pro-outside-root") do |outside_root|
-          inside_asset = File.join(rails_root, "public", "webpack", "loadable-stats.json")
-          outside_asset = File.join(outside_root, "secret.json")
-          FileUtils.mkdir_p(File.dirname(inside_asset))
-          File.write(inside_asset, "{}")
-          File.write(outside_asset, "{}")
-
-          allow(Rails).to receive(:root).and_return(Pathname.new(rails_root))
-          allow(ReactOnRailsPro::RendererCacheHelpers)
-            .to receive(:collect_assets)
-            .and_return([inside_asset, outside_asset])
-
-          expect(described_class.new.send(:companion_assets)).to contain_exactly(inside_asset)
-        end
-      end
-    end
-  end
-
   describe "#set_no_store_headers" do
     it "sets no-store and content-sniffing guard headers" do
       controller = described_class.new
@@ -133,63 +131,33 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
-  describe "#tarball_entries" do
+  describe "#serve_bundle_tarball" do
     let(:controller) { described_class.new }
 
-    before do
-      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
-    end
+    it "serves the artifact snapshot bytes when live sources mutate afterward" do
+      Dir.mktmpdir("ror-pro-controller-snapshot") do |directory|
+        bundle = File.join(directory, "server.js")
+        manifest = File.join(directory, "manifest.json")
+        File.binwrite(bundle, "identified bundle")
+        File.binwrite(manifest, "identified manifest")
+        artifact = ReactOnRailsPro::RendererArtifact.new(
+          role: :server,
+          bundle:,
+          companions: { "manifest.json" => manifest }
+        )
+        File.binwrite(bundle, "later bundle")
+        File.binwrite(manifest, "later manifest")
+        response_body = nil
+        allow(controller).to receive(:params).and_return(hash: artifact.id)
+        allow(controller).to receive(:send_data) { |body, **| response_body = body }
 
-    it "keeps the bundle when no companions are present" do
-      allow(controller).to receive(:companion_assets).and_return([])
+        controller.send(:serve_bundle_tarball, artifact)
 
-      expect(controller.send(:tarball_entries, "/srv/bundle-hash.js"))
-        .to eq("bundle.js" => "/srv/bundle-hash.js")
-    end
-
-    it "skips a companion whose basename collides with the bundle entry" do
-      allow(controller).to receive(:companion_assets).and_return([
-                                                                   "/srv/other/bundle.js",
-                                                                   "/srv/loadable-stats.json"
-                                                                 ])
-
-      entries = controller.send(:tarball_entries, "/srv/server-hash.js")
-
-      expect(entries).to eq(
-        "bundle.js" => "/srv/server-hash.js",
-        "loadable-stats.json" => "/srv/loadable-stats.json"
-      )
-      expect(Rails.logger).to have_received(:warn).with(/basename collides with bundle entry/)
-    end
-
-    it "skips duplicate companion basenames and keeps the first" do
-      allow(controller).to receive(:companion_assets).and_return([
-                                                                   "/srv/a/manifest.json",
-                                                                   "/srv/b/manifest.json"
-                                                                 ])
-
-      entries = controller.send(:tarball_entries, "/srv/bundle.js")
-
-      expect(entries).to eq(
-        "bundle.js" => "/srv/bundle.js",
-        "manifest.json" => "/srv/a/manifest.json"
-      )
-      expect(Rails.logger).to have_received(:warn).with(/duplicate companion basename/)
-    end
-
-    it "skips companions whose basename is not a safe tarball entry name" do
-      allow(controller).to receive(:companion_assets).and_return([
-                                                                   "/srv/.hidden.json",
-                                                                   "/srv/loadable-stats.json"
-                                                                 ])
-
-      entries = controller.send(:tarball_entries, "/srv/bundle.js")
-
-      expect(entries).to eq(
-        "bundle.js" => "/srv/bundle.js",
-        "loadable-stats.json" => "/srv/loadable-stats.json"
-      )
-      expect(Rails.logger).to have_received(:warn).with(/is not a safe tarball entry name/)
+        extracted = File.join(directory, "extracted")
+        ReactOnRailsPro::RollingDeploy::Tarball.extract(response_body, extracted)
+        expect(File.binread(File.join(extracted, "bundle.js"))).to eq("identified bundle")
+        expect(File.binread(File.join(extracted, "manifest.json"))).to eq("identified manifest")
+      end
     end
   end
 
@@ -277,34 +245,57 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
     end
   end
 
-  describe "#safe_current_bundle_sources" do
+  describe "#safe_current_artifacts" do
     let(:controller) { described_class.new }
-    let(:pool) { class_double(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool) }
 
-    before do
-      stub_const("ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool", pool)
-      allow(ReactOnRailsPro).to receive(:configuration).and_return(
-        instance_double(ReactOnRailsPro::Configuration, node_renderer?: true)
-      )
-      allow(Rails).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+    it "omits an artifact when a companion resolves outside Rails.root" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        Dir.mktmpdir("ror-pro-outside") do |outside|
+          bundle = File.join(root, "server.js")
+          companion = File.join(outside, "manifest.json")
+          File.write(bundle, "bundle")
+          File.write(companion, "{}")
+          artifact = ReactOnRailsPro::RendererArtifact.new(
+            role: :server,
+            bundle:,
+            companions: { "manifest.json" => companion }
+          )
+          allow(Rails).to receive_messages(root: Pathname.new(root), logger: instance_double(Logger, warn: nil))
+          allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+
+          expect(controller.send(:safe_current_artifacts)).to eq([])
+          expect(Rails.logger).to have_received(:warn).with(/cannot be served as a complete artifact/)
+        end
+      end
     end
 
-    it "returns an empty array when bundle_sources raises a non-ReactOnRailsPro error" do
-      allow(ReactOnRailsPro::RendererCacheHelpers)
-        .to receive(:bundle_sources)
-        .and_raise(NoMethodError, "undefined method `bundle_hash' for nil:NilClass")
+    it "does not include inline companion bodies in invalid-source warnings" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        root = File.realpath(root)
+        bundle = File.join(root, "server.js")
+        File.write(bundle, "bundle")
+        sentinel = "private-inline-companion-body"
+        inline = ReactOnRailsPro::RendererArtifact::InlineCompanion.new(
+          url: "http://localhost:3035/manifest.json",
+          body: sentinel
+        )
+        artifact = ReactOnRailsPro::RendererArtifact.new(
+          role: :server,
+          bundle:,
+          companions: { "manifest.json" => inline }
+        )
+        logger = instance_double(Logger, warn: nil)
+        allow(Rails).to receive_messages(root: Pathname.new(root), logger:)
+        allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
 
-      expect(controller.send(:safe_current_bundle_sources)).to eq([])
-      expect(Rails.logger).to have_received(:warn).with(/bundle source discovery failed/)
-    end
-
-    it "warns and returns [] when node_renderer? is false so operators see the misconfiguration" do
-      allow(ReactOnRailsPro).to receive(:configuration).and_return(
-        instance_double(ReactOnRailsPro::Configuration, node_renderer?: false)
-      )
-
-      expect(controller.send(:safe_current_bundle_sources)).to eq([])
-      expect(Rails.logger).to have_received(:warn).with(/node_renderer\? is false/)
+        expect(controller.send(:safe_current_artifacts)).to eq([])
+        safe_warning = satisfy("includes the URL without the inline body") do |message|
+          message.include?(inline.url) && !message.include?(sentinel)
+        end
+        expect(logger).to have_received(:warn).with(safe_warning)
+      end
     end
   end
 end

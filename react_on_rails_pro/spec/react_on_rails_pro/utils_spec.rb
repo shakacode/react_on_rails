@@ -49,71 +49,37 @@ module ReactOnRailsPro
         end
 
         describe ".bundle_hash" do
-          context "with server bundle with hash in webpack output filename" do
-            it "returns path for server bundle file name" do
-              server_bundle_js_file = "/webpack/production/webpack-bundle-0123456789abcdef.js"
-              server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
-              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
-                .and_return(server_bundle_js_file)
-              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
-                .and_return(server_bundle_js_file_path)
-              allow(ReactOnRails.configuration)
-                .to receive_messages(server_bundle_js_file: "webpack-bundle.js",
-                                     rsc_bundle_js_file: "rsc-webpack-bundle.js")
-              allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(123)
+          let(:server_artifact) { instance_double(RendererArtifact, role: :server, id: "rorp-v2-s-#{'a' * 64}") }
+          let(:rsc_artifact) { instance_double(RendererArtifact, role: :rsc, id: "rorp-v2-r-#{'b' * 64}") }
 
-              result = described_class.bundle_hash
-
-              expect(result).to eq("webpack-bundle-0123456789abcdef.js")
-            end
+          before do
+            described_class.instance_variable_set(:@bundle_hash, nil)
+            described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+            allow(RendererCacheHelpers).to receive(:build_current_artifacts)
+              .and_return([server_artifact, rsc_artifact])
           end
 
-          context "with server bundle without hash in webpack output filename" do
-            it "returns MD5 hash plus environment string for server bundle file name" do
-              server_bundle_js_file = "webpack/production/webpack-bundle.js"
-              server_bundle_js_file_path = File.expand_path("./public/#{server_bundle_js_file}")
-              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
-                .and_return(server_bundle_js_file)
-              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
-                .and_return(server_bundle_js_file_path)
-              allow(ReactOnRails.configuration)
-                .to receive(:server_bundle_js_file).and_return("webpack-bundle.js")
-              allow(Digest::MD5).to receive(:file)
-                .with(server_bundle_js_file_path)
-                .and_return("foobarfoobar")
-              allow(File).to receive(:mtime).with(server_bundle_js_file_path).and_return(345)
-
-              result = described_class.bundle_hash
-
-              expect(result).to eq("foobarfoobar-development")
-            end
+          after do
+            described_class.instance_variable_set(:@bundle_hash, nil)
+            described_class.instance_variable_set(:@rsc_bundle_hash, nil)
           end
 
-          context "with rsc bundle without hash in webpack output filename" do
-            it "returns MD5 for rsc bundle file name" do
-              rsc_bundle_js_file = "webpack/production/rsc-webpack-bundle.js"
-              rsc_bundle_js_file_path = File.expand_path("./public/#{rsc_bundle_js_file}")
-              allow(Shakapacker).to receive_message_chain("manifest.lookup!")
-                .and_return(rsc_bundle_js_file)
-              allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path)
-                .and_return(rsc_bundle_js_file_path.gsub("rsc-", ""))
-              allow(described_class).to receive(:rsc_bundle_js_file_path)
-                .and_return(rsc_bundle_js_file_path)
-              allow(ReactOnRails.configuration)
-                .to receive(:server_bundle_js_file)
-                .and_return("webpack-bundle.js")
-              allow(ReactOnRailsPro.configuration)
-                .to receive(:rsc_bundle_js_file)
-                .and_return("rsc-webpack-bundle.js")
-              allow(Digest::MD5).to receive(:file)
-                .with(rsc_bundle_js_file_path)
-                .and_return("barfoobarfoo")
-              allow(File).to receive(:mtime).with(rsc_bundle_js_file_path).and_return(345)
+          it "preserves the public hash methods while returning composite artifact IDs" do
+            expect(described_class.bundle_hash).to eq(server_artifact.id)
+            expect(described_class.rsc_bundle_hash).to eq(rsc_artifact.id)
+          end
 
-              result = described_class.rsc_bundle_hash
+          it "memoizes only ID strings in production instead of retaining artifact bodies" do
+            allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
 
-              expect(result).to eq("barfoobarfoo-development")
+            2.times do
+              expect(described_class.bundle_hash).to eq(server_artifact.id)
+              expect(described_class.rsc_bundle_hash).to eq(rsc_artifact.id)
             end
+
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts).once
+            expect(described_class.instance_variable_get(:@bundle_hash)).to be_a(String)
+            expect(described_class.instance_variable_get(:@rsc_bundle_hash)).to be_a(String)
           end
         end
       end

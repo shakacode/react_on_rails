@@ -86,10 +86,14 @@ module ReactOnRailsPro
         end
       end
 
-      def render_code(path, js_code, send_bundle)
+      def render_code(path, js_code, send_bundle, bundle_role: :server)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request #{path}" }
-        form = form_with_code(js_code, send_bundle)
-        perform_request(path, form:)
+        artifacts = if send_bundle
+                      ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+                    end
+        request_path = send_bundle ? retarget_render_path(path, artifacts, bundle_role) : path
+        form = form_with_code(js_code, send_bundle, artifacts:)
+        perform_request(request_path, form:)
       end
 
       def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false)
@@ -102,14 +106,12 @@ module ReactOnRailsPro
         end
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        bundle_role = is_rsc_payload ? :rsc : :server
         ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _tasks|
-          if send_bundle
-            Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
-            upload_assets
-          end
+          request_path, artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:)
 
-          form = form_with_code(js_code, false, rsc_stream_observability:)
-          perform_request(path, form:, stream: true)
+          form = form_with_code(js_code, false, artifacts:, rsc_stream_observability:)
+          perform_request(request_path, form:, stream: true)
         end
       end
 
@@ -145,6 +147,7 @@ module ReactOnRailsPro
         async_props_block:,
         pull_enabled: false,
         push_props: nil,
+        is_rsc_payload: false,
         rsc_stream_observability: false
       )
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
@@ -155,29 +158,28 @@ module ReactOnRailsPro
         end
 
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
+        bundle_role = is_rsc_payload ? :rsc : :server
         ReactOnRailsPro::StreamRequest.create(
           first_chunk_warn_callback: warn_cb,
           pull_enabled:
         ) do |send_bundle, tasks|
-          if send_bundle
-            Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
-            upload_assets
-          end
+          request_path, artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:)
 
           # Open a bidirectional HTTP/2 stream using async-http's Writable body.
           # output supports << (alias for write) and close (sends END_STREAM).
           output, response = connection.post_bidi(
-            path,
+            request_path,
             headers: [["content-type", "application/x-ndjson"]]
           )
 
+          rsc_artifact = artifact_for_role(artifacts, :rsc)
           emitter = ReactOnRailsPro::AsyncPropsEmitter.new(
-            pool.rsc_bundle_hash,
+            rsc_artifact&.id || pool.rsc_bundle_hash,
             output,
             pull_enabled:
           )
           initial_data = build_initial_incremental_request(
-            js_code, emitter, pull_enabled:, push_props:, rsc_stream_observability:
+            js_code, emitter, artifacts:, pull_enabled:, push_props:, rsc_stream_observability:
           )
 
           # Send the initial render request as first NDJSON line
@@ -197,35 +199,16 @@ module ReactOnRailsPro
         end
       end
 
-      def upload_assets
+      def upload_assets(artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
+        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading assets")
+        target_bundles = artifacts.map(&:id)
 
-        # Early checks with descriptive messages. add_bundle_to_form(check_bundle: true) also
-        # validates existence, but these provide clearer context for the rake task user.
-        server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
-        unless File.exist?(server_bundle_path)
-          raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
-                                        "Please build your bundles before uploading assets."
-        end
-
-        # Create a list of bundle timestamps to send to the node renderer
-        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-        target_bundles = [pool.server_bundle_hash]
-
-        # Add RSC bundle if enabled
-        if ReactOnRailsPro.configuration.enable_rsc_support
-          rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-          unless File.exist?(rsc_bundle_path)
-            raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
-                                          "Please build your bundles before uploading assets."
-          end
-          target_bundles << pool.rsc_bundle_hash
-        end
-
-        assets_to_copy = assets_to_copy_for_upload
-
-        with_asset_upload_single_flight(upload_assets_single_flight_key(target_bundles, assets_to_copy)) do
-          form = form_with_assets_and_bundle(assets_to_copy:)
+        # Artifact IDs already bind every bundle and companion byte. Keying the
+        # single-flight upload by those IDs avoids re-reading live paths after
+        # the operation-scoped snapshot was constructed.
+        with_asset_upload_single_flight(upload_assets_single_flight_key(target_bundles, [])) do
+          form = form_with_assets_and_bundle(artifacts:)
           # TODO: targetBundles is only kept for backward compatibility with older node renderers
           # (protocol 2.0.0) that require it. The new node renderer derives target directories from
           # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
@@ -332,103 +315,121 @@ module ReactOnRailsPro
                           "expected at most #{warn_timeout}."
       end
 
-      def form_with_code(js_code, send_bundle, rsc_stream_observability: false)
-        form = common_form_data
+      def form_with_code(js_code, send_bundle, artifacts: nil, rsc_stream_observability: false)
+        artifacts ||= if send_bundle
+                        ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+                      end
+        form = common_form_data(artifacts:)
         form["renderingRequest"] = js_code
         form["rscStreamObservability"] = true if rsc_stream_observability
-        populate_form_with_bundle_and_assets(form, check_bundle: false) if send_bundle
+        populate_form_with_bundle_and_assets(form, check_bundle: false, artifacts:) if send_bundle
         form
       end
 
-      def populate_form_with_bundle_and_assets(form, check_bundle:, assets_to_copy: assets_to_copy_for_upload)
-        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-
-        add_bundle_to_form(
-          form,
-          bundle_path: ReactOnRails::Utils.server_bundle_js_file_path,
-          bundle_file_name: pool.renderer_bundle_file_name,
-          bundle_hash: pool.server_bundle_hash,
-          check_bundle:
-        )
-
-        if ReactOnRailsPro.configuration.enable_rsc_support
+      def populate_form_with_bundle_and_assets(form, check_bundle:, artifacts: nil, assets_to_copy: nil)
+        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "building renderer upload")
+        artifacts.each do |artifact|
           add_bundle_to_form(
             form,
-            bundle_path: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
-            bundle_file_name: pool.rsc_renderer_bundle_file_name,
-            bundle_hash: pool.rsc_bundle_hash,
-            check_bundle:
+            bundle_path: artifact.bundle,
+            bundle_file_name: "#{artifact.id}.js",
+            bundle_hash: artifact.id,
+            check_bundle:,
+            bundle_body: artifact.bundle_body
           )
         end
 
-        add_assets_to_form(form, assets_to_copy:)
+        if assets_to_copy
+          add_assets_to_form(form, assets_to_copy:)
+        else
+          artifact = artifacts.fetch(0)
+          add_assets_to_form(
+            form,
+            assets_to_copy: artifact.companions,
+            snapshot_bodies: artifact.companion_bodies
+          )
+        end
       end
 
-      def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:)
-        raise ReactOnRailsPro::Error, "Bundle not found #{bundle_path}" if check_bundle && !File.exist?(bundle_path)
+      def add_bundle_to_form(form, bundle_path:, bundle_file_name:, bundle_hash:, check_bundle:, bundle_body: nil)
+        if check_bundle && bundle_body.nil? && !File.exist?(bundle_path)
+          raise ReactOnRailsPro::Error, "Bundle not found #{bundle_path}"
+        end
 
         form["bundle_#{bundle_hash}"] = {
-          body: get_form_body_for_file(bundle_path),
+          body: bundle_body || get_form_body_for_file(bundle_path),
           content_type: "text/javascript",
           filename: bundle_file_name
         }
       end
 
       def assets_to_copy_for_upload
-        assets_to_copy = (ReactOnRailsPro.configuration.assets_to_copy || []).dup
-        # react_client_manifest and react_server_manifest files are needed to generate react server components payload
-        if ReactOnRailsPro.configuration.enable_rsc_support
-          assets_to_copy << ReactOnRailsPro::Utils.react_client_manifest_file_path
-          assets_to_copy << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-        end
-
-        assets_to_copy
+        ReactOnRailsPro::Utils
+          .renderer_artifacts(action_description: "collecting renderer upload assets")
+          .fetch(0).companions.values
       end
 
-      def add_assets_to_form(form, assets_to_copy:)
+      def add_assets_to_form(form, assets_to_copy:, snapshot_bodies: nil)
         return form unless assets_to_copy.present?
 
-        assets_to_copy.each_with_index do |asset_path, idx|
-          Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
-          unless http_url?(asset_path) || File.exist?(asset_path)
-            warn "Asset not found #{asset_path}"
-            next
-          end
-
-          content_type = ReactOnRailsPro::Utils.mine_type_from_file_name(asset_path)
-
-          begin
-            form["assetsToCopy#{idx}"] = {
-              body: get_form_body_for_file(asset_path),
-              content_type:,
-              filename: File.basename(asset_path)
-            }
-          rescue StandardError => e
-            warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{e}"
-          end
+        assets = assets_to_copy.respond_to?(:each_pair) ? assets_to_copy.to_a : Array(assets_to_copy)
+        assets.each_with_index do |asset, idx|
+          add_asset_to_form(form, asset, idx, snapshot_bodies)
         end
 
         form
       end
 
-      def form_with_assets_and_bundle(assets_to_copy: assets_to_copy_for_upload)
-        form = common_form_data
-        populate_form_with_bundle_and_assets(form, check_bundle: true, assets_to_copy:)
+      def add_asset_to_form(form, asset, index, snapshot_bodies)
+        basename, asset_path = asset.is_a?(Array) ? asset : [File.basename(asset.to_s), asset]
+        Rails.logger.info { "[ReactOnRailsPro] Uploading asset #{asset_path}" }
+        snapshot_body = snapshot_bodies&.fetch(basename, nil)
+        unless uploadable_asset?(asset_path, snapshot_body)
+          warn "Asset not found #{asset_path}"
+          return
+        end
+
+        form["assetsToCopy#{index}"] = {
+          body: asset_upload_body(asset_path, snapshot_body),
+          content_type: ReactOnRailsPro::Utils.mine_type_from_file_name(basename),
+          filename: basename
+        }
+      rescue StandardError => e
+        warn "[ReactOnRailsPro] Error uploading asset #{asset_path}: #{e}"
+      end
+
+      def uploadable_asset?(asset_path, snapshot_body)
+        snapshot_body || asset_path.is_a?(RendererArtifact::InlineCompanion) ||
+          http_url?(asset_path) || File.exist?(asset_path)
+      end
+
+      def asset_upload_body(asset_path, snapshot_body)
+        return snapshot_body if snapshot_body
+        return asset_path.body if asset_path.is_a?(RendererArtifact::InlineCompanion)
+
+        get_form_body_for_file(asset_path)
+      end
+
+      def form_with_assets_and_bundle(artifacts: nil, assets_to_copy: nil)
+        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "building renderer upload")
+        form = common_form_data(artifacts:)
+        populate_form_with_bundle_and_assets(form, check_bundle: true, artifacts:, assets_to_copy:)
         form
       end
 
-      def common_form_data
-        ReactOnRailsPro::Utils.common_form_data
+      def common_form_data(artifacts: nil)
+        ReactOnRailsPro::Utils.common_form_data(artifacts:)
       end
 
       def build_initial_incremental_request(
         js_code,
         emitter,
+        artifacts: nil,
         pull_enabled: false,
         push_props: nil,
         rsc_stream_observability: false
       )
-        data = common_form_data.merge(
+        data = common_form_data(artifacts:).merge(
           renderingRequest: js_code,
           onRequestClosedUpdateChunk: emitter.end_stream_chunk
         )
@@ -438,6 +439,33 @@ module ReactOnRailsPro
           data[:pushProps] = Array(push_props)
         end
         data
+      end
+
+      def retarget_render_path(path, artifacts, role)
+        match = path.match(%r{\A/bundles/[^/]+/(?<endpoint>render|incremental-render)/})
+        return path unless match
+
+        artifact = artifact_for_role(artifacts, role)
+        unless artifact
+          raise ReactOnRailsPro::Error,
+                "No renderer artifact is configured for role #{role.inspect} while retrying #{match[:endpoint]}"
+        end
+
+        path.sub(%r{\A/bundles/[^/]+/}, "/bundles/#{artifact.id}/")
+      end
+
+      def prepare_streaming_request(path, send_bundle:, bundle_role:)
+        return [path, nil] unless send_bundle
+
+        Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
+        artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+        request_path = retarget_render_path(path, artifacts, bundle_role)
+        upload_assets(artifacts:)
+        [request_path, artifacts]
+      end
+
+      def artifact_for_role(artifacts, role)
+        Array(artifacts).find { |artifact| artifact.role == role }
       end
 
       def upload_assets_single_flight_key(target_bundles, assets_to_copy)
@@ -452,6 +480,10 @@ module ReactOnRailsPro
       end
 
       def upload_asset_fingerprint(asset_path)
+        if asset_path.is_a?(RendererArtifact::InlineCompanion)
+          return "inline:#{asset_path.url}:#{Digest::SHA256.hexdigest(asset_path.body)}"
+        end
+
         path = asset_path.to_s
         return "url:#{path}" if http_url?(path)
         return "missing:#{path}" unless File.exist?(path)

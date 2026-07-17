@@ -16,8 +16,11 @@
 require "fileutils"
 require "securerandom"
 require "pathname"
+require "uri"
 
 require "react_on_rails_pro/error"
+require "react_on_rails_pro/renderer_artifact"
+require "react_on_rails_pro/renderer_artifact_support"
 
 module ReactOnRailsPro
   # Shared helpers for staging the Node Renderer bundle cache. Used by both
@@ -60,8 +63,22 @@ module ReactOnRailsPro
       collect_assets_with_required_paths.first
     end
 
+    # Resolves the complete runtime-visible renderer artifact set once. Every
+    # producer must use these value objects so the cache directory ID and the
+    # bytes staged or uploaded under it cannot be assembled from different
+    # companion lists.
+    def build_current_artifacts(action_description:, url_loader: method(:load_url_companion))
+      RendererArtifactSupport.build(self, action_description:, url_loader:)
+    end
+
+    def stageable_companion_mapping(assets, required_paths, action_description, url_loader: method(:load_url_companion))
+      RendererArtifactSupport.stageable_mapping(self, assets, required_paths, action_description, url_loader:)
+    end
+
+    def load_url_companion(url) = RendererArtifactSupport.load_url(url)
+
     def required_rsc_asset_basenames
-      required_rsc_asset_paths_for_current_config.map { |path| File.basename(path) }
+      required_rsc_asset_paths_for_current_config.map { |path| asset_basename(path) }
     end
 
     # No-arg companion to `required_rsc_asset_paths` for callers (rolling-deploy
@@ -94,7 +111,7 @@ module ReactOnRailsPro
     # and `/path/b/manifest.json`) silently overwrite one another. Uniq-by-path
     # cannot detect this; warn so the user notices the misconfiguration.
     def warn_on_duplicate_basenames(assets)
-      basenames = assets.reject { |a| http_url?(a) }.map { |a| File.basename(a.to_s) }
+      basenames = assets.map { |asset| asset_basename(asset) }
       duplicates = basenames.tally.select { |_, count| count > 1 }.keys
       return if duplicates.empty?
 
@@ -163,6 +180,10 @@ module ReactOnRailsPro
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 
+    def write_content_atomically(content, dest, log_prefix:, source_label: nil)
+      RendererArtifactSupport.write_content_atomically(content, dest, log_prefix:, source_label:)
+    end
+
     def asset_label(asset_path)
       asset_path.to_s.empty? ? "<blank>" : asset_path
     end
@@ -174,21 +195,28 @@ module ReactOnRailsPro
       path.to_s.match?(%r{\Ahttps?://})
     end
 
+    def asset_basename(asset) = RendererArtifactSupport.asset_basename(asset)
+
     # Must expand against Rails.root so that callers who expand per-asset paths
     # against the same base produce Set-comparable strings. Without an explicit
     # base, File.expand_path uses Dir.pwd, which differs in Docker RUN steps
     # and would make the Set lookup miss.
     #
-    # URL-backed manifests (dev server) cannot be staged; exclude them so
-    # `each_stageable_asset` does not see them as "required" and raise.
+    # Keep URL-backed manifests as their URL strings. Development/test may
+    # materialize them, while production-like builds must recognize them as
+    # required and fail instead of silently publishing an incomplete artifact.
     def required_rsc_asset_paths(manifests)
       return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
 
       Set.new(
-        manifests
-          .reject { |path| http_url?(path) }
-          .map { |path| File.expand_path(path.to_s, Rails.root) }
+        manifests.map do |path|
+          http_url?(path) ? path.to_s : File.expand_path(path.to_s, Rails.root)
+        end
       )
+    end
+
+    def required_source?(source, required_paths)
+      RendererArtifactSupport.required_source?(source, required_paths)
     end
 
     def validate_bundle_exists!(path, action_description)
@@ -269,20 +297,16 @@ module ReactOnRailsPro
     # on the bundle path, which raises raw `Errno::ENOENT` if the file is
     # missing — bypassing the friendly `ReactOnRailsPro::Error` message.
     def bundle_sources(pool, action_description)
-      server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
-      validate_bundle_exists!(server_bundle_path, action_description)
-      server_hash = pool.server_bundle_hash
-      validate_bundle_hash!(server_hash, server_bundle_path)
-      sources = [[server_bundle_path, server_hash]]
-
-      return sources unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      validate_bundle_exists!(rsc_bundle_path, action_description)
-      rsc_hash = pool.rsc_bundle_hash
-      validate_bundle_hash!(rsc_hash, rsc_bundle_path)
-      sources << [rsc_bundle_path, rsc_hash]
-      sources
+      artifacts = if ReactOnRailsPro::Utils.respond_to?(:renderer_artifacts)
+                    ReactOnRailsPro::Utils.renderer_artifacts(action_description:)
+                  else
+                    build_current_artifacts(action_description:)
+                  end
+      artifacts.map do |artifact|
+        hash = artifact.role == :server ? pool.server_bundle_hash : pool.rsc_bundle_hash
+        validate_bundle_hash!(hash, artifact.bundle)
+        [artifact.bundle, hash]
+      end
     end
   end
 end

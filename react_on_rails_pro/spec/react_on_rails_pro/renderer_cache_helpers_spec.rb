@@ -69,4 +69,152 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       expect(described_class.collect_assets.map(&:to_s)).to contain_exactly(custom_asset, loadable_stats_path)
     end
   end
+
+  describe ".build_current_artifacts" do
+    let(:directory) { Pathname.new(Dir.mktmpdir) }
+    let(:config) do
+      instance_double(ReactOnRailsPro::Configuration, assets_to_copy:, enable_rsc_support: false)
+    end
+    let(:assets_to_copy) { [first_stats, second_stats] }
+    let(:first_stats) { write_file("first/loadable-stats.json", '{"build":"first"}') }
+    let(:second_stats) { write_file("second/loadable-stats.json", '{"build":"second"}') }
+    let(:server_bundle) { write_file("server.js", "server bundle") }
+    let(:rsc_bundle) { write_file("rsc.js", "rsc bundle") }
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
+      allow(described_class).to receive(:loadable_stats_asset_path).and_return(nil)
+      allow(Rails).to receive(:root).and_return(directory)
+    end
+
+    after { FileUtils.rm_rf(directory) }
+
+    def write_file(relative_path, contents)
+      path = directory.join(relative_path)
+      FileUtils.mkdir_p(path.dirname)
+      path.binwrite(contents)
+      path
+    end
+
+    it "uses one last-wins flat companion mapping for the artifact" do
+      artifact = described_class.build_current_artifacts(action_description: "testing").fetch(0)
+
+      expect(artifact.companions).to eq("loadable-stats.json" => second_stats)
+      expect { described_class.build_current_artifacts(action_description: "testing") }
+        .to output(/Duplicate asset basenames.*Only the last entry/).to_stderr
+    end
+
+    it "changes the current artifact ID when only a companion changes" do
+      first_id = described_class.build_current_artifacts(action_description: "testing").fetch(0).id
+
+      second_stats.binwrite('{"build":"changed"}')
+      second_id = described_class.build_current_artifacts(action_description: "testing").fetch(0).id
+
+      expect(second_id).not_to eq(first_id)
+    end
+
+    it "captures companion bytes once for server and RSC artifacts" do
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([])
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
+      allow(File).to receive(:binread).and_wrap_original do |original, path|
+        second_stats.binwrite('{"build":"changed between artifacts"}') if path.to_s == rsc_bundle.to_s
+        original.call(path)
+      end
+
+      artifacts = described_class.build_current_artifacts(action_description: "testing")
+
+      expect(artifacts.map { |artifact| artifact.companion_bodies.fetch("loadable-stats.json") })
+        .to eq(['{"build":"second"}', '{"build":"second"}'])
+      expect(artifacts.fetch(1).companion_bodies.fetch("loadable-stats.json"))
+        .to be(artifacts.fetch(0).companion_bodies.fetch("loadable-stats.json"))
+    end
+
+    it "warns and excludes missing optional companions" do
+      missing = directory.join("missing.json")
+      allow(config).to receive(:assets_to_copy).and_return([missing])
+
+      expect do
+        artifact = described_class.build_current_artifacts(action_description: "testing").fetch(0)
+        expect(artifact.companions).to be_empty
+      end.to output(/Asset not found.*missing.json/).to_stderr
+    end
+
+    it "materializes URL-backed companions in development so their bytes are identified" do
+      url = "http://localhost:3035/webpack/development/loadable-stats.json"
+      allow(config).to receive(:assets_to_copy).and_return([url])
+      allow(Rails.env).to receive_messages(development?: true, test?: false)
+
+      artifact = described_class.build_current_artifacts(
+        action_description: "testing",
+        url_loader: ->(requested_url) { requested_url == url ? '{"dev":true}' : raise("unexpected URL") }
+      ).fetch(0)
+
+      source = artifact.companions.fetch("loadable-stats.json")
+      expect(source).to be_a(ReactOnRailsPro::RendererArtifact::InlineCompanion)
+      expect(source.body).to eq('{"dev":true}')
+    end
+
+    it "materializes a URL-backed server bundle in development so its bytes are identified" do
+      url = "http://localhost:3035/webpack/development/server-bundle.js"
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(url)
+      allow(Rails.env).to receive_messages(development?: true, test?: false)
+
+      artifact = described_class.build_current_artifacts(
+        action_description: "rendering",
+        url_loader: ->(requested_url) { requested_url == url ? "dev server bundle" : raise("unexpected URL") }
+      ).fetch(0)
+
+      expect(artifact.bundle.to_s).to eq(url)
+      expect(artifact.bundle_body).to eq("dev server bundle")
+      expect(artifact.id).to match(/\Arorp-v2-s-[0-9a-f]{64}\z/)
+    end
+
+    it "rejects a URL-backed server bundle outside development" do
+      url = "https://assets.example.com/server-bundle.js"
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(url)
+      allow(Rails.env).to receive_messages(development?: false, test?: false)
+
+      expect do
+        described_class.build_current_artifacts(
+          action_description: "pre-seeding",
+          url_loader: ->(_) { raise "must not fetch in production" }
+        )
+      end.to raise_error(ReactOnRailsPro::Error, /supported only in development/)
+    end
+
+    it "warns and excludes an optional URL-backed companion in production" do
+      allow(config).to receive(:assets_to_copy)
+        .and_return(["https://assets.example.com/loadable-stats.json"])
+      allow(Rails.env).to receive_messages(development?: false, test?: false)
+
+      expect do
+        artifact = described_class.build_current_artifacts(action_description: "pre-seeding").fetch(0)
+        expect(artifact.companions).to be_empty
+      end.to output(/Skipping optional URL-backed renderer companion/).to_stderr
+    end
+
+    it "hard-fails a required URL-backed companion that cannot be materialized" do
+      url = "https://assets.example.com/react-client-manifest.json"
+      allow(Rails.env).to receive_messages(development?: false, test?: false)
+
+      expect do
+        described_class.stageable_companion_mapping(
+          [url],
+          Set[url],
+          "pre-seeding",
+          url_loader: ->(_) { raise "must not fetch in production" }
+        )
+      end.to raise_error(ReactOnRailsPro::Error, /Required URL-backed renderer companion/)
+    end
+
+    it "derives required URL companion basenames from the URI path rather than its query" do
+      url = "https://assets.example.com/react-client-manifest.json?v=2"
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([url])
+
+      expect(described_class.required_rsc_asset_basenames).to eq(["react-client-manifest.json"])
+    end
+  end
 end

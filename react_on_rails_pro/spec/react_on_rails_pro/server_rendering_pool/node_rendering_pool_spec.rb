@@ -29,8 +29,9 @@ module ReactOnRailsPro
 
         before do
           allow(described_class).to receive(:prepare_render_path).and_return(render_path)
+          allow(render_options).to receive(:rsc_payload_streaming?).and_return(false)
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, "console.log('x')", false)
+            .with(render_path, "console.log('x')", false, bundle_role: :server)
             .and_return(response)
           allow(ReactOnRailsPro.configuration).to receive(:renderer_use_fallback_exec_js).and_return(false)
         end
@@ -58,6 +59,7 @@ module ReactOnRailsPro
 
         before do
           allow(render_options).to receive(:set_option)
+          allow(render_options).to receive(:rsc_payload_streaming?).and_return(false)
           allow(described_class).to receive(:prepare_render_path).and_return(render_path)
           allow(ReactOnRailsPro.configuration).to receive(:renderer_use_fallback_exec_js).and_return(false)
         end
@@ -68,7 +70,7 @@ module ReactOnRailsPro
             "Original error:\nConnection refused - connect(2) for 127.0.0.1:3800\n"
           )
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, false)
+            .with(render_path, js_code, false, bundle_role: :server)
             .and_raise(renderer_error)
 
           expect do
@@ -92,10 +94,10 @@ module ReactOnRailsPro
           )
 
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, false)
+            .with(render_path, js_code, false, bundle_role: :server)
             .and_return(send_bundle_response)
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, true)
+            .with(render_path, js_code, true, bundle_role: :server)
             .and_raise(bundle_load_error)
 
           expect do
@@ -186,6 +188,7 @@ module ReactOnRailsPro
                 async_props_block:,
                 pull_enabled: false,
                 push_props: nil,
+                is_rsc_payload: false,
                 rsc_stream_observability: false
               )
           end
@@ -207,6 +210,7 @@ module ReactOnRailsPro
                 async_props_block:,
                 pull_enabled: true,
                 push_props: [],
+                is_rsc_payload: false,
                 rsc_stream_observability: false
               )
           end

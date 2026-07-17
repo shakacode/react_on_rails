@@ -121,22 +121,18 @@ module ReactOnRailsPro
     end
 
     def self.publish_bundles(adapter)
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      # Companion manifests are generated for the deploy as a whole, so server
-      # and RSC hashes from the same build intentionally share this asset set.
-      assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
-
-      # Defer the hash computation behind a block: `bundle_hash` reads the bundle
-      # file (`File.mtime` in dev/test, `Digest::MD5.file` for non-content-hashed
-      # names), so evaluating it eagerly as an argument would let a missing
-      # bundle raise and bypass the per-bundle warning path.
-      server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      publish_bundle_if_present(adapter, server_bundle, assets, "server") { pool.server_bundle_hash }
-
-      return unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      publish_bundle_if_present(adapter, rsc_bundle, assets, "RSC") { pool.rsc_bundle_hash }
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "publishing rolling-deploy artifacts")
+      artifacts.each do |artifact|
+        bundle_label = artifact.role == :rsc ? "RSC" : "server"
+        artifact.with_materialized_files do |bundle, companions|
+          publish_bundle_if_present(
+            adapter,
+            bundle.to_s,
+            companions.values.map(&:to_s),
+            bundle_label
+          ) { artifact.id }
+        end
+      end
     end
 
     # Some collected companion assets may be absent or point at non-file paths.

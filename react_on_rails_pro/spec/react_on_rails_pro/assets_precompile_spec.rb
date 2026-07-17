@@ -397,6 +397,9 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
   describe ".publish_current_bundle_if_configured" do
     let(:server_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-server-bundle.js") }
+    let(:server_artifact) do
+      ReactOnRailsPro::RendererArtifact.new(role: :server, bundle: server_bundle, companions: {})
+    end
     let(:adapter_class) do
       Class.new do
         def upload(*); end
@@ -421,6 +424,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
       allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
         .to receive(:server_bundle_hash).and_return("abc123")
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([server_artifact])
     end
 
     after do
@@ -461,7 +465,24 @@ describe ReactOnRailsPro::AssetsPrecompile do
         described_class.send(:publish_current_bundle_if_configured)
       end
 
-      expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: []).exactly(5).times
+      expect(adapter).to have_received(:upload)
+        .with(
+          server_artifact.id,
+          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          assets: []
+        ).exactly(5).times
+    end
+
+    it "publishes the canonical artifact ID rather than a bundle-only pool hash" do
+      allow(adapter).to receive(:upload)
+
+      described_class.send(:publish_current_bundle_if_configured)
+
+      expect(adapter).to have_received(:upload).with(
+        server_artifact.id,
+        bundle: materialized_artifact_path(File.basename(server_bundle)),
+        assets: []
+      )
     end
 
     it "warns and continues when upload times out" do
@@ -469,7 +490,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       allow(adapter).to receive(:upload) { sleep 1 }
 
       expect { described_class.send(:publish_current_bundle_if_configured) }
-        .to output(/rolling_deploy_adapter#upload for abc123 timed out after 0.05s/).to_stderr
+        .to output(/rolling_deploy_adapter#upload for #{server_artifact.id} timed out after 0.05s/).to_stderr
     end
 
     # Regression: per the rolling-deploy contract, an adapter#upload failure
@@ -479,57 +500,69 @@ describe ReactOnRailsPro::AssetsPrecompile do
     # and break the build.
     it "warns and continues precompile when adapter#upload raises" do
       allow(adapter).to receive(:upload).and_raise(RuntimeError, "S3 upload boom")
+      expected_warning = /rolling_deploy_adapter#upload for #{server_artifact.id} raised RuntimeError: S3 upload boom/
 
       expect { described_class.send(:publish_current_bundle_if_configured) }
-        .to output(/rolling_deploy_adapter#upload for abc123 raised RuntimeError: S3 upload boom/).to_stderr
+        .to output(expected_warning).to_stderr
 
-      expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
+      expect(adapter).to have_received(:upload).with(
+        server_artifact.id,
+        bundle: materialized_artifact_path(File.basename(server_bundle)),
+        assets: []
+      )
     end
 
-    it "warns and skips publication when the server bundle hash is blank" do
-      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-        .to receive(:server_bundle_hash).and_return(nil)
+    it "warns and skips publication when canonical artifact construction fails" do
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .and_raise(ReactOnRailsPro::Error, "artifact identity failed")
 
       expect(adapter).not_to receive(:upload)
       expect { described_class.send(:publish_current_bundle_if_configured) }
-        .to output(/Skipping rolling_deploy_adapter publication for server bundle/).to_stderr
+        .to output(/rolling_deploy_adapter publication failed:.*artifact identity failed/).to_stderr
     end
 
-    it "warns and skips publication when the server bundle file is missing after precompile" do
+    it "publishes captured bundle bytes when the source is removed after snapshot construction" do
+      uploaded_body = nil
+      allow(adapter).to receive(:upload) { |_hash, bundle:, **| uploaded_body = File.binread(bundle) }
       FileUtils.rm_f(server_bundle)
 
-      expect(adapter).not_to receive(:upload)
-      expect { described_class.send(:publish_current_bundle_if_configured) }
-        .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*does not exist/m).to_stderr
+      expect { described_class.send(:publish_current_bundle_if_configured) }.not_to output.to_stderr
+      expect(uploaded_body).to eq("// server bundle content")
     end
 
-    # Regression: `bundle_hash` reads the bundle file (`File.mtime` in dev/test,
-    # `Digest::MD5.file` for non-content-hashed names) and raises when the
-    # bundle is missing. Evaluating it eagerly as an argument would let that
-    # raise escape to the outer rescue in `publish_current_bundle_if_configured`,
-    # bypassing the per-bundle "does not exist" warning. Verify the per-bundle
-    # warning still fires even when the hash accessor itself raises.
-    it "still emits the per-bundle missing-file warning when server_bundle_hash raises" do
-      FileUtils.rm_f(server_bundle)
-      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
-        .to receive(:server_bundle_hash).and_raise(Errno::ENOENT, "No such file")
+    # Canonical artifact construction is now the fail-fast identity seam. If
+    # that snapshot cannot be built, publication degrades the next deploy but
+    # must not fail the current assets:precompile.
+    it "continues precompile when renderer artifact construction raises" do
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .and_raise(Errno::ENOENT, "No such file")
 
       expect(adapter).not_to receive(:upload)
-      warning_pattern = /Server bundle .*does not exist; skipping rolling_deploy_adapter publication for server bundle/m
+      warning_pattern = /rolling_deploy_adapter publication failed: Errno::ENOENT: No such file/m
       expect { described_class.send(:publish_current_bundle_if_configured) }.to output(warning_pattern).to_stderr
     end
 
-    it "warns and skips publication when the server bundle path is a directory" do
+    it "uses a bounded materialized snapshot when the source path changes type" do
+      uploaded_path = nil
+      uploaded_body = nil
+      allow(adapter).to receive(:upload) do |_hash, bundle:, **|
+        uploaded_path = bundle
+        uploaded_body = File.binread(bundle)
+      end
       FileUtils.rm_f(server_bundle)
       FileUtils.mkdir_p(server_bundle)
 
-      expect(adapter).not_to receive(:upload)
-      expect { described_class.send(:publish_current_bundle_if_configured) }
-        .to output(/Server bundle .*rolling-deploy-upload-server-bundle\.js.*is not a file/m).to_stderr
+      described_class.send(:publish_current_bundle_if_configured)
+
+      expect(uploaded_body).to eq("// server bundle content")
+      expect(File.exist?(uploaded_path)).to be(false)
     end
 
     context "when RSC support is enabled" do
       let(:rsc_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-rsc-bundle.js") }
+      let(:rsc_artifact) do
+        ReactOnRailsPro::RendererArtifact.new(role: :rsc, bundle: rsc_bundle, companions: {})
+      end
       let(:config) do
         instance_double(
           ReactOnRailsPro::Configuration,
@@ -541,9 +574,12 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       before do
         File.write(rsc_bundle, "// rsc bundle content")
-        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
         allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
           .to receive(:rsc_bundle_hash).and_return("rsc999")
+        allow(ReactOnRailsPro::Utils).to receive_messages(rsc_bundle_js_file_path: rsc_bundle,
+                                                          renderer_artifacts: [
+                                                            server_artifact, rsc_artifact
+                                                          ])
         allow(adapter).to receive(:upload)
       end
 
@@ -552,18 +588,33 @@ describe ReactOnRailsPro::AssetsPrecompile do
       it "uploads both server and RSC bundles" do
         described_class.send(:publish_current_bundle_if_configured)
 
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
-        expect(adapter).to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
+        expect(adapter).to have_received(:upload).with(
+          server_artifact.id,
+          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          assets: []
+        )
+        expect(adapter).to have_received(:upload).with(
+          rsc_artifact.id,
+          bundle: materialized_artifact_path(File.basename(rsc_bundle)),
+          assets: []
+        )
       end
 
-      it "warns and skips publication when the RSC bundle file is missing after precompile" do
+      it "publishes captured RSC bytes when the source is removed after snapshot construction" do
         FileUtils.rm_f(rsc_bundle)
 
-        expect { described_class.send(:publish_current_bundle_if_configured) }
-          .to output(/RSC bundle .*rolling-deploy-upload-rsc-bundle\.js.*does not exist/m).to_stderr
+        expect { described_class.send(:publish_current_bundle_if_configured) }.not_to output.to_stderr
 
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
-        expect(adapter).not_to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
+        expect(adapter).to have_received(:upload).with(
+          server_artifact.id,
+          bundle: materialized_artifact_path(File.basename(server_bundle)),
+          assets: []
+        )
+        expect(adapter).to have_received(:upload).with(
+          rsc_artifact.id,
+          bundle: materialized_artifact_path(File.basename(rsc_bundle)),
+          assets: []
+        )
       end
     end
 
@@ -582,10 +633,11 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_f(existing_asset) }
 
       it "filters out missing assets, warns, and still uploads the remaining ones" do
-        expect { described_class.send(:publish_current_bundle_if_configured) }
+        result = nil
+        expect { result = described_class.send(:filter_existing_assets, [existing_asset, missing_asset]) }
           .to output(/Skipping invalid assets.*missing:.*rolling-deploy-upload-missing-asset/m).to_stderr
 
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+        expect(result).to eq([existing_asset])
       end
     end
 
@@ -606,10 +658,11 @@ describe ReactOnRailsPro::AssetsPrecompile do
       end
 
       it "filters out non-file assets, warns, and still uploads the remaining files" do
-        expect { described_class.send(:publish_current_bundle_if_configured) }
+        result = nil
+        expect { result = described_class.send(:filter_existing_assets, [existing_asset, directory_asset]) }
           .to output(/Skipping invalid assets.*not a file:.*rolling-deploy-upload-directory-asset/m).to_stderr
 
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+        expect(result).to eq([existing_asset])
       end
     end
 
@@ -637,10 +690,13 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       it "uploads only the valid entries and warns about both invalid kinds in a single line" do
         warning_pattern = /Skipping invalid assets.*missing:.*rolling-deploy-upload-missing.*not a file:.*mixed-dir/m
-        expect { described_class.send(:publish_current_bundle_if_configured) }
+        result = nil
+        expect do
+          result = described_class.send(:filter_existing_assets, [valid_asset, missing_asset, directory_asset])
+        end
           .to output(warning_pattern).to_stderr
 
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [valid_asset])
+        expect(result).to eq([valid_asset])
       end
     end
 
@@ -701,9 +757,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_rf(rails_root.to_s) }
 
       it "expands relative entries against Rails.root before checking existence" do
-        described_class.send(:publish_current_bundle_if_configured)
-
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [resolved_path])
+        expect(described_class.send(:filter_existing_assets, [relative_path])).to eq([resolved_path])
       end
     end
 
@@ -721,10 +775,12 @@ describe ReactOnRailsPro::AssetsPrecompile do
       after { FileUtils.rm_f(existing_asset) }
 
       it "skips URL-backed assets without misclassifying them as missing files" do
-        described_class.send(:publish_current_bundle_if_configured)
-
-        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+        expect(described_class.send(:filter_existing_assets, [existing_asset, url_asset])).to eq([existing_asset])
       end
+    end
+
+    def materialized_artifact_path(basename)
+      a_string_matching(%r{/rorp-artifact-[^/]+/#{Regexp.escape(basename)}\z})
     end
   end
 end

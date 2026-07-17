@@ -55,6 +55,7 @@ describe ReactOnRailsPro::Request do
     )
     allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle_path)
     allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_server_bundle_path)
+    allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path).and_return(nil)
 
     described_class.instance_variable_set(:@connection, mock_connection)
   end
@@ -62,6 +63,43 @@ describe ReactOnRailsPro::Request do
   after do
     FakeFS.deactivate!
     described_class.instance_variable_set(:@connection, nil)
+  end
+
+  describe ".render_code" do
+    it "retargets a bundle-upload retry to the ID from the uploaded artifact snapshot" do
+      artifact = instance_double(
+        ReactOnRailsPro::RendererArtifact,
+        role: :server,
+        id: "rorp-v2-s-#{'a' * 64}",
+        bundle: Pathname.new(server_bundle_path),
+        bundle_body: "captured bundle",
+        companions: {},
+        companion_bodies: {}
+      )
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+        .with(action_description: "uploading requested assets")
+        .and_return([artifact])
+      response = mock_response(status: 200)
+      requested_path = nil
+      requested_form = nil
+      allow(mock_connection).to receive(:post) do |path, form:|
+        requested_path = path
+        requested_form = form
+        response
+      end
+
+      expect(
+        described_class.render_code(
+          "/bundles/old-id/render/digest",
+          "ReactOnRails.dummy",
+          true,
+          bundle_role: :server
+        )
+      ).to be(response)
+      expect(requested_path).to eq("/bundles/#{artifact.id}/render/digest")
+      expect(requested_form).to include("bundle_#{artifact.id}")
+    end
   end
 
   describe "render_code_as_stream" do
@@ -140,6 +178,17 @@ describe ReactOnRailsPro::Request do
     end
 
     it "reuploads bundles when bundle not found on renderer" do
+      artifact = instance_double(
+        ReactOnRailsPro::RendererArtifact,
+        role: :server,
+        id: "rorp-v2-s-#{'b' * 64}",
+        bundle: Pathname.new(server_bundle_path),
+        bundle_body: "captured bundle",
+        companions: {},
+        companion_bodies: {}
+      )
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
       request_paths = []
       call_count = 0
 
@@ -153,11 +202,19 @@ describe ReactOnRailsPro::Request do
         end
       end
 
-      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');", is_rsc_payload: false)
+      stream = described_class.render_code_as_stream(
+        "/bundles/old-id/render/digest",
+        "console.log('Hello, world!');",
+        is_rsc_payload: false
+      )
       chunks = []
       stream.each_chunk { |chunk| chunks << chunk }
       expect(chunks.map { |c| c["html"] }).to eq(["Hello, world!"])
-      expect(request_paths).to eq(["/render", "/upload-assets", "/render"])
+      expect(request_paths).to eq([
+                                    "/bundles/old-id/render/digest",
+                                    "/upload-assets",
+                                    "/bundles/#{artifact.id}/render/digest"
+                                  ])
     end
 
     it "passes the stream observability opt-in to the renderer request" do
@@ -408,6 +465,43 @@ describe ReactOnRailsPro::Request do
       expect(described_class.send(:upload_assets_single_flight_key, ["server-hash"], [asset_path]))
         .not_to eq(initial_key)
     end
+
+    it "builds the upload from the same artifact ID and auto-discovered companion set" do
+      loadable_stats = "public/webpack/production/loadable-stats.json"
+      File.write(loadable_stats, '{"assets":[]}')
+      allow(ReactOnRailsPro.configuration).to receive_messages(assets_to_copy: [], enable_rsc_support: false)
+      allow(Rails).to receive(:root).and_return(Pathname.new("."))
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path)
+        .and_return(loadable_stats)
+
+      artifact = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "testing upload").fetch(0)
+      form = described_class.send(:form_with_assets_and_bundle)
+
+      expect(form).to include("bundle_#{artifact.id}")
+      expect(form.fetch("bundle_#{artifact.id}").fetch(:filename)).to eq("#{artifact.id}.js")
+      uploaded_asset = form.values.find { |value| value.is_a?(Hash) && value[:filename] == "loadable-stats.json" }
+      expect(uploaded_asset).not_to be_nil
+    end
+
+    it "uploads the bytes captured by the artifact when live files change afterward" do
+      loadable_stats = "public/webpack/production/loadable-stats.json"
+      File.write(loadable_stats, "identified stats")
+      File.write(server_bundle_path, "identified bundle")
+      allow(ReactOnRailsPro.configuration).to receive_messages(assets_to_copy: [], enable_rsc_support: false)
+      allow(Rails).to receive(:root).and_return(Pathname.new("."))
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path)
+        .and_return(loadable_stats)
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "testing immutable upload")
+
+      File.write(loadable_stats, "later stats")
+      File.write(server_bundle_path, "later bundle")
+      form = described_class.send(:form_with_assets_and_bundle, artifacts:)
+
+      bundle_part = form.fetch("bundle_#{artifacts.fetch(0).id}")
+      asset_part = form.values.find { |value| value.is_a?(Hash) && value[:filename] == "loadable-stats.json" }
+      expect(bundle_part.fetch(:body)).to eq("identified bundle")
+      expect(asset_part.fetch(:body)).to eq("identified stats")
+    end
   end
 
   describe "get_form_body_for_file" do
@@ -628,6 +722,45 @@ describe ReactOnRailsPro::Request do
         parsed = JSON.parse(data.chomp)
         parsed.key?("renderingRequest") && parsed["renderingRequest"] == js_code
       end)
+    end
+
+    it "retargets a bundle-upload retry to the uploaded artifact snapshot" do
+      artifact = instance_double(
+        ReactOnRailsPro::RendererArtifact,
+        role: :server,
+        id: "rorp-v2-s-#{'c' * 64}",
+        bundle: Pathname.new(server_bundle_path),
+        bundle_body: "captured bundle",
+        companions: {},
+        companion_bodies: {}
+      )
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(false)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+      request_paths = []
+      call_count = 0
+      allow(mock_connection).to receive(:post_bidi) do |path, **_options|
+        request_paths << path
+        call_count += 1
+        response = if call_count == 1
+                     mock_response(status: ReactOnRailsPro::STATUS_SEND_BUNDLE, chunks: ["Bundle not found"])
+                   else
+                     mock_response(status: 200, chunks: [to_length_prefixed("chunk")])
+                   end
+        [mock_output, response]
+      end
+      allow(mock_connection).to receive(:post).and_return(mock_response(status: 200, chunks: ["Assets uploaded"]))
+
+      stream = described_class.render_code_with_incremental_updates(
+        "/bundles/old-id/incremental-render/digest",
+        js_code,
+        async_props_block:
+      )
+      stream.each_chunk(&:itself)
+
+      expect(request_paths).to eq([
+                                    "/bundles/old-id/incremental-render/digest",
+                                    "/bundles/#{artifact.id}/incremental-render/digest"
+                                  ])
     end
 
     it "passes the stream observability opt-in in the initial incremental request" do
