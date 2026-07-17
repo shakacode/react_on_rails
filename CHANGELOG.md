@@ -47,7 +47,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Genuine write failures (for example a `JSON::GeneratorError`) still log at `error` with a backtrace.
   This mirrors the sibling `ReactOnRailsPro::Stream#log_client_disconnect` convention. Fixes
   [Issue 4325](https://github.com/shakacode/react_on_rails/issues/4325).
-  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [PR 4719](https://github.com/shakacode/react_on_rails/pull/4719) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
