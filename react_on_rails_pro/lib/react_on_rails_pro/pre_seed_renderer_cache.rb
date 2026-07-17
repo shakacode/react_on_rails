@@ -54,9 +54,15 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
       artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: action_description(mode))
 
-      with_cache_mutation_lock(cache_dir) do
+      current_hashes = with_cache_mutation_lock(cache_dir) do
         stage_artifacts(artifacts, cache_dir, mode)
       end
+
+      # Previous-deploy staging performs bounded network I/O and uses its own
+      # atomic promotion guards. Keep it outside the snapshot critical section
+      # so a slow adapter cannot block another process from staging current
+      # artifacts or pruning snapshots.
+      RollingDeployCacheStager.call(cache_dir:, current_hashes:, mode:)
     end
 
     def self.stage_artifacts(artifacts, cache_dir, mode)
@@ -84,10 +90,8 @@ module ReactOnRailsPro
         raise
       end
 
-      # Optionally seed previous deploys' bundle hashes for rolling-deploy safety.
-      # No-op when neither config.rolling_deploy_adapter nor PREVIOUS_BUNDLE_HASHES is set.
-      RollingDeployCacheStager.call(cache_dir:, current_hashes:, mode:)
       prune_orphaned_artifact_snapshots(cache_dir)
+      current_hashes
     end
     private_class_method :stage_artifacts
 

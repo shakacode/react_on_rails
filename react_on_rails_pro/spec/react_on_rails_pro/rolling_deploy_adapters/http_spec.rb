@@ -360,6 +360,40 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
     end
   end
 
+  describe ".download_bundle_tarball" do
+    it "keeps payload extraction inside the monotonic fetch deadline" do
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      allow(described_class).to receive(:http_stream).and_yield(response).and_return(response)
+      allow(described_class).to receive(:stream_response_body)
+      expect(described_class).to receive(:with_deadline).with(deadline).and_yield
+
+      result = described_class.send(:download_bundle_tarball, "https://example.com", "hash123", deadline:) do
+        :extracted_payload
+      end
+
+      expect(result).to eq(:extracted_payload)
+    end
+
+    it "interrupts slow payload extraction and removes the download tempfile" do
+      deadline = 5.0
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      allow(described_class).to receive(:http_stream).and_yield(response).and_return(response)
+      allow(described_class).to receive(:stream_response_body)
+      allow(described_class).to receive(:monotonic_now).and_return(4.9)
+      tempfile_path = nil
+
+      expect do
+        described_class.send(:download_bundle_tarball, "https://example.com", "hash123", deadline:) do |tmp|
+          tempfile_path = tmp.path
+          sleep 1
+        end
+      end.to raise_error(Timeout::Error, /rolling-deploy HTTP deadline expired/)
+
+      expect(File.exist?(tempfile_path)).to be(false)
+    end
+  end
+
   describe ".http_get" do
     let(:config) do
       instance_double(

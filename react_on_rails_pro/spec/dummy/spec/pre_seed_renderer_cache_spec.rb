@@ -80,6 +80,25 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  it "releases the snapshot lock before seeding previous deploys" do
+    lock_held = false
+    allow(described_class).to receive(:with_cache_mutation_lock).and_wrap_original do |method, *args, &block|
+      method.call(*args) do
+        lock_held = true
+        begin
+          block.call
+        ensure
+          lock_held = false
+        end
+      end
+    end
+    expect(ReactOnRailsPro::RollingDeployCacheStager).to receive(:call) do
+      expect(lock_held).to be(false)
+    end
+
+    described_class.call(mode: :copy)
+  end
+
   context "when mode is :symlink" do
     it "normalizes trailing-slash and relative cache aliases to one sibling lock" do
       expected = "#{File.expand_path(cache_dir)}.preseed.lock"

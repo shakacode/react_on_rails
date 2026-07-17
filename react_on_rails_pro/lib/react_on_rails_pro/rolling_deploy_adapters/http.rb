@@ -392,7 +392,7 @@ module ReactOnRailsPro
 
             tmp.flush
             tmp.rewind
-            yield tmp
+            with_deadline(deadline) { yield tmp }
           end
         end
 
