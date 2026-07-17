@@ -61,6 +61,10 @@ For a prerelease, the task warns and skips the GitHub release; after adding the 
 #### Why changelog comes BEFORE the release
 
 - `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
+- Before confirmation, the release task prepares the GitHub body and verifies it fits GitHub's limit. For unusually
+  large sections, it first replaces repeated same-repository PR/issue URLs and contributor profile URLs with compact
+  GitHub-native references without dropping entries. If the result is still too large, it keeps Markdown-safe beginning
+  and ending excerpts and links to the complete tag-pinned changelog.
 - The release task aborts a stable target if no matching non-empty section exists; prereleases warn and
   skip GitHub release creation
 - A premature version header (if release fails) is harmless -- you'll release eventually
@@ -634,7 +638,9 @@ bundle exec rake "sync_github_release[16.5.0.rc.1]"
 bundle exec rake "sync_github_release[16.5.0,true]"
 ```
 
-`sync_github_release` reads release notes from the matching `CHANGELOG.md` section and creates/updates the GitHub release for the corresponding tag.
+`sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
+as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
+recovery path when package publication succeeded but the final GitHub step failed.
 
 ### Pre-Release Checklist
 
@@ -734,6 +740,7 @@ If the release fails partway through (e.g., during NPM publish):
 3. If GitHub release creation fails after successful publishing:
    - Fix GitHub auth (`gh auth login`) or permissions
    - Ensure `CHANGELOG.md` has matching header `### [X.Y.Z]`
+   - Do not rerun registry publication; the failure message prints the GitHub-only recovery command
    - Rerun only: `bundle exec rake "sync_github_release[X.Y.Z]"`
 
 4. If some packages were published but not others:

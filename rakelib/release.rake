@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler"
+require "cgi"
 require "digest"
 require "English"
 require "json"
@@ -28,6 +29,7 @@ NPM_REGISTRY_URL = "https://registry.npmjs.org/"
 RUBYGEMS_VERSIONS_API_URL = "https://rubygems.org/api/v1/versions"
 RUBYGEMS_VERSIONS_OPEN_TIMEOUT_SECONDS = 10
 RUBYGEMS_VERSIONS_READ_TIMEOUT_SECONDS = 15
+GITHUB_RELEASE_BODY_MAX_LENGTH = 125_000
 NPM_PUBLISH_VERIFY_ATTEMPTS = 6
 NPM_PUBLISH_VERIFY_RETRY_DELAY_SECONDS = 5
 NPM_INSTALL_DEPENDENCY_FIELDS = %w[dependencies optionalDependencies peerDependencies].freeze
@@ -6661,6 +6663,14 @@ def report_release_dry_run_changelog(version:, has_changelog:)
        "no GitHub release would be created."
 end
 
+def report_github_release_notes_preflight!(version:, changelog_notes:)
+  return unless changelog_notes
+
+  github_notes = github_release_notes(notes: changelog_notes, tag: "v#{version}")
+  puts "  GitHub:    ✓ release body prepared before publishing " \
+       "(#{changelog_notes.length} → #{github_notes.length} characters)"
+end
+
 def confirm_release!(version:, monorepo_root:, dry_run: false)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   has_changelog = extract_changelog_section(changelog_path:, version:)
@@ -6674,6 +6684,8 @@ def confirm_release!(version:, monorepo_root:, dry_run: false)
         bundle exec rake "release[#{version}]"
     ERROR
   end
+
+  report_github_release_notes_preflight!(version:, changelog_notes: has_changelog)
 
   return report_release_dry_run_changelog(version:, has_changelog:) if dry_run
 
@@ -6723,11 +6735,97 @@ def ensure_git_tag_exists!(monorepo_root:, tag:)
   abort "❌ Git tag #{tag.inspect} was not found locally or remotely."
 end
 
+def compact_github_release_notes(notes)
+  compacted_notes = notes.gsub(
+    %r{\[PR (\d+)\]\(https://github\.com/shakacode/react_on_rails/pull/\1\)}
+  ) { "##{Regexp.last_match(1)}" }
+  compacted_notes = compacted_notes.gsub(
+    %r{\[(?:Issue|issue) (\d+)\]\(https://github\.com/shakacode/react_on_rails/issues/\1\)}
+  ) { "##{Regexp.last_match(1)}" }
+  compacted_notes.gsub(%r{\[([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\]\(https://github\.com/\1\)}) do
+    username = Regexp.last_match(1)
+    "[#{username}](/#{username})"
+  end
+end
+
+def github_release_body_within_limit?(notes)
+  notes.length <= GITHUB_RELEASE_BODY_MAX_LENGTH
+end
+
+def ensure_github_release_body_within_limit!(notes)
+  return notes if github_release_body_within_limit?(notes)
+
+  abort "❌ Prepared GitHub release notes still exceed GitHub's #{GITHUB_RELEASE_BODY_MAX_LENGTH}-character limit."
+end
+
+def github_release_omission(tag)
+  <<~MARKDOWN
+
+    ---
+
+    > Some changelog entries were omitted from this page to fit GitHub's release-description limit.
+    > Read the [complete #{tag} changelog](https://github.com/shakacode/react_on_rails/blob/#{tag}/CHANGELOG.md).
+
+    ---
+
+  MARKDOWN
+end
+
+def github_release_escaped_excerpt(notes, character_budget:, from:)
+  low = 0
+  high = [notes.length, character_budget].min
+
+  while low < high
+    count = (low + high + 1) / 2
+    candidate = from == :beginning ? notes[0, count] : notes[-count, count]
+    if CGI.escapeHTML(candidate).length <= character_budget
+      low = count
+    else
+      high = count - 1
+    end
+  end
+
+  excerpt = from == :beginning ? notes[0, low] : notes[-low, low]
+  CGI.escapeHTML(excerpt)
+end
+
+def github_release_excerpt(title:, escaped_notes:)
+  "#### #{title} (excerpt)\n\n<pre>#{escaped_notes}</pre>"
+end
+
+def truncate_github_release_notes(notes:, tag:)
+  omission = github_release_omission(tag).strip
+  beginning_template = github_release_excerpt(title: "Beginning of release notes", escaped_notes: "")
+  ending_template = github_release_excerpt(title: "End of release notes", escaped_notes: "")
+  fixed_content = [beginning_template, omission, ending_template].join("\n\n")
+  available_characters = GITHUB_RELEASE_BODY_MAX_LENGTH - fixed_content.length
+  beginning_budget = available_characters * 3 / 4
+  ending_budget = available_characters - beginning_budget
+  beginning = github_release_escaped_excerpt(notes, character_budget: beginning_budget, from: :beginning)
+  ending = github_release_escaped_excerpt(notes, character_budget: ending_budget, from: :ending)
+
+  [
+    github_release_excerpt(title: "Beginning of release notes", escaped_notes: beginning),
+    omission,
+    github_release_excerpt(title: "End of release notes", escaped_notes: ending)
+  ].join("\n\n")
+end
+
+def github_release_notes(notes:, tag:)
+  compacted_notes = compact_github_release_notes(notes)
+  return compacted_notes if github_release_body_within_limit?(compacted_notes)
+
+  truncated_notes = truncate_github_release_notes(notes: compacted_notes, tag:)
+  ensure_github_release_body_within_limit!(truncated_notes)
+end
+
 def prepare_github_release_context(monorepo_root:, gem_version:)
   prerelease = release_prerelease_version?(gem_version)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   notes = extract_changelog_section(changelog_path:, version: gem_version)
   abort "❌ Could not find `### [#{gem_version}]` in CHANGELOG.md. Add that section and retry." unless notes
+
+  notes = github_release_notes(notes:, tag: "v#{gem_version}")
 
   {
     notes:,
@@ -6735,6 +6833,16 @@ def prepare_github_release_context(monorepo_root:, gem_version:)
     tag: "v#{gem_version}",
     title: "v#{gem_version}"
   }
+end
+
+def abort_github_release_publish_failure!(tag)
+  version = tag.delete_prefix("v")
+  abort <<~ERROR
+    ❌ Failed to publish GitHub release #{tag}.
+
+    The git tag and registry packages may already be published. Retry only the idempotent GitHub step:
+      bundle exec rake "sync_github_release[#{version}]"
+  ERROR
 end
 
 # rubocop:disable Metrics/AbcSize
@@ -6769,7 +6877,7 @@ def publish_or_update_github_release(monorepo_root:, release_context:, dry_run:)
 
     puts "Publishing GitHub release #{release_context[:tag]}#{release_context[:prerelease] ? ' (prerelease)' : ''}"
     success = system(*release_command, chdir: monorepo_root)
-    abort "❌ Failed to publish GitHub release #{release_context[:tag]}." unless success
+    abort_github_release_publish_failure!(release_context[:tag]) unless success
   end
 end
 # rubocop:enable Metrics/AbcSize
