@@ -5,7 +5,7 @@
 
 ## Requirements
 
-- You must use React on Rails v11.0.7 or higher.
+- You must use **React on Rails Pro** v16.4.0 or higher.
 
 ## Install the Gem and the Node Module
 
@@ -42,10 +42,11 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    - `RENDERER_ALL_WORKERS_RESTART_INTERVAL`
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
-2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
+2. Configure ENV values and run your launch script. For example:
    ```bash
-   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node-renderer
+   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node renderer/node-renderer.js
    ```
+   Or via package.json scripts: `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
 ## JavaScript Configuration File
