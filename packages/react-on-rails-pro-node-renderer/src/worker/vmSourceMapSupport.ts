@@ -36,7 +36,10 @@
  * Performance: `prepareStackTrace` only runs when an error's `.stack` is first
  * accessed. External source map text is captured asynchronously while building
  * the VM so same-path rebuilds stay generation-isolated; SourceMap parsing and
- * position lookups stay lazy and cached per bundle registration.
+ * position lookups stay lazy and cached per bundle registration. Inline and
+ * external maps are both size-capped: an oversized map is skipped and its frames
+ * keep their bundled locations rather than paying its bytes for the life of the
+ * pooled VM.
  */
 
 import fs from 'fs';
@@ -101,6 +104,55 @@ let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
 const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
+// External `.map` files get the same ceiling as inline maps. This is a pre-read
+// size gate, not a hard memory bound: a map that grows between the `statSync` in
+// `resolveReadableSourceMapPath` and the read below still gets read in full.
+//
+// The two ceilings share a number but not a unit: this one is compared against
+// `stats.size` (bytes on disk), while `MAX_INLINE_SOURCE_MAP_BYTES` is compared
+// against a JS string length (UTF-16 code units), so a map with multi-byte
+// characters admits a different amount of data inline than externally. The
+// inline unit predates this constant and is left alone here.
+const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
+
+// `preloadSourceMapJsonForBundle` re-checks the map on every VM build, and with
+// `maxVMPoolSize` defaulting to 2 an app with more bundles than that rebuilds
+// per request — so an unthrottled warning is a flood at request rate. (The
+// error-path lookup can also repeat, but only until the miss retires, bounded by
+// MAX_MISSING_SOURCE_MAP_RETRIES.) Warn once per map path instead. Bundle paths
+// are per-deploy, so this is bounded as an insertion-ordered FIFO rather
+// than tied to registration lifetime: evicting the oldest entry only risks a
+// duplicate warning, while unregistering a bundle would re-warn on every VM
+// rebuild and defeat the throttle.
+//
+// A warned path is never re-armed, so if a path is reused (contrary to the
+// per-deploy assumption) and its map drops under the cap and later grows back
+// over it, that second regression warns only if the entry has since been
+// evicted. The map is still re-checked and skipped correctly either way; only
+// the warning is suppressed.
+const MAX_WARNED_OVERSIZED_SOURCE_MAP_PATHS = 256;
+const warnedOversizedSourceMapPaths = new Set<string>();
+
+function warnOversizedSourceMap(sourceMapPath: string, sizeInBytes: number) {
+  if (warnedOversizedSourceMapPaths.has(sourceMapPath)) {
+    return;
+  }
+
+  if (warnedOversizedSourceMapPaths.size >= MAX_WARNED_OVERSIZED_SOURCE_MAP_PATHS) {
+    const oldestPath = warnedOversizedSourceMapPaths.values().next().value;
+    if (oldestPath !== undefined) {
+      warnedOversizedSourceMapPaths.delete(oldestPath);
+    }
+  }
+
+  warnedOversizedSourceMapPaths.add(sourceMapPath);
+  log.warn(
+    'Skipping source map %s: size of %d bytes exceeds the %d byte limit. Stack frames for this bundle will keep their bundled locations.',
+    sourceMapPath,
+    sizeInBytes,
+    MAX_EXTERNAL_SOURCE_MAP_BYTES,
+  );
+}
 
 function shouldRetryMissingSourceMap(registration: BundleSourceMapRegistration) {
   return registration.retryMissingSourceMap === true && !retiredMissingSourceMapRetries.has(registration);
@@ -290,11 +342,25 @@ function candidateSourceMapPaths(bundleFilePath: string, sourceMappingUrl: strin
   return Array.from(new Set(candidatePaths));
 }
 
+/**
+ * Distinguishes "a map is here but too large" from "nothing readable here" — a
+ * distinction the candidate loops depend on, since an oversized candidate must
+ * stop resolution while an absent one may simply not have arrived yet.
+ */
+const OVERSIZED_SOURCE_MAP = Symbol('oversizedSourceMap');
+type SourceMapCandidateResult = string | typeof OVERSIZED_SOURCE_MAP | undefined;
+
+/**
+ * Resolves a candidate map path to a readable, within-cap file inside the real
+ * bundle directory, warning once when the map is oversized. The size check is
+ * last, so it only ever runs on a realpath already proven contained, and reuses
+ * the `stat` the `isFile` check already needs.
+ */
 function resolveReadableSourceMapPath(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-) {
+): SourceMapCandidateResult {
   const bundleDirectory = path.dirname(bundleFilePath);
   try {
     const resolvedPath = path.resolve(candidatePath);
@@ -307,8 +373,14 @@ function resolveReadableSourceMapPath(
       return undefined;
     }
 
-    if (!fs.statSync(realSourceMapPath).isFile()) {
+    const stats = fs.statSync(realSourceMapPath);
+    if (!stats.isFile()) {
       return undefined;
+    }
+
+    if (stats.size > MAX_EXTERNAL_SOURCE_MAP_BYTES) {
+      warnOversizedSourceMap(realSourceMapPath, stats.size);
+      return OVERSIZED_SOURCE_MAP;
     }
 
     return realSourceMapPath;
@@ -317,10 +389,14 @@ function resolveReadableSourceMapPath(
   }
 }
 
-function readSourceMapFile(bundleFilePath: string, candidatePath: string, realBundleDirectory: string) {
+function readSourceMapFile(
+  bundleFilePath: string,
+  candidatePath: string,
+  realBundleDirectory: string,
+): SourceMapCandidateResult {
   const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
-  if (!sourceMapPath) {
-    return undefined;
+  if (sourceMapPath === OVERSIZED_SOURCE_MAP || sourceMapPath === undefined) {
+    return sourceMapPath;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
@@ -333,10 +409,10 @@ async function readSourceMapFileAsync(
   bundleFilePath: string,
   candidatePath: string,
   realBundleDirectory: string,
-) {
+): Promise<SourceMapCandidateResult> {
   const sourceMapPath = resolveReadableSourceMapPath(bundleFilePath, candidatePath, realBundleDirectory);
-  if (!sourceMapPath) {
-    return undefined;
+  if (sourceMapPath === OVERSIZED_SOURCE_MAP || sourceMapPath === undefined) {
+    return sourceMapPath;
   }
 
   // `sourceMapPath` is filename-only and read through a final realpath that must
@@ -345,11 +421,16 @@ async function readSourceMapFileAsync(
   return fs.promises.readFile(sourceMapPath, 'utf8');
 }
 
+/**
+ * Returns the source-map JSON for a bundle, `null` when a map was found but is
+ * unusable for good (oversized), or `undefined` when no map was found and one
+ * may still appear later.
+ */
 function readSourceMapJsonForBundle(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
   realBundleDirectory: string,
-): string | undefined {
+): string | null | undefined {
   try {
     // Stack formatting is synchronous, so source-map discovery stays sync and
     // is cached per bundle registration.
@@ -360,11 +441,20 @@ function readSourceMapJsonForBundle(
     // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
     // uploaded alongside it under that name is also worth checking.
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    let higherPriorityCandidateMissing = false;
     for (const candidatePath of candidatePaths) {
       const sourceMapJson = readSourceMapFile(bundleFilePath, candidatePath, realBundleDirectory);
+      if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
+        // Never fall through to a lower-priority candidate: remapping through a
+        // map the bundle does not name is worse than keeping bundled locations.
+        // Terminal only if nothing higher-priority was merely missing — if one
+        // was, it can still arrive, so leave the miss retryable.
+        return higherPriorityCandidateMissing ? undefined : null;
+      }
       if (sourceMapJson) {
         return sourceMapJson;
       }
+      higherPriorityCandidateMissing = true;
     }
     return undefined;
   } catch (error) {
@@ -373,23 +463,30 @@ function readSourceMapJsonForBundle(
   }
 }
 
+/** Async counterpart of {@link readSourceMapJsonForBundle}; same tri-state result. */
 async function readSourceMapJsonForBundleAsync(
   bundleFilePath: string,
   sourceMappingUrl: string | undefined,
   realBundleDirectory: string,
-): Promise<string | undefined> {
+): Promise<string | null | undefined> {
   try {
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
       return parseDataUrlSourceMap(sourceMappingUrl);
     }
 
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
+    let higherPriorityCandidateMissing = false;
     for (const candidatePath of candidatePaths) {
       // eslint-disable-next-line no-await-in-loop
       const sourceMapJson = await readSourceMapFileAsync(bundleFilePath, candidatePath, realBundleDirectory);
+      // See the comment in the sync variant.
+      if (sourceMapJson === OVERSIZED_SOURCE_MAP) {
+        return higherPriorityCandidateMissing ? undefined : null;
+      }
       if (sourceMapJson) {
         return sourceMapJson;
       }
+      higherPriorityCandidateMissing = true;
     }
     return undefined;
   } catch (error) {
@@ -419,6 +516,12 @@ export async function preloadSourceMapJsonForBundle(bundleFilePath: string, bund
     sourceMappingUrl,
     realBundleDirectory,
   );
+  if (sourceMapJson === null) {
+    // A map is present but over the cap. Retrying cannot fix that, and leaving
+    // the miss retryable would let a later same-path map remap this VM
+    // generation, so settle it now.
+    return { retryMissingSourceMap: false, sourceMapJson: null };
+  }
   if (sourceMapJson !== undefined && !isValidJson(sourceMapJson)) {
     log.debug('Preloaded source map for bundle %s is not valid JSON yet; retrying lazily.', bundleFilePath);
     return { retryMissingSourceMap: true, sourceMapJson: undefined };
@@ -505,6 +608,7 @@ export function resetSourceMapSupport() {
   retiredMissingSourceMapRetries = new WeakSet<BundleSourceMapRegistration>();
   missingSourceMapRetryCounts = new WeakMap<BundleSourceMapRegistration, number>();
   warnedMissingSourceMapConstructor = false;
+  warnedOversizedSourceMapPaths.clear();
 }
 
 function createSourceMap(payload: ConstructorParameters<typeof SourceMap>[0]): SourceMap | null {
@@ -543,42 +647,70 @@ function readRegisteredBundleContentsForSourceMapLookup(bundleFilePath: string) 
   return fs.readFileSync(bundleFilePath, 'utf8');
 }
 
+/**
+ * `terminal` means a map was found but can never be used for this generation
+ * (oversized), so retrying is pointless and would risk remapping this generation
+ * with a different file. `missing` means nothing usable was found yet and a map
+ * may still appear, so the existing retry budget applies.
+ */
+type SourceMapLoadResult =
+  | { status: 'loaded'; sourceMap: LoadedSourceMap }
+  | { status: 'terminal' }
+  | { status: 'missing' };
+
 function loadSourceMapForBundle(
   bundleFilePath: string,
   registration: BundleSourceMapRegistration,
-): LoadedSourceMap | null {
+): SourceMapLoadResult {
   try {
     const sourceMappingUrl =
       registration.sourceMappingUrl === undefined
         ? extractSourceMappingUrl(readRegisteredBundleContentsForSourceMapLookup(bundleFilePath))
         : (registration.sourceMappingUrl ?? undefined);
 
+    // A registration's own null means "confirmed no usable map for this VM
+    // generation", which is terminal by definition. Say so here rather than
+    // letting `?? undefined` coerce it into the retryable `missing` path and
+    // relying on the caller's `shouldRetryMissingSourceMap` check to settle it.
+    if (registration.sourceMapJson === null) {
+      return { status: 'terminal' };
+    }
+
+    // The reader returns null only for an oversized map — also terminal.
     const sourceMapJson =
       registration.sourceMapJson === undefined
         ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl, registration.realBundleDirectory)
-        : (registration.sourceMapJson ?? undefined);
+        : registration.sourceMapJson;
 
+    if (sourceMapJson === null) {
+      return { status: 'terminal' };
+    }
     if (!sourceMapJson) {
-      return null;
+      return { status: 'missing' };
     }
     const payload = JSON.parse(sourceMapJson) as ConstructorParameters<typeof SourceMap>[0];
     const sourceMap = createSourceMap(payload);
     if (!sourceMap) {
-      return null;
+      return { status: 'missing' };
     }
     const sourceRoot = typeof payload.sourceRoot === 'string' ? payload.sourceRoot : undefined;
     return {
-      sourceMap,
-      sourceRoot,
-      sources: Array.isArray(payload.sources)
-        ? payload.sources
-            .filter((source): source is string => typeof source === 'string')
-            .map((source) => applySourceRoot(sourceRoot, source))
-        : [],
+      status: 'loaded',
+      sourceMap: {
+        sourceMap,
+        sourceRoot,
+        sources: Array.isArray(payload.sources)
+          ? payload.sources
+              .filter((source): source is string => typeof source === 'string')
+              .map((source) => applySourceRoot(sourceRoot, source))
+          : [],
+      },
     };
   } catch (error) {
+    // Includes JSON.parse failures on a partially-written map, which stay
+    // retryable so the completed map can be picked up.
     log.debug('Failed to load source map for bundle %s: %s', bundleFilePath, error);
-    return null;
+    return { status: 'missing' };
   }
 }
 
@@ -592,17 +724,18 @@ function sourceMapForRegistration(
       return null;
     }
 
-    sourceMap = loadSourceMapForBundle(registration.bundleFilePath, registration);
-    if (sourceMap) {
+    const loadResult = loadSourceMapForBundle(registration.bundleFilePath, registration);
+    if (loadResult.status === 'loaded') {
+      sourceMap = loadResult.sourceMap;
       sourceMapCache.set(registration, sourceMap);
       missingSourceMapRetryCounts.delete(registration);
-    } else if (
-      !shouldRetryMissingSourceMap(registration) ||
-      (registration.sourceMappingUrl === null && !registration.retryMissingSourceMap)
-    ) {
-      sourceMapCache.set(registration, sourceMap);
     } else {
-      recordMissingSourceMapRetry(registration, lookupAttempt);
+      sourceMap = null;
+      if (loadResult.status === 'terminal' || !shouldRetryMissingSourceMap(registration)) {
+        sourceMapCache.set(registration, sourceMap);
+      } else {
+        recordMissingSourceMapRetry(registration, lookupAttempt);
+      }
     }
   }
   return sourceMap;

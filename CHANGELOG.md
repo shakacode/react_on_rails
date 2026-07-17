@@ -37,6 +37,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
+  larger than 50MB are no longer read into memory. Previously only inline (`data:`) source maps were
+  size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
+  stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
+  remapped to original sources, and the renderer logs a warning naming the map. An oversized map is never
+  substituted: the renderer will not fall back to a differently-named map alongside the bundle. When the
+  oversized map is the one the bundle names, that result is final for the VM generation and is not retried;
+  a map that merely arrives late is still retried as before. The 50MB limit matches the pre-existing cap for
+  inline maps. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Bounded RSC browser performance fallback marks across soft navigations**: Browsers
   that cannot preserve `PerformanceMark.detail` now retain only the 200 most recent fallback
   entries, and React on Rails Pro clears the fallback queue during Turbo/Turbolinks page teardown.
