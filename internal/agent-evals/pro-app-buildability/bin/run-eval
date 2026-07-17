@@ -124,12 +124,22 @@ fi
 
 private_dir="$(mktemp -d "${TMPDIR:-/tmp}/ror-pro-agent-eval.XXXXXX")"
 chmod 700 "$private_dir"
+npm_cache_dir=""
 cleanup() {
   rm -rf "$private_dir"
+  [[ -z "$npm_cache_dir" ]] || rm -rf "$npm_cache_dir"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
+npm_cache_dir="$(mktemp -d "$(dirname "$workspace")/.ror-eval-npm-cache.XXXXXX")"
+chmod 700 "$npm_cache_dir"
 mkdir -m 700 "$private_dir/runner-home" "$private_dir/agent-home" "$private_dir/codex-home" "$private_dir/tmp"
+# npm/npx installs transient executable shims below its cache. Keep that cache
+# on the same executable disposable mount as the workspace instead of the
+# intentionally noexec private credential tmpfs. This config is discovered via
+# HOME, so the stripped seven-variable allowlist remains unchanged.
+printf 'cache=%s\n' "$npm_cache_dir" >"$private_dir/runner-home/.npmrc"
+printf 'cache=%s\n' "$npm_cache_dir" >"$private_dir/agent-home/.npmrc"
 
 minimal_env=(env -i "PATH=$safe_path" "HOME=$private_dir/runner-home" "TMPDIR=$private_dir/tmp" LANG=C LC_ALL=C SHELL=/bin/sh CODEX_EVAL=1)
 for command_name in "${required_commands[@]}"; do
@@ -154,6 +164,7 @@ timeout_command="$("${minimal_env[@]}" /bin/sh -c 'command -v "$1"' sh "$timeout
 auth_material_available="$auth_requested"
 auth_source=none
 brokered_credential=""
+credential_snapshot=""
 claude_settings="$private_dir/claude-settings.json"
 if [[ "$auth_material_available" == true ]]; then
   auth_source=operator-attested-file-broker
@@ -187,6 +198,10 @@ if [[ "$auth_material_available" == true ]]; then
     credential_helper_command='/bin/sh "$TMPDIR/../credential-helper"'
     jq -n --arg helper "$credential_helper_command" '{apiKeyHelper:$helper}' >"$claude_settings"
   fi
+  # Preserve the originally brokered bytes in runner memory. The selected CLI
+  # shares our UID and may rotate or replace its writable credential file; leak
+  # checks must never switch to those later bytes.
+  credential_snapshot="$(<"$brokered_credential")"
 else
   jq -n '{}' >"$claude_settings"
 fi
@@ -287,6 +302,12 @@ normalize_agent_events() {
   fi
 }
 
+assert_credential_absent() {
+  local scan_target="$1"
+  printf '%s' "$credential_snapshot" |
+    "$eval_dir/bin/assert-credential-absent" "$scan_target" -
+}
+
 probe_timeout_seconds="$timeout_seconds"
 ((probe_timeout_seconds > 120)) && probe_timeout_seconds=120
 maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
@@ -323,7 +344,7 @@ probe_exit=$?
 set -e
 normalize_agent_events "$raw_probe_events" "$normalized_probe_events" "$probe_exit"
 if [[ "$auth_material_available" == true ]]; then
-  "$eval_dir/bin/assert-credential-absent" "$workspace" "$brokered_credential"
+  assert_credential_absent "$workspace"
 fi
 EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
   perl "$eval_dir/bin/sanitize-events.pl" "$normalized_probe_events" >"$safe_probe_events"
@@ -354,7 +375,7 @@ if "$eval_dir/bin/probe-allows-scaffold" "$probe_exit" "$probe_result" "$sandbox
   [[ "$runner_exit" == 124 ]] && timed_out=true
   normalize_agent_events "$raw_scaffold_events" "$normalized_scaffold_events" "$runner_exit"
   if [[ "$auth_material_available" == true ]]; then
-    "$eval_dir/bin/assert-credential-absent" "$workspace" "$brokered_credential"
+    assert_credential_absent "$workspace"
   fi
   EVAL_PRIVATE_DIR="$private_dir" EVAL_WORKSPACE="$workspace" EVAL_OUTPUT="$output" \
     perl "$eval_dir/bin/sanitize-events.pl" "$normalized_scaffold_events" >"$safe_scaffold_events"
@@ -426,7 +447,7 @@ checksum_files="$private_dir/checksum-files"
   --write "$output"/*.json >/dev/null
 (cd "$output" && while IFS= read -r file; do shasum -a 256 "$file"; done <"$checksum_files" >SHA256SUMS)
 if [[ "$auth_material_available" == true ]]; then
-  "$eval_dir/bin/assert-credential-absent" "$output" "$brokered_credential"
+  assert_credential_absent "$output"
 fi
 
 echo "recorded run: $output"

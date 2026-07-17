@@ -62,6 +62,19 @@ if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$tmp/model
 fi
 rg -q 'credential bytes found in run output' "$tmp/embedded-credential-error"
 
+# The runner must scan with the originally brokered bytes even if the agent
+# rotates or replaces its writable credential store during execution.
+printf '%s' 'original-credential-snapshot-value' >"$tmp/credential-output/rotated.txt"
+printf '%s' 'rotated-credential-store-value' >"$tmp/model-credential"
+if printf '%s' 'original-credential-snapshot-value' |
+  "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" - \
+    2>"$tmp/immutable-credential-snapshot-error"; then
+  echo "immutable credential snapshot leak was accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/immutable-credential-snapshot-error"
+: >"$tmp/credential-output/rotated.txt"
+
 for newline_mode in newline no-newline; do
   claude_helper_dir="$tmp/claude-helper-$newline_mode"
   mkdir "$claude_helper_dir"
@@ -126,6 +139,28 @@ test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
 test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
   "$tmp/claude-events.normalized.jsonl")" = passed
 printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"structured-timeout","name":"StructuredOutput","input":{"status":"completed","summary":"must not survive timeout","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}]}}' \
+  >"$tmp/structured-timeout-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/structured-timeout-claude-events.jsonl" \
+  "$tmp/structured-timeout-claude-events.normalized.jsonl" 124
+if jq -e 'select(.item.type == "agent_message")' \
+  "$tmp/structured-timeout-claude-events.normalized.jsonl" >/dev/null; then
+  echo "timeout Claude invocation promoted StructuredOutput to a completed report" >&2
+  exit 1
+fi
+printf '%s\n' \
+  '{"type":"result","subtype":"success","structured_output":{"status":"completed","summary":"must not survive failure","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}' \
+  >"$tmp/result-failure-claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/result-failure-claude-events.jsonl" \
+  "$tmp/result-failure-claude-events.normalized.jsonl" 1
+if jq -e 'select(.item.type == "agent_message")' \
+  "$tmp/result-failure-claude-events.normalized.jsonl" >/dev/null; then
+  echo "failed Claude invocation promoted a success result to a completed report" >&2
+  exit 1
+fi
+printf '%s\n' \
   '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"pending-tool","name":"Bash","input":{"command":"sleep 999"}}]}}' \
   >"$tmp/pending-claude-events.jsonl"
 if node "$eval_dir/bin/normalize-claude-events.mjs" \
@@ -180,8 +215,7 @@ printf '%s\n' '{"type":"result","subtype":"success","result":"{\"status\":\"part
 printf '%s' '{"type":"assistant","message":' >>"$tmp/valid-prefix-truncated-tail.jsonl"
 node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/valid-prefix-truncated-tail.jsonl" "$tmp/valid-prefix-truncated-tail.normalized.jsonl" 124
-test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
-  "$tmp/valid-prefix-truncated-tail.normalized.jsonl")" = partial
+test ! -s "$tmp/valid-prefix-truncated-tail.normalized.jsonl"
 
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
@@ -434,8 +468,12 @@ if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
 fi
 test "$(rg -n 'shasum -a 256 \"\$file\"; done <\"\$checksum_files\" >SHA256SUMS' \
   "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
-  "$(rg -n 'assert-credential-absent\" \"\$output\"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
-rg -q 'assert-credential-absent\" \"\$workspace\"' "$eval_dir/bin/run-eval"
+  "$(rg -n 'assert_credential_absent \"\$output\"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+rg -q 'assert_credential_absent \"\$workspace\"' "$eval_dir/bin/run-eval"
+rg -Fq 'credential_snapshot=' "$eval_dir/bin/run-eval"
+rg -Fq 'assert_credential_absent' "$eval_dir/bin/run-eval"
+rg -Fq 'cache=' "$eval_dir/bin/run-eval"
+rg -Fq '.npmrc' "$eval_dir/bin/run-eval"
 rg -Fq '"$eval_dir/bin" "$eval_dir/isolated-host" "$eval_dir/schemas"' \
   "$eval_dir/bin/run-eval"
 

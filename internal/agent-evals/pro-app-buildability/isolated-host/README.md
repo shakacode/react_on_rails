@@ -31,10 +31,13 @@ disposable, otherwise secret-free host. It must not be used to run untrusted
 prompts or to claim model-credential non-disclosure against a hostile agent.
 
 The private directory is removed by the harness traps. Exact credential bytes
-are searched as a binary stream in the workspace after each agent call and in
-the completed output after checksums are written. For Codex JSON credentials,
-sensitive token/key/secret leaf values are searched independently as well. A
-match, unreadable artifact, or output symlink fails closed. The committed output continues to record
+are snapshotted in runner memory before the agent starts, then searched as a
+binary stream in the workspace after each agent call and in the completed
+output after checksums are written. The unchanged snapshot remains authoritative
+even if the CLI rotates or replaces its writable credential store. For Codex
+JSON credentials, sensitive token/key/secret leaf values are searched
+independently as well. A match, unreadable artifact, or output symlink fails
+closed. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 
@@ -65,7 +68,10 @@ dirty repository, an existing output, symlink inputs, permissive credential
 files, and missing credential files. It mounts the repository and linked
 worktree Git metadata read-only, streams the credential on standard input, and
 uses UID/GID-owned tmpfs filesystems for the workspace, runner-private data,
-temporary files, and installed gems.
+temporary files, and installed gems. The runner-private tmpfs stays `noexec`;
+an automatically removed npm cache lives beside the workspace on its executable
+tmpfs so `npx` can run downloaded package shims without widening the agent
+environment allowlist.
 
 The credential source must be outside both the repository and any external Git
 metadata bind. Evidence is first written to a private host staging directory.

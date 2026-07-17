@@ -164,10 +164,13 @@ if (pendingBash.size > 0) {
 }
 
 // Prefer the canonical final `result` payload; fall back to the last
-// StructuredOutput tool call. Emitting the schema-constrained final report as a
-// trailing `agent_message` lets `run-eval` extract it with the same jq filter it
-// uses for Codex.
-const finalReport = resultReport ?? structuredOutputReport;
+// StructuredOutput tool call only when the Claude process itself succeeded.
+// A timeout or other nonzero exit can occur after either event was emitted, so
+// promoting one in that case would let an incomplete call claim completion.
+// Emitting the schema-constrained final report as a trailing `agent_message`
+// lets `run-eval` extract it with the same jq filter it uses for Codex.
+const invocationSucceeded = agentExitCode === null || agentExitCode === 0;
+const finalReport = invocationSucceeded ? (resultReport ?? structuredOutputReport) : null;
 if (finalReport !== null) {
   output.write(
     `${JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: finalReport } })}\n`,
