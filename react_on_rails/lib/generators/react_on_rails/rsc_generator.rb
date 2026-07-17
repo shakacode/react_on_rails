@@ -53,7 +53,7 @@ module ReactOnRails
         if options[:invoked_by_install] || prerequisites_met?
           warn_about_react_version_for_rsc(force: true)
           setup_rsc
-          add_rsc_npm_dependencies
+          add_rsc_npm_dependencies unless options[:invoked_by_install]
           install_agent_guardrails
           print_success_message unless options[:invoked_by_install]
         else
