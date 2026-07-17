@@ -185,12 +185,13 @@ module ReactOnRailsPro
       end
 
       def build_renderer_artifact_snapshot
-        unless Rails.env.development? || Rails.env.test?
-          # Production artifact IDs are already memoized as strings. Keep warm renderer requests lightweight;
-          # Request resolves these identities to captured bytes only if the renderer asks for an upload.
+        unless ReactOnRails.configuration.development_mode
+          # Outside development, the renderer pool owns process-stable artifact IDs. Keep warm renderer requests
+          # lightweight; Request resolves these identities to captured bytes only if the renderer asks for an upload.
+          node_pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
           return [
-            RendererArtifact::Identity.new(role: :server, id: ReactOnRailsPro::Utils.bundle_hash),
-            RendererArtifact::Identity.new(role: :rsc, id: ReactOnRailsPro::Utils.rsc_bundle_hash)
+            RendererArtifact::Identity.new(role: :server, id: node_pool.server_bundle_hash),
+            RendererArtifact::Identity.new(role: :rsc, id: node_pool.rsc_bundle_hash)
           ].freeze
         end
 

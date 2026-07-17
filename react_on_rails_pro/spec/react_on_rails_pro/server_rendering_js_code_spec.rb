@@ -198,6 +198,7 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           ssr_pre_hook_js: nil
         )
         allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRails.configuration).to receive(:development_mode).and_return(true)
         allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
           .with(action_description: "preparing server render", roles: %i[server rsc])
           .and_return([server_artifact, rsc_artifact])
@@ -239,9 +240,10 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
       it "retains only lightweight artifact identities across production renders" do
         server_id = "rorp-v2-s-#{'a' * 64}"
         rsc_id = "rorp-v2-r-#{'b' * 64}"
-        allow(Rails.env).to receive_messages(development?: false, test?: false)
-        allow(ReactOnRailsPro::Utils).to receive_messages(
-          bundle_hash: server_id,
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+        allow(ReactOnRails.configuration).to receive(:development_mode).and_return(false)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+          server_bundle_hash: server_id,
           rsc_bundle_hash: rsc_id
         )
         identities = [
@@ -262,6 +264,35 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         expect(ReactOnRailsPro::Utils).not_to have_received(:renderer_artifacts)
         expect(render_options).to have_received(:set_option)
           .with(:renderer_artifact_snapshot, identities).twice
+      end
+
+      it "uses stable pool identities in Rails test when development mode is disabled" do
+        server_id = "rorp-v2-s-#{'c' * 64}"
+        rsc_id = "rorp-v2-r-#{'d' * 64}"
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("test"))
+        allow(ReactOnRails.configuration).to receive(:development_mode).and_return(false)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool).to receive_messages(
+          server_bundle_hash: server_id,
+          rsc_bundle_hash: rsc_id
+        )
+
+        described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(ReactOnRailsPro::Utils).not_to have_received(:renderer_artifacts)
+        expect(render_options).to have_received(:set_option)
+          .with(
+            :renderer_artifact_snapshot,
+            [
+              ReactOnRailsPro::RendererArtifact::Identity.new(role: :server, id: server_id),
+              ReactOnRailsPro::RendererArtifact::Identity.new(role: :rsc, id: rsc_id)
+            ]
+          )
       end
     end
   end
