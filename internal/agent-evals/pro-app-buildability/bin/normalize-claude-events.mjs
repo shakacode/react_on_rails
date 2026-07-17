@@ -58,7 +58,9 @@ let resultReport = null;
 let structuredOutputReport = null;
 
 const emitCommand = (command, isError, rawOutput) => {
-  if (commandCount >= MAX_COMMANDS) return;
+  if (commandCount >= MAX_COMMANDS) {
+    throw new Error(`Claude transcript exceeds ${MAX_COMMANDS}-command normalization limit`);
+  }
   commandCount += 1;
   const item = {
     type: 'command_execution',
@@ -75,21 +77,27 @@ const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
 for await (const line of rl) {
   bytesRead += Buffer.byteLength(line, 'utf8') + 1;
-  if (bytesRead > MAX_INPUT_BYTES) break;
+  if (bytesRead > MAX_INPUT_BYTES) {
+    throw new Error(`Claude transcript exceeds ${MAX_INPUT_BYTES}-byte normalization limit`);
+  }
   const trimmed = line.trim();
   if (!trimmed) continue;
   let event;
   try {
     event = JSON.parse(trimmed);
   } catch {
-    continue;
+    throw new Error('Claude stream-json transcript contains a malformed event');
   }
   if (event?.type === 'assistant') {
     const blocks = event.message?.content;
     if (Array.isArray(blocks)) {
       for (const block of blocks) {
         if (block?.type !== 'tool_use') continue;
-        if (block.name === 'Bash' && typeof block.input?.command === 'string' && typeof block.id === 'string') {
+        if (
+          block.name === 'Bash' &&
+          typeof block.input?.command === 'string' &&
+          typeof block.id === 'string'
+        ) {
           pendingBash.set(block.id, block.input.command);
         } else if (block.name === 'StructuredOutput' && block.input && typeof block.input === 'object') {
           structuredOutputReport = JSON.stringify(block.input);
@@ -108,12 +116,18 @@ for await (const line of rl) {
       }
     }
   } else if (event?.type === 'result' && event.subtype === 'success') {
-    if (typeof event.result === 'string' && event.result.length > 0) {
+    if (event.structured_output && typeof event.structured_output === 'object') {
+      resultReport = JSON.stringify(event.structured_output);
+    } else if (typeof event.result === 'string' && event.result.length > 0) {
       resultReport = event.result;
     } else if (event.result && typeof event.result === 'object') {
       resultReport = JSON.stringify(event.result);
     }
   }
+}
+
+if (pendingBash.size > 0) {
+  throw new Error('Claude transcript ended with incomplete Bash tool calls');
 }
 
 // Prefer the canonical final `result` payload; fall back to the last

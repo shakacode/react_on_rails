@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+usage() {
+  echo "usage: $0 --agent codex|claude --model MODEL --timeout SECONDS --model-credential-file FILE --output ABSOLUTE_PATH" >&2
+}
+
+agent=""
+model=""
+timeout_seconds=""
+model_credential_file=""
+output=""
+while (($#)); do
+  case "$1" in
+    --agent) agent="${2:-}"; shift 2 ;;
+    --model) model="${2:-}"; shift 2 ;;
+    --timeout) timeout_seconds="${2:-}"; shift 2 ;;
+    --model-credential-file) model_credential_file="${2:-}"; shift 2 ;;
+    --output) output="${2:-}"; shift 2 ;;
+    *) usage; exit 64 ;;
+  esac
+done
+
+[[ "$agent" == codex || "$agent" == claude ]] || { usage; exit 64; }
+[[ -n "$model" && "$timeout_seconds" =~ ^[1-9][0-9]*$ && "$output" = /* ]] || {
+  usage
+  exit 64
+}
+[[ ! -L "$model_credential_file" && -f "$model_credential_file" && -s "$model_credential_file" ]] || {
+  echo "model credential must be a nonempty regular file, not a symbolic link" >&2
+  exit 65
+}
+credential_mode="$(stat -f '%Lp' "$model_credential_file" 2>/dev/null || \
+  stat -c '%a' "$model_credential_file" 2>/dev/null)" || {
+  echo "cannot determine model credential permissions" >&2
+  exit 65
+}
+[[ "$credential_mode" =~ ^[0-7]{3,4}$ ]] || {
+  echo "unexpected model credential permission format" >&2
+  exit 65
+}
+(( (8#$credential_mode & 077) == 0 )) || {
+  echo "model credential must not be group- or world-accessible" >&2
+  exit 65
+}
+[[ ! -L "$output" && ! -e "$output" ]] || {
+  echo "output must not already exist or be a symbolic link" >&2
+  exit 65
+}
+
+for command_name in docker git realpath; do
+  command -v "$command_name" >/dev/null || {
+    echo "missing required command: $command_name" >&2
+    exit 69
+  }
+done
+
+root="$(git rev-parse --show-toplevel)"
+[[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
+  echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
+  exit 65
+}
+credential_real="$(realpath "$model_credential_file")"
+output_parent="$(dirname "$output")"
+[[ -d "$output_parent" ]] || { echo "output parent must exist" >&2; exit 65; }
+output_parent="$(realpath "$output_parent")"
+image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
+host_uid="$(id -u)"
+host_gid="$(id -g)"
+git_common_dir="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
+staging_parent="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-output.XXXXXX")"
+cleanup_staging() {
+  if [[ -d "$staging_parent/run" && ! -e "$output" ]]; then
+    mv "$staging_parent/run" "$output"
+  fi
+  rmdir "$staging_parent" 2>/dev/null || true
+}
+trap cleanup_staging EXIT
+trap 'exit 130' INT TERM
+
+docker_args=(
+  run --rm --interactive
+  --read-only
+  --cap-drop ALL
+  --security-opt no-new-privileges
+  --user "$host_uid:$host_gid"
+  --mount "type=bind,source=$root,target=/repo,readonly"
+  --mount "type=bind,source=$staging_parent,target=/evidence"
+  --tmpfs "/tmp:rw,noexec,nosuid,nodev,mode=1777,uid=$host_uid,gid=$host_gid"
+  --tmpfs "/run/eval-private:rw,noexec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
+  --tmpfs "/workspace:rw,exec,nosuid,nodev,mode=0700,uid=$host_uid,gid=$host_gid"
+  --tmpfs "/usr/local/bundle:rw,exec,nosuid,nodev,mode=1777,uid=$host_uid,gid=$host_gid"
+  --env TMPDIR=/run/eval-private
+  --env EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability
+  --workdir /repo
+)
+case "$git_common_dir/" in
+  "$root/"*) ;;
+  *) docker_args+=(--mount "type=bind,source=$git_common_dir,target=$git_common_dir,readonly") ;;
+esac
+
+docker "${docker_args[@]}" \
+  "$image" \
+  internal/agent-evals/pro-app-buildability/bin/run-eval \
+    --agent "$agent" \
+    --model "$model" \
+    --timeout "$timeout_seconds" \
+    --workspace /workspace/run \
+    --output /evidence/run \
+    --model-credential-stdin \
+    --ack-disposable-secret-free-host \
+  <"$credential_real"
+
+[[ -d "$staging_parent/run" && ! -e "$output" ]] || {
+  echo "container completed without a uniquely deliverable run output" >&2
+  exit 1
+}
+mv "$staging_parent/run" "$output"
+rmdir "$staging_parent"
+trap - EXIT

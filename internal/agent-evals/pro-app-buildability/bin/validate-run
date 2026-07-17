@@ -5,11 +5,13 @@ run_dir="${1:-}"
 [[ -d "$run_dir" ]] || { echo "usage: $0 RUN_DIRECTORY" >&2; exit 64; }
 root="$(git rev-parse --show-toplevel)"
 eval_dir="$root/internal/agent-evals/pro-app-buildability"
+dependency_root="${EVAL_HARNESS_DEPENDENCY_ROOT:-$eval_dir}"
 
 for command in jq node rg shasum; do
   command -v "$command" >/dev/null || { echo "missing required command: $command" >&2; exit 69; }
 done
-[[ -d "$eval_dir/node_modules/ajv" && -d "$eval_dir/node_modules/ajv-formats" && -d "$eval_dir/node_modules/prettier" ]] || {
+[[ -d "$dependency_root/node_modules/ajv" && -d "$dependency_root/node_modules/ajv-formats" && \
+  -d "$dependency_root/node_modules/prettier" ]] || {
   echo "install pinned validator dependencies: pnpm --dir $eval_dir install --frozen-lockfile --ignore-workspace" >&2
   exit 69
 }
@@ -39,6 +41,15 @@ jq -e --slurpfile invocation "$run_dir/invocation.json" \
     .runner.maximum_agent_call_wall_clock_seconds ==
       $invocation[0].maximum_agent_call_wall_clock_seconds' \
   "$run_dir/run.json" >/dev/null || { echo "run/invocation timeout budgets disagree" >&2; exit 1; }
+jq -e --slurpfile invocation "$run_dir/invocation.json" \
+  '.agent.name == ($invocation[0].agent // "codex") and
+    .agent.model == $invocation[0].model and
+    .security.credential_store == $invocation[0].credential_store and
+    .security.auth_material_available == $invocation[0].auth_material_available and
+    (.security.auth_source // "none") == ($invocation[0].auth_source // "none") and
+    .runner.sandbox_network_access == $invocation[0].sandbox_network_access and
+    .runner.isolated_host_attestation == $invocation[0].isolated_host_attestation' \
+  "$run_dir/run.json" >/dev/null || { echo "run/invocation security or agent identity disagrees" >&2; exit 1; }
 
 recorded_revision="$(jq -r .repository.revision "$run_dir/run.json")"
 while IFS=$'\t' read -r relative expected; do

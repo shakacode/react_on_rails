@@ -8,6 +8,81 @@ trap 'rm -rf "$tmp"' EXIT INT TERM
 
 node "$eval_dir/bin/validate-json.mjs" --schemas-only
 
+(cd "$eval_dir" && node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+
+const ajv = new Ajv2020({ allErrors: true, strict: true });
+addFormats(ajv);
+const load = (path) => JSON.parse(fs.readFileSync(path, 'utf8'));
+const invocationValidate = ajv.compile(load('schemas/invocation.schema.json'));
+const runValidate = ajv.compile(load('schemas/run.schema.json'));
+const fixtureDir = 'runs/2026-07-12-codex-gpt-5.4-final21-network-off';
+const invocation = load(`${fixtureDir}/invocation.json`);
+Object.assign(invocation, {
+  agent: 'codex',
+  auth_material_available: true,
+  auth_source: 'operator-attested-file-broker',
+  isolated_host_attestation: false,
+});
+if (invocationValidate(invocation)) throw new Error('unattested invocation accepted auth material');
+invocation.isolated_host_attestation = true;
+if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
+
+const run = load(`${fixtureDir}/run.json`);
+Object.assign(run.security, {
+  auth_material_available: true,
+  auth_source: 'operator-attested-file-broker',
+});
+run.runner.isolated_host_attestation = false;
+if (runValidate(run)) throw new Error('unattested run accepted auth material');
+run.runner.isolated_host_attestation = true;
+if (!runValidate(run)) throw new Error(ajv.errorsText(runValidate.errors));
+NODE
+)
+
+mkdir "$tmp/credential-output"
+printf '%s' 'test-model-credential-with-embedded-byte-check' >"$tmp/model-credential"
+printf '%s' 'prefix:test-model-credential-with-embedded-byte-check:suffix' \
+  >"$tmp/credential-output/embedded.txt"
+if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$tmp/model-credential" \
+  2>"$tmp/embedded-credential-error"; then
+  echo "embedded credential bytes were accepted in run output" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/embedded-credential-error"
+
+mkdir "$tmp/unattested-workspace"
+if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
+  --workspace "$tmp/unattested-workspace" --output "$tmp/unattested-output" \
+  --model-credential-file "$tmp/model-credential" 2>"$tmp/unattested-credential-error"; then
+  echo "model credential was accepted without isolated-host attestation" >&2
+  exit 1
+fi
+rg -q 'model credentials require --ack-disposable-secret-free-host' \
+  "$tmp/unattested-credential-error"
+
+printf '%s\n' \
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"npm view create-react-on-rails-app version --json"}}]}}' \
+  '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-1","content":"1.0.0","is_error":false}]}}' \
+  '{"type":"result","subtype":"success","structured_output":{"status":"passed","summary":"done","commands":[],"checks":[],"friction":[],"human_interventions":0,"blockers":[]}}' \
+  >"$tmp/claude-events.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/claude-events.jsonl" "$tmp/claude-events.normalized.jsonl"
+test "$(jq -r 'select(.item.type == "command_execution") | .item.command' \
+  "$tmp/claude-events.normalized.jsonl")" = 'npm view create-react-on-rails-app version --json'
+test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
+  "$tmp/claude-events.normalized.jsonl")" = passed
+printf '%s\n' 'not-json' >"$tmp/malformed-claude-events.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-claude-events.jsonl" "$tmp/malformed-claude-events.normalized.jsonl" \
+  2>"$tmp/malformed-claude-events-error"; then
+  echo "malformed Claude stream-json event was accepted" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-claude-events-error"
+
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \
   'AWS_ACCESS_KEY_ID=aws-access-key-01234' \
@@ -232,8 +307,13 @@ rg -q 'scaffold_timeout_seconds:\$scaffold_timeout' "$eval_dir/bin/run-eval"
 rg -q 'maximum_agent_call_wall_clock_seconds:\$maximum_agent_wall_clock' "$eval_dir/bin/run-eval"
 rg -q 'invocation timeout budget mismatch' "$eval_dir/bin/validate-run"
 rg -q 'run/invocation timeout budgets disagree' "$eval_dir/bin/validate-run"
+rg -q 'run/invocation security or agent identity disagrees' "$eval_dir/bin/validate-run"
 rg -q 'cli_auth_credentials_store=.?file' "$eval_dir/bin/run-eval"
-rg -q 'auth_material_available:false' "$eval_dir/bin/run-eval"
+rg -q 'auth_material_available:\$auth_material_available' "$eval_dir/bin/run-eval"
+rg -q 'auth_source:\$auth_source' "$eval_dir/bin/run-eval"
+rg -q -- '--model-credential-file' "$eval_dir/bin/run-eval"
+rg -q 'agent_args=.*-p --bare' "$eval_dir/bin/run-eval"
+rg -q 'apiKeyHelper:\$helper' "$eval_dir/bin/run-eval"
 rg -q 'node npm perl pnpm' "$eval_dir/bin/run-eval"
 rg -q 'CODEX_HOME=\$private_dir/codex-home' "$eval_dir/bin/run-eval"
 rg -q 'rubygems_probe_command="gem search --remote --exact '\''\^rails\$'\''"' "$eval_dir/bin/run-eval"
@@ -248,6 +328,79 @@ if rg -q 'host_home|CODEX_EVAL_HOME|CODEX_AUTH_FILE' "$eval_dir/bin/run-eval"; t
 fi
 if rg -q 'cp .*auth|install .*auth' "$eval_dir/bin/run-eval"; then
   echo "runner must not copy authentication into the sandbox filesystem" >&2
+  exit 1
+fi
+test "$(rg -n 'shasum -a 256 \"\$file\"; done <\"\$checksum_files\" >SHA256SUMS' \
+  "$eval_dir/bin/run-eval" | cut -d: -f1)" -lt \
+  "$(rg -n 'assert-credential-absent\" \"\$output\"' "$eval_dir/bin/run-eval" | cut -d: -f1)"
+rg -q 'assert-credential-absent\" \"\$workspace\"' "$eval_dir/bin/run-eval"
+rg -Fq '"$eval_dir/bin" "$eval_dir/isolated-host" "$eval_dir/schemas"' \
+  "$eval_dir/bin/run-eval"
+
+isolated_host="$eval_dir/isolated-host"
+bash -n "$isolated_host/run-in-container"
+test -x "$isolated_host/run-in-container"
+rg -Fq -- '--mount "type=bind,source=$root,target=/repo,readonly"' \
+  "$isolated_host/run-in-container"
+rg -Fq -- '--mount "type=bind,source=$staging_parent,target=/evidence"' \
+  "$isolated_host/run-in-container"
+rg -Fq -- '--read-only' "$isolated_host/run-in-container"
+rg -Fq -- '--cap-drop ALL' "$isolated_host/run-in-container"
+rg -Fq -- '--security-opt no-new-privileges' "$isolated_host/run-in-container"
+rg -Fq -- '--model-credential-stdin' "$isolated_host/run-in-container"
+rg -Fq -- '<"$credential_real"' "$isolated_host/run-in-container"
+rg -Fq -- 'uid=$host_uid,gid=$host_gid' "$isolated_host/run-in-container"
+rg -Fq -- 'source=$git_common_dir,target=$git_common_dir,readonly' \
+  "$isolated_host/run-in-container"
+rg -Fq -- 'EVAL_HARNESS_DEPENDENCY_ROOT=/opt/pro-app-buildability' \
+  "$isolated_host/run-in-container"
+rg -Fq -- 'pnpm --dir /opt/pro-app-buildability install --frozen-lockfile --ignore-workspace' \
+  "$isolated_host/Dockerfile"
+rg -Fq -- "createRequire(path.join(dependencyRoot, 'package.json'))" \
+  "$eval_dir/bin/validate-json.mjs"
+if rg -q 'operator-model-credential|source=\$credential_real' "$isolated_host/run-in-container"; then
+  echo "isolated host must stream the credential instead of mounting it" >&2
+  exit 1
+fi
+if rg -q 'ANTHROPIC_API_KEY|OPENAI_API_KEY|REACT_ON_RAILS_PRO_LICENSE' \
+  "$isolated_host/Dockerfile" "$isolated_host/run-in-container"; then
+  echo "isolated host must not place credentials or licenses in build args or environment" >&2
+  exit 1
+fi
+
+mkdir "$tmp/wrapper-repo" "$tmp/fake-bin" "$tmp/wrapper-output-parent"
+git -C "$tmp/wrapper-repo" init --quiet
+printf '%s\n' tracked >"$tmp/wrapper-repo/tracked"
+git -C "$tmp/wrapper-repo" add tracked
+git -C "$tmp/wrapper-repo" -c user.name=Eval -c user.email=eval@example.test \
+  commit --quiet -m fixture
+printf '%s' 'wrapper-test-model-credential' >"$tmp/wrapper-model-credential"
+chmod 600 "$tmp/wrapper-model-credential"
+# The generated fake expands these variables when the wrapper invokes it.
+# shellcheck disable=SC2016
+printf '%s\n' '#!/bin/sh' 'set -eu' \
+  'printf "%s\n" "$@" >"$FAKE_DOCKER_ARGS"' \
+  'for argument do' \
+  '  case "$argument" in' \
+  '    type=bind,source=*,target=/evidence) evidence=${argument#type=bind,source=}; evidence=${evidence%,target=/evidence}; mkdir "$evidence/run" ;;' \
+  '  esac' \
+  'done' \
+  'shasum -a 256 | awk '\''{print $1}'\'' >"$FAKE_DOCKER_STDIN_SHA"' \
+  >"$tmp/fake-bin/docker"
+chmod +x "$tmp/fake-bin/docker"
+(cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-args" \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/run")
+test "$(cat "$tmp/fake-docker-stdin-sha")" = \
+  "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
+rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
+if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
+  echo "wrapper exposed the host credential path to the container command" >&2
   exit 1
 fi
 

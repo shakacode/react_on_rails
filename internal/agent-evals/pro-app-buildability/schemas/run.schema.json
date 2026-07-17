@@ -85,7 +85,6 @@
         "shell_environment_inherit",
         "credential_store",
         "auth_material_available",
-        "auth_source",
         "stripped_sensitive_variable_categories",
         "raw_cleanup",
         "auth_material_persisted"
@@ -187,6 +186,38 @@
           }
         },
         "required": ["runner"]
+      },
+      "else": {
+        "type": "object",
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "auth_source": { "const": "none" } }
+          }
+        },
+        "required": ["security"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "auth_material_available": { "const": true } },
+            "required": ["auth_material_available"]
+          }
+        },
+        "required": ["security"]
+      },
+      "then": {
+        "properties": {
+          "security": {
+            "type": "object",
+            "properties": { "auth_source": { "const": "operator-attested-file-broker" } },
+            "required": ["auth_source"]
+          }
+        },
+        "required": ["security"]
       }
     }
   ]

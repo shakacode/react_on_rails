@@ -4,7 +4,6 @@
   "additionalProperties": false,
   "required": [
     "command",
-    "agent",
     "model",
     "scaffold_timeout_seconds",
     "probe_timeout_seconds",
@@ -20,7 +19,6 @@
     "capability_probe",
     "credential_store",
     "auth_material_available",
-    "auth_source",
     "human_followups_sent",
     "shell_environment_policy"
   ],
@@ -71,7 +69,22 @@
     },
     {
       "if": { "properties": { "auth_material_available": { "const": true } } },
-      "then": { "properties": { "isolated_host_attestation": { "const": true } } }
+      "then": {
+        "properties": {
+          "isolated_host_attestation": { "const": true },
+          "auth_source": { "const": "operator-attested-file-broker" }
+        },
+        "required": ["auth_source"]
+      },
+      "else": { "properties": { "auth_source": { "const": "none" } } }
+    },
+    {
+      "if": { "properties": { "agent": { "const": "codex" } }, "required": ["agent"] },
+      "then": { "properties": { "command": { "const": "codex exec" } } }
+    },
+    {
+      "if": { "properties": { "agent": { "const": "claude" } }, "required": ["agent"] },
+      "then": { "properties": { "command": { "const": "claude -p" } } }
     }
   ]
 }

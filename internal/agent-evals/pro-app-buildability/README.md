@@ -49,30 +49,29 @@ captures:
   dependency manifest, and lockfile input.
 
 The repository and workspace must be clean, and workspace/output real paths
-must be disjoint. Before invoking Codex, the runner requires GNU `timeout` and
+must be disjoint. Before invoking the selected agent, the runner requires GNU `timeout` and
 checks npm and RubyGems from the same minimal environment used for the run.
-Codex is ephemeral, ignores user configuration/rules, disables multi-agent
-work, uses the workspace-write sandbox, and receives an explicit model and
-timeout. Both the Codex process and its shell tools start from `env -i` with
-private empty `HOME` and `CODEX_HOME` directories inside the temporary run
-directory. Tool environment inheritance is `none`, with only `PATH`, private
-`HOME` and `TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
+Codex runs ephemeral with strict ignored user configuration and rules. Claude
+runs `--bare` without session persistence, slash commands, plugins, Chrome,
+MCP servers, or the Agent tool. Both receive an explicit model and timeout and
+start from `env -i` with private homes inside the temporary run directory. Tool
+environment inheritance is `none`, with only `PATH`, private `HOME` and
+`TMPDIR`, locale, shell, and `CODEX_EVAL` added back.
 
 `--timeout` is the scaffold-agent call budget. The capability probe has its own
 `min(--timeout, 120)` budget. `invocation.json` and `run.json` record both plus
 `maximum_agent_call_wall_clock_seconds`, their sum when both agent calls consume
-their full budgets. That maximum covers Codex call time only; small runner
+their full budgets. That maximum covers agent call time only; small runner
 preflight, sanitization, evidence derivation, and validation overhead is outside
 it.
 
-The configured file credential store is inside that empty disposable
-`CODEX_HOME`; no credential is copied, inherited, or mounted into the process.
-Private homes prevent default discovery and inheritance, but the workspace-write
-sandbox does **not** confine absolute-path reads from the host. The default local
-eval therefore keeps model-shell network access off and cannot proceed to
-scaffolding. Until a separately reviewed credential broker or stronger
-execution boundary exists, the default run records an authentication-blocked
-`incomplete` result. This is known evidence, not a supported onboarding claim.
+The configured file credential store is inside the mode-`0700` disposable
+private directory. Without `--model-credential-file`, no credential is copied
+or inherited into the process. Private homes prevent default discovery and
+inheritance, but the workspace-write sandbox does **not** confine absolute-path
+reads from the host. The default local eval therefore keeps model-shell network
+access off and records an authentication-blocked `incomplete` result. This is
+known evidence, not a supported onboarding claim.
 
 A network-enabled capability/scaffold run is allowed only on a disposable VM or
 container that contains no host secrets. The operator must acknowledge that
@@ -93,11 +92,38 @@ turn must run the exact commands in `network-probe-prompt.md`; a missing command
 nonzero exit, disabled sandbox network, missing attestation, or evidence-limit
 overflow fails closed and prevents scaffolding.
 
-Raw events and stderr live only under a mode-`0700` temporary directory. No
-authentication material is made available to the process. `umask 077` applies throughout, and
-`EXIT`/`INT`/`TERM` traps delete the directory. Generic categories of stripped
-sensitive parent variables are recorded without exposing the operator's exact
-variable names; their values are neither read nor passed to the agent.
+Credentialed runs additionally require `--model-credential-file` and refuse
+that option without the isolated-host attestation. Codex accepts a complete
+`auth.json` object; Claude accepts one nonempty API-key line. The operator input
+must be a non-symlink file with no group/world access. The broker copies it only
+into the disposable private directory, never widens environment inheritance,
+and records `auth_material_available: true` with
+`auth_source: operator-attested-file-broker`. Use the reviewed container wrapper
+instead of running this directly on a workstation:
+
+```bash
+docker build --tag react-on-rails-pro-app-eval:local \
+  --file internal/agent-evals/pro-app-buildability/isolated-host/Dockerfile \
+  internal/agent-evals/pro-app-buildability
+
+internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \
+  --agent claude --model sonnet --timeout 2700 \
+  --model-credential-file /secure/operator/claude-api-key \
+  --output /absolute/path/to/eval-output/local-claude
+```
+
+See [`isolated-host/README.md`](isolated-host/README.md) for the threat model,
+mounts, credential formats, and license boundary. Image build and harness tests
+never run an eval and require no model credential or Pro license.
+
+Raw events and stderr live only under a mode-`0700` temporary directory. When
+the broker is enabled, authentication is available only through the selected
+agent's private file-backed mechanism; otherwise it is unavailable. `umask 077`
+applies throughout, and `EXIT`/`INT`/`TERM` traps delete the directory. Generic
+categories of stripped sensitive parent variables are recorded without
+exposing the operator's exact variable names; their values are neither read nor
+passed to the agent. Exact credential bytes are rejected if they appear in the
+workspace or completed output, including when embedded inside a larger file.
 
 Evidence parsing is bounded before JSON parsing or file reads. Event bytes and
 event count, visited/selected artifact counts, recursion depth, per-file bytes,
