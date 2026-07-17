@@ -4761,7 +4761,13 @@ describe InstallGenerator, type: :generator do
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
+      shakapacker_watch_template = File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/bin/shakapacker-watch",
+        __dir__
+      )
 
+      expect(install_generator).to receive(:copy_file)
+        .with(shakapacker_watch_template, "bin/shakapacker-watch")
       expect(install_generator).to receive(:say_status)
         .with(:gsub, "bin/dev", true)
         .twice
@@ -6298,6 +6304,58 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('DEFAULT_ROUTE = "hello_world"')
         expect(content).to include("ReactOnRails::Dev::ServerManager")
       end
+    end
+
+    it "preserves an existing Shakapacker watch binstub without prompting or changing its permissions" do
+      shakapacker_watch = <<~RUBY
+        #!/usr/bin/env ruby
+        puts "Shakapacker-owned watcher"
+      RUBY
+      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
+      simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
+      File.chmod(0o640, shakapacker_watch_path)
+
+      expect(install_generator.shell).not_to receive(:file_collision)
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      expect(File.read(shakapacker_watch_path)).to eq(shakapacker_watch)
+      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o640)
+    end
+
+    it "preserves an existing Shakapacker watch binstub when run with --force" do
+      shakapacker_watch = <<~RUBY
+        #!/usr/bin/env ruby
+        puts "Customized watcher"
+      RUBY
+      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
+      force_generator = described_class.new([], { force: true }, destination_root:)
+      simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
+      File.chmod(0o640, shakapacker_watch_path)
+
+      Dir.chdir(destination_root) do
+        force_generator.send(:add_bin_scripts)
+      end
+
+      expect(File.read(shakapacker_watch_path)).to eq(shakapacker_watch)
+      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o640)
+    end
+
+    it "installs the React on Rails Shakapacker watch fallback when the binstub is absent" do
+      template_path = File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/bin/shakapacker-watch",
+        __dir__
+      )
+      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      expect(File.read(shakapacker_watch_path)).to eq(File.read(template_path))
+      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o755)
     end
 
     it "detects custom bin/dev files" do
