@@ -64,6 +64,11 @@ module ReactOnRailsPro
       ROLE_CODES.key(value.to_s.delete_prefix("#{ID_PREFIX}-").slice(0))
     end
 
+    def self.safe_companion_name?(value)
+      name = value.to_s.dup.force_encoding(Encoding::UTF_8)
+      name.valid_encoding? && SAFE_COMPANION_NAME_PATTERN.match?(name)
+    end
+
     # Materializes only this value object's captured bytes and removes them as
     # soon as the synchronous consumer returns. This lets path-based adapter
     # APIs and tarball composition use the exact bytes bound into +id+ without
@@ -94,8 +99,8 @@ module ReactOnRailsPro
     def normalize_companions(companions)
       casefolded_names = {}
       companions.to_h.each_with_object({}) do |(basename, source), mapping|
-        name = basename.to_s
-        unless safe_companion_name?(name)
+        name = basename.to_s.dup.force_encoding(Encoding::UTF_8)
+        unless self.class.safe_companion_name?(name)
           raise ArgumentError, "Renderer artifact companion name must be a safe flat basename: #{name.inspect}"
         end
 
@@ -109,10 +114,6 @@ module ReactOnRailsPro
         casefolded_names[name.downcase] = name
         mapping[name] = source.is_a?(InlineCompanion) ? source : Pathname.new(source.to_s)
       end.freeze
-    end
-
-    def safe_companion_name?(name)
-      SAFE_COMPANION_NAME_PATTERN.match?(name)
     end
 
     def build_id

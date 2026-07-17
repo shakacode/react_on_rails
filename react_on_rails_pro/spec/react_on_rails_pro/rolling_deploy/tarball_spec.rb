@@ -59,6 +59,16 @@ describe ReactOnRailsPro::RollingDeploy::Tarball do
     end
   end
 
+  it "normalizes valid UTF-8 tar header bytes tagged as binary" do
+    Dir.mktmpdir("ror-pro-tarball") do |directory|
+      binary_name = "café.json".b
+
+      expect(described_class.extract(unchecked_tarball(binary_name), directory)).to eq(["café.json"])
+      expect(Dir.children(directory)).to eq(["café.json"])
+      expect(Dir.children(directory).first.encoding).to eq(Encoding::UTF_8)
+    end
+  end
+
   it "rejects unsafe entry names during composition" do
     Dir.mktmpdir("ror-pro-tarball") do |directory|
       source = File.join(directory, "source.json")
@@ -72,11 +82,32 @@ describe ReactOnRailsPro::RollingDeploy::Tarball do
     end
   end
 
+  it "rejects invalid UTF-8 entry names during composition" do
+    Dir.mktmpdir("ror-pro-tarball") do |directory|
+      source = File.join(directory, "source.json")
+      File.write(source, "payload")
+      invalid_name = "manifest-\xff.json".b
+
+      expect { compose(invalid_name => source) }
+        .to raise_error(ReactOnRailsPro::Error, /not valid UTF-8/)
+    end
+  end
+
   it "rejects unsafe entry names during extraction" do
     Dir.mktmpdir("ror-pro-tarball") do |directory|
       expect { described_class.extract(unchecked_tarball("../escape"), directory) }
         .to raise_error(ReactOnRailsPro::Error, /not a safe basename/)
       expect(File.exist?(File.join(directory, "..", "escape"))).to be(false)
+    end
+  end
+
+  it "rejects invalid UTF-8 entry names during extraction" do
+    Dir.mktmpdir("ror-pro-tarball") do |directory|
+      invalid_name = "manifest-\xff.json".b
+
+      expect { described_class.extract(unchecked_tarball(invalid_name), directory) }
+        .to raise_error(ReactOnRailsPro::Error, /not valid UTF-8/)
+      expect(Dir.children(directory)).to be_empty
     end
   end
 end

@@ -156,7 +156,14 @@ module ReactOnRailsPro
 
       def validate_compose_entries!(entries)
         entries.each do |name, path|
-          unless ENTRY_NAME_PATTERN.match?(name.to_s)
+          raw_name = name.to_s
+          utf8_name = raw_name.dup.force_encoding(Encoding::UTF_8)
+          unless utf8_name.valid_encoding?
+            raise ReactOnRailsPro::Error,
+                  "Tarball entry name #{raw_name.inspect} is not valid UTF-8."
+          end
+
+          unless ReactOnRailsPro::RendererArtifact.safe_companion_name?(utf8_name)
             raise ReactOnRailsPro::Error,
                   "Tarball entry name #{name.inspect} is not a safe basename. " \
                   "Allowed: flat basenames without slashes, backslashes, colons, or control characters."
@@ -193,8 +200,17 @@ module ReactOnRailsPro
         # so a legitimate `./bundle.js` doesn't get rejected. The shared flat-
         # basename contract still rejects subdirectories and traversal names.
         raw = entry.full_name.to_s
-        name = raw.delete_prefix("./")
-        unless ENTRY_NAME_PATTERN.match?(name)
+        # Ruby 3.3 tags tar header bytes as ASCII-8BIT even when they contain a
+        # valid UTF-8 filename. The wire contract uses UTF-8 names: retag valid
+        # bytes before matching/writing, and reject malformed input instead of
+        # passing ambiguous bytes to the filesystem.
+        name = raw.dup.force_encoding(Encoding::UTF_8)
+        unless name.valid_encoding?
+          raise ReactOnRailsPro::Error,
+                "Rolling-deploy tarball entry name #{raw.inspect} is not valid UTF-8."
+        end
+        name = name.delete_prefix("./")
+        unless ReactOnRailsPro::RendererArtifact.safe_companion_name?(name)
           raise ReactOnRailsPro::Error,
                 "Rolling-deploy tarball entry name #{raw.inspect} is not a safe basename. " \
                 "Allowed: flat basenames without slashes, backslashes, colons, control characters, or `.` / `..`."

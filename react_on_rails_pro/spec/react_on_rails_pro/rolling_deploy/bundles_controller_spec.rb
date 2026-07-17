@@ -326,6 +326,30 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
       end
     end
 
+    it "does not advertise malformed UTF-8 companion names from an artifact-like source" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        root = File.realpath(root)
+        bundle = File.join(root, "server.js")
+        companion = File.join(root, "manifest.json")
+        File.write(bundle, "bundle")
+        File.write(companion, "{}")
+        malformed_name = "manifest-\xff.json".b
+        artifact = instance_double(
+          ReactOnRailsPro::RendererArtifact,
+          id: "rorp-v2-s-#{'a' * 64}",
+          bundle: Pathname.new(bundle),
+          companions: { malformed_name => Pathname.new(companion) }
+        )
+        logger = instance_double(Logger, warn: nil)
+        allow(Rails).to receive_messages(root: Pathname.new(root), logger:)
+        allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+
+        expect(controller.send(:safe_current_artifacts)).to eq([])
+        expect(logger).to have_received(:warn).with(/cannot be served as a complete artifact/)
+      end
+    end
+
     it "omits an artifact when a companion resolves outside Rails.root" do
       Dir.mktmpdir("ror-pro-root") do |root|
         Dir.mktmpdir("ror-pro-outside") do |outside|

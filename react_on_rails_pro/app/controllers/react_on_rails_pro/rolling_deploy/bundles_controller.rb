@@ -247,7 +247,7 @@ module ReactOnRailsPro
 
         invalid = artifact.companions.find do |name, source|
           source.is_a?(RendererArtifact::InlineCompanion) ||
-            !ReactOnRailsPro::RollingDeploy::Tarball::ENTRY_NAME_PATTERN.match?(name) ||
+            !RendererArtifact.safe_companion_name?(name) ||
             !safe_companion_asset_path(source.to_s, rails_root, rails_root)
         end
         return true unless invalid

@@ -178,6 +178,16 @@ module ReactOnRailsPro
       end
     end
 
+    it "rejects malformed UTF-8 companion names" do
+      bundle = write_file("bundle.js", "bundle")
+      manifest = write_file("manifest.json", "manifest")
+      malformed_name = "manifest-\xff.json".b
+
+      expect do
+        described_class.new(role: :server, bundle:, companions: { malformed_name => manifest })
+      end.to raise_error(ArgumentError, /safe flat basename/)
+    end
+
     it "rejects a companion that would overwrite the materialized bundle" do
       bundle = write_file("server.js", "bundle")
       companion = write_file("companion.js", "companion")
