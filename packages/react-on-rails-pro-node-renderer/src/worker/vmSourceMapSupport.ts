@@ -36,10 +36,11 @@
  * Performance: `prepareStackTrace` only runs when an error's `.stack` is first
  * accessed. External source map text is captured asynchronously while building
  * the VM so same-path rebuilds stay generation-isolated; SourceMap parsing and
- * position lookups stay lazy and cached per bundle registration. Inline and
- * external maps are both size-capped: an oversized map is skipped and its frames
- * keep their bundled locations rather than paying its bytes for the life of the
- * pooled VM.
+ * position lookups stay lazy and cached per bundle registration. Once the
+ * parsed `SourceMap` is cached, the raw map JSON is released so each pooled VM
+ * generation retains a single copy instead of both. Inline and external maps
+ * are both size-capped: an oversized map is skipped and its frames keep their
+ * bundled locations rather than paying its bytes for the life of the pooled VM.
  */
 
 import fs from 'fs';
@@ -47,6 +48,20 @@ import path from 'path';
 import { SourceMap } from 'module';
 import type { SourceMapping } from 'module';
 import log from '../shared/log.js';
+
+/**
+ * Sentinel stored in {@link BundleSourceMapRegistration.sourceMapJson} once the
+ * parsed source map has been cached: the raw JSON string is released so a
+ * pooled VM generation does not retain both copies for its lifetime. It is
+ * deliberately distinct from `null` ("confirmed no usable map") and `undefined`
+ * ("check lazily on first error") so that a parsed-map eviction can never
+ * silently fall through to a disk re-read — a re-read could remap this VM
+ * generation with a newer same-path map, which is exactly what freezing the
+ * JSON at registration time exists to prevent.
+ *
+ * @internal Exported for tests.
+ */
+export const RAW_SOURCE_MAP_JSON_DISCARDED = Symbol('rawSourceMapJsonDiscarded');
 
 export interface BundleSourceMapRegistration {
   bundleFilePath: string;
@@ -67,9 +82,11 @@ export interface BundleSourceMapRegistration {
    * `undefined` keeps lazy synchronous lookup behavior. `null` means registration
    * time lookup found no usable source map. A string freezes the source-map JSON
    * for this VM generation so same-path rebuilds cannot remap old bytecode with
-   * a newer map.
+   * a newer map. {@link RAW_SOURCE_MAP_JSON_DISCARDED} means the frozen JSON was
+   * parsed, cached, and released; the parsed map is this generation's surviving
+   * copy and lookups must never fall back to disk.
    */
-  sourceMapJson?: string | null;
+  sourceMapJson?: string | null | typeof RAW_SOURCE_MAP_JSON_DISCARDED;
   realBundleDirectory: string;
   /**
    * External source maps can arrive after a bundle first becomes visible. When
@@ -103,7 +120,8 @@ const sourceMapLookupAttempts = new WeakSet<SourceMapLookupAttempt>();
 let warnedMissingSourceMapConstructor = false;
 
 const MAX_MISSING_SOURCE_MAP_RETRIES = 5;
-const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
+/** @internal Exported for tests. */
+export const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 // External `.map` files get the same ceiling as inline maps. This is a pre-read
 // size gate, not a hard memory bound: a map that grows between the `statSync` in
 // `resolveReadableSourceMapPath` and the read below still gets read in full.
@@ -113,7 +131,8 @@ const MAX_INLINE_SOURCE_MAP_BYTES = 50 * 1024 * 1024;
 // against a JS string length (UTF-16 code units), so a map with multi-byte
 // characters admits a different amount of data inline than externally. The
 // inline unit predates this constant and is left alone here.
-const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
+/** @internal Exported for tests. */
+export const MAX_EXTERNAL_SOURCE_MAP_BYTES = MAX_INLINE_SOURCE_MAP_BYTES;
 
 // `preloadSourceMapJsonForBundle` re-checks the map on every VM build, and with
 // `maxVMPoolSize` defaulting to 2 an app with more bundles than that rebuilds
@@ -423,8 +442,8 @@ async function readSourceMapFileAsync(
 
 /**
  * Returns the source-map JSON for a bundle, `null` when a map was found but is
- * unusable for good (oversized), or `undefined` when no map was found and one
- * may still appear later.
+ * unusable for good (oversized, or an unusable inline `data:` URL), or
+ * `undefined` when no map was found and one may still appear later.
  */
 function readSourceMapJsonForBundle(
   bundleFilePath: string,
@@ -435,7 +454,12 @@ function readSourceMapJsonForBundle(
     // Stack formatting is synchronous, so source-map discovery stays sync and
     // is cached per bundle registration.
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
-      return parseDataUrlSourceMap(sourceMappingUrl);
+      // An unusable inline map (oversized, malformed, or non-JSON mime type) is
+      // terminal, matching registration-time normalization in
+      // `preloadSourceMapJsonForBundle` / `registerBundleForSourceMaps`: a
+      // usable map cannot "arrive later" for a data: URL, and retrying would
+      // re-extract from the on-disk bundle, risking a newer same-path map.
+      return parseDataUrlSourceMap(sourceMappingUrl) ?? null;
     }
 
     // Fallback: the uploaded bundle is renamed to `<timestamp>.js`, so a map
@@ -471,7 +495,8 @@ async function readSourceMapJsonForBundleAsync(
 ): Promise<string | null | undefined> {
   try {
     if (sourceMappingUrl && sourceMappingUrl.startsWith('data:')) {
-      return parseDataUrlSourceMap(sourceMappingUrl);
+      // See the comment in the sync variant: unusable inline maps are terminal.
+      return parseDataUrlSourceMap(sourceMappingUrl) ?? null;
     }
 
     const candidatePaths = candidateSourceMapPaths(bundleFilePath, sourceMappingUrl);
@@ -558,7 +583,9 @@ export function registerBundleForSourceMaps(
       : undefined;
   // sourceMapJson states: string = known JSON for this VM generation, null =
   // confirmed no usable source map, undefined = check lazily on first error.
-  const registration = {
+  // After the first successful parse the string is swapped for
+  // RAW_SOURCE_MAP_JSON_DISCARDED so only the parsed copy is retained.
+  const registration: BundleSourceMapRegistration = {
     bundleFilePath,
     firstLineColumnOffset,
     realBundleDirectory: fs.realpathSync(path.dirname(bundleFilePath)),
@@ -663,20 +690,32 @@ function loadSourceMapForBundle(
   registration: BundleSourceMapRegistration,
 ): SourceMapLoadResult {
   try {
+    // A registration's own null means "confirmed no usable map for this VM
+    // generation", which is terminal by definition. Say so here rather than
+    // letting `?? undefined` coerce it into the retryable `missing` path and
+    // relying on the caller's `shouldRetryMissingSourceMap` check to settle it.
+    // Checked before the sourceMappingURL lookup below so a settled
+    // registration never re-reads the bundle from disk.
+    if (registration.sourceMapJson === null) {
+      return { status: 'terminal' };
+    }
+
+    // The raw JSON was released when the parsed map was cached. Reaching this
+    // point means the parsed map was evicted (for example, the registration was
+    // unregistered while an in-flight error still holds it). Do NOT fall back
+    // to a disk re-read: a newer same-path map could remap this generation.
+    // Keeping bundled frame locations is the safe terminal outcome.
+    if (registration.sourceMapJson === RAW_SOURCE_MAP_JSON_DISCARDED) {
+      return { status: 'terminal' };
+    }
+
     const sourceMappingUrl =
       registration.sourceMappingUrl === undefined
         ? extractSourceMappingUrl(readRegisteredBundleContentsForSourceMapLookup(bundleFilePath))
         : (registration.sourceMappingUrl ?? undefined);
 
-    // A registration's own null means "confirmed no usable map for this VM
-    // generation", which is terminal by definition. Say so here rather than
-    // letting `?? undefined` coerce it into the retryable `missing` path and
-    // relying on the caller's `shouldRetryMissingSourceMap` check to settle it.
-    if (registration.sourceMapJson === null) {
-      return { status: 'terminal' };
-    }
-
-    // The reader returns null only for an oversized map — also terminal.
+    // The reader returns null only for a map that is unusable for good
+    // (oversized, or an unusable inline map) — also terminal.
     const sourceMapJson =
       registration.sourceMapJson === undefined
         ? readSourceMapJsonForBundle(bundleFilePath, sourceMappingUrl, registration.realBundleDirectory)
@@ -729,6 +768,16 @@ function sourceMapForRegistration(
       sourceMap = loadResult.sourceMap;
       sourceMapCache.set(registration, sourceMap);
       missingSourceMapRetryCounts.delete(registration);
+      if (typeof registration.sourceMapJson === 'string') {
+        // The parsed map is now this generation's surviving copy; release the
+        // raw JSON so the pooled VM does not retain both for its lifetime.
+        // Lazy registrations (sourceMapJson === undefined) are left alone: the
+        // raw JSON never lived on the registration for those. Mutating the
+        // shared registration object is the point: every holder must see the
+        // release.
+        // eslint-disable-next-line no-param-reassign
+        registration.sourceMapJson = RAW_SOURCE_MAP_JSON_DISCARDED;
+      }
     } else {
       sourceMap = null;
       if (loadResult.status === 'terminal' || !shouldRetryMissingSourceMap(registration)) {

@@ -37,8 +37,21 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
+  bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
+  the parsed map becomes the VM generation's single retained copy. A registration whose raw JSON was
+  released never falls back to re-reading the map from disk, preserving the same-path rebuild guarantee:
+  old VM generations keep remapping through their own map even after the on-disk map is overwritten. Also
+  makes an unusable inline (`data:`) source map terminal on the lazy lookup path instead of retried,
+  matching registration-time behavior. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
-  larger than 50MB are no longer read into memory. Previously only inline (`data:`) source maps were
+  whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is
+  not a hard memory bound: a map that grows between the size check and the read is still read in full).
+  Previously only inline (`data:`) source maps were
   size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
   stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
   remapped to original sources, and the renderer logs a warning naming the map. An oversized map is never
