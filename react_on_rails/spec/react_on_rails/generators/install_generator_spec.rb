@@ -4760,14 +4760,13 @@ describe InstallGenerator, type: :generator do
 
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
+      allow(install_generator).to receive(:copy_file).and_call_original
       allow(install_generator).to receive(:use_rsc?).and_return(false)
       shakapacker_watch_template = File.expand_path(
         "../../../lib/generators/react_on_rails/templates/base/base/bin/shakapacker-watch",
         __dir__
       )
 
-      expect(install_generator).to receive(:copy_file)
-        .with(shakapacker_watch_template, "bin/shakapacker-watch")
       expect(install_generator).to receive(:say_status)
         .with(:gsub, "bin/dev", true)
         .twice
@@ -4777,6 +4776,9 @@ describe InstallGenerator, type: :generator do
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
+
+      expect(install_generator).to have_received(:copy_file)
+        .with(shakapacker_watch_template, "bin/shakapacker-watch")
     end
 
     it "does not install typescript dependencies in pretend mode" do
