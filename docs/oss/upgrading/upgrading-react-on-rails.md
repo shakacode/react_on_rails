@@ -185,15 +185,16 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
-  - Minimum Ruby version: 3.2 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 20
+  - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
+  - Minimum Node.js version: 18
+  - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
 ### Migration Steps
 
 1. **Update Dependencies**
 
-   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
+   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest stable release and substitute accordingly.
 
    ```ruby
    # Gemfile
