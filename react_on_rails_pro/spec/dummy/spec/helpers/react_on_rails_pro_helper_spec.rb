@@ -2983,6 +2983,8 @@ describe ReactOnRailsProHelper do
       mocked_response = instance_double(ActionDispatch::Response)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive_messages(server_bundle_hash: "#{'a' * 32}-test", rsc_bundle_hash: "#{'b' * 32}-test")
 
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks

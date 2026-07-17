@@ -30,7 +30,13 @@ module ReactOnRailsPro
 
     def build(cache_helpers, action_description:, url_loader:, roles: nil)
       selected_roles = normalize_roles(roles)
+      bundles = selected_bundle_paths(selected_roles)
+      validate_selected_bundle_paths!(cache_helpers, bundles, action_description)
       assets, required_paths = cache_helpers.collect_assets_with_required_paths
+      # Server-only callers still identify any RSC manifests that already exist,
+      # but a not-yet-built RSC output must not prevent plain SSR cache keys.
+      # Selecting the RSC role keeps both manifests fail-loud and required.
+      required_paths = Set.new unless selected_roles.include?(:rsc)
       companions = stageable_mapping(cache_helpers, assets, required_paths, action_description, url_loader:)
 
       artifacts = []
@@ -38,7 +44,7 @@ module ReactOnRailsPro
                           build_bundle_artifact(
                             cache_helpers,
                             role: :server,
-                            bundle: ReactOnRails::Utils.server_bundle_js_file_path,
+                            bundle: bundles.fetch(:server),
                             companions:,
                             action_description:,
                             url_loader:
@@ -48,7 +54,7 @@ module ReactOnRailsPro
         artifacts << build_bundle_artifact(
           cache_helpers,
           role: :rsc,
-          bundle: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
+          bundle: bundles.fetch(:rsc),
           companions:,
           companion_bodies: server_artifact&.companion_bodies,
           action_description:,
@@ -57,6 +63,27 @@ module ReactOnRailsPro
       end
       artifacts.freeze
     end
+
+    def selected_bundle_paths(selected_roles)
+      selected_roles.to_h do |role|
+        path = if role == :server
+                 ReactOnRails::Utils.server_bundle_js_file_path
+               else
+                 ReactOnRailsPro::Utils.rsc_bundle_js_file_path
+               end
+        [role, path]
+      end.freeze
+    end
+    private_class_method :selected_bundle_paths
+
+    def validate_selected_bundle_paths!(cache_helpers, bundles, action_description)
+      bundles.each_value do |bundle|
+        next if cache_helpers.http_url?(bundle)
+
+        cache_helpers.validate_bundle_exists!(bundle, action_description)
+      end
+    end
+    private_class_method :validate_selected_bundle_paths!
 
     # Metadata-only freshness check for development/test hash lookups. The
     # signature covers every selected bundle plus every configured companion,
@@ -114,10 +141,7 @@ module ReactOnRailsPro
       url_loader:,
       companion_bodies: nil
     )
-      unless cache_helpers.http_url?(bundle)
-        cache_helpers.validate_bundle_exists!(bundle, action_description)
-        return RendererArtifact.new(role:, bundle:, companions:, companion_bodies:)
-      end
+      return RendererArtifact.new(role:, bundle:, companions:, companion_bodies:) unless cache_helpers.http_url?(bundle)
 
       unless Rails.env.development? || Rails.env.test?
         raise ReactOnRailsPro::Error,

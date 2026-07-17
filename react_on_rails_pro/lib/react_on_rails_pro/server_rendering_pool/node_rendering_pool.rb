@@ -131,12 +131,21 @@ module ReactOnRailsPro
         end
 
         def server_bundle_hash
+          return ReactOnRailsPro::Utils.bundle_hash if volatile_artifact_ids?
+
           @server_bundle_hash ||= ReactOnRailsPro::Utils.bundle_hash
         end
 
         def rsc_bundle_hash
+          return ReactOnRailsPro::Utils.rsc_bundle_hash if volatile_artifact_ids?
+
           @rsc_bundle_hash ||= ReactOnRailsPro::Utils.rsc_bundle_hash
         end
+
+        def volatile_artifact_ids?
+          Rails.env.development? || Rails.env.test?
+        end
+        private :volatile_artifact_ids?
 
         def prepare_render_path(js_code, render_options)
           # TODO: Remove the request_digest. See https://github.com/shakacode/react_on_rails_pro/issues/119

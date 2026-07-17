@@ -204,8 +204,12 @@ describe ReactOnRailsPro::Cache, :caching do
         allow(Rails).to receive(:root).and_return(root)
         allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
         allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(missing_rsc_bundle)
-        allow(ReactOnRailsPro::RendererCacheHelpers)
-          .to receive_messages(loadable_stats_asset_path: nil, rsc_manifest_paths: [])
+        allow(ReactOnRailsPro::Utils)
+          .to receive_messages(
+            react_client_manifest_file_path: root.join("missing-react-client-manifest.json"),
+            react_server_client_manifest_file_path: root.join("missing-react-server-client-manifest.json")
+          )
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path).and_return(nil)
         allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([])
         ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
         ReactOnRailsPro::Utils.instance_variable_set(:@rsc_bundle_hash, nil)

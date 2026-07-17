@@ -18,6 +18,38 @@ require_relative "../spec_helper"
 module ReactOnRailsPro
   module ServerRenderingPool # rubocop:disable Metrics/ModuleLength
     RSpec.describe NodeRenderingPool do
+      describe "artifact IDs" do
+        before do
+          described_class.instance_variable_set(:@server_bundle_hash, nil)
+          described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+        end
+
+        after do
+          described_class.instance_variable_set(:@server_bundle_hash, nil)
+          described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+        end
+
+        it "refreshes server and RSC IDs in development and test environments" do
+          allow(Rails.env).to receive_messages(development?: false, test?: true)
+          allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
+
+          expect([described_class.server_bundle_hash, described_class.server_bundle_hash])
+            .to eq(%w[server-one server-two])
+          expect([described_class.rsc_bundle_hash, described_class.rsc_bundle_hash]).to eq(%w[rsc-one rsc-two])
+        end
+
+        it "memoizes server and RSC IDs outside development and test environments" do
+          allow(Rails.env).to receive_messages(development?: false, test?: false)
+          allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
+
+          expect([described_class.server_bundle_hash, described_class.server_bundle_hash])
+            .to eq(%w[server-one server-one])
+          expect([described_class.rsc_bundle_hash, described_class.rsc_bundle_hash]).to eq(%w[rsc-one rsc-one])
+        end
+      end
+
       describe ".eval_js" do
         let(:render_options) { instance_double(ReactOnRails::ReactComponent::RenderOptions) }
         let(:render_path) { "/bundles/123/render/abc" }

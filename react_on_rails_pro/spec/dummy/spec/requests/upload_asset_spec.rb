@@ -79,7 +79,7 @@ describe "Upload asset" do
       FileUtils.rm_f(first_asset_path)
       expect do
         ReactOnRailsPro::Request.upload_assets
-      end.to output("Asset not found #{first_asset_path}\n").to_stderr
+      end.to output("[ReactOnRailsPro] Asset not found #{first_asset_path} (missing or not a file)\n").to_stderr
     end
   end
 

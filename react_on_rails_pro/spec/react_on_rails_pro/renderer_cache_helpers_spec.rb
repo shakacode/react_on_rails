@@ -141,6 +141,46 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       expect(artifacts.map(&:role)).to eq([:server])
     end
 
+    it "treats missing RSC manifests as optional when building only the server artifact" do
+      missing_client_manifest = directory.join("missing-react-client-manifest.json")
+      missing_server_manifest = directory.join("missing-react-server-client-manifest.json")
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths)
+        .and_return([missing_client_manifest, missing_server_manifest])
+
+      expect do
+        artifact = described_class.build_current_artifacts(
+          action_description: "testing",
+          roles: [:server]
+        ).fetch(0)
+
+        expect(artifact.companions).to eq("loadable-stats.json" => second_stats)
+      end.to output(/Asset not found.*missing-react-client.*Asset not found.*missing-react-server/m).to_stderr
+    end
+
+    it "reports a missing RSC bundle before validating its required manifests" do
+      missing_rsc_bundle = directory.join("missing-rsc.js")
+      missing_manifest = directory.join("missing-react-client-manifest.json")
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(missing_rsc_bundle)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([missing_manifest])
+
+      expect do
+        described_class.build_current_artifacts(action_description: "testing", roles: [:rsc])
+      end.to raise_error(ReactOnRailsPro::MissingRendererBundleError, /missing-rsc\.js/)
+    end
+
+    it "still requires RSC manifests when building an RSC artifact" do
+      missing_manifest = directory.join("missing-react-client-manifest.json")
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([missing_manifest])
+
+      expect do
+        described_class.build_current_artifacts(action_description: "testing", roles: [:rsc])
+      end.to raise_error(ReactOnRailsPro::Error, /Required RSC asset not found.*missing-react-client-manifest/)
+    end
+
     it "builds only the requested RSC role without resolving the server bundle" do
       allow(config).to receive(:enable_rsc_support).and_return(true)
       allow(described_class).to receive(:rsc_manifest_paths).and_return([])
