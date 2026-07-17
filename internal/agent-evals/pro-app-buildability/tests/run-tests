@@ -159,6 +159,29 @@ node "$eval_dir/bin/normalize-claude-events.mjs" \
   "$tmp/truncated-timeout-claude-events.jsonl" \
   "$tmp/truncated-timeout-claude-events.normalized.jsonl" 124
 test ! -s "$tmp/truncated-timeout-claude-events.normalized.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/truncated-timeout-claude-events.jsonl" \
+  "$tmp/truncated-nontimeout-claude-events.normalized.jsonl" 1 \
+  2>"$tmp/truncated-nontimeout-claude-events-error"; then
+  echo "non-timeout mode accepted a truncated final Claude event" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/truncated-nontimeout-claude-events-error"
+printf '%s' $'not-json\n ' >"$tmp/malformed-before-blank-tail.jsonl"
+if node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/malformed-before-blank-tail.jsonl" "$tmp/malformed-before-blank-tail.normalized.jsonl" 124 \
+  2>"$tmp/malformed-before-blank-tail-error"; then
+  echo "timeout mode accepted a complete malformed event before a blank tail" >&2
+  exit 1
+fi
+rg -q 'malformed event' "$tmp/malformed-before-blank-tail-error"
+printf '%s\n' '{"type":"result","subtype":"success","result":"{\"status\":\"partial\"}"}' \
+  >"$tmp/valid-prefix-truncated-tail.jsonl"
+printf '%s' '{"type":"assistant","message":' >>"$tmp/valid-prefix-truncated-tail.jsonl"
+node "$eval_dir/bin/normalize-claude-events.mjs" \
+  "$tmp/valid-prefix-truncated-tail.jsonl" "$tmp/valid-prefix-truncated-tail.normalized.jsonl" 124
+test "$(jq -r 'select(.item.type == "agent_message") | .item.text | fromjson | .status' \
+  "$tmp/valid-prefix-truncated-tail.normalized.jsonl")" = partial
 
 printf '%s\n' 'authorization: super-sensitive-value' 'authorization: Bearer multi-word-secret' \
   'SECRET_KEY_BASE=base-secret-value-123' 'AWS_SECRET_ACCESS_KEY=aws-secret-value-456' \

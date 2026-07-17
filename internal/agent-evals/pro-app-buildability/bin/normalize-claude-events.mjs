@@ -103,11 +103,11 @@ for await (const line of rl) {
   if (bytesRead > MAX_INPUT_BYTES) {
     throw new Error(`Claude transcript exceeds ${MAX_INPUT_BYTES}-byte normalization limit`);
   }
-  const trimmed = line.trim();
-  if (!trimmed) continue;
   if (truncatedTimeoutTailSeen) {
     throw new Error('Claude stream-json transcript contains a malformed event');
   }
+  const trimmed = line.trim();
+  if (!trimmed) continue;
   let event;
   try {
     event = JSON.parse(trimmed);
