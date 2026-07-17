@@ -17,13 +17,23 @@ file is mounted into the container. The private copy is used as the agent's
 native file-backed credential source:
 
 - Codex expects a complete `auth.json` JSON object.
-- Claude expects a single-line Anthropic API key. Claude `--bare` reads it only
+- Claude expects a single-line Anthropic API key. The broker removes one
+  optional trailing newline before Claude `--bare` reads the effective bytes
   through the private `apiKeyHelper` script.
+
+The agent CLI and its tools run under the same container UID. File-backed
+authentication therefore cannot be hidden from a malicious agent or tool while
+remaining readable by the CLI. Mode `0700` prevents access by other Unix users;
+it does not create a privilege boundary within that shared UID. This harness
+accepts that limitation only for the repository-owned eval prompt on a
+disposable, otherwise secret-free host. It must not be used to run untrusted
+prompts or to claim model-credential non-disclosure against a hostile agent.
 
 The private directory is removed by the harness traps. Exact credential bytes
 are searched as a binary stream in the workspace after each agent call and in
-the completed output after checksums are written. A match, unreadable artifact,
-or output symlink fails closed. The committed output continues to record
+the completed output after checksums are written. For Codex JSON credentials,
+sensitive token/key/secret leaf values are searched independently as well. A
+match, unreadable artifact, or output symlink fails closed. The committed output continues to record
 `auth_material_persisted: false`; it records availability and the attested file
 broker, never credential values or paths.
 
@@ -55,6 +65,12 @@ files, and missing credential files. It mounts the repository and linked
 worktree Git metadata read-only, streams the credential on standard input, and
 uses UID/GID-owned tmpfs filesystems for the workspace, runner-private data,
 temporary files, and installed gems.
+
+The credential source must be outside both the repository and any external Git
+metadata bind. Evidence is first written to a private host staging directory.
+Failed/rejected runs and any staging directory with unexpected siblings are
+deleted; only one completed `run` directory is published to the requested
+output path after Docker exits successfully.
 
 ```bash
 internal/agent-evals/pro-app-buildability/isolated-host/run-in-container \

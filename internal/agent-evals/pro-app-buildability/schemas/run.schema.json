@@ -143,7 +143,10 @@
         "network_probe_artifact": { "const": "sandbox-network-probe.json" },
         "exit_code": { "type": "integer" },
         "timed_out": { "type": "boolean" },
-        "config_artifact": { "const": "invocation.json" }
+        "config_artifact": { "const": "invocation.json" },
+        "execution_boundary": {
+          "enum": ["workspace-write", "isolated-host-attested", "claude-permission-gated"]
+        }
       },
       "allOf": [
         {

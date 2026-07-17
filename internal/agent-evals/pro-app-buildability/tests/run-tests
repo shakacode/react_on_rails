@@ -20,6 +20,11 @@ const invocationValidate = ajv.compile(load('schemas/invocation.schema.json'));
 const runValidate = ajv.compile(load('schemas/run.schema.json'));
 const fixtureDir = 'runs/2026-07-12-codex-gpt-5.4-final21-network-off';
 const invocation = load(`${fixtureDir}/invocation.json`);
+const legacyClaudeCommand = { ...invocation, command: 'claude -p' };
+delete legacyClaudeCommand.agent;
+if (invocationValidate(legacyClaudeCommand)) {
+  throw new Error('legacy invocation without agent accepted a Claude command');
+}
 Object.assign(invocation, {
   agent: 'codex',
   auth_material_available: true,
@@ -28,6 +33,10 @@ Object.assign(invocation, {
 });
 if (invocationValidate(invocation)) throw new Error('unattested invocation accepted auth material');
 invocation.isolated_host_attestation = true;
+if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
+Object.assign(invocation, { agent: 'claude', command: 'claude -p', sandbox: 'workspace-write' });
+if (invocationValidate(invocation)) throw new Error('Claude invocation claimed Codex workspace sandbox');
+invocation.sandbox = 'isolated-host-attested';
 if (!invocationValidate(invocation)) throw new Error(ajv.errorsText(invocationValidate.errors));
 
 const run = load(`${fixtureDir}/run.json`);
@@ -52,6 +61,41 @@ if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$tmp/model
   exit 1
 fi
 rg -q 'credential bytes found in run output' "$tmp/embedded-credential-error"
+
+for newline_mode in newline no-newline; do
+  claude_credential="$tmp/claude-credential-$newline_mode"
+  if [[ "$newline_mode" == newline ]]; then
+    printf '%s\n' 'synthetic-claude-key-effective-bytes' >"$claude_credential"
+  else
+    printf '%s' 'synthetic-claude-key-effective-bytes' >"$claude_credential"
+  fi
+  "$eval_dir/bin/canonicalize-model-credential" claude "$claude_credential"
+  test "$(wc -c <"$claude_credential" | tr -d ' ')" = 36
+  test "$(cat "$claude_credential")" = 'synthetic-claude-key-effective-bytes'
+  printf '%s' 'prefix:synthetic-claude-key-effective-bytes:suffix' \
+    >"$tmp/credential-output/claude-$newline_mode.txt"
+  if "$eval_dir/bin/assert-credential-absent" "$tmp/credential-output" "$claude_credential" \
+    2>"$tmp/claude-$newline_mode-leak-error"; then
+    echo "effective Claude key bytes were accepted for $newline_mode input" >&2
+    exit 1
+  fi
+  rg -q 'credential bytes found in run output' "$tmp/claude-$newline_mode-leak-error"
+  : >"$tmp/credential-output/claude-$newline_mode.txt"
+done
+
+printf '%s\n' \
+  '{"tokens":{"access_token":"synthetic-codex-access-token-value","refresh_token":"synthetic-codex-refresh-token-value"},"account":{"label":"not-sensitive-metadata"}}' \
+  >"$tmp/synthetic-codex-auth.json"
+printf '%s' 'prefix:synthetic-codex-access-token-value:suffix' \
+  >"$tmp/credential-output/codex-token-leak.txt"
+if "$eval_dir/bin/assert-credential-absent" \
+  "$tmp/credential-output" "$tmp/synthetic-codex-auth.json" \
+  2>"$tmp/codex-token-leak-error"; then
+  echo "Codex JSON token leaf embedded in output was accepted" >&2
+  exit 1
+fi
+rg -q 'credential bytes found in run output' "$tmp/codex-token-leak-error"
+: >"$tmp/credential-output/codex-token-leak.txt"
 
 mkdir "$tmp/unattested-workspace"
 if "$eval_dir/bin/run-eval" --agent codex --model test-model --timeout 10 \
@@ -382,20 +426,31 @@ printf '%s\n' '#!/bin/sh' 'set -eu' \
   'printf "%s\n" "$@" >"$FAKE_DOCKER_ARGS"' \
   'for argument do' \
   '  case "$argument" in' \
-  '    type=bind,source=*,target=/evidence) evidence=${argument#type=bind,source=}; evidence=${evidence%,target=/evidence}; mkdir "$evidence/run" ;;' \
+  '    type=bind,source=*,target=/evidence) evidence=${argument#type=bind,source=}; evidence=${evidence%,target=/evidence} ;;' \
   '  esac' \
   'done' \
+  'printf "%s" "$evidence" >"$FAKE_DOCKER_EVIDENCE"' \
+  'mkdir "$evidence/run"' \
+  'case "$FAKE_DOCKER_MODE" in' \
+  '  success) ;;' \
+  '  fail) exit 42 ;;' \
+  '  sibling) printf "%s" unexpected >"$evidence/unexpected" ;;' \
+  'esac' \
   'shasum -a 256 | awk '\''{print $1}'\'' >"$FAKE_DOCKER_STDIN_SHA"' \
   >"$tmp/fake-bin/docker"
 chmod +x "$tmp/fake-bin/docker"
 (cd "$tmp/wrapper-repo" && \
   PATH="$tmp/fake-bin:$PATH" \
   FAKE_DOCKER_ARGS="$tmp/fake-docker-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-evidence" \
+  FAKE_DOCKER_MODE=success \
   FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-stdin-sha" \
   "$isolated_host/run-in-container" \
     --agent claude --model test-model --timeout 10 \
     --model-credential-file "$tmp/wrapper-model-credential" \
     --output "$tmp/wrapper-output-parent/run")
+test -d "$tmp/wrapper-output-parent/run"
+test ! -e "$(cat "$tmp/fake-docker-evidence")"
 test "$(cat "$tmp/fake-docker-stdin-sha")" = \
   "$(shasum -a 256 "$tmp/wrapper-model-credential" | awk '{print $1}')"
 rg -Fxq -- '--model-credential-stdin' "$tmp/fake-docker-args"
@@ -403,6 +458,74 @@ if rg -Fq "$tmp/wrapper-model-credential" "$tmp/fake-docker-args"; then
   echo "wrapper exposed the host credential path to the container command" >&2
   exit 1
 fi
+
+set +e
+(cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-fail-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-fail-evidence" \
+  FAKE_DOCKER_MODE=fail \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-fail-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/failed-run")
+wrapper_fail_exit=$?
+set -e
+test "$wrapper_fail_exit" = 42
+test ! -e "$tmp/wrapper-output-parent/failed-run"
+test ! -e "$(cat "$tmp/fake-docker-fail-evidence")"
+
+if (cd "$tmp/wrapper-repo" && \
+  PATH="$tmp/fake-bin:$PATH" \
+  FAKE_DOCKER_ARGS="$tmp/fake-docker-sibling-args" \
+  FAKE_DOCKER_EVIDENCE="$tmp/fake-docker-sibling-evidence" \
+  FAKE_DOCKER_MODE=sibling \
+  FAKE_DOCKER_STDIN_SHA="$tmp/fake-docker-sibling-stdin-sha" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-model-credential" \
+    --output "$tmp/wrapper-output-parent/sibling-run") 2>"$tmp/wrapper-sibling-error"; then
+  echo "wrapper accepted an unexpected evidence staging sibling" >&2
+  exit 1
+fi
+test ! -e "$tmp/wrapper-output-parent/sibling-run"
+test ! -e "$(cat "$tmp/fake-docker-sibling-evidence")"
+rg -q 'unexpected staged evidence' "$tmp/wrapper-sibling-error"
+
+printf '%s' 'repo-contained-credential' >"$tmp/wrapper-repo/model-credential"
+chmod 600 "$tmp/wrapper-repo/model-credential"
+if (cd "$tmp/wrapper-repo" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$tmp/wrapper-repo/model-credential" \
+    --output "$tmp/wrapper-output-parent/repo-credential-run") \
+  2>"$tmp/wrapper-repo-credential-error"; then
+  echo "wrapper accepted a credential inside the mounted repository" >&2
+  exit 1
+fi
+rg -q 'outside the repository' "$tmp/wrapper-repo-credential-error"
+
+mkdir "$tmp/wrapper-main"
+git -C "$tmp/wrapper-main" init --quiet
+printf '%s\n' tracked >"$tmp/wrapper-main/tracked"
+git -C "$tmp/wrapper-main" add tracked
+git -C "$tmp/wrapper-main" -c user.name=Eval -c user.email=eval@example.test \
+  commit --quiet -m fixture
+git -C "$tmp/wrapper-main" worktree add --quiet -b linked-fixture "$tmp/wrapper-linked"
+git_common_credential="$tmp/wrapper-main/.git/model-credential"
+printf '%s' 'git-common-contained-credential' >"$git_common_credential"
+chmod 600 "$git_common_credential"
+if (cd "$tmp/wrapper-linked" && PATH="$tmp/fake-bin:$PATH" \
+  "$isolated_host/run-in-container" \
+    --agent claude --model test-model --timeout 10 \
+    --model-credential-file "$git_common_credential" \
+    --output "$tmp/wrapper-output-parent/git-credential-run") \
+  2>"$tmp/wrapper-git-credential-error"; then
+  echo "wrapper accepted a credential inside external Git metadata" >&2
+  exit 1
+fi
+rg -q 'outside Git metadata' "$tmp/wrapper-git-credential-error"
 
 printf '%013000d' 0 >"$tmp/long-stderr"
 "$eval_dir/bin/build-runner-diagnostics" "$tmp/long-stderr" "$tmp/long-diagnostics.json"

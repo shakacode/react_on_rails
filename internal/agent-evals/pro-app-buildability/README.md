@@ -69,9 +69,12 @@ The configured file credential store is inside the mode-`0700` disposable
 private directory. Without `--model-credential-file`, no credential is copied
 or inherited into the process. Private homes prevent default discovery and
 inheritance, but the workspace-write sandbox does **not** confine absolute-path
-reads from the host. The default local eval therefore keeps model-shell network
-access off and records an authentication-blocked `incomplete` result. This is
-known evidence, not a supported onboarding claim.
+reads from the host, and Claude does not use that Codex sandbox. The invocation
+records `workspace-write` for Codex, `isolated-host-attested` for attested
+Claude runs, and `claude-permission-gated` for unattested Claude diagnostics.
+The default local eval therefore keeps model-shell network access off and
+records an authentication-blocked `incomplete` result. This is known evidence,
+not a supported onboarding claim.
 
 A network-enabled capability/scaffold run is allowed only on a disposable VM or
 container that contains no host secrets. The operator must acknowledge that
@@ -101,6 +104,12 @@ and records `auth_material_available: true` with
 `auth_source: operator-attested-file-broker`. Use the reviewed container wrapper
 instead of running this directly on a workstation:
 
+The selected CLI and its tools share one container UID, so a file credential
+readable by the CLI is not hidden from a malicious agent running as that UID.
+This is an accepted limitation only for the repository-owned prompt on a
+disposable host with no unrelated secrets. The broker reduces persistence risk;
+it is not a credential-isolation boundary against a hostile model.
+
 ```bash
 docker build --tag react-on-rails-pro-app-eval:local \
   --file internal/agent-evals/pro-app-buildability/isolated-host/Dockerfile \
@@ -124,6 +133,9 @@ categories of stripped sensitive parent variables are recorded without
 exposing the operator's exact variable names; their values are neither read nor
 passed to the agent. Exact credential bytes are rejected if they appear in the
 workspace or completed output, including when embedded inside a larger file.
+Claude's optional trailing newline is removed before scanning so the effective
+key is checked. Sensitive string leaves from Codex JSON authentication are
+checked separately from the complete JSON document.
 
 Evidence parsing is bounded before JSON parsing or file reads. Event bytes and
 event count, visited/selected artifact counts, recursion depth, per-file bytes,

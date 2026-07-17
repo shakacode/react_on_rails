@@ -171,21 +171,15 @@ if [[ "$auth_material_available" == true ]]; then
     echo "brokered model credential must contain 1 to 1048576 bytes" >&2
     exit 65
   }
-  chmod 600 "$brokered_credential"
   if [[ "$agent" == codex ]]; then
+    chmod 600 "$brokered_credential"
     jq -e 'type == "object"' "$brokered_credential" >/dev/null 2>&1 || {
       echo "Codex model credential must be a JSON object suitable for auth.json" >&2
       exit 65
     }
   else
-    perl -e '
-      local $/;
-      my $credential = <>;
-      exit((defined($credential) && $credential =~ /\A[^\r\n]+(?:\n)?\z/) ? 0 : 1);
-    ' "$brokered_credential" || {
-      echo "Claude model credential must contain exactly one nonempty line" >&2
-      exit 65
-    }
+    "$eval_dir/bin/canonicalize-model-credential" claude "$brokered_credential"
+    chmod 600 "$brokered_credential"
     credential_helper="$private_dir/credential-helper"
     # The generated helper expands these variables when Claude invokes it.
     # shellcheck disable=SC2016
@@ -244,6 +238,14 @@ for file in network-probe-prompt.md package.json pnpm-lock.yaml prompt.md rubric
 done
 
 sandbox_network_access="$isolated_host_attestation"
+execution_boundary="workspace-write"
+if [[ "$agent" == claude ]]; then
+  if [[ "$isolated_host_attestation" == true ]]; then
+    execution_boundary="isolated-host-attested"
+  else
+    execution_boundary="claude-permission-gated"
+  fi
+fi
 shell_policy="shell_environment_policy.set={PATH=\"$safe_path\",HOME=\"$private_dir/agent-home\",TMPDIR=\"$private_dir/tmp\",LANG=\"C\",LC_ALL=\"C\",SHELL=\"/bin/sh\",CODEX_EVAL=\"1\"}"
 npm_probe_command='npm view create-react-on-rails-app version --json'
 rubygems_probe_command="gem search --remote --exact '^rails$'"
@@ -290,6 +292,7 @@ probe_timeout_seconds="$timeout_seconds"
 maximum_agent_call_wall_clock_seconds=$((probe_timeout_seconds + timeout_seconds))
 
 jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
+  --arg execution_boundary "$execution_boundary" \
   --arg auth_source "$auth_source" --argjson auth_material_available "$auth_material_available" \
   --argjson scaffold_timeout "$timeout_seconds" \
   --argjson probe_timeout "$probe_timeout_seconds" \
@@ -299,7 +302,7 @@ jq -n --arg command "$agent_command" --arg agent "$agent" --arg model "$model" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
   '{command:$command,agent:$agent,model:$model,scaffold_timeout_seconds:$scaffold_timeout,
     probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
-    sandbox:"workspace-write",ephemeral:true,
+    sandbox:$execution_boundary,ephemeral:true,
     ignore_user_config:true,ignore_rules:true,strict_config:true,multi_agent:false,
     sandbox_network_access:$sandbox_network_access,isolated_host_attestation:$isolated_host_attestation,
     capability_probe:{npm:$npm_probe,rubygems:$rubygems_probe},
@@ -393,6 +396,7 @@ jq -n \
   --arg npm "$(npm --version)" --arg pnpm "$(pnpm --version)" --arg git "$(git --version)" \
   --argjson inputs "$input_hashes" --argjson stripped "$stripped_categories" --argjson network "$network_json" \
   --argjson sandbox_network_access "$sandbox_network_access" \
+  --arg execution_boundary "$execution_boundary" \
   --argjson isolated_host_attestation "$isolated_host_attestation" \
   --arg timeout_command "$timeout_command" --argjson scaffold_timeout "$timeout_seconds" \
   --argjson maximum_agent_wall_clock "$maximum_agent_call_wall_clock_seconds" --argjson exit_code "$runner_exit" \
@@ -411,7 +415,8 @@ jq -n \
       probe_timeout_seconds:$probe_timeout,maximum_agent_call_wall_clock_seconds:$maximum_agent_wall_clock,
       sandbox_network_access:$sandbox_network_access,
       isolated_host_attestation:$isolated_host_attestation,network_probe_artifact:"sandbox-network-probe.json",
-      exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json"},
+      exit_code:$exit_code,timed_out:$timed_out,config_artifact:"invocation.json",
+      execution_boundary:$execution_boundary},
     result:{classification:$classification,reason:$reason,tutorial_claims_supported:false}}' >"$output/run.json"
 
 checksum_files="$private_dir/checksum-files"

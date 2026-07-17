@@ -49,32 +49,43 @@ credential_mode="$(stat -f '%Lp' "$model_credential_file" 2>/dev/null || \
   exit 65
 }
 
-for command_name in docker git realpath; do
+for command_name in docker find git realpath; do
   command -v "$command_name" >/dev/null || {
     echo "missing required command: $command_name" >&2
     exit 69
   }
 done
 
-root="$(git rev-parse --show-toplevel)"
+root="$(realpath "$(git rev-parse --show-toplevel)")"
+credential_real="$(realpath "$model_credential_file")"
+git_common_dir="$(realpath "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)")"
+case "$credential_real" in
+  "$root"|"$root"/*)
+    echo "model credential must be outside the repository" >&2
+    exit 65
+    ;;
+esac
+case "$credential_real" in
+  "$git_common_dir"|"$git_common_dir"/*)
+    echo "model credential must be outside Git metadata" >&2
+    exit 65
+    ;;
+esac
 [[ -z "$(git -C "$root" status --porcelain=v1)" ]] || {
   echo "repository must be clean so the recorded revision identifies the harness exactly" >&2
   exit 65
 }
-credential_real="$(realpath "$model_credential_file")"
 output_parent="$(dirname "$output")"
 [[ -d "$output_parent" ]] || { echo "output parent must exist" >&2; exit 65; }
 output_parent="$(realpath "$output_parent")"
 image="${EVAL_HARNESS_IMAGE:-react-on-rails-pro-app-eval:local}"
 host_uid="$(id -u)"
 host_gid="$(id -g)"
-git_common_dir="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
 staging_parent="$(mktemp -d "${TMPDIR:-/tmp}/ror-eval-output.XXXXXX")"
 cleanup_staging() {
-  if [[ -d "$staging_parent/run" && ! -e "$output" ]]; then
-    mv "$staging_parent/run" "$output"
-  fi
-  rmdir "$staging_parent" 2>/dev/null || true
+  [[ -d "$staging_parent" ]] || return 0
+  chmod -R u+rwX "$staging_parent" 2>/dev/null || true
+  find "$staging_parent" -depth -delete 2>/dev/null || true
 }
 trap cleanup_staging EXIT
 trap 'exit 130' INT TERM
@@ -112,8 +123,20 @@ docker "${docker_args[@]}" \
     --ack-disposable-secret-free-host \
   <"$credential_real"
 
-[[ -d "$staging_parent/run" && ! -e "$output" ]] || {
-  echo "container completed without a uniquely deliverable run output" >&2
+staged_entry_count=0
+expected_run_found=false
+unexpected_staged_evidence=false
+while IFS= read -r -d '' staged_entry; do
+  staged_entry_count=$((staged_entry_count + 1))
+  if [[ "$staged_entry" == "$staging_parent/run" && -d "$staged_entry" && ! -L "$staged_entry" ]]; then
+    expected_run_found=true
+  else
+    unexpected_staged_evidence=true
+  fi
+done < <(find "$staging_parent" -mindepth 1 -maxdepth 1 -print0)
+[[ "$staged_entry_count" == 1 && "$expected_run_found" == true && \
+  "$unexpected_staged_evidence" == false && ! -e "$output" ]] || {
+  echo "container produced missing or unexpected staged evidence" >&2
   exit 1
 }
 mv "$staging_parent/run" "$output"
