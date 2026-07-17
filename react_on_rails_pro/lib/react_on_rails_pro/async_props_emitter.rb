@@ -127,15 +127,25 @@ module ReactOnRailsPro
       return if @request_stream_closed
 
       chunk = yield
-      @request_stream << "#{chunk.to_json}\n"
+      serialized_chunk = "#{chunk.to_json}\n"
+
+      # Scope the closed-stream classification to the socket write itself. Building
+      # and serializing the chunk above (including a prop value's own #to_json) can
+      # raise IOError/Errno::* for reasons unrelated to a disconnect; letting those
+      # fall through to the genuine-failure path below keeps them at error level
+      # instead of latching the emitter shut and silently dropping later props.
+      begin
+        @request_stream << serialized_chunk
+      rescue *self.class.closed_request_stream_errors => e
+        # Routine disconnect race, not a genuine failure: keep it quiet, mirroring
+        # ReactOnRailsPro::Stream#log_client_disconnect. The prop is intentionally
+        # not marked pushed, matching the error path below.
+        return handle_closed_request_stream(prop_name, action, e)
+      end
+
       # Once the chunk is written, Ruby treats the prop as settled too.
       # That keeps duplicate pull requests filtered even if the JS manager is recreated.
       @pushed_props.add(prop_name)
-    rescue *self.class.closed_request_stream_errors => e
-      # Routine disconnect race, not a genuine failure: keep it quiet, mirroring
-      # ReactOnRailsPro::Stream#log_client_disconnect. The prop is intentionally not
-      # marked pushed, matching the error path below.
-      handle_closed_request_stream(prop_name, action, e)
     rescue StandardError => e
       # Continue streaming: one failed async prop write should not abort the
       # entire render. The prop is not marked as pushed unless the write

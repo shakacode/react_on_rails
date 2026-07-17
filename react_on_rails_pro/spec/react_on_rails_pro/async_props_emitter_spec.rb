@@ -212,6 +212,29 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       expect(mock_logger).not_to have_received(:debug)
     end
 
+    it "treats a socket error raised while serializing a prop value as a genuine failure, not a disconnect" do
+      # Only the request-stream write is a disconnect race. A prop value whose own
+      # #to_json raises a socket-family error is a real bug: it must log at error
+      # (with a backtrace) and must NOT latch the emitter closed, so later props on
+      # a still-open stream keep flowing.
+      exploding = Object.new
+      def exploding.to_json(*)
+        raise Errno::EPIPE
+      end
+      written = []
+      allow(request_stream).to receive(:<<) { |chunk| written << chunk }
+
+      emitter.call("boom", exploding)
+      emitter.call("after", 1)
+
+      expect(mock_logger).to have_received(:error) do |&block|
+        expect(block.call).to include("Failed to send async prop 'boom'")
+      end
+      expect(mock_logger).not_to have_received(:debug)
+      # Not latched: the good prop after the raising one is still written.
+      expect(written).to contain_exactly(a_string_including("after"))
+    end
+
     it "does not mark a prop pushed when the write hits a closed stream" do
       pull_emitter = described_class.new(bundle_timestamp, request_stream, pull_enabled: true)
       allow(request_stream).to receive(:<<).and_raise(Protocol::HTTP::Body::Writable::Closed)
