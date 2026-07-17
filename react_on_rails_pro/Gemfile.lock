@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ..
   specs:
-    react_on_rails (17.0.0.rc.12)
+    react_on_rails (17.0.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,14 +20,14 @@ PATH
 PATH
   remote: .
   specs:
-    react_on_rails_pro (17.0.0.rc.12)
+    react_on_rails_pro (17.0.0)
       async (>= 2.29)
       async-http (~> 0.95)
       execjs (~> 2.9)
       io-endpoint (~> 0.17.0)
       jwt (>= 2.5, < 4)
       nokogiri (>= 1.12, < 2)
-      react_on_rails (= 17.0.0.rc.12)
+      react_on_rails (= 17.0.0)
 
 GEM
   remote: https://rubygems.org/
