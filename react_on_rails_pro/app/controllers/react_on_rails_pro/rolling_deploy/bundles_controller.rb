@@ -242,9 +242,9 @@ module ReactOnRailsPro
           )
           return false
         end
+        return false unless bundle_source_servable?(artifact)
 
-        sources = { BUNDLE_ENTRY_NAME => artifact.bundle }.merge(artifact.companions)
-        invalid = sources.find do |name, source|
+        invalid = artifact.companions.find do |name, source|
           source.is_a?(RendererArtifact::InlineCompanion) ||
             !ReactOnRailsPro::RollingDeploy::Tarball::ENTRY_NAME_PATTERN.match?(name) ||
             !safe_companion_asset_path(source.to_s, rails_root, rails_root)
@@ -255,6 +255,17 @@ module ReactOnRailsPro
         Rails.logger.warn(
           "[ReactOnRailsPro::RollingDeploy::BundlesController] artifact #{artifact.id} cannot be served as a " \
           "complete artifact because #{name.inspect} resolves to unsupported source #{source_label(source)}."
+        )
+        false
+      end
+
+      def bundle_source_servable?(artifact)
+        return true if File.file?(artifact.bundle)
+
+        Rails.logger.warn(
+          "[ReactOnRailsPro::RollingDeploy::BundlesController] artifact #{artifact.id} cannot be served as a " \
+          "complete artifact because #{BUNDLE_ENTRY_NAME.inspect} resolves to unsupported source " \
+          "#{source_label(artifact.bundle)}."
         )
         false
       end

@@ -55,13 +55,17 @@ module ReactOnRailsPro
           before do
             described_class.instance_variable_set(:@bundle_hash, nil)
             described_class.instance_variable_set(:@rsc_bundle_hash, nil)
-            allow(RendererCacheHelpers).to receive(:build_current_artifacts)
-              .and_return([server_artifact, rsc_artifact])
+            described_class.instance_variable_set(:@artifact_source_signatures, nil)
+            allow(RendererCacheHelpers).to receive(:artifact_source_signature).and_return(["stable"])
+            allow(RendererCacheHelpers).to receive(:build_current_artifacts) do |roles:, **|
+              roles == [:server] ? [server_artifact] : [rsc_artifact]
+            end
           end
 
           after do
             described_class.instance_variable_set(:@bundle_hash, nil)
             described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+            described_class.instance_variable_set(:@artifact_source_signatures, nil)
           end
 
           it "preserves the public hash methods while returning composite artifact IDs" do
@@ -69,7 +73,7 @@ module ReactOnRailsPro
             expect(described_class.rsc_bundle_hash).to eq(rsc_artifact.id)
           end
 
-          it "memoizes only ID strings in production instead of retaining artifact bodies" do
+          it "memoizes only role-scoped ID strings in production instead of retaining artifact bodies" do
             allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
 
             2.times do
@@ -77,9 +81,84 @@ module ReactOnRailsPro
               expect(described_class.rsc_bundle_hash).to eq(rsc_artifact.id)
             end
 
-            expect(RendererCacheHelpers).to have_received(:build_current_artifacts).once
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts)
+              .with(action_description: "computing current artifact identity", roles: [:server]).once
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts)
+              .with(action_description: "computing current artifact identity", roles: [:rsc]).once
             expect(described_class.instance_variable_get(:@bundle_hash)).to be_a(String)
             expect(described_class.instance_variable_get(:@rsc_bundle_hash)).to be_a(String)
+          end
+
+          it "reuses a dev/test ID while the complete local source signature is unchanged" do
+            2.times { expect(described_class.bundle_hash).to eq(server_artifact.id) }
+
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts).once
+          end
+
+          it "rebuilds a dev/test ID when the complete local source signature changes" do
+            allow(RendererCacheHelpers).to receive(:artifact_source_signature)
+              .and_return(["first"], ["first"], ["changed"], ["changed"], ["changed"])
+            changed_artifact = instance_double(RendererArtifact, role: :server, id: "rorp-v2-s-#{'c' * 64}")
+            allow(RendererCacheHelpers).to receive(:build_current_artifacts)
+              .with(action_description: "computing current artifact identity", roles: [:server])
+              .and_return([server_artifact], [changed_artifact])
+
+            expect(described_class.bundle_hash).to eq(server_artifact.id)
+            expect(described_class.bundle_hash).to eq(changed_artifact.id)
+          end
+
+          it "does not cache an ID captured while source metadata changes" do
+            described_class.instance_variable_set(:@bundle_hash, "old-id")
+            described_class.instance_variable_set(:@artifact_source_signatures, server: ["old"])
+            allow(RendererCacheHelpers).to receive(:artifact_source_signature)
+              .and_return(["new"], ["new"], ["during-build"], ["old"], ["old"], ["old"])
+            raced_artifact = instance_double(RendererArtifact, role: :server, id: "rorp-v2-s-#{'c' * 64}")
+            stable_artifact = instance_double(RendererArtifact, role: :server, id: "rorp-v2-s-#{'d' * 64}")
+            allow(RendererCacheHelpers).to receive(:build_current_artifacts)
+              .with(action_description: "computing current artifact identity", roles: [:server])
+              .and_return([raced_artifact], [stable_artifact])
+
+            expect(described_class.bundle_hash).to eq(raced_artifact.id)
+            expect(described_class.bundle_hash).to eq(stable_artifact.id)
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts).twice
+          end
+
+          it "serializes concurrent artifact ID refreshes" do
+            allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+            build_entered = Queue.new
+            release_first_build = Queue.new
+            build_count_mutex = Mutex.new
+            build_count = 0
+            allow(RendererCacheHelpers).to receive(:build_current_artifacts) do
+              current_count = build_count_mutex.synchronize { build_count += 1 }
+              build_entered << current_count
+              release_first_build.pop if current_count == 1
+              [server_artifact]
+            end
+
+            first = Thread.new { described_class.bundle_hash }
+            expect(build_entered.pop).to eq(1)
+            second_started = Queue.new
+            second = Thread.new do
+              second_started << true
+              described_class.bundle_hash
+            end
+            second_started.pop
+            deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 1
+            Thread.pass while second.alive? && second.status != "sleep" &&
+                              Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
+            release_first_build << true
+
+            expect([first.value, second.value]).to eq([server_artifact.id, server_artifact.id])
+            expect(build_count).to eq(1)
+          end
+
+          it "rebuilds dev/test IDs for volatile URL-backed sources" do
+            allow(RendererCacheHelpers).to receive(:artifact_source_signature).and_return(nil)
+
+            2.times { expect(described_class.bundle_hash).to eq(server_artifact.id) }
+
+            expect(RendererCacheHelpers).to have_received(:build_current_artifacts).twice
           end
         end
       end

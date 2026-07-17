@@ -17,7 +17,9 @@ require "react_on_rails_pro/renderer_cache_path"
 require "react_on_rails_pro/renderer_cache_helpers"
 
 module ReactOnRailsPro
-  module Utils
+  module Utils # rubocop:disable Metrics/ModuleLength
+    ARTIFACT_ID_MUTEX = Mutex.new
+
     ###########################################################
     # PUBLIC API
     ###########################################################
@@ -97,33 +99,76 @@ module ReactOnRailsPro
     # method names because they are part of the Ruby/Node wire contract; the
     # values remain opaque safe directory names to the Node renderer.
     def self.bundle_hash
-      return @bundle_hash if @bundle_hash && memoize_artifact_ids?
-
-      refresh_artifact_ids.fetch(:server)
+      artifact_id(:server)
     end
 
     def self.rsc_bundle_hash
-      return @rsc_bundle_hash if @rsc_bundle_hash && memoize_artifact_ids?
+      artifact_id(:rsc)
+    end
 
-      refresh_artifact_ids.fetch(:rsc) do
-        raise ReactOnRailsPro::Error, "No current renderer artifact is configured for role :rsc"
+    def self.renderer_artifacts(action_description: "computing current artifact identity", roles: nil)
+      RendererCacheHelpers.build_current_artifacts(action_description:, roles:)
+    end
+
+    def self.refresh_artifact_ids(roles: nil)
+      selected_roles = roles || configured_artifact_roles
+      signatures_before = artifact_source_signatures(selected_roles)
+      ids = renderer_artifacts(roles: selected_roles).to_h { |artifact| [artifact.role, artifact.id] }
+      signatures_after = artifact_source_signatures(selected_roles)
+      @artifact_source_signatures ||= {}
+      ids.each do |role, id|
+        role == :server ? @bundle_hash = id : @rsc_bundle_hash = id
+        signature_before = signatures_before[role]
+        signature_after = signatures_after[role]
+        @artifact_source_signatures.delete(role)
+        @artifact_source_signatures[role] = signature_after if signature_before && signature_before == signature_after
       end
-    end
-
-    def self.renderer_artifacts(action_description: "computing current artifact identity")
-      RendererCacheHelpers.build_current_artifacts(action_description:)
-    end
-
-    def self.refresh_artifact_ids
-      ids = renderer_artifacts.to_h { |artifact| [artifact.role, artifact.id] }
-      @bundle_hash = ids[:server]
-      @rsc_bundle_hash = ids[:rsc]
       ids
     end
 
     def self.memoize_artifact_ids?
       !Rails.env.development? && !Rails.env.test?
     end
+
+    def self.artifact_id(role)
+      cached = role == :server ? @bundle_hash : @rsc_bundle_hash
+      return cached if cached && memoize_artifact_ids?
+
+      ARTIFACT_ID_MUTEX.synchronize do
+        cached = role == :server ? @bundle_hash : @rsc_bundle_hash
+        return cached if cached && artifact_id_fresh?(role)
+
+        refresh_artifact_ids(roles: [role]).fetch(role) do
+          raise ReactOnRailsPro::Error, "No current renderer artifact is configured for role #{role.inspect}"
+        end
+      end
+    end
+
+    def self.artifact_id_fresh?(role)
+      return true if memoize_artifact_ids?
+
+      previous = @artifact_source_signatures&.fetch(role, nil)
+      current = RendererCacheHelpers.artifact_source_signature(roles: [role])
+      previous && current && previous == current
+    end
+
+    def self.artifact_source_signatures(roles)
+      return {} if memoize_artifact_ids?
+
+      roles.to_h { |role| [role, RendererCacheHelpers.artifact_source_signature(roles: [role])] }
+    end
+
+    def self.configured_artifact_roles
+      roles = [:server]
+      roles << :rsc if ReactOnRailsPro.configuration.enable_rsc_support
+      roles
+    end
+    private_class_method :artifact_id,
+                         :artifact_id_fresh?,
+                         :artifact_source_signatures,
+                         :configured_artifact_roles,
+                         :memoize_artifact_ids?,
+                         :refresh_artifact_ids
 
     # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.
     def self.bundle_file_name(bundle_name)

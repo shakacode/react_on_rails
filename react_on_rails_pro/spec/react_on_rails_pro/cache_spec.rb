@@ -193,6 +193,65 @@ describe ReactOnRailsPro::Cache, :caching do
       ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
     end
 
+    it "uses the missing RSC sentinel through the real artifact hash path" do
+      Dir.mktmpdir("ror-pro-cache-key") do |directory|
+        root = Pathname.new(directory)
+        server_bundle = root.join("server.js")
+        server_bundle.binwrite("server bundle")
+        missing_rsc_bundle = root.join("missing-rsc.js")
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = true
+        allow(Rails).to receive(:root).and_return(root)
+        allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
+        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(missing_rsc_bundle)
+        allow(ReactOnRailsPro::RendererCacheHelpers)
+          .to receive_messages(loadable_stats_asset_path: nil, rsc_manifest_paths: [])
+        allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([])
+        ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@rsc_bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@artifact_source_signatures, nil)
+
+        result = described_class.base_cache_key("foobar", prerender: true)
+
+        expect(result.fetch(3)).to match(/\Arorp-v2-s-[0-9a-f]{64}\z/)
+        expect(result.fetch(4)).to eq(described_class::RSC_BUNDLE_MISSING_CACHE_KEY)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+        ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@rsc_bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@artifact_source_signatures, nil)
+      end
+    end
+
+    it "raises when the configured RSC bundle exists but is not a file" do
+      Dir.mktmpdir("ror-pro-cache-key") do |directory|
+        root = Pathname.new(directory)
+        server_bundle = root.join("server.js")
+        server_bundle.binwrite("server bundle")
+        rsc_bundle_directory = root.join("rsc-directory")
+        rsc_bundle_directory.mkdir
+        original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
+        ReactOnRailsPro.configuration.enable_rsc_support = true
+        allow(Rails).to receive(:root).and_return(root)
+        allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
+        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle_directory)
+        allow(ReactOnRailsPro::RendererCacheHelpers)
+          .to receive_messages(loadable_stats_asset_path: nil, rsc_manifest_paths: [])
+        allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([])
+        ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@rsc_bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@artifact_source_signatures, nil)
+
+        expect { described_class.base_cache_key("foobar", prerender: true) }
+          .to raise_error(ReactOnRailsPro::Error, /not a file/)
+      ensure
+        ReactOnRailsPro.configuration.enable_rsc_support = original_enable_rsc_support
+        ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@rsc_bundle_hash, nil)
+        ReactOnRailsPro::Utils.instance_variable_set(:@artifact_source_signatures, nil)
+      end
+    end
+
     it "does not require the RSC bundle hash when RSC support is disabled" do
       original_enable_rsc_support = ReactOnRailsPro.configuration.enable_rsc_support
       ReactOnRailsPro.configuration.enable_rsc_support = false

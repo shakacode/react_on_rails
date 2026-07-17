@@ -131,6 +131,42 @@ describe ReactOnRailsPro::RendererCacheHelpers do
         .to be(artifacts.fetch(0).companion_bodies.fetch("loadable-stats.json"))
     end
 
+    it "builds only the requested server role without resolving the RSC bundle" do
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([])
+      expect(ReactOnRailsPro::Utils).not_to receive(:rsc_bundle_js_file_path)
+
+      artifacts = described_class.build_current_artifacts(action_description: "testing", roles: [:server])
+
+      expect(artifacts.map(&:role)).to eq([:server])
+    end
+
+    it "builds only the requested RSC role without resolving the server bundle" do
+      allow(config).to receive(:enable_rsc_support).and_return(true)
+      allow(described_class).to receive(:rsc_manifest_paths).and_return([])
+      allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
+      expect(ReactOnRails::Utils).not_to receive(:server_bundle_js_file_path)
+
+      artifacts = described_class.build_current_artifacts(action_description: "testing", roles: [:rsc])
+
+      expect(artifacts.map(&:role)).to eq([:rsc])
+    end
+
+    it "changes the local source signature when only a companion changes" do
+      first_signature = described_class.artifact_source_signature(roles: [:server])
+
+      second_stats.binwrite('{"build":"changed and larger"}')
+      second_signature = described_class.artifact_source_signature(roles: [:server])
+
+      expect(second_signature).not_to eq(first_signature)
+    end
+
+    it "treats URL-backed artifact sources as volatile" do
+      allow(config).to receive(:assets_to_copy).and_return(["http://localhost:3035/loadable-stats.json"])
+
+      expect(described_class.artifact_source_signature(roles: [:server])).to be_nil
+    end
+
     it "warns and excludes missing optional companions" do
       missing = directory.join("missing.json")
       allow(config).to receive(:assets_to_copy).and_return([missing])
@@ -215,6 +251,34 @@ describe ReactOnRailsPro::RendererCacheHelpers do
       allow(described_class).to receive(:rsc_manifest_paths).and_return([url])
 
       expect(described_class.required_rsc_asset_basenames).to eq(["react-client-manifest.json"])
+    end
+  end
+
+  describe ".bundle_sources" do
+    it "uses the IDs from the already-built artifact snapshots" do
+      server = instance_double(
+        ReactOnRailsPro::RendererArtifact,
+        role: :server,
+        bundle: Pathname.new("/tmp/server.js"),
+        id: "rorp-v2-s-#{'a' * 64}"
+      )
+      rsc = instance_double(
+        ReactOnRailsPro::RendererArtifact,
+        role: :rsc,
+        bundle: Pathname.new("/tmp/rsc.js"),
+        id: "rorp-v2-r-#{'b' * 64}"
+      )
+      pool = class_double(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+      allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([server, rsc])
+      expect(pool).not_to receive(:server_bundle_hash)
+      expect(pool).not_to receive(:rsc_bundle_hash)
+
+      expect(described_class.bundle_sources(pool, "testing")).to eq(
+        [
+          [server.bundle, server.id],
+          [rsc.bundle, rsc.id]
+        ]
+      )
     end
   end
 end

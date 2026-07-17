@@ -67,8 +67,15 @@ module ReactOnRailsPro
     # producer must use these value objects so the cache directory ID and the
     # bytes staged or uploaded under it cannot be assembled from different
     # companion lists.
-    def build_current_artifacts(action_description:, url_loader: method(:load_url_companion))
-      RendererArtifactSupport.build(self, action_description:, url_loader:)
+    def build_current_artifacts(action_description:, url_loader: method(:load_url_companion), roles: nil)
+      RendererArtifactSupport.build(self, action_description:, url_loader:, roles:)
+    end
+
+    # Returns a cheap freshness signature for every local source that affects
+    # the requested artifact roles. URL-backed sources return nil because they
+    # have no trustworthy filesystem metadata and must remain volatile.
+    def artifact_source_signature(roles: nil)
+      RendererArtifactSupport.source_signature(self, roles:)
     end
 
     def stageable_companion_mapping(assets, required_paths, action_description, url_loader: method(:load_url_companion))
@@ -220,10 +227,14 @@ module ReactOnRailsPro
     end
 
     def validate_bundle_exists!(path, action_description)
-      return if File.file?(path)
+      return if File.stat(path).file?
 
       raise ReactOnRailsPro::Error,
-            "Bundle not found or not a file at #{path}. " \
+            "Bundle exists but is not a file at #{path}. " \
+            "Please configure a bundle file before #{action_description} the renderer cache."
+    rescue Errno::ENOENT, Errno::ENOTDIR
+      raise ReactOnRailsPro::MissingRendererBundleError,
+            "Bundle not found at #{path}. " \
             "Please build your bundles before #{action_description} the renderer cache."
     end
 
@@ -288,24 +299,15 @@ module ReactOnRailsPro
             "it may have been removed after mkdir_p (race with an external cleanup)."
     end
 
-    # Resolves bundle sources as [path, hash] pairs so callers can iterate
-    # without needing to re-call pool methods. `pool` must respond to
-    # `server_bundle_hash` and (when RSC is enabled) `rsc_bundle_hash`.
-    #
-    # Validates each bundle path exists *before* computing its hash, because
-    # `pool.server_bundle_hash` eventually calls `Digest::MD5.file` / `File.mtime`
-    # on the bundle path, which raises raw `Errno::ENOENT` if the file is
-    # missing — bypassing the friendly `ReactOnRailsPro::Error` message.
-    def bundle_sources(pool, action_description)
-      artifacts = if ReactOnRailsPro::Utils.respond_to?(:renderer_artifacts)
-                    ReactOnRailsPro::Utils.renderer_artifacts(action_description:)
-                  else
-                    build_current_artifacts(action_description:)
-                  end
+    # Legacy compatibility wrapper returning [path, ID] pairs. New internal
+    # callers consume RendererArtifact values directly so the captured bytes
+    # stay bound to the ID. Reuse each already-built artifact ID here instead
+    # of asking the pool to perform a second, potentially divergent build.
+    def bundle_sources(_pool, action_description)
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description:)
       artifacts.map do |artifact|
-        hash = artifact.role == :server ? pool.server_bundle_hash : pool.rsc_bundle_hash
-        validate_bundle_hash!(hash, artifact.bundle)
-        [artifact.bundle, hash]
+        validate_bundle_hash!(artifact.id, artifact.bundle)
+        [artifact.bundle, artifact.id]
       end
     end
   end

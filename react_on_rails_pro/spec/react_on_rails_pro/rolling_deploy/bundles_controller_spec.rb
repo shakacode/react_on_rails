@@ -248,6 +248,23 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
   describe "#safe_current_artifacts" do
     let(:controller) { described_class.new }
 
+    it "serves the trusted configured bundle when it resolves outside Rails.root" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        Dir.mktmpdir("ror-pro-outside") do |outside|
+          bundle = File.join(outside, "server.js")
+          File.write(bundle, "bundle")
+          artifact = ReactOnRailsPro::RendererArtifact.new(role: :server, bundle:, companions: {})
+          logger = instance_double(Logger, warn: nil)
+          allow(Rails).to receive_messages(root: Pathname.new(root), logger:)
+          allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+
+          expect(controller.send(:safe_current_artifacts)).to eq([artifact])
+          expect(logger).not_to have_received(:warn)
+        end
+      end
+    end
+
     it "omits an artifact when a companion resolves outside Rails.root" do
       Dir.mktmpdir("ror-pro-root") do |root|
         Dir.mktmpdir("ror-pro-outside") do |outside|

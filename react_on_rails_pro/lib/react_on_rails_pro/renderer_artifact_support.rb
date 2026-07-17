@@ -25,37 +25,85 @@ require "react_on_rails_pro/renderer_http_client"
 module ReactOnRailsPro
   # Assembly and immutable-byte helpers used by RendererCacheHelpers. Keeping
   # artifact construction separate makes the cache/staging API easier to audit.
-  module RendererArtifactSupport
+  module RendererArtifactSupport # rubocop:disable Metrics/ModuleLength
     module_function
 
-    def build(cache_helpers, action_description:, url_loader:)
+    def build(cache_helpers, action_description:, url_loader:, roles: nil)
+      selected_roles = normalize_roles(roles)
       assets, required_paths = cache_helpers.collect_assets_with_required_paths
       companions = stageable_mapping(cache_helpers, assets, required_paths, action_description, url_loader:)
 
-      server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      server_artifact = build_bundle_artifact(
-        cache_helpers,
-        role: :server,
-        bundle: server_bundle,
-        companions:,
-        action_description:,
-        url_loader:
-      )
-      artifacts = [server_artifact]
-      return artifacts.freeze unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      artifacts << build_bundle_artifact(
-        cache_helpers,
-        role: :rsc,
-        bundle: rsc_bundle,
-        companions:,
-        companion_bodies: server_artifact.companion_bodies,
-        action_description:,
-        url_loader:
-      )
+      artifacts = []
+      server_artifact = if selected_roles.include?(:server)
+                          build_bundle_artifact(
+                            cache_helpers,
+                            role: :server,
+                            bundle: ReactOnRails::Utils.server_bundle_js_file_path,
+                            companions:,
+                            action_description:,
+                            url_loader:
+                          ).tap { |artifact| artifacts << artifact }
+                        end
+      if selected_roles.include?(:rsc)
+        artifacts << build_bundle_artifact(
+          cache_helpers,
+          role: :rsc,
+          bundle: ReactOnRailsPro::Utils.rsc_bundle_js_file_path,
+          companions:,
+          companion_bodies: server_artifact&.companion_bodies,
+          action_description:,
+          url_loader:
+        )
+      end
       artifacts.freeze
     end
+
+    # Metadata-only freshness check for development/test hash lookups. The
+    # signature covers every selected bundle plus every configured companion,
+    # including missing optional paths so later appearance invalidates it.
+    # URL-backed inputs are deliberately volatile because a URL has no local
+    # metadata capable of proving that its response body is unchanged.
+    def source_signature(cache_helpers, roles: nil)
+      selected_roles = normalize_roles(roles)
+      assets, = cache_helpers.collect_assets_with_required_paths
+      entries = selected_roles.map do |role|
+        bundle = if role == :server
+                   ReactOnRails::Utils.server_bundle_js_file_path
+                 else
+                   ReactOnRailsPro::Utils.rsc_bundle_js_file_path
+                 end
+        [:bundle, role, bundle]
+      end
+      entries.concat(assets.map { |asset| [:companion, cache_helpers.asset_basename(asset), asset] })
+      return nil if entries.any? { |_, _, source| cache_helpers.http_url?(source) }
+
+      entries.map { |kind, name, source| local_source_metadata(kind, name, source) }.freeze
+    end
+
+    def normalize_roles(roles)
+      available = [:server]
+      available << :rsc if ReactOnRailsPro.configuration.enable_rsc_support
+      return available if roles.nil?
+
+      requested = Array(roles).map(&:to_sym).uniq
+      invalid = requested - available
+      if requested.empty? || invalid.any?
+        raise ReactOnRailsPro::Error,
+              "Renderer artifact roles must be selected from #{available.inspect}; received #{requested.inspect}"
+      end
+
+      available & requested
+    end
+    private_class_method :normalize_roles
+
+    def local_source_metadata(kind, name, source)
+      expanded = File.expand_path(source.to_s, Rails.root.to_s)
+      stat = File.stat(expanded)
+      [kind, name, expanded, stat.dev, stat.ino, stat.size, stat.mtime.to_r, stat.ctime.to_r].freeze
+    rescue ArgumentError, Errno::ENOENT, Errno::ENOTDIR => e
+      [kind, name, source.to_s, e.class.name].freeze
+    end
+    private_class_method :local_source_metadata
 
     def build_bundle_artifact(
       cache_helpers,
