@@ -68,7 +68,7 @@ end %>
   { post: @post.to_props }
 end %>
 
-<%# Static RSC (strips hydration scripts for fully static pages) %>
+<%# Static RSC (strips RSC bootstrap scripts for fully static pages) %>
 <%= cached_static_rsc_component("StaticPage", cache_key: [@page]) do
   { page: @page.to_props }
 end %>
@@ -77,6 +77,8 @@ end %>
 <% card = cached_async_react_component("ProductCard", cache_key: [@product]) { @product.to_props } %>
 <%= card.value %>
 ```
+
+> **Note:** `cached_static_rsc_component` strips only the embedded RSC payload bootstrap scripts, not general component pack scripts. For fully static pages with no client interactivity, also pass `auto_load_bundle: false` and load your explicit sidecar pack separately.
 
 ### Rails Context And Render Order
 
