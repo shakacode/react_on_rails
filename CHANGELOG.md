@@ -50,6 +50,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
+- **[Pro]** **Bounded RSC browser performance fallback marks across soft navigations**: Browsers
+  that cannot preserve `PerformanceMark.detail` now retain only the 200 most recent fallback
+  entries, and React on Rails Pro clears the fallback queue during Turbo/Turbolinks page teardown.
+  The TypeScript runtime, generated inline helper, and Ruby streaming mirror share the same limit.
+  Fixes [Issue 4329](https://github.com/shakacode/react_on_rails/issues/4329).
+  [PR 4690](https://github.com/shakacode/react_on_rails/pull/4690) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
   17.0.0.rc.9 made webpack fail with `Module not found: Can't resolve 'react-on-rails-rsc/client.node'`
   (and `server.node`) unless the optional `react-on-rails-rsc` peer dependency was installed, because the

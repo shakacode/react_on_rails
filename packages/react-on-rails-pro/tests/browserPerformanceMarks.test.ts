@@ -161,6 +161,23 @@ describe('browserPerformanceMarks runtime helper', () => {
     ]);
   });
 
+  it('keeps only the most recent 200 fallback entries', () => {
+    setPerformanceMarkDetailSupport(false);
+    setPerformanceMark(jest.fn() as Performance['mark']);
+
+    for (let index = 0; index < 205; index += 1) {
+      markBrowserPerformance(`react-on-rails:rsc:payload:${index}`, {
+        source: 'react-on-rails-pro',
+        index,
+      });
+    }
+
+    const queue = globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE];
+    expect(queue).toHaveLength(200);
+    expect(queue?.[0]).toEqual(expect.objectContaining({ name: 'react-on-rails:rsc:payload:5' }));
+    expect(queue?.at(-1)).toEqual(expect.objectContaining({ name: 'react-on-rails:rsc:payload:204' }));
+  });
+
   it('uses the same fallback contract from generated inline mark scripts', () => {
     setPerformanceMarkDetailSupport(false);
     Object.defineProperty(globalThis, 'self', {
@@ -192,6 +209,29 @@ describe('browserPerformanceMarks runtime helper', () => {
     ]);
   });
 
+  it('caps fallback entries created by generated inline mark scripts', () => {
+    setPerformanceMarkDetailSupport(false);
+    Object.defineProperty(globalThis, 'self', {
+      configurable: true,
+      value: globalThis,
+      writable: true,
+    });
+    setPerformanceMark(jest.fn() as Performance['mark']);
+
+    for (let index = 0; index < 205; index += 1) {
+      const markScript = createBrowserPerformanceMarkScript(`react-on-rails:rsc:payload:${index}`, {
+        source: 'react-on-rails-pro',
+        index,
+      });
+      new Function(markScript)();
+    }
+
+    const queue = globalWithQueue[REACT_ON_RAILS_PERFORMANCE_MARKS_QUEUE];
+    expect(queue).toHaveLength(200);
+    expect(queue?.[0]).toEqual(expect.objectContaining({ name: 'react-on-rails:rsc:payload:5' }));
+    expect(queue?.at(-1)).toEqual(expect.objectContaining({ name: 'react-on-rails:rsc:payload:204' }));
+  });
+
   it('keeps the generated inline mark script body aligned with the Ruby stream script', () => {
     const markScript = createBrowserPerformanceMarkScript('react-on-rails:rsc:contract', {
       source: 'react-on-rails-pro',
@@ -211,7 +251,9 @@ describe('browserPerformanceMarks runtime helper', () => {
         'try{perf.mark("react-on-rails:rsc:contract");entry.fallback="mark-detail-unavailable";}' +
         'catch(fallbackError){entry.fallback="performance-mark-unavailable";}' +
         '}else{entry.fallback="performance-mark-unavailable";}' +
-        '(self.REACT_ON_RAILS_PERFORMANCE_MARKS=self.REACT_ON_RAILS_PERFORMANCE_MARKS||[]).push(entry);})()',
+        'var queue=self.REACT_ON_RAILS_PERFORMANCE_MARKS=' +
+        'self.REACT_ON_RAILS_PERFORMANCE_MARKS||[];queue.push(entry);' +
+        'if(queue.length>200){queue.splice(0,queue.length-200);}})()',
     );
   });
 
