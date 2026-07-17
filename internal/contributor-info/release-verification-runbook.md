@@ -367,8 +367,12 @@ Check, with file/PR evidence for every claim:
 1. Every Lane 0 BREAKING CHANGE appears in the CHANGELOG release section AND in the upgrade
    guide, with the user-visible consequence stated (not just the internal change).
 2. Every DEBUT FEATURE has a CHANGELOG entry and documentation reachable from the docs site nav.
-3. Every issue labeled release:<X.Y.Z>-must-have is closed, and its fix is in
-   {{PREV_STABLE}}..{{RC_TAG}} (verify by commit, not by issue state).
+3. Every issue labeled release:<X.Y.Z>-must-have has a promotion-safe disposition. For a code or
+   docs defect, verify its fix is in `{{PREV_STABLE}}..{{RC_TAG}}` by commit; an open issue with a
+   landed fix is not automatically a gap, but stale acceptance criteria or remaining work is. For
+   a final-assembly/publish issue whose own lifecycle necessarily ends after promotion, require
+   its pre-publish dependencies and checklist to be satisfied; do not require the issue to close
+   before the publish steps it tracks can run.
 4. Version-stamp coherence: derive the expected gem/CHANGELOG and npm package versions from
    {{RC_TAG}} before comparing (for example, `v17.0.0.rc.7` -> gem/CHANGELOG `17.0.0.rc.7`,
    npm `17.0.0-rc.7`); gem version.rb files, every published package.json, and the CHANGELOG
