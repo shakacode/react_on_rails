@@ -46,7 +46,7 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    ```bash
    RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node renderer/node-renderer.js
    ```
-   Or via package.json scripts: `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
+   Or via a script you define in package.json, e.g. `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
 ## JavaScript Configuration File
