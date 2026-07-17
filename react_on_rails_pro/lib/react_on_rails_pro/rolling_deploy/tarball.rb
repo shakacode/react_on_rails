@@ -20,6 +20,7 @@ require "tempfile"
 require "zlib"
 
 require "react_on_rails_pro/error"
+require "react_on_rails_pro/renderer_artifact"
 
 module ReactOnRailsPro
   module RollingDeploy
@@ -51,17 +52,14 @@ module ReactOnRailsPro
       # file doesn't blow heap before the running total trips the size cap.
       EXTRACT_CHUNK_SIZE = 64 * 1024
 
-      # Path-safety regex for tar entries. We require entries to be flat
-      # basenames (no slashes, no `..`, no NUL bytes, no leading dot, no
-      # leading hyphen) so an attacker can never write outside the target
-      # directory or hide files from `ls`. The `./` prefix permitted by tar
-      # is normalised away before this match runs.
-      #
-      # Functionally identical to `ReactOnRailsPro::RollingDeploy::SAFE_HASH_PATTERN`
-      # — kept as a separate constant because tarball entry names and
-      # rolling-deploy hash strings are conceptually distinct: a future
-      # protocol change might tighten one without the other.
-      ENTRY_NAME_PATTERN = /\A[A-Za-z0-9_][A-Za-z0-9_.\-]*\z/
+      # Path-safety regex for tar entries. Reuse RendererArtifact's companion
+      # contract so every flat basename accepted into an artifact can cross the
+      # HTTP rolling-deploy transport unchanged. The shared pattern rejects
+      # slash, backslash, colon, NUL/ASCII controls, and the special `.` / `..`
+      # directory entries while permitting ordinary filename characters such
+      # as spaces, `@`, `%`, Unicode, and leading dots or hyphens. The `./`
+      # prefix permitted by tar is normalised away before this match runs.
+      ENTRY_NAME_PATTERN = ReactOnRailsPro::RendererArtifact::SAFE_COMPANION_NAME_PATTERN
 
       # Compose a gzipped tarball from the given entries and yield the
       # resulting Tempfile. The temp file is removed when the block returns.
@@ -161,7 +159,7 @@ module ReactOnRailsPro
           unless ENTRY_NAME_PATTERN.match?(name.to_s)
             raise ReactOnRailsPro::Error,
                   "Tarball entry name #{name.inspect} is not a safe basename. " \
-                  "Allowed: flat alphanumeric basenames (no slashes, no leading dot)."
+                  "Allowed: flat basenames without slashes, backslashes, colons, or control characters."
           end
 
           raise ReactOnRailsPro::Error, "Tarball source path for #{name.inspect} is blank" if path.to_s.empty?
@@ -192,14 +190,14 @@ module ReactOnRailsPro
       def safe_entry_name!(entry)
         # `TarReader` exposes the entry name verbatim; tar archives commonly
         # prefix entries with `./`. Strip that prefix before the pattern check
-        # so a legitimate `./bundle.js` doesn't get rejected, but anything more
-        # exotic (subdir, leading-dot hidden name, traversal) still fails.
+        # so a legitimate `./bundle.js` doesn't get rejected. The shared flat-
+        # basename contract still rejects subdirectories and traversal names.
         raw = entry.full_name.to_s
         name = raw.delete_prefix("./")
         unless ENTRY_NAME_PATTERN.match?(name)
           raise ReactOnRailsPro::Error,
                 "Rolling-deploy tarball entry name #{raw.inspect} is not a safe basename. " \
-                "Allowed: flat alphanumeric basenames (no slashes, no leading dot, no `..`)."
+                "Allowed: flat basenames without slashes, backslashes, colons, control characters, or `.` / `..`."
         end
         name
       end

@@ -112,6 +112,19 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
         hash_including(as: :internal_rolling_bundle)
       )
     end
+
+    it "normalizes a root mount without generating double-slash routes" do
+      described_class.draw_routes(mapper, path: "/")
+
+      expect(mapper).to have_received(:get).with(
+        "/manifest",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_manifest)
+      )
+      expect(mapper).to have_received(:get).with(
+        "/bundles/:hash",
+        hash_including(as: :react_on_rails_pro_rolling_deploy_bundle)
+      )
+    end
   end
 
   describe "#set_no_store_headers" do
@@ -157,6 +170,32 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
         ReactOnRailsPro::RollingDeploy::Tarball.extract(response_body, extracted)
         expect(File.binread(File.join(extracted, "bundle.js"))).to eq("identified bundle")
         expect(File.binread(File.join(extracted, "manifest.json"))).to eq("identified manifest")
+      end
+    end
+
+    it "round-trips every safe flat companion basename accepted by renderer artifacts" do
+      Dir.mktmpdir("ror-pro-controller-flat-names") do |directory|
+        bundle = File.join(directory, "server.js")
+        File.binwrite(bundle, "bundle")
+        names = ["data@2x.json", "my data.json", "manifest%402x.json", "café.json", ".hidden.json", "-prefixed.json"]
+        companions = names.each_with_index.to_h do |name, index|
+          source = File.join(directory, "source-#{index}.json")
+          File.binwrite(source, "companion #{index}")
+          [name, source]
+        end
+        artifact = ReactOnRailsPro::RendererArtifact.new(role: :server, bundle:, companions:)
+        response_body = nil
+        allow(controller).to receive(:params).and_return(hash: artifact.id)
+        allow(controller).to receive(:send_data) { |body, **| response_body = body }
+
+        controller.send(:serve_bundle_tarball, artifact)
+
+        extracted = File.join(directory, "extracted")
+        extracted_names = ReactOnRailsPro::RollingDeploy::Tarball.extract(response_body, extracted)
+        expect(extracted_names).to contain_exactly("bundle.js", *names)
+        names.each_with_index do |name, index|
+          expect(File.binread(File.join(extracted, name))).to eq("companion #{index}")
+        end
       end
     end
   end
@@ -262,6 +301,28 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
           expect(controller.send(:safe_current_artifacts)).to eq([artifact])
           expect(logger).not_to have_received(:warn)
         end
+      end
+    end
+
+    it "serves companions with safe flat basenames outside the legacy tar alphabet" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        root = File.realpath(root)
+        bundle = File.join(root, "server.js")
+        companion = File.join(root, "manifest.json")
+        File.write(bundle, "bundle")
+        File.write(companion, "{}")
+        artifact = ReactOnRailsPro::RendererArtifact.new(
+          role: :server,
+          bundle:,
+          companions: { "my manifest@2x%.json" => companion }
+        )
+        logger = instance_double(Logger, warn: nil)
+        allow(Rails).to receive_messages(root: Pathname.new(root), logger:)
+        allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+
+        expect(controller.send(:safe_current_artifacts)).to eq([artifact])
+        expect(logger).not_to have_received(:warn)
       end
     end
 

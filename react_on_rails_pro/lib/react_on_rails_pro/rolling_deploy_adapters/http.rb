@@ -304,7 +304,7 @@ module ReactOnRailsPro
           path = normalized_previous_path(uri.path, mount_path:)
           return nil unless path
 
-          uri.path = path == "/" ? path : path.chomp("/")
+          uri.path = path == "/" ? "" : path.chomp("/")
           uri.to_s
         rescue URI::InvalidURIError => e
           warn_invalid_previous_url("is not a valid URI: #{e.message}")

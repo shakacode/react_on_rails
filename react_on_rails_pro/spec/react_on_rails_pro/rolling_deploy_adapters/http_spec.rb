@@ -76,6 +76,28 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
                                                                     ])
     end
 
+    it "normalizes explicit and inherited root paths before endpoint suffixes are appended" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [
+          "https://explicit-root.example.com/",
+          "https://inherited-root.example.com"
+        ],
+        rolling_deploy_mount_path: "/"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      bases = described_class.send(:configured_previous_urls)
+
+      expect(bases).to eq([
+                            "https://explicit-root.example.com",
+                            "https://inherited-root.example.com"
+                          ])
+      expect(bases.map { |base| URI("#{base}/manifest").request_uri }).to all(eq("/manifest"))
+      expect(bases.map { |base| URI("#{base}/bundles/hash123").request_uri }).to all(eq("/bundles/hash123"))
+    end
+
     it "rejects unsafe URL components and a bare origin when the mount path is blank" do
       config = instance_double(
         ReactOnRailsPro::Configuration,

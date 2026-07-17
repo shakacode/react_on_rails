@@ -93,10 +93,11 @@ module ReactOnRailsPro
         # mount) must pass distinct prefixes so the Rails route registry
         # doesn't raise on duplicate names.
         def draw_routes(mapper, path:, as_prefix: DEFAULT_ROUTE_PREFIX)
-          mapper.get("#{path}/manifest",
+          route_prefix = path.to_s.sub(%r{/+\z}, "")
+          mapper.get("#{route_prefix}/manifest",
                      to: "react_on_rails_pro/rolling_deploy/bundles#manifest",
                      as: :"#{as_prefix}_manifest")
-          mapper.get("#{path}/bundles/:hash",
+          mapper.get("#{route_prefix}/bundles/:hash",
                      to: "react_on_rails_pro/rolling_deploy/bundles#show",
                      constraints: { hash: ROUTE_HASH_PATTERN },
                      as: :"#{as_prefix}_bundle")
