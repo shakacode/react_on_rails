@@ -153,6 +153,10 @@ setup_release_repo() {
   git remote add origin "$origin_dir"
 
   mkdir -p react_on_rails/lib/react_on_rails
+  mkdir -p script/lib
+  cp "$SCRIPT_DIR/ci-changes-detector" script/ci-changes-detector
+  cp "$SCRIPT_DIR/lib/git-diff-base" script/lib/git-diff-base
+  chmod +x script/ci-changes-detector
   printf 'module ReactOnRails\n  VERSION = "1.0.0"\nend\n' > react_on_rails/lib/react_on_rails/version.rb
   printf 'core\n' > app.txt
   printf '## [Unreleased]\n\n## [1.0.0.rc.0]\n- Fix something\n' > CHANGELOG.md
@@ -251,15 +255,46 @@ test_promote_aborts_when_not_on_release_branch() {
 test_promote_aborts_when_tip_drifted_from_rc_tag() {
   setup_release_repo
   # Add a content commit after the rc tag so the tip no longer matches v1.0.0.rc.0
-  # (different commit AND different tree). The identity check fires first.
-  printf 'drift\n' > drift.txt
+  # and changes shipped Ruby runtime content.
+  printf '\nmodule RuntimeDrift; end\n' >> react_on_rails/lib/react_on_rails/version.rb
   git add .
   git commit -qm "post-rc drift"
+  git push -q origin release/1.0.0
   run_rf promote 1.0.0 --dry-run
 
   assert_status 1 "$RF_STATUS" "promote drift status"
   assert_contains "$RF_OUT" "is not the accepted RC commit v1.0.0.rc.0" "promote drift"
   assert_not_contains "$RF_OUT" "would run: bundle exec rake release" "promote drift should stop before release"
+}
+
+test_promote_accepts_changelog_commit_atop_rc() {
+  setup_release_repo
+  printf '\n## [1.0.0]\n- Stable release notes\n' >> CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Finalize changelog for 1.0.0"
+  git push -q origin release/1.0.0
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 0 "$RF_STATUS" "promote changelog-only status"
+  assert_contains "$RF_OUT" "1 metadata-only commit after v1.0.0.rc.0" "promote changelog-only classification"
+  assert_contains "$RF_OUT" 'DRY RUN: would run: bundle exec rake release[1.0.0]' "promote changelog-only release"
+}
+
+test_promote_aborts_when_local_release_branch_is_stale() {
+  setup_release_repo
+  printf '\n## [1.0.0]\n- Stable release notes\n' >> CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Finalize changelog for 1.0.0"
+  git push -q origin release/1.0.0
+  git reset -q --hard v1.0.0.rc.0
+
+  run_rf promote 1.0.0 --dry-run
+
+  assert_status 1 "$RF_STATUS" "promote stale release branch status"
+  assert_contains "$RF_OUT" "local release/1.0.0 is not in sync with origin/release/1.0.0" \
+    "promote stale release branch message"
+  assert_not_contains "$RF_OUT" "would run: bundle exec rake release" \
+    "promote stale release branch stops before release"
 }
 
 # #3: an EMPTY (or metadata-only) commit layered on top of the RC has the SAME
@@ -268,6 +303,7 @@ test_promote_aborts_when_tip_drifted_from_rc_tag() {
 test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree() {
   setup_release_repo
   git commit -q --allow-empty -m "empty commit on top of the RC"
+  git push -q origin release/1.0.0
   # Sanity: the tree is unchanged vs the rc tag (the gap the old check missed).
   if [ -n "$(git diff --stat v1.0.0.rc.0)" ]; then
     fail "fixture invalid: expected an empty tree diff vs the rc tag"
@@ -587,6 +623,8 @@ run_test test_promote_dry_run_treats_option_like_remote_as_remote_name
 run_test test_promote_accepts_explicit_rc_tag
 run_test test_promote_aborts_when_not_on_release_branch
 run_test test_promote_aborts_when_tip_drifted_from_rc_tag
+run_test test_promote_accepts_changelog_commit_atop_rc
+run_test test_promote_aborts_when_local_release_branch_is_stale
 run_test test_promote_aborts_on_empty_commit_atop_rc_despite_equal_tree
 run_test test_promote_aborts_on_dirty_worktree
 run_test test_promote_aborts_when_no_rc_tag_found
