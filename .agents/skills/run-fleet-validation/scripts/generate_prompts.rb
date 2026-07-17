@@ -97,6 +97,8 @@ module FleetValidation
     def validate_options!
       raise ManifestError, "schema_version must be 1" unless @manifest["schema_version"] == 1
       raise ManifestError, "repos must be an array" unless @manifest["repos"].is_a?(Array)
+
+      validate_repo_entries!
       raise ManifestError, "--prompts must be positive" unless @prompt_count.positive?
       raise ManifestError, "--machines must name at least one machine" if @machines.empty?
       raise ManifestError, "--machines cannot exceed --prompts" if @machines.length > @prompt_count
@@ -115,6 +117,52 @@ module FleetValidation
       return if @prompt_count <= target_count
 
       raise ManifestError, "--prompts #{@prompt_count} exceeds #{target_count} available hard-gate targets"
+    end
+
+    def validate_repo_entries!
+      defaults = @manifest.fetch("defaults", {})
+      raise ManifestError, "defaults must be a mapping" unless defaults.is_a?(Hash)
+
+      @manifest.fetch("repos").each_with_index do |repo, index|
+        raise ManifestError, "repos[#{index}] must be a mapping" unless repo.is_a?(Hash)
+
+        next unless repo["tier"] == "hard_gate"
+
+        validate_hard_gate_repo!(defaults.merge(repo), index)
+      end
+    end
+
+    def validate_hard_gate_repo!(repo, index)
+      %w[name headline package_manager ruby_test build].each do |field|
+        value = repo[field]
+        if value.nil? || (value.respond_to?(:empty?) && value.empty?)
+          raise ManifestError, "repos[#{index}] hard gate is missing #{field}"
+        end
+        next if value.is_a?(String)
+
+        raise ManifestError, "repos[#{index}] hard gate #{field} must be a string"
+      end
+      unless [true, false].include?(repo["needs_pro"])
+        raise ManifestError, "repos[#{index}] hard gate needs_pro must be true or false"
+      end
+
+      validate_repo_collection!(repo, index, "packages")
+      validate_repo_collection!(repo, index, "smoke")
+      unless repo.fetch("smoke").all? { |path| path.is_a?(String) && !path.empty? }
+        raise ManifestError, "repos[#{index}] hard gate smoke entries must be non-empty strings"
+      end
+
+      repo.fetch("packages").each_with_index do |package, package_index|
+        unless package.is_a?(Hash) && package["ecosystem"].to_s != "" && package["name"].to_s != ""
+          raise ManifestError, "repos[#{index}].packages[#{package_index}] must name an ecosystem and package"
+        end
+      end
+    end
+
+    def validate_repo_collection!(repo, index, field)
+      return if repo[field].is_a?(Array)
+
+      raise ManifestError, "repos[#{index}] hard gate #{field} must be an array"
     end
 
     def build_targets
@@ -245,10 +293,11 @@ module FleetValidation
            template literally. Heartbeat successful claims at phase transitions.
         3. Concurrently spawn one execution subagent for the assigned monorepo generator/install gate,
            if present, plus one per successfully claimed app target (maximum #{targets.length} here). The
-           monorepo worker needs no app claim and runs the three exact commands in its own clean checkout
-           at the resolved tag. Every app worker uses its own scratch clone/worktree, validates or updates
-           the existing release bump, runs the effective install/build/test/smoke ladder, and prepares
-           exact public-safe evidence. Child agents must not spawn more agents.
+           monorepo worker needs no app claim and runs the local checkout commands plus the published
+           three-mode matrix in an isolated scratch directory. Every app worker uses its own scratch
+           clone/worktree, validates or updates the existing release bump, runs the effective
+           install/build/test/smoke ladder, and prepares exact public-safe evidence.
+           Child agents must not spawn more agents.
         4. As coordinator, reconcile their reports against live current-head state. Re-run cheap checks
            needed to resolve disagreement. Never convert missing evidence into a pass.
 
@@ -318,10 +367,19 @@ module FleetValidation
     def render_core_target(target)
       <<~TARGET.chomp
         - #{target.fetch('name')} — #{target.fetch('headline')}
-          In a clean checkout at the resolved tag, run exactly:
+          In a clean checkout at the resolved tag, run the local generator/build smoke:
           `(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)`
           `pnpm run build`
           `CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh`
+          Then, in a separate scratch directory with no local package or gem overrides, replace
+          `RESOLVED_NPM_VERSION` with the exact normalized candidate version and run the published matrix:
+          `npx --yes create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-standard --standard`
+          `npx --yes create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-pro`
+          `npx --yes create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-rsc --rsc`
+          Never submit the placeholder literally. Install/build/smoke all three generated apps. Assert the
+          standard app is core-only, the default app has working Pro SSR without RSC, and the RSC app is
+          streamed and interactive. Verify exact candidate gem/npm locks in every applicable app and the
+          independently resolved RSC version only in the RSC app. Keep Pro/RSC logs private.
           This gate is validation-only. Do not create a branch or PR, and do not substitute fleet app CI.
       TARGET
     end

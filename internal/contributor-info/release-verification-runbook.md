@@ -372,7 +372,11 @@ Check, with file/PR evidence for every claim:
    landed fix is not automatically a gap, but stale acceptance criteria or remaining work is. For
    a final-assembly/publish issue whose own lifecycle necessarily ends after promotion, require
    its pre-publish dependencies and checklist to be satisfied; do not require the issue to close
-   before the publish steps it tracks can run.
+   before the publish steps it tracks can run. Example: an unchecked issue box is stale only when
+   linked commit evidence proves the tagged candidate already satisfies it and no implementation,
+   documentation, test, or rollout work remains. An unchecked box naming any such remaining work is
+   still a gap. A final-publish issue may remain open when its only remaining boxes are the publish
+   steps that promotion itself unlocks.
 4. Version-stamp coherence: derive the expected gem/CHANGELOG and npm package versions from
    {{RC_TAG}} before comparing (for example, `v17.0.0.rc.7` -> gem/CHANGELOG `17.0.0.rc.7`,
    npm `17.0.0-rc.7`); gem version.rb files, every published package.json, and the CHANGELOG

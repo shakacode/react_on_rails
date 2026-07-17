@@ -483,6 +483,11 @@ pnpm run build
 CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh
 ```
 
+Also run the published three-mode matrix from the candidate-specific section above in a separate
+scratch directory with no local overrides. The gate does not pass unless `--standard`, default Pro,
+and `--rsc` installs all build and smoke with the exact candidate locks and independently resolved RSC
+lock where applicable.
+
 If a command fails for an environmental reason, record the failure and file or link a follow-up
 issue. Do not silently mark the gate as passed.
 

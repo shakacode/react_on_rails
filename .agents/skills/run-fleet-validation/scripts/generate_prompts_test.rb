@@ -62,6 +62,10 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "workflow=cpflow-review-app.yml, status_check=cpflow/review-app"
     assert_includes pack, "one execution subagent for the assigned monorepo generator/install gate"
     assert_includes pack, "(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)"
+    assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-standard --standard"
+    assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-pro`"
+    assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-rsc --rsc"
+    assert_includes pack, "independently resolved RSC version only in the RSC app"
     assert_includes pack, "verify: true"
   end
 
@@ -156,6 +160,37 @@ class FleetValidationGeneratorTest < Minitest::Test
         build_generator(manifest_path: manifest)
       end
       assert_equal "manifest root must be a mapping", error.message
+    end
+  end
+
+  def test_rejects_a_non_mapping_repo_entry
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos")[0] = "not-a-repo"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0] must be a mapping", error.message
+    end
+  end
+
+  def test_rejects_a_hard_gate_missing_a_required_field
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      hard_gate = manifest.fetch("repos").find { |repo| repo["tier"] == "hard_gate" }
+      hard_gate.delete("name")
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0] hard gate is missing name", error.message
     end
   end
 
