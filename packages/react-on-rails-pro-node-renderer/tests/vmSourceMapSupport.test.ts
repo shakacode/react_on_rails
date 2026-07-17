@@ -783,6 +783,109 @@ describe('source-mapped stack traces for VM errors', () => {
       }
     });
 
+    test('lazy registration settles to the sentinel after a successful load, so eviction cannot re-read disk', async () => {
+      // A lazy registration (external map, no preloaded JSON) keeps
+      // `sourceMapJson === undefined` until its first load. Without settling it
+      // on success, a later cache eviction would re-read a newer same-path map.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+      const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+      expect(registration.sourceMapJson).toBeUndefined();
+
+      // Successful load reads the external map from disk and settles the lazy
+      // registration to the sentinel (Finding A).
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+
+      // Evict the parsed cache while still holding the registration, then leave a
+      // different valid map on disk. A fall-through re-read would remap this
+      // generation through the newer map.
+      unregisterBundleForSourceMaps(registration);
+      await fsPromises.writeFile(
+        mapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+        expect(readPaths).not.toContain(mapPath);
+        expect(readPaths).not.toContain(bundlePath);
+        expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
+
+    test('corrupt inline data: map is terminal on first lookup and releases its retained payload', async () => {
+      // A data: payload that passes mime + size but decodes to non-JSON. Its JSON
+      // is validated lazily (not eagerly at build), so it is frozen as a decoded
+      // string until the first remap. That lookup fails to parse and settles
+      // terminal — an inline map is never retryable (a re-read could pick up a
+      // newer same-path generation) — and the settle releases the retained data.
+      const corruptDataUrl = 'data:application/json;charset=utf-8,not-valid-json';
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${corruptDataUrl}\n`;
+      const bundlePath = await writeVmBundle(bundleContents);
+
+      // Decoded and frozen, not eagerly validated, and not retryable.
+      const preloaded = await preloadSourceMapJsonForBundle(bundlePath, bundleContents);
+      expect(preloaded.sourceMapJson).toBe('not-valid-json');
+      expect(preloaded.retryMissingSourceMap).toBe(false);
+
+      const registration = registerBundleForSourceMaps(
+        bundlePath,
+        0,
+        bundleContents,
+        preloaded.sourceMapJson,
+        preloaded.retryMissingSourceMap,
+      );
+      expect(registration.sourceMapJson).toBe('not-valid-json');
+
+      // The invalid JSON never remaps; the terminal settle then releases both the
+      // frozen bad string and the retained encoded data: URL — nothing leaks for
+      // the pooled VM's life (Finding B), and it is not retried.
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(registration.sourceMappingUrl).toBeNull();
+    });
+
+    test('retired retryable external map settles to the sentinel so eviction cannot re-read disk', async () => {
+      // A retryable external map that never arrives is retired at the retry cap.
+      // Retirement must settle sourceMapJson to the sentinel; otherwise a later
+      // parsed-cache eviction would re-read disk and could pick up a newer
+      // same-path map.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+
+      // No map on disk: registered retryable, sourceMappingUrl is a filename.
+      const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+      expect(registration.sourceMapJson).toBeUndefined();
+      expect(registration.sourceMappingUrl).toBe(mapFileName);
+
+      // Exhaust the retry budget (MAX_MISSING_SOURCE_MAP_RETRIES = 5); the map
+      // never arrives, so each lookup misses and the retries retire.
+      for (let index = 0; index < 5; index += 1) {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+      }
+
+      // Retirement settled the JSON to the sentinel; the external filename is
+      // kept (not a large payload).
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(registration.sourceMappingUrl).toBe(mapFileName);
+    });
+
     test('oversized inline source map on the lazy lookup path is terminal, not retryable', async () => {
       // The lazy path re-reads the bundle from disk to find its
       // sourceMappingURL, so serve the oversized inline map via a readFileSync
