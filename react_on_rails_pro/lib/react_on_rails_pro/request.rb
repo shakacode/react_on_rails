@@ -86,17 +86,17 @@ module ReactOnRailsPro
         end
       end
 
-      def render_code(path, js_code, send_bundle, bundle_role: :server)
+      def render_code(path, js_code, send_bundle, bundle_role: :server, artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request #{path}" }
-        artifacts = if send_bundle
-                      ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
-                    end
+        artifacts ||= if send_bundle
+                        ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+                      end
         request_path = send_bundle ? retarget_render_path(path, artifacts, bundle_role) : path
         form = form_with_code(js_code, send_bundle, artifacts:)
         perform_request(request_path, form:)
       end
 
-      def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false)
+      def render_code_as_stream(path, js_code, is_rsc_payload:, rsc_stream_observability: false, artifacts: nil)
         Rails.logger.info { "[ReactOnRailsPro] Perform rendering request as a stream #{path}" }
         if is_rsc_payload && !ReactOnRailsPro.configuration.enable_rsc_support
           raise ReactOnRailsPro::Error,
@@ -108,9 +108,9 @@ module ReactOnRailsPro
         warn_cb = ->(request_time) { warn_if_slow_streaming_first_chunk(path, request_time) }
         bundle_role = is_rsc_payload ? :rsc : :server
         ReactOnRailsPro::StreamRequest.create(first_chunk_warn_callback: warn_cb) do |send_bundle, _tasks|
-          request_path, artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:)
+          request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
-          form = form_with_code(js_code, false, artifacts:, rsc_stream_observability:)
+          form = form_with_code(js_code, false, artifacts: request_artifacts, rsc_stream_observability:)
           perform_request(request_path, form:, stream: true)
         end
       end
@@ -148,11 +148,11 @@ module ReactOnRailsPro
         pull_enabled: false,
         push_props: nil,
         is_rsc_payload: false,
-        rsc_stream_observability: false
+        rsc_stream_observability: false,
+        artifacts: nil
       )
         Rails.logger.info { "[ReactOnRailsPro] Perform incremental rendering request #{path}" }
 
-        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
         if !push_props.nil? && !pull_enabled
           raise ArgumentError, "push_props can only be provided when pull_enabled is true"
         end
@@ -163,7 +163,7 @@ module ReactOnRailsPro
           first_chunk_warn_callback: warn_cb,
           pull_enabled:
         ) do |send_bundle, tasks|
-          request_path, artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:)
+          request_path, request_artifacts = prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts:)
 
           # Open a bidirectional HTTP/2 stream using async-http's Writable body.
           # output supports << (alias for write) and close (sends END_STREAM).
@@ -172,18 +172,16 @@ module ReactOnRailsPro
             headers: [["content-type", "application/x-ndjson"]]
           )
 
-          rsc_artifact = artifact_for_role(artifacts, :rsc)
-          emitter = ReactOnRailsPro::AsyncPropsEmitter.new(
-            rsc_artifact&.id || pool.rsc_bundle_hash,
+          emitter = build_incremental_emitter(request_artifacts, output, pull_enabled:)
+          write_initial_incremental_request(
             output,
-            pull_enabled:
+            js_code,
+            emitter,
+            artifacts: request_artifacts,
+            pull_enabled:,
+            push_props:,
+            rsc_stream_observability:
           )
-          initial_data = build_initial_incremental_request(
-            js_code, emitter, artifacts:, pull_enabled:, push_props:, rsc_stream_observability:
-          )
-
-          # Send the initial render request as first NDJSON line
-          output << "#{initial_data.to_json}\n"
 
           # Execute async props block in a separate fiber.
           # This runs concurrently with the response streaming back to the client.
@@ -441,6 +439,21 @@ module ReactOnRailsPro
         data
       end
 
+      def build_incremental_emitter(artifacts, output, pull_enabled:)
+        rsc_artifact = artifact_for_role(artifacts, :rsc)
+        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+        ReactOnRailsPro::AsyncPropsEmitter.new(
+          rsc_artifact&.id || pool.rsc_bundle_hash,
+          output,
+          pull_enabled:
+        )
+      end
+
+      def write_initial_incremental_request(output, js_code, emitter, **)
+        initial_data = build_initial_incremental_request(js_code, emitter, **)
+        output << "#{initial_data.to_json}\n"
+      end
+
       def retarget_render_path(path, artifacts, role)
         match = path.match(%r{\A/bundles/[^/]+/(?<endpoint>render|incremental-render)/})
         return path unless match
@@ -454,11 +467,11 @@ module ReactOnRailsPro
         path.sub(%r{\A/bundles/[^/]+/}, "/bundles/#{artifact.id}/")
       end
 
-      def prepare_streaming_request(path, send_bundle:, bundle_role:)
-        return [path, nil] unless send_bundle
+      def prepare_streaming_request(path, send_bundle:, bundle_role:, artifacts: nil)
+        return [path, artifacts] unless send_bundle
 
         Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
-        artifacts = ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
+        artifacts ||= ReactOnRailsPro::Utils.renderer_artifacts(action_description: "uploading requested assets")
         request_path = retarget_render_path(path, artifacts, bundle_role)
         upload_assets(artifacts:)
         [request_path, artifacts]

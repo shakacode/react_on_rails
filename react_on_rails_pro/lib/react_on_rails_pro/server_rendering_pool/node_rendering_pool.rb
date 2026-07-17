@@ -69,6 +69,7 @@ module ReactOnRailsPro
           is_rsc_payload = ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
           async_props_block = render_options.internal_option(:async_props_block)
           rsc_stream_observability = render_options.internal_option(:rsc_stream_observability) == true
+          artifacts = renderer_artifact_snapshot(render_options)
 
           if async_props_block
             # Use incremental rendering when async props block is provided
@@ -77,23 +78,28 @@ module ReactOnRailsPro
             # Pull mode is enabled whenever push_props is set, including [] for pure pull.
             # nil means push-only mode with no bidirectional prop-request channel.
             pull_enabled = !push_props.nil?
-            ReactOnRailsPro::Request.render_code_with_incremental_updates(
-              path,
-              js_code,
+            request_options = {
               async_props_block:,
               pull_enabled:,
               push_props:,
               is_rsc_payload:,
               rsc_stream_observability:
+            }
+            request_options[:artifacts] = artifacts if artifacts
+            ReactOnRailsPro::Request.render_code_with_incremental_updates(
+              path,
+              js_code,
+              **request_options
             )
           else
             # Use standard streaming when no async props block
             path = prepare_render_path(js_code, render_options)
+            request_options = { is_rsc_payload:, rsc_stream_observability: }
+            request_options[:artifacts] = artifacts if artifacts
             ReactOnRailsPro::Request.render_code_as_stream(
               path,
               js_code,
-              is_rsc_payload:,
-              rsc_stream_observability:
+              **request_options
             )
           end
         end
@@ -101,12 +107,10 @@ module ReactOnRailsPro
         def eval_js(js_code, render_options, send_bundle: false)
           path = prepare_render_path(js_code, render_options)
 
-          response = ReactOnRailsPro::Request.render_code(
-            path,
-            js_code,
-            send_bundle,
-            bundle_role: bundle_role_for(render_options)
-          )
+          request_options = { bundle_role: bundle_role_for(render_options) }
+          artifacts = renderer_artifact_snapshot(render_options)
+          request_options[:artifacts] = artifacts if artifacts
+          response = ReactOnRailsPro::Request.render_code(path, js_code, send_bundle, **request_options)
 
           case response.status
           when 200
@@ -160,6 +164,16 @@ module ReactOnRailsPro
 
         private
 
+        def renderer_artifact_snapshot(render_options)
+          return unless ReactOnRailsPro.configuration.enable_rsc_support
+
+          render_options.internal_option(:renderer_artifact_snapshot)
+        end
+
+        def artifact_for_role(artifacts, role)
+          Array(artifacts).find { |artifact| artifact.role == role }
+        end
+
         def bundle_role_for(render_options)
           if ReactOnRailsPro.configuration.enable_rsc_support && render_options.rsc_payload_streaming?
             :rsc
@@ -174,7 +188,9 @@ module ReactOnRailsPro
 
           rsc_support_enabled = ReactOnRailsPro.configuration.enable_rsc_support
           is_rendering_rsc_payload = rsc_support_enabled && render_options.rsc_payload_streaming?
-          bundle_hash = is_rendering_rsc_payload ? rsc_bundle_hash : server_bundle_hash
+          bundle_role = is_rendering_rsc_payload ? :rsc : :server
+          artifact = artifact_for_role(renderer_artifact_snapshot(render_options), bundle_role)
+          bundle_hash = artifact&.id || (is_rendering_rsc_payload ? rsc_bundle_hash : server_bundle_hash)
 
           "/bundles/#{bundle_hash}/#{endpoint}/#{render_options.request_digest}"
         end

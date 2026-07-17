@@ -76,6 +76,42 @@ module ReactOnRailsPro
             /Renderer rejected malformed request or hit an unhandled VM error: 400:\n#{Regexp.escape(response_body)}/
           )
         end
+
+        it "reuses the operation artifact snapshot when retrying a normal render after 410" do
+          server_artifact = instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :server,
+            id: "server-id-before-drift"
+          )
+          rsc_artifact = instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :rsc,
+            id: "rsc-id-before-companion-drift"
+          )
+          artifacts = [server_artifact, rsc_artifact]
+          send_bundle_response = instance_double(
+            ReactOnRailsPro::RendererHttpClient::Response,
+            status: ReactOnRailsPro::STATUS_SEND_BUNDLE,
+            body: "Bundle not found"
+          )
+          success_response = instance_double(
+            ReactOnRailsPro::RendererHttpClient::Response,
+            status: 200,
+            body: "rendered"
+          )
+          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+          allow(render_options).to receive(:internal_option)
+            .with(:renderer_artifact_snapshot)
+            .and_return(artifacts)
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, "console.log('x')", false, bundle_role: :server, artifacts:)
+            .and_return(send_bundle_response)
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, "console.log('x')", true, bundle_role: :server, artifacts:)
+            .and_return(success_response)
+
+          expect(described_class.eval_js("console.log('x')", render_options)).to eq("rendered")
+        end
       end
 
       describe ".exec_server_render_js error classification" do
@@ -169,12 +205,26 @@ module ReactOnRailsPro
           before do
             allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
             allow(render_options).to receive(:rsc_payload_streaming?).and_return(true)
+            allow(render_options).to receive(:internal_option)
+              .with(:renderer_artifact_snapshot)
+              .and_return(nil)
           end
 
           it "uses RSC bundle hash instead of server bundle hash" do
             path = described_class.prepare_incremental_render_path(js_code, render_options)
 
             expect(path).to eq("/bundles/rsc456/incremental-render/abc123")
+          end
+
+          it "uses the operation snapshot RSC ID instead of rereading a volatile pool ID" do
+            rsc_artifact = instance_double(ReactOnRailsPro::RendererArtifact, role: :rsc, id: "rsc-snapshot")
+            allow(render_options).to receive(:internal_option)
+              .with(:renderer_artifact_snapshot)
+              .and_return([rsc_artifact])
+
+            path = described_class.prepare_incremental_render_path(js_code, render_options)
+
+            expect(path).to eq("/bundles/rsc-snapshot/incremental-render/abc123")
           end
         end
       end

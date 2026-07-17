@@ -171,6 +171,12 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
     end
 
     context "when streaming with RSC support" do
+      let(:server_artifact) do
+        instance_double(ReactOnRailsPro::RendererArtifact, role: :server, id: "server-artifact-id")
+      end
+      let(:rsc_artifact) do
+        instance_double(ReactOnRailsPro::RendererArtifact, role: :rsc, id: "rsc-artifact-id-before-drift")
+      end
       let(:render_options) do
         instance_double(
           ReactOnRails::ReactComponent::RenderOptions,
@@ -191,7 +197,11 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
           rendering_returns_promises: false,
           ssr_pre_hook_js: nil
         )
-        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-bundle-hash")
+        allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts)
+          .with(action_description: "preparing server render", roles: %i[server rsc])
+          .and_return([server_artifact, rsc_artifact])
+        allow(render_options).to receive(:set_option)
       end
 
       it "keeps the RSC-aware streaming function and manifest metadata" do
@@ -210,6 +220,41 @@ RSpec.describe ReactOnRailsPro::ServerRenderingJsCode do
         expected_server_manifest =
           'railsContext.reactServerClientManifestFileName = "react-server-client-manifest.json"'
         expect(result).to include(expected_server_manifest)
+      end
+
+      it "captures one server and RSC artifact snapshot before embedding the RSC ID" do
+        result = described_class.render(
+          props_string,
+          rails_context,
+          redux_stores,
+          react_component_name,
+          render_options
+        )
+
+        expect(render_options).to have_received(:set_option)
+          .with(:renderer_artifact_snapshot, [server_artifact, rsc_artifact])
+        expect(result).to include('rscBundleHash: "rsc-artifact-id-before-drift"')
+      end
+
+      it "memoizes the full artifact snapshot outside development and test" do
+        allow(Rails.env).to receive_messages(development?: false, test?: false)
+        described_class.instance_variable_set(:@stable_renderer_artifact_snapshot, nil)
+
+        2.times do
+          described_class.render(
+            props_string,
+            rails_context,
+            redux_stores,
+            react_component_name,
+            render_options
+          )
+        end
+
+        expect(ReactOnRailsPro::Utils).to have_received(:renderer_artifacts).once
+        expect(render_options).to have_received(:set_option)
+          .with(:renderer_artifact_snapshot, [server_artifact, rsc_artifact]).twice
+      ensure
+        described_class.instance_variable_set(:@stable_renderer_artifact_snapshot, nil)
       end
     end
   end
