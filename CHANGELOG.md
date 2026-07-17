@@ -37,6 +37,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
+  disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
+  `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
+  now treated as routine disconnects: logged once at `debug` (no backtrace, gated on `logging_on_server`)
+  and short-circuited so the block's remaining props are skipped silently. Previously every remaining
+  prop produced an `error`-level entry with a 5-frame backtrace, so a single disconnect spammed logs in
+  proportion to the number of props still in flight and buried genuine emit failures in the noise.
+  Genuine write failures (for example a `JSON::GeneratorError`) still log at `error` with a backtrace.
+  This mirrors the sibling `ReactOnRailsPro::Stream#log_client_disconnect` convention. Fixes
+  [Issue 4325](https://github.com/shakacode/react_on_rails/issues/4325).
+  [PR XXXX](https://github.com/shakacode/react_on_rails/pull/XXXX) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
   bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
   the parsed map becomes the VM generation's single retained copy. For inline (`data:`) maps the encoded

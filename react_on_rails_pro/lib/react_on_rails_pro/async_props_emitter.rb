@@ -50,14 +50,42 @@ module ReactOnRailsPro
   class AsyncPropsEmitter
     SANITIZED_REJECTION_REASON = "Async prop rejected by server"
 
+    # Socket-level errors that mean the renderer request stream is already gone.
+    # These mirror the family that ReactOnRailsPro::Stream#log_client_disconnect
+    # (concerns/stream.rb) treats as a routine client disconnect, so the two files
+    # classify disconnect races the same way.
+    CLOSED_REQUEST_STREAM_SOCKET_ERRORS = [
+      IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED
+    ].freeze
+
     attr_reader :pull_requests
 
     def initialize(bundle_timestamp, request_stream, pull_enabled: false)
       @bundle_timestamp = bundle_timestamp
       @request_stream = request_stream
       @pushed_props = Set.new
+      # Latched the first time a write hits a closed request stream, so the rest of
+      # the user's block (which runs in its own fiber and may keep emitting) is
+      # skipped silently instead of logging once per remaining prop.
+      @request_stream_closed = false
       @pull_enabled = pull_enabled
       @pull_requests = PullRequestQueue.new(@pushed_props) if pull_enabled
+    end
+
+    # Exception classes that indicate a write landed on an already-closed request
+    # stream. `@request_stream` is a Protocol::HTTP::Body::Writable::Output; writing
+    # after its queue closes raises Protocol::HTTP::Body::Writable::Closed on a clean
+    # close, or the stored socket error (Errno::*/IOError) that tore the stream down
+    # on an aborted one (see async-http Output#passthrough -> Writable#write).
+    #
+    # Resolved at rescue time rather than at load time on purpose: the protocol-http
+    # writable-body class is required lazily (only once streaming starts) and its
+    # Closed constant has moved namespaces across gem versions, so the defined? guard
+    # keeps this file loadable everywhere and picks the class up once it exists.
+    def self.closed_request_stream_errors
+      return CLOSED_REQUEST_STREAM_SOCKET_ERRORS unless defined?(Protocol::HTTP::Body::Writable::Closed)
+
+      CLOSED_REQUEST_STREAM_SOCKET_ERRORS + [Protocol::HTTP::Body::Writable::Closed]
     end
 
     # Sends an async prop to the Node renderer.
@@ -92,11 +120,22 @@ module ReactOnRailsPro
     private
 
     def write_settled_chunk(prop_name, action:)
+      # A closed request stream is routine (client disconnect, or the block still
+      # emitting after renderComplete winds the connection down). Once we have seen
+      # it close, skip the remaining writes entirely so a block emitting N more props
+      # does not generate N log lines or N wasted serializations.
+      return if @request_stream_closed
+
       chunk = yield
       @request_stream << "#{chunk.to_json}\n"
       # Once the chunk is written, Ruby treats the prop as settled too.
       # That keeps duplicate pull requests filtered even if the JS manager is recreated.
       @pushed_props.add(prop_name)
+    rescue *self.class.closed_request_stream_errors => e
+      # Routine disconnect race, not a genuine failure: keep it quiet, mirroring
+      # ReactOnRailsPro::Stream#log_client_disconnect. The prop is intentionally not
+      # marked pushed, matching the error path below.
+      handle_closed_request_stream(prop_name, action, e)
     rescue StandardError => e
       # Continue streaming: one failed async prop write should not abort the
       # entire render. The prop is not marked as pushed unless the write
@@ -105,6 +144,20 @@ module ReactOnRailsPro
         backtrace = e.backtrace&.first(5)&.join("\n")
         "[ReactOnRailsPro::AsyncProps] Failed to #{action} async prop '#{prop_name}': " \
           "#{e.class} - #{e.message}\n#{backtrace}"
+      end
+    end
+
+    # Handles a write to an already-closed request stream. Mirrors
+    # ReactOnRailsPro::Stream#log_client_disconnect: quiet (debug, no backtrace) and
+    # gated on logging_on_server. Latches @request_stream_closed so this logs at most
+    # once per stream and the block's remaining emits are skipped without noise.
+    def handle_closed_request_stream(prop_name, action, error)
+      @request_stream_closed = true
+      return unless ReactOnRails.configuration.logging_on_server
+
+      Rails.logger.debug do
+        "[ReactOnRailsPro::AsyncProps] Request stream closed while emitting async prop " \
+          "'#{prop_name}' (#{action}); skipping remaining props: #{error.class}"
       end
     end
 
