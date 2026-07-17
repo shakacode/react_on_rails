@@ -287,6 +287,28 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
       end
     end
 
+    it "omits an artifact when a companion case-insensitively collides with the bundle entry" do
+      Dir.mktmpdir("ror-pro-root") do |root|
+        root = File.realpath(root)
+        bundle = File.join(root, "server.js")
+        companion = File.join(root, "manifest.json")
+        File.write(bundle, "bundle")
+        File.write(companion, "{}")
+        artifact = ReactOnRailsPro::RendererArtifact.new(
+          role: :server,
+          bundle:,
+          companions: { "BUNDLE.JS" => companion }
+        )
+        logger = instance_double(Logger, warn: nil)
+        allow(Rails).to receive_messages(root: Pathname.new(root), logger:)
+        allow(ReactOnRailsPro.configuration).to receive(:node_renderer?).and_return(true)
+        allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
+
+        expect(controller.send(:safe_current_artifacts)).to eq([])
+        expect(logger).to have_received(:warn).with(/companion collides with "bundle\.js"/)
+      end
+    end
+
     it "does not include inline companion URL secrets or bodies in invalid-source warnings" do
       Dir.mktmpdir("ror-pro-root") do |root|
         root = File.realpath(root)

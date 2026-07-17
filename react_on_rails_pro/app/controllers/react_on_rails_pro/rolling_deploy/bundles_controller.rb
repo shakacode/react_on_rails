@@ -235,7 +235,7 @@ module ReactOnRailsPro
 
       def artifact_servable?(artifact)
         rails_root = File.realpath(File.expand_path(Rails.root.to_s))
-        if artifact.companions.key?(BUNDLE_ENTRY_NAME)
+        if artifact.companions.each_key.any? { |name| name.casecmp?(BUNDLE_ENTRY_NAME) }
           Rails.logger.warn(
             "[ReactOnRailsPro::RollingDeploy::BundlesController] artifact #{artifact.id} cannot be served as a " \
             "complete artifact because a companion collides with #{BUNDLE_ENTRY_NAME.inspect}."
