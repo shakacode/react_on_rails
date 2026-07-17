@@ -632,6 +632,63 @@ describe('source-mapped stack traces for VM errors', () => {
       });
     });
 
+    test('inline data: map encoded URL is released after first parse; external map filename is kept', async () => {
+      // Inline map: registration holds the whole encoded data: payload, which is
+      // dead weight once the parsed map is cached. Releasing only the raw JSON
+      // (but not this URL) would leave the larger base64 copy retained.
+      const inlineBundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+        buildThrowingBundleMap('bundle.js'),
+      )}\n`;
+      const inlineBundlePath = await writeVmBundle(inlineBundleContents);
+      const inlineRegistration = registerBundleForSourceMaps(inlineBundlePath, 0, inlineBundleContents);
+      expect(typeof inlineRegistration.sourceMappingUrl).toBe('string');
+      expect(inlineRegistration.sourceMappingUrl).toEqual(expect.stringContaining('data:application/json'));
+
+      // (a) Remapping still works on first parse.
+      expect(resolveOriginalPositionForRegistration(inlineRegistration, inlineBundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+
+      // (b) The encoded inline payload is released alongside the raw JSON.
+      expect(inlineRegistration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(inlineRegistration.sourceMappingUrl).toBeNull();
+
+      // External map: sourceMappingUrl is a small relative filename the lazy read
+      // path legitimately uses, so the release must leave it intact.
+      const externalBundlePath = path.join(serverBundleCachePath(testName), 'external', 'bundle.js');
+      const externalMapFileName = `${path.basename(externalBundlePath)}.map`;
+      const externalMapPath = path.join(path.dirname(externalBundlePath), externalMapFileName);
+      const externalBundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${externalMapFileName}\n`;
+      await writeBundleAt(externalBundlePath, externalBundleContents);
+      await fsPromises.writeFile(
+        externalMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(externalBundlePath))),
+      );
+      const externalPreload = await preloadSourceMapJsonForBundle(externalBundlePath, externalBundleContents);
+      const externalRegistration = registerBundleForSourceMaps(
+        externalBundlePath,
+        0,
+        externalBundleContents,
+        externalPreload.sourceMapJson,
+        externalPreload.retryMissingSourceMap,
+      );
+      expect(externalRegistration.sourceMappingUrl).toBe(externalMapFileName);
+
+      expect(resolveOriginalPositionForRegistration(externalRegistration, externalBundlePath, 3, 17)).toEqual(
+        {
+          source: ORIGINAL_SOURCE,
+          line: 2,
+          column: 3,
+        },
+      );
+
+      expect(externalRegistration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      // Unchanged: only the inline data: payload is released, never the filename.
+      expect(externalRegistration.sourceMappingUrl).toBe(externalMapFileName);
+    });
+
     test('remap keeps working after the raw JSON is released and the on-disk map is overwritten', async () => {
       const bundlePath = vmBundlePath(testName);
       const mapFileName = `${path.basename(bundlePath)}.map`;

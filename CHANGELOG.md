@@ -39,11 +39,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
   bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
-  the parsed map becomes the VM generation's single retained copy. A registration whose raw JSON was
-  released never falls back to re-reading the map from disk, preserving the same-path rebuild guarantee:
-  old VM generations keep remapping through their own map even after the on-disk map is overwritten. Also
-  makes an unusable inline (`data:`) source map terminal on the lazy lookup path instead of retried,
-  matching registration-time behavior. Partially addresses
+  the parsed map becomes the VM generation's single retained copy. For inline (`data:`) maps the encoded
+  URL payload (larger than the raw JSON) is released as well, so the single-copy reduction applies to both
+  external and inline maps. A registration whose raw map was released never falls back to re-reading the
+  map from disk, preserving the same-path rebuild guarantee: old VM generations keep remapping through
+  their own map even after the on-disk map is overwritten. Also makes an unusable inline (`data:`) source
+  map terminal on the lazy lookup path instead of retried, matching registration-time behavior. Partially
+  addresses
   [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
   [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
   [justin808](https://github.com/justin808).

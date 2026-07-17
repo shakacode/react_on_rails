@@ -777,6 +777,21 @@ function sourceMapForRegistration(
         // release.
         // eslint-disable-next-line no-param-reassign
         registration.sourceMapJson = RAW_SOURCE_MAP_JSON_DISCARDED;
+
+        // For an inline map, `sourceMappingUrl` holds the entire encoded
+        // `data:application/json;...` payload (≈1.33× the JSON for base64) —
+        // dead weight once the parsed map is cached, since the sentinel guard
+        // above returns terminal before any code re-reads it. Release it too so
+        // single-copy retention actually applies to inline maps. External maps
+        // keep their `sourceMappingUrl`: it is a small relative filename the
+        // lazy read path legitimately uses, not a large payload.
+        if (
+          typeof registration.sourceMappingUrl === 'string' &&
+          registration.sourceMappingUrl.startsWith('data:')
+        ) {
+          // eslint-disable-next-line no-param-reassign
+          registration.sourceMappingUrl = null;
+        }
       }
     } else {
       sourceMap = null;
