@@ -290,6 +290,7 @@ module ReactOnRailsPro
           path = value.to_s.strip
           return nil if path.empty?
 
+          path = collapse_repeated_slashes(path)
           path = "/#{path}" unless path.start_with?("/")
           path = path.chomp("/")
           path.empty? ? "/" : path
@@ -321,12 +322,16 @@ module ReactOnRailsPro
         end
 
         def normalized_previous_path(value, mount_path:)
-          path = value.to_s
+          path = collapse_repeated_slashes(value.to_s)
           return path unless path.empty? || path == "/"
           return mount_path if mount_path
 
           warn_invalid_previous_url("is a bare origin but rolling_deploy_mount_path is blank")
           nil
+        end
+
+        def collapse_repeated_slashes(path)
+          path.squeeze("/")
         end
 
         def warn_invalid_previous_url(reason)

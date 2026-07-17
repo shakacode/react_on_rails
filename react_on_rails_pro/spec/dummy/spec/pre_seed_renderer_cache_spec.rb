@@ -566,7 +566,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     after { FileUtils.rm_rf(directory_bundle_path) }
 
     it "raises the friendly bundle error before hashing or staging" do
-      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /exists but is not a file/)
     end
   end
 

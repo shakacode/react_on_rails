@@ -84,6 +84,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   preserves explicit paths, rejects ambiguous legacy hashes across origins, verifies every v2 payload before staging,
   and enforces monotonic operation deadlines. Fixes
   [Issue 4620](https://github.com/shakacode/react_on_rails/issues/4620).
+  [PR 4701](https://github.com/shakacode/react_on_rails/pull/4701) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
   whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is

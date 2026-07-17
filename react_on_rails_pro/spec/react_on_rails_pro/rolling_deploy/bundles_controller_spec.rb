@@ -287,14 +287,14 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
       end
     end
 
-    it "does not include inline companion bodies in invalid-source warnings" do
+    it "does not include inline companion URL secrets or bodies in invalid-source warnings" do
       Dir.mktmpdir("ror-pro-root") do |root|
         root = File.realpath(root)
         bundle = File.join(root, "server.js")
         File.write(bundle, "bundle")
         sentinel = "private-inline-companion-body"
         inline = ReactOnRailsPro::RendererArtifact::InlineCompanion.new(
-          url: "http://localhost:3035/manifest.json",
+          url: "https://user:password@localhost:3035/manifest.json?token=signed-secret#private",
           body: sentinel
         )
         artifact = ReactOnRailsPro::RendererArtifact.new(
@@ -308,8 +308,12 @@ describe ReactOnRailsPro::RollingDeploy::BundlesController do
         allow(ReactOnRailsPro::Utils).to receive(:renderer_artifacts).and_return([artifact])
 
         expect(controller.send(:safe_current_artifacts)).to eq([])
-        safe_warning = satisfy("includes the URL without the inline body") do |message|
-          message.include?(inline.url) && !message.include?(sentinel)
+        safe_warning = satisfy("redacts the inline URL and body") do |message|
+          !message.include?("user") &&
+            !message.include?("password") &&
+            !message.include?("signed-secret") &&
+            !message.include?("private") &&
+            !message.include?(sentinel)
         end
         expect(logger).to have_received(:warn).with(safe_warning)
       end

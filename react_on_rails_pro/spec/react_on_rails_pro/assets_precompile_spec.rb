@@ -601,9 +601,14 @@ describe ReactOnRailsPro::AssetsPrecompile do
       end
 
       it "publishes captured RSC bytes when the source is removed after snapshot construction" do
+        uploaded_rsc_body = nil
+        allow(adapter).to receive(:upload) do |hash, bundle:, **|
+          uploaded_rsc_body = File.binread(bundle) if hash == rsc_artifact.id
+        end
         FileUtils.rm_f(rsc_bundle)
 
         expect { described_class.send(:publish_current_bundle_if_configured) }.not_to output.to_stderr
+        expect(uploaded_rsc_body).to eq("// rsc bundle content")
 
         expect(adapter).to have_received(:upload).with(
           server_artifact.id,

@@ -271,7 +271,7 @@ module ReactOnRailsPro
       end
 
       def source_label(source)
-        return "inline URL #{source.url.inspect}" if source.is_a?(RendererArtifact::InlineCompanion)
+        return "redacted inline URL" if source.is_a?(RendererArtifact::InlineCompanion)
 
         source.to_s.inspect
       end

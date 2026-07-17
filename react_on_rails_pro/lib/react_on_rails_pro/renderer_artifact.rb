@@ -47,14 +47,7 @@ module ReactOnRailsPro
       @role = role.to_sym
       @bundle = Pathname.new(bundle.to_s)
       @bundle_body = capture_body(bundle_body || File.binread(@bundle))
-      @companions = companions.to_h.each_with_object({}) do |(basename, source), mapping|
-        name = basename.to_s
-        unless COMPANION_NAME_PATTERN.match?(name)
-          raise ArgumentError, "Renderer artifact companion name must be a safe flat basename: #{name.inspect}"
-        end
-
-        mapping[name] = source.is_a?(InlineCompanion) ? source : Pathname.new(source.to_s)
-      end.freeze
+      @companions = normalize_companions(companions)
       @companion_bodies = capture_companion_bodies(companion_bodies)
       @id = build_id.freeze
       freeze
@@ -76,6 +69,14 @@ module ReactOnRailsPro
     # APIs and tarball composition use the exact bytes bound into +id+ without
     # retaining large snapshots in a process-wide cache.
     def with_materialized_files(bundle_name: File.basename(bundle.to_s))
+      bundle_name = bundle_name.to_s
+      conflicting_name = companion_bodies.each_key.find { |basename| basename.casecmp?(bundle_name) }
+      if conflicting_name
+        raise ArgumentError,
+              "Renderer companion name #{conflicting_name.inspect} conflicts with bundle filename " \
+              "#{bundle_name.inspect}"
+      end
+
       Dir.mktmpdir("rorp-artifact-") do |directory|
         bundle_path = File.join(directory, bundle_name)
         File.binwrite(bundle_path, bundle_body)
@@ -89,6 +90,26 @@ module ReactOnRailsPro
     end
 
     private
+
+    def normalize_companions(companions)
+      casefolded_names = {}
+      companions.to_h.each_with_object({}) do |(basename, source), mapping|
+        name = basename.to_s
+        unless COMPANION_NAME_PATTERN.match?(name)
+          raise ArgumentError, "Renderer artifact companion name must be a safe flat basename: #{name.inspect}"
+        end
+
+        previous_name = casefolded_names[name.downcase]
+        if previous_name
+          raise ArgumentError,
+                "Renderer artifact companion names must be unique ignoring case: " \
+                "#{previous_name.inspect} conflicts with #{name.inspect}"
+        end
+
+        casefolded_names[name.downcase] = name
+        mapping[name] = source.is_a?(InlineCompanion) ? source : Pathname.new(source.to_s)
+      end.freeze
+    end
 
     def build_id
       role_code = ROLE_CODES.fetch(role) do

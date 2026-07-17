@@ -58,6 +58,24 @@ describe ReactOnRailsPro::RollingDeployAdapters::Http do
                                                                     ])
     end
 
+    it "collapses repeated slashes in inherited mounts and explicit paths" do
+      config = instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_previous_url: nil,
+        rolling_deploy_previous_urls: [
+          "https://first.example.com",
+          "https://second.example.com//custom///nested//"
+        ],
+        rolling_deploy_mount_path: "//react_on_rails_pro///rolling_deploy//"
+      )
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+
+      expect(described_class.send(:configured_previous_urls)).to eq([
+                                                                      "https://first.example.com/react_on_rails_pro/rolling_deploy",
+                                                                      "https://second.example.com/custom/nested"
+                                                                    ])
+    end
+
     it "rejects unsafe URL components and a bare origin when the mount path is blank" do
       config = instance_double(
         ReactOnRailsPro::Configuration,

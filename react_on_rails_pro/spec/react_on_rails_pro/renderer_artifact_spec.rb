@@ -145,5 +145,36 @@ module ReactOnRailsPro
         described_class.new(role: :server, bundle:, companions: { "../manifest.json" => manifest })
       end.to raise_error(ArgumentError, /safe flat basename/)
     end
+
+    it "rejects a companion that would overwrite the materialized bundle" do
+      bundle = write_file("server.js", "bundle")
+      companion = write_file("companion.js", "companion")
+      artifact = described_class.new(
+        role: :server,
+        bundle:,
+        companions: { "BUNDLE.JS" => companion }
+      )
+
+      expect do
+        artifact.with_materialized_files(bundle_name: "bundle.js") { nil }
+      end.to raise_error(ArgumentError, /conflicts with bundle filename/)
+    end
+
+    it "rejects companion names that collide on case-insensitive filesystems" do
+      bundle = write_file("server.js", "bundle")
+      first_manifest = write_file("first-manifest.json", "first")
+      second_manifest = write_file("second-manifest.json", "second")
+
+      expect do
+        described_class.new(
+          role: :server,
+          bundle:,
+          companions: {
+            "manifest.json" => first_manifest,
+            "MANIFEST.JSON" => second_manifest
+          }
+        )
+      end.to raise_error(ArgumentError, /unique ignoring case/)
+    end
   end
 end
