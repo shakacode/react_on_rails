@@ -788,6 +788,21 @@ describe ReactOnRailsHelper do
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
 
+    it "does not mutate a frozen html_options hash" do
+      frozen_opts = { class: "widget", tag: "span" }.freeze
+      expect do
+        react_component("App", html_options: frozen_opts)
+      end.not_to raise_error
+      expect(frozen_opts).to eq({ class: "widget", tag: "span" })
+    end
+
+    it "does not leak state into a reused html_options hash across calls" do
+      shared_opts = { class: "widget", tag: "span" }
+      react_component("App", html_options: shared_opts)
+      react_component("App", html_options: shared_opts)
+      expect(shared_opts).to eq({ class: "widget", tag: "span" })
+    end
+
     describe "Pro inline hydration script" do
       let(:hydration_script) do
         %(typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');)
@@ -853,6 +868,21 @@ describe ReactOnRailsHelper do
       react_component_hash("App", props:, immediate_hydration: false)
 
       expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
+    end
+
+    it "does not mutate a frozen html_options hash" do
+      frozen_opts = { class: "widget" }.freeze
+      expect do
+        react_component_hash("App", props:, html_options: frozen_opts)
+      end.not_to raise_error
+      expect(frozen_opts).to eq({ class: "widget" })
+    end
+
+    it "does not leak state into a reused html_options hash across calls" do
+      shared_opts = { class: "widget" }
+      react_component_hash("App", props:, html_options: shared_opts)
+      react_component_hash("App", props:, html_options: shared_opts)
+      expect(shared_opts).to eq({ class: "widget" })
     end
   end
 

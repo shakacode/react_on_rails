@@ -15,6 +15,10 @@
 
 require_relative "spec_helper"
 require "react_on_rails_pro/async_props_emitter"
+# Ensures Protocol::HTTP::Body::Writable::Closed is loaded so the emitter's
+# closed-stream classification (and the tests that raise it) resolve the real
+# class rather than falling back to the socket-only error set.
+require "protocol/http/body/writable"
 
 RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
   let(:bundle_timestamp) { "bundle-12345" }
@@ -153,6 +157,157 @@ RSpec.describe ReactOnRailsPro::AsyncPropsEmitter do
       pull_emitter.pull_requests.close
 
       expect(pull_emitter.pull_requests.dequeue).to be_nil
+    end
+  end
+
+  describe "closed request stream handling" do
+    # The user's async-props block runs in its own fiber and can keep emitting
+    # after the client disconnects or the connection winds down post-renderComplete.
+    # Those writes hit an already-closed stream: a routine race, not a real failure.
+    let(:mock_logger) { instance_double(Logger) }
+
+    before do
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+      allow(mock_logger).to receive(:debug)
+      allow(mock_logger).to receive(:error)
+      allow(ReactOnRails.configuration).to receive(:logging_on_server).and_return(true)
+    end
+
+    it "logs a closed-stream write at debug (not error) with no backtrace" do
+      allow(request_stream).to receive(:<<).and_raise(Protocol::HTTP::Body::Writable::Closed)
+
+      expect { emitter.call("books", []) }.not_to raise_error
+
+      expect(mock_logger).to have_received(:debug) do |&block|
+        message = block.call
+        expect(message).to include("Request stream closed")
+        expect(message).to include("books")
+        expect(message).to include("Protocol::HTTP::Body::Writable::Closed")
+        expect(message).not_to include("\n") # single line, no 5-frame backtrace
+      end
+      expect(mock_logger).not_to have_received(:error)
+    end
+
+    it "treats a socket disconnect (Errno::EPIPE) as a closed stream, not an error" do
+      allow(request_stream).to receive(:<<).and_raise(Errno::EPIPE)
+
+      expect { emitter.call("books", []) }.not_to raise_error
+
+      expect(mock_logger).to have_received(:debug)
+      expect(mock_logger).not_to have_received(:error)
+    end
+
+    it "still logs a genuine write failure at error with a backtrace" do
+      allow(request_stream).to receive(:<<).and_raise(RuntimeError.new("bad serialization"))
+
+      expect { emitter.call("books", []) }.not_to raise_error
+
+      expect(mock_logger).to have_received(:error) do |&block|
+        message = block.call
+        expect(message).to include("Failed to send async prop 'books'")
+        expect(message).to include("RuntimeError")
+        expect(message).to include("bad serialization")
+        expect(message).to match(/\.rb:\d+/) # backtrace frame present
+      end
+      expect(mock_logger).not_to have_received(:debug)
+    end
+
+    it "treats a socket error raised while serializing a prop value as a genuine failure, not a disconnect" do
+      # Only the request-stream write is a disconnect race. A prop value whose own
+      # #to_json raises a socket-family error is a real bug: it must log at error
+      # (with a backtrace) and must NOT latch the emitter closed, so later props on
+      # a still-open stream keep flowing.
+      exploding = Object.new
+      def exploding.to_json(*)
+        raise Errno::EPIPE
+      end
+      written = []
+      allow(request_stream).to receive(:<<) { |chunk| written << chunk }
+
+      emitter.call("boom", exploding)
+      emitter.call("after", 1)
+
+      expect(mock_logger).to have_received(:error) do |&block|
+        expect(block.call).to include("Failed to send async prop 'boom'")
+      end
+      expect(mock_logger).not_to have_received(:debug)
+      # Not latched: the good prop after the raising one is still written.
+      expect(written).to contain_exactly(a_string_including("after"))
+    end
+
+    it "does not mark a prop pushed when the write hits a closed stream" do
+      pull_emitter = described_class.new(bundle_timestamp, request_stream, pull_enabled: true)
+      allow(request_stream).to receive(:<<).and_raise(Protocol::HTTP::Body::Writable::Closed)
+
+      Async do
+        pull_emitter.call("books", [])
+        pull_emitter.pull_requests.enqueue("books")
+        pull_emitter.pull_requests.close
+
+        # Prop is retryable via pull mode because it was never settled.
+        expect(pull_emitter.pull_requests.dequeue).to eq("books")
+        expect(pull_emitter.pull_requests.dequeue).to be_nil
+      end
+    end
+
+    it "logs once and skips remaining emits after the stream closes" do
+      write_attempts = 0
+      allow(request_stream).to receive(:<<) do
+        write_attempts += 1
+        raise Protocol::HTTP::Body::Writable::Closed
+      end
+
+      emitter.call("a", 1)
+      emitter.call("b", 2)
+      emitter.reject("c", "denied")
+
+      expect(write_attempts).to eq(1) # only the first emit is attempted after close
+      expect(mock_logger).to have_received(:debug).once
+      expect(mock_logger).not_to have_received(:error)
+    end
+
+    it "still short-circuits but stays silent when logging_on_server is false" do
+      allow(ReactOnRails.configuration).to receive(:logging_on_server).and_return(false)
+      write_attempts = 0
+      allow(request_stream).to receive(:<<) do
+        write_attempts += 1
+        raise Protocol::HTTP::Body::Writable::Closed
+      end
+
+      emitter.call("a", 1)
+      emitter.call("b", 2)
+
+      expect(write_attempts).to eq(1)
+      expect(mock_logger).not_to have_received(:debug)
+      expect(mock_logger).not_to have_received(:error)
+    end
+
+    it "demotes a closed-stream write in #reject to debug, not error" do
+      # #reject also emits a separate debug line (the redacted internal reason)
+      # while building the chunk, so capture every debug message and assert the
+      # closed-stream line is among them rather than picking the first call.
+      debug_messages = []
+      allow(mock_logger).to receive(:debug) { |*args, &block| debug_messages << (block ? block.call : args.first) }
+      allow(request_stream).to receive(:<<).and_raise(Protocol::HTTP::Body::Writable::Closed)
+
+      expect { emitter.reject("secretData", "forbidden") }.not_to raise_error
+
+      expect(debug_messages).to include(
+        a_string_including("Request stream closed").and(a_string_including("secretData"))
+      )
+      expect(mock_logger).not_to have_received(:error)
+    end
+  end
+
+  describe ".closed_request_stream_errors" do
+    it "pins the async-http writable-closed exception API alongside the socket family" do
+      # The emitter rescues these classes to demote disconnect races. Pin the API so
+      # a gem change fails here instead of silently reclassifying disconnects as
+      # error-level noise (mirrors the PullRequestQueue ClosedError pin below).
+      expect(defined?(Protocol::HTTP::Body::Writable::Closed)).to eq("constant")
+      expect(described_class.closed_request_stream_errors).to include(
+        Protocol::HTTP::Body::Writable::Closed, IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::ECONNABORTED
+      )
     end
   end
 
