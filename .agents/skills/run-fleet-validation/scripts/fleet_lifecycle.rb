@@ -92,6 +92,15 @@ module FleetValidation
           "status" => "pending",
           "app_work_allowed" => false,
           "opened_at" => nil,
+          "public_marker" => {
+            "status" => "pending",
+            "pack_id" => nil,
+            "candidate" => nil,
+            "candidate_commit" => nil,
+            "snapshot_fingerprint" => nil,
+            "opened_at" => nil,
+            "evidence" => nil
+          },
           "waiver" => nil,
           "blocker_id" => nil,
           "blocker_evidence" => nil,
@@ -320,8 +329,8 @@ module FleetValidation
 
     def preflight_schema
       fields = %w[
-        status app_work_allowed opened_at waiver blocker_id blocker_evidence release_ci artifacts
-        generator_matrix capabilities
+        status app_work_allowed opened_at public_marker waiver blocker_id blocker_evidence release_ci
+        artifacts generator_matrix capabilities
       ]
       object_schema(
         fields,
@@ -329,6 +338,7 @@ module FleetValidation
           "status" => { "enum" => %w[pending passed waived blocked unknown] },
           "app_work_allowed" => { "type" => "boolean" },
           "opened_at" => nullable_string,
+          "public_marker" => public_marker_schema,
           "waiver" => waiver_schema,
           "blocker_id" => nullable_string,
           "blocker_evidence" => nullable_string,
@@ -436,6 +446,21 @@ module FleetValidation
               "tree_evidence" => nullable_string
             }
           ),
+          "evidence" => nullable_string
+        }
+      )
+    end
+
+    def public_marker_schema
+      object_schema(
+        %w[status pack_id candidate candidate_commit snapshot_fingerprint opened_at evidence],
+        {
+          "status" => { "enum" => %w[pending unique absent duplicate mismatched unknown] },
+          "pack_id" => nullable_string,
+          "candidate" => nullable_string,
+          "candidate_commit" => nullable_string,
+          "snapshot_fingerprint" => nullable_string,
+          "opened_at" => nullable_string,
           "evidence" => nullable_string
         }
       )
@@ -656,6 +681,8 @@ module FleetValidation
         and terminal status plus replayable evidence for release CI, artifacts, and generator matrix.
         Remote coordinators cross-check that unique marker against the published pack snapshot; an
         absent, duplicate, stale, malformed, or mismatched marker leaves the barrier `UNKNOWN`.
+        Record that cross-check in `preflight.public_marker` with `status: unique`, the exact
+        pack/candidate/commit/fingerprint/opened-at fields, and replayable public-safe evidence.
         If an owned release-wide blocker makes opening the barrier impossible, close the pack with
         `preflight.status: blocked`, a durable `preflight.blocker_id`, public-safe
         `preflight.blocker_evidence`, and `APP_WORK_ALLOWED` still false. In that terminal path every
@@ -790,6 +817,7 @@ module FleetValidation
       inventory:,
       required_paths:,
       expected_candidate: nil,
+      expected_pack_id: nil,
       expected_snapshot_fingerprint: nil,
       closeout: false
     )
@@ -797,6 +825,7 @@ module FleetValidation
       @inventory = inventory
       @required_paths = required_paths
       @expected_candidate = expected_candidate
+      @expected_pack_id = expected_pack_id
       @expected_snapshot_fingerprint = expected_snapshot_fingerprint
       @closeout = closeout
     end
@@ -810,6 +839,8 @@ module FleetValidation
       result.concat(private_field_errors)
       result.concat(disposition_state_errors)
       result.concat(timestamp_errors)
+      marker_error = public_preflight_marker_error
+      result << marker_error if public_preflight_marker_required? && marker_error
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
@@ -1334,6 +1365,9 @@ module FleetValidation
       if @expected_snapshot_fingerprint && pack["snapshot_fingerprint"] != @expected_snapshot_fingerprint
         errors << "pack snapshot_fingerprint does not match the current manifest"
       end
+      if @expected_pack_id && pack["pack_id"] != @expected_pack_id
+        errors << "pack ID mismatch: expected #{@expected_pack_id}, got #{pack['pack_id']}"
+      end
       errors
     end
 
@@ -1780,7 +1814,29 @@ module FleetValidation
       preflight["app_work_allowed"] == true &&
         timestamp(preflight["opened_at"]) &&
         %w[passed waived].include?(preflight["status"]) &&
-        preflight_errors.empty? && pack_identity_errors.empty? && candidate_error.nil?
+        preflight_errors.empty? && pack_identity_errors.empty? && candidate_error.nil? &&
+        public_preflight_marker_error.nil?
+    end
+
+    def public_preflight_marker_required?
+      app_work_started? || @ledger.dig("preflight", "app_work_allowed") == true ||
+        (@closeout && !preflight_blocked?)
+    end
+
+    def public_preflight_marker_error
+      marker = @ledger.dig("preflight", "public_marker")
+      pack = @ledger.fetch("pack", {})
+      preflight = @ledger.fetch("preflight", {})
+      valid = marker.is_a?(Hash) && marker["status"] == "unique" &&
+              marker["pack_id"] == pack["pack_id"] &&
+              marker["candidate"] == pack["candidate"] &&
+              marker["candidate_commit"] == pack["candidate_commit"] &&
+              marker["snapshot_fingerprint"] == pack["snapshot_fingerprint"] &&
+              marker["opened_at"] == preflight["opened_at"] &&
+              present?(marker["evidence"])
+      return if valid
+
+      "public preflight marker is not unique and snapshot-bound"
     end
 
     def valid_waiver?(waiver, expected_gate)
@@ -2019,7 +2075,11 @@ module FleetValidation
         @ledger.dig("preflight", gate, "status") == "waived"
       end
       partial ||= paths.any? { |path| path["status"] == "waived" }
-      partial ||= blockers.any? { |blocker| %w[waived deferred].include?(blocker["status"]) }
+      partial ||= blockers.any? do |blocker|
+        %w[waived deferred].include?(blocker["status"]) ||
+          (soft_only_blockers.include?(blocker["id"]) &&
+            !%w[resolved waived deferred].include?(blocker["status"]))
+      end
       partial ||= @ledger.dig("tracker", "promotion") == "hold"
 
       partial ? "PARTIAL" : "PASS"

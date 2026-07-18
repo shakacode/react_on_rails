@@ -53,7 +53,9 @@ policy/inventory manifest fails closed.
    Before any remote maker starts, publish the generated pack-bound preflight marker on the release
    tracker with the exact candidate tag/commit, manifest snapshot fingerprint, barrier timestamp,
    and public-safe terminal gate evidence. Every remote coordinator must read and cross-check that
-   unique marker; launch timing alone never proves `APP_WORK_ALLOWED`.
+   unique marker; launch timing alone never proves `APP_WORK_ALLOWED`. Record the verified marker
+   in `preflight.public_marker` with `status: unique`, the exact pack/candidate/commit/fingerprint/
+   opened-at fields, and replayable public-safe evidence.
    Record `preflight.opened_at` when opening the barrier and each mutable target's
    `work_started_at`; closeout rejects missing or reversed ordering evidence. The validation-only
    monorepo generator gate may run before the mutation barrier.
@@ -115,11 +117,13 @@ that same file:
 ```bash
 ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
+  --expected-pack-id PACK_ID \
   --expected-candidate vX.Y.Z.rc.N \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
-The validator fails closed on stale candidates, product package versions that do not normalize to
+The validator fails closed on stale pack IDs or candidates, missing/duplicate/mismatched public
+preflight markers, product package versions that do not normalize to
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
 review-app state, candidate-managed hard-gate package versions that differ from the resolved release
 snapshot,

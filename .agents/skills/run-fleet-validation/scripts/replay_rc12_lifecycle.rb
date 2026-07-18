@@ -68,6 +68,7 @@ module FleetValidation
         ledger,
         inventory: generator.lifecycle_inventory,
         required_paths: generator.required_paths,
+        expected_pack_id: ledger.dig("pack", "pack_id"),
         expected_candidate: CANDIDATE,
         closeout: true
       )
@@ -85,6 +86,15 @@ module FleetValidation
       ledger.fetch("preflight")["status"] = "passed"
       ledger.fetch("preflight")["app_work_allowed"] = true
       ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00Z"
+      ledger.fetch("preflight")["public_marker"] = {
+        "status" => "unique",
+        "pack_id" => ledger.dig("pack", "pack_id"),
+        "candidate" => CANDIDATE,
+        "candidate_commit" => ledger.dig("pack", "candidate_commit"),
+        "snapshot_fingerprint" => generator.snapshot_fingerprint,
+        "opened_at" => ledger.dig("preflight", "opened_at"),
+        "evidence" => "public-safe unique marker evidence"
+      }
       %w[release_ci artifacts generator_matrix].each do |gate|
         ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
       end

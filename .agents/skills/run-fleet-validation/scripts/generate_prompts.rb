@@ -533,6 +533,8 @@ module FleetValidation
           its candidate tag and commit, snapshot fingerprint, opened_at, gate evidence, and barrier state
           against the pack snapshot and the local ledger when accessible. Missing, duplicate, stale,
           malformed, or mismatched markers are `UNKNOWN`: make no app write and do not trust launch timing.
+          Record a successful cross-check in `preflight.public_marker` with `status: unique`, the exact
+          pack/candidate/commit/fingerprint/opened-at fields, and replayable public-safe evidence.
       STEPS
     end
 

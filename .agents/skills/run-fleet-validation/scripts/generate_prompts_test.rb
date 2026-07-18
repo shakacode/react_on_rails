@@ -48,6 +48,15 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger.fetch("preflight")["status"] = "passed"
     ledger.fetch("preflight")["app_work_allowed"] = true
     ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00Z"
+    ledger.fetch("preflight")["public_marker"] = {
+      "status" => "unique",
+      "pack_id" => ledger.dig("pack", "pack_id"),
+      "candidate" => ledger.dig("pack", "candidate"),
+      "candidate_commit" => ledger.dig("pack", "candidate_commit"),
+      "snapshot_fingerprint" => generator.snapshot_fingerprint,
+      "opened_at" => "2026-07-18T10:00:00Z",
+      "evidence" => "public-safe unique marker evidence"
+    }
     %w[release_ci artifacts generator_matrix].each do |gate|
       ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
     end
@@ -352,6 +361,31 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes errors, "app work started before APP_WORK_ALLOWED"
     assert_empty FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+  end
+
+  def test_app_work_allowed_requires_a_unique_pack_bound_public_marker
+    generator = build_generator
+    mutations = [
+      ->(marker) { marker["status"] = "duplicate" },
+      ->(marker) { marker["pack_id"] = "another-pack" },
+      ->(marker) { marker["candidate"] = "v17.0.0.rc.11" },
+      ->(marker) { marker["candidate_commit"] = "ffffffffffffffffffffffffffffffffffffffff" },
+      ->(marker) { marker["snapshot_fingerprint"] = "stale-fingerprint" },
+      ->(marker) { marker["opened_at"] = "2026-07-18T09:00:00Z" },
+      ->(marker) { marker["evidence"] = nil }
+    ]
+
+    mutations.each do |mutate|
+      ledger = complete_ledger(generator)
+      mutate.call(ledger.fetch("preflight").fetch("public_marker"))
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths
+      ).errors
+
+      assert_includes errors, "public preflight marker is not unique and snapshot-bound"
+    end
   end
 
   def test_app_work_allowed_requires_the_exact_pack_snapshot_and_restart_handoff
@@ -1448,6 +1482,36 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
   end
 
+  def test_nested_soft_track_blocker_renders_partial_without_blocking_promotion
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("checks").fetch("hosted_ci").merge!(
+      "status" => "blocked",
+      "blocker_id" => "soft-check-followup"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "soft-check-followup",
+        "status" => "open",
+        "public_summary" => "Soft-track hosted CI follow-up",
+        "owner" => { "issue_url" => "https://example.invalid/issues/soft-check-followup" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
   def test_blocker_shared_with_a_hard_gate_remains_release_gating
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1548,6 +1612,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         VALIDATOR,
         "--manifest", MANIFEST,
         "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
         "--expected-candidate", "v17.0.0.rc.12",
         "--render-tracker", tracker_path
       )
@@ -1571,6 +1636,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         VALIDATOR,
         "--ledger",
         ledger_path,
+        "--expected-pack-id",
+        "fleet-test-pack",
         "--expected-candidate",
         "v17.0.0.rc.12"
       )
@@ -1591,6 +1658,35 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       refute status.success?
       assert_includes stderr, "missing argument: --expected-candidate"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_expected_pack_id
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "another-pack",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-pack-id"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr, "pack ID mismatch: expected another-pack, got fleet-test-pack"
     end
   end
 

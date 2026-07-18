@@ -14,6 +14,7 @@ module FleetValidation
       options = {
         manifest_path: "internal/contributor-info/demo-fleet.yml",
         ledger_path: nil,
+        expected_pack_id: nil,
         expected_candidate: nil,
         tracker_path: nil
       }
@@ -21,13 +22,14 @@ module FleetValidation
       parser.parse!(argv)
       raise OptionParser::MissingArgument, "--ledger" unless options[:ledger_path]
       raise OptionParser::MissingArgument, "--expected-candidate" unless options[:expected_candidate]
+      raise OptionParser::MissingArgument, "--expected-pack-id" unless options[:expected_pack_id]
 
       manifest = YAML.safe_load_file(options.fetch(:manifest_path), aliases: false)
       ledger = JSON.parse(File.read(options.fetch(:ledger_path)))
       pack = ledger.is_a?(Hash) && ledger["pack"].is_a?(Hash) ? ledger["pack"] : {}
       lifecycle = Lifecycle.new(
         manifest:,
-        pack_id: pack["pack_id"].to_s,
+        pack_id: options.fetch(:expected_pack_id),
         release_selector: pack["release_selector"].to_s
       )
       errors = SchemaValidator.new(lifecycle.schema).errors(ledger)
@@ -40,6 +42,7 @@ module FleetValidation
         ledger,
         inventory: lifecycle.inventory,
         required_paths: lifecycle.required_paths,
+        expected_pack_id: options[:expected_pack_id],
         expected_candidate: options[:expected_candidate],
         expected_snapshot_fingerprint: lifecycle.snapshot_fingerprint,
         closeout: true
@@ -66,6 +69,9 @@ module FleetValidation
         parser.banner = "Usage: validate_ledger.rb --ledger PATH [options]"
         parser.on("--manifest PATH", "Fleet manifest path") { |value| options[:manifest_path] = value }
         parser.on("--ledger PATH", "Result ledger JSON path") { |value| options[:ledger_path] = value }
+        parser.on("--expected-pack-id ID", "Require this exact generated pack ID") do |value|
+          options[:expected_pack_id] = value
+        end
         parser.on("--expected-candidate TAG", "Require this exact candidate") do |value|
           options[:expected_candidate] = value
         end

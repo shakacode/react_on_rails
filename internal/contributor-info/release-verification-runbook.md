@@ -66,6 +66,9 @@ The ledger binds each hard-gate check to an immutable audited/reviewed/current t
 normalizes product gem/npm versions to the selected candidate, retains replayable independent-audit
 evidence, and records merge/reachability proof per mutable target. Its derived aggregate therefore
 represents partial fleet merges without discarding proof for lanes that already landed.
+Distributed app work additionally requires a `preflight.public_marker` record with unique status,
+exact pack/candidate/commit/fingerprint/opened-at identity, and replayable public-safe evidence.
+Closeout validation receives the expected pack ID independently rather than trusting the ledger.
 
 A failed required release path closes as `BLOCKED` with lane evidence and an owned blocker reference;
 it must never be relabeled as passed or waived merely to satisfy closeout. Waived and deferred
