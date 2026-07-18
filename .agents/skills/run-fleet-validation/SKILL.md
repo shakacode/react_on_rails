@@ -61,12 +61,15 @@ GITHUB_TOKEN="$(gh auth token)" \
     --output-dir tmp/fleet-health-v17
 ```
 
-The command verifies the exact public RubyGems/npm artifacts before inspecting public default
-heads. It writes `fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`, binding
-currency, CI, reusable-smoke adoption, review-app capability, staleness, and Dependabot v1 evidence
-to exact public default commits. Active public targets block on missing, stale, failed, or unknown
-required evidence. Report-only and archived targets retain findings without blocking the aggregate.
-The scheduled `.github/workflows/demo-fleet-health.yml` run uploads the same three artifacts.
+The command verifies both `react_on_rails` gems and all four unified-version npm packages, plus the
+independently versioned `react-on-rails-rsc`, before inspecting public default heads. It writes
+`fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`. Currency uses only direct
+root `DEPENDS_ON` packages from each public SPDX SBOM and rejects mixed direct versions; missing
+root identity fails closed. CI and reusable-smoke evidence remains exact-default-head, while
+PR-only review-app capability uses the configured public workflow and its latest public run URL
+and timestamp. Active public targets block on missing, stale, failed, or unknown required evidence.
+Report-only and archived targets retain findings without blocking the aggregate. The scheduled
+`.github/workflows/demo-fleet-health.yml` run uploads the same three evidence files.
 
 The Dependabot v1 evaluation is deliberately narrow: weekly enabled Bundler/npm/GitHub Actions
 coverage plus grouped React on Rails gem/npm updates. Do not substitute a generic Renovate preset.

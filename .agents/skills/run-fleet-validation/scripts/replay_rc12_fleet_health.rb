@@ -50,8 +50,32 @@ module FleetValidation
           "source" => "https://rubygems.org"
         },
         {
+          "ecosystem" => "gem",
+          "name" => "react_on_rails_pro",
+          "version" => "17.0.0",
+          "source" => "https://rubygems.org"
+        },
+        {
           "ecosystem" => "npm",
           "name" => "react-on-rails",
+          "version" => "17.0.0",
+          "source" => "https://registry.npmjs.org"
+        },
+        {
+          "ecosystem" => "npm",
+          "name" => "react-on-rails-pro",
+          "version" => "17.0.0",
+          "source" => "https://registry.npmjs.org"
+        },
+        {
+          "ecosystem" => "npm",
+          "name" => "react-on-rails-pro-node-renderer",
+          "version" => "17.0.0",
+          "source" => "https://registry.npmjs.org"
+        },
+        {
+          "ecosystem" => "npm",
+          "name" => "create-react-on-rails-app",
           "version" => "17.0.0",
           "source" => "https://registry.npmjs.org"
         },

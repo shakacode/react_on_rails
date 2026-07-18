@@ -103,7 +103,7 @@ class FleetHealthTest < Minitest::Test
     assert_equal "passed", target(evidence, "sanitized-active-current").dig("currency", "status")
   end
 
-  def test_currency_evidence_keeps_only_relevant_packages_and_accepts_any_matching_version
+  def test_currency_rejects_mixed_direct_versions_and_keeps_only_relevant_packages
     observations = Marshal.load(Marshal.dump(@observations))
     current = observations.fetch("sanitized-active-current")
     current.fetch("package_versions").prepend(
@@ -127,7 +127,8 @@ class FleetHealthTest < Minitest::Test
     )
     currency = target(evidence, "sanitized-active-current").fetch("currency")
 
-    assert_equal "passed", currency.fetch("status")
+    assert_equal "blocked", currency.fetch("status")
+    assert_includes currency.fetch("findings"), "react_on_rails"
     refute_includes currency.fetch("observed").map { |package| package.fetch("name") }, "unrelated"
   end
 
@@ -235,10 +236,43 @@ class FleetHealthTest < Minitest::Test
   def test_public_sbom_parser_extracts_gem_and_npm_versions
     sbom = {
       "sbom" => {
+        "SPDXID" => "SPDXRef-DOCUMENT",
         "packages" => [
-          { "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:gem/react_on_rails@17.0.0" }] },
-          { "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:npm/react-on-rails@17.0.0" }] },
-          { "externalRefs" => [{ "referenceType" => "website", "referenceLocator" => "https://example.invalid" }] }
+          { "SPDXID" => "SPDXRef-Root", "name" => "demo" },
+          {
+            "SPDXID" => "SPDXRef-Gem",
+            "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:gem/react_on_rails@17.0.0" }]
+          },
+          {
+            "SPDXID" => "SPDXRef-Npm",
+            "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:npm/react-on-rails@17.0.0" }]
+          },
+          {
+            "SPDXID" => "SPDXRef-Transitive",
+            "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:npm/react-on-rails@16.0.0" }]
+          }
+        ],
+        "relationships" => [
+          {
+            "spdxElementId" => "SPDXRef-DOCUMENT",
+            "relationshipType" => "DESCRIBES",
+            "relatedSpdxElement" => "SPDXRef-Root"
+          },
+          {
+            "spdxElementId" => "SPDXRef-Root",
+            "relationshipType" => "DEPENDS_ON",
+            "relatedSpdxElement" => "SPDXRef-Gem"
+          },
+          {
+            "spdxElementId" => "SPDXRef-Root",
+            "relationshipType" => "DEPENDS_ON",
+            "relatedSpdxElement" => "SPDXRef-Npm"
+          },
+          {
+            "spdxElementId" => "SPDXRef-Npm",
+            "relationshipType" => "DEPENDS_ON",
+            "relatedSpdxElement" => "SPDXRef-Transitive"
+          }
         ]
       }
     }
@@ -254,14 +288,35 @@ class FleetHealthTest < Minitest::Test
     )
   end
 
+  def test_public_sbom_parser_fails_closed_without_a_root_dependency_identity
+    sbom = {
+      "sbom" => {
+        "SPDXID" => "SPDXRef-DOCUMENT",
+        "packages" => [
+          {
+            "SPDXID" => "SPDXRef-Gem",
+            "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:gem/react_on_rails@17.0.0" }]
+          }
+        ],
+        "relationships" => []
+      }
+    }
+
+    assert_empty FleetValidation::PublicSBOM.package_versions(sbom)
+  end
+
   def test_public_registry_resolver_verifies_exact_stable_artifacts
     responses = {
       "https://rubygems.org/api/v1/versions/react_on_rails.json" => [
         { "number" => "17.0.0", "yanked" => false }
       ],
-      "https://registry.npmjs.org/react-on-rails" => {
-        "versions" => { "17.0.0" => {} }
-      },
+      "https://rubygems.org/api/v1/versions/react_on_rails_pro.json" => [
+        { "number" => "17.0.0", "yanked" => false }
+      ],
+      "https://registry.npmjs.org/react-on-rails" => { "versions" => { "17.0.0" => {} } },
+      "https://registry.npmjs.org/react-on-rails-pro" => { "versions" => { "17.0.0" => {} } },
+      "https://registry.npmjs.org/react-on-rails-pro-node-renderer" => { "versions" => { "17.0.0" => {} } },
+      "https://registry.npmjs.org/create-react-on-rails-app" => { "versions" => { "17.0.0" => {} } },
       "https://registry.npmjs.org/react-on-rails-rsc" => {
         "versions" => { "19.2.1" => {} }
       }
@@ -271,6 +326,24 @@ class FleetHealthTest < Minitest::Test
     artifacts = resolver.resolve(release: "v17.0.0", rsc_version: "19.2.1")
 
     assert_equal stable_registry_artifacts, artifacts
+    assert_equal 7, @contract.schema.dig("properties", "registry", "properties", "artifacts", "minItems")
+  end
+
+  def test_public_registry_resolver_rejects_an_incomplete_product_suite
+    resolver = FleetValidation::PublicRegistryResolver.new(fetcher: lambda do |url|
+      next [] if url.end_with?("react_on_rails_pro.json")
+
+      if url.include?("rubygems.org")
+        [{ "number" => "17.0.0", "yanked" => false }]
+      else
+        { "versions" => { "17.0.0" => {}, "19.2.1" => {} } }
+      end
+    end)
+
+    error = assert_raises(FleetValidation::ManifestError) do
+      resolver.resolve(release: "v17.0.0", rsc_version: "19.2.1")
+    end
+    assert_includes error.message, "react_on_rails_pro"
   end
 
   def test_public_github_probe_binds_health_evidence_to_the_default_head
@@ -293,9 +366,38 @@ class FleetHealthTest < Minitest::Test
         },
         "/repos/#{repo}/dependency-graph/sbom" => {
           "sbom" => {
+            "SPDXID" => "SPDXRef-DOCUMENT",
             "packages" => [
-              { "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:gem/react_on_rails@17.0.0" }] },
-              { "externalRefs" => [{ "referenceType" => "purl", "referenceLocator" => "pkg:npm/react-on-rails@17.0.0" }] }
+              { "SPDXID" => "SPDXRef-Root", "name" => "demo" },
+              {
+                "SPDXID" => "SPDXRef-Gem",
+                "externalRefs" => [
+                  { "referenceType" => "purl", "referenceLocator" => "pkg:gem/react_on_rails@17.0.0" }
+                ]
+              },
+              {
+                "SPDXID" => "SPDXRef-Npm",
+                "externalRefs" => [
+                  { "referenceType" => "purl", "referenceLocator" => "pkg:npm/react-on-rails@17.0.0" }
+                ]
+              }
+            ],
+            "relationships" => [
+              {
+                "spdxElementId" => "SPDXRef-DOCUMENT",
+                "relationshipType" => "DESCRIBES",
+                "relatedSpdxElement" => "SPDXRef-Root"
+              },
+              {
+                "spdxElementId" => "SPDXRef-Root",
+                "relationshipType" => "DEPENDS_ON",
+                "relatedSpdxElement" => "SPDXRef-Gem"
+              },
+              {
+                "spdxElementId" => "SPDXRef-Root",
+                "relationshipType" => "DEPENDS_ON",
+                "relatedSpdxElement" => "SPDXRef-Npm"
+              }
             ]
           }
         },
@@ -307,19 +409,29 @@ class FleetHealthTest < Minitest::Test
               "status" => "completed",
               "conclusion" => "success",
               "html_url" => "https://example.invalid/smoke"
-            },
-            {
-              "name" => "cpflow/review-app",
-              "status" => "completed",
-              "conclusion" => "success",
-              "html_url" => "https://example.invalid/review-app"
             }
           ]
         },
         "/repos/#{repo}/actions/workflows?per_page=100" => {
           "workflows" => [
             { "path" => ".github/workflows/demo-fleet-smoke.yml", "name" => "Demo fleet smoke" },
-            { "path" => ".github/workflows/cpflow-review-app.yml", "name" => "Review app" }
+            {
+              "id" => 42,
+              "path" => ".github/workflows/cpflow-review-app.yml",
+              "name" => "Review app",
+              "state" => "active",
+              "html_url" => "https://example.invalid/workflow"
+            }
+          ]
+        },
+        "/repos/#{repo}/actions/workflows/42/runs?per_page=1" => {
+          "workflow_runs" => [
+            {
+              "status" => "completed",
+              "conclusion" => "success",
+              "html_url" => "https://example.invalid/review-app-run",
+              "updated_at" => "2026-07-18T10:00:00Z"
+            }
           ]
         }
       },
@@ -344,7 +456,47 @@ class FleetHealthTest < Minitest::Test
     assert_equal "passed", observation.dig("default_ci", "status")
     assert_equal true, observation.dig("smoke", "shared_contract")
     assert_equal "passed", observation.dig("review_app", "status")
+    assert_includes observation.dig("review_app", "evidence"), "2026-07-18T10:00:00Z"
     assert_equal "passed", observation.dig("dependabot", "status")
+  end
+
+  def test_review_app_capability_distinguishes_broken_pending_and_missing_runs
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-review-app.yml",
+      "name" => "Review app",
+      "state" => "active",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end
+    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([
+                                                                        {
+                                                                          "status" => "completed",
+                                                                          "conclusion" => "failure",
+                                                                          "html_url" => "https://example.invalid/run",
+                                                                          "updated_at" => "2026-07-18T10:00:00Z"
+                                                                        }
+                                                                      ]))
+
+    broken = probe.send(:review_app_status, repo, target, [workflow])
+    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([
+                                                                        { "status" => "in_progress", "html_url" => "https://example.invalid/run", "updated_at" => "2026-07-18T11:00:00Z" }
+                                                                      ]))
+    pending = probe.send(:review_app_status, repo, target, [workflow])
+    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([]))
+    missing_run = probe.send(:review_app_status, repo, target, [workflow])
+    absent_workflow = probe.send(:review_app_status, repo, target, [])
+
+    assert_equal "blocked", broken.fetch("status")
+    assert_equal "unknown", pending.fetch("status")
+    assert_equal "unknown", missing_run.fetch("status")
+    assert_equal "unknown", absent_workflow.fetch("status")
   end
 
   def test_public_github_probe_degrades_a_target_failure_to_unknown
@@ -399,8 +551,32 @@ class FleetHealthTest < Minitest::Test
         "source" => "https://rubygems.org"
       },
       {
+        "ecosystem" => "gem",
+        "name" => "react_on_rails_pro",
+        "version" => "17.0.0",
+        "source" => "https://rubygems.org"
+      },
+      {
         "ecosystem" => "npm",
         "name" => "react-on-rails",
+        "version" => "17.0.0",
+        "source" => "https://registry.npmjs.org"
+      },
+      {
+        "ecosystem" => "npm",
+        "name" => "react-on-rails-pro",
+        "version" => "17.0.0",
+        "source" => "https://registry.npmjs.org"
+      },
+      {
+        "ecosystem" => "npm",
+        "name" => "react-on-rails-pro-node-renderer",
+        "version" => "17.0.0",
+        "source" => "https://registry.npmjs.org"
+      },
+      {
+        "ecosystem" => "npm",
+        "name" => "create-react-on-rails-app",
         "version" => "17.0.0",
         "source" => "https://registry.npmjs.org"
       },

@@ -12,6 +12,14 @@ module FleetValidation
   class PublicRegistryResolver
     RUBYGEMS = "https://rubygems.org"
     NPM = "https://registry.npmjs.org"
+    PRODUCT_GEMS = %w[react_on_rails react_on_rails_pro].freeze
+    PRODUCT_NPM = %w[
+      react-on-rails
+      react-on-rails-pro
+      react-on-rails-pro-node-renderer
+      create-react-on-rails-app
+    ].freeze
+    RSC_NPM = "react-on-rails-rsc"
 
     def initialize(fetcher:)
       @fetcher = fetcher
@@ -19,39 +27,39 @@ module FleetValidation
 
     def resolve(release:, rsc_version:)
       product_version = release.delete_prefix("v")
-      gem_versions = @fetcher.call("#{RUBYGEMS}/api/v1/versions/react_on_rails.json")
-      npm_product = @fetcher.call("#{NPM}/react-on-rails")
-      npm_rsc = @fetcher.call("#{NPM}/react-on-rails-rsc")
-      unless Array(gem_versions).any? { |entry| entry["number"] == product_version && entry["yanked"] != true }
-        raise ManifestError, "react_on_rails #{product_version} is not a public non-yanked RubyGems artifact"
+      gem_artifacts = PRODUCT_GEMS.map do |name|
+        versions = @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
+        unless Array(versions).any? { |entry| entry["number"] == product_version && entry["yanked"] != true }
+          raise ManifestError, "#{name} #{product_version} is not a public non-yanked RubyGems artifact"
+        end
+
+        registry_artifact("gem", name, product_version, RUBYGEMS)
       end
-      unless npm_product.fetch("versions", {}).key?(product_version)
-        raise ManifestError, "react-on-rails #{product_version} is not a public npm artifact"
+      npm_artifacts = PRODUCT_NPM.map do |name|
+        document = @fetcher.call("#{NPM}/#{name}")
+        unless document.fetch("versions", {}).key?(product_version)
+          raise ManifestError, "#{name} #{product_version} is not a public npm artifact"
+        end
+
+        registry_artifact("npm", name, product_version, NPM)
       end
+      npm_rsc = @fetcher.call("#{NPM}/#{RSC_NPM}")
       unless npm_rsc.fetch("versions", {}).key?(rsc_version)
-        raise ManifestError, "react-on-rails-rsc #{rsc_version} is not a public npm artifact"
+        raise ManifestError, "#{RSC_NPM} #{rsc_version} is not a public npm artifact"
       end
 
-      [
-        {
-          "ecosystem" => "gem",
-          "name" => "react_on_rails",
-          "version" => product_version,
-          "source" => RUBYGEMS
-        },
-        {
-          "ecosystem" => "npm",
-          "name" => "react-on-rails",
-          "version" => product_version,
-          "source" => NPM
-        },
-        {
-          "ecosystem" => "npm",
-          "name" => "react-on-rails-rsc",
-          "version" => rsc_version,
-          "source" => NPM
-        }
-      ]
+      gem_artifacts + npm_artifacts + [registry_artifact("npm", RSC_NPM, rsc_version, NPM)]
+    end
+
+    private
+
+    def registry_artifact(ecosystem, name, version, source)
+      {
+        "ecosystem" => ecosystem,
+        "name" => name,
+        "version" => version,
+        "source" => source
+      }
     end
   end
 
@@ -59,11 +67,36 @@ module FleetValidation
     module_function
 
     def package_versions(document)
-      versions = Array(document.dig("sbom", "packages")).filter_map do |package|
+      sbom = document["sbom"]
+      return [] unless sbom.is_a?(Hash)
+
+      direct_ids = direct_dependency_ids(sbom)
+      return [] if direct_ids.empty?
+
+      versions = Array(sbom["packages"]).filter_map do |package|
+        next unless direct_ids.include?(package["SPDXID"])
+
         purl = Array(package["externalRefs"]).find { |reference| reference["referenceType"] == "purl" }
         parse_purl(purl && purl["referenceLocator"])
       end
       versions.uniq { |package| [package["ecosystem"], package["name"], package["version"]] }
+    end
+
+    def direct_dependency_ids(sbom)
+      document_id = sbom["SPDXID"]
+      return [] if document_id.to_s.empty?
+
+      relationships = Array(sbom["relationships"])
+      root_ids = relationships.filter_map do |relationship|
+        relationship["relatedSpdxElement"] if relationship["spdxElementId"] == document_id &&
+                                              relationship["relationshipType"] == "DESCRIBES"
+      end
+      return [] if root_ids.empty?
+
+      relationships.filter_map do |relationship|
+        relationship["relatedSpdxElement"] if root_ids.include?(relationship["spdxElementId"]) &&
+                                              relationship["relationshipType"] == "DEPENDS_ON"
+      end.uniq
     end
 
     def parse_purl(value)
@@ -149,7 +182,7 @@ module FleetValidation
         "package_versions" => package_versions(repo),
         "default_ci" => check_status(checks),
         "smoke" => smoke_status(repo, head, checks, workflows),
-        "review_app" => review_app_status(target, checks, workflows),
+        "review_app" => review_app_status(repo, target, workflows),
         "dependabot" => dependabot_status(repo, head, target.fetch("packages"))
       }
     rescue StandardError => e
@@ -197,18 +230,49 @@ module FleetValidation
       )
     end
 
-    def review_app_status(target, checks, workflows)
-      review_workflows = workflows.select { |workflow| review_app_name?(workflow["name"]) || review_app_name?(workflow["path"]) }
-      review_checks = checks.select { |check| review_app_name?(check["name"]) }
+    def review_app_status(repo, target, workflows)
+      review_workflows = workflows.select do |workflow|
+        review_app_name?(workflow["name"]) || review_app_name?(workflow["path"])
+      end
       if review_workflows.empty? && target.fetch("review_app") == "not_required"
         return evidence_status("not_applicable", "Review app is not required by public fleet policy")
       end
       return evidence_status("unknown", "Required review-app workflow was not found") if review_workflows.empty?
 
-      status = check_status(review_checks)
-      status["evidence"] = [status["evidence"], review_workflows.map { |workflow| workflow["path"] }.join(", ")]
-                           .reject { |value| value.to_s.empty? }.join("; ")
-      status
+      statuses = review_workflows.map { |workflow| review_workflow_status(repo, workflow) }
+      aggregate_status = if statuses.any? { |status| status["status"] == "blocked" }
+                           "blocked"
+                         elsif statuses.any? { |status| status["status"] == "unknown" }
+                           "unknown"
+                         else
+                           "passed"
+                         end
+      evidence_status(aggregate_status, statuses.filter_map { |status| status["evidence"] }.join("; "))
+    end
+
+    def review_workflow_status(repo, workflow)
+      workflow_evidence = workflow["html_url"] || workflow["path"]
+      unless workflow["state"] == "active"
+        return evidence_status("blocked", "#{workflow_evidence}; state=#{workflow['state'] || 'unknown'}")
+      end
+
+      workflow_id = workflow.fetch("id")
+      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?per_page=1")
+                    .fetch("workflow_runs", [])
+      return evidence_status("unknown", "#{workflow_evidence}; no public workflow run") if runs.empty?
+
+      run = runs.first
+      evidence = [
+        workflow_evidence,
+        run["html_url"],
+        ("updated_at=#{run['updated_at']}" if run["updated_at"])
+      ].compact.join("; ")
+      return evidence_status("unknown", evidence) unless run["status"] == "completed"
+
+      status = PASSING_CONCLUSIONS.include?(run["conclusion"]) ? "passed" : "blocked"
+      evidence_status(status, evidence)
+    rescue StandardError => e
+      evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
     end
 
     def dependabot_status(repo, head, packages)
@@ -263,12 +327,16 @@ module FleetValidation
     PRODUCT_PACKAGES = {
       "gem" => %w[react_on_rails react_on_rails_pro],
       "npm" => %w[
-        react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer
+        react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app
       ]
     }.freeze
     PUBLIC_REGISTRY_ARTIFACTS = [
       %w[gem react_on_rails],
+      %w[gem react_on_rails_pro],
       %w[npm react-on-rails],
+      %w[npm react-on-rails-pro],
+      %w[npm react-on-rails-pro-node-renderer],
+      %w[npm create-react-on-rails-app],
       %w[npm react-on-rails-rsc]
     ].freeze
 
@@ -341,7 +409,11 @@ module FleetValidation
             %w[status artifacts findings],
             {
               "status" => { "enum" => %w[passed blocked] },
-              "artifacts" => { "type" => "array", "items" => registry_artifact_schema },
+              "artifacts" => {
+                "type" => "array",
+                "minItems" => PUBLIC_REGISTRY_ARTIFACTS.length,
+                "items" => registry_artifact_schema
+              },
               "findings" => string_array
             }
           ),
@@ -513,9 +585,10 @@ module FleetValidation
         actual_versions = observed.filter_map do |actual|
           actual["version"] if key == [actual["ecosystem"], actual["name"]]
         end
-        package["name"] unless actual_versions.any? do |actual|
+        all_acceptable = actual_versions.any? && actual_versions.all? do |actual|
           acceptable_version?(package["ecosystem"], package["name"], actual, package["expected"])
         end
+        package["name"] unless all_acceptable
       end
 
       {
