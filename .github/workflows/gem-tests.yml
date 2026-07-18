@@ -246,17 +246,20 @@ jobs:
               )
               abort "generator manifest dry run failed with status #{status}" unless status.zero?
 
+              id_for = lambda do |item|
+                metadata = item.metadata
+                "#{metadata.fetch(:rerun_file_path)}[#{metadata.fetch(:scoped_id)}]"
+              end
               examples = RSpec.world.all_examples.map do |example|
                 metadata = example.metadata
                 file = metadata.fetch(:rerun_file_path)
                 scoped_id = metadata.fetch(:scoped_id)
-                { id: "#{file}[#{scoped_id}]", file:, scoped_id:, example: }
+                { id: id_for.call(example), file:, scoped_id: }
               end
               ids = examples.map { |row| row.fetch(:id) }
               abort "generator manifest is empty" if ids.empty?
               abort "generator manifest has duplicate scoped IDs" unless ids.uniq.length == ids.length
 
-              rows_by_example = examples.to_h { |row| [row.fetch(:example), row] }
               atomic_unit_by_id = {}
               setup_count_by_unit = Hash.new(0)
 
@@ -270,17 +273,14 @@ jobs:
                 if owns_context_hook
                   descendants = group.descendant_filtered_examples
                   existing_units = descendants.filter_map do |example|
-                    row = rows_by_example.fetch(example)
-                    atomic_unit_by_id[row.fetch(:id)]
+                    atomic_unit_by_id[id_for.call(example)]
                   end.uniq
                   abort "nested generator setup spans multiple atomic units" if existing_units.length > 1
 
-                  metadata = group.metadata
-                  own_unit_id = "#{metadata.fetch(:rerun_file_path)}[#{metadata.fetch(:scoped_id)}]"
+                  own_unit_id = id_for.call(group)
                   unit_id = existing_units.first || own_unit_id
                   descendants.each do |example|
-                    row = rows_by_example.fetch(example)
-                    atomic_unit_by_id[row.fetch(:id)] = unit_id
+                    atomic_unit_by_id[id_for.call(example)] = unit_id
                   end
                   setup_count_by_unit[unit_id] += 1
                 end
@@ -293,15 +293,17 @@ jobs:
                 id = row.fetch(:id)
                 atomic_unit_by_id.fetch(id, id)
               end.to_a
+              weight_by_unit = units.to_h do |unit_id, rows|
+                [unit_id, rows.length + setup_count_by_unit.fetch(unit_id, 0)]
+              end
               shards = Array.new(shard_count) { [] }
               shard_loads = Array.new(shard_count, 0)
               shard_example_counts = Array.new(shard_count, 0)
 
               units.sort_by do |unit_id, rows|
-                unit_weight = rows.length + setup_count_by_unit.fetch(unit_id, 0)
-                [-unit_weight, Digest::SHA256.hexdigest(unit_id), unit_id]
+                [-weight_by_unit.fetch(unit_id), Digest::SHA256.hexdigest(unit_id), unit_id]
               end.each do |unit_id, rows|
-                unit_weight = rows.length + setup_count_by_unit.fetch(unit_id, 0)
+                unit_weight = weight_by_unit.fetch(unit_id)
                 target = (0...shard_count).min_by do |index|
                   [shard_loads[index], shard_example_counts[index], shards[index].length, index]
                 end

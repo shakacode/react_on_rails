@@ -273,7 +273,7 @@ assertMatches(
 assertMatches(
   'generator subshards balance examples and shared setup units',
   gemRspecScript,
-  /unit_weight = rows\.length \+ setup_count_by_unit\.fetch\(unit_id, 0\)/,
+  /weight_by_unit = units\.to_h[\s\S]*rows\.length \+ setup_count_by_unit\.fetch\(unit_id, 0\)/,
 );
 assertMatches(
   'generator subshards reject duplicate scoped IDs',
