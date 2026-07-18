@@ -1509,13 +1509,7 @@ class ChangelogReconciler
     base_version = source_release_base_version(source)
     removed_sections = stray_rc_sections(target, base_version)
 
-    target_entries = section_entries(find_unreleased(target))
-    # De-duplicate against every section that will remain on main, not only the
-    # current [Unreleased]. A maintained release branch retains its stable
-    # section, whose entries may already live in main's history. Exclude RC
-    # sections being removed so their entries can still be re-homed before the
-    # section headers disappear.
-    added, skipped = partition_source_against_retained_target(target, source, removed_sections, base_version)
+    target_entries, added, skipped = reconcile_entries(target, source, removed_sections, base_version)
 
     # Only re-render when there is a real change; otherwise return the target
     # changelog byte-for-byte so a no-op run never reflows existing entries.
@@ -1536,18 +1530,44 @@ class ChangelogReconciler
 
   private
 
-  def partition_source_against_retained_target(target, source, removed_sections, base_version)
+  def reconcile_entries(target, source, removed_sections, base_version)
+    target_entries = section_entries(find_unreleased(target))
+    source_entries = collect_source_entries(source, base_version)
+    replacement_prs = authoritative_replacement_pr_numbers(source, base_version, target_entries)
+
+    # De-duplicate against every section that will remain on main, not only the
+    # current [Unreleased]. A maintained release branch retains its stable
+    # section, whose entries may already live in main's history. Exclude RC
+    # sections being removed so their entries can still be re-homed before the
+    # section headers disappear.
     retained_target_entries = target[:sections]
                               .reject { |section| removed_sections.include?(section) }
-                              .flat_map { |section| section_entries(section) }
+                              .flat_map do |section|
+      entries = section_entries(section)
+      section[:version] == UNRELEASED ? entries.reject { |entry| replacement_prs.include?(entry.pr_number) } : entries
+    end
     seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
     target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
 
-    partition_source_entries(
-      collect_source_entries(source, base_version),
-      seen_pr_numbers,
-      target_entry_texts
-    )
+    added, skipped = partition_source_entries(source_entries, seen_pr_numbers, target_entry_texts)
+    retained_unreleased_entries = target_entries.reject { |entry| replacement_prs.include?(entry.pr_number) }
+    [retained_unreleased_entries, added, skipped]
+  end
+
+  # Final stamping can consolidate an earlier entry with a follow-up PR while
+  # main still has narrower prerelease wording for that same own PR. The final
+  # stable entry is authoritative, so remove the narrower [Unreleased] copy and
+  # let the normal partition pass add the final wording and heading.
+  def authoritative_replacement_pr_numbers(source, base_version, target_entries)
+    stable_entries = stable_sections(source, base_version).flat_map { |section| section_entries(section) }
+    stable_entries_by_pr = stable_entries.select(&:pr_number).group_by(&:pr_number)
+
+    target_entries.filter_map do |target_entry|
+      candidates = stable_entries_by_pr[target_entry.pr_number]
+      next unless candidates&.any? { |entry| normalize_text(entry.text) != normalize_text(target_entry.text) }
+
+      target_entry.pr_number
+    end.to_set
   end
 
   # Collapse every release-branch source section that belongs in main's

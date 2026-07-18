@@ -322,6 +322,47 @@ EOF
   assert_not_contains "$(cat CHANGELOG.md)" "Original branch wording" "branch wording skipped"
 }
 
+# Final stamping can consolidate an earlier entry with a follow-up PR and move
+# it to a different heading. The final stable wording is authoritative: replace
+# a narrower target [Unreleased] entry with the same own PR instead of skipping
+# the final entry merely because that PR number is already present.
+test_final_stable_wording_replaces_target_unreleased_copy() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Changed
+
+- **Narrow prerelease wording**: only the follow-up. $(pr_link 4670) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Breaking Changes
+
+- **Canonical final wording**: covers the original [PR 4490](https://github.com/shakacode/react_on_rails/pull/4490) and the follow-up. $(pr_link 4670) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  run_changelog release/17.0.0 >/dev/null
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "Canonical final wording" "final stable wording kept"
+  assert_contains "$changelog" "PR 4490" "consolidated original PR kept"
+  assert_not_contains "$changelog" "Narrow prerelease wording" "narrow target wording replaced"
+  assert_contains "$changelog" "#### Breaking Changes" "final heading kept"
+}
+
 # Multiple distinct entries that share one PR number are all carried over (the
 # dedup key is "PR already on main", not "PR seen once"); two entries from the
 # same new PR both land.
@@ -966,6 +1007,7 @@ test_missing_source_changelog_errors_clearly() {
 run_test test_collapses_rc_sections_and_branch_unreleased_into_main_unreleased
 run_test test_dry_run_previews_without_writing
 run_test test_dedupes_by_pr_number_even_with_different_prose
+run_test test_final_stable_wording_replaces_target_unreleased_copy
 run_test test_multiple_entries_same_new_pr_all_carry_over
 run_test test_entries_regroup_under_headings_in_order
 run_test test_second_run_is_noop
