@@ -491,12 +491,16 @@ RSpec.describe "script/release-forward-port" do
 
   it "uses source-body backport PR references to find exact target patches" do
     with_release_repo do |repo|
-      write_file(repo, "app.txt", "base\nmain fix\n")
-      write_file(repo, "main-only.txt", "combined target work\n")
+      write_file(repo, "app.txt", "top\nanchor\nbottom\n")
+      shared_base_sha = commit_all(repo, "Prepare shared source context")
+
+      write_file(repo, "app.txt", "top\nanchor\nmain bottom\n")
+      commit_all(repo, "Change adjacent target context")
+      write_file(repo, "app.txt", "top\nanchor\nmain fix\nmain bottom\n")
       commit_all(repo, "Fix release regression on main (#123)")
 
-      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
-      write_file(repo, "app.txt", "base\nmain fix\n")
+      git(repo, "checkout", "-b", "release/1.0.1", shared_base_sha)
+      write_file(repo, "app.txt", "top\nanchor\nmain fix\nbottom\n")
       git(repo, "add", "app.txt")
       git(
         repo,

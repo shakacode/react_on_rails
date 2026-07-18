@@ -261,19 +261,28 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
-    identity_candidates = target_history_source_identity_candidates(subject, target)
-    return "already forward-ported to #{target} via narrated cherry-pick -x evidence with no later target revert" if
-      identity_candidates.any? { |target_sha| narrated_forward_port_commit_live?(target_sha, target) }
-
-    identity_candidates.concat(target_history_source_provenance_candidates(sha, target)).uniq!
-    return patch_equivalent_skip_reason_message(target) if
-      identity_candidates.any? &&
-      patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
+    targeted_reason = targeted_patch_equivalent_skip_reason(sha, subject, target)
+    return targeted_reason if targeted_reason
 
     return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
     return unless patch_equivalent_commit_present_on_target?(sha, target)
 
     patch_equivalent_skip_reason_message(target)
+  end
+
+  def targeted_patch_equivalent_skip_reason(sha, subject, target)
+    identity_candidates = target_history_source_identity_candidates(subject, target)
+    return "already forward-ported to #{target} via narrated cherry-pick -x evidence with no later target revert" if
+      identity_candidates.any? { |target_sha| narrated_forward_port_commit_live?(target_sha, target) }
+
+    provenance_candidates = target_history_source_provenance_candidates(sha, target)
+    return patch_equivalent_skip_reason_message(target) if
+      identity_candidates.any? &&
+      patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
+
+    patch_equivalent_skip_reason_message(target) if
+      provenance_candidates.any? &&
+      patch_equivalent_commit_present_on_target?(sha, target, candidates: provenance_candidates, zero_context: true)
   end
 
   def patch_equivalent_skip_reason_message(target)
@@ -604,12 +613,12 @@ class ReleaseForwardPort
     end.uniq
   end
 
-  def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil)
+  def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil, zero_context: false)
     source_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE]
-    source_patch_id = patch_id_for_commit(sha, paths: source_paths)
+    source_patch_id = patch_id_for_commit(sha, paths: source_paths, zero_context:)
 
     (candidates || patch_equivalent_target_candidates(sha, target)).any? do |target_sha|
-      patch_id_for_target_candidate(target_sha, sha, source_paths:) == source_patch_id &&
+      patch_id_for_target_candidate(target_sha, sha, source_paths:, zero_context:) == source_patch_id &&
         target_commit_live_on_target?(target_sha, target)
     end
   end
@@ -687,14 +696,15 @@ class ReleaseForwardPort
     (source_paths_for_target_diff(target, sha) - changed_paths_for_commit(sha)).any?
   end
 
-  def patch_id_for_target_candidate(target_sha, source_sha, source_paths: changed_paths_for_commit(source_sha))
+  def patch_id_for_target_candidate(target_sha, source_sha, source_paths: changed_paths_for_commit(source_sha),
+                                    zero_context: false)
     parents = git("rev-list", "--parents", "-n", "1", target_sha).split.drop(1)
-    return patch_id_for_commit(target_sha, paths: source_paths) if parents.empty?
+    return patch_id_for_commit(target_sha, paths: source_paths, zero_context:) if parents.empty?
 
     target_to_source_paths = target_to_source_path_map(target_sha, source_sha).select do |_target_path, source_path|
       source_paths.include?(source_path)
     end
-    patch_id_for_commit(target_sha, target_to_source_paths:, paths: target_to_source_paths.keys)
+    patch_id_for_commit(target_sha, target_to_source_paths:, paths: target_to_source_paths.keys, zero_context:)
   end
 
   def source_paths_for_target_diff(first_parent, sha)
@@ -764,7 +774,7 @@ class ReleaseForwardPort
     @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
   end
 
-  def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil)
+  def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil, zero_context: false)
     # git show --format= emits diff-only output. git patch-id still hashes the
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
@@ -776,6 +786,7 @@ class ReleaseForwardPort
       rename_detection_option(target_to_source_paths),
       sha
     ]
+    args << "--unified=0" if zero_context
     args.push("--", *paths) if paths
     patch = git(*args).b
     patch = normalize_patch_paths(patch, target_to_source_paths)
