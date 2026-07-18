@@ -192,6 +192,7 @@ module FleetValidation
   class PublicGitHubProbe
     SHARED_SMOKE_REFERENCE = "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@"
     PASSING_CONCLUSIONS = %w[success neutral skipped].freeze
+    MAX_PAGES = 20
     REVIEW_APP_MAX_AGE_DAYS = 45
 
     def initialize(client:)
@@ -208,7 +209,10 @@ module FleetValidation
       default_branch = metadata.fetch("default_branch")
       commit = @client.get("/repos/#{repo}/commits/#{default_branch}")
       head = commit.fetch("sha")
-      checks = @client.get("/repos/#{repo}/commits/#{head}/check-runs?per_page=100").fetch("check_runs", [])
+      checks = paginated_collection(
+        "/repos/#{repo}/commits/#{head}/check-runs?per_page=100",
+        "check_runs"
+      )
       workflows = @client.get("/repos/#{repo}/actions/workflows?per_page=100").fetch("workflows", [])
 
       {
@@ -230,6 +234,21 @@ module FleetValidation
     end
 
     private
+
+    def paginated_collection(path, key)
+      items = []
+      1.upto(MAX_PAGES) do |page|
+        separator = path.include?("?") ? "&" : "?"
+        page_path = page == 1 ? path : "#{path}#{separator}page=#{page}"
+        batch = @client.get(page_path).fetch(key, [])
+        raise ManifestError, "#{key} page #{page} is not an array" unless batch.is_a?(Array)
+
+        items.concat(batch)
+        return items if batch.length < 100
+      end
+
+      raise ManifestError, "#{key} pagination remained full after #{MAX_PAGES} pages"
+    end
 
     def package_versions(repo)
       PublicSBOM.package_versions(@client.get("/repos/#{repo}/dependency-graph/sbom"))

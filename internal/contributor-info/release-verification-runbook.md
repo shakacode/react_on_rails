@@ -95,13 +95,19 @@ also dependencies, not substitutes: they shorten individual gates but do not own
 identities, combined audit, merge authority, or promotion closeout.
 
 After stable publication, update `standing_health.stable_release` and `standing_health.rsc_version`
-in `demo-fleet.yml`, then generate a fresh public standing-health pack:
+in `demo-fleet.yml` and commit that manifest change. Generate evidence only from a clean working
+tree so the policy commit names the exact checked-in manifest:
 
 ```bash
+test -z "$(git status --porcelain)" || {
+  echo "Commit the manifest and clean the working tree before generating fleet evidence." >&2
+  exit 1
+}
+POLICY_COMMIT="$(git rev-parse HEAD)"
 bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
   --live \
   --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
-  --policy-commit "$(git rev-parse HEAD)" \
+  --policy-commit "$POLICY_COMMIT" \
   --output-dir tmp/fleet-health-stable
 ```
 

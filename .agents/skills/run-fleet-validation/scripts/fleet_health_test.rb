@@ -625,6 +625,52 @@ class FleetHealthTest < Minitest::Test
     assert_equal "unknown", probe.send(:check_status, [success, pending]).fetch("status")
   end
 
+  def test_default_ci_includes_check_runs_after_the_first_page
+    path = "/repos/sanitized/demo/commits/#{'a' * 40}/check-runs?per_page=100"
+    success = {
+      "status" => "completed",
+      "conclusion" => "success",
+      "html_url" => "https://example.invalid/success"
+    }
+    failure = {
+      "status" => "completed",
+      "conclusion" => "failure",
+      "html_url" => "https://example.invalid/failure"
+    }
+    client = Struct.new(:first_path, :success, :failure) do
+      def get(path)
+        return { "check_runs" => Array.new(100) { success.dup } } if path == first_path
+        return { "check_runs" => [failure] } if path == "#{first_path}&page=2"
+
+        raise "unexpected page #{path}"
+      end
+    end.new(path, success, failure)
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    checks = probe.send(:paginated_collection, path, "check_runs")
+
+    assert_equal 101, checks.length
+    assert_equal "blocked", probe.send(:check_status, checks).fetch("status")
+  end
+
+  def test_check_run_pagination_fails_closed_at_the_bound
+    path = "/repos/sanitized/demo/commits/#{'a' * 40}/check-runs?per_page=100"
+    client = Struct.new(:requests) do
+      def get(path)
+        requests << path
+        { "check_runs" => Array.new(100) { { "status" => "completed", "conclusion" => "success" } } }
+      end
+    end.new([])
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    error = assert_raises(FleetValidation::ManifestError) do
+      probe.send(:paginated_collection, path, "check_runs")
+    end
+
+    assert_includes error.message, "pagination remained full"
+    assert_equal FleetValidation::PublicGitHubProbe::MAX_PAGES, client.requests.length
+  end
+
   def test_public_github_probe_binds_health_evidence_to_the_default_head
     target = @contract.targets.first
     repo = target.fetch("name")
@@ -1320,7 +1366,9 @@ class FleetHealthTest < Minitest::Test
     assert_includes skill, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb"
     assert_includes rc_plan, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
     assert_includes runbook, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
-    assert_includes runbook, '--policy-commit "$(git rev-parse HEAD)"'
+    assert_includes runbook, 'test -z "$(git status --porcelain)"'
+    assert_includes runbook, 'POLICY_COMMIT="$(git rev-parse HEAD)"'
+    assert_includes runbook, '--policy-commit "$POLICY_COMMIT"'
     assert_includes runbook, "--output-dir tmp/fleet-health-stable"
   end
 
