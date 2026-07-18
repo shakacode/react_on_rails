@@ -5045,6 +5045,9 @@ describe RscGenerator, type: :generator do
       expect(missing).not_to include(
         "rscConfig declaration (const rscConfig = rscWebpackConfig()) in ServerClientOrBoth.js"
       )
+      expect(missing).not_to include(
+        "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
+      )
     end
 
     it "verifier returns empty for a fully transformed ServerClientOrBoth" do
@@ -5192,12 +5195,18 @@ describe RscGenerator, type: :generator do
       reflowed = server_client_or_both_content(destructured_import: true)
                  .gsub("    // default is the standard client and server build",
                        "    // fall through to the combined client + server build")
-                 .gsub("      } else {", "      }else{")
+                 .gsub("  } else {", "  }else{")
+      # Guard: the fixture must actually contain the compact `}else{` form, so this
+      # test can't silently no-op (the indentation the helper emits is 2 spaces).
+      expect(reflowed).to include("}else{")
+      expect(reflowed).not_to include("} else {")
       simulate_existing_file(config_path, reflowed)
 
       generator.send(:update_server_client_or_both_for_rsc)
 
       result = File.read(File.join(destination_root, config_path))
+      # Passes because DEFAULT_BUILD_BRANCH_ANCHOR is whitespace-tolerant
+      # (`\}\s*else\s*\{`), genuinely matching the compact `}else{` form.
       expect(result).to include("process.env.RSC_BUNDLE_ONLY")
       expect(result.scan("process.env.RSC_BUNDLE_ONLY").length).to eq(1)
     end

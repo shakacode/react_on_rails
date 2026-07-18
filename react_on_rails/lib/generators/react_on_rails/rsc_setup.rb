@@ -378,6 +378,10 @@ module ReactOnRails
       # array it becomes — both fully whitespace tolerant (inner brackets/commas).
       DEFAULT_RESULT_ARRAY = /result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*\]\s*;?/
       RSC_RESULT_ARRAY = /result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\]/
+      # The RSC-aware default-build log, matched by its `console.log('…')` call
+      # shape so a bare comment mention of the message text can't no-op the rewrite.
+      RSC_BUNDLES_LOG =
+        /console\.log\(\s*'\[React on Rails\] Creating client, server, and RSC bundles\.'\s*\)/
       # The bare `} else {` default-build branch: the one whose body reaches the
       # 2-element default result assignment with no intervening `}`. The
       # RSC_BUNDLE_ONLY branch is spliced immediately before it. `[^}]` cannot span
@@ -455,7 +459,7 @@ module ReactOnRails
       end
 
       def update_scob_default_bundle_output(config_path, content)
-        unless content.include?("client, server, and RSC bundles")
+        unless content.match?(RSC_BUNDLES_LOG)
           gsub_file(
             config_path,
             /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\)\s*;?/,
