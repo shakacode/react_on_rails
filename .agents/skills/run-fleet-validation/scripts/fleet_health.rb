@@ -213,7 +213,10 @@ module FleetValidation
         "/repos/#{repo}/commits/#{head}/check-runs?per_page=100",
         "check_runs"
       )
-      workflows = @client.get("/repos/#{repo}/actions/workflows?per_page=100").fetch("workflows", [])
+      workflows = paginated_collection(
+        "/repos/#{repo}/actions/workflows?per_page=100",
+        "workflows"
+      )
 
       {
         "default_branch" => default_branch,

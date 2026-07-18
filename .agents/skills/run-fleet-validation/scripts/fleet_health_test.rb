@@ -671,6 +671,116 @@ class FleetHealthTest < Minitest::Test
     assert_equal FleetValidation::PublicGitHubProbe::MAX_PAGES, client.requests.length
   end
 
+  def test_later_workflow_page_supplies_smoke_and_review_app_discovery
+    repo = "sanitized/demo"
+    head = "a" * 40
+    path = "/repos/#{repo}/actions/workflows?per_page=100"
+    filler = Array.new(100) do |index|
+      { "id" => index, "path" => ".github/workflows/filler-#{index}.yml", "name" => "Filler #{index}" }
+    end
+    caller = {
+      "id" => 4100,
+      "path" => ".github/workflows/ci.yml",
+      "name" => "CI",
+      "html_url" => "https://example.invalid/ci"
+    }
+    review = {
+      "id" => 4200,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Review app",
+      "state" => "active",
+      "html_url" => "https://example.invalid/review"
+    }
+    responses = {
+      path => { "workflows" => filler },
+      "#{path}&page=2" => { "workflows" => [caller, review] },
+      "/repos/#{repo}/actions/workflows/4100/runs?branch=main&per_page=20" => {
+        "workflow_runs" => [{
+          "id" => 4101,
+          "head_sha" => head,
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/smoke-run"
+        }]
+      },
+      "/repos/#{repo}/actions/runs/4101/jobs?per_page=100" => {
+        "jobs" => [{
+          "name" => "Fleet / Demo fleet smoke",
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/smoke-job"
+        }]
+      },
+      "/repos/#{repo}/actions/workflows/4200/runs?event=pull_request&per_page=20" => {
+        "workflow_runs" => [valid_review_run]
+      }
+    }
+    client = Struct.new(:responses) do
+      def get(path)
+        responses.fetch(path)
+      end
+
+      def content(_repo, path, ref:)
+        raise "wrong head" unless ref == "a" * 40
+        return YAML.dump("jobs" => {}) unless path == ".github/workflows/ci.yml"
+
+        YAML.dump(
+          "jobs" => {
+            "fleet" => {
+              "name" => "Fleet",
+              "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+            }
+          }
+        )
+      end
+    end.new(responses)
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    workflows = probe.send(:paginated_collection, path, "workflows")
+    smoke = probe.send(:smoke_status, repo, head, [], workflows, default_branch: "main")
+    review_app = probe.send(
+      :review_app_status,
+      repo,
+      @contract.targets.first,
+      workflows,
+      default_branch: "main",
+      observed_at: "2026-07-18T12:00:00Z"
+    )
+
+    assert_equal 102, workflows.length
+    assert_equal "passed", smoke.fetch("status")
+    assert_equal "passed", review_app.fetch("status")
+  end
+
+  def test_workflow_pagination_rejects_malformed_and_incomplete_pages
+    path = "/repos/sanitized/demo/actions/workflows?per_page=100"
+    malformed_client = Struct.new(:path) do
+      def get(request_path)
+        raise "unexpected path" unless request_path == path
+
+        { "workflows" => {} }
+      end
+    end.new(path)
+    error = assert_raises(FleetValidation::ManifestError) do
+      FleetValidation::PublicGitHubProbe.new(client: malformed_client)
+                                        .send(:paginated_collection, path, "workflows")
+    end
+    assert_includes error.message, "is not an array"
+
+    requests = []
+    full_client = Object.new
+    full_client.define_singleton_method(:get) do |request_path|
+      requests << request_path
+      { "workflows" => Array.new(100) { { "path" => ".github/workflows/filler.yml" } } }
+    end
+    error = assert_raises(FleetValidation::ManifestError) do
+      FleetValidation::PublicGitHubProbe.new(client: full_client)
+                                        .send(:paginated_collection, path, "workflows")
+    end
+    assert_includes error.message, "pagination remained full"
+    assert_equal FleetValidation::PublicGitHubProbe::MAX_PAGES, requests.length
+  end
+
   def test_public_github_probe_binds_health_evidence_to_the_default_head
     target = @contract.targets.first
     repo = target.fetch("name")
@@ -738,6 +848,15 @@ class FleetHealthTest < Minitest::Test
           ]
         },
         "/repos/#{repo}/actions/workflows?per_page=100" => {
+          "workflows" => Array.new(100) do |index|
+            {
+              "id" => index,
+              "path" => ".github/workflows/filler-#{index}.yml",
+              "name" => "Filler #{index}"
+            }
+          end
+        },
+        "/repos/#{repo}/actions/workflows?per_page=100&page=2" => {
           "workflows" => [
             {
               "id" => 41,
