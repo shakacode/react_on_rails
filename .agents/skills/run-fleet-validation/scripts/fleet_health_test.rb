@@ -692,6 +692,30 @@ class FleetHealthTest < Minitest::Test
     refute_includes error.message, "private-secret"
   end
 
+  def test_public_github_probe_encodes_the_default_branch_in_the_commit_path
+    target = @contract.targets.first
+    branch = "release/17.0 + café"
+    requests = []
+    client = Object.new
+    client.define_singleton_method(:get) do |path|
+      requests << path
+      raise "stop after commit lookup" unless requests.one?
+
+      { "visibility" => "public", "default_branch" => branch, "archived" => false }
+    end
+
+    public_github_probe(client:).observe(target, observed_at: "2026-07-18T12:00:00Z")
+
+    encoded_branch = URI.encode_www_form_component(branch)
+    assert_equal(
+      [
+        "/repos/#{target.fetch('name')}",
+        "/repos/#{target.fetch('name')}/commits/#{encoded_branch}"
+      ],
+      requests
+    )
+  end
+
   def test_default_ci_requires_a_successful_exact_head_check
     probe = public_github_probe(client: nil)
     skipped = {

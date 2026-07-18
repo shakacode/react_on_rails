@@ -209,7 +209,8 @@ module FleetValidation
       end
 
       default_branch = metadata.fetch("default_branch")
-      commit = @client.get("/repos/#{repo}/commits/#{default_branch}")
+      encoded_branch = URI.encode_www_form_component(default_branch)
+      commit = @client.get("/repos/#{repo}/commits/#{encoded_branch}")
       head = commit.fetch("sha")
       checks = paginated_collection(
         "/repos/#{repo}/commits/#{head}/check-runs?per_page=100",
