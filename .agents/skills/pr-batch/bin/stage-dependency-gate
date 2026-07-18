@@ -1,0 +1,370 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+MUTATION_CAPABILITIES = %w[
+  branch_worktree_create
+  patch_edit
+  commit
+  push
+  pr_open
+  final_validation
+  merge
+].freeze
+REMOTE_CAPABILITIES = %w[push pr_open final_validation merge].freeze
+BASE_REFRESH_TRIGGERS = %w[
+  semantic_overlap
+  required_dependency
+  conflict_or_base_sensitive
+  consumer_policy
+].freeze
+EDGE_TYPES = %w[edit validation_open merge_order].freeze
+EDGE_STATES = %w[pending satisfied].freeze
+PREPARATION_FIELDS = %w[
+  source_patch_inspection
+  collision_domain_mapping
+  semantic_adaptation_notes
+  validation_review_plan
+  evidence_templates
+].freeze
+BASE_MOVEMENT_STATES = %w[unchanged moved].freeze
+BLOCKED_CAPABILITIES_BY_TYPE = {
+  "edit" => MUTATION_CAPABILITIES,
+  "validation_open" => REMOTE_CAPABILITIES,
+  "merge_order" => ["merge"]
+}.freeze
+
+def unknown_identity?(value)
+  !value.is_a?(String) || value.strip.empty? || value.strip.casecmp?("UNKNOWN")
+end
+
+def normalized_identity(value)
+  value.strip.downcase(:fold)
+end
+
+def full_sha?(value)
+  value.is_a?(String) && value.match?(/\A[0-9a-f]{40}\z/i)
+end
+
+def same_sha?(left, right)
+  full_sha?(left) && full_sha?(right) && left.casecmp?(right)
+end
+
+def closed_value_reason(value, prefix)
+  return "#{prefix}-missing" unless value.is_a?(String) && !value.strip.empty?
+  return "#{prefix}-unknown" if value.strip.casecmp?("UNKNOWN")
+
+  "#{prefix}-unsupported"
+end
+
+def preparation_reason(preparation)
+  return "preparation-missing" if preparation.nil?
+  return "preparation-malformed" unless preparation.is_a?(Hash)
+  return "preparation-missing" unless PREPARATION_FIELDS.all? do |field|
+    preparation[field].is_a?(String) && !preparation[field].strip.empty?
+  end
+
+  "preparation-unknown" if PREPARATION_FIELDS.any? do |field|
+    preparation[field].strip.casecmp?("UNKNOWN")
+  end
+end
+
+def fail_input(reason)
+  puts JSON.generate(
+    "contract" => "stage-dependency-gate",
+    "version" => 1,
+    "status" => "invalid-input",
+    "reason" => reason
+  )
+  exit
+end
+
+def load_trusted_plan(path)
+  fail_input("trusted-plan-path-unknown") if unknown_identity?(path)
+
+  JSON.parse(File.read(path, encoding: "UTF-8"))
+rescue SystemCallError
+  fail_input("trusted-plan-unreadable")
+rescue JSON::ParserError
+  fail_input("trusted-plan-malformed")
+end
+
+def validated_trusted_plan_edges(plan, lane_ids)
+  fail_input("trusted-plan-object-required") unless plan.is_a?(Hash)
+  unless plan["contract"] == "stage-dependency-plan" && plan["version"] == 1
+    fail_input("trusted-plan-contract-invalid")
+  end
+  fail_input("trusted-plan-id-invalid") if unknown_identity?(plan["id"])
+  fail_input("trusted-plan-edges-array-required") unless plan["edges"].is_a?(Array)
+  fail_input("trusted-plan-edge-record-invalid") unless plan.fetch("edges").all? { |edge| edge.is_a?(Hash) }
+
+  edge_ids = plan.fetch("edges").map { |edge| edge["id"] }
+  if edge_ids.any? { |edge_id| unknown_identity?(edge_id) } || edge_ids.uniq.length != edge_ids.length
+    fail_input("trusted-plan-edge-id-invalid-or-duplicate")
+  end
+  unless plan.fetch("edges").all? do |edge|
+    %w[from to].all? { |key| !unknown_identity?(edge[key]) } && EDGE_TYPES.include?(edge["type"])
+  end
+    fail_input("trusted-plan-edge-tuple-invalid")
+  end
+  unless plan.fetch("edges").all? { |edge| lane_ids.include?(edge["from"]) && lane_ids.include?(edge["to"]) }
+    fail_input("trusted-plan-edge-endpoint-unknown")
+  end
+
+  plan.fetch("edges")
+end
+
+def critical_path(lanes, edges)
+  lanes_by_id = lanes.to_h { |lane| [lane.fetch("id"), lane] }
+  lane_ids = lanes_by_id.keys.sort
+  predecessors = lane_ids.to_h { |lane_id| [lane_id, []] }
+  successors = lane_ids.to_h { |lane_id| [lane_id, []] }
+  edges.map { |edge| [edge["from"], edge["to"]] }.uniq.each do |from, to|
+    next unless lanes_by_id.key?(from) && lanes_by_id.key?(to)
+
+    predecessors.fetch(to) << from
+    successors.fetch(from) << to
+  end
+  predecessors.each_value(&:sort!)
+  successors.each_value(&:sort!)
+
+  ready = lane_ids.select { |lane_id| predecessors.fetch(lane_id).empty? }
+  paths = {}
+  until ready.empty?
+    lane_id = ready.shift
+    candidates = predecessors.fetch(lane_id).map { |predecessor| paths.fetch(predecessor) + [lane_id] }
+    paths[lane_id] = candidates.empty? ? [lane_id] : candidates.min_by { |path| [-path.length, path.join("\0")] }
+    successors.fetch(lane_id).each do |successor|
+      next unless predecessors.fetch(successor).all? { |predecessor| paths.key?(predecessor) }
+      next if paths.key?(successor) || ready.include?(successor)
+
+      ready << successor
+      ready.sort!
+    end
+  end
+
+  cycle = paths.length != lane_ids.length
+  selected = cycle ? [] : (paths.values.min_by { |path| [-path.length, path.join("\0")] } || [])
+  result = {
+    "lane_ids" => selected,
+    "edge_count" => [selected.length - 1, 0].max,
+    "tie_breaker" => "maximum-dependency-hops-then-lexicographic-lane-id-sequence",
+    "assignments" => selected.map do |lane_id|
+      lane = lanes_by_id.fetch(lane_id)
+      { "lane_id" => lane_id, "maker" => lane["maker"], "checker" => lane["checker"] }
+    end
+  }
+  result["reason"] = "dependency-cycle" if cycle
+  result
+end
+
+begin
+  input = JSON.parse($stdin.read)
+rescue JSON::ParserError
+  fail_input("malformed-json")
+end
+fail_input("top-level-object-required") unless input.is_a?(Hash)
+fail_input("unsupported-contract-version") unless input["contract"] == "stage-dependency-gate" && input["version"] == 1
+fail_input("lanes-and-edges-arrays-required") unless input["lanes"].is_a?(Array) && input["edges"].is_a?(Array)
+fail_input("lane-array-empty") if input.fetch("lanes").empty?
+fail_input("lane-record-invalid") unless input.fetch("lanes").all? { |lane| lane.is_a?(Hash) }
+fail_input("edge-record-invalid") unless input.fetch("edges").all? { |edge| edge.is_a?(Hash) }
+lane_ids = input.fetch("lanes").map { |lane| lane["id"] }
+fail_input("lane-id-invalid-or-duplicate") if lane_ids.any? { |lane_id| unknown_identity?(lane_id) } || lane_ids.uniq.length != lane_ids.length
+fail_input("lane-head-or-base-sha-malformed") unless input.fetch("lanes").all? do |lane|
+  full_sha?(lane["head_sha"]) && full_sha?(lane["base_sha"])
+end
+live_edge_ids = input.fetch("edges").map { |edge| edge["id"] }
+if live_edge_ids.any? { |edge_id| unknown_identity?(edge_id) } || live_edge_ids.uniq.length != live_edge_ids.length
+  fail_input("edge-id-invalid-or-duplicate")
+end
+if ARGV.empty?
+  fail_input("trusted-plan-required")
+elsif ARGV.length == 4 && ARGV[0] == "--trusted-plan" && ARGV[2] == "--trusted-plan-id"
+  trusted_plan_path = ARGV[1]
+  expected_trusted_plan_id = ARGV[3]
+else
+  fail_input("arguments-invalid")
+end
+fail_input("trusted-plan-id-invalid") if unknown_identity?(expected_trusted_plan_id)
+trusted_plan = load_trusted_plan(trusted_plan_path)
+planned_edges = validated_trusted_plan_edges(trusted_plan, lane_ids)
+fail_input("trusted-plan-id-mismatch") unless trusted_plan.fetch("id") == expected_trusted_plan_id
+planned_edge_ids = planned_edges.map { |edge| edge.fetch("id") }
+fail_input("live-edge-not-in-trusted-plan") unless (live_edge_ids - planned_edge_ids).empty?
+live_edges_by_id = input.fetch("edges").to_h { |edge| [edge.fetch("id"), edge] }
+graph_edges = planned_edges.map do |planned_edge|
+  live_edge = live_edges_by_id.fetch(planned_edge.fetch("id"), {})
+  planned_edge.merge(
+    "state" => live_edge["state"],
+    "evidence" => live_edge["evidence"],
+    "base_movement" => live_edge["base_movement"]
+  )
+end
+batch_maker_identities = input.fetch("lanes").filter_map do |lane|
+  normalized_identity(lane["maker"]) unless unknown_identity?(lane["maker"])
+end.uniq
+lanes = input.fetch("lanes").sort_by { |lane| lane.fetch("id") }.map do |lane|
+  permissions = { "read_only_discovery" => true }
+  MUTATION_CAPABILITIES.each { |capability| permissions[capability] = true }
+  blockers = []
+  base_refresh = []
+  preparation_blocker_added = false
+
+  if unknown_identity?(lane["maker"]) || unknown_identity?(lane["checker"])
+    MUTATION_CAPABILITIES.each { |capability| permissions[capability] = false }
+    blockers << { "scope" => "lane", "reason" => "maker-checker-identity-unknown" }
+  elsif normalized_identity(lane["maker"]) == normalized_identity(lane["checker"])
+    permissions["merge"] = false
+    blockers << { "scope" => "lane", "reason" => "maker-checker-not-distinct" }
+  elsif batch_maker_identities.include?(normalized_identity(lane["checker"]))
+    permissions["merge"] = false
+    blockers << { "scope" => "lane", "reason" => "maker-checker-not-independent" }
+  end
+
+  incoming_edges = graph_edges.select { |edge| edge["to"] == lane.fetch("id") }
+  incoming_edges.sort_by { |edge| edge["id"].to_s }.each do |edge|
+    unless EDGE_TYPES.include?(edge["type"])
+      reason = closed_value_reason(edge["type"], "edge-type")
+      MUTATION_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => reason }
+      next
+    end
+
+    unless EDGE_STATES.include?(edge["state"])
+      reason = closed_value_reason(edge["state"], "edge-state")
+      MUTATION_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => reason }
+      next
+    end
+
+    if edge["state"] == "satisfied" && !edge["evidence"].is_a?(Hash)
+      BLOCKED_CAPABILITIES_BY_TYPE.fetch(edge["type"]).each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-object-malformed" }
+      next
+    end
+    if edge["state"] == "satisfied" &&
+       (!edge.dig("evidence", "evidence_ref").is_a?(String) || edge.dig("evidence", "evidence_ref").strip.empty?)
+      BLOCKED_CAPABILITIES_BY_TYPE.fetch(edge["type"]).each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-ref-missing" }
+      next
+    end
+    if edge["state"] == "satisfied" && edge.dig("evidence", "evidence_ref").strip.casecmp?("UNKNOWN")
+      BLOCKED_CAPABILITIES_BY_TYPE.fetch(edge["type"]).each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-ref-unknown" }
+      next
+    end
+    if edge["type"] == "validation_open" && edge["state"] == "satisfied" && !edge["base_movement"].is_a?(Hash)
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "base-movement-object-malformed" }
+      next
+    end
+
+    if edge["type"] == "edit" && edge["state"] == "pending"
+      MUTATION_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "pending" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "pending"
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "pending" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !full_sha?(edge.dig("evidence", "head_sha"))
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-head-malformed" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !same_sha?(edge.dig("evidence", "head_sha"), lane["head_sha"])
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-head-stale" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !full_sha?(edge.dig("evidence", "base_sha"))
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-base-malformed" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !BASE_MOVEMENT_STATES.include?(edge.dig("base_movement", "status"))
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      reason = closed_value_reason(edge.dig("base_movement", "status"), "base-movement")
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => reason }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          (same_sha?(edge.dig("evidence", "base_sha"), lane["base_sha"]) !=
+           (edge.dig("base_movement", "status") == "unchanged"))
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "base-movement-inconsistent" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          BASE_REFRESH_TRIGGERS.any? { |trigger| ![true, false].include?(edge.dig("base_movement", trigger)) }
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "base-refresh-input-unknown" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !same_sha?(edge.dig("evidence", "base_sha"), lane["base_sha"]) &&
+          BASE_REFRESH_TRIGGERS.any? { |trigger| edge.dig("base_movement", trigger) == true }
+      REMOTE_CAPABILITIES.each { |capability| permissions[capability] = false }
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "base-refresh-required" }
+      base_refresh << { "edge_id" => edge["id"], "required" => true, "reason" => "refresh-trigger-present" }
+    elsif edge["type"] == "validation_open" && edge["state"] == "satisfied" &&
+          !same_sha?(edge.dig("evidence", "base_sha"), lane["base_sha"])
+      base_refresh << { "edge_id" => edge["id"], "required" => false, "reason" => "independent-behind-base" }
+    elsif edge["type"] == "merge_order" && edge["state"] == "pending"
+      permissions["merge"] = false
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "pending" }
+    elsif edge["type"] == "merge_order" && edge["state"] == "satisfied" &&
+          edge.dig("evidence", "terminal_state") != "merged"
+      permissions["merge"] = false
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "predecessor-not-merged" }
+    elsif edge["type"] == "merge_order" && edge["state"] == "satisfied" &&
+          !full_sha?(edge.dig("evidence", "head_sha"))
+      permissions["merge"] = false
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-head-malformed" }
+    elsif edge["type"] == "merge_order" && edge["state"] == "satisfied" &&
+          !same_sha?(edge.dig("evidence", "head_sha"),
+                     input.fetch("lanes").find { |source| source["id"] == edge["from"] }&.dig("head_sha"))
+      permissions["merge"] = false
+      blockers << { "edge_id" => edge["id"], "type" => edge["type"], "reason" => "evidence-head-stale" }
+    end
+
+    next unless edge["state"] == "pending" && %w[edit validation_open].include?(edge["type"])
+    next unless (reason = preparation_reason(lane["preparation"]))
+
+    MUTATION_CAPABILITIES.each { |capability| permissions[capability] = false }
+    unless preparation_blocker_added
+      blockers << { "scope" => "lane", "reason" => reason }
+      preparation_blocker_added = true
+    end
+  end
+
+  {
+    "id" => lane.fetch("id"),
+    "permissions" => permissions,
+    "hosted_ci" => permissions.fetch("final_validation") ? "eligible-via-repo-seam" : "not-yet-eligible",
+    "blockers" => blockers,
+    "base_refresh" => base_refresh
+  }
+end
+
+checker_blockers = lanes.filter_map do |lane|
+  blocker = lane.fetch("blockers").find { |entry| entry.fetch("reason").start_with?("maker-checker-") }
+  { "lane_id" => lane.fetch("id"), "reason" => blocker.fetch("reason") } if blocker
+end
+path = critical_path(input.fetch("lanes"), graph_edges)
+if path["reason"] == "dependency-cycle"
+  lanes.each do |lane|
+    MUTATION_CAPABILITIES.each { |capability| lane.fetch("permissions")[capability] = false }
+    lane["hosted_ci"] = "not-yet-eligible"
+    lane.fetch("blockers") << { "scope" => "graph", "reason" => "dependency-cycle" }
+  end
+end
+
+puts JSON.generate(
+  "contract" => "stage-dependency-gate",
+  "version" => 1,
+  "status" => lanes.all? { |lane| lane.fetch("permissions").fetch("merge") } ? "eligible" : "gated",
+  "trusted_plan_id" => trusted_plan&.fetch("id", nil),
+  "lanes" => lanes,
+  "checker_verdict" => {
+    "status" => checker_blockers.empty? ? "eligible" : "blocked",
+    "blockers" => checker_blockers
+  },
+  "critical_path" => path,
+  "downstream_requirements" => {
+    "final_combined_tip_validation" => "required-via-repo-seam",
+    "preserved_gates" => %w[exact_head_ci independent_review unresolved_threads merge_readiness]
+  }
+)

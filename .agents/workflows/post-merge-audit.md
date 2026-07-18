@@ -11,6 +11,16 @@ For a verified Codex GPT-5.6 batch, preserve this route profile:
 - Independent adversarial QA: Sol/xhigh
 - Routine deterministic QA: Sol/high
 
+For a verified Claude batch, preserve this provisional route profile
+(`claude-profile v0`):
+
+- Multi-lane coordinator: Opus 4.8/xhigh
+- Simple, positively classified worker: Sonnet 5/high
+- Unknown or uncertain worker: Opus 4.8/xhigh
+- High-risk or escalated work: Opus 4.8/xhigh
+- Independent adversarial QA: Opus 4.8/xhigh
+- Routine deterministic QA: Opus 4.8/high
+
 ## Coordination Rules
 
 These prompts intentionally repeat the worked-issue scope state machine from
@@ -42,7 +52,11 @@ shared skill source, and `.agents/workflows/pr-processing.md`.
   exact model/effort plus binding source must satisfy operator policy. Under the
   conservative GPT-5.6 profile, qualifying independent adversarial QA uses
   Sol/xhigh; Sol/high is limited to routine deterministic QA. Terra may collect
-  mechanical evidence but does not issue the qualifying verdict. Below-policy,
+  mechanical evidence but does not issue the qualifying verdict. Under the
+  provisional Claude profile (`claude-profile v0`), qualifying independent
+  adversarial QA uses Opus 4.8/xhigh; Opus 4.8/high is limited to routine
+  deterministic QA. Sonnet may collect mechanical evidence but does not issue
+  the qualifying verdict. Below-policy,
   non-independent, or `UNKNOWN` checker state makes the audit non-clean and must
   be reported as `checker_route_compliance: UNKNOWN|failed`.
 - During independent audits, agents may draft issue bodies but must not create issues, comments, labels, fixes, reverts, branches, or PRs.
@@ -167,7 +181,8 @@ If you do not know or cannot verify an item from GitHub/local git, say UNKNOWN r
 
 Run this separately in Codex and Claude. For completed-batch audit, designate
 one launch-assured policy-compliant run as the qualifying checker (Sol under the
-conservative GPT-5.6 profile) and the other run as an advisory auditor. Do not
+conservative GPT-5.6 profile; Opus 4.8 under the provisional Claude profile)
+and the other run as an advisory auditor. Do not
 share one agent's output with the other until both are done.
 
 ```text
@@ -187,7 +202,10 @@ installed rosters, dispatch-resolved classes, prompt text, and model self-report
 do not. Under the conservative GPT-5.6 profile, qualifying independent
 adversarial QA uses Sol/xhigh; Sol/high is limited to routine deterministic QA.
 Terra may collect mechanical evidence but must not issue the qualifying audit
-verdict. If checker identity, exact model/effort, binding source, or
+verdict. Under the provisional Claude profile, qualifying independent
+adversarial QA uses Opus 4.8/xhigh; Opus 4.8/high is limited to routine
+deterministic QA. Sonnet may collect mechanical evidence but must not issue the
+qualifying audit verdict. If checker identity, exact model/effort, binding source, or
 independence is unavailable, below policy, or `UNKNOWN`, do not return a clean
 verdict; report `checker_route_compliance: UNKNOWN|failed` and the exact fresh
 qualifying-checker reservation needed. For `Audit role: advisory-auditor`,

@@ -57,13 +57,34 @@ class PrCiReadinessTest < Minitest::Test
     assert_equal "UNKNOWN", out["verdict"]
   end
 
-  def test_cancel_row_does_not_mask_passing
+  def test_same_context_current_pass_supersedes_cancelled_history
     out = PrCiReadiness.assess(pr_number: 1, required_used: true, rows: [
-                                 { "name" => "rspec", "bucket" => "pass" },
-                                 { "name" => "stale", "bucket" => "cancel" }
+                                 { "workflow" => "CI", "name" => "rspec", "bucket" => "pass" },
+                                 { "workflow" => "CI", "name" => "rspec", "bucket" => "cancel" }
                                ])
     assert_equal "READY", out["verdict"]
     assert_empty out["failing"]
+    assert_empty out["pending"]
+  end
+
+  def test_distinct_cancelled_required_context_is_not_ready_with_name_surfaced
+    out = PrCiReadiness.assess(pr_number: 1, required_used: true, rows: [
+                                 { "workflow" => "CI", "name" => "unit", "bucket" => "pass" },
+                                 { "workflow" => "Security", "name" => "security", "bucket" => "cancel" }
+                               ])
+
+    assert_equal "NOT_READY", out["verdict"]
+    assert_equal ["security"], out["pending"]
+  end
+
+  def test_same_name_in_different_workflow_does_not_supersede_cancelled_required_context
+    out = PrCiReadiness.assess(pr_number: 1, required_used: true, rows: [
+                                 { "workflow" => "CI", "name" => "unit", "bucket" => "pass" },
+                                 { "workflow" => "Security", "name" => "unit", "bucket" => "cancel" }
+                               ])
+
+    assert_equal "NOT_READY", out["verdict"]
+    assert_equal ["unit"], out["pending"]
   end
 
   def test_cancel_row_dropped_from_failing_and_pending
@@ -128,10 +149,14 @@ end
 class PrCiReadinessCliTest < Minitest::Test
   # Build a temp dir with a fake `gh` executable that emits canned `gh pr
   # checks` JSON, then run the real script with that dir prepended to PATH.
-  def with_fake_gh(required_json:, full_json:, pr_head: "head-sha", runs: {}, review_pages: {}, review_error: false)
+  def with_fake_gh(required_json:, full_json:, pr_head: "head-sha", runs: {}, review_pages: {}, review_error: false,
+                   required_check_fields: nil, rejected_check_field: nil, check_stderr: nil, check_status: 0,
+                   required_check_error: nil, full_check_error: nil)
     Dir.mktmpdir("pr-ci-readiness-test") do |dir|
       gh = File.join(dir, "gh")
-      File.write(gh, fake_gh_script(required_json, full_json, pr_head, runs, review_pages, review_error))
+      File.write(gh, fake_gh_script(required_json, full_json, pr_head, runs, review_pages, review_error,
+                                    required_check_fields, rejected_check_field, check_stderr, check_status,
+                                    required_check_error, full_check_error))
       FileUtils.chmod(0o755, gh)
       env = { "PATH" => "#{dir}#{File::PATH_SEPARATOR}#{ENV.fetch('PATH')}" }
       yield env
@@ -141,7 +166,8 @@ class PrCiReadinessCliTest < Minitest::Test
   # The fake gh handles `gh repo view ...` (so --repo is optional) and
   # `gh pr checks ...`, returning the required vs full payload based on the
   # presence of the --required flag. Non-JSON ("") models "no required checks".
-  def fake_gh_script(required_json, full_json, pr_head, runs, review_pages, review_error)
+  def fake_gh_script(required_json, full_json, pr_head, runs, review_pages, review_error, required_check_fields,
+                     rejected_check_field, check_stderr, check_status, required_check_error, full_check_error)
     run_cases = runs.map do |run_id, payload|
       run_json = JSON.generate(payload.fetch(:run))
       jobs_json = JSON.generate("total_count" => payload.fetch(:jobs).length, "jobs" => payload.fetch(:jobs))
@@ -198,6 +224,41 @@ class PrCiReadinessCliTest < Minitest::Test
                                         }
                                       }
                                     })
+    check_fields_guard = if required_check_fields
+                           <<~BASH
+                             if [[ " $* " != *" --json #{required_check_fields} "* ]]; then
+                               exit 2
+                             fi
+                           BASH
+                         else
+                           ""
+                         end
+    rejected_check_field_guard = if rejected_check_field
+                                   <<~BASH
+                                     if [[ "$*" = *"#{rejected_check_field}"* ]]; then
+                                       exit 1
+                                     fi
+                                   BASH
+                                 else
+                                   ""
+                                 end
+    check_stderr_command = check_stderr ? "printf '%b' #{check_stderr.inspect} >&2" : ""
+    required_check_error_command = if required_check_error
+                                     <<~BASH
+                                       printf '%b' #{required_check_error.inspect} >&2
+                                       exit 1
+                                     BASH
+                                   else
+                                     ""
+                                   end
+    full_check_error_command = if full_check_error
+                                 <<~BASH
+                                   printf '%b' #{full_check_error.inspect} >&2
+                                   exit 1
+                                 BASH
+                               else
+                                 ""
+                               end
 
     <<~SH
       #!/usr/bin/env bash
@@ -212,14 +273,19 @@ class PrCiReadinessCliTest < Minitest::Test
         exit 0
       fi
       if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+      #{check_fields_guard}
+      #{rejected_check_field_guard}
+        #{check_stderr_command}
         for arg in "$@"; do
           if [ "$arg" = "--required" ]; then
+          #{required_check_error_command}
             printf '%s' #{required_json.inspect}
-            exit 0
+            exit #{check_status}
           fi
         done
+      #{full_check_error_command}
         printf '%s' #{full_json.inspect}
-        exit 0
+        exit #{check_status}
       fi
       if [ "$1" = "api" ]; then
         if [ "$2" = "graphql" ]; then
@@ -240,6 +306,18 @@ class PrCiReadinessCliTest < Minitest::Test
 
   def run_script(env, *)
     Open3.capture2e(env, "ruby", SCRIPT, *)
+  end
+
+  def test_check_fetch_requests_workflow_identity
+    with_fake_gh(
+      required_json: '[{"workflow":"CI","name":"unit","bucket":"pass"}]',
+      full_json: "[]",
+      required_check_fields: "name,state,bucket,link,workflow"
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo")
+      assert status.success?, out
+      assert_equal "READY", JSON.parse(out)["verdict"]
+    end
   end
 
   def test_required_checks_used_when_present
@@ -586,22 +664,77 @@ class PrCiReadinessCliTest < Minitest::Test
     end
   end
 
-  def test_cancel_only_required_and_empty_full_is_unknown_via_cli
-    # Cancel-only required falls back; if the full list is also empty, UNKNOWN.
+  def test_cancel_only_required_and_empty_full_is_not_ready_via_cli
     with_fake_gh(
       required_json: '[{"name":"stale","state":"CANCELLED","bucket":"cancel","link":"x"}]',
       full_json: "[]"
     ) do |env|
       out, = run_script(env, "123", "--repo", "owner/repo")
       data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal false, data["required_used"]
+      assert_equal ["stale"], data["pending"]
+    end
+  end
+
+  def test_cancelled_required_context_blocks_unrelated_full_list_pass
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: '[{"workflow":"CI","name":"unit","bucket":"pass"}]'
+    ) do |env|
+      out, = run_script(env, "123", "--repo", "owner/repo")
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal false, data["required_used"]
+      assert_equal ["security"], data["pending"]
+    end
+  end
+
+  def test_full_list_pass_cannot_authenticate_failed_required_query
+    with_fake_gh(
+      required_json: "",
+      full_json: '[{"workflow":"CI","name":"unit","bucket":"pass"}]',
+      required_check_error: "HTTP 503 while querying required checks\n"
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo")
+      assert status.success?, out
+      data = JSON.parse(out)
       assert_equal "UNKNOWN", data["verdict"]
       assert_equal false, data["required_used"]
     end
   end
 
-  def test_cancel_row_does_not_mask_passing_via_cli
+  def test_known_good_no_required_diagnostic_allows_full_list_pass
     with_fake_gh(
-      required_json: '[{"name":"rspec","bucket":"pass"},{"name":"stale","bucket":"cancel"}]',
+      required_json: "",
+      full_json: '[{"workflow":"CI","name":"unit","bucket":"pass"}]',
+      check_stderr: "no required checks reported on the 'feature' branch\n",
+      check_status: 1
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo")
+      assert status.success?, out
+      data = JSON.parse(out)
+      assert_equal "READY", data["verdict"]
+      assert_equal false, data["required_used"]
+    end
+  end
+
+  def test_full_list_current_pass_supersedes_cancelled_required_context_with_same_identity
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: '[{"workflow":"Security","name":"security","bucket":"pass"}]'
+    ) do |env|
+      out, = run_script(env, "123", "--repo", "owner/repo")
+      data = JSON.parse(out)
+      assert_equal "READY", data["verdict"]
+      assert_equal false, data["required_used"]
+      assert_empty data["pending"]
+    end
+  end
+
+  def test_same_context_current_pass_supersedes_cancelled_history_via_cli
+    with_fake_gh(
+      required_json: '[{"workflow":"CI","name":"rspec","bucket":"pass"},{"workflow":"CI","name":"rspec","bucket":"cancel"}]',
       full_json: "[]"
     ) do |env|
       out, = run_script(env, "123", "--repo", "owner/repo")
@@ -853,6 +986,248 @@ class PrCiReadinessCliTest < Minitest::Test
       assert_equal false, data["required_used"]
       assert_empty data["pending"]
       assert_empty data.fetch("requested_hosted").fetch("pending")
+    end
+  end
+
+  def test_requested_hosted_success_does_not_erase_cancelled_required_context
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: "[]",
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal ["security"], data["pending"]
+      assert_empty data.fetch("requested_hosted").fetch("failing")
+    end
+  end
+
+  def test_requested_hosted_success_accepts_same_context_full_list_supersession
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: '[{"workflow":"Security","name":"security","bucket":"pass"}]',
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      data = JSON.parse(out)
+      assert_equal "READY", data["verdict"]
+      assert_empty data["pending"]
+    end
+  end
+
+  def test_requested_hosted_success_does_not_accept_different_workflow_supersession
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: '[{"workflow":"CI","name":"security","bucket":"pass"}]',
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal ["security"], data["pending"]
+    end
+  end
+
+  def test_requested_hosted_success_does_not_override_failed_full_supersession_query
+    with_fake_gh(
+      required_json: '[{"workflow":"Security","name":"security","bucket":"cancel"}]',
+      full_json: '[{"workflow":"Security","name":"security","bucket":"pass"}]',
+      full_check_error: "HTTP 503 while querying full checks\n",
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      data = JSON.parse(out)
+      assert_equal "NOT_READY", data["verdict"]
+      assert_equal ["security"], data["pending"]
+    end
+  end
+
+  def test_requested_hosted_success_is_unknown_when_old_gh_rejects_workflow_field
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      rejected_check_field: "workflow",
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_plain_invocation_is_unknown_when_old_gh_rejects_workflow_field
+    with_fake_gh(required_json: "", full_json: "[]", rejected_check_field: "workflow") do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_ready_after_known_good_no_required_checks_diagnostic
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: "no required checks reported on the 'feature' branch\n",
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "READY", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_ready_after_known_good_no_checks_diagnostic_with_crlf
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: "no checks reported on the 'feature' branch\r\n",
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "READY", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_unknown_when_no_checks_diagnostic_has_trailing_error_line
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: "no required checks reported on the 'feature' branch\nHTTP 503 while querying checks\n",
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_unknown_when_no_checks_diagnostic_has_same_line_suffix
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: "no required checks reported on the 'feature' branch; HTTP 503 while querying checks\n",
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_unknown_without_exception_for_invalid_stderr_byte
+    invalid_stderr = "no required checks reported on the 'feat".b + "\xFF".b + "ure' branch\n".b
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: invalid_stderr,
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
+    end
+  end
+
+  def test_requested_hosted_success_is_unknown_for_malformed_non_utf8_stderr_sequence
+    malformed_stderr = "no required checks reported on the 'feat".b + "\xC3\x28".b + "ure' branch\n".b
+    with_fake_gh(
+      required_json: "",
+      full_json: "[]",
+      check_stderr: malformed_stderr,
+      check_status: 1,
+      pr_head: "abc123",
+      runs: {
+        "42" => {
+          run: { "id" => 42, "name" => "hosted", "head_sha" => "abc123", "status" => "completed",
+                 "conclusion" => "success", "html_url" => "https://example.test/runs/42" },
+          jobs: []
+        }
+      }
+    ) do |env|
+      out, status = run_script(env, "123", "--repo", "owner/repo", "--requested-hosted-run", "42")
+      assert status.success?, out
+      assert_equal "UNKNOWN", JSON.parse(out)["verdict"]
     end
   end
 

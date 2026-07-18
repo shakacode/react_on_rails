@@ -6,11 +6,13 @@
 # Encapsulates the repeated "is this PR's CI ready?" rule that is otherwise
 # restated in prose across pr-batch, adversarial-pr-review, and pr-processing:
 #
-#   1. Run `gh pr checks <PR> --required`. If it reports no usable required
-#      checks -- either no JSON at all, or only cancelled/superseded rows --
-#      fall back to the full `gh pr checks <PR>` list.
-#   2. An empty check list => UNKNOWN / not ready.
-#   3. Ignore superseded/cancelled rows (bucket "cancel").
+#   1. Run `gh pr checks <PR> --required`. If it reports no current required
+#      checks -- either no JSON at all, or only cancelled rows -- fall back to
+#      the full `gh pr checks <PR>` list while retaining required cancellations.
+#   2. No current rows or retained required cancellations => UNKNOWN / not ready.
+#   3. A required cancellation blocks as pending unless a non-cancel row with
+#      the same workflow and name proves supersession. Ignore other cancelled
+#      rows from the full advisory list.
 #   4. Otherwise READY only when no failing (bucket "fail") and no pending
 #      (bucket "pending") rows remain. Passing and skipping rows are fine.
 #   5. Inventory current-head PENDING review drafts visible to the current
@@ -34,7 +36,7 @@ module PrCiReadiness
 
   module_function
 
-  # Parse a `gh pr checks --json name,state,bucket,link` payload into rows.
+  # Parse a `gh pr checks --json name,state,bucket,link,workflow` payload into rows.
   # Blank or non-JSON input (e.g. gh's "no required checks" message) yields [].
   def parse_rows(raw)
     return [] if raw.nil? || raw.strip.empty?
@@ -45,18 +47,38 @@ module PrCiReadiness
     []
   end
 
-  # True when the raw payload holds a JSON array with at least one row that
-  # counts toward the gate. A required-check list made up entirely of cancelled
-  # rows would otherwise short-circuit the full-list fallback and then drop to
-  # zero active rows, producing a spurious UNKNOWN; treating it as "no usable
-  # checks" lets the caller fall back to the full list instead.
+  def json_array_payload?(raw)
+    JSON.parse(raw.to_s).is_a?(Array)
+  rescue JSON::ParserError
+    false
+  end
+
+  # True when the raw payload holds a JSON array with at least one current row.
+  # A required-check list made up entirely of cancelled rows still falls back
+  # so the full list can supply same-context supersession evidence.
   def usable_checks?(raw)
     !active_rows(parse_rows(raw)).empty?
   end
 
-  # Rows that count toward the gate: cancelled/superseded rows are dropped.
+  # Current rows that count toward a full/advisory gate. Required cancellations
+  # are reconciled separately so unrelated cancelled advisory noise stays out.
   def active_rows(rows)
     rows.reject { |row| row["bucket"].to_s == "cancel" }
+  end
+
+  def check_identity(row)
+    [row["workflow"].to_s, row["name"].to_s]
+  end
+
+  # Preserve required cancellations unless a current row with the exact same
+  # workflow/name identity supersedes them. Full-list cancellations are noise.
+  def readiness_rows(rows, required_used:, required_cancellations: [])
+    current_rows = active_rows(rows)
+    gate_rows = required_used ? rows : current_rows + required_cancellations
+    current_contexts = current_rows.map { |row| check_identity(row) }
+    gate_rows.reject do |row|
+      row["bucket"].to_s == "cancel" && current_contexts.include?(check_identity(row))
+    end
   end
 
   def failing_names(rows)
@@ -64,7 +86,7 @@ module PrCiReadiness
   end
 
   def pending_names(rows)
-    rows.select { |row| row["bucket"].to_s == "pending" }.map { |row| row["name"].to_s }
+    rows.select { |row| %w[cancel pending].include?(row["bucket"].to_s) }.map { |row| row["name"].to_s }
   end
 
   def verdict_for(rows, failing, pending)
@@ -78,8 +100,8 @@ module PrCiReadiness
   end
 
   # Build the normalized result hash from the captured check rows.
-  def assess(pr_number:, required_used:, rows:)
-    rows = active_rows(rows)
+  def assess(pr_number:, required_used:, rows:, required_cancellations: [])
+    rows = readiness_rows(rows, required_used:, required_cancellations:)
     failing = failing_names(rows)
     pending = pending_names(rows)
 
@@ -139,9 +161,12 @@ module PrCiReadiness
     Usage: pr-ci-readiness <pr-number> [options]
 
     Decide whether a PR's CI is ready to merge. Runs `gh pr checks <PR> --required`
-    first; when no usable required checks exist (no rows, or only cancelled rows),
-    falls back to the full `gh pr checks <PR>` list. An empty list is
-    UNKNOWN/not-ready. Cancelled/superseded rows are ignored.
+    first; when no current required checks exist (no rows, or only cancelled rows),
+    falls back to the full `gh pr checks <PR>` list. Required cancellations remain
+    pending unless a current check with the same workflow and name supersedes them.
+    Cancelled rows found only in the full advisory list are ignored. A truly empty
+    required and full check list is UNKNOWN/not-ready. An unavailable check-query
+    capability is also UNKNOWN and cannot be overridden by requested hosted runs.
     The PR is READY only when no failing or pending checks remain.
     Current-head PENDING review drafts visible to the current authenticated
     viewer also block readiness. The viewer-scoped inventory is paginated;
@@ -185,9 +210,10 @@ module PrCiReadiness
         }
       }
 
-    verdict is UNKNOWN when neither the required nor the full check list reports any
-    checks (cancelled rows do not count). required_used is true when the required
-    check list was non-empty and was used as the readiness gate.
+    verdict is UNKNOWN when neither check list supplies current rows or retained
+    required cancellation evidence. required_used is true when current required
+    rows were used directly; it remains false after full-list fallback even when a
+    required cancellation remains blocking evidence.
     With --requested-hosted-run and no usable required checks, the requested
     current-head runs are the gate instead of the full advisory check list.
 
@@ -265,43 +291,73 @@ module PrCiReadiness
     end
 
     # Fetch the required-check list first; fall back to the full list when the
-    # required form yields no rows. required_used flips to false on fallback.
+    # required form yields no current rows. required_used flips false on fallback.
     def assess(repo, pr_number, requested_hosted_runs:)
-      required_raw = fetch_checks(repo, pr_number, required: true)
+      required_fetch = fetch_checks(repo, pr_number, required: true)
+      required_raw = required_fetch.fetch(:raw)
+      required_query_known = required_fetch.fetch(:known_good)
+      full_query_known = nil
+      required_rows = PrCiReadiness.parse_rows(required_raw)
+      required_cancellations = required_rows.select { |row| row["bucket"].to_s == "cancel" }
       if PrCiReadiness.usable_checks?(required_raw)
-        rows = PrCiReadiness.parse_rows(required_raw)
+        rows = required_rows
         required_used = true
         requested_hosted_only = false
       elsif requested_hosted_runs.any?
         rows = []
         required_used = false
         requested_hosted_only = true
+        if required_cancellations.any?
+          full_fetch = fetch_checks(repo, pr_number, required: false)
+          full_rows = PrCiReadiness.parse_rows(full_fetch.fetch(:raw))
+          full_query_known = full_fetch.fetch(:known_good)
+          required_contexts = required_cancellations.map { |row| PrCiReadiness.check_identity(row) }
+          rows = PrCiReadiness.active_rows(full_rows).select do |row|
+            required_contexts.include?(PrCiReadiness.check_identity(row))
+          end
+        end
       else
-        rows = PrCiReadiness.parse_rows(fetch_checks(repo, pr_number, required: false))
+        full_fetch = fetch_checks(repo, pr_number, required: false)
+        rows = PrCiReadiness.parse_rows(full_fetch.fetch(:raw))
+        full_query_known = full_fetch.fetch(:known_good)
         required_used = false
         requested_hosted_only = false
       end
       result =
-        if requested_hosted_only
+        if requested_hosted_only && required_cancellations.empty?
           requested_hosted_base_result(pr_number)
         else
-          PrCiReadiness.assess(pr_number:, required_used:, rows:)
+          PrCiReadiness.assess(pr_number:, required_used:, rows:, required_cancellations:)
         end
+      query_evidence_known = required_query_known && full_query_known != false
+      result["verdict"] = "UNKNOWN" if !query_evidence_known && result["verdict"] == "READY"
       result = apply_requested_hosted_runs(result, repo, pr_number, requested_hosted_runs)
       apply_viewer_review_inventory(result, repo, pr_number)
     end
 
-    # `gh pr checks` exits non-zero when checks are failing/pending and also when
-    # no (required) checks exist, so the exit status is intentionally ignored;
-    # we inspect the captured stdout instead.
+    # `gh pr checks` exits non-zero for ordinary failing/pending checks and when
+    # no checks exist. JSON output and the established no-checks diagnostic are
+    # therefore known-good; other command/query failures remain distinguishable.
     def fetch_checks(repo, pr_number, required:)
       cmd = ["gh", "pr", "checks", pr_number.to_s, "--repo", repo]
       cmd << "--required" if required
-      cmd += ["--json", "name,state,bucket,link"]
-      # gh writes "no required checks..." to stderr when it exits non-zero; we
-      # inspect stdout only, so discard stderr to keep our output clean.
-      out, _status = Open3.capture2(*cmd, err: File::NULL)
-      out.to_s.force_encoding("UTF-8")
+      cmd += ["--json", "name,state,bucket,link,workflow"]
+      out, err, status = Open3.capture3(*cmd)
+      raw = out.to_s.force_encoding("UTF-8")
+      known_good = PrCiReadiness.json_array_payload?(raw) ||
+                   status.success? && raw.strip.empty? || no_checks_diagnostic?(err)
+      { raw:, known_good: }
+    end
+
+    def no_checks_diagnostic?(stderr)
+      replacement_occurred = false
+      normalized = stderr.to_s.dup.force_encoding(Encoding::UTF_8).scrub do
+        replacement_occurred = true
+        "\uFFFD"
+      end
+      return false if replacement_occurred
+
+      normalized.match?(/\Ano (?:required )?checks reported on the '[^\r\n]+' branch(?:\r?\n)?\z/)
     end
 
     def apply_requested_hosted_runs(result, repo, pr_number, requested_hosted_runs)
@@ -540,6 +596,7 @@ module PrCiReadiness
       [
         check_all_passing,
         check_failing,
+        check_required_cancellation,
         check_cancel_only,
         check_empty,
         check_parse_helpers
@@ -564,6 +621,15 @@ module PrCiReadiness
                                  ])
       ok = out["verdict"] == "NOT_READY" && out["failing"] == ["lint"] && out["pending"].empty?
       ok ? [] : ["failing did not yield NOT_READY (lint)"]
+    end
+
+    def check_required_cancellation
+      out = PrCiReadiness.assess(pr_number: 1, required_used: true, rows: [
+                                   { "workflow" => "CI", "name" => "unit", "bucket" => "pass" },
+                                   { "workflow" => "Security", "name" => "security", "bucket" => "cancel" }
+                                 ])
+      ok = out["verdict"] == "NOT_READY" && out["pending"] == ["security"]
+      ok ? [] : ["distinct required cancellation did not yield NOT_READY (security)"]
     end
 
     def check_cancel_only

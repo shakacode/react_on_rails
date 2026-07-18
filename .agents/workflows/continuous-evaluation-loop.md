@@ -18,8 +18,13 @@ role, not a maker role.
   GPT-5.6 profile, use these QA routes:
   - Independent adversarial QA: Sol/xhigh
   - Routine deterministic QA: Sol/high
+    Under the provisional Claude profile (`claude-profile v0`), use these QA
+    routes:
+  - Independent adversarial QA: Opus 4.8/xhigh
+  - Routine deterministic QA: Opus 4.8/high
     Terra may collect mechanical evidence but may not issue the qualifying
-    intent-achievement or final-risk verdict. If exact-policy checker model,
+    intent-achievement or final-risk verdict; the same limit applies to Sonnet
+    under the Claude profile. If exact-policy checker model,
     binding, or effort is mismatched, unavailable, below policy, or `UNKNOWN`, report
     `checker_route_compliance: UNKNOWN|failed` and do not return a clean/`realized`
     verdict. Without an exact-checker policy, preserve unavailable model/effort or
