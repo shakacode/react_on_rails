@@ -906,6 +906,15 @@ module FleetValidation
     def evaluate_staleness(default_commit_at)
       commit_time = Time.iso8601(default_commit_at.to_s)
       age_days = ((Time.iso8601(@generated_at) - commit_time) / 86_400).floor
+      if age_days.negative?
+        return {
+          "status" => "unknown",
+          "age_days" => age_days,
+          "max_age_days" => @max_default_age_days,
+          "evidence" => "#{default_commit_at}; generated_at=#{@generated_at}; future default commit timestamp"
+        }
+      end
+
       {
         "status" => age_days <= @max_default_age_days ? "passed" : "blocked",
         "age_days" => age_days,

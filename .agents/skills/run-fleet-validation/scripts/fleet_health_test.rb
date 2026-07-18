@@ -130,6 +130,23 @@ class FleetHealthTest < Minitest::Test
     assert_equal ["sanitized-active-drifted"], evidence.dig("aggregate", "blocking_targets")
   end
 
+  def test_future_default_commit_timestamp_is_unknown_instead_of_fresh
+    observations = Marshal.load(Marshal.dump(@observations))
+    observations.fetch("sanitized-active-current")["default_commit_at"] = "2026-07-19T12:00:00Z"
+
+    evidence = @contract.evaluate(
+      observations:,
+      registry_artifacts: stable_registry_artifacts
+    )
+    current = target(evidence, "sanitized-active-current")
+
+    assert_equal "unknown", current.dig("staleness", "status")
+    assert_equal(-1, current.dig("staleness", "age_days"))
+    assert_includes current.dig("staleness", "evidence"), "future default commit timestamp"
+    assert_includes current.fetch("findings"), "staleness"
+    assert_equal "blocked", current.fetch("status")
+  end
+
   def test_report_only_target_retains_required_review_app_drift_without_blocking
     manifest = Marshal.load(Marshal.dump(@manifest))
     report_only = manifest.fetch("repos").find { |repo| repo["name"] == "sanitized/report-only" }
