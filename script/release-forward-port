@@ -172,7 +172,8 @@ class ReleaseForwardPort
 
       Default mode forward-ports commits that are on a release branch but not on the target
       branch. The helper cherry-picks with -x, skips commits already forward-ported with -x
-      evidence or patches present in the target tree, and excludes RC version bump commits.
+      evidence or patches present in the target tree, and excludes RC version bump and
+      changelog-only commits.
 
       --changelog mode runs a separate CHANGELOG.md reconciliation pass instead of the
       cherry-pick loop: it collapses every release-branch entry (each rc.N section plus
@@ -272,6 +273,10 @@ class ReleaseForwardPort
   end
 
   def special_skip_reason(sha, subject, target, target_version)
+    if changed_paths_for_commit(sha) == [CHANGELOG_FILE]
+      return "changelog-only commit; use --changelog reconciliation to re-home release entries under [Unreleased]"
+    end
+
     return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
       rc_version_bump?(subject)
 

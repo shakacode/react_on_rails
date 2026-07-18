@@ -295,12 +295,19 @@ git fetch origin
 git checkout main
 git pull --rebase
 
-# Inspect the plan first. Expect fix/CHANGELOG commits to be PICK and
-# Bump version commits to be SKIP.
+# Inspect the plan first. Expect fix commits to be PICK and pure CHANGELOG/version-bump
+# commits to be SKIP; changelog content is handled by the reconciliation pass below.
 script/release-forward-port --source origin/release/17.0.0 --target main --dry-run
 
 # Apply the same plan. The helper checks out the local target branch and cherry-picks with -x.
 script/release-forward-port --source origin/release/17.0.0 --target main
+
+# Preview, then re-home all release changelog entries under main's [Unreleased].
+script/release-forward-port --source origin/release/17.0.0 --target main --changelog --dry-run
+script/release-forward-port --source origin/release/17.0.0 --target main --changelog
+git diff --check
+git add CHANGELOG.md
+git commit -m "Reconcile X.Y.Z release changelog on main"
 git push   # or open a PR if main is protected / the fix needs review on main
 ```
 
@@ -311,6 +318,9 @@ git push   # or open a PR if main is protected / the fix needs review on main
   `git revert` of the matching target commit.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
+- Pure `CHANGELOG.md` stamp commits are skipped in code mode. After the code picks finish, run the
+  separate `--changelog` dry-run and apply commands shown above; that pass de-duplicates release entries
+  into `main`'s `[Unreleased]` section and removes RC-header residue from mixed code/changelog picks.
 - Known limitation: the "already forward-ported" skip still starts from history evidence. If a later
   target commit quotes the exact `(cherry picked from commit <sha>)` footer in its message body, that can
   look like `-x` evidence. Standard `git revert` commits of the footer-bearing target commit prevent the

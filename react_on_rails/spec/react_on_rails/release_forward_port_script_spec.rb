@@ -279,6 +279,21 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "defers changelog-only commits to the reconciliation pass" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1.rc.1]\n- Release fix\n")
+      changelog_sha = commit_all(repo, "Update changelog for 1.0.1.rc.1")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{changelog_sha[0, 12]} Update changelog for 1.0.1.rc.1")
+      expect(stdout).to include("changelog-only commit; use --changelog reconciliation")
+    end
+  end
+
   it "prints usage without a stack trace for argument errors" do
     _stdout, stderr, status = run_script_from_repo_root("--bogus")
 
