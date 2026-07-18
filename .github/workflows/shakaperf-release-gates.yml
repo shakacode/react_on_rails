@@ -1,10 +1,13 @@
+---
 name: ShakaPerf Release Gates
-run-name: ShakaPerf Release Gates — ${{ inputs.target_version }} on ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
+run-name: >-
+  ShakaPerf Release Gates — ${{ inputs.target_version }} on
+  ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
 
 permissions:
   contents: read
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       target_version:
@@ -22,11 +25,14 @@ concurrency:
 
 jobs:
   candidate:
-    name: Validate ${{ inputs.target_version }} on ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
+    name: >-
+      Validate ${{ inputs.target_version }} on ${{ github.ref_name }} @
+      ${{ inputs.candidate_sha }}
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     outputs:
-      runtime_tree_fingerprint: ${{ steps.candidate.outputs.runtime_tree_fingerprint }}
+      runtime_tree_fingerprint: >-
+        ${{ steps.candidate.outputs.runtime_tree_fingerprint }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,8 +59,12 @@ jobs:
           load "rakelib/release.rake"
 
           candidate_sha = ENV.fetch("CANDIDATE_SHA")
-          current_sha = current_git_sha!(Dir.pwd, context: "validating ShakaPerf candidate")
-          abort "Candidate SHA #{candidate_sha} no longer matches workflow HEAD #{current_sha}." \
+          current_sha = current_git_sha!(
+            Dir.pwd,
+            context: "validating ShakaPerf candidate"
+          )
+          abort "Candidate SHA #{candidate_sha} no longer matches " \
+                "workflow HEAD #{current_sha}." \
             unless candidate_sha == current_sha
 
           target_version = ENV.fetch("TARGET_VERSION")
@@ -71,33 +81,48 @@ jobs:
             head_sha: candidate_sha
           )
           prepared_version = prepared_candidate&.fetch(:target_version)
-          unless target_version == current_version || target_version == prepared_version
-            abort "Target version #{target_version} is neither the checked-in version " \
-                  "#{current_version} nor the prepared changelog version #{prepared_version || 'none'}."
+          unless target_version == current_version ||
+                 target_version == prepared_version
+            abort "Target version #{target_version} is neither " \
+                  "the checked-in version #{current_version} nor " \
+                  "the prepared changelog version " \
+                  "#{prepared_version || 'none'}."
           end
 
-          fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root: Dir.pwd, sha: candidate_sha)
-          abort "Unable to fingerprint ShakaPerf candidate #{candidate_sha}." unless fingerprint
+          fingerprint = shakaperf_runtime_tree_fingerprint(
+            monorepo_root: Dir.pwd,
+            sha: candidate_sha
+          )
+          abort "Unable to fingerprint ShakaPerf candidate " \
+                "#{candidate_sha}." \
+            unless fingerprint
 
           File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |output|
             output.puts "runtime_tree_fingerprint=#{fingerprint}"
           end
           File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") do |summary|
-            summary.puts "Testing #{target_version} on #{ENV.fetch('RELEASE_BRANCH')} at #{candidate_sha}."
+            summary.puts(
+              "Testing #{target_version} on " \
+              "#{ENV.fetch('RELEASE_BRANCH')} at #{candidate_sha}."
+            )
             summary.puts "Runtime tree fingerprint: `#{fingerprint}`"
           end
           RUBY
 
   rsc-fouc:
-    name: RSC FOUC gate for ${{ inputs.target_version }} @ ${{ inputs.candidate_sha }}
+    name: >-
+      RSC FOUC gate for ${{ inputs.target_version }} @
+      ${{ inputs.candidate_sha }}
     needs: candidate
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
       RAILS_ENV: test
       NODE_ENV: test
-      # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
-      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc  # gitleaks:allow
+      # Dummy value for RAILS_ENV=test; no real credentials are encrypted or
+      # persisted.
+      SECRET_KEY_BASE: >- # gitleaks:allow
+        dummy-secret-key-base-for-shakaperf-rsc-fouc
       SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
       SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
     steps:
@@ -110,10 +135,13 @@ jobs:
 
       - name: Check Pro license secret
         env:
-          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+          REACT_ON_RAILS_PRO_LICENSE: >-
+            ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
         run: |
           if [[ -z "${REACT_ON_RAILS_PRO_LICENSE}" ]]; then
-            echo "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set; cannot run the Pro dummy app ShakaPerf gate"
+            echo \
+              "::error::REACT_ON_RAILS_PRO_LICENSE_V2 secret is not set;" \
+              "cannot run the Pro dummy app ShakaPerf gate"
             exit 1
           fi
 
@@ -126,7 +154,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Latest Node comes from .tool-versions; pinned below the Node startup regression.
+          # Latest Node comes from .tool-versions; pinned below the Node startup
+          # regression.
           # https://github.com/nodejs/node/issues/56010
           node-version-file: .tool-versions
 
@@ -181,7 +210,8 @@ jobs:
       - name: Prepare Pro dummy app
         working-directory: react_on_rails_pro/spec/dummy
         env:
-          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+          REACT_ON_RAILS_PRO_LICENSE: >-
+            ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
         run: |
           bundle exec rake react_on_rails:generate_packs
           pnpm run build:test
@@ -202,7 +232,8 @@ jobs:
       - name: Start Pro dummy app
         shell: bash
         env:
-          REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
+          REACT_ON_RAILS_PRO_LICENSE: >-
+            ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
           NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           set -euo pipefail
@@ -210,12 +241,17 @@ jobs:
           mkdir -p "$RUNNER_TEMP/shakaperf-logs"
 
           cd react_on_rails_pro/spec/dummy
-          RENDERER_PORT=3800 pnpm run node-renderer > "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" 2>&1 &
+          RENDERER_PORT=3800 \
+            pnpm run node-renderer \
+            > "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" 2>&1 &
           node_renderer_pid="$!"
           echo "$node_renderer_pid" > "$RUNNER_TEMP/shakaperf-node-renderer.pid"
 
-          # RSCPostsPageOverHTTP fetches http://localhost:3000/api/... inside the node renderer.
-          PORT=3000 REACT_RENDERER_URL=http://127.0.0.1:3800 bundle exec rails s -b 127.0.0.1 -p 3000 \
+          # RSCPostsPageOverHTTP fetches http://localhost:3000/api/... inside
+          # the node renderer.
+          PORT=3000 \
+            REACT_RENDERER_URL=http://127.0.0.1:3800 \
+            bundle exec rails s -b 127.0.0.1 -p 3000 \
             > "$RUNNER_TEMP/shakaperf-logs/rails.log" 2>&1 &
           rails_pid="$!"
           echo "$rails_pid" > "$RUNNER_TEMP/shakaperf-rails.pid"
@@ -263,19 +299,25 @@ jobs:
 
           for attempt in {1..60}; do
             echo "Waiting for RSC FOUC probe server (${attempt}/60)..."
-            # /info proves the renderer socket responds, /empty proves Rails responds,
+            # /info proves the renderer socket responds, /empty proves Rails
+            # responds,
             # and the RSC page proves both sides are warm enough for the gate.
             if probe_renderer_info &&
-              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
-              curl --connect-timeout 2 --max-time 5 -fsS "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" > /dev/null
+              curl --connect-timeout 2 --max-time 5 -fsS \
+                "$SHAKAPERF_CONTROL_URL/empty" > /dev/null &&
+              curl --connect-timeout 2 --max-time 5 -fsS \
+                "$SHAKAPERF_CONTROL_URL/rsc_posts_page_over_http" \
+                > /dev/null
             then
-              # All probes are up; exit this step and leave the background servers running for ShakaPerf.
+              # All probes are up; exit this step and leave the background
+              # servers running for ShakaPerf.
               exit 0
             fi
 
             if ! kill -0 "$node_renderer_pid" 2>/dev/null; then
               echo "::error::Node renderer died before becoming ready"
-              tail -n 100 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
+              tail -n 100 \
+                "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
               exit 1
             fi
 
@@ -288,19 +330,25 @@ jobs:
             sleep 2
           done
 
-          echo "::error::Timed out waiting for renderer /info, $SHAKAPERF_CONTROL_URL/empty, and /rsc_posts_page_over_http"
+          echo \
+            "::error::Timed out waiting for renderer /info," \
+            "$SHAKAPERF_CONTROL_URL/empty, and" \
+            "/rsc_posts_page_over_http"
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/node-renderer.log" || true
           tail -n 200 "$RUNNER_TEMP/shakaperf-logs/rails.log" || true
           exit 1
 
       - name: Run RSC FOUC ShakaPerf gate
         run: |
-          # This release gate compares the candidate app with itself. The assertions
-          # in the abtest are absolute, so they fail even when both sides are broken.
+          # This release gate compares the candidate app with itself. The
+          # assertions in the abtest are absolute, so they fail even when both
+          # sides are broken.
+          filter_path="test/shakaperf/rsc-fouc/ab-tests"
+          filter_path+="/rsc-fouc-release-gate.abtest.ts"
           pnpm exec shaka-perf compare \
             --categories visreg \
             --config test/shakaperf/rsc-fouc/abtests.config.ts \
-            --filter test/shakaperf/rsc-fouc/ab-tests/rsc-fouc-release-gate.abtest.ts \
+            --filter "$filter_path" \
             --controlURL "$SHAKAPERF_CONTROL_URL" \
             --experimentURL "$SHAKAPERF_EXPERIMENT_URL" \
             --full-report-zip
@@ -325,7 +373,9 @@ jobs:
         if: always()
         shell: bash
         run: |
-          for pidfile in "$RUNNER_TEMP/shakaperf-rails.pid" "$RUNNER_TEMP/shakaperf-node-renderer.pid"; do
+          for pidfile in \
+            "$RUNNER_TEMP/shakaperf-rails.pid" \
+            "$RUNNER_TEMP/shakaperf-node-renderer.pid"; do
             if [ -f "$pidfile" ]; then
               kill "$(cat "$pidfile")" 2>/dev/null || true
             fi
@@ -347,7 +397,8 @@ jobs:
           RELEASE_BRANCH: ${{ github.ref_name }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           RUN_ID: ${{ github.run_id }}
-          RUNTIME_TREE_FINGERPRINT: ${{ needs.candidate.outputs.runtime_tree_fingerprint }}
+          RUNTIME_TREE_FINGERPRINT: >-
+            ${{ needs.candidate.outputs.runtime_tree_fingerprint }}
           TARGET_VERSION: ${{ inputs.target_version }}
         run: |
           ruby -rjson -rtime <<'RUBY'
@@ -355,7 +406,9 @@ jobs:
             schema_version: 2,
             run_attempt: Integer(ENV.fetch("RUN_ATTEMPT"), 10),
             run_id: Integer(ENV.fetch("RUN_ID"), 10),
-            run_url: "https://github.com/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('RUN_ID')}",
+            run_url: "https://github.com/" \
+                     "#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/" \
+                     "#{ENV.fetch('RUN_ID')}",
             branch: ENV.fetch("RELEASE_BRANCH"),
             candidate_sha: ENV.fetch("CANDIDATE_SHA"),
             target_version: ENV.fetch("TARGET_VERSION"),
@@ -363,7 +416,10 @@ jobs:
             runtime_tree_fingerprint: ENV.fetch("RUNTIME_TREE_FINGERPRINT"),
             completed_at: Time.now.utc.iso8601
           }
-          File.write("shakaperf-release-evidence.json", "#{JSON.pretty_generate(evidence)}\n")
+          File.write(
+            "shakaperf-release-evidence.json",
+            "#{JSON.pretty_generate(evidence)}\n"
+          )
           RUBY
 
       - name: Upload ShakaPerf release evidence

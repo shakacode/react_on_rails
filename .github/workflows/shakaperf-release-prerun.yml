@@ -1,10 +1,11 @@
+---
 name: Pre-run ShakaPerf Release Gates
 
 permissions:
   actions: write
   contents: read
 
-on:
+"on":
   push:
     branches:
       - 'release/**'
@@ -57,12 +58,17 @@ jobs:
           end
 
           summary = if candidate
-                      "Prepared #{candidate.fetch(:target_version)} on #{candidate.fetch(:branch)} " \
-                        "at #{candidate.fetch(:candidate_sha)}; dispatching ShakaPerf."
+                      "Prepared #{candidate.fetch(:target_version)} on " \
+                        "#{candidate.fetch(:branch)} at " \
+                        "#{candidate.fetch(:candidate_sha)}; " \
+                        "dispatching ShakaPerf."
                     else
-                      "CHANGELOG.md does not prepare the next version for this release branch; no gate dispatched."
+                      "CHANGELOG.md does not prepare the next version " \
+                        "for this release branch; no gate dispatched."
                     end
-          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") { |file| file.puts summary }
+          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") do |file|
+            file.puts summary
+          end
           RUBY
 
       - name: Dispatch ShakaPerf release gate
