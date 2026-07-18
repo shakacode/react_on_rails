@@ -58,7 +58,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
+2. Make sure you have **Node.js 20+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**. The default setup bundles Fastify 5, which requires Node.js 20+ — on Node.js 18 the renderer exits at startup unless you pin Fastify 4 via your package manager's dependency-override mechanism (npm [`overrides`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides), Yarn/Bun [`resolutions`](https://yarnpkg.com/configuration/manifest#resolutions), or pnpm [`pnpm.overrides`](https://pnpm.io/package_json#pnpmoverrides)). (The package's `engines.node` floor is `>=18.19.0`, which applies only to that Fastify 4 path.)
 3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
    npm init -y
