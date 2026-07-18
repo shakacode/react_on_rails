@@ -1,6 +1,6 @@
 ---
 name: run-fleet-validation
-description: Generate and coordinate the complete React on Rails release fleet lifecycle from internal/contributor-info/demo-fleet.yml. Use when a maintainer wants to validate the latest RC or beta, split fleet work across machines or agent sessions, inspect fleet progress, or run fail-closed release closeout from a durable result ledger.
+description: Generate and coordinate the complete React on Rails release fleet lifecycle or public-only standing-health evidence from internal/contributor-info/demo-fleet.yml. Use when a maintainer wants to validate an RC/beta/final, inspect fleet currency/default health, split release work across machines, or run fail-closed closeout.
 ---
 
 # Run Fleet Validation
@@ -12,7 +12,7 @@ Generate the prompt pack from the manifest instead of copying repository lists i
 From the React on Rails repository root, run:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
   --prompts 6 \
   --output-dir tmp/fleet-validation-prompts
@@ -40,6 +40,46 @@ candidate, reuse its existing generated files or create a fresh pack; regenerati
 prove that the dynamic selector still resolves to the same candidate. A changed candidate or
 policy/inventory manifest fails closed. Generate a fresh pack in a fresh output directory; one pack
 must never replace another pack's durable result ledger.
+
+## Generate public standing-health evidence
+
+Standing health is a sibling contract, not a shortened candidate closeout. It reads only manifest
+entries explicitly marked `standing_health.public: true` plus the manifest's archived public
+targets. It never queries or emits a non-public lane, never mutates a demo repository, and never
+turns archived or `soft_track` entries into blocking targets.
+
+The manifest's `standing_health.stable_release` and `standing_health.rsc_version` fields are the
+authoritative scheduled defaults:
+
+```bash
+GITHUB_TOKEN="$(gh auth token)" \
+  bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+    --live \
+    --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
+    --policy-commit "$(git rev-parse HEAD)" \
+    --output-dir tmp/fleet-health-stable
+```
+
+Pass `--release` and/or `--rsc-version` only for an intentional manual override.
+The command verifies both `react_on_rails` gems and all four unified-version npm packages, plus the
+independently versioned `react-on-rails-rsc`, before inspecting public default heads. It writes
+`fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`. Currency uses only direct
+root `DEPENDS_ON` packages from each public SPDX SBOM and rejects mixed direct versions; missing
+root identity fails closed. npm prereleases use the repository's dot-to-hyphen ecosystem
+normalization. CI remains exact-default-head. Reusable-smoke evidence requires a successful
+exact-head execution of the workflow that actually calls the shared contract; required commands
+must be nonblank and required stages must all succeed. PR-only review-app capability uses the exact
+`standing_health.review_app_workflow` public path and a recent `pull_request` run whose base branch,
+head branch, and head SHA agree with its public PR metadata. Staging, cleanup, delete, help, and
+promotion workflows never substitute for that path. GitHub archival of an active target is
+surfaced as blocking manifest drift. Active public targets block on missing, stale, failed, or
+unknown required evidence.
+Report-only and archived targets retain findings without blocking the aggregate. The scheduled
+`.github/workflows/demo-fleet-health.yml` run uploads the same three evidence files.
+
+The Dependabot v1 evaluation is deliberately narrow: the same enabled weekly root entry must
+provide Bundler/npm/GitHub Actions coverage, with React on Rails grouping on the qualifying gem/npm
+entry. Do not substitute a generic Renovate preset.
 
 ## Launch and coordinate
 
@@ -116,7 +156,7 @@ The independent checker validates the exact ledger and renders the append-only t
 that same file:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
   --expected-pack-id PACK_ID \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
@@ -171,7 +211,8 @@ audit also records replayable public-safe evidence.
 For the checked-in sanitized RC12 regression corpus:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 ```
 
 ## Validate changes to this skill
@@ -179,8 +220,10 @@ ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
 Run both checks after changing the generator or prompt contract:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts_test.rb
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts_test.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" \
   .agents/skills/run-fleet-validation
 ```

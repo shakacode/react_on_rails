@@ -1,0 +1,155 @@
+name: Demo fleet reusable smoke
+
+"on":
+  workflow_call:
+    inputs:
+      ruby-version:
+        description: Ruby version used by the caller repository
+        required: false
+        type: string
+        default: "3.3"
+      node-version:
+        description: Node.js version used by the caller repository
+        required: false
+        type: string
+        default: "22"
+      install-command:
+        description: Caller-owned dependency installation command
+        required: true
+        type: string
+      test-command:
+        description: Caller-owned test command; empty skips this step
+        required: false
+        type: string
+        default: ""
+      build-command:
+        description: Caller-owned build command
+        required: true
+        type: string
+      smoke-command:
+        description: Caller-owned local smoke command
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Demo fleet smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact caller head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74  # v1
+        with:
+          ruby-version: ${{ inputs['ruby-version'] }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs['node-version'] }}
+
+      - name: Validate required commands
+        id: validate
+        continue-on-error: true
+        env:
+          INSTALL_COMMAND: ${{ inputs['install-command'] }}
+          BUILD_COMMAND: ${{ inputs['build-command'] }}
+          SMOKE_COMMAND: ${{ inputs['smoke-command'] }}
+        run: |
+          ruby -e '
+            required = {
+              "install-command" => ENV.fetch("INSTALL_COMMAND"),
+              "build-command" => ENV.fetch("BUILD_COMMAND"),
+              "smoke-command" => ENV.fetch("SMOKE_COMMAND")
+            }
+            blank = required.filter_map { |name, command| name if command.strip.empty? }
+            abort("Required workflow commands are blank: #{blank.join(", ")}") unless blank.empty?
+          '
+
+      - name: Install dependencies
+        id: install
+        if: ${{ steps.validate.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          COMMAND: ${{ inputs['install-command'] }}
+        run: bash -lc "$COMMAND"
+
+      - name: Run tests
+        id: test
+        if: ${{ steps.validate.outcome == 'success' && inputs['test-command'] != '' }}
+        continue-on-error: true
+        env:
+          COMMAND: ${{ inputs['test-command'] }}
+        run: bash -lc "$COMMAND"
+
+      - name: Build application
+        id: build
+        if: ${{ steps.validate.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          COMMAND: ${{ inputs['build-command'] }}
+        run: bash -lc "$COMMAND"
+
+      - name: Run local smoke
+        id: smoke
+        if: ${{ steps.validate.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          COMMAND: ${{ inputs['smoke-command'] }}
+        run: bash -lc "$COMMAND"
+
+      - name: Write exact-head smoke evidence
+        if: always()
+        env:
+          HEAD_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          ruby -rjson -e '
+            outcomes = {
+              "validate" => ENV.fetch("VALIDATE_OUTCOME"),
+              "install" => ENV.fetch("INSTALL_OUTCOME"),
+              "test" => ENV.fetch("TEST_OUTCOME"),
+              "build" => ENV.fetch("BUILD_OUTCOME"),
+              "smoke" => ENV.fetch("SMOKE_OUTCOME")
+            }
+            required_passed = %w[validate install build smoke].all? do |step|
+              outcomes.fetch(step) == "success"
+            end
+            test_passed = %w[success skipped].include?(outcomes.fetch("test"))
+            evidence = {
+              "schema_version" => 1,
+              "repository" => ENV.fetch("REPOSITORY"),
+              "head_sha" => ENV.fetch("HEAD_SHA"),
+              "outcomes" => outcomes,
+              "status" => required_passed && test_passed ? "passed" : "blocked"
+            }
+            rendered = "#{JSON.pretty_generate(evidence)}\n"
+            File.write("fleet-smoke-evidence.json", rendered)
+          '
+
+      - name: Upload exact-head smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-smoke-evidence-${{ github.sha }}
+          path: fleet-smoke-evidence.json
+          if-no-files-found: error
+
+      - name: Enforce smoke result
+        if: always()
+        run: |
+          ruby -rjson -e '
+            evidence = JSON.parse(File.read("fleet-smoke-evidence.json"))
+            exit(evidence.fetch("status") == "passed" ? 0 : 1)
+          '

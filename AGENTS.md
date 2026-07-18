@@ -113,6 +113,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   release/capability preflight, balanced subagent-driven hard-gate prompts,
   report-only soft-track coverage, a durable result ledger/schema, independent
   audit, authorized merge, reachability/tree-parity proof, and tracker closeout.
+  The same skill also generates public-only standing-health packs that verify
+  stable artifact currency, exact-default-head CI/smoke, review-app capability,
+  default-branch staleness, and the evaluated Dependabot v1 policy without
+  mutating demo repositories.
 - Default simplify model: `claude-opus-4-8`
 
 ## External Flagship Demo Coordination

@@ -81,7 +81,7 @@ default, report-only soft-track coverage, a durable result ledger/schema, and in
 From the repository root, run:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
   --prompts 6 \
   --output-dir tmp/fleet-validation-prompts
@@ -140,11 +140,30 @@ independent audit, merge/reachability, or closeout. The generated pack does not 
 independent behavioral lanes in `release-verification-runbook.md` or the maintainer's final
 promotion decision.
 
+The standing-health implementation uses the same canonical manifest but a separate public-only
+schema and evidence pack:
+
+```bash
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  --live \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --policy-commit "$(git rev-parse HEAD)" \
+  --output-dir tmp/fleet-health-stable
+```
+
+The scheduled/default stable versions come from `standing_health.stable_release` and
+`standing_health.rsc_version` in the manifest. Pass explicit version flags only for a manual
+historical or forward-looking probe.
+Only explicitly public standing-health entries are queried. Active public targets gate the
+standing-health result; soft-track and archived targets are report-only. The evidence records
+exact-default-head currency, CI, reusable-smoke adoption, review-app capability, staleness, and
+Dependabot v1 conformance. It does not grant candidate promotion or mutate any demo.
+
 The checker validates one public-safe `result-ledger.json` and renders the append-only tracker
 matrix from that exact file:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
   --expected-pack-id PACK_ID \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \

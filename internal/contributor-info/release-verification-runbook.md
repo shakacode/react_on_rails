@@ -94,6 +94,39 @@ which detects drift between releases. Hosted-CI dispatch and generator-CI routin
 also dependencies, not substitutes: they shorten individual gates but do not own blocker
 identities, combined audit, merge authority, or promotion closeout.
 
+After stable publication, update `standing_health.stable_release` and `standing_health.rsc_version`
+in `demo-fleet.yml` and commit that manifest change. Generate evidence only from a clean working
+tree so the policy commit names the exact checked-in manifest:
+
+```bash
+test -z "$(git status --porcelain)" || {
+  echo "Commit the manifest and clean the working tree before generating fleet evidence." >&2
+  exit 1
+}
+POLICY_COMMIT="$(git rev-parse HEAD)"
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  --live \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --policy-commit "$POLICY_COMMIT" \
+  --output-dir tmp/fleet-health-stable
+```
+
+The command verifies those
+exact public registry artifacts across both gems, all four unified-version npm packages, and the
+independently versioned RSC package. Direct-lock currency comes only from root `DEPENDS_ON` SPDX
+relationships; mixed direct versions block and missing root identity fails closed. npm
+prereleases use ecosystem-normalized hyphen notation. Default CI stays bound to the public default
+head. Smoke passes only after the workflow containing the shared smoke contract succeeds for that
+exact head, with nonblank required commands and every required stage successful. PR-only
+review-app capability uses the exact `standing_health.review_app_workflow` public path and a recent
+`pull_request` run whose base branch, head branch, and head SHA agree with its PR metadata. Staging,
+cleanup, delete, help, and promotion workflows never substitute for that path. GitHub archival of
+an active target blocks as manifest drift. Dependabot requires one enabled weekly root entry per
+required ecosystem; separate disabled, non-root, or differently scheduled entries cannot combine
+into a pass. Keep soft-track and archived findings report-only. This pack is evidence for fleet
+currency and capability drift; it is not a replacement for the candidate ledger or a
+release-promotion signal.
+
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
 
