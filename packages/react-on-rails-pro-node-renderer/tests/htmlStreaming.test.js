@@ -229,12 +229,20 @@ describe('html streaming', () => {
     10000,
   );
 
-  it("shouldn't notify error reporter when throwJsErrors is false and shell error happens", async () => {
+  it('notifies the error reporter with the genuine render error when throwJsErrors is false and a shell error happens', async () => {
+    // Behavior change (#4629 / PR #4631 observability fix): RSC rendering errors now reach the
+    // error reporter (Sentry/Honeybadger) even with the default throwJsErrors:false, via the
+    // custom 'renderingError' stream event. Previously the reporter was never called on this path
+    // (this test asserted `.not.toHaveBeenCalled()`), so genuine production render failures were
+    // invisible to monitoring. The reported error is the real render failure, not a benign path.
     await makeRequest({
       props: { throwSyncError: true },
       // throwJsErrors is false by default
     });
-    expect(errorReporter.message).not.toHaveBeenCalled();
+    expect(errorReporter.message).toHaveBeenCalled();
+    expect(errorReporter.message).toHaveBeenCalledWith(
+      expect.stringMatching(/Rendering error in stream[\s\S.]*Sync error from AsyncComponentsTreeForTesting/),
+    );
   }, 10000);
 
   it('should notify error reporter when throwJsErrors is true and shell error happens', async () => {
@@ -288,12 +296,19 @@ describe('html streaming', () => {
     10000,
   );
 
-  it('should not notify error reporter when throwJsErrors is false and async error happens', async () => {
+  it('notifies the error reporter with the genuine render error when throwJsErrors is false and an async error happens', async () => {
+    // Behavior change (#4629 / PR #4631 observability fix): async RSC rendering errors now reach
+    // the error reporter even with throwJsErrors:false, via the custom 'renderingError' stream
+    // event. Previously this asserted `.not.toHaveBeenCalled()`. The reported error is the real
+    // async render failure, not a benign path.
     await makeRequest({
       props: { throwAsyncError: true },
       throwJsErrors: false,
     });
-    expect(errorReporter.message).not.toHaveBeenCalled();
+    expect(errorReporter.message).toHaveBeenCalled();
+    expect(errorReporter.message).toHaveBeenCalledWith(
+      expect.stringMatching(/Rendering error in stream[\s\S.]*Async error from AsyncHelloWorldHooks/),
+    );
   }, 10000);
 
   it('should notify error reporter when throwJsErrors is true and async error happens', async () => {

@@ -25,7 +25,7 @@ import m from 'module';
 import cluster from 'cluster';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
-import { promisify, TextEncoder } from 'util';
+import { promisify, TextEncoder, types as utilTypes } from 'util';
 import type { ReactOnRails as ROR } from 'react-on-rails' with { 'resolution-mode': 'import' };
 import type { Context } from 'vm';
 
@@ -612,23 +612,41 @@ export async function buildExecutionContext(
       });
 
       if (isReadableStream(result)) {
-        const reportedErrors = new WeakSet<Error>();
-        const reportStreamError = (error: Error, label: string) => {
-          if (reportedErrors.has(error)) return;
-          reportedErrors.add(error);
-          const msg = formatExceptionMessage({ renderingRequest }, error, label, remapStackTraceForRequest);
+        const reportedErrors = new WeakSet<object>();
+        // A stream error thrown inside the sandboxed VM realm is a genuine Error, but it
+        // fails the worker-realm `instanceof Error` check because it comes from a different
+        // realm's `Error.prototype`. Wrapping it in `new Error(String(error))` would discard
+        // its original message and stack (the whole point of reporting to Sentry/Honeybadger).
+        // Use a realm-agnostic check — `util.types.isNativeError` inspects the internal
+        // [[ErrorData]] slot, so it recognizes VM-realm Errors — plus a duck-type for
+        // error-like objects. Only truly non-Error throwables (strings, numbers, …) are
+        // wrapped, since those have no usable stack to preserve.
+        const isErrorLike = (value: unknown): value is { message?: string; stack?: string } => {
+          // eslint-disable-next-line @typescript-eslint/no-deprecated -- Error.isError (the suggested replacement) is not available until Node 23+; this package still supports Node 22, where util.types.isNativeError is the realm-agnostic native-Error check.
+          if (utilTypes.isNativeError(value)) return true;
+          if (typeof value !== 'object' || value === null) return false;
+          const { message, stack } = value as { message?: unknown; stack?: unknown };
+          return typeof stack === 'string' || typeof message === 'string';
+        };
+        const reportStreamError = (error: unknown, label: string) => {
+          const reportable: object = isErrorLike(error) ? error : new Error(String(error));
+          if (reportedErrors.has(reportable)) return;
+          reportedErrors.add(reportable);
+          const msg = formatExceptionMessage(
+            { renderingRequest },
+            reportable,
+            label,
+            remapStackTraceForRequest,
+          );
           errorReporter.message(msg);
         };
 
-        result.on('renderingError', (error: Error) => {
+        result.on('renderingError', (error: unknown) => {
           reportStreamError(error, 'Rendering error in stream');
         });
 
         const newStreamAfterHandlingError = handleStreamError(result, (error) => {
-          reportStreamError(
-            error instanceof Error ? error : new Error(String(error)),
-            'Error in a rendering stream',
-          );
+          reportStreamError(error, 'Error in a rendering stream');
         });
         return newStreamAfterHandlingError;
       }
