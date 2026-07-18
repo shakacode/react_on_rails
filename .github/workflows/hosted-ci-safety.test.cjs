@@ -226,17 +226,17 @@ assertMatches(
 
 const gemMatrixScript = extractRunScript(gemTestsWorkflow, 'Set gem tests matrix');
 const latestUnit = { 'ruby-version': '3.4', 'dependency-level': 'latest', shard: 'unit' };
-const latestGenerators = {
+const latestGenerators = ['generators-1', 'generators-2', 'generators-3'].map((shard) => ({
   'ruby-version': '3.4',
   'dependency-level': 'latest',
-  shard: 'generators',
-};
+  shard,
+}));
 const minimumUnit = { 'ruby-version': '3.2', 'dependency-level': 'minimum', shard: 'unit' };
-const minimumGenerators = {
+const minimumGenerators = ['generators-1', 'generators-2', 'generators-3'].map((shard) => ({
   'ruby-version': '3.2',
   'dependency-level': 'minimum',
-  shard: 'generators',
-};
+  shard,
+}));
 
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: false, generators: false }).include,
@@ -245,13 +245,51 @@ assert.deepEqual(
 );
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: false, generators: true }).include,
-  [latestGenerators, latestUnit],
-  'optimized generator PR matrix should keep the latest generator and unit shards',
+  [...latestGenerators, latestUnit],
+  'optimized generator PR matrix should keep three latest generator subshards and the latest unit shard',
 );
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: true, generators: false }).include,
-  [latestGenerators, latestUnit, minimumGenerators, minimumUnit],
-  'main, merge-group, release-target, and force-full matrices should retain both dependency levels and shards',
+  [...latestGenerators, latestUnit, ...minimumGenerators, minimumUnit],
+  'main, merge-group, release-target, and force-full matrices should retain both unit rows and three generator subshards per dependency level',
+);
+
+const gemRspecScript = extractRunScript(gemTestsWorkflow, 'Run rspec tests');
+assertMatches(
+  'generator subshards use stable RSpec scoped IDs',
+  gemRspecScript,
+  /metadata\.fetch\(:rerun_file_path\)[\s\S]*metadata\.fetch\(:scoped_id\)/,
+);
+assertMatches(
+  'generator subshards keep context-hook setup atomic',
+  gemRspecScript,
+  /all_hooks_for, position, :context[\s\S]*atomic_unit_by_id/,
+);
+assertMatches(
+  'generator subshards use a deterministic head-local tie break',
+  gemRspecScript,
+  /Digest::SHA256\.hexdigest\(unit_id\)/,
+);
+assertMatches(
+  'generator subshards balance examples and shared setup units',
+  gemRspecScript,
+  /weight_by_unit = units\.to_h[\s\S]*rows\.length \+ setup_count_by_unit\.fetch\(unit_id, 0\)/,
+);
+assertMatches(
+  'generator subshards reject duplicate scoped IDs',
+  gemRspecScript,
+  /ids\.uniq\.length == ids\.length/,
+);
+assertMatches(
+  'unit shard retains generator exclusion',
+  gemRspecScript,
+  /bundle exec rspec spec\/react_on_rails --exclude-pattern "\*\*\/generators\/\*\*"/,
+);
+assertDoesNotMatch('generator subshards avoid brittle line-number selection', gemRspecScript, /line_number/);
+assertDoesNotMatch(
+  'generator subshards do not split shared setup by leaf-example hash',
+  gemRspecScript,
+  /Digest::SHA256\.hexdigest\(id\)\.to_i\(16\) % shard_count/,
 );
 
 assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);
