@@ -711,6 +711,24 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "independent audit maker identities do not cover every mutable target"
   end
 
+  def test_independent_audit_rejects_blank_maker_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item["maker_id"] = "   "
+    end
+    ledger.fetch("audit")["maker_ids"] = ["   "]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities contain blank values"
+  end
+
   def test_closeout_requires_identified_checker_and_makers
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -788,6 +806,60 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "release-wide preflight artifacts is not passed or explicitly waived"
+  end
+
+  def test_owned_preflight_blocker_can_close_without_opening_the_app_work_barrier
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger.fetch("pack").merge!(
+      "candidate" => "v17.0.0.rc.12",
+      "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tracker_mode" => "strict-rc",
+      "resolved_packages" => resolved_packages(generator)
+    )
+    ledger.fetch("preflight").merge!(
+      "status" => "blocked",
+      "app_work_allowed" => false,
+      "blocker_id" => "artifact-blocker",
+      "blocker_evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger.fetch("preflight").fetch("artifacts").merge!(
+      "status" => "blocked",
+      "evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "artifact-blocker",
+        "status" => "open",
+        "public_summary" => "Published candidate artifacts are incoherent",
+        "owner" => { "issue_url" => "https://example.invalid/issues/artifact-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("audit").merge!(
+      "status" => "passed",
+      "checker" => "independent-checker",
+      "maker_ids" => [],
+      "evidence" => "public-safe blocked-preflight audit"
+    )
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
+    ledger.fetch("tracker").merge!("status" => "ready", "promotion" => "blocked")
+
+    schema_errors = FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+    semantic_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_empty schema_errors
+    assert_empty semantic_errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
   end
 
   def test_published_artifact_defects_cannot_be_waived
@@ -1296,6 +1368,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_report_only_targets_require_retained_package_lock_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["package_locks"] = []
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) are missing retained package lock evidence"
   end
 
   def test_resolved_product_versions_must_match_the_selected_candidate
@@ -1857,6 +1944,24 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert(errors.any? { |error| error.include?("check evidence is not bound to its immutable current head") })
+  end
+
+  def test_report_only_checks_must_have_terminal_current_head_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("checks").each_value do |check|
+      check.merge!("status" => "unknown", "head_commit" => nil, "evidence" => nil)
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 report-only target(s) have unknown or stale check evidence"
   end
 
   def test_sanitized_rc12_replay_exercises_inventory_barriers_ownership_and_tracker_regeneration

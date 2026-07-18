@@ -72,6 +72,12 @@ it must never be relabeled as passed or waived merely to satisfy closeout. Waive
 blockers require structured authority, evidence URL, and reason fields in addition to any durable
 owner.
 
+An owned release-wide preflight defect may also close the candidate as `BLOCKED` without fabricating
+an app run. Keep `APP_WORK_ALLOWED` false, retain the preflight blocker ID and public-safe evidence,
+leave every app target untouched, record no maker identities in the independent audit, and mark
+aggregate merge/reachability plus tracker promotion blocked. Report-only targets that do run must
+retain their inspected package versions/sources and terminal exact-head check evidence.
+
 This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
 which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are
 also dependencies, not substitutes: they shorten individual gates but do not own blocker

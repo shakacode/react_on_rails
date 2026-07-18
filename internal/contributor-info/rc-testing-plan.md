@@ -97,6 +97,13 @@ per assigned target. With the default partition, no coordinator receives more th
 targets. Run each prompt as a separate top-level task; do not place all six under one shared
 four-slot agent tree.
 
+If the release-wide preflight finds an owned terminal blocker, do not manufacture passing app
+results to finish the ledger. Keep `APP_WORK_ALLOWED` false, retain the blocker ID and public-safe
+evidence, leave every app target untouched, audit the blocked disposition with no maker IDs, and
+close aggregate merge/reachability and promotion as blocked. When report-only tracks do run, their
+closeout evidence includes retained package versions/sources and terminal checks bound to the exact
+inspected head; `pending` or `unknown` is not a completed report.
+
 Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
 versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
 five prompts may start simultaneously but must wait for that exact marker before mutation. This

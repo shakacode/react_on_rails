@@ -70,6 +70,8 @@ module FleetValidation
           "app_work_allowed" => false,
           "opened_at" => nil,
           "waiver" => nil,
+          "blocker_id" => nil,
+          "blocker_evidence" => nil,
           "release_ci" => { "status" => "pending", "evidence" => nil },
           "artifacts" => { "status" => "pending", "evidence" => nil },
           "generator_matrix" => { "status" => "pending", "evidence" => nil },
@@ -287,7 +289,8 @@ module FleetValidation
 
     def preflight_schema
       fields = %w[
-        status app_work_allowed opened_at waiver release_ci artifacts generator_matrix capabilities
+        status app_work_allowed opened_at waiver blocker_id blocker_evidence release_ci artifacts
+        generator_matrix capabilities
       ]
       object_schema(
         fields,
@@ -296,6 +299,8 @@ module FleetValidation
           "app_work_allowed" => { "type" => "boolean" },
           "opened_at" => nullable_string,
           "waiver" => waiver_schema,
+          "blocker_id" => nullable_string,
+          "blocker_evidence" => nullable_string,
           "release_ci" => preflight_gate_schema,
           "artifacts" => preflight_gate_schema,
           "generator_matrix" => preflight_gate_schema,
@@ -613,6 +618,11 @@ module FleetValidation
         `preflight.app_work_allowed` to `true`; that schema-validated state is the ledger's explicit
         `APP_WORK_ALLOWED` marker. Every mutable target records `work_started_at`, which must be later
         than the barrier time. The validation-only monorepo generator gate may run before this marker.
+        If an owned release-wide blocker makes opening the barrier impossible, close the pack with
+        `preflight.status: blocked`, a durable `preflight.blocker_id`, public-safe
+        `preflight.blocker_evidence`, and `APP_WORK_ALLOWED` still false. In that terminal path every
+        app target remains untouched, the independent audit records no maker IDs, and aggregate
+        merge/reachability plus tracker promotion remain blocked.
 
         Before worker launch, record a machine/session capability attestation covering
         nonblocking permissions, Git and GitHub authentication, registry/network access, required toolchains,
@@ -629,7 +639,9 @@ module FleetValidation
         <<~ROW.chomp
           - `#{target.fetch('id')}` — Report only; do not mutate.
             Inspect the fresh default, current package locks, standing CI/smoke metadata, and archived or deferred disposition.
-            Record `reported`, `blocked`, `waived`, or `unknown` plus public-safe evidence in the shared ledger.
+            Retain the inspected package versions/sources and exact-head check evidence. Record
+            `reported`, `blocked`, or `waived` plus public-safe evidence in the shared ledger;
+            `pending` or `unknown` cannot close the pack.
         ROW
       end
 
@@ -749,6 +761,20 @@ module FleetValidation
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
+      if @closeout && preflight_blocked?
+        result.concat(blocker_identity_errors)
+        result.concat(blocker_owner_errors)
+        result.concat(blocker_reference_errors)
+        result.concat(preflight_errors)
+        result.concat(pack_identity_errors)
+        result.concat(blocked_preflight_state_errors)
+        result.concat(independent_audit_errors)
+        result << "independent audit is not passed" unless @ledger.dig("audit", "status") == "passed"
+        result.concat(tracker_errors)
+        result << promotion_error if promotion_error
+        return result
+      end
+
       result.concat(required_path_errors) if @closeout
       result.concat(blocker_identity_errors) if @closeout
       result.concat(blocker_owner_errors) if @closeout
@@ -760,7 +786,7 @@ module FleetValidation
       result << work_state_result_error if @closeout && work_state_result_error
       result << package_lock_error if @closeout && package_lock_error
       result << package_version_error if @closeout && package_version_error
-      result << check_evidence_error if @closeout && check_evidence_error
+      result.concat(check_evidence_errors) if @closeout
       result.concat(revision_evidence_errors) if @closeout
       result.concat(waiver_evidence_errors) if @closeout
       result.concat(base_identity_errors) if @closeout
@@ -784,6 +810,10 @@ module FleetValidation
       Array(@ledger["inventory"]).any? do |item|
         item["work_mode"] == "mutation" && item["work_state"] != "not_started"
       end
+    end
+
+    def preflight_blocked?
+      @ledger.dig("preflight", "status") == "blocked"
     end
 
     def candidate_error
@@ -847,6 +877,7 @@ module FleetValidation
       end
       errors << "review app capability UNKNOWN for #{count} started target(s)" unless count.zero?
       return errors unless @closeout
+      return errors if preflight_blocked?
 
       Array(@ledger["inventory"]).each do |item|
         review_app = item.fetch("review_app", {})
@@ -865,6 +896,28 @@ module FleetValidation
                      blocked
                    end
         errors << "target #{item['id']} review-app smoke is not terminal" unless terminal
+      end
+      errors
+    end
+
+    def blocked_preflight_state_errors
+      errors = Array(@ledger["inventory"]).filter_map do |item|
+        expected_merge_status = item["work_mode"] == "mutation" ? "not_started" : "not_applicable"
+        untouched_checks = item.fetch("checks", {}).values.all? do |check|
+          check["status"] == "pending" && !present?(check["head_commit"]) && !present?(check["evidence"]) &&
+            check["waiver"].nil? && !present?(check["blocker_id"])
+        end
+        untouched = item["work_state"] == "not_started" && !present?(item["work_started_at"]) &&
+                    !present?(item["maker_id"]) && item["result"] == "pending" &&
+                    Array(item["package_locks"]).empty? && untouched_checks &&
+                    item.dig("merge", "status") == expected_merge_status && !present?(item["evidence"])
+        "blocked preflight target #{item['id']} contains app-work state" unless untouched
+      end
+      errors << "blocked preflight aggregate merge status must be blocked" unless @ledger.dig("merge", "status") == "blocked"
+      %w[default_branch tree_parity].each do |field|
+        unless @ledger.dig("reachability", field) == "blocked"
+          errors << "blocked preflight aggregate reachability #{field} must be blocked"
+        end
       end
       errors
     end
@@ -947,6 +1000,21 @@ module FleetValidation
 
     def preflight_errors
       preflight = @ledger.fetch("preflight", {})
+      if preflight["status"] == "blocked"
+        errors = []
+        errors << "blocked preflight must keep APP_WORK_ALLOWED closed" unless preflight["app_work_allowed"] == false
+        errors << "blocked preflight must not record an opened barrier" if present?(preflight["opened_at"])
+        errors << "blocked preflight is missing public-safe blocker evidence" unless present?(preflight["blocker_evidence"])
+        blocked_gate = %w[release_ci artifacts generator_matrix].any? do |field|
+          preflight.dig(field, "status") == "blocked" && present?(preflight.dig(field, "evidence"))
+        end
+        blocked_capability = preflight.fetch("capabilities", {}).any? do |field, status|
+          field != "restart_handoff" && status == "blocked"
+        end
+        errors << "blocked preflight has no explicitly blocked gate or capability" unless blocked_gate || blocked_capability
+        return errors
+      end
+
       waiver = preflight["status"] == "waived" ? preflight["waiver"] : nil
       errors = %w[release_ci generator_matrix].filter_map do |field|
         next if preflight_gate_passed?(preflight[field]) || valid_waiver?(waiver, field)
@@ -1046,22 +1114,25 @@ module FleetValidation
 
     def package_lock_error
       expected_by_id = @inventory.to_h { |target| [target.fetch("id"), Array(target["packages"])] }
-      count = Array(@ledger["inventory"]).count do |item|
-        next false unless item["tier"] == "hard_gate"
-
+      invalid_items = Array(@ledger["inventory"]).select do |item|
         locks = item["package_locks"]
-        malformed = !locks.is_a?(Array) || locks.empty? || locks.any? do |lock|
+        expected = expected_by_id.fetch(item["id"], []).map { |package| [package["ecosystem"], package["name"]] }
+        malformed = !locks.is_a?(Array) || (expected.any? && locks.empty?) || Array(locks).any? do |lock|
           %w[ecosystem name version source].any? { |field| !present?(lock[field]) }
         end
         next true if malformed
 
         actual = locks.map { |lock| [lock["ecosystem"], lock["name"]] }
-        expected = expected_by_id.fetch(item["id"], []).map { |package| [package["ecosystem"], package["name"]] }
         (expected - actual).any? || actual.tally.any? { |_identity, total| total > 1 }
       end
-      return if count.zero?
+      return if invalid_items.empty?
 
-      "#{count} hard-gate target(s) are missing retained package lock evidence"
+      hard_gate_count = invalid_items.count { |item| item["tier"] == "hard_gate" }
+      if hard_gate_count.positive?
+        "#{hard_gate_count} hard-gate target(s) are missing retained package lock evidence"
+      else
+        "#{invalid_items.length} inventory target(s) are missing retained package lock evidence"
+      end
     end
 
     def package_version_error
@@ -1080,22 +1151,28 @@ module FleetValidation
       "#{count} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
     end
 
-    def check_evidence_error
-      count = Array(@ledger["inventory"]).count do |item|
-        next false unless item["tier"] == "hard_gate"
-
+    def check_evidence_errors
+      invalid_items = Array(@ledger["inventory"]).select do |item|
         checks = item["checks"]
         current_head = item.dig("revisions", "current")
+        allowed_statuses = item["tier"] == "hard_gate" ? %w[passed blocked waived] : %w[passed reported blocked waived]
         !checks.is_a?(Hash) || %w[install build test local_smoke hosted_ci review].any? do |name|
           check = checks[name]
-          !check.is_a?(Hash) || !%w[passed blocked waived].include?(check["status"]) ||
+          !check.is_a?(Hash) || !allowed_statuses.include?(check["status"]) ||
             !present?(check["evidence"]) || !commit_identity?(check["head_commit"]) ||
             check["head_commit"] != current_head
         end
       end
-      return if count.zero?
-
-      "#{count} hard-gate target(s) check evidence is not bound to its immutable current head"
+      hard_gate_count = invalid_items.count { |item| item["tier"] == "hard_gate" }
+      report_only_count = invalid_items.count { |item| item["work_mode"] == "report_only" }
+      errors = []
+      if hard_gate_count.positive?
+        errors << "#{hard_gate_count} hard-gate target(s) check evidence is not bound to its immutable current head"
+      end
+      if report_only_count.positive?
+        errors << "#{report_only_count} report-only target(s) have unknown or stale check evidence"
+      end
+      errors
     end
 
     def revision_evidence_errors
@@ -1134,15 +1211,26 @@ module FleetValidation
       audit = @ledger.fetch("audit", {})
       errors = []
       audit_maker_ids = Array(audit["maker_ids"])
-      mutable_maker_ids = Array(@ledger["inventory"]).filter_map do |item|
+      raw_mutable_maker_ids = Array(@ledger["inventory"]).filter_map do |item|
         item["maker_id"] if item["work_mode"] == "mutation"
       end
       mutable_count = Array(@ledger["inventory"]).count { |item| item["work_mode"] == "mutation" }
       errors << "independent audit checker is missing" unless present?(audit["checker"])
-      errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
       errors << "independent audit evidence is missing" unless present?(audit["evidence"])
-      if mutable_maker_ids.length != mutable_count || mutable_maker_ids.uniq.sort != audit_maker_ids.uniq.sort
-        errors << "independent audit maker identities do not cover every mutable target"
+      if preflight_blocked?
+        unless raw_mutable_maker_ids.none? { |maker_id| present?(maker_id) } && audit_maker_ids.empty?
+          errors << "blocked preflight audit must not claim maker identities"
+        end
+      else
+        errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
+        if raw_mutable_maker_ids.any? { |maker_id| !present?(maker_id) } ||
+           audit_maker_ids.any? { |maker_id| !present?(maker_id) }
+          errors << "independent audit maker identities contain blank values"
+        end
+        mutable_maker_ids = raw_mutable_maker_ids.select { |maker_id| present?(maker_id) }
+        if mutable_maker_ids.length != mutable_count || mutable_maker_ids.uniq.sort != audit_maker_ids.uniq.sort
+          errors << "independent audit maker identities do not cover every mutable target"
+        end
       end
       if present?(audit["checker"]) && audit_maker_ids.include?(audit["checker"])
         errors << "independent audit checker is also a maker"
@@ -1171,6 +1259,13 @@ module FleetValidation
 
     def blocker_reference_errors
       blockers = Array(@ledger["blockers"]).to_h { |blocker| [blocker["id"], blocker] }
+      preflight_errors = []
+      if preflight_blocked?
+        blocker = blockers[@ledger.dig("preflight", "blocker_id")]
+        unless blocker && durable_owner?(blocker["owner"])
+          preflight_errors << "blocked preflight has no owned blocker reference"
+        end
+      end
       inventory_errors = Array(@ledger["inventory"]).flat_map do |item|
         references = []
         if item["result"] == "blocked" || item.dig("baseline", "classification") == "candidate_regression"
@@ -1198,7 +1293,7 @@ module FleetValidation
 
         "required path #{path['id']} blocked result has no owned blocker reference"
       end
-      inventory_errors + path_errors
+      preflight_errors + inventory_errors + path_errors
     end
 
     def waiver_evidence_errors

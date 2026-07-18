@@ -53,7 +53,13 @@ policy/inventory manifest fails closed.
    Record `preflight.opened_at` when opening the barrier and each mutable target's
    `work_started_at`; closeout rejects missing or reversed ordering evidence. The validation-only
    monorepo generator gate may run before the mutation barrier.
+   If an owned release-wide blocker makes the barrier impossible to open, use the terminal blocked
+   preflight path instead: retain its durable `blocker_id` and public-safe `blocker_evidence`, keep
+   `APP_WORK_ALLOWED` false, leave every app target untouched, audit with an empty maker list, and
+   keep aggregate merge/reachability and tracker promotion blocked.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
+   Its terminal report must retain the package versions/sources and exact-head evidence for every
+   check; `pending` and `unknown` do not count as report-only closeout.
 4. Each prompt is a separate top-level coordinator task and must use its bounded subagents as
    written. Do not launch the six prompts as children of one shared four-slot agent tree.
 5. Keep each lane in a separate checkout or worktree. Do not share mutable app checkouts between
