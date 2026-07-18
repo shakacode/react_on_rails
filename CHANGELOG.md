@@ -219,7 +219,7 @@ surrogate pair`, so such content crashed the entire server render instead of pas
   [Issue 4497](https://github.com/shakacode/react_on_rails/issues/4497).
   [PR 4541](https://github.com/shakacode/react_on_rails/pull/4541) by
   [justin808](https://github.com/justin808).
-- **[Pro] React Server Components now require the stable React 19.2.x RSC line**: React on Rails Pro 17 requires `react-on-rails-rsc >= 19.2.1 < 20`, React >= 19.2.7, and matching React DOM. The Pro generator scaffolds that coordinated stable runtime and rejects prerelease RSC packages below the stable peer floor. The adopted `react-on-rails-rsc` artifact uses the React on Rails Pro commercial terms rather than MIT and reports `SEE LICENSE IN LICENSE.md` in npm metadata. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch to downgrade startup errors to warnings. [Issue 4357](https://github.com/shakacode/react_on_rails/issues/4357). [PR 4490](https://github.com/shakacode/react_on_rails/pull/4490) and [PR 4670](https://github.com/shakacode/react_on_rails/pull/4670) by [justin808](https://github.com/justin808).
+- **[Pro] React Server Components now require the stable React 19.2.x RSC line**: Pro RSC apps on React on Rails 17 require `react-on-rails-rsc >= 19.2.1 < 20`, React >= 19.2.7, and matching React DOM. Non-RSC Pro apps retain React 18 support. The Pro generator scaffolds that coordinated stable runtime and rejects prerelease RSC packages below the stable peer floor. The adopted `react-on-rails-rsc` artifact uses the React on Rails Pro commercial terms rather than MIT and reports `SEE LICENSE IN LICENSE.md` in npm metadata. Set `REACT_ON_RAILS_PRO_DISABLE_VERSION_CHECK=1` only as an emergency rollout escape hatch to downgrade startup errors to warnings. [Issue 4357](https://github.com/shakacode/react_on_rails/issues/4357). [PR 4490](https://github.com/shakacode/react_on_rails/pull/4490) and [PR 4670](https://github.com/shakacode/react_on_rails/pull/4670) by [justin808](https://github.com/justin808).
 - **Removed the inert `config.server_render_method` option**: The open-source configuration no longer accepts `config.server_render_method`. The option never selected a server render method — the open-source gem always renders with ExecJS — and its validator raised `ReactOnRails::Error` at boot for any value other than blank or `"ExecJS"`. Setting it now raises `NoMethodError` at boot, so delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; `rake react_on_rails:doctor` also flags the stale line. For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`. Fixes [Issue 4415](https://github.com/shakacode/react_on_rails/issues/4415). [PR 4423](https://github.com/shakacode/react_on_rails/pull/4423) by [justin808](https://github.com/justin808).
 - **Removed three deprecated configuration options** (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`): These were deprecated in v16 and are gone in v17. Setting any of them now raises `NoMethodError` at boot; delete the stale lines from `config/initializers/react_on_rails.rb` (`rake react_on_rails:doctor` flags them). Migration: delete `config.generated_assets_dirs` — public asset paths come from `public_output_path` in `config/shakapacker.yml`; delete `config.skip_display_none` — it had no runtime effect; replace `config.defer_generated_component_packs = true` with `config.generated_component_packs_loading_strategy = :defer`, and simply delete `config.defer_generated_component_packs = false` (the removed option was truthy-gated — only `= true` set `:defer`; `= false` was a no-op that fell through to the default strategy, so it did **not** mean `:sync`; set `:sync` explicitly only if you relied on synchronous loading). The default strategy is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker. Fixes [Issue 4419](https://github.com/shakacode/react_on_rails/issues/4419). [PR 4432](https://github.com/shakacode/react_on_rails/pull/4432) by [justin808](https://github.com/justin808).
 - **Removed the never-wired `RenderRequest` / `JsCodeBuilder` / `RenderingStrategy` rendering layer**: The internal strategy-pattern classes `ReactOnRails::RenderRequest`, `ReactOnRails::JsCodeBuilder`, `ReactOnRails::RenderingStrategy` (with `ExecJsStrategy`), and — in Pro — `ReactOnRailsPro::JsCodeBuilder` and `ReactOnRailsPro::RenderingStrategy::NodeStrategy`, plus the undocumented `ReactOnRails.rendering_strategy` and `ReactOnRails.js_code_builder` module accessors, are removed. This scaffolding was built for the strategy-pattern refactor in [Issue 2905](https://github.com/shakacode/react_on_rails/issues/2905) (closed without wiring it in) and was never invoked on any production server-rendering path — SSR runs through `ServerRenderingJsCode` and `ServerRenderingPool`, which never touched this layer. These constants and accessors were internal and undocumented; if you reference them in application code, remove the reference (the layer performed no work). Fixes [Issue 4414](https://github.com/shakacode/react_on_rails/issues/4414). [PR 4437](https://github.com/shakacode/react_on_rails/pull/4437) by [justin808](https://github.com/justin808).
@@ -505,7 +505,8 @@ surrogate pair`, so such content crashed the entire server render instead of pas
 
 - **[Pro]** **Truncated RSC parser streams now warn at EOF**: The Pro RSC length-prefixed stream
   parser flushes at stream end so incomplete trailing records emit the existing parser warning,
-  while expected request-abort cleanup remains quiet.
+  while expected request-abort cleanup remains quiet. Fixes
+  [Issue 4370](https://github.com/shakacode/react_on_rails/issues/4370).
   [PR 4392](https://github.com/shakacode/react_on_rails/pull/4392) by
   [justin808](https://github.com/justin808).
 
@@ -520,14 +521,16 @@ surrogate pair`, so such content crashed the entire server render instead of pas
 - **[Pro]** **RSC stylesheet inference retries after transient stats read failures**: Pro now caches
   client-chunk stylesheet metadata only after a successful `loadable-stats.json` read, so a
   deploy-race or temporary parse/read failure does not disable inferred RSC client stylesheets for
-  the worker lifetime.
+  the worker lifetime. Fixes
+  [Issue 4371](https://github.com/shakacode/react_on_rails/issues/4371).
   [PR 4401](https://github.com/shakacode/react_on_rails/pull/4401) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **RSC loadable-stats retry diagnostics stay visible**: Malformed or unreadable
   `loadable-stats.json` warnings are suppressed only for the retry window, and native ESM stack
   paths rewritten through source maps are normalized back to the runtime `lib/` directory before
-  resolving stats.
+  resolving stats. Follow-up to
+  [PR 4401](https://github.com/shakacode/react_on_rails/pull/4401).
   [PR 4447](https://github.com/shakacode/react_on_rails/pull/4447) by
   [justin808](https://github.com/justin808).
 
