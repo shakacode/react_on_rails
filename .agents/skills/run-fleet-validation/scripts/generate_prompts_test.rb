@@ -729,6 +729,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "independent audit maker identities contain blank values"
   end
 
+  def test_independent_audit_rejects_duplicate_maker_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["maker_ids"] = %w[maker-1 maker-1]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities must be unique"
+  end
+
   def test_closeout_requires_identified_checker_and_makers
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -860,6 +875,26 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_empty schema_errors
     assert_empty semantic_errors
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_preflight_status_rejects_disposition_fields_from_other_states
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["waiver"] = {
+      "gate" => "release_ci",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "Sanitized stale disposition"
+    }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "passed preflight retains disposition fields from another state"
   end
 
   def test_published_artifact_defects_cannot_be_waived
@@ -1453,6 +1488,82 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
   end
 
+  def test_report_only_lock_versions_match_the_resolved_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    lock = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+                 .fetch("package_locks").first
+    lock["version"] = "0.0.1"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes(
+      errors,
+      "1 report-only target(s) retain package versions or sources outside the resolved release snapshot"
+    )
+  end
+
+  def test_target_check_path_and_blocker_dispositions_match_their_statuses
+    generator = build_generator
+    waiver = {
+      "gate" => "stale",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "Sanitized stale disposition"
+    }
+    cases = [
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first["waiver"] = waiver },
+        expected: "target result passed retains disposition fields from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first.fetch("checks").fetch("install")["blocker_id"] = "stale" },
+        expected: "target check install passed retains disposition fields from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first.fetch("baseline")["waiver"] = waiver },
+        expected: "target baseline clean retains a waiver from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("required_paths").first["blocker_id"] = "stale" },
+        expected: "required path passed retains disposition fields from another state"
+      },
+      {
+        mutate: lambda do |ledger|
+          ledger["blockers"] = [
+            {
+              "id" => "open-blocker",
+              "status" => "open",
+              "public_summary" => "Sanitized open blocker",
+              "owner" => { "issue_url" => "https://example.invalid/issues/open" },
+              "disposition" => waiver.merge("gate" => "open-blocker")
+            }
+          ]
+          ledger.fetch("tracker")["promotion"] = "blocked"
+        end,
+        expected: "blocker open-blocker open status retains a waiver disposition"
+      }
+    ]
+
+    cases.each do |test_case|
+      ledger = complete_ledger(generator)
+      test_case.fetch(:mutate).call(ledger)
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_includes errors, test_case.fetch(:expected)
+    end
+  end
+
   def test_closeout_rejects_nonterminal_work_and_blank_result_or_baseline_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1587,6 +1698,55 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     refute(errors.any? { |error| error.match?(/merge status|reachability|base is missing/) }, errors.join("\n"))
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_blocked_merge_cannot_retain_a_merge_commit_or_successful_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["status"] = "blocked"
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/owned" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} blocked merge retains a merge commit"
+    assert_includes errors, "target #{target.fetch('id')} blocked merge retains successful reachability"
+  end
+
+  def test_not_applicable_merge_cannot_retain_mutation_authority_or_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("merge").merge!(
+      "authority" => "ask",
+      "authority_evidence" => "stale mutation authority",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} not-applicable merge retains mutation state"
   end
 
   def test_blocked_closeout_rejects_an_unauthorized_recorded_merge
@@ -1818,6 +1978,22 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
     assert(errors.any? { |error| error.include?("tree-parity evidence is incomplete") })
+  end
+
+  def test_mutation_base_reconciliation_must_be_explicitly_passed_even_without_base_movement
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases")["reconciliation"] = "reported"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} base reconciliation is not passed"
   end
 
   def test_validation_only_core_gate_does_not_require_merge_base_or_reachability_evidence

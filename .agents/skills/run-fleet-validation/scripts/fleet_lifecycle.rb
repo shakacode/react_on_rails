@@ -758,6 +758,7 @@ module FleetValidation
       result.concat(capability_errors)
       result.concat(inventory_errors)
       result.concat(private_field_errors)
+      result.concat(disposition_state_errors)
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
@@ -868,6 +869,94 @@ module FleetValidation
           "blocker #{blocker['id'] || 'missing-id'} contains forbidden private field #{field}"
         end
       end
+    end
+
+    def disposition_state_errors
+      preflight = @ledger.fetch("preflight", {})
+      errors = []
+      preflight_conflict = case preflight["status"]
+                           when "waived"
+                             present?(preflight["blocker_id"]) || present?(preflight["blocker_evidence"])
+                           when "blocked"
+                             !preflight["waiver"].nil?
+                           else
+                             [
+                               !preflight["waiver"].nil?,
+                               present?(preflight["blocker_id"]),
+                               present?(preflight["blocker_evidence"])
+                             ].any?
+                           end
+      if preflight_conflict
+        errors << "#{preflight['status']} preflight retains disposition fields from another state"
+      end
+
+      Array(@ledger["inventory"]).each do |item|
+        result_blocker_allowed = item["result"] == "blocked" ||
+                                 item.dig("baseline", "classification") == "candidate_regression"
+        result_conflict = if item["result"] == "waived"
+                            present?(item["blocker_id"])
+                          elsif item["result"] == "blocked"
+                            !item["waiver"].nil?
+                          else
+                            !item["waiver"].nil? || (present?(item["blocker_id"]) && !result_blocker_allowed)
+                          end
+        if result_conflict
+          errors << "target result #{item['result']} retains disposition fields from another state"
+        end
+
+        baseline = item.fetch("baseline", {})
+        unless %w[waived baseline_defect].include?(baseline["classification"]) || baseline["waiver"].nil?
+          errors << "target baseline #{baseline['classification']} retains a waiver from another state"
+        end
+
+        item.fetch("checks", {}).each do |name, check|
+          conflict = case check["status"]
+                     when "waived"
+                       present?(check["blocker_id"])
+                     when "blocked"
+                       !check["waiver"].nil?
+                     else
+                       !check["waiver"].nil? || present?(check["blocker_id"])
+                     end
+          if conflict
+            errors << "target check #{name} #{check['status']} retains disposition fields from another state"
+          end
+        end
+
+        review_app = item.fetch("review_app", {})
+        review_conflict = case review_app["deployed_smoke"]
+                          when "waived"
+                            present?(review_app["blocker_id"])
+                          when "blocked"
+                            !review_app["waiver"].nil?
+                          else
+                            !review_app["waiver"].nil? || present?(review_app["blocker_id"])
+                          end
+        if review_conflict
+          errors << "target review-app #{review_app['deployed_smoke']} retains disposition fields from another state"
+        end
+      end
+
+      Array(@ledger["required_paths"]).each do |path|
+        conflict = case path["status"]
+                   when "waived"
+                     present?(path["blocker_id"])
+                   when "blocked"
+                     !path["waiver"].nil?
+                   else
+                     !path["waiver"].nil? || present?(path["blocker_id"])
+                   end
+        if conflict
+          errors << "required path #{path['status']} retains disposition fields from another state"
+        end
+      end
+
+      Array(@ledger["blockers"]).each do |blocker|
+        next if %w[waived deferred].include?(blocker["status"]) || blocker["disposition"].nil?
+
+        errors << "blocker #{blocker['id']} #{blocker['status']} status retains a waiver disposition"
+      end
+      errors
     end
 
     def review_app_errors
@@ -1139,16 +1228,19 @@ module FleetValidation
       resolved = Array(@ledger.dig("pack", "resolved_packages")).to_h do |package|
         [[package["ecosystem"], package["name"]], [package["version"], package["source"]]]
       end
-      count = Array(@ledger["inventory"]).count do |item|
-        next false unless item["tier"] == "hard_gate"
-
+      invalid_items = Array(@ledger["inventory"]).select do |item|
         Array(item["package_locks"]).any? do |lock|
           resolved[[lock["ecosystem"], lock["name"]]] != [lock["version"], lock["source"]]
         end
       end
-      return if count.zero?
+      return if invalid_items.empty?
 
-      "#{count} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+      hard_gate_count = invalid_items.count { |item| item["tier"] == "hard_gate" }
+      if hard_gate_count.positive?
+        "#{hard_gate_count} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+      else
+        "#{invalid_items.length} report-only target(s) retain package versions or sources outside the resolved release snapshot"
+      end
     end
 
     def check_evidence_errors
@@ -1223,6 +1315,9 @@ module FleetValidation
         end
       else
         errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
+        if audit_maker_ids.length != audit_maker_ids.uniq.length
+          errors << "independent audit maker identities must be unique"
+        end
         if raw_mutable_maker_ids.any? { |maker_id| !present?(maker_id) } ||
            audit_maker_ids.any? { |maker_id| !present?(maker_id) }
           errors << "independent audit maker identities contain blank values"
@@ -1252,6 +1347,9 @@ module FleetValidation
         if commit_identity?(bases["audit"]) && commit_identity?(bases["reviewed"]) &&
            bases["audit"] != bases["reviewed"]
           errors << "target #{item['id']} audit base does not match reviewed base"
+        end
+        unless bases["reconciliation"] == "passed"
+          errors << "target #{item['id']} base reconciliation is not passed"
         end
       end
       errors
@@ -1352,9 +1450,13 @@ module FleetValidation
       Array(@ledger["inventory"]).flat_map do |item|
         merge = item.fetch("merge", {})
         if item["work_mode"] != "mutation"
-          next [] if merge["status"] == "not_applicable"
-
-          next ["target #{item['id']} must mark merge not_applicable"]
+          errors = []
+          errors << "target #{item['id']} must mark merge not_applicable" unless merge["status"] == "not_applicable"
+          if merge["authority"] != "none" || present?(merge["authority_evidence"]) ||
+             present?(merge["merge_commit"])
+            errors << "target #{item['id']} not-applicable merge retains mutation state"
+          end
+          next errors
         end
 
         errors = []
@@ -1370,6 +1472,13 @@ module FleetValidation
           errors << "target #{item['id']} merge evidence is missing" unless present?(merge["evidence"])
         elsif merge["status"] == "blocked"
           errors << "target #{item['id']} blocked merge disposition has no evidence" unless present?(merge["evidence"])
+          if present?(merge["merge_commit"])
+            errors << "target #{item['id']} blocked merge retains a merge commit"
+          end
+          reachability = item.fetch("reachability", {})
+          if reachability["default_branch"] == "passed" || reachability["tree_parity"] == "passed"
+            errors << "target #{item['id']} blocked merge retains successful reachability"
+          end
         end
         if !release_blocked? && merge["status"] != "merged"
           errors << "target #{item['id']} merge is incomplete for a promotable release"
