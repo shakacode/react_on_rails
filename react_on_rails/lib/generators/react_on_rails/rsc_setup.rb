@@ -394,27 +394,46 @@ module ReactOnRails
           )
         end
 
-        unless content.include?("RSC_BUNDLE_ONLY")
-          rsc_bundle_handling = <<~JS.chomp
-            } else if (process.env.RSC_BUNDLE_ONLY) {
-                // eslint-disable-next-line no-console
-                console.log('[React on Rails] Creating only the RSC bundle.');
-                result = rscConfig;
-          JS
-          # Anchor on the final bare `} else {` (the default-build branch) rather
-          # than the literal `// default is the standard client and server build`
-          # comment, so a reflowed/reworded/removed comment cannot silently
-          # no-op this insertion — the same fragility class #4630 fixed for the
-          # semicolon/whitespace transforms above. `\} else \{` never matches the
-          # `} else if (...) {` branches, so this stays targeted.
-          gsub_file(
-            config_path,
-            /\n(\s*\}\s*else\s*\{\s*\n)/,
-            "\n  #{rsc_bundle_handling}\n\\1"
-          )
-        end
+        insert_rsc_bundle_only_branch(config_path, content)
 
         update_scob_default_bundle_output(config_path, content)
+      end
+
+      # Anchor regex for the default-build branch: the bare `} else {` whose body
+      # assigns the default `result = [clientConfig, serverConfig]`. The RSC_BUNDLE_ONLY
+      # branch is inserted immediately before it. Two properties make this safe:
+      #   1. Correct branch only. `[^}]` cannot span a closing brace, so from any
+      #      *earlier* bare `} else {` (e.g. an `if (envSpecific) {…} else {…}`) the
+      #      lazy run is blocked by that else's own `}` before it can reach the
+      #      default `result = [clientConfig, serverConfig]`. Only the default
+      #      branch — whose body reaches that assignment with no intervening `}` —
+      #      matches. `\} else \{` also never matches `} else if (…) {`.
+      #   2. No comment dependency. The anchor keys off the default `result`
+      #      assignment, not the `// default is the standard client and server build`
+      #      comment, so a reflowed/reworded/removed comment cannot silently no-op it.
+      DEFAULT_BUILD_BRANCH_ANCHOR =
+        /\n(\s*\}\s*else\s*\{[^}]*?result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*\]\s*;?)/
+
+      def insert_rsc_bundle_only_branch(config_path, content)
+        return if content.include?("RSC_BUNDLE_ONLY")
+
+        # Only splice in the branch when exactly one default-build branch is
+        # identifiable. Thor's gsub_file replaces every match, so bailing on 0 or
+        # 2+ matches guards against inserting into an unintended branch (safe
+        # no-op → surfaced by check_rsc_scob_config / manual review instead).
+        return unless content.scan(DEFAULT_BUILD_BRANCH_ANCHOR).length == 1
+
+        rsc_bundle_handling = <<~JS.chomp
+          } else if (process.env.RSC_BUNDLE_ONLY) {
+              // eslint-disable-next-line no-console
+              console.log('[React on Rails] Creating only the RSC bundle.');
+              result = rscConfig;
+        JS
+        gsub_file(
+          config_path,
+          DEFAULT_BUILD_BRANCH_ANCHOR,
+          "\n  #{rsc_bundle_handling}\n\\1"
+        )
       end
 
       def update_scob_default_bundle_output(config_path, content)

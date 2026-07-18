@@ -5097,6 +5097,36 @@ describe RscGenerator, type: :generator do
       expect(result.scan("process.env.RSC_BUNDLE_ONLY").length).to eq(1)
     end
 
+    it "inserts RSC_BUNDLE_ONLY into the default branch only, not an earlier bare `} else {`" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Customized SCOB with an EARLIER bare `} else {` on the envSpecific guard,
+      # before `let result;` is declared. The insertion must anchor on the
+      # default-build branch, not this earlier else — otherwise `result = rscConfig`
+      # is spliced in before `result` exists, corrupting the config.
+      customized = server_client_or_both_content(destructured_import: true)
+                   .sub(
+                     "  if (envSpecific) {\n    envSpecific(clientConfig, serverConfig);\n  }",
+                     "  if (envSpecific) {\n    envSpecific(clientConfig, serverConfig);\n  " \
+                     "} else {\n    throw new Error('envSpecific is required');\n  }"
+                   )
+      simulate_existing_file(config_path, customized)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      # Exactly one RSC branch, and the earlier custom else is untouched.
+      expect(result.scan("process.env.RSC_BUNDLE_ONLY").length).to eq(1)
+      expect(result).to include("} else {\n    throw new Error('envSpecific is required');\n  }")
+      # The RSC branch sits inside the bundle-selection block, immediately before
+      # the default `} else {` (the one whose body builds the default result).
+      expect(result).to match(
+        /result = rscConfig;\n\s*\} else \{[^}]*?result = \[clientConfig, serverConfig, rscConfig\]/m
+      )
+      # Corruption signature: no `result = rscConfig;` before `let result;`.
+      before_decl = result[0...result.index("let result;")]
+      expect(before_decl).not_to include("result = rscConfig;")
+    end
+
     # #4630 core invariant: the third envSpecific arg (rscConfig) is what lets
     # development.js flip `clientWebpackConfig.lazyCompilation = false` for RSC.
     # If this rewrite silently no-ops, lazy compilation is left ON. Guard the
