@@ -37,14 +37,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
-- **Server rendering no longer crashes on lone UTF-16 surrogates**: When the JavaScript renderer emits
-  a string containing a lone surrogate (commonly from truncating text mid-emoji, e.g. an excerpt cut with
-  `slice`/`substring`), `JSON.stringify` serializes it as a `\uXXXX` escape that Ruby's `JSON.parse`
-  rejected with `incomplete surrogate pair`, failing the entire render. The parser now repairs such escapes
-  to the Unicode replacement character (`�`) and retries, passing the content through to the browser instead
-  of failing. Clean payloads are unaffected — the repair only runs after a parse error. (Applies on `json`
-  gem versions that raise on lone surrogates, i.e. `>= 2.17`; older versions already degrade them silently
-  without crashing.) Fixes
+- **Server rendering no longer crashes on or corrupts lone UTF-16 surrogates**: When the JavaScript
+  renderer emits a string containing a lone surrogate (commonly from truncating text mid-emoji, e.g. an
+  excerpt cut with `slice`/`substring`), `JSON.stringify` serializes it as a `\uXXXX` escape that Ruby's
+  `JSON.parse` mishandles — depending on the case and `json` gem version it raises `incomplete surrogate
+pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now normalizes such escapes to
+  the Unicode replacement character (`�`) and passes the content through to the browser instead of failing.
+  This works the same across `json` gem versions. Clean payloads are unaffected: repair only runs when the
+  text actually contains a surrogate escape, a single cheap substring check. Fixes
   [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
   [PR 4745](https://github.com/shakacode/react_on_rails/pull/4745) by
   [AbanoubGhadban](https://github.com/AbanoubGhadban).
