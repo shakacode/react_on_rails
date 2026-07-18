@@ -244,6 +244,11 @@ module FleetValidation
       existing_pack = existing.fetch("pack", {})
       return unless existing_pack["pack_id"] == @pack_id
 
+      schema_errors = SchemaValidator.new(schema).errors(existing)
+      unless schema_errors.empty?
+        raise ManifestError, "existing result ledger does not match the current schema: #{schema_errors.join('; ')}"
+      end
+
       same_snapshot = existing_pack["release_selector"] == @release_selector &&
                       existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
       if same_snapshot && resolved_candidate_reusable?(existing)
@@ -274,15 +279,17 @@ module FleetValidation
     end
 
     def build_inventory
+      defaults = @manifest.fetch("defaults", {})
       [CORE_INVENTORY_TARGET] + @manifest.fetch("repos").map do |repo|
         tier = repo.fetch("tier")
+        effective = tier == "hard_gate" ? defaults.merge(repo) : repo
         {
           "id" => slug(repo.fetch("name")),
           "name" => repo.fetch("name"),
           "headline" => repo.fetch("headline"),
           "tier" => tier,
           "work_mode" => tier == "soft_track" ? "report_only" : "mutation",
-          "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
+          "packages" => Array(effective["packages"]).map { |package| package.slice("ecosystem", "name") }
         }
       end
     end
@@ -759,6 +766,7 @@ module FleetValidation
       result.concat(inventory_errors)
       result.concat(private_field_errors)
       result.concat(disposition_state_errors)
+      result.concat(timestamp_errors)
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
@@ -1187,6 +1195,21 @@ module FleetValidation
       "base moved after audit without passing reconciliation"
     end
 
+    def timestamp_errors
+      errors = []
+      opened_at = @ledger.dig("preflight", "opened_at")
+      if present?(opened_at) && !timestamp(opened_at)
+        errors << "preflight opened_at must be an ISO8601 timestamp with an explicit offset"
+      end
+      Array(@ledger["inventory"]).each do |item|
+        work_started_at = item["work_started_at"]
+        next unless present?(work_started_at) && !timestamp(work_started_at)
+
+        errors << "target #{item['id']} work_started_at must be an ISO8601 timestamp with an explicit offset"
+      end
+      errors
+    end
+
     def preflight_errors
       preflight = @ledger.fetch("preflight", {})
       if preflight["status"] == "blocked"
@@ -1205,11 +1228,16 @@ module FleetValidation
       end
 
       waiver = preflight["status"] == "waived" ? preflight["waiver"] : nil
-      errors = %w[release_ci generator_matrix].filter_map do |field|
-        next if preflight_gate_passed?(preflight[field]) || valid_waiver?(waiver, field)
+      errors = if preflight["status"] == "waived" && !terminal_preflight_waiver?(preflight, waiver)
+                 ["waived preflight has no terminal failed gate with replayable evidence"]
+               else
+                 []
+               end
+      errors.concat(%w[release_ci generator_matrix].filter_map do |field|
+        next if preflight_gate_passed?(preflight[field]) || valid_preflight_waiver?(waiver, field, preflight[field])
 
         "release-wide preflight #{field} is not passed or explicitly waived"
-      end
+      end)
       unless preflight_gate_passed?(preflight["artifacts"])
         message = if valid_waiver?(waiver, "artifacts")
                     "release-wide preflight artifacts must pass and cannot be waived"
@@ -1220,7 +1248,8 @@ module FleetValidation
       end
       capabilities = preflight.fetch("capabilities", {})
       %w[status permissions git_auth github_auth registry_network toolchains host_capacity coordination].each do |field|
-        next if capabilities[field] == "passed" || valid_waiver?(waiver, "capabilities.#{field}")
+        next if capabilities[field] == "passed" ||
+                valid_preflight_capability_waiver?(waiver, field, capabilities[field])
 
         errors << "capability #{field} is not passed or explicitly waived"
       end
@@ -1672,9 +1701,32 @@ module FleetValidation
     end
 
     def timestamp(value)
+      return unless value.to_s.match?(/(?:Z|[+-]\d{2}:\d{2})\z/)
+
       Time.iso8601(value.to_s)
     rescue ArgumentError
       nil
+    end
+
+    def terminal_preflight_waiver?(preflight, waiver)
+      gate = waiver["gate"] if waiver.is_a?(Hash)
+      if %w[release_ci generator_matrix].include?(gate)
+        valid_preflight_waiver?(waiver, gate, preflight[gate])
+      elsif gate.to_s.start_with?("capabilities.")
+        field = gate.delete_prefix("capabilities.")
+        valid_preflight_capability_waiver?(waiver, field, preflight.dig("capabilities", field))
+      else
+        false
+      end
+    end
+
+    def valid_preflight_waiver?(waiver, field, gate)
+      valid_waiver?(waiver, field) && gate.is_a?(Hash) &&
+        %w[blocked waived].include?(gate["status"]) && present?(gate["evidence"])
+    end
+
+    def valid_preflight_capability_waiver?(waiver, field, status)
+      valid_waiver?(waiver, "capabilities.#{field}") && %w[blocked waived].include?(status)
     end
 
     def release_blocked?

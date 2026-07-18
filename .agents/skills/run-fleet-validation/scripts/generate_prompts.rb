@@ -110,6 +110,9 @@ module FleetValidation
     def validate_options!
       raise ManifestError, "schema_version must be 1" unless @manifest["schema_version"] == 1
       raise ManifestError, "repos must be an array" unless @manifest["repos"].is_a?(Array)
+      unless @release_selector.is_a?(String) && !@release_selector.strip.empty?
+        raise ManifestError, "release selector must be nonempty"
+      end
 
       validate_repo_entries!
       raise ManifestError, "--prompts must be positive" unless @prompt_count.positive?

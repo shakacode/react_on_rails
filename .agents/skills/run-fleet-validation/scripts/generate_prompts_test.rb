@@ -385,6 +385,24 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert(errors.any? { |error| error.include?("started before the preflight barrier opened") })
   end
 
+  def test_lifecycle_timestamps_require_explicit_offsets
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00"
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["work_started_at"] = "2026-07-18T10:01:00"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "preflight opened_at must be an ISO8601 timestamp with an explicit offset"
+    assert_includes errors, "target #{target.fetch('id')} work_started_at must be an ISO8601 timestamp with an explicit offset"
+  end
+
   def test_ledger_fails_closed_when_a_report_only_soft_track_is_missing
     generator = build_generator
     ledger = generator.ledger_template
@@ -1049,6 +1067,31 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "app work started before APP_WORK_ALLOWED"
+  end
+
+  def test_preflight_waiver_requires_a_terminal_failed_gate_with_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").merge!(
+      "status" => "waived",
+      "waiver" => {
+        "gate" => "release_ci",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "Sanitized waiver"
+      }
+    )
+    ledger.fetch("preflight").fetch("release_ci").merge!("status" => "unknown", "evidence" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "waived preflight has no terminal failed gate with replayable evidence"
+    assert_includes errors, "release-wide preflight release_ci is not passed or explicitly waived"
   end
 
   def test_closeout_rejects_unknown_or_nonterminal_inventory_results
@@ -2005,6 +2048,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_same_pack_regeneration_rejects_a_ledger_outside_the_current_schema
+    Dir.mktmpdir do |directory|
+      generator = build_generator(release_selector: "v17.0.0.rc.12")
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      ledger.delete("tracker")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      error = assert_raises(FleetValidation::ManifestError) { generator.write_pack(directory) }
+
+      assert_includes error.message, "existing result ledger does not match the current schema"
+    end
+  end
+
   def test_dynamic_selector_pack_cannot_reuse_a_resolved_candidate_barrier
     Dir.mktmpdir do |directory|
       generator = build_generator
@@ -2498,6 +2557,31 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       assert_equal "repos[0].packages[0] ecosystem must be gem or npm", error.message
     end
+  end
+
+  def test_hard_gate_inventory_uses_the_same_default_derived_packages_as_its_prompt
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      repo = manifest.fetch("repos").first
+      packages = repo.delete("packages")
+      manifest.fetch("defaults")["packages"] = packages
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      generator = build_generator(manifest_path:)
+      inventory = generator.lifecycle_inventory.find { |target| target["id"] == "shakacode-hichee" }
+
+      assert_equal packages, inventory.fetch("packages")
+      assert_includes generator.render_pack, "gem:react_on_rails"
+    end
+  end
+
+  def test_rejects_blank_release_selectors_before_writing_a_pack
+    error = assert_raises(FleetValidation::ManifestError) do
+      build_generator(release_selector: "   ")
+    end
+
+    assert_equal "release selector must be nonempty", error.message
   end
 
   def test_rejects_a_manifest_without_required_lifecycle_paths
