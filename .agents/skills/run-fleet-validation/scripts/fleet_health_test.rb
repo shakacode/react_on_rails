@@ -1778,6 +1778,46 @@ class FleetHealthTest < Minitest::Test
     assert_includes observation.dig("default_ci", "evidence"), "public API unavailable"
   end
 
+  def test_public_github_probe_preserves_sbom_failure_as_unknown_evidence
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    head = "a" * 40
+    client = Object.new
+    client.define_singleton_method(:get) do |path|
+      case path
+      when "/repos/#{repo}"
+        { "visibility" => "public", "default_branch" => "main", "archived" => false }
+      when "/repos/#{repo}/commits/main"
+        { "sha" => head }
+      when "/repos/#{repo}/commits/#{head}/check-runs?per_page=100"
+        { "check_runs" => [] }
+      when "/repos/#{repo}/actions/workflows?per_page=100"
+        { "workflows" => [] }
+      when "/repos/#{repo}/dependency-graph/sbom"
+        raise FleetValidation::ManifestError, "SBOM permission denied"
+      else
+        raise "unexpected path #{path}"
+      end
+    end
+    dependabot_config = dependabot_v1_config
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "unexpected content path #{path}" unless path == ".github/dependabot.yml" && ref == head
+
+      YAML.dump(dependabot_config)
+    end
+
+    observation = public_github_probe(client:).observe(
+      target,
+      observed_at: "2026-07-18T12:00:00Z"
+    )
+
+    assert_nil observation.fetch("default_commit")
+    assert_equal "unknown", observation.dig("default_ci", "status")
+    assert_includes observation.dig("default_ci", "evidence"), "FleetValidation::ManifestError"
+    assert_includes observation.dig("default_ci", "evidence"), "SBOM permission denied"
+    refute_includes observation.dig("default_ci", "evidence"), "react_on_rails"
+  end
+
   def test_reusable_smoke_workflow_is_read_only_and_emits_exact_head_evidence
     workflow = File.read(REUSABLE_SMOKE)
 

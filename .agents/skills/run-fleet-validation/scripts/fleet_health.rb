@@ -236,7 +236,7 @@ module FleetValidation
     rescue NonPublicRepositoryError
       raise
     rescue StandardError => e
-      unknown_observation(observed_at, e.message)
+      unknown_observation(observed_at, "#{e.class}: #{e.message}")
     end
 
     private
@@ -258,8 +258,6 @@ module FleetValidation
 
     def package_versions(repo)
       PublicSBOM.package_versions(@client.get("/repos/#{repo}/dependency-graph/sbom"))
-    rescue StandardError
-      []
     end
 
     def check_status(checks)
