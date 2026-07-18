@@ -1494,6 +1494,59 @@ class FleetHealthTest < Minitest::Test
     assert_includes status.fetch("evidence"), "run age exceeds 1 days"
   end
 
+  def test_shared_smoke_reports_incomplete_discovery_when_all_workflow_reads_fail
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = { "id" => 41, "path" => ".github/workflows/ci.yml" }
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, _path, ref:|
+      raise "wrong head" unless ref == head
+
+      raise FleetValidation::ManifestError, "workflow content forbidden"
+    end
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [workflow], default_branch: "main")
+
+    assert_equal "unknown", status.fetch("status")
+    assert_equal false, status.fetch("shared_contract")
+    assert_includes status.fetch("evidence"), ".github/workflows/ci.yml"
+    assert_includes status.fetch("evidence"), "FleetValidation::ManifestError"
+    assert_includes status.fetch("evidence"), "workflow content forbidden"
+    refute_includes status.fetch("evidence"), "No reusable fleet-smoke caller"
+  end
+
+  def test_shared_smoke_does_not_pass_when_discovery_is_partially_incomplete
+    repo = "sanitized/demo"
+    head = "a" * 40
+    healthy = { "id" => 41, "path" => ".github/workflows/ci.yml" }
+    unreadable = { "id" => 42, "path" => ".github/workflows/private.yml" }
+    caller_content = YAML.dump(
+      "jobs" => {
+        "fleet" => {
+          "name" => "Fleet",
+          "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        }
+      }
+    )
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "wrong head" unless ref == head
+      return caller_content if path == healthy.fetch("path")
+
+      raise FleetValidation::ManifestError, "workflow content forbidden"
+    end
+    client.define_singleton_method(:get) { |_path| raise "run lookup must not start with incomplete discovery" }
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [healthy, unreadable], default_branch: "main")
+
+    assert_equal "unknown", status.fetch("status")
+    assert_equal true, status.fetch("shared_contract")
+    assert_includes status.fetch("evidence"), ".github/workflows/private.yml"
+    assert_includes status.fetch("evidence"), "workflow content forbidden"
+  end
+
   def test_shared_smoke_requires_an_exact_head_run_of_the_shared_workflow
     repo = "sanitized/demo"
     head = "a" * 40

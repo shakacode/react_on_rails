@@ -283,11 +283,19 @@ module FleetValidation
     end
 
     def smoke_status(repo, head, _checks, workflows, default_branch:)
+      discovery_errors = []
       shared_callers = workflows.flat_map do |workflow|
         content = @client.content(repo, workflow.fetch("path"), ref: head)
         shared_smoke_callers(content).map { |caller| [workflow, caller] }
-      rescue StandardError
+      rescue StandardError => e
+        discovery_errors << "#{workflow['path'] || 'unknown workflow'}: #{e.class}: #{e.message}"
         []
+      end
+      unless discovery_errors.empty?
+        return evidence_status(
+          "unknown",
+          "Reusable fleet-smoke caller discovery was incomplete: #{discovery_errors.join('; ')}"
+        ).merge("shared_contract" => shared_callers.any?)
       end
       if shared_callers.empty?
         return evidence_status("unknown", "No reusable fleet-smoke caller was found at the default head")
@@ -402,8 +410,6 @@ module FleetValidation
       callers.each do |caller|
         caller["name_collision"] = local_job_names.include?(called_smoke_job_name(caller))
       end
-    rescue Psych::Exception
-      []
     end
 
     def called_smoke_job_name(caller)
