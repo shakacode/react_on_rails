@@ -100,14 +100,17 @@ function hasRenderingErrorSignal(renderingError: unknown) {
 function createRSCDiagnosticScript(
   metadata: Record<string, unknown>,
   cacheKey: string,
+  railsEnv: string | undefined,
   sanitizedNonce?: string,
 ) {
   const { hasErrors, renderingError } = metadata;
   // `hasErrors` is a boolean per the server wire contract; renderingError only carries
   // a useful diagnostic when the server provided a non-blank message or stack.
   if (hasErrors !== true && !hasRenderingErrorSignal(renderingError)) return undefined;
+  const diagnostic =
+    railsEnv === 'development' || railsEnv === 'test' ? { hasErrors, renderingError } : { hasErrors: true };
   return createScriptTag(
-    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify({ hasErrors, renderingError })}`,
+    `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(diagnostic)}`,
     sanitizedNonce,
     true,
   );
@@ -1594,6 +1597,7 @@ function applyStreamedStylesheetPreloadGating(
 }
 
 type InjectRSCPayloadOptions = {
+  railsEnv?: string;
   rscClientManifestStylesheetHrefs?: ReadonlySet<string>;
   rscClientChunkStylesheetHrefsByChunkName?: RSCClientChunkStylesheetHrefsByChunkName;
   rscStreamObservability?: boolean;
@@ -1633,6 +1637,7 @@ export default function injectRSCPayload(
   options: InjectRSCPayloadOptions = {},
 ) {
   const {
+    railsEnv,
     rscClientManifestStylesheetHrefs = new Set<string>(),
     rscClientChunkStylesheetHrefsByChunkName = loadRSCClientChunkStylesheetHrefsByChunkName(),
     rscStreamObservability = false,
@@ -2011,7 +2016,12 @@ export default function injectRSCPayload(
             const handleParsedChunk = (content: Uint8Array, metadata: Record<string, unknown>) => {
               const flightData = textDecoder.decode(content);
               if (!hasEmittedDiagnosticScript) {
-                const diagnosticScript = createRSCDiagnosticScript(metadata, rscPayloadKey, sanitizedNonce);
+                const diagnosticScript = createRSCDiagnosticScript(
+                  metadata,
+                  rscPayloadKey,
+                  railsEnv,
+                  sanitizedNonce,
+                );
                 if (diagnosticScript) {
                   rscPayloadBuffers.push(Buffer.from(diagnosticScript));
                   hasEmittedDiagnosticScript = true;

@@ -231,6 +231,7 @@ const streamRenderReactComponent = (
                 domNodeId,
                 railsContext.cspNonce,
                 {
+                  railsEnv: railsContext.railsEnv,
                   rscClientManifestStylesheetHrefs,
                   ...(reactClientManifestFileName
                     ? {}
