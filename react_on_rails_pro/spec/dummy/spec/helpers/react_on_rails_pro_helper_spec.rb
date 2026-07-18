@@ -1479,6 +1479,59 @@ describe ReactOnRailsProHelper do
         expect(second_run_chunks).to eq(first_run_chunks)
       end
 
+      # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
+      #
+      # A shell-ready render whose async boundary errors emits a chunk with
+      # hasErrors: true but still completes "normally" under production defaults
+      # (raise_non_shell_server_rendering_errors: false, set in the dummy app).
+      # The broken fragment must NOT be written to the view-level stream cache.
+      context "when a streamed chunk reports render errors" do # rubocop:disable RSpec/MultipleMemoizedHelpers
+        let(:error_chunks) do
+          [
+            { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+              hasErrors: false, isShellReady: true },
+            { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+              hasErrors: true, isShellReady: true }
+          ]
+        end
+
+        it "does not write the error-containing stream to the cache" do
+          mock_request_and_response(error_chunks)
+          render_with_cached_stream
+
+          run_stream
+
+          # The whole stream was consumed (no exception aborted it) ...
+          expect(chunks_read.count).to eq(error_chunks.count)
+          # ... yet nothing was cached because a chunk reported hasErrors.
+          expect(cache_data).to be_empty
+        end
+
+        it "re-renders on the next request instead of serving a cached broken fragment" do
+          mock_request_and_response(error_chunks, count: 2)
+          render_with_cached_stream
+
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+
+          # Second request: because the first render was not cached, this is a
+          # MISS again and hits Node rather than replaying the broken fragment.
+          reset_stream_buffers
+          @rendered_rails_context = nil
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+        end
+
+        it "still caches a clean stream (control)" do
+          mock_request_and_response
+          render_with_cached_stream
+
+          run_stream
+
+          expect(cache_data).not_to be_empty
+        end
+      end
+
       it "serves a HIT on the second render when cache_options includes a namespace" do
         # The second mocked response only feeds a regression (second Node call),
         # letting the chunks_read assertion below fail legibly instead of erroring.

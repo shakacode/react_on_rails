@@ -37,6 +37,20 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Streaming caches no longer persist error-containing renders**: When a streamed render
+  emits a chunk with `hasErrors: true` (for example a Suspense boundary whose async data fetch hit a
+  transient failure on that one request), the resulting chunk set is no longer written to
+  `Rails.cache`. Under production defaults (`raise_non_shell_server_rendering_errors: false`), a stream
+  whose shell rendered but whose async boundary errored completes "normally", so both stream cache-write
+  paths (`ReactOnRailsPro::StreamCache` for prerender caching and `cached_stream_react_component`'s
+  view-level cache) previously persisted the broken fragment and served it from cache to every
+  subsequent visitor on that key until the entry expired — turning a single transient failure into a
+  persistent outage for that component. Both paths now detect the error chunk and skip the cache write;
+  clean renders are still cached. Fixes
+  [Issue 4581](https://github.com/shakacode/react_on_rails/issues/4581).
+  [PR 4722](https://github.com/shakacode/react_on_rails/pull/4722) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
   disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
   `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
