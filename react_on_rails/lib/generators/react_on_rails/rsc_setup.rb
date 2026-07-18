@@ -358,6 +358,14 @@ module ReactOnRails
         config_path = resolve_server_client_or_both_path
         return unless config_path
 
+        # `content` is read once as a pre-run snapshot; every guard below checks
+        # this snapshot rather than re-reading the file after each gsub_file.
+        # That is safe only because the five transforms are textually
+        # independent — none of the inserted strings satisfies a later guard
+        # (e.g. the import line `const rscWebpackConfig = require(...)` never
+        # contains the invocation marker `rscWebpackConfig()`). Preserve that
+        # invariant: do not add a transform whose output would flip a
+        # subsequent `include?`/`match?` guard, or re-read `content` per step.
         content = File.read(File.join(destination_root, config_path))
 
         unless content.include?("require('./rscWebpackConfig')")
@@ -393,9 +401,15 @@ module ReactOnRails
                 console.log('[React on Rails] Creating only the RSC bundle.');
                 result = rscConfig;
           JS
+          # Anchor on the final bare `} else {` (the default-build branch) rather
+          # than the literal `// default is the standard client and server build`
+          # comment, so a reflowed/reworded/removed comment cannot silently
+          # no-op this insertion — the same fragility class #4630 fixed for the
+          # semicolon/whitespace transforms above. `\} else \{` never matches the
+          # `} else if (...) {` branches, so this stays targeted.
           gsub_file(
             config_path,
-            %r{\n(\s*\} else \{\s*\n\s*// default is the standard client and server build)},
+            /\n(\s*\}\s*else\s*\{\s*\n)/,
             "\n  #{rsc_bundle_handling}\n\\1"
           )
         end

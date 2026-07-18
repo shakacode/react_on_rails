@@ -5063,6 +5063,59 @@ describe RscGenerator, type: :generator do
       expect(result).to include("[clientConfig, serverConfig, rscConfig]")
       expect(result).to include("client, server, and RSC bundles")
     end
+
+    it "inserts the RSC_BUNDLE_ONLY branch even when the default-build comment is removed" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # A linter/user may drop or reword the `// default is the standard client
+      # and server build` comment; the insertion must not depend on it.
+      content_without_comment = server_client_or_both_content(destructured_import: true)
+                                .gsub("    // default is the standard client and server build\n", "")
+      simulate_existing_file(config_path, content_without_comment)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("process.env.RSC_BUNDLE_ONLY")
+      expect(result).to include("result = rscConfig;")
+      # Exactly one RSC_BUNDLE_ONLY branch — the bare `} else {` anchor must not
+      # match the `} else if (...) {` branches.
+      expect(result.scan("process.env.RSC_BUNDLE_ONLY").length).to eq(1)
+    end
+
+    it "inserts the RSC_BUNDLE_ONLY branch when the default-build comment is reworded and reflowed" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      reflowed = server_client_or_both_content(destructured_import: true)
+                 .gsub("    // default is the standard client and server build",
+                       "    // fall through to the combined client + server build")
+                 .gsub("      } else {", "      }else{")
+      simulate_existing_file(config_path, reflowed)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("process.env.RSC_BUNDLE_ONLY")
+      expect(result.scan("process.env.RSC_BUNDLE_ONLY").length).to eq(1)
+    end
+
+    # #4630 core invariant: the third envSpecific arg (rscConfig) is what lets
+    # development.js flip `clientWebpackConfig.lazyCompilation = false` for RSC.
+    # If this rewrite silently no-ops, lazy compilation is left ON. Guard the
+    # exact 3-arg shape development.js's `developmentEnvOnly(client, _server,
+    # rscWebpackConfig)` relies on.
+    it "rewrites envSpecific to the 3-arg form that enables lazyCompilation=false" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      # The rscConfig third arg must be present and truthy at runtime.
+      expect(result).to include("const rscConfig = rscWebpackConfig();")
+      expect(result).to match(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
+      # The pre-RSC 2-arg call must be gone (that shape leaves lazyCompilation on).
+      expect(result).not_to match(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;/)
+    end
   end
 
   # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
