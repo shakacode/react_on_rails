@@ -354,6 +354,39 @@ module ReactOnRails
         say "✅ Updated webpack configs for RSC", :green
       end
 
+      # Structural matchers shared by the ServerClientOrBoth (SCOB) transforms in
+      # update_server_client_or_both_for_rsc / update_scob_default_bundle_output and
+      # their verifier counterparts in check_rsc_scob_config. Each keys off a real
+      # JS declaration/branch/assignment shape rather than a bare substring, so:
+      #   * a stray mention in a comment or string literal cannot suppress a
+      #     transform (which would leave dangling `rscConfig` references →
+      #     `ReferenceError: rscConfig is not defined` at runtime) or fool the
+      #     verifier into reporting a partial setup as complete; and
+      #   * linter whitespace reflow (e.g. `[ clientConfig, serverConfig ]`) is
+      #     tolerated, matching the rest of this file.
+      # A transform's skip-guard and its verifier check use the *same* constant so
+      # the two can never disagree on what "already applied" means.
+      RSC_WEBPACK_CONFIG_IMPORT =
+        %r{const\s+rscWebpackConfig\s*=\s*require\(\s*'\./rscWebpackConfig'\s*\)}
+      RSC_CONFIG_DECLARATION = /const\s+rscConfig\s*=\s*rscWebpackConfig\(\s*\)/
+      ENVSPECIFIC_RSC_CALL = /envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/
+      # The RSC_BUNDLE_ONLY branch, matched by its `process.env.RSC_BUNDLE_ONLY`
+      # condition together with the `result = rscConfig` assignment in its body —
+      # a bare `RSC_BUNDLE_ONLY` comment mention satisfies neither.
+      RSC_BUNDLE_ONLY_BRANCH = /process\.env\.RSC_BUNDLE_ONLY\s*\)[^}]*?result\s*=\s*rscConfig\s*;?/
+      # The 2-element default result array we rewrite, and the 3-element RSC-aware
+      # array it becomes — both fully whitespace tolerant (inner brackets/commas).
+      DEFAULT_RESULT_ARRAY = /result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*\]\s*;?/
+      RSC_RESULT_ARRAY = /result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\]/
+      # The bare `} else {` default-build branch: the one whose body reaches the
+      # 2-element default result assignment with no intervening `}`. The
+      # RSC_BUNDLE_ONLY branch is spliced immediately before it. `[^}]` cannot span
+      # an earlier else's closing brace, so an unrelated earlier `} else {` (e.g. an
+      # `if (envSpecific) {…} else {…}`) is never matched, and `\} else \{` never
+      # matches `} else if (…) {`. Keyed off the default result assignment, not the
+      # `// default …` comment, so comment reflow/reword/removal can't no-op it.
+      DEFAULT_BUILD_BRANCH_ANCHOR = /\n(\s*\}\s*else\s*\{[^}]*?#{DEFAULT_RESULT_ARRAY})/
+
       def update_server_client_or_both_for_rsc
         config_path = resolve_server_client_or_both_path
         return unless config_path
@@ -361,14 +394,14 @@ module ReactOnRails
         # `content` is read once as a pre-run snapshot; every guard below checks
         # this snapshot rather than re-reading the file after each gsub_file.
         # That is safe only because the five transforms are textually
-        # independent — none of the inserted strings satisfies a later guard
-        # (e.g. the import line `const rscWebpackConfig = require(...)` never
-        # contains the invocation marker `rscWebpackConfig()`). Preserve that
-        # invariant: do not add a transform whose output would flip a
-        # subsequent `include?`/`match?` guard, or re-read `content` per step.
+        # independent — each skip-guard matches a distinct real JS shape and none
+        # of the inserted strings satisfies a later guard (e.g. the import line
+        # `const rscWebpackConfig = require(...)` never matches RSC_CONFIG_DECLARATION,
+        # whose identifier is `rscConfig`). Preserve that invariant: do not add a
+        # transform whose output would flip a later guard, or re-read `content`.
         content = File.read(File.join(destination_root, config_path))
 
-        unless content.include?("require('./rscWebpackConfig')")
+        unless content.match?(RSC_WEBPACK_CONFIG_IMPORT)
           server_import_pattern =
             %r{(const\s+(?:\{[^\}]*\}|\w+)\s*=\s*require\('\./serverWebpackConfig'\)\s*;?)}
           gsub_file(
@@ -378,7 +411,7 @@ module ReactOnRails
           )
         end
 
-        unless content.include?("rscWebpackConfig()")
+        unless content.match?(RSC_CONFIG_DECLARATION)
           gsub_file(
             config_path,
             /^(\s*const serverConfig = serverWebpackConfig\(\)\s*;?)$/,
@@ -386,7 +419,7 @@ module ReactOnRails
           )
         end
 
-        unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
+        unless content.match?(ENVSPECIFIC_RSC_CALL)
           gsub_file(
             config_path,
             /envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;?/,
@@ -399,23 +432,8 @@ module ReactOnRails
         update_scob_default_bundle_output(config_path, content)
       end
 
-      # Anchor regex for the default-build branch: the bare `} else {` whose body
-      # assigns the default `result = [clientConfig, serverConfig]`. The RSC_BUNDLE_ONLY
-      # branch is inserted immediately before it. Two properties make this safe:
-      #   1. Correct branch only. `[^}]` cannot span a closing brace, so from any
-      #      *earlier* bare `} else {` (e.g. an `if (envSpecific) {…} else {…}`) the
-      #      lazy run is blocked by that else's own `}` before it can reach the
-      #      default `result = [clientConfig, serverConfig]`. Only the default
-      #      branch — whose body reaches that assignment with no intervening `}` —
-      #      matches. `\} else \{` also never matches `} else if (…) {`.
-      #   2. No comment dependency. The anchor keys off the default `result`
-      #      assignment, not the `// default is the standard client and server build`
-      #      comment, so a reflowed/reworded/removed comment cannot silently no-op it.
-      DEFAULT_BUILD_BRANCH_ANCHOR =
-        /\n(\s*\}\s*else\s*\{[^}]*?result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*\]\s*;?)/
-
       def insert_rsc_bundle_only_branch(config_path, content)
-        return if content.include?("RSC_BUNDLE_ONLY")
+        return if content.match?(RSC_BUNDLE_ONLY_BRANCH)
 
         # Only splice in the branch when exactly one default-build branch is
         # identifiable. Thor's gsub_file replaces every match, so bailing on 0 or
@@ -445,11 +463,11 @@ module ReactOnRails
           )
         end
 
-        return if content.match?(/result\s*=\s*\[clientConfig,\s*serverConfig,\s*rscConfig\]/)
+        return if content.match?(RSC_RESULT_ARRAY)
 
         gsub_file(
           config_path,
-          /result\s*=\s*\[clientConfig,\s*serverConfig\]\s*;?/,
+          DEFAULT_RESULT_ARRAY,
           "result = [clientConfig, serverConfig, rscConfig];"
         )
       end
@@ -661,24 +679,22 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         missing = []
-        unless content.include?("require('./rscWebpackConfig')")
-          missing << "rscWebpackConfig import in ServerClientOrBoth.js"
+        # Each check uses the SAME structural matcher as the corresponding
+        # transform's skip-guard, so a comment/string mention can neither suppress
+        # the transform nor mask its absence, and the two can never disagree.
+        missing << "rscWebpackConfig import in ServerClientOrBoth.js" unless content.match?(RSC_WEBPACK_CONFIG_IMPORT)
+        unless content.match?(RSC_CONFIG_DECLARATION)
+          missing << "rscConfig declaration (const rscConfig = rscWebpackConfig()) in ServerClientOrBoth.js"
         end
-        unless content.include?("rscWebpackConfig()")
-          missing << "rscWebpackConfig() invocation in ServerClientOrBoth.js"
-        end
-        unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
+        unless content.match?(ENVSPECIFIC_RSC_CALL)
           missing << "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
         end
-        # Also verify the two default-branch transforms. These share the
-        # `} else {` anchor in insert_rsc_bundle_only_branch, which deliberately
-        # no-ops on a customized file where a single default branch can't be
-        # identified — so their success is NOT implied by the invocation above,
-        # and a silent miss must be surfaced rather than masked.
-        missing << "RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js" unless content.include?("RSC_BUNDLE_ONLY")
-        unless content.match?(/result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\]/)
-          missing << "RSC-aware default result array in ServerClientOrBoth.js"
-        end
+        # The two default-branch transforms share the `} else {` anchor in
+        # insert_rsc_bundle_only_branch, which deliberately no-ops on a customized
+        # file where a single default branch can't be identified — so their success
+        # is NOT implied by the invocation above and a silent miss must be surfaced.
+        missing << "RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js" unless content.match?(RSC_BUNDLE_ONLY_BRANCH)
+        missing << "RSC-aware default result array in ServerClientOrBoth.js" unless content.match?(RSC_RESULT_ARRAY)
         missing
       end
 

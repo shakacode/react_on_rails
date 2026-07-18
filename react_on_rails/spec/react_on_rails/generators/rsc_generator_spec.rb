@@ -5011,7 +5011,7 @@ describe RscGenerator, type: :generator do
 
       missing = generator.send(:check_rsc_scob_config)
       expect(missing).to include(
-        "rscWebpackConfig() invocation in ServerClientOrBoth.js"
+        "rscConfig declaration (const rscConfig = rscWebpackConfig()) in ServerClientOrBoth.js"
       )
       expect(missing).to include(
         "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
@@ -5042,7 +5042,9 @@ describe RscGenerator, type: :generator do
       expect(missing).to include("RSC-aware default result array in ServerClientOrBoth.js")
       # The three upstream markers are still present, so they must NOT be flagged.
       expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
-      expect(missing).not_to include("rscWebpackConfig() invocation in ServerClientOrBoth.js")
+      expect(missing).not_to include(
+        "rscConfig declaration (const rscConfig = rscWebpackConfig()) in ServerClientOrBoth.js"
+      )
     end
 
     it "verifier returns empty for a fully transformed ServerClientOrBoth" do
@@ -5054,6 +5056,83 @@ describe RscGenerator, type: :generator do
 
       missing = generator.send(:check_rsc_scob_config)
       expect(missing).to eq([])
+    end
+
+    it "inserts the rscConfig declaration even when rscWebpackConfig() appears only in a comment" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # A stray comment mentioning the invocation must NOT trip the skip-guard —
+      # otherwise the `const rscConfig = rscWebpackConfig();` declaration is skipped
+      # while envSpecific/RSC_BUNDLE_ONLY still reference rscConfig, producing
+      # `ReferenceError: rscConfig is not defined` at runtime.
+      with_comment = server_client_or_both_content(destructured_import: true)
+                     .sub("const serverClientOrBoth = (envSpecific) => {",
+                          "// NOTE: rscWebpackConfig() is invoked below\n" \
+                          "const serverClientOrBoth = (envSpecific) => {")
+      simulate_existing_file(config_path, with_comment)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      # Declaration inserted exactly once, and every rscConfig reference is backed.
+      expect(result).to include("const rscConfig = rscWebpackConfig();")
+      expect(result.scan("const rscConfig = rscWebpackConfig();").length).to eq(1)
+      expect(result).to include("envSpecific(clientConfig, serverConfig, rscConfig);")
+      expect(generator.send(:check_rsc_scob_config)).to eq([])
+    end
+
+    it "inserts the RSC_BUNDLE_ONLY branch even when RSC_BUNDLE_ONLY appears only in a comment" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # A stray comment mentioning RSC_BUNDLE_ONLY must not make the branch
+      # insertion silently no-op via a loose substring guard.
+      with_comment = server_client_or_both_content(destructured_import: true)
+                     .sub("  let result;",
+                          "  // RSC_BUNDLE_ONLY handling is added below\n  let result;")
+      simulate_existing_file(config_path, with_comment)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("} else if (process.env.RSC_BUNDLE_ONLY) {")
+      expect(result.scan("result = rscConfig;").length).to eq(1)
+      expect(generator.send(:check_rsc_scob_config)).to eq([])
+    end
+
+    it "verifier flags a stray RSC_BUNDLE_ONLY comment mention as a missing branch" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Fully transform, then replace the real branch with a bare comment mention.
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
+      generator.send(:update_server_client_or_both_for_rsc)
+      full = File.read(File.join(destination_root, config_path))
+      stray = full.sub(/  \} else if \(process\.env\.RSC_BUNDLE_ONLY\) \{.*?result = rscConfig;\n/m,
+                       "  // RSC_BUNDLE_ONLY branch removed by a downstream tool\n")
+      File.write(File.join(destination_root, config_path), stray)
+
+      # The loose substring `RSC_BUNDLE_ONLY` is still present, but the structural
+      # matcher (condition + `result = rscConfig`) is not, so it is flagged.
+      missing = generator.send(:check_rsc_scob_config)
+      expect(missing).to include("RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js")
+    end
+
+    it "recognizes an inner-bracket-spaced result array as already RSC-aware (no double transform)" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
+      generator.send(:update_server_client_or_both_for_rsc)
+      full = File.read(File.join(destination_root, config_path))
+      # Simulate a linter reflowing the array with inner-bracket spaces.
+      reflowed = full.sub("result = [clientConfig, serverConfig, rscConfig];",
+                          "result = [ clientConfig, serverConfig, rscConfig ];")
+      File.write(File.join(destination_root, config_path), reflowed)
+
+      generator2 = described_class.new([], {}, { destination_root: })
+      generator2.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("result = [ clientConfig, serverConfig, rscConfig ];")
+      # Not double-rewritten into a broken/duplicated array.
+      expect(result.scan(/result\s*=\s*\[[^\]]*rscConfig[^\]]*\]/).length).to eq(1)
+      expect(generator2.send(:check_rsc_scob_config)).to eq([])
     end
 
     it "is idempotent across consecutive runs" do
