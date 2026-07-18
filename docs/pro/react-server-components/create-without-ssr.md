@@ -78,7 +78,11 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 // use the same config as serverWebpackConfig.js but add the RSC loader
 const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
-const serverWebpackConfig = require('./serverWebpackConfig');
+const serverWebpackModule = require('./serverWebpackConfig');
+// Backward compatibility:
+// - New Pro config exports: { default: configureServer, extractLoader }
+// - Legacy config exports: module.exports = configureServer
+const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
 // React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
@@ -92,23 +96,21 @@ const resolveReactServerEntry = (entryFilename) => {
   return entryPath;
 };
 
-// Function that extracts a specific loader from a webpack rule
-function extractLoader(rule, loaderName) {
-  return rule.use.find((item) => {
-    let testValue;
-
-    if (typeof item === 'string') {
-      testValue = item;
-    } else if (typeof item.loader === 'string') {
-      testValue = item.loader;
-    }
-
-    return testValue.includes(loaderName);
+// Function that extracts a specific loader from a webpack rule.
+// Prefer the helper exported by the Pro server config when present; otherwise fall back.
+const extractLoader =
+  serverWebpackModule.extractLoader ||
+  ((rule, loaderName) => {
+    if (!Array.isArray(rule.use)) return null;
+    return rule.use.find((item) => {
+      const testValue = typeof item === 'string' ? item : item.loader;
+      return testValue && testValue.includes(loaderName);
+    });
   });
-}
 
 const configureRsc = () => {
-  const rscConfig = serverWebpackConfig();
+  // Pass true to skip the RSC manifest plugin - the RSC bundle doesn't need it.
+  const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`
   const rscEntry = {
@@ -116,14 +118,31 @@ const configureRsc = () => {
   };
   rscConfig.entry = rscEntry;
 
-  // Add the RSC loader before the babel loader
+  // Add the RSC WebpackLoader to the JS rule's loader chain.
+  // This loader replaces 'use client' files with registerClientReference proxies in the RSC bundle.
+  // Webpack loaders execute right-to-left, so appending makes the RSC loader run first (before babel/swc).
   const rules = rscConfig.module.rules;
   rules.forEach((rule) => {
-    if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
-      // If your project uses a different JS loader, insert it before that loader instead.
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader) {
+    if (typeof rule.use === 'function') {
+      // SWC transpiler defines rule.use as a function: use: ({ resource }) => getSwcLoaderConfig(resource)
+      // Wrap it to append the RSC WebpackLoader to the returned loader(s).
+      const originalUse = rule.use;
+      // Must use `function` (not arrow) so `.call(this, data)` forwards webpack's context.
+      rule.use = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        const resultArray = Array.isArray(result) ? result : result ? [result] : [];
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        if (jsLoader) {
+          return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
+        }
+        return result;
+      };
+    } else if (Array.isArray(rule.use)) {
+      // Babel transpiler defines rule.use as a static array.
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
         rule.use.push({
           loader: 'react-on-rails-rsc/WebpackLoader',
         });
@@ -168,6 +187,10 @@ const configureRsc = () => {
 module.exports = configureRsc;
 ```
 
+> **Note:** This config uses the same core RSC webpack patterns as the template that ships with the `react_on_rails:rsc` generator, which is the canonical, maintained version. Two details matter here: `serverWebpackConfig(true)` skips the RSC manifest plugin (the RSC bundle must not inherit it — this requires the `rscBundle` guard added to `serverWebpackConfig.js` in step 5), and the loader insertion handles both `babel-loader` and `swc-loader` (including SWC's function-form `rule.use`) so SWC projects still get the RSC loader. If your project transpiles JS with a loader other than Babel or SWC, add its name to the `extractLoader(...)` checks — otherwise the RSC loader is silently not inserted for that rule and the RSC bundle will not exclude `'use client'` modules.
+>
+> These minimal snippets intentionally omit **scoped client-reference discovery**. Because `RSCWebpackPlugin` is used without a `clientReferences` option, it falls back to a **broad scan** of every `'use client'` module — the original, working behavior. The generator additionally wires the reference-discovery build (`bin/shakapacker-precompile-hook` generates a scoped `ssr-generated/rsc-client-references.json`) so only the client references actually reachable through the server-component graph are bundled. Scoped discovery is a build-time optimization, not a correctness requirement for this manual setup. For that production-grade wiring, generate the config with `react_on_rails:rsc` or follow [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md).
+
 Add the new RSC Webpack configuration to the bundle configuration returned by `webpackConfig` function in `config/webpack/ServerClientOrBoth.js` file:
 
 ```js
@@ -208,7 +231,7 @@ This change will make the bundling process generate a new bundle named `rsc-bund
 Then, we need to tell React on Rails to upload the `rsc-bundle.js` file to the renderer while uploading the server bundle.
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_bundle_js_file = "rsc-bundle.js"
 end
@@ -239,16 +262,26 @@ module.exports = configureClient;
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 // existing code...
 
-const configureServer = () => {
+// Accept an `rscBundle` flag so the RSC bundle can reuse this config without the
+// client-manifest plugin. `rscWebpackConfig.js` calls `serverWebpackConfig(true)`;
+// the regular server build calls it with no argument (`rscBundle` defaults to `false`).
+const configureServer = (rscBundle = false) => {
   // existing code...
 
-  config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  // The RSC bundle must not inherit the client-manifest plugin, so only add it
+  // for the actual server bundle. Without this guard the `serverWebpackConfig(true)`
+  // call in `rscWebpackConfig.js` has no effect and the RSC bundle still gets the plugin.
+  if (!rscBundle) {
+    config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
 
   return config;
 };
 
 module.exports = configureServer;
 ```
+
+> **Note:** The `react_on_rails:rsc` generator's Pro config exports `{ default: configureServer, extractLoader }` and updates its importers to destructure that shape, but this minimal manual snippet keeps the simple function export so existing `serverWebpackConfig()` consumers (such as your `ServerClientOrBoth.js`) keep working. The `rscWebpackConfig.js` snippet above already tolerates both export shapes.
 
 ## Create a React Server Component
 
