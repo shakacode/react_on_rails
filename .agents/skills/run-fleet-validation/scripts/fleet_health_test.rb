@@ -40,6 +40,24 @@ class FleetHealthTest < Minitest::Test
     )
   end
 
+  def test_required_review_app_requires_an_exact_workflow_path
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    manifest.fetch("repos").first.fetch("standing_health")["review_app_workflow"] = " "
+
+    error = assert_raises(FleetValidation::ManifestError) do
+      FleetValidation::FleetHealth.new(
+        manifest:,
+        pack_id: "missing-review-app-path",
+        release: "v17.0.0",
+        rsc_version: "19.2.1",
+        policy_commit: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        generated_at: "2026-07-18T12:00:00Z"
+      )
+    end
+
+    assert_includes error.message, "review_app_workflow"
+  end
+
   def test_active_drift_blocks_aggregate_while_soft_and_archived_targets_are_report_only
     evidence = @contract.evaluate(
       observations: @observations,
@@ -417,7 +435,7 @@ class FleetHealthTest < Minitest::Test
             { "path" => ".github/workflows/demo-fleet-smoke.yml", "name" => "Demo fleet smoke" },
             {
               "id" => 42,
-              "path" => ".github/workflows/cpflow-review-app.yml",
+              "path" => ".github/workflows/cpflow-deploy-review-app.yml",
               "name" => "Review app",
               "state" => "active",
               "html_url" => "https://example.invalid/workflow"
@@ -465,7 +483,7 @@ class FleetHealthTest < Minitest::Test
     repo = target.fetch("name")
     workflow = {
       "id" => 42,
-      "path" => ".github/workflows/cpflow-review-app.yml",
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
       "name" => "Review app",
       "state" => "active",
       "html_url" => "https://example.invalid/workflow"
@@ -497,6 +515,91 @@ class FleetHealthTest < Minitest::Test
     assert_equal "unknown", pending.fetch("status")
     assert_equal "unknown", missing_run.fetch("status")
     assert_equal "unknown", absent_workflow.fetch("status")
+  end
+
+  def test_review_app_ignores_staging_when_policy_does_not_require_a_review_app
+    target = @contract.targets.first.merge(
+      "review_app" => "not_required",
+      "review_app_workflow" => nil
+    )
+    staging_workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/cpflow-deploy-staging.yml",
+      "name" => "Deploy staging",
+      "state" => "active",
+      "html_url" => "https://example.invalid/staging-workflow"
+    }
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end.new([
+              {
+                "status" => "completed",
+                "conclusion" => "success",
+                "html_url" => "https://example.invalid/staging-run",
+                "updated_at" => "2026-07-18T10:00:00Z"
+              }
+            ])
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(:review_app_status, target.fetch("name"), target, [staging_workflow])
+
+    assert_equal "not_applicable", status.fetch("status")
+  end
+
+  def test_review_app_ignores_auxiliary_failure_when_exact_deploy_review_workflow_passes
+    target = @contract.targets.first
+    exact_workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active",
+      "html_url" => "https://example.invalid/review-workflow"
+    }
+    cleanup_workflow = {
+      "id" => 43,
+      "path" => ".github/workflows/cpflow-cleanup-review-app.yml",
+      "name" => "Cleanup review app",
+      "state" => "active",
+      "html_url" => "https://example.invalid/cleanup-workflow"
+    }
+    client = Struct.new(:responses) do
+      def get(path)
+        responses.fetch(path)
+      end
+    end.new({
+              "/repos/#{target.fetch('name')}/actions/workflows/42/runs?per_page=1" => {
+                "workflow_runs" => [
+                  {
+                    "status" => "completed",
+                    "conclusion" => "success",
+                    "html_url" => "https://example.invalid/review-run",
+                    "updated_at" => "2026-07-18T10:00:00Z"
+                  }
+                ]
+              },
+              "/repos/#{target.fetch('name')}/actions/workflows/43/runs?per_page=1" => {
+                "workflow_runs" => [
+                  {
+                    "status" => "completed",
+                    "conclusion" => "failure",
+                    "html_url" => "https://example.invalid/cleanup-run",
+                    "updated_at" => "2026-07-18T11:00:00Z"
+                  }
+                ]
+              }
+            })
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(
+                                                 :review_app_status,
+                                                 target.fetch("name"),
+                                                 target,
+                                                 [exact_workflow, cleanup_workflow]
+                                               )
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes status.fetch("evidence"), "review-run"
+    refute_includes status.fetch("evidence"), "cleanup-run"
   end
 
   def test_public_github_probe_degrades_a_target_failure_to_unknown

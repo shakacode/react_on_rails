@@ -30,6 +30,9 @@
 #                    `cpflow_app_name` must be non-null before `verify: true` can
 #                    be cleared; a null name inside the block is an unverified
 #                    placeholder. The orchestrator skips smoke when no app is set.
+#   standing_health.review_app_workflow
+#                  — exact public workflow path used for standing review-app
+#                    evidence when `standing_health.review_app: required`.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
@@ -140,7 +143,7 @@ repos:
     standing_health:
       public: true
       disposition: active
-      review_app: required
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -170,6 +173,7 @@ repos:
       public: true
       disposition: active
       review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -192,6 +196,7 @@ repos:
       public: true
       disposition: active
       review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -213,6 +218,7 @@ repos:
       public: true
       disposition: active
       review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -233,6 +239,7 @@ repos:
       public: true
       disposition: active
       review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -256,6 +263,7 @@ repos:
       public: true
       disposition: active
       review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }

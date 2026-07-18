@@ -99,10 +99,11 @@ After stable publication, generate a fresh public standing-health pack with
 exact public registry artifacts across both gems, all four unified-version npm packages, and the
 independently versioned RSC package. Direct-lock currency comes only from root `DEPENDS_ON` SPDX
 relationships; mixed direct versions block and missing root identity fails closed. Default CI and
-smoke stay bound to public default heads, while PR-only review-app capability uses the configured
-workflow's latest public run URL and timestamp. Keep soft-track and archived findings report-only.
-This pack is evidence for fleet currency and capability drift; it is not a replacement for the
-candidate ledger or a release-promotion signal.
+smoke stay bound to public default heads, while PR-only review-app capability uses the exact
+`standing_health.review_app_workflow` public path and its latest public run URL and timestamp.
+Staging, cleanup, delete, help, and promotion workflows never substitute for that path. Keep
+soft-track and archived findings report-only. This pack is evidence for fleet currency and
+capability drift; it is not a replacement for the candidate ledger or a release-promotion signal.
 
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.

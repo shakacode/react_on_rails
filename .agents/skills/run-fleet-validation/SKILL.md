@@ -66,8 +66,10 @@ independently versioned `react-on-rails-rsc`, before inspecting public default h
 `fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`. Currency uses only direct
 root `DEPENDS_ON` packages from each public SPDX SBOM and rejects mixed direct versions; missing
 root identity fails closed. CI and reusable-smoke evidence remains exact-default-head, while
-PR-only review-app capability uses the configured public workflow and its latest public run URL
-and timestamp. Active public targets block on missing, stale, failed, or unknown required evidence.
+PR-only review-app capability uses the exact `standing_health.review_app_workflow` public path and
+its latest public run URL and timestamp. Staging, cleanup, delete, help, and promotion workflows
+never substitute for that path. Active public targets block on missing, stale, failed, or unknown
+required evidence.
 Report-only and archived targets retain findings without blocking the aggregate. The scheduled
 `.github/workflows/demo-fleet-health.yml` run uploads the same three evidence files.
 

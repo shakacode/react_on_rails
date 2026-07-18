@@ -231,23 +231,19 @@ module FleetValidation
     end
 
     def review_app_status(repo, target, workflows)
-      review_workflows = workflows.select do |workflow|
-        review_app_name?(workflow["name"]) || review_app_name?(workflow["path"])
-      end
-      if review_workflows.empty? && target.fetch("review_app") == "not_required"
+      if target.fetch("review_app") == "not_required"
         return evidence_status("not_applicable", "Review app is not required by public fleet policy")
       end
-      return evidence_status("unknown", "Required review-app workflow was not found") if review_workflows.empty?
 
-      statuses = review_workflows.map { |workflow| review_workflow_status(repo, workflow) }
-      aggregate_status = if statuses.any? { |status| status["status"] == "blocked" }
-                           "blocked"
-                         elsif statuses.any? { |status| status["status"] == "unknown" }
-                           "unknown"
-                         else
-                           "passed"
-                         end
-      evidence_status(aggregate_status, statuses.filter_map { |status| status["evidence"] }.join("; "))
+      workflow_path = target["review_app_workflow"]
+      unless workflow_path.is_a?(String) && !workflow_path.empty?
+        return evidence_status("unknown", "Required review-app workflow path is not configured")
+      end
+
+      workflow = workflows.find { |candidate| candidate["path"] == workflow_path }
+      return evidence_status("unknown", "Configured review-app workflow was not found: #{workflow_path}") unless workflow
+
+      review_workflow_status(repo, workflow)
     end
 
     def review_workflow_status(repo, workflow)
@@ -316,10 +312,6 @@ module FleetValidation
 
     def smoke_name?(value)
       value.to_s.match?(/smoke/i)
-    end
-
-    def review_app_name?(value)
-      value.to_s.match?(/review.?app|cpflow/i)
     end
   end
 
@@ -478,12 +470,24 @@ module FleetValidation
           raise ManifestError, "#{repo['name']} soft_track cannot be active standing health"
         end
 
+        review_app = health.fetch("review_app", "not_required")
+        unless %w[required not_required].include?(review_app)
+          raise ManifestError, "#{repo['name']} standing_health.review_app is invalid"
+        end
+
+        review_app_workflow = health["review_app_workflow"]
+        if review_app == "required" && !exact_workflow_path?(review_app_workflow)
+          raise ManifestError,
+                "#{repo['name']} standing_health.review_app_workflow must be an exact .github/workflows YAML path"
+        end
+
         {
           "id" => slug(repo.fetch("name")),
           "name" => repo.fetch("name"),
           "tier" => repo.fetch("tier"),
           "disposition" => disposition,
-          "review_app" => health.fetch("review_app", "not_required"),
+          "review_app" => review_app,
+          "review_app_workflow" => review_app_workflow,
           "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
         }
       end
@@ -498,6 +502,7 @@ module FleetValidation
           "tier" => "soft_track",
           "disposition" => "archived",
           "review_app" => "not_required",
+          "review_app_workflow" => nil,
           "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
         }
       end
@@ -507,6 +512,10 @@ module FleetValidation
       raise ManifestError, "standing health has no public targets" if selected.empty?
 
       selected
+    end
+
+    def exact_workflow_path?(value)
+      value.is_a?(String) && value.match?(%r{\A\.github/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml\z})
     end
 
     def evaluate_registry(artifacts)

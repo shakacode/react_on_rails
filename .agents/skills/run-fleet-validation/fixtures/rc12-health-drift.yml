@@ -20,6 +20,7 @@ manifest:
         public: true
         disposition: active
         review_app: required
+        review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     - name: sanitized/active-drifted
       headline: Active drifted demo
       tier: hard_gate
@@ -31,6 +32,7 @@ manifest:
         public: true
         disposition: active
         review_app: required
+        review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     - name: sanitized/report-only
       headline: Report-only historical demo
       tier: soft_track
