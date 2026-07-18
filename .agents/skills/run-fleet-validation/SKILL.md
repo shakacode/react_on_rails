@@ -136,7 +136,8 @@ check/review evidence that does not match the immutable audited/reviewed/current
 mutable-app check evidence that does not match the reconciled current base revision,
 missing package/check/baseline evidence, unowned
 blockers, inactive blockers still referenced by blocked outcomes, blockers whose status remains
-`UNKNOWN`, contradictory tracker promotion, private-only fields, missing required paths,
+`UNKNOWN`, release blockers paired with `hold` or `recommend` promotion, `blocked` promotion without
+a release blocker, private-only fields, missing required paths,
 non-independent audit, base movement,
 authority/freeze conflict, and missing default reachability/tree parity.
 The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven

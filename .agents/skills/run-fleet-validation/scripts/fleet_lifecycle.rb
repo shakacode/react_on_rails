@@ -1710,7 +1710,11 @@ module FleetValidation
       if tracker["status"] == "posted" && !present?(tracker["comment_url"])
         errors << "posted tracker closeout is missing comment_url"
       end
-      if tracker["promotion"] == "blocked" && !release_blocked?
+      if release_blocked?
+        unless tracker["promotion"] == "blocked"
+          errors << "tracker promotion must be blocked while a release blocker remains"
+        end
+      elsif tracker["promotion"] == "blocked"
         errors << "tracker promotion is blocked without a release blocker"
       end
       errors

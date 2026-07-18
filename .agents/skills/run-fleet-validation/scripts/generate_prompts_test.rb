@@ -1855,6 +1855,31 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "tracker promotion is blocked without a release blocker"
   end
 
+  def test_tracker_must_claim_blocked_when_a_release_blocker_remains
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "release-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/release-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "tracker promotion must be blocked while a release blocker remains"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
   def test_result_ledger_schema_closes_public_blocker_and_review_app_shapes
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)

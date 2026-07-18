@@ -158,7 +158,8 @@ commit, plus the ledger's unique public preflight-marker record, must match the 
 snapshot before any distributed app work can validate.
 Resolved package entries use the canonical `registry` source so local workspace/path overrides
 cannot stand in for published artifacts. Blocked outcomes must reference active owned blockers, and
-tracker promotion must agree with whether a release blocker remains.
+tracker promotion must be `blocked` exactly when a release blocker remains; `hold` is only a
+non-gating partial disposition.
 Waived and deferred blockers additionally retain a durable owner and need a structured disposition
 naming the gate, authority, evidence URL, and public-safe reason. A failed required path may close
 the run as `BLOCKED` only with its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
