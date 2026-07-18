@@ -82,6 +82,10 @@ module ReactOnRailsPro
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
     DEFAULT_ROLLING_DEPLOY_ADAPTER = nil
     DEFAULT_ROLLING_DEPLOY_TOKEN = nil
+    # Two knobs, both default-unset: `*_URL` is the original single-origin form
+    # (kept for backward compatibility); `*_URLS` is the newer ordered-multi-origin
+    # form. Configure only one — the plural reader falls back to the singular and
+    # setup rejects setting both. See `rolling_deploy_previous_urls` below.
     DEFAULT_ROLLING_DEPLOY_PREVIOUS_URL = nil
     DEFAULT_ROLLING_DEPLOY_PREVIOUS_URLS = nil
     DEFAULT_ROLLING_DEPLOY_MOUNT_PATH = "/react_on_rails_pro/rolling_deploy"
