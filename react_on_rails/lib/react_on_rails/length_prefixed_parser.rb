@@ -26,7 +26,9 @@ module ReactOnRails
     # stays valid regardless of the input string's encoding, which may be binary.
     REPLACEMENT_CHAR_ESCAPE = '\ufffd'
     FOUR_HEX_DIGITS = /\A[0-9a-fA-F]{4}\z/
-    private_constant :REPLACEMENT_CHAR_ESCAPE, :FOUR_HEX_DIGITS
+    BACKSLASH_BYTE = 0x5C # "\\"
+    LOWER_U_BYTE = 0x75   # "u"
+    private_constant :REPLACEMENT_CHAR_ESCAPE, :FOUR_HEX_DIGITS, :BACKSLASH_BYTE, :LOWER_U_BYTE
 
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
     # Used by the non-streaming rendering path where ExecJS/node renderer returns a single result.
@@ -69,14 +71,20 @@ module ReactOnRails
     end
 
     # Replaces only genuinely LONE \uXXXX surrogate escapes with the U+FFFD
-    # replacement escape, leaving everything else byte-for-byte intact.
+    # replacement escape, leaving every other byte intact.
     #
-    # This walks the string left to right rather than using a global regex so it
-    # gets three things right that a naive gsub does not:
+    # The scan runs at the BYTE level (mirroring #feed / #try_parse_header in this
+    # file). Every meaningful token — "\\", "u", the four hex digits — is
+    # single-byte ASCII, so byte scanning is O(n) regardless of the payload's
+    # encoding (character indexing would be O(n^2) on multibyte text) and, because
+    # byteslice/getbyte never raise on invalid byte sequences, it also cannot turn
+    # a genuinely-corrupt-UTF-8 input into a non-JSON exception on the retry path.
+    #
+    # It gets three things right that a naive global regex does not:
     #   * Backslash parity — a "\u..." is a real escape only when the backslash
     #     before "u" is itself unescaped. In "\\uD83D" the backslash is escaped,
     #     so "uD83D" is literal text and must not be rewritten. Consuming "\\" as
-    #     one unit makes the following "u" an ordinary character.
+    #     one unit makes the following "u" an ordinary byte.
     #   * Pairing — a high surrogate (U+D800..U+DBFF) is kept only when it is
     #     immediately followed by a low surrogate (U+DC00..U+DFFF); the valid pair
     #     passes through untouched. A high surrogate followed by anything else, and
@@ -84,69 +92,68 @@ module ReactOnRails
     #   * No over-consumption — a non-surrogate escape (e.g. "A") is never
     #     swallowed as part of a pair.
     #
-    # The replacement is an ASCII \u escape (not a literal multibyte char) so the
-    # output stays valid regardless of the input string's encoding, which may be
-    # binary. Best-effort recovery for already-malformed input, so it runs only on
-    # the JSON::ParserError retry path and never on the happy path.
+    # The replacement is an ASCII \u escape so the output stays valid regardless of
+    # encoding. It runs only on the JSON::ParserError retry path, never the happy
+    # path. Genuinely-invalid UTF-8 bytes pass through unchanged, so the caller's
+    # second JSON.parse surfaces them as an ordinary JSON::ParserError, not a new type.
     def self.sanitize_unpaired_surrogates(str)
-      out = String.new(encoding: str.encoding)
+      bytes = str.b
+      out = String.new(encoding: Encoding::BINARY)
       index = 0
-      length = str.length
+      length = bytes.bytesize
 
       while index < length
-        chunk, advance = next_sanitized_token(str, index, length)
+        chunk, advance = next_sanitized_token(bytes, index, length)
         out << chunk
         index += advance
       end
 
-      out
+      out.force_encoding(str.encoding)
     end
 
-    # Returns [text_to_emit, characters_consumed] for the token at +index+.
-    def self.next_sanitized_token(str, index, length)
-      code = unicode_escape_codepoint(str, index, length)
-      return non_escape_token(str, index, length) if code.nil?
-      return surrogate_token(str, index, length, code) if code.between?(0xD800, 0xDFFF)
+    # Returns [bytes_to_emit, bytes_consumed] for the token at +index+.
+    def self.next_sanitized_token(bytes, index, length)
+      code = unicode_escape_codepoint(bytes, index, length)
+      return non_escape_token(bytes, index, length) if code.nil?
+      return surrogate_token(bytes, index, length, code) if code.between?(0xD800, 0xDFFF)
 
-      [str[index, 6], 6] # ordinary non-surrogate \uXXXX escape
+      [bytes.byteslice(index, 6), 6] # ordinary non-surrogate \uXXXX escape
     end
-    private_class_method :next_sanitized_token
 
-    # A "\X" escape is consumed as one unit so an escaped backslash can't be
-    # misread as the start of a \u escape; any other character is verbatim.
-    def self.non_escape_token(str, index, length)
-      return [str[index, 2], 2] if str[index] == "\\" && index + 1 < length
+    # A "\X" escape is consumed as one two-byte unit so an escaped backslash can't
+    # be misread as the start of a \u escape; any other byte is emitted verbatim.
+    def self.non_escape_token(bytes, index, length)
+      return [bytes.byteslice(index, 2), 2] if bytes.getbyte(index) == BACKSLASH_BYTE && index + 1 < length
 
-      [str[index], 1]
+      [bytes.byteslice(index, 1), 1]
     end
-    private_class_method :non_escape_token
 
     # A high surrogate is kept only when immediately followed by a low surrogate;
     # otherwise it (or a lone low surrogate) becomes the U+FFFD replacement escape.
-    def self.surrogate_token(str, index, length, code)
+    def self.surrogate_token(bytes, index, length, code)
       if code.between?(0xD800, 0xDBFF)
-        low = unicode_escape_codepoint(str, index + 6, length)
-        return [str[index, 12], 12] if low&.between?(0xDC00, 0xDFFF)
+        low = unicode_escape_codepoint(bytes, index + 6, length)
+        return [bytes.byteslice(index, 12), 12] if low&.between?(0xDC00, 0xDFFF)
       end
 
       [REPLACEMENT_CHAR_ESCAPE, 6]
     end
-    private_class_method :surrogate_token
 
-    # Returns the codepoint of a genuine six-character \uXXXX escape starting at
+    # Returns the codepoint of a genuine six-byte \uXXXX escape starting at
     # +index+, or nil when +index+ does not begin one. Callers reach this position
-    # only after two-character "\X" escapes have been consumed as a unit, so a
-    # leading backslash here is always unescaped (odd backslash parity).
-    def self.unicode_escape_codepoint(str, index, length)
+    # only after two-byte "\X" escapes have been consumed as a unit, so a leading
+    # backslash here is always unescaped (odd backslash parity).
+    def self.unicode_escape_codepoint(bytes, index, length)
       return nil unless index + 6 <= length
-      return nil unless str[index] == "\\" && str[index + 1] == "u"
+      return nil unless bytes.getbyte(index) == BACKSLASH_BYTE && bytes.getbyte(index + 1) == LOWER_U_BYTE
 
-      hex = str[index + 2, 4]
+      hex = bytes.byteslice(index + 2, 4)
       return nil unless hex.match?(FOUR_HEX_DIGITS)
 
       hex.to_i(16)
     end
-    private_class_method :unicode_escape_codepoint
+
+    private_class_method :next_sanitized_token, :non_escape_token, :surrogate_token, :unicode_escape_codepoint
 
     def initialize
       # Binary encoding ensures correct byte-position arithmetic regardless of payload encoding.

@@ -274,7 +274,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     end
 
     it "preserves valid surrogate pairs" do
-      json = '{"html":"Hi 😀"}'
+      json = '{"html":"Hi \uD83D\uDE00"}'
       expect(described_class.parse_json_lenient(json)).to eq("html" => "Hi \u{1F600}")
     end
 
@@ -285,7 +285,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
 
   describe ".sanitize_unpaired_surrogates" do
     it "leaves valid surrogate pairs and non-surrogate escapes untouched" do
-      json = '{"a":"😀","b":"A"}'
+      json = '{"a":"\uD83D\uDE00","b":"A"}'
       expect(described_class.sanitize_unpaired_surrogates(json)).to eq(json)
     end
 
@@ -318,7 +318,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     it "does not mis-pair a lone surrogate with a following field's data" do
       # A lone high surrogate in "bad" must not consume the "ok" field: "ok"
       # still decodes to A + U+1F600, and only "bad" becomes U+FFFD.
-      result = recovered('{"bad":"\uD83D","ok":"A😀"}')
+      result = recovered('{"bad":"\uD83D","ok":"A\uD83D\uDE00"}')
       expect(result).to eq("bad" => "�", "ok" => "A\u{1F600}")
     end
 
@@ -334,7 +334,7 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     it "keeps a valid surrogate pair that is adjacent to a lone surrogate" do
       # Escaped valid pair followed by a lone high surrogate: the pair survives
       # as U+1F600 and only the trailing lone high surrogate becomes U+FFFD.
-      result = recovered('{"h":"😀\uD83D"}')
+      result = recovered('{"h":"\uD83D\uDE00\uD83D"}')
       expect(result["h"]).to eq("\u{1F600}�")
     end
 
@@ -359,6 +359,53 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       expect { result = described_class.parse_one_chunk_result(payload) }.not_to raise_error
       expect(result["html"]).to be_a(Hash)
       expect(result["html"]["html"].valid_encoding?).to be(true)
+    end
+  end
+
+  # Regression for issue #4710 review: the byte-level sanitizer must never turn
+  # a genuinely-invalid-UTF-8 input into a non-JSON exception on the retry path,
+  # and must stay O(n)/correct on large multibyte payloads.
+  describe "encoding safety and multibyte payloads" do
+    # Mirrors the real caller, which force_encodes render bytes to UTF-8 without
+    # validating them, so the sanitizer can receive genuinely-invalid byte runs.
+    def utf8(bytes)
+      bytes.dup.force_encoding(Encoding::UTF_8)
+    end
+
+    it "never raises on genuinely-invalid UTF-8 bytes and preserves them" do
+      input = utf8("{\"h\":\"a\xFFb\\uD83D\"}")
+      expect(input.valid_encoding?).to be(false)
+
+      out = nil
+      expect { out = described_class.sanitize_unpaired_surrogates(input) }.not_to raise_error
+      expect(out.bytes).to include(0xFF) # corrupt byte passed through untouched
+      expect(out).to include('\\ufffd') # the lone surrogate still became U+FFFD
+    end
+
+    it "degrades an invalid-byte object payload to a ParseError, never a new type" do
+      raw_content = utf8("{\"html\":\"a\xFFb\\uD83D\",\"consoleReplayScript\":\"\"}")
+      metadata = { "payloadType" => "object" }.to_json
+      payload = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+
+      # Whatever happens, it must be either a clean parse or the parser's own
+      # ParseError — not ArgumentError/EncodingError from scanning invalid bytes.
+      expect do
+        described_class.parse_one_chunk_result(payload)
+      rescue described_class::ParseError
+        # acceptable graceful degradation
+      end.not_to raise_error
+    end
+
+    it "recovers a lone surrogate embedded in a large multibyte payload" do
+      big = "日本語テキスト" * 500
+      recovered = JSON.parse(described_class.sanitize_unpaired_surrogates(%({"h":"#{big}\\uD83D#{big}"})))
+      expect(recovered["h"]).to eq("#{big}�#{big}")
+    end
+
+    it "preserves an escaped valid pair inside a large multibyte payload" do
+      big = "日本語テキスト" * 500
+      recovered = JSON.parse(described_class.sanitize_unpaired_surrogates(%({"h":"#{big}\\uD83D\\uDE00"})))
+      expect(recovered["h"]).to eq("#{big}\u{1F600}")
     end
   end
 end
