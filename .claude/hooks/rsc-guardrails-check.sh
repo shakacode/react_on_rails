@@ -117,7 +117,16 @@ detect_multiline_dangerously_set_inner_html() {
   local file="$1"
   local -r max_lookahead=5
   local -a lines=()
-  local line la val first_char found leading n i j
+  local line la val found leading n i j sq pure_single pure_double pure_template
+
+  # A value is exempt only when it is a SINGLE self-contained literal with nothing appended. Anchored
+  # (^…$) so a value that merely STARTS with a literal and then concatenates/interpolates user data
+  # (e.g. `'<b>' + userHtml`) is NOT treated as a pure literal and still warns.
+  sq="'"
+  pure_single="^${sq}[^${sq}]*${sq}\$"
+  pure_double='^"[^"]*"$'
+  # shellcheck disable=SC2016  # literal backticks/$ are the regex we want, not command substitution
+  pure_template='^`[^`]*`$'
 
   while IFS= read -r line || [ -n "$line" ]; do
     lines+=("$line")
@@ -147,17 +156,17 @@ detect_multiline_dangerously_set_inner_html() {
         if printf '%s' "$val" | grep -Eq -- '^(string|TrustedHTML)([[:space:]]*\|[[:space:]]*(string|TrustedHTML))*$'; then
           break
         fi
-        first_char="${val:0:1}"
-        # Plain quoted string literal — not user-controlled.
-        if [ "$first_char" = "'" ] || [ "$first_char" = '"' ]; then
+        # Whole value is a single quoted string literal (nothing concatenated) — not user-controlled.
+        if printf '%s' "$val" | grep -Eq -- "$pure_single" \
+          || printf '%s' "$val" | grep -Eq -- "$pure_double"; then
           break
         fi
-        # Template literal with no `${...}` interpolation — also not user-controlled.
+        # Whole value is a template literal with no `${...}` interpolation — also not user-controlled.
         # shellcheck disable=SC2016  # literal ${ is intentional; we are searching for the token, not expanding it
-        if [ "$first_char" = '`' ] && ! printf '%s' "$val" | grep -qF -- '${'; then
+        if printf '%s' "$val" | grep -Eq -- "$pure_template" && ! printf '%s' "$val" | grep -qF -- '${'; then
           break
         fi
-        # Anything else (variable, member access, call, interpolated template) is a real raw-HTML sink.
+        # Anything else (variable, member access, call, interpolated/concatenated literal) is a real sink.
         found=1
         break
       fi
@@ -234,7 +243,7 @@ esac
 DANGEROUSLY_SET_INNER_HTML_PATTERN="dangerouslySetInnerHTML[[:space:]]*(=([^=]|\$)|:[[:space:]]*\\{[^}]*__html)"
 RAW_HTML_PROPERTY_PATTERN="(\\.(inner|outer)HTML|\\[[[:space:]]*['\"](inner|outer)HTML['\"][[:space:]]*\\])"
 ASSIGNMENT_OPERATOR_PATTERN='([-+*/%&|^?]|[*][*]|<<|>>|>>>|&&|[|][|]|[?][?])?='
-SINK_PATTERN="${DANGEROUSLY_SET_INNER_HTML_PATTERN}|${RAW_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write\\("
+SINK_PATTERN="${DANGEROUSLY_SET_INNER_HTML_PATTERN}|${RAW_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write(ln)?\\("
 SINK_MATCHES="$(grep -nE -- "$SINK_PATTERN" "$FILE" 2>/dev/null \
   | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' \
   | exclude_type_only_dangerously_set_inner_html || true)"

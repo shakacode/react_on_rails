@@ -168,6 +168,41 @@ describe('rsc-guardrails hook', () => {
     });
   });
 
+  it('warns when a split __html value starts with a literal but concatenates/interpolates more', () => {
+    [
+      // A value that begins with a literal but appends user data is NOT a pure literal.
+      "const props = { dangerouslySetInnerHTML: {\n  __html: '<b>' + userHtml,\n} };\n",
+      'const props = { dangerouslySetInnerHTML: {\n  __html: "<b>" + userHtml,\n} };\n',
+      "const props = { dangerouslySetInnerHTML: {\n  __html: userHtml + '</b>',\n} };\n",
+      // Interpolated template literal (not a pure, self-contained literal).
+      'const props = { dangerouslySetInnerHTML: {\n  __html: `<b>${userHtml}</b>`,\n} };\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('multilineLiteralPrefixSink.tsx', source);
+
+      expect(guardrailWarningContext(output)).toMatch(/Matched line\(s\): \d/);
+    });
+  });
+
+  it('does not warn for a split __html value that is a single self-contained literal', () => {
+    [
+      "const props = { dangerouslySetInnerHTML: {\n  __html: '<b>foo</b>',\n} };\n",
+      'const props = { dangerouslySetInnerHTML: {\n  __html: "<b>foo</b>",\n} };\n',
+      'const props = { dangerouslySetInnerHTML: {\n  __html: `<hr/>`,\n} };\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('multilinePureLiteral.tsx', source);
+
+      expect(output).toBe('');
+    });
+  });
+
+  it('warns for document.writeln and document.write raw-HTML sinks', () => {
+    ['document.writeln(userHtml);\n', 'document.write(userHtml);\n'].forEach((source) => {
+      const output = runRSCGuardrailsHook('documentWrite.ts', source);
+
+      expect(guardrailWarningContext(output)).toContain('Matched line(s): 1');
+    });
+  });
+
   it('warns for compound raw-HTML assignments', () => {
     ['+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '^=', '|='].forEach((operator) => {
       const output = runRSCGuardrailsHook(
