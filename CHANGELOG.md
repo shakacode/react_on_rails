@@ -61,6 +61,19 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4724](https://github.com/shakacode/react_on_rails/pull/4724) by
   [justin808](https://github.com/justin808).
 
+- **Stopped server rendering from crashing on unpaired UTF-16 surrogates**: JavaScript's
+  `JSON.stringify` can emit a lone surrogate escape (for example `\uD83D` with no paired low
+  surrogate) from corrupted user data, database-encoding issues, or upstream API responses.
+  Ruby's `JSON.parse` rejects a lone high surrogate with `JSON::ParserError: incomplete
+surrogate pair`, so such content crashed the entire server render instead of passing through
+  for the browser to display. The render-result parsers now retry once with unpaired surrogates
+  replaced by the Unicode replacement character (U+FFFD) — this only runs after a parse failure,
+  so the happy path is unchanged. Covers the length-prefixed object-payload and metadata paths
+  plus the legacy JSON fallback for older bundles. Fixes
+  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
+  [PR 4726](https://github.com/shakacode/react_on_rails/pull/4726) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
   disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
   `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
