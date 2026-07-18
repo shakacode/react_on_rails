@@ -101,7 +101,7 @@ GOAL_PROMPT_FALLBACK_LINE = "- Resolve `$pr-batch`; autoload/self-contained: loa
 ITEM_FIXTURE_FIELD_PREFIXES = ["- Target:", "  Original:", "  Goal:", "  Notes:", "  Done when:"].freeze
 CODEX_PROMPT_START = "#{GOAL_LINE}\n#{INVOCATION_LINE}\n".freeze
 SHARED_PROMPT_START = "#{INVOCATION_LINE}\n".freeze
-REPO_ROOT = File.expand_path("../../..", __dir__)
+SKILL_NAME = "plan-pr-batch"
 CONTINUATION_BATCH_TITLE_LINE = "Batch title: <PROJECT> <A?> <MM-DD HH:MM> - <continuation title>."
 GOAL_PROMPT_BATCH_SIZE_ORDER_SNIPPET = <<~TEXT.chomp
   merge_authority: <none | ask | auto_merge_when_gates_pass>.
@@ -181,6 +181,26 @@ ALLOWED_PRESSURE_SCENARIO_REFS = %w[
 
 def abort_with_failure(message)
   abort "FAIL: #{message}"
+end
+
+def skill_metadata_candidates
+  candidates = [File.expand_path("../SKILL.md", __dir__)]
+
+  shared_root = ENV["AGENT_WORKFLOWS_ROOT"]
+  candidates << File.join(shared_root, "skills", SKILL_NAME, "SKILL.md") if shared_root && !shared_root.empty?
+
+  home = Dir.home
+  candidates << File.join(ENV.fetch("CODEX_HOME", File.join(home, ".codex")), "skills", SKILL_NAME, "SKILL.md")
+  candidates << File.join(ENV.fetch("CLAUDE_HOME", File.join(home, ".claude")), "skills", SKILL_NAME, "SKILL.md")
+  candidates << File.join(home, "src", "agent-workflows", "skills", SKILL_NAME, "SKILL.md")
+  candidates.uniq
+end
+
+def resolve_skill_metadata_path
+  skill_path = skill_metadata_candidates.find { |candidate| File.file?(candidate) }
+  return File.realpath(skill_path) if skill_path
+
+  abort_with_failure("SKILL.md not found; checked: #{skill_metadata_candidates.join(', ')}")
 end
 
 def read_repo_file(path)
@@ -360,8 +380,8 @@ def assert_prompt_budget(label, prompt_template, codex_prefix:)
   }
 end
 
-skill_path = File.expand_path("../SKILL.md", __dir__)
-abort_with_failure("SKILL.md not found at #{skill_path}") unless File.exist?(skill_path)
+skill_path = resolve_skill_metadata_path
+REPO_ROOT = File.expand_path("../..", File.dirname(skill_path))
 
 skill_text = File.read(skill_path, encoding: "UTF-8")
 workflow_text = read_repo_file("workflows/pr-processing.md")

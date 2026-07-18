@@ -141,6 +141,24 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     refute_includes output.string, "\n  - FAKE_OK"
   end
 
+  def test_workflow_overlays_preserve_repo_follow_up_issue_authority
+    workflow_paths = %w[
+      .agents/workflows/post-merge-audit.md
+      .agents/workflows/pr-processing.md
+    ]
+
+    workflow_paths.each do |path|
+      text = File.read(File.expand_path("../../#{path}", __dir__), encoding: "UTF-8").gsub(/\s+/, " ")
+
+      assert_includes text, "Follow-up issues are expensive. Default to no new issue.", path
+      assert_includes text, "The user explicitly chooses issue tracking after seeing the deferred bundle.", path
+      assert_includes text, "create at most one bundled follow-up issue per PR by default", path
+      refute_match(/follow-up issues by default/i, text, path)
+      refute_match(/one child issue per independently actionable/i, text, path)
+      refute_match(/one parent issue/i, text, path)
+    end
+  end
+
   def test_every_explicit_exclusion_has_a_reviewed_reason
     refute_empty AgentWorkflowDriftManifest::EXCLUSIONS
     AgentWorkflowDriftManifest::EXCLUSIONS.each_value { |reason| refute_empty reason.strip }

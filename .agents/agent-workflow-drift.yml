@@ -87,7 +87,12 @@ files:
   mode: identical
 - source: skills/plan-pr-batch/scripts/check_goal_prompt_size.rb
   consumer: ".agents/skills/plan-pr-batch/scripts/check_goal_prompt_size.rb"
-  mode: identical
+  mode: overlay
+  reason: React on Rails resolves the intentionally unvendored plan-pr-batch skill
+    metadata and source-pack surfaces through trusted installed/shared roots.
+  consumer_mode: '100755'
+  source_sha256: b3af1f20bc51c7d710c2575c9be30b36bb02a30f37d0f5b526dc7efc6f42c7b2
+  consumer_sha256: c402b87f745eff360e4dc76cfc0c2f351070caec8ff310a36bad202c7b69b0ae
 - source: skills/post-merge-audit/bin/closeout-evidence-replay
   consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay"
   mode: identical
@@ -183,18 +188,18 @@ files:
   consumer: ".agents/workflows/post-merge-audit.md"
   mode: overlay
   reason: React on Rails adds local helper resolution and release-branch changelog
-    routing.
+    routing while preserving ask-first bundled follow-up authorization.
   consumer_mode: '100644'
   source_sha256: 0cfb6733b5b88976927220eec5fb62c9bf82711f4880c0c9ad59778dc7817df5
-  consumer_sha256: 6e30782681e4f2d18601f2ee4d39c8dab33178d5f439bbabd5960bfb8c63f57f
+  consumer_sha256: 9024be5f773d99d56e229dfe57c7e213a0c0492921ea74b2440452d1be1a6aac
 - source: workflows/pr-processing.md
   consumer: ".agents/workflows/pr-processing.md"
   mode: overlay
   reason: React on Rails adds release-train, hosted-CI, coordination, review-coverage,
-    changelog-routing, and installed-helper policy.
+    changelog-routing, installed-helper, and ask-first bundled follow-up policy.
   consumer_mode: '100644'
   source_sha256: 9b37c280bcdd950dd0d477370029bf6448c308a702e58927dc36261ff241df38
-  consumer_sha256: e4bdcf151959b6b250ec9141db32921021bdb5ca3f80c25168673a4bd49af65d
+  consumer_sha256: ab2bb3843ee947bad4f1cde10942d137016259a8e628156344fccbde4f8b7144
 - source: workflows/tdd.md
   consumer: ".agents/workflows/tdd.md"
   mode: overlay
