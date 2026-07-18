@@ -7,6 +7,7 @@ require_relative "../support/generator_spec_helper"
 describe GeneratorMessages do
   it "has an empty messages array" do
     expect(described_class.messages).to be_empty
+    expect(described_class.messages).to eq([])
   end
 
   it "has a method that can add errors" do

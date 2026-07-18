@@ -37,8 +37,6 @@ module ReactOnRails
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
-        expect(described_class.name).to eq("ReactOnRails::Configuration")
-
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = ""
