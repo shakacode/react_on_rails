@@ -5016,7 +5016,33 @@ describe RscGenerator, type: :generator do
       expect(missing).to include(
         "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
       )
+      # The verifier now also covers the two default-branch transforms so a
+      # silent RSC_BUNDLE_ONLY / result-array no-op is surfaced, not masked.
+      expect(missing).to include("RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js")
+      expect(missing).to include("RSC-aware default result array in ServerClientOrBoth.js")
       expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
+    end
+
+    it "verifier flags a missing RSC_BUNDLE_ONLY branch even when import/invocation/envSpecific are present" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Fully transform, then simulate a downstream tool stripping just the
+      # RSC_BUNDLE_ONLY branch and reverting the default result array.
+      simulate_existing_file(config_path,
+                             server_client_or_both_content(destructured_import: true))
+      generator.send(:update_server_client_or_both_for_rsc)
+      full = File.read(File.join(destination_root, config_path))
+      degraded = full
+                 .sub(/  \} else if \(process\.env\.RSC_BUNDLE_ONLY\) \{.*?result = rscConfig;\n/m, "")
+                 .sub("result = [clientConfig, serverConfig, rscConfig];",
+                      "result = [clientConfig, serverConfig];")
+      File.write(File.join(destination_root, config_path), degraded)
+
+      missing = generator.send(:check_rsc_scob_config)
+      expect(missing).to include("RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js")
+      expect(missing).to include("RSC-aware default result array in ServerClientOrBoth.js")
+      # The three upstream markers are still present, so they must NOT be flagged.
+      expect(missing).not_to include("rscWebpackConfig import in ServerClientOrBoth.js")
+      expect(missing).not_to include("rscWebpackConfig() invocation in ServerClientOrBoth.js")
     end
 
     it "verifier returns empty for a fully transformed ServerClientOrBoth" do

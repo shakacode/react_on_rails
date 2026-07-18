@@ -670,6 +670,15 @@ module ReactOnRails
         unless content.match?(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\)/)
           missing << "envSpecific(clientConfig, serverConfig, rscConfig) call in ServerClientOrBoth.js"
         end
+        # Also verify the two default-branch transforms. These share the
+        # `} else {` anchor in insert_rsc_bundle_only_branch, which deliberately
+        # no-ops on a customized file where a single default branch can't be
+        # identified — so their success is NOT implied by the invocation above,
+        # and a silent miss must be surfaced rather than masked.
+        missing << "RSC_BUNDLE_ONLY branch in ServerClientOrBoth.js" unless content.include?("RSC_BUNDLE_ONLY")
+        unless content.match?(/result\s*=\s*\[\s*clientConfig\s*,\s*serverConfig\s*,\s*rscConfig\s*\]/)
+          missing << "RSC-aware default result array in ServerClientOrBoth.js"
+        end
         missing
       end
 
