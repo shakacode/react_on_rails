@@ -30,12 +30,10 @@ class FleetValidationGeneratorTest < Minitest::Test
       "policy_commit" => "policy-commit",
       "tracker_mode" => "strict-rc"
     )
-    ledger.fetch("preflight").merge!(
-      "status" => "passed",
-      "release_ci" => "passed",
-      "artifacts" => "passed",
-      "generator_matrix" => "passed"
-    )
+    ledger.fetch("preflight")["status"] = "passed"
+    %w[release_ci artifacts generator_matrix].each do |gate|
+      ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
+    end
     ledger.fetch("preflight").fetch("capabilities").transform_values! { "passed" }
     ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = "restart-safe handoff"
     ledger.fetch("inventory").each do |item|
@@ -44,14 +42,10 @@ class FleetValidationGeneratorTest < Minitest::Test
         "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
         "evidence" => "public-safe evidence"
       )
-      item["package_locks"] = [
-        {
-          "ecosystem" => "gem",
-          "name" => "example-package",
-          "version" => "1.0.0",
-          "source" => "registry"
-        }
-      ]
+      expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
+      item["package_locks"] = expected.fetch("packages").map do |package|
+        package.merge("version" => "1.0.0", "source" => "registry")
+      end
       item.fetch("checks").each_value do |check|
         check.merge!("status" => "passed", "evidence" => "public-safe evidence")
       end
@@ -61,6 +55,12 @@ class FleetValidationGeneratorTest < Minitest::Test
         "deployed_smoke" => "waived"
       )
       item.fetch("baseline").merge!("classification" => "clean", "evidence" => "fresh default passed")
+      item.fetch("bases").merge!(
+        "audit" => "base-commit",
+        "reviewed" => "base-commit",
+        "current" => "base-commit",
+        "reconciliation" => "passed"
+      )
     end
     ledger.fetch("required_paths").each do |path|
       path.merge!("status" => "passed", "lane" => "sanitized-lane", "evidence" => "public-safe evidence")
@@ -352,9 +352,11 @@ class FleetValidationGeneratorTest < Minitest::Test
 
   def test_closeout_requires_reconciliation_when_the_default_base_moves
     generator = build_generator
-    ledger = generator.ledger_template
+    ledger = complete_ledger(generator)
     ledger.fetch("merge")["reviewed_base_commit"] = "base-before"
     ledger.fetch("merge")["current_base_commit"] = "base-after"
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("bases").merge!("reviewed" => "target-before", "current" => "target-after", "reconciliation" => "blocked")
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -371,6 +373,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger = complete_ledger(generator)
     ledger.fetch("audit")["base_commit"] = nil
     ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
+    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }.fetch("bases")["audit"] = nil
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -382,6 +385,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "audit base_commit is missing"
     assert_includes errors, "merge reviewed_base_commit is missing"
     assert_includes errors, "merge current_base_commit is missing"
+    assert(errors.any? { |error| error.include?("audit base is missing") })
   end
 
   def test_generated_closeout_requires_independent_audit_authorized_merge_reachability_and_tree_parity
@@ -465,7 +469,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_closeout_requires_all_release_wide_preflight_gates_to_pass
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("preflight")["artifacts"] = "unknown"
+    ledger.fetch("preflight").fetch("artifacts")["status"] = "unknown"
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -483,7 +487,6 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger = complete_ledger(generator)
     ledger.fetch("preflight").merge!(
       "status" => "waived",
-      "artifacts" => "blocked",
       "waiver" => {
         "gate" => "artifacts",
         "authority" => "maintainer",
@@ -491,6 +494,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "reason" => "sanitized"
       }
     )
+    ledger.fetch("preflight").fetch("artifacts")["status"] = "blocked"
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -500,6 +504,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "release-wide preflight artifacts must pass and cannot be waived"
+  end
+
+  def test_release_wide_preflight_passes_require_retained_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").fetch("release_ci")["evidence"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "release-wide preflight release_ci is not passed or explicitly waived"
   end
 
   def test_empty_preflight_waiver_does_not_open_the_app_work_barrier
@@ -579,6 +598,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "merge is not allowed while tracker mode or freeze state conflicts"
+  end
+
+  def test_closeout_requires_applicable_merges_to_be_complete
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("merge")["status"] = "authorized"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "closeout merge status is not merged"
   end
 
   def test_closeout_requires_replayable_explicit_merge_authority_evidence
@@ -676,6 +710,25 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_blocked_hard_gate_outcomes_require_owned_blocker_references
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target["result"] = "blocked"
+    target.fetch("checks").fetch("hosted_ci")["status"] = "blocked"
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("blocked result has no owned blocker reference") })
+    assert(errors.any? { |error| error.include?("blocked check hosted_ci has no owned blocker reference") })
+  end
+
   def test_waived_hard_gate_and_check_require_structured_waiver_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -713,6 +766,19 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert status.success?, stderr
       assert_includes stdout, "VALID fleet result ledger"
       assert File.exist?(tracker_path)
+    end
+  end
+
+  def test_ledger_cli_requires_an_external_expected_candidate
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+
+      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, VALIDATOR, "--manifest", MANIFEST, "--ledger", ledger_path)
+
+      refute status.success?
+      assert_includes stderr, "missing argument: --expected-candidate"
     end
   end
 
@@ -769,6 +835,40 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_closeout_requires_every_manifest_package_in_the_retained_lock_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" && item["package_locks"].length > 1 }
+    target.fetch("package_locks").pop
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_closeout_rejects_nonterminal_work_and_blank_result_or_baseline_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").first
+    target["work_state"] = "not_started"
+    target["evidence"] = nil
+    target.fetch("baseline")["evidence"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) are unknown or nonterminal"
   end
 
   def test_closeout_requires_terminal_install_build_test_smoke_ci_and_review_evidence
@@ -854,7 +954,8 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes index, "[CLOSEOUT.md](CLOSEOUT.md)"
       assert_includes index, "`result-ledger.json`"
       assert_includes index, "Do not start the app mutation prompts before `APP_WORK_ALLOWED`"
-      assert_operator index.index("Start prompt coordinator 1"), :<, index.index("Start the remaining prompt coordinators")
+      assert_operator index.index("Start prompt coordinator 1"), :<, index.index("[PREFLIGHT.md](PREFLIGHT.md)")
+      assert_operator index.index("[PREFLIGHT.md](PREFLIGHT.md)"), :<, index.index("Start the remaining prompt coordinators")
       refute_includes index, "Start all 6 prompt coordinators simultaneously after the snapshot exists"
     end
   end

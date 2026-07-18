@@ -39,9 +39,9 @@ module FleetValidation
         "preflight" => {
           "status" => "pending",
           "waiver" => nil,
-          "release_ci" => "pending",
-          "artifacts" => "pending",
-          "generator_matrix" => "pending",
+          "release_ci" => { "status" => "pending", "evidence" => nil },
+          "artifacts" => { "status" => "pending", "evidence" => nil },
+          "generator_matrix" => { "status" => "pending", "evidence" => nil },
           "capabilities" => {
             "status" => "pending",
             "permissions" => "pending",
@@ -59,12 +59,19 @@ module FleetValidation
             "work_state" => "not_started",
             "result" => "pending",
             "waiver" => nil,
+            "blocker_id" => nil,
             "package_locks" => [],
             "checks" => %w[install build test local_smoke hosted_ci review].to_h do |check|
-              [check, { "status" => "pending", "evidence" => nil, "waiver" => nil }]
+              [check, { "status" => "pending", "evidence" => nil, "waiver" => nil, "blocker_id" => nil }]
             end,
             "review_app" => { "state" => "unknown", "evidence" => nil, "deployed_smoke" => "pending" },
             "baseline" => { "classification" => "pending", "evidence" => nil },
+            "bases" => {
+              "audit" => nil,
+              "reviewed" => nil,
+              "current" => nil,
+              "reconciliation" => "pending"
+            },
             "evidence" => nil
           )
         end,
@@ -161,7 +168,8 @@ module FleetValidation
           "name" => repo.fetch("name"),
           "headline" => repo.fetch("headline"),
           "tier" => tier,
-          "work_mode" => tier == "soft_track" ? "report_only" : "mutation"
+          "work_mode" => tier == "soft_track" ? "report_only" : "mutation",
+          "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
         }
       end
     end
@@ -175,9 +183,9 @@ module FleetValidation
         {
           "status" => { "enum" => %w[pending passed waived blocked unknown] },
           "waiver" => waiver_schema,
-          "release_ci" => status_string,
-          "artifacts" => status_string,
-          "generator_matrix" => status_string,
+          "release_ci" => preflight_gate_schema,
+          "artifacts" => preflight_gate_schema,
+          "generator_matrix" => preflight_gate_schema,
           "capabilities" => object_schema(
             %w[
               status permissions git_auth github_auth registry_network toolchains host_capacity
@@ -202,7 +210,7 @@ module FleetValidation
     def inventory_item_schema
       object_schema(
         %w[
-          id tier work_mode work_state result waiver package_locks checks review_app baseline evidence
+          id tier work_mode work_state result waiver blocker_id package_locks checks review_app baseline bases evidence
         ],
         {
           "id" => nonempty_string,
@@ -211,6 +219,7 @@ module FleetValidation
           "work_state" => { "enum" => %w[not_started running finished blocked unknown] },
           "result" => { "enum" => %w[pending passed reported blocked waived unknown] },
           "waiver" => waiver_schema,
+          "blocker_id" => nullable_string,
           "package_locks" => {
             "type" => "array",
             "items" => object_schema(
@@ -246,6 +255,15 @@ module FleetValidation
                 "enum" => %w[pending clean baseline_defect candidate_regression waived unknown]
               },
               "evidence" => nullable_string
+            }
+          ),
+          "bases" => object_schema(
+            %w[audit reviewed current reconciliation],
+            {
+              "audit" => nullable_string,
+              "reviewed" => nullable_string,
+              "current" => nullable_string,
+              "reconciliation" => status_string
             }
           ),
           "evidence" => nullable_string
@@ -342,11 +360,22 @@ module FleetValidation
 
     def evidence_status_schema
       object_schema(
-        %w[status evidence waiver],
+        %w[status evidence waiver blocker_id],
         {
           "status" => status_string,
           "evidence" => nullable_string,
-          "waiver" => waiver_schema
+          "waiver" => waiver_schema,
+          "blocker_id" => nullable_string
+        }
+      )
+    end
+
+    def preflight_gate_schema
+      object_schema(
+        %w[status evidence],
+        {
+          "status" => status_string,
+          "evidence" => nullable_string
         }
       )
     end
@@ -407,6 +436,8 @@ module FleetValidation
         - registry and tarball artifacts are coherent with that commit; and
         - the published standard / Pro / Pro+RSC generator matrix is green.
 
+        Each gate records both a terminal status and public-safe replayable evidence. A bare `passed`
+        status never opens the barrier. Published-artifact defects are non-waivable and must be republished.
         An explicit public-safe waiver may replace a failed gate only when the release policy allows
         it and the ledger records the authority and evidence URL. Missing, pending, conflicting, stale,
         or `UNKNOWN` evidence does not open the barrier.
@@ -499,6 +530,7 @@ module FleetValidation
       result << review_app_error if review_app_error
       result.concat(required_path_errors) if @closeout
       result.concat(blocker_owner_errors) if @closeout
+      result.concat(blocker_reference_errors) if @closeout
       result.concat(preflight_errors) if @closeout
       result.concat(pack_identity_errors) if @closeout
       result << inventory_completion_error if @closeout && inventory_completion_error
@@ -611,10 +643,17 @@ module FleetValidation
 
     def base_movement_error
       merge = @ledger.fetch("merge", {})
-      reviewed = merge["reviewed_base_commit"]
-      current = merge["current_base_commit"]
-      return unless present?(reviewed) && present?(current) && reviewed != current
-      return if merge["base_reconciliation"] == "passed"
+      moved = Array(@ledger["inventory"]).any? do |item|
+        next false unless item["tier"] == "hard_gate"
+
+        bases = item.fetch("bases", {})
+        present?(bases["reviewed"]) && present?(bases["current"]) &&
+          bases["reviewed"] != bases["current"] && bases["reconciliation"] != "passed"
+      end
+      moved ||= present?(merge["reviewed_base_commit"]) && present?(merge["current_base_commit"]) &&
+                merge["reviewed_base_commit"] != merge["current_base_commit"] &&
+                merge["base_reconciliation"] != "passed"
+      return unless moved
 
       "base moved after audit without passing reconciliation"
     end
@@ -623,11 +662,11 @@ module FleetValidation
       preflight = @ledger.fetch("preflight", {})
       waiver = preflight["status"] == "waived" ? preflight["waiver"] : nil
       errors = %w[release_ci generator_matrix].filter_map do |field|
-        next if preflight[field] == "passed" || valid_waiver?(waiver, field)
+        next if preflight_gate_passed?(preflight[field]) || valid_waiver?(waiver, field)
 
         "release-wide preflight #{field} is not passed or explicitly waived"
       end
-      unless preflight["artifacts"] == "passed"
+      unless preflight_gate_passed?(preflight["artifacts"])
         message = if valid_waiver?(waiver, "artifacts")
                     "release-wide preflight artifacts must pass and cannot be waived"
                   else
@@ -655,7 +694,9 @@ module FleetValidation
       count = Array(@ledger["inventory"]).count do |item|
         terminal_results = item["tier"] == "hard_gate" ? %w[passed blocked waived] : %w[reported blocked waived]
         baseline = item.dig("baseline", "classification")
-        !terminal_results.include?(item["result"]) || %w[pending unknown].include?(baseline)
+        !terminal_results.include?(item["result"]) || %w[pending unknown].include?(baseline) ||
+          !%w[finished blocked].include?(item["work_state"]) || !present?(item["evidence"]) ||
+          !present?(item.dig("baseline", "evidence"))
       end
       return if count.zero?
 
@@ -663,13 +704,19 @@ module FleetValidation
     end
 
     def package_lock_error
+      expected_by_id = @inventory.to_h { |target| [target.fetch("id"), Array(target["packages"])] }
       count = Array(@ledger["inventory"]).count do |item|
         next false unless item["tier"] == "hard_gate"
 
         locks = item["package_locks"]
-        !locks.is_a?(Array) || locks.empty? || locks.any? do |lock|
+        malformed = !locks.is_a?(Array) || locks.empty? || locks.any? do |lock|
           %w[ecosystem name version source].any? { |field| !present?(lock[field]) }
         end
+        next true if malformed
+
+        actual = locks.map { |lock| [lock["ecosystem"], lock["name"]] }
+        expected = expected_by_id.fetch(item["id"], []).map { |package| [package["ecosystem"], package["name"]] }
+        (expected - actual).any?
       end
       return if count.zero?
 
@@ -711,7 +758,34 @@ module FleetValidation
       %w[reviewed_base_commit current_base_commit].each do |field|
         errors << "merge #{field} is missing" unless present?(merge[field])
       end
+      Array(@ledger["inventory"]).each do |item|
+        next unless item["tier"] == "hard_gate"
+
+        bases = item.fetch("bases", {})
+        %w[audit reviewed current].each do |field|
+          errors << "target #{item['id']} #{field} base is missing" unless present?(bases[field])
+        end
+      end
       errors
+    end
+
+    def blocker_reference_errors
+      blockers = Array(@ledger["blockers"]).to_h { |blocker| [blocker["id"], blocker] }
+      Array(@ledger["inventory"]).flat_map do |item|
+        references = []
+        if item["result"] == "blocked" || item.dig("baseline", "classification") == "candidate_regression"
+          references << ["result", item["blocker_id"]]
+        end
+        item.fetch("checks", {}).each do |name, check|
+          references << ["check #{name}", check["blocker_id"]] if check["status"] == "blocked"
+        end
+        references.filter_map do |label, blocker_id|
+          blocker = blockers[blocker_id]
+          next if blocker && durable_owner?(blocker["owner"])
+
+          "target #{item['id']} blocked #{label} has no owned blocker reference"
+        end
+      end
     end
 
     def waiver_evidence_errors
@@ -739,7 +813,7 @@ module FleetValidation
 
     def merge_authority_error
       merge = @ledger.fetch("merge", {})
-      return unless merge["status"] == "merged"
+      return "closeout merge status is not merged" unless merge["status"] == "merged"
 
       authorized = %w[ask auto_merge_when_gates_pass].include?(merge["authority"])
       conflict = merge["freeze_state"] != "clear" || @ledger.dig("pack", "tracker_mode") == "conflict"
@@ -780,6 +854,10 @@ module FleetValidation
     def valid_waiver?(waiver, expected_gate)
       waiver.is_a?(Hash) && waiver["gate"] == expected_gate &&
         %w[authority evidence_url reason].all? { |field| present?(waiver[field]) }
+    end
+
+    def preflight_gate_passed?(gate)
+      gate.is_a?(Hash) && gate["status"] == "passed" && present?(gate["evidence"])
     end
 
     def release_blocked?

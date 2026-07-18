@@ -37,9 +37,11 @@ regenerating files for the same exact candidate run.
 
 ## Launch and coordinate
 
-1. Read `tmp/fleet-validation-prompts/INDEX.md` and run `PREFLIGHT.md`.
-2. Start the prompt coordinators, three per machine for the default six-prompt/two-machine layout.
-   Prompt 1 publishes the exact candidate/RSC snapshot. No app mutation worker may start before the
+1. Read `tmp/fleet-validation-prompts/INDEX.md` and start prompt 1 in snapshot/read-only mode.
+   It publishes the exact candidate/RSC snapshot and generator-matrix evidence without starting its
+   assigned app mutation.
+2. Run `PREFLIGHT.md` against that snapshot, then start the remaining prompt coordinators.
+   No app mutation worker may start before the
    pack ledger has `APP_WORK_ALLOWED`, backed by terminal-green exact-commit CI, artifacts, and the
    standard/Pro/Pro+RSC generator matrix, or an explicit policy-allowed public-safe waiver.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.

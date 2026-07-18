@@ -75,16 +75,14 @@ module FleetValidation
         "policy_commit" => "sanitized-policy-commit",
         "tracker_mode" => "strict-rc"
       )
-      ledger.fetch("preflight").merge!(
-        "status" => "passed",
-        "release_ci" => "passed",
-        "artifacts" => "passed",
-        "generator_matrix" => "passed"
-      )
+      ledger.fetch("preflight")["status"] = "passed"
+      %w[release_ci artifacts generator_matrix].each do |gate|
+        ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
+      end
       capabilities = ledger.fetch("preflight").fetch("capabilities")
       capabilities.transform_values! { "passed" }
       capabilities["restart_handoff"] = "sanitized restart-safe handoff"
-      complete_inventory(ledger)
+      complete_inventory(ledger, generator)
       ledger.fetch("required_paths").each do |path|
         path.merge!("status" => "passed", "lane" => "sanitized-lane", "evidence" => "public-safe evidence")
       end
@@ -112,21 +110,17 @@ module FleetValidation
       ledger
     end
 
-    def complete_inventory(ledger)
+    def complete_inventory(ledger, generator)
       ledger.fetch("inventory").each do |item|
         item.merge!(
           "work_state" => "finished",
           "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
           "evidence" => "public-safe evidence"
         )
-        item["package_locks"] = [
-          {
-            "ecosystem" => "gem",
-            "name" => "example-package",
-            "version" => "1.0.0",
-            "source" => "registry"
-          }
-        ]
+        expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
+        item["package_locks"] = expected.fetch("packages").map do |package|
+          package.merge("version" => "1.0.0", "source" => "registry")
+        end
         item.fetch("checks").each_value do |check|
           check.merge!("status" => "passed", "evidence" => "public-safe evidence")
         end
@@ -138,6 +132,12 @@ module FleetValidation
         item.fetch("baseline").merge!(
           "classification" => "clean",
           "evidence" => "sanitized fresh-default control"
+        )
+        item.fetch("bases").merge!(
+          "audit" => "sanitized-base",
+          "reviewed" => "sanitized-base",
+          "current" => "sanitized-base",
+          "reconciliation" => "passed"
         )
       end
     end

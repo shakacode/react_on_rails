@@ -89,7 +89,8 @@ ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
 
 The default prompt contract resolves the **latest RC or beta** when each lane starts. Use
 `--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Follow
-`tmp/fleet-validation-prompts/INDEX.md`: run `PREFLIGHT.md`, start the prompt coordinators, run
+`tmp/fleet-validation-prompts/INDEX.md`: start prompt 1 for the exact snapshot and read-only generator
+matrix, run `PREFLIGHT.md`, start the remaining prompt coordinators, run
 `REPORT-ONLY.md`, then reserve a maker-independent checker for `CLOSEOUT.md`. Each prompt
 coordinates bounded subagents: one read-only live-evidence pass plus one isolated execution worker
 per assigned target. With the default partition, no coordinator receives more than two execution

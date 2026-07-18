@@ -260,9 +260,12 @@ module FleetValidation
       <<~MARKDOWN
         # Fleet validation launch index
 
-        1. Run [PREFLIGHT.md](PREFLIGHT.md) and record its results in `result-ledger.json`.
-        2. Start prompt coordinator 1 so the release-snapshot leader can resolve and publish the shared snapshot.
-        3. Start the remaining prompt coordinators after that snapshot exists.
+        1. Start prompt coordinator 1 in snapshot/read-only mode so the release-snapshot leader can
+           resolve and publish the shared snapshot and generator-matrix evidence. It must not start its
+           assigned app mutation yet.
+        2. Run [PREFLIGHT.md](PREFLIGHT.md) against that exact snapshot and record its results in
+           `result-ledger.json`.
+        3. Start the remaining prompt coordinators after the snapshot exists and preflight opens the barrier.
            Do not start the app mutation prompts before `APP_WORK_ALLOWED`; coordinators may prepare
            read-only evidence while waiting.
         4. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.

@@ -20,6 +20,7 @@ module FleetValidation
       parser = option_parser(options)
       parser.parse!(argv)
       raise OptionParser::MissingArgument, "--ledger" unless options[:ledger_path]
+      raise OptionParser::MissingArgument, "--expected-candidate" unless options[:expected_candidate]
 
       manifest = YAML.safe_load_file(options.fetch(:manifest_path), aliases: false)
       ledger = JSON.parse(File.read(options.fetch(:ledger_path)))
