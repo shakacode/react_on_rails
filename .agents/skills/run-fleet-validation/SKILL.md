@@ -33,7 +33,9 @@ balances weighted lanes across the named machines. The same pack also inventorie
 - `result-ledger.json` and `result-ledger.schema.json` — the durable public-safe evidence contract.
 
 Every replacement candidate needs a freshly generated pack and ID; pass `--pack-id ID` only when
-regenerating files for the same exact candidate run.
+regenerating files for the same exact candidate run. Same-pack regeneration preserves the result
+ledger only when both the release selector and complete manifest fingerprint still match; a changed
+candidate or policy/inventory manifest fails closed.
 
 ## Launch and coordinate
 
@@ -92,9 +94,13 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
 ```
 
 The validator fails closed on stale candidates, incomplete inventory, premature app work,
-`UNKNOWN` capabilities or review-app state, missing package/check/baseline evidence, unowned
+`UNKNOWN` capabilities or review-app state, retained package versions that differ from the resolved
+release snapshot, missing package/check/baseline evidence, unowned
 blockers, private-only fields, missing required paths, non-independent audit, base movement,
 authority/freeze conflict, and missing default reachability/tree parity.
+The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven
+hard-gate app repositories. A blocker-owned terminal `BLOCKED` run can close without inventing a
+merge or post-merge reachability evidence; merge-eligible runs still require both.
 
 For the checked-in sanitized RC12 regression corpus:
 

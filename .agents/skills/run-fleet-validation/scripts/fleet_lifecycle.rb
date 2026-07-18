@@ -1,11 +1,24 @@
 # frozen_string_literal: true
 
 require "json"
+require "digest"
 
 module FleetValidation
   class ManifestError < StandardError; end
 
   class Lifecycle
+    CORE_INVENTORY_TARGET = {
+      "id" => "react-on-rails-generator-install-smoke",
+      "name" => "react_on_rails generator/install smoke",
+      "headline" => "Monorepo generator and install smoke",
+      "tier" => "hard_gate",
+      "work_mode" => "mutation",
+      "packages" => [
+        { "ecosystem" => "gem", "name" => "react_on_rails" },
+        { "ecosystem" => "npm", "name" => "react-on-rails" }
+      ]
+    }.freeze
+
     attr_reader :inventory, :required_paths
 
     def initialize(manifest:, pack_id:, release_selector:)
@@ -31,10 +44,12 @@ module FleetValidation
         "pack" => {
           "pack_id" => @pack_id,
           "release_selector" => @release_selector,
+          "snapshot_fingerprint" => snapshot_fingerprint,
           "candidate" => nil,
           "candidate_commit" => nil,
           "policy_commit" => nil,
-          "tracker_mode" => nil
+          "tracker_mode" => nil,
+          "resolved_packages" => []
         },
         "preflight" => {
           "status" => "pending",
@@ -65,7 +80,7 @@ module FleetValidation
               [check, { "status" => "pending", "evidence" => nil, "waiver" => nil, "blocker_id" => nil }]
             end,
             "review_app" => { "state" => "unknown", "evidence" => nil, "deployed_smoke" => "pending" },
-            "baseline" => { "classification" => "pending", "evidence" => nil },
+            "baseline" => { "classification" => "pending", "evidence" => nil, "waiver" => nil },
             "bases" => {
               "audit" => nil,
               "reviewed" => nil,
@@ -131,17 +146,22 @@ module FleetValidation
         "properties" => {
           "schema_version" => { "const" => 1 },
           "pack" => object_schema(
-            %w[pack_id release_selector candidate candidate_commit policy_commit tracker_mode],
+            %w[
+              pack_id release_selector snapshot_fingerprint candidate candidate_commit policy_commit
+              tracker_mode resolved_packages
+            ],
             {
               "pack_id" => nonempty_string,
               "release_selector" => nonempty_string,
+              "snapshot_fingerprint" => nonempty_string,
               "candidate" => nullable_string,
               "candidate_commit" => nullable_string,
               "policy_commit" => nullable_string,
               "tracker_mode" => {
                 "type" => %w[string null],
                 "enum" => [nil, "development", "accelerated-rc", "strict-rc", "final-release"]
-              }
+              },
+              "resolved_packages" => { "type" => "array", "items" => package_lock_schema }
             }
           ),
           "preflight" => preflight_schema,
@@ -174,7 +194,14 @@ module FleetValidation
     def write_ledger(path)
       if File.exist?(path)
         existing = JSON.parse(File.read(path))
-        return if existing.dig("pack", "pack_id") == @pack_id
+        existing_pack = existing.fetch("pack", {})
+        if existing_pack["pack_id"] == @pack_id
+          same_snapshot = existing_pack["release_selector"] == @release_selector &&
+                          existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
+          return if same_snapshot
+
+          raise ManifestError, "existing result ledger belongs to a different release snapshot"
+        end
       end
 
       File.write(path, "#{JSON.pretty_generate(ledger_template)}\n")
@@ -183,7 +210,7 @@ module FleetValidation
     end
 
     def build_inventory
-      @manifest.fetch("repos").map do |repo|
+      [CORE_INVENTORY_TARGET] + @manifest.fetch("repos").map do |repo|
         tier = repo.fetch("tier")
         {
           "id" => slug(repo.fetch("name")),
@@ -271,12 +298,13 @@ module FleetValidation
             }
           ),
           "baseline" => object_schema(
-            %w[classification evidence],
+            %w[classification evidence waiver],
             {
               "classification" => {
                 "enum" => %w[pending clean baseline_defect candidate_regression waived unknown]
               },
-              "evidence" => nullable_string
+              "evidence" => nullable_string,
+              "waiver" => waiver_schema
             }
           ),
           "bases" => object_schema(
@@ -417,6 +445,18 @@ module FleetValidation
       { "type" => "string", "minLength" => 1 }
     end
 
+    def package_lock_schema
+      object_schema(
+        %w[ecosystem name version source],
+        {
+          "ecosystem" => { "enum" => %w[gem npm] },
+          "name" => nonempty_string,
+          "version" => nonempty_string,
+          "source" => nonempty_string
+        }
+      )
+    end
+
     def nullable_string
       { "type" => %w[string null] }
     end
@@ -541,6 +581,15 @@ module FleetValidation
     def slug(value)
       value.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
     end
+
+    def snapshot_fingerprint
+      @snapshot_fingerprint ||= Digest::SHA256.hexdigest(
+        JSON.generate(
+          "release_selector" => @release_selector,
+          "manifest" => @manifest
+        )
+      )
+    end
   end
 
   class LedgerValidator
@@ -567,21 +616,23 @@ module FleetValidation
       result.concat(preflight_errors) if @closeout
       result.concat(pack_identity_errors) if @closeout
       result << inventory_completion_error if @closeout && inventory_completion_error
+      result << work_state_result_error if @closeout && work_state_result_error
       result << package_lock_error if @closeout && package_lock_error
+      result << package_version_error if @closeout && package_version_error
       result << check_evidence_error if @closeout && check_evidence_error
       result.concat(waiver_evidence_errors) if @closeout
-      result.concat(base_identity_errors) if @closeout
-      result << base_movement_error if @closeout && base_movement_error
+      result.concat(base_identity_errors) if @closeout && merge_eligible?
+      result << base_movement_error if @closeout && merge_eligible? && base_movement_error
       result.concat(independent_audit_errors) if @closeout
       result << "independent audit is not passed" if @closeout && @ledger.dig("audit", "status") != "passed"
       if @closeout && !present?(@ledger.dig("preflight", "capabilities", "restart_handoff"))
         result << "capability restart_handoff is missing"
       end
-      result.concat(reachability_errors) if @closeout
+      result.concat(reachability_errors) if @closeout && merge_eligible?
       result.concat(tracker_errors) if @closeout
-      result << merge_authority_error if @closeout && merge_authority_error
+      result << merge_authority_error if @closeout && merge_eligible? && merge_authority_error
       result << promotion_error if @closeout && promotion_error
-      if @closeout && @ledger.dig("merge", "status") == "merged" &&
+      if @closeout && merge_eligible? && @ledger.dig("merge", "status") == "merged" &&
          !present?(@ledger.dig("merge", "authority_evidence"))
         result << "merged result is missing explicit authority evidence"
       end
@@ -743,6 +794,20 @@ module FleetValidation
       "#{count} inventory target(s) are unknown or nonterminal"
     end
 
+    def work_state_result_error
+      count = Array(@ledger["inventory"]).count do |item|
+        allowed = if item["tier"] == "hard_gate"
+                    { "finished" => %w[passed waived], "blocked" => ["blocked"] }
+                  else
+                    { "finished" => %w[reported waived], "blocked" => ["blocked"] }
+                  end
+        !Array(allowed[item["work_state"]]).include?(item["result"])
+      end
+      return if count.zero?
+
+      "#{count} inventory target(s) have inconsistent work-state/result combinations"
+    end
+
     def package_lock_error
       expected_by_id = @inventory.to_h { |target| [target.fetch("id"), Array(target["packages"])] }
       count = Array(@ledger["inventory"]).count do |item|
@@ -761,6 +826,22 @@ module FleetValidation
       return if count.zero?
 
       "#{count} hard-gate target(s) are missing retained package lock evidence"
+    end
+
+    def package_version_error
+      resolved = Array(@ledger.dig("pack", "resolved_packages")).to_h do |package|
+        [[package["ecosystem"], package["name"]], package["version"]]
+      end
+      count = Array(@ledger["inventory"]).count do |item|
+        next false unless item["tier"] == "hard_gate"
+
+        Array(item["package_locks"]).any? do |lock|
+          resolved[[lock["ecosystem"], lock["name"]]] != lock["version"]
+        end
+      end
+      return if count.zero?
+
+      "#{count} hard-gate target(s) retain package versions outside the resolved release snapshot"
     end
 
     def check_evidence_error
@@ -794,16 +875,28 @@ module FleetValidation
       audit = @ledger.fetch("audit", {})
       merge = @ledger.fetch("merge", {})
       errors = []
-      errors << "audit base_commit is missing" unless present?(audit["base_commit"])
+      unless commit_identity?(audit["base_commit"])
+        errors << "audit base_commit is missing or not an exact commit identity"
+      end
       %w[reviewed_base_commit current_base_commit].each do |field|
-        errors << "merge #{field} is missing" unless present?(merge[field])
+        errors << "merge #{field} is missing or not an exact commit identity" unless commit_identity?(merge[field])
+      end
+      if commit_identity?(audit["base_commit"]) && commit_identity?(merge["reviewed_base_commit"]) &&
+         audit["base_commit"] != merge["reviewed_base_commit"]
+        errors << "audit base_commit does not match merge reviewed_base_commit"
       end
       Array(@ledger["inventory"]).each do |item|
         next unless item["tier"] == "hard_gate"
 
         bases = item.fetch("bases", {})
         %w[audit reviewed current].each do |field|
-          errors << "target #{item['id']} #{field} base is missing" unless present?(bases[field])
+          unless commit_identity?(bases[field])
+            errors << "target #{item['id']} #{field} base is missing or not an exact commit identity"
+          end
+        end
+        if commit_identity?(bases["audit"]) && commit_identity?(bases["reviewed"]) &&
+           bases["audit"] != bases["reviewed"]
+          errors << "target #{item['id']} audit base does not match reviewed base"
         end
       end
       errors
@@ -833,6 +926,10 @@ module FleetValidation
         errors = []
         if item["result"] == "waived" && !valid_waiver?(item["waiver"], item["id"])
           errors << "target #{item['id']} waived result is missing structured waiver evidence"
+        end
+        if item.dig("baseline", "classification") == "waived" &&
+           !valid_waiver?(item.dig("baseline", "waiver"), "#{item['id']}:baseline")
+          errors << "target #{item['id']} waived baseline is missing structured waiver evidence"
         end
         item.fetch("checks", {}).each do |name, check|
           next unless check["status"] == "waived"
@@ -893,6 +990,10 @@ module FleetValidation
       "promotion cannot be recommended while release blockers remain"
     end
 
+    def merge_eligible?
+      !release_blocked?
+    end
+
     def durable_owner?(owner)
       return false unless owner.is_a?(Hash)
 
@@ -932,7 +1033,7 @@ module FleetValidation
       hard_gate_blocked = Array(@ledger["inventory"]).any? do |item|
         next false unless item["tier"] == "hard_gate"
 
-        top_level_blocked = !%w[passed waived].include?(item["result"])
+        top_level_blocked = !%w[passed waived].include?(item["result"]) || item["work_state"] == "blocked"
         check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
         top_level_blocked || check_blocked || candidate_regression
@@ -1083,7 +1184,7 @@ module FleetValidation
       blocked = inventory.any? do |item|
         next false unless item["tier"] == "hard_gate"
 
-        top_level_blocked = !%w[passed waived].include?(item["result"])
+        top_level_blocked = !%w[passed waived].include?(item["result"]) || item["work_state"] == "blocked"
         check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
         top_level_blocked || check_blocked || candidate_regression
@@ -1096,7 +1197,9 @@ module FleetValidation
       partial = inventory.any? do |item|
         target_waived = item["result"] == "waived"
         check_waived = item.fetch("checks", {}).values.any? { |check| check["status"] == "waived" }
-        target_waived || check_waived || (item["tier"] == "soft_track" && item["result"] == "blocked")
+        baseline_waived = item.dig("baseline", "classification") == "waived"
+        target_waived || check_waived || baseline_waived ||
+          (item["tier"] == "soft_track" && item["result"] == "blocked")
       end
       partial ||= @ledger.dig("preflight", "status") == "waived"
       partial ||= %w[release_ci artifacts generator_matrix].any? do |gate|

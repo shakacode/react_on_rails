@@ -28,7 +28,10 @@ class FleetValidationGeneratorTest < Minitest::Test
       "candidate" => "v17.0.0.rc.12",
       "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "tracker_mode" => "strict-rc"
+      "tracker_mode" => "strict-rc",
+      "resolved_packages" => generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
+                                      .uniq { |package| [package["ecosystem"], package["name"]] }
+                                      .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
     )
     ledger.fetch("preflight")["status"] = "passed"
     %w[release_ci artifacts generator_matrix].each do |gate|
@@ -56,9 +59,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       )
       item.fetch("baseline").merge!("classification" => "clean", "evidence" => "fresh default passed")
       item.fetch("bases").merge!(
-        "audit" => "base-commit",
-        "reviewed" => "base-commit",
-        "current" => "base-commit",
+        "audit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "reviewed" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "current" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "reconciliation" => "passed"
       )
       item.fetch("reachability").merge!(
@@ -77,15 +80,15 @@ class FleetValidationGeneratorTest < Minitest::Test
       "status" => "passed",
       "checker" => "independent-checker",
       "maker_ids" => ["maker-1"],
-      "base_commit" => "base-commit"
+      "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     )
     ledger.fetch("merge").merge!(
       "authority" => "auto_merge_when_gates_pass",
       "authority_evidence" => "trusted batch goal",
       "freeze_state" => "clear",
       "status" => "merged",
-      "reviewed_base_commit" => "base-commit",
-      "current_base_commit" => "base-commit",
+      "reviewed_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "current_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "base_reconciliation" => "passed"
     )
     ledger.fetch("reachability").merge!("default_branch" => "passed", "tree_parity" => "passed")
@@ -125,8 +128,9 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_lifecycle_inventory_includes_every_hard_gate_and_report_only_soft_track
     inventory = build_generator.lifecycle_inventory
 
-    assert_equal 7, (inventory.count { |target| target.fetch("tier") == "hard_gate" })
+    assert_equal 8, (inventory.count { |target| target.fetch("tier") == "hard_gate" })
     assert_equal 5, (inventory.count { |target| target.fetch("tier") == "soft_track" })
+    assert(inventory.any? { |target| target.fetch("id") == "react-on-rails-generator-install-smoke" })
     assert(inventory.select { |target| target.fetch("tier") == "soft_track" }
                     .all? { |target| target.fetch("work_mode") == "report_only" })
   end
@@ -390,9 +394,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "audit base_commit is missing"
-    assert_includes errors, "merge reviewed_base_commit is missing"
-    assert_includes errors, "merge current_base_commit is missing"
+    assert_includes errors, "audit base_commit is missing or not an exact commit identity"
+    assert_includes errors, "merge reviewed_base_commit is missing or not an exact commit identity"
+    assert_includes errors, "merge current_base_commit is missing or not an exact commit identity"
     assert(errors.any? { |error| error.include?("audit base is missing") })
   end
 
@@ -677,7 +681,7 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes tracker, "<!-- fleet-validation-closeout:fleet-test-pack -->"
     assert_includes tracker, "Verdict: PASS"
-    assert_equal 12, (tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) })
+    assert_equal 13, (tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) })
     assert_includes tracker, "## Required release paths"
     assert_includes tracker, "## Blocker ownership"
     assert_includes tracker, "Promotion recommendation: recommend"
@@ -898,7 +902,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       %w[build hosted_ci install local_smoke review test],
       target.fetch("checks").keys.sort
     )
-    assert_equal %w[classification evidence], target.fetch("baseline").keys.sort
+    assert_equal %w[classification evidence waiver], target.fetch("baseline").keys.sort
     assert_equal %w[deployed_smoke evidence state], target.fetch("review_app").keys.sort
   end
 
@@ -934,6 +938,23 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
   end
 
+  def test_closeout_rejects_retained_lock_versions_that_do_not_match_the_resolved_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    lock = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("package_locks").first
+    lock["version"] = "0.0.1"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) retain package versions outside the resolved release snapshot"
+  end
+
   def test_closeout_rejects_nonterminal_work_and_blank_result_or_baseline_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -950,6 +971,133 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 inventory target(s) are unknown or nonterminal"
+  end
+
+  def test_closeout_rejects_a_blocked_work_state_with_a_passing_result
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }["work_state"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) have inconsistent work-state/result combinations"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_closeout_requires_structured_baseline_waiver_and_renders_partial
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("baseline").merge!("classification" => "waived", "waiver" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("waived baseline is missing structured waiver evidence") })
+    target.fetch("baseline")["waiver"] = {
+      "gate" => "#{target['id']}:baseline",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/baseline-waiver",
+      "reason" => "sanitized"
+    }
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_blocked_closeout_does_not_require_merge_or_post_merge_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    target.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" }
+      }
+    ]
+    ledger.fetch("merge").merge!(
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "status" => "blocked",
+      "reviewed_base_commit" => nil,
+      "current_base_commit" => nil
+    )
+    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    target.fetch("reachability").transform_values! { nil }
+    target.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    refute(errors.any? { |error| error.match?(/merge status|reachability|base is missing/) }, errors.join("\n"))
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_closeout_binds_audited_bases_to_reviewed_revisions
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["base_commit"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ledger.fetch("merge")["reviewed_base_commit"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("bases").merge!(
+      "audit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "reviewed" => "dddddddddddddddddddddddddddddddddddddddd"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("audit base does not match reviewed base") })
+    assert_includes errors, "audit base_commit does not match merge reviewed_base_commit"
+  end
+
+  def test_same_pack_id_cannot_be_reused_for_a_different_release_snapshot
+    Dir.mktmpdir do |directory|
+      build_generator(release_selector: "v17.0.0.rc.12").write_pack(directory)
+      regenerated = build_generator(release_selector: "v17.0.0.rc.13")
+
+      error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
+      assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+    end
+  end
+
+  def test_same_pack_id_cannot_be_reused_after_manifest_policy_changes
+    Dir.mktmpdir do |directory|
+      build_generator(release_selector: "v17.0.0.rc.12").write_pack(directory)
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("defaults")["build"] = "changed sanitized build command"
+      manifest_path = File.join(directory, "changed-manifest.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+      regenerated = build_generator(
+        manifest_path:,
+        release_selector: "v17.0.0.rc.12"
+      )
+
+      error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
+      assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+    end
   end
 
   def test_closeout_requires_per_target_reachability_and_tree_parity_evidence
@@ -990,11 +1138,11 @@ class FleetValidationGeneratorTest < Minitest::Test
     stdout, stderr, status = Open3.capture3(RbConfig.ruby, RC12_REPLAY)
 
     assert status.success?, stderr
-    assert_includes stdout, "hard_gates=7"
+    assert_includes stdout, "hard_gates=8"
     assert_includes stdout, "soft_tracks=5"
     assert_includes stdout, "required_path=webpack-rsc-production:scheduled"
     assert_includes stdout, "unowned_blockers_rejected=6"
-    assert_includes stdout, "tracker_rows=12"
+    assert_includes stdout, "tracker_rows=13"
     assert_includes stdout, "tracker_verdict=PARTIAL"
     assert_includes stdout, "SANITIZED_RC12_REPLAY_PASS"
   end

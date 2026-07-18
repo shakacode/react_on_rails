@@ -34,7 +34,7 @@ module FleetValidation
 
       tracker = TrackerRenderer.new(ledger).render
       tracker_rows = tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) }
-      raise "tracker row mismatch" unless tracker_rows == 12
+      raise "tracker row mismatch" unless tracker_rows == 13
       raise "tracker verdict mismatch" unless tracker.include?("Verdict: PARTIAL")
 
       Dir.mktmpdir do |directory|
@@ -73,7 +73,10 @@ module FleetValidation
         "candidate" => CANDIDATE,
         "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "tracker_mode" => "strict-rc"
+        "tracker_mode" => "strict-rc",
+        "resolved_packages" => generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
+                                      .uniq { |package| [package["ecosystem"], package["name"]] }
+                                      .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
       )
       ledger.fetch("preflight")["status"] = "passed"
       %w[release_ci artifacts generator_matrix].each do |gate|
@@ -90,15 +93,15 @@ module FleetValidation
         "status" => "passed",
         "checker" => "independent-checker",
         "maker_ids" => ["maker-1"],
-        "base_commit" => "sanitized-base"
+        "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       )
       ledger.fetch("merge").merge!(
         "authority" => "auto_merge_when_gates_pass",
         "authority_evidence" => "sanitized trusted batch goal",
         "freeze_state" => "clear",
         "status" => "merged",
-        "reviewed_base_commit" => "sanitized-base",
-        "current_base_commit" => "sanitized-base",
+        "reviewed_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "current_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "base_reconciliation" => "passed"
       )
       ledger.fetch("reachability").merge!("default_branch" => "passed", "tree_parity" => "passed")
@@ -134,9 +137,9 @@ module FleetValidation
           "evidence" => "sanitized fresh-default control"
         )
         item.fetch("bases").merge!(
-          "audit" => "sanitized-base",
-          "reviewed" => "sanitized-base",
-          "current" => "sanitized-base",
+          "audit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "reviewed" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "current" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "reconciliation" => "passed"
         )
         item.fetch("reachability").merge!(
