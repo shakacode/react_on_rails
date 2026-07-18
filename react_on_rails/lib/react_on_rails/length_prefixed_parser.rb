@@ -21,6 +21,12 @@ module ReactOnRails
     # MIRROR VALUES END
     private_constant :CONTROL_MESSAGE_TYPES
 
+    # Matches a single \uXXXX escape, optionally paired with the following \uXXXX
+    # escape so a valid high+low surrogate pair can be recognized as one unit.
+    SURROGATE_ESCAPE_PAIR = /\\u[0-9a-fA-F]{4}(?:\\u[0-9a-fA-F]{4})?/
+    SURROGATE_ESCAPE_CODE = /\\u([0-9a-fA-F]{4})/
+    private_constant :SURROGATE_ESCAPE_PAIR, :SURROGATE_ESCAPE_CODE
+
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
     # Used by the non-streaming rendering path where ExecJS/node renderer returns a single result.
     # Returns a single Hash: { "html" => String|nil, "consoleReplayScript" => "...", ... }
@@ -38,6 +44,48 @@ module ReactOnRails
               "Malformed render result: expected exactly one length-prefixed chunk but found #{results.size}"
       end
       results.first
+    end
+
+    # Parses JSON emitted by JavaScript's JSON.stringify, tolerating one Unicode
+    # divergence that would otherwise crash SSR.
+    #
+    # JavaScript strings are UTF-16 and JSON.stringify happily emits unpaired
+    # surrogate escapes (e.g. a lone high surrogate "\ud83d" from corrupted user
+    # data, DB encoding issues, or API responses). Ruby's JSON.parse rejects a
+    # lone HIGH surrogate with "incomplete surrogate pair", so JS output that the
+    # browser would render fine (as U+FFFD) crashes the whole Ruby-side render.
+    #
+    # To keep React on Rails a general-purpose framework that passes content
+    # through instead of crashing, we retry the parse ONCE with unpaired
+    # surrogates replaced by the U+FFFD replacement character. The retry runs
+    # only after a JSON::ParserError, so the happy path pays nothing. If the
+    # sanitized string still fails to parse, the (second) JSON::ParserError
+    # propagates so genuinely malformed JSON is still surfaced to callers.
+    def self.parse_json_lenient(str)
+      JSON.parse(str)
+    rescue JSON::ParserError
+      JSON.parse(sanitize_unpaired_surrogates(str))
+    end
+
+    # Replaces unpaired \uXXXX surrogate escapes with the U+FFFD replacement
+    # escape (�), leaving valid high+low pairs intact. The replacement is an
+    # ASCII \u escape (not a literal multibyte char) so the output stays valid
+    # regardless of the input string's encoding, which may be binary.
+    #
+    # Best-effort recovery for already-malformed input; it is not a general JSON
+    # validator and does not distinguish surrogate escapes inside string literals
+    # from other contexts (JSON only permits \u escapes inside strings, so this is
+    # safe in practice). Adjacent all-escaped surrogates in pathological input may
+    # be re-paired greedily, but the result is always valid UTF-8 and never crashes.
+    def self.sanitize_unpaired_surrogates(str)
+      str.gsub(SURROGATE_ESCAPE_PAIR) do |seq|
+        codes = seq.scan(SURROGATE_ESCAPE_CODE).flatten.map { |hex| hex.to_i(16) }
+        if codes.length == 2 && codes[0].between?(0xD800, 0xDBFF) && codes[1].between?(0xDC00, 0xDFFF)
+          seq # valid surrogate pair — leave untouched
+        else
+          codes.map { |code| code.between?(0xD800, 0xDFFF) ? '\ufffd' : format('\\u%04x', code) }.join
+        end
+      end
     end
 
     def initialize
@@ -118,7 +166,7 @@ module ReactOnRails
       raise ParseError, "Malformed length-prefixed header: negative content length" if @content_len.negative?
 
       begin
-        @metadata = JSON.parse(meta_json.force_encoding(Encoding::UTF_8))
+        @metadata = self.class.parse_json_lenient(meta_json.force_encoding(Encoding::UTF_8))
       rescue JSON::ParserError
         raise ParseError, "Malformed length-prefixed header: invalid metadata JSON", cause: nil
       end
@@ -161,7 +209,7 @@ module ReactOnRails
     end
 
     def parse_object_payload(raw_content)
-      JSON.parse(raw_content)
+      self.class.parse_json_lenient(raw_content)
     rescue JSON::ParserError
       raise ParseError, "Malformed length-prefixed object payload JSON", cause: nil
     end

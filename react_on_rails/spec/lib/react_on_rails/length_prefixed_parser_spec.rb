@@ -236,4 +236,86 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
       )
     end
   end
+
+  # Regression coverage for GitHub issue #4710: JavaScript's JSON.stringify can
+  # emit unpaired UTF-16 surrogate escapes (e.g. a lone high surrogate "\ud83d")
+  # that Ruby's JSON.parse rejects with "incomplete surrogate pair". SSR must
+  # pass such content through (as U+FFFD) instead of crashing.
+  describe ".parse_json_lenient" do
+    it "parses ordinary JSON unchanged" do
+      expect(described_class.parse_json_lenient('{"html":"<div>ok</div>","n":1}')).to eq(
+        "html" => "<div>ok</div>", "n" => 1
+      )
+    end
+
+    it "never crashes on a lone high surrogate and yields valid UTF-8" do
+      # Whether the underlying JSON.parse raises "incomplete surrogate pair"
+      # (older json gems / the client's scenario) or silently substitutes
+      # (newer json gems have their own lenient handling), parse_json_lenient
+      # must return valid, renderable content instead of propagating a crash.
+      %w[
+        {"html":"\uD83D"}
+        {"html":"Hello\uD83Dworld"}
+        {"html":"\uD83DA"}
+      ].each do |json|
+        result = nil
+        expect { result = described_class.parse_json_lenient(json) }.not_to raise_error
+        expect(result["html"].valid_encoding?).to be(true)
+      end
+    end
+
+    it "decodes a sanitized lone high surrogate to U+FFFD" do
+      # Deterministic across json versions: run the recovery pipeline directly
+      # (sanitize then parse) so the produced replacement char is asserted
+      # regardless of whether the raw JSON.parse would have raised.
+      raw = '{"html":"Hello \uD83D world"}'
+      recovered = JSON.parse(described_class.sanitize_unpaired_surrogates(raw))
+      expect(recovered["html"]).to eq("Hello � world")
+    end
+
+    it "preserves valid surrogate pairs" do
+      json = '{"html":"Hi 😀"}'
+      expect(described_class.parse_json_lenient(json)).to eq("html" => "Hi \u{1F600}")
+    end
+
+    it "re-raises for genuinely malformed JSON that is not a surrogate issue" do
+      expect { described_class.parse_json_lenient('{"html":}') }.to raise_error(JSON::ParserError)
+    end
+  end
+
+  describe ".sanitize_unpaired_surrogates" do
+    it "leaves valid surrogate pairs and non-surrogate escapes untouched" do
+      json = '{"a":"😀","b":"A"}'
+      expect(described_class.sanitize_unpaired_surrogates(json)).to eq(json)
+    end
+
+    it "replaces a lone high surrogate escape with the U+FFFD escape" do
+      # Returns the raw JSON string with the escape rewritten (not yet parsed):
+      # the 8-character literal "�", which JSON.parse then decodes to U+FFFD.
+      expect(described_class.sanitize_unpaired_surrogates('"\uD83D"')).to eq('"\ufffd"')
+    end
+
+    it "replaces a lone high surrogate followed by a non-surrogate escape" do
+      expect(described_class.sanitize_unpaired_surrogates('"\uD83DA"')).to eq('"\ufffdA"')
+    end
+
+    it "produces ASCII-only output so encoding stays safe for binary input" do
+      out = described_class.sanitize_unpaired_surrogates('"\uD83D"'.b)
+      expect(out).to eq('"\ufffd"')
+      expect(out.ascii_only?).to be(true)
+    end
+  end
+
+  describe "lone surrogates in an object payload" do
+    it "does not crash and yields valid, renderable content" do
+      raw_content = '{"html":"Hello \uD83D world","consoleReplayScript":""}'
+      metadata = { "payloadType" => "object" }.to_json
+      payload = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+
+      result = nil
+      expect { result = described_class.parse_one_chunk_result(payload) }.not_to raise_error
+      expect(result["html"]).to be_a(Hash)
+      expect(result["html"]["html"].valid_encoding?).to be(true)
+    end
+  end
 end
