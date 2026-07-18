@@ -371,10 +371,20 @@ module FleetValidation
           artifacts: do not create a bump branch or PR for it.
         - Capture dependency install, intentional lockfile diff, build/assets, target tests, required CI,
           primary route smoke, SSR/hydration, and the target's headline Pro/RSC behavior where applicable.
-          Record the immutable target head for every check; a later commit invalidates that evidence and
-          requires the audited, reviewed, and current revision plus affected checks to be refreshed.
+          Record the immutable target head for every check and the reconciled current base for every
+          mutable app check; a later target or base commit invalidates that evidence and requires the
+          audited, reviewed, and current revisions, bases, and affected checks to be refreshed.
           When review-app metadata is null/unverified, derive a repo-owned local boot/smoke command from
           target docs; do not invent a public deployment URL or claim hosted review-app smoke.
+        - For every assigned target, produce its complete schema-valid `inventory` row. It must include
+          id, tier, work_mode, maker_id, work_state, work_started_at, result, waiver, blocker_id,
+          package_locks, checks, review_app, baseline, revisions, bases, merge, reachability, and evidence.
+          Validate it against the inventory-item definition in `result-ledger.schema.json` and write the
+          exact fragment to `lane-result-#{number}.json`. Only an explicitly designated single ledger
+          writer may take the pack's lock and atomically merge the row into `result-ledger.json`;
+          otherwise include the exact JSON fragment in the final response for the closeout coordinator
+          to validate and merge. Do not return only a prose summary, and never hand-copy prose into the
+          ledger.
         - A confirmed candidate regression is BLOCKED and needs a linked issue. Unrelated failures remain
           PENDING until an allowed tracker waiver exists. Lane 4b artifact defects cannot be waived.
         - For HiChee or Pro/private material, never paste private logs, URLs, screenshots, credentials, or
@@ -390,6 +400,8 @@ module FleetValidation
 
         Final response:
         - Resolved release identifiers and tracking issue.
+        - One exact JSON fragment containing each assigned target's complete schema-valid `inventory` row,
+          unless those rows were already atomically merged into the shared `result-ledger.json`.
         - One row per target: PASSED / BLOCKED / PENDING / UNKNOWN, PR, current-head CI, smoke evidence,
           blocker/waiver link, and next owner/action.
         - Any manifest fields proven stale, with an exact proposed YAML patch.

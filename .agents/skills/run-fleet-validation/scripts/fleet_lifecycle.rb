@@ -102,6 +102,7 @@ module FleetValidation
                 {
                   "status" => "pending",
                   "head_commit" => nil,
+                  "base_commit" => nil,
                   "evidence" => nil,
                   "waiver" => nil,
                   "blocker_id" => nil
@@ -523,10 +524,11 @@ module FleetValidation
 
     def evidence_status_schema
       object_schema(
-        %w[status head_commit evidence waiver blocker_id],
+        %w[status head_commit base_commit evidence waiver blocker_id],
         {
           "status" => status_string,
           "head_commit" => nullable_string,
+          "base_commit" => nullable_string,
           "evidence" => nullable_string,
           "waiver" => waiver_schema,
           "blocker_id" => nullable_string
@@ -1007,8 +1009,8 @@ module FleetValidation
         item_errors = []
         expected_merge_status = item["work_mode"] == "mutation" ? "not_started" : "not_applicable"
         untouched_checks = item.fetch("checks", {}).values.all? do |check|
-          check["status"] == "pending" && !present?(check["head_commit"]) && !present?(check["evidence"]) &&
-            check["waiver"].nil? && !present?(check["blocker_id"])
+          check["status"] == "pending" && !present?(check["head_commit"]) && !present?(check["base_commit"]) &&
+            !present?(check["evidence"]) && check["waiver"].nil? && !present?(check["blocker_id"])
         end
         untouched = item["work_state"] == "not_started" && !present?(item["work_started_at"]) &&
                     !present?(item["maker_id"]) && item["result"] == "pending" &&
@@ -1161,6 +1163,9 @@ module FleetValidation
       Array(@ledger["blockers"]).flat_map do |blocker|
         status = blocker["status"]
         errors = []
+        if status == "unknown"
+          errors << "blocker #{blocker['id'] || 'missing-id'} remains UNKNOWN at closeout"
+        end
         if %w[waived deferred].include?(status) &&
            !valid_waiver?(blocker["disposition"], blocker["id"])
           errors << "blocker #{blocker['id'] || 'missing-id'} " \
@@ -1373,25 +1378,39 @@ module FleetValidation
     end
 
     def check_evidence_errors
-      invalid_items = Array(@ledger["inventory"]).select do |item|
+      invalid_head_items = []
+      invalid_base_items = []
+      Array(@ledger["inventory"]).each do |item|
         checks = item["checks"]
         current_head = item.dig("revisions", "current")
+        current_base = item.dig("bases", "current")
         allowed_statuses = item["tier"] == "hard_gate" ? %w[passed blocked waived] : %w[passed reported blocked waived]
-        !checks.is_a?(Hash) || %w[install build test local_smoke hosted_ci review].any? do |name|
+        invalid_head = !checks.is_a?(Hash) || %w[install build test local_smoke hosted_ci review].any? do |name|
           check = checks[name]
           !check.is_a?(Hash) || !allowed_statuses.include?(check["status"]) ||
             !present?(check["evidence"]) || !commit_identity?(check["head_commit"]) ||
             check["head_commit"] != current_head
         end
+        invalid_base = item["work_mode"] == "mutation" &&
+                       (!checks.is_a?(Hash) || %w[install build test local_smoke hosted_ci review].any? do |name|
+                         check = checks[name]
+                         !check.is_a?(Hash) || !commit_identity?(check["base_commit"]) ||
+                           check["base_commit"] != current_base
+                       end)
+        invalid_head_items << item if invalid_head
+        invalid_base_items << item if invalid_base
       end
-      hard_gate_count = invalid_items.count { |item| item["tier"] == "hard_gate" }
-      report_only_count = invalid_items.count { |item| item["work_mode"] == "report_only" }
+      hard_gate_count = invalid_head_items.count { |item| item["tier"] == "hard_gate" }
+      report_only_count = invalid_head_items.count { |item| item["work_mode"] == "report_only" }
       errors = []
       if hard_gate_count.positive?
         errors << "#{hard_gate_count} hard-gate target(s) check evidence is not bound to its immutable current head"
       end
       if report_only_count.positive?
         errors << "#{report_only_count} report-only target(s) have unknown or stale check evidence"
+      end
+      invalid_base_items.each do |item|
+        errors << "target #{item['id']} check evidence is not bound to its reconciled current base"
       end
       errors
     end

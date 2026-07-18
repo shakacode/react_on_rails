@@ -75,7 +75,12 @@ class FleetValidationGeneratorTest < Minitest::Test
         resolved.dup
       end
       item.fetch("checks").each_value do |check|
-        check.merge!("status" => "passed", "head_commit" => revision, "evidence" => "public-safe evidence")
+        check.merge!(
+          "status" => "passed",
+          "head_commit" => revision,
+          "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "evidence" => "public-safe evidence"
+        )
       end
       item.fetch("review_app").merge!(
         "state" => "not_configured",
@@ -677,6 +682,31 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "blocker IDs must be unique: duplicate-blocker"
   end
 
+  def test_closeout_rejects_unknown_blocker_status_even_with_a_durable_owner
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "uncertain-blocker",
+        "status" => "unknown",
+        "public_summary" => "Public-safe state is still unknown",
+        "owner" => { "issue_url" => "https://example.invalid/issues/uncertain-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker uncertain-blocker remains UNKNOWN at closeout"
+  end
+
   def test_public_ledger_rejects_private_blocker_fields
     generator = build_generator
     ledger = generator.ledger_template
@@ -714,6 +744,26 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "base moved after audit without passing reconciliation"
+  end
+
+  def test_closeout_requires_checks_to_be_bound_to_the_reconciled_current_base
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    reconciled_base = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("bases").merge!("current" => reconciled_base, "reconciliation" => "passed")
+    target.fetch("baseline")["head_commit"] = reconciled_base
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "target #{target.fetch('id')} check evidence is not bound to its reconciled current base"
   end
 
   def test_closeout_requires_per_target_audit_reviewed_and_current_base_identities
@@ -1494,6 +1544,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       %w[build hosted_ci install local_smoke review test],
       target.fetch("checks").keys.sort
     )
+    assert(target.fetch("checks").values.all? { |check| check.key?("base_commit") })
     assert_equal %w[classification evidence head_commit waiver], target.fetch("baseline").keys.sort
     assert_equal %w[blocker_id deployed_smoke evidence head_commit state waiver], target.fetch("review_app").keys.sort
   end
@@ -2358,6 +2409,19 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-rsc --rsc"
     assert_includes pack, "independently resolved RSC version only in the RSC app"
     assert_includes pack, "verify: true"
+  end
+
+  def test_each_lane_emits_a_complete_schema_valid_inventory_fragment_for_closeout
+    pack = build_generator.render_pack
+
+    assert_includes pack, "complete schema-valid `inventory` row"
+    assert_includes pack, "Do not return only a prose summary"
+    assert_includes pack, "id, tier, work_mode, maker_id, work_state, work_started_at, result, waiver, blocker_id,"
+    assert_includes pack, "package_locks, checks, review_app, baseline, revisions, bases, merge, reachability, and evidence"
+    assert_includes pack, "`lane-result-1.json`"
+    assert_includes pack, "`lane-result-6.json`"
+    assert_includes pack, "atomically merge the row into `result-ledger.json`"
+    assert_includes pack, "exact JSON fragment"
   end
 
   def test_rejects_machine_names_that_collide_as_paths

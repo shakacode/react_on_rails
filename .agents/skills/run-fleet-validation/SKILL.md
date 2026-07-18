@@ -62,23 +62,28 @@ policy/inventory manifest fails closed.
    check; `pending` and `unknown` do not count as report-only closeout.
 4. Each prompt is a separate top-level coordinator task and must use its bounded subagents as
    written. Do not launch the six prompts as children of one shared four-slot agent tree.
-5. Keep each lane in a separate checkout or worktree. Do not share mutable app checkouts between
+5. Require each lane to write its complete schema-valid inventory fragment to its generated
+   `lane-result-N.json` path and return the exact JSON in its final response when it cannot access
+   the shared pack checkout. Only the explicitly designated single ledger writer may merge those
+   fragments into `result-ledger.json`, under the pack lock and with an atomic file replacement.
+   Prose summaries are not ledger evidence.
+6. Keep each lane in a separate checkout or worktree. Do not share mutable app checkouts between
    lanes.
-6. Let lane coordinators create or update bump PRs and post idempotent evidence comments. Merge
+7. Let lane coordinators create or update bump PRs and post idempotent evidence comments. Merge
    remains a generated closeout task and requires explicit authority plus a fresh mode/freeze read.
-7. Require an authoritative coordination claim for every mutable app target before its execution
+8. Require an authoritative coordination claim for every mutable app target before its execution
    subagent starts. A status read is not a lock. A refused claim or unknown claim outcome is
    non-passing and must not produce a competing worktree or branch. Reuse live candidate ownership
    first; generated fallback claim targets are only for genuinely fresh lanes and are stable by
    resolved candidate plus repository so separately generated packs cannot race.
-8. Treat the release tracking issue plus its newest candidate-specific comments as the public
+9. Treat the release tracking issue plus its newest candidate-specific comments as the public
    source of truth. The issue body can describe an earlier candidate in the same release cycle;
    do not mistake that for the current candidate when a newer explicit RC section exists. A hard
    gate remains pending until it has exact install, build, test, smoke, and required-CI evidence,
    or an explicit waiver allowed by the RC plan.
-9. Generate a fresh pack for every replacement candidate, even when the manifest is unchanged.
-   Never reuse old prompt files or their snapshot marker for a new RC/beta. Within one exact
-   candidate run, re-run only affected lanes and preserve that pack ID.
+10. Generate a fresh pack for every replacement candidate, even when the manifest is unchanged.
+    Never reuse old prompt files or their snapshot marker for a new RC/beta. Within one exact
+    candidate run, re-run only affected lanes and preserve that pack ID.
 
 ## Report status
 
@@ -110,8 +115,10 @@ The validator fails closed on stale candidates, product package versions that do
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
 review-app state, retained package versions that differ from the resolved release snapshot,
 check/review evidence that does not match the immutable audited/reviewed/current target revision,
+mutable-app check evidence that does not match the reconciled current base revision,
 missing package/check/baseline evidence, unowned
-blockers, private-only fields, missing required paths, non-independent audit, base movement,
+blockers, blockers whose status remains `UNKNOWN`, private-only fields, missing required paths,
+non-independent audit, base movement,
 authority/freeze conflict, and missing default reachability/tree parity.
 The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven
 hard-gate app repositories. A blocker-owned terminal `BLOCKED` run can close without inventing a

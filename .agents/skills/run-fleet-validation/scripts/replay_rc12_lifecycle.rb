@@ -148,7 +148,12 @@ module FleetValidation
           resolved.dup
         end
         item.fetch("checks").each_value do |check|
-          check.merge!("status" => "passed", "head_commit" => revision, "evidence" => "public-safe evidence")
+          check.merge!(
+            "status" => "passed",
+            "head_commit" => revision,
+            "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "evidence" => "public-safe evidence"
+          )
         end
         item.fetch("review_app").merge!(
           "state" => "not_configured",
