@@ -362,6 +362,83 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips adapted release backports whose narrated upstream PR is live on target" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nnewer main fix\n")
+      commit_all(repo, "Fix release regression on main (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nrelease-adapted fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Backports #123 to the release train with release-specific behavior preserved."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("source commit identifies a live upstream PR already present on main")
+      expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
+    end
+  end
+
+  it "does not skip a narrated upstream PR after its target commit is reverted" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      commit_all(repo, "Fix release regression on main (#123)")
+      git(repo, "revert", "--no-edit", "HEAD")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~2")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Backports #123 to the release train."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR")
+    end
+  end
+
+  it "skips generated LLM artifact-only commits" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "llms-full.txt", "generated OSS docs\n")
+      write_file(repo, "llms-full-pro.txt", "generated Pro docs\n")
+      artifact_sha = commit_all(repo, "Regenerate release-branch llms artifacts")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{artifact_sha[0, 12]} Regenerate release-branch llms artifacts")
+      expect(stdout).to include("generated LLM artifact-only commit")
+    end
+  end
+
   it "skips no-footer cherry-picks after later target context changes" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

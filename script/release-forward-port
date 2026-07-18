@@ -28,6 +28,7 @@ class ReleaseForwardPort
   }.freeze
   EMPTY_PATCH_ID = "__empty_patch__"
   HUNKLESS_PATCH_ID_PREFIX = "__hunkless_patch__:"
+  GENERATED_LLM_FILES = %w[llms-full.txt llms-full-pro.txt].freeze
   CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
   CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
   NARRATED_CHERRY_PICK_PATTERN =
@@ -250,6 +251,9 @@ class ReleaseForwardPort
     return active_source_revert_skip_reason(subject, target, target_version) if
       source_standard_revert_on_target?(sha, target)
 
+    return "source commit identifies a live upstream PR already present on #{target}" if
+      source_narrated_pr_origin_on_target?(sha, target)
+
     return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
       already_forward_ported_with_x?(sha, target)
 
@@ -336,8 +340,14 @@ class ReleaseForwardPort
   end
 
   def special_skip_reason(sha, subject, target, target_version)
-    if changed_paths_for_commit(sha) == [CHANGELOG_FILE]
+    changed_paths = changed_paths_for_commit(sha)
+    if changed_paths == [CHANGELOG_FILE]
       return "changelog-only commit; use --changelog reconciliation to re-home release entries under [Unreleased]"
+    end
+
+    if changed_paths.any? && (changed_paths - GENERATED_LLM_FILES).empty?
+      return "generated LLM artifact-only commit; regenerate from current target documentation instead of replaying " \
+             "stale release output"
     end
 
     return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
@@ -487,6 +497,28 @@ class ReleaseForwardPort
   def source_cherry_pick_origin_reverted_on_target?(sha, target)
     origin_sha = cherry_pick_origin(sha)
     origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
+  end
+
+  def source_narrated_pr_origin_on_target?(sha, target)
+    subject = subject_for_commit(sha).to_s
+    release_pr_numbers = subject.scan(/#(\d+)/).flatten
+    body = git("log", "-1", "--format=%B", sha)
+    narrated_pr_numbers = body.each_line.flat_map do |line|
+      next [] unless line.match?(/\b(?:backports?|already\b.*merged\s+in|main\s+PR)\b/i)
+
+      line.scan(/#(\d+)/).flatten
+    end
+
+    (narrated_pr_numbers - release_pr_numbers).uniq.any? do |pr_number|
+      target_pr_commit_shas(pr_number, target).any? { |target_sha| target_commit_live_on_target?(target_sha, target) }
+    end
+  end
+
+  def target_pr_commit_shas(pr_number, target)
+    suffix = "(##{pr_number})"
+    target_history_commits_mentioning(suffix, target).select do |sha|
+      subject_for_commit(sha)&.end_with?(suffix)
+    end
   end
 
   def source_standard_revert_on_target?(sha, target)
