@@ -189,6 +189,8 @@ module FleetValidation
             "evidence" => "no mutable branch"
           )
         end
+        next unless item["work_mode"] == "mutation"
+
         item.fetch("reachability").merge!(
           "default_branch" => "passed",
           "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",

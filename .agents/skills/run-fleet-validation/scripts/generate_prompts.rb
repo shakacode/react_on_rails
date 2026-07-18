@@ -188,6 +188,9 @@ module FleetValidation
         unless package.is_a?(Hash) && package["ecosystem"].to_s != "" && package["name"].to_s != ""
           raise ManifestError, "repos[#{index}].packages[#{package_index}] must name an ecosystem and package"
         end
+        unless %w[gem npm].include?(package["ecosystem"])
+          raise ManifestError, "repos[#{index}].packages[#{package_index}] ecosystem must be gem or npm"
+        end
       end
     end
 

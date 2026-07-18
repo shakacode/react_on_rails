@@ -769,6 +769,7 @@ module FleetValidation
         result.concat(preflight_errors)
         result.concat(pack_identity_errors)
         result.concat(blocked_preflight_state_errors)
+        result.concat(waiver_evidence_errors)
         result.concat(independent_audit_errors)
         result << "independent audit is not passed" unless @ledger.dig("audit", "status") == "passed"
         result.concat(tracker_errors)
@@ -990,7 +991,12 @@ module FleetValidation
     end
 
     def blocked_preflight_state_errors
-      errors = Array(@ledger["inventory"]).filter_map do |item|
+      errors = Array(@ledger["inventory"]).flat_map do |item|
+        if item["work_mode"] == "validation_only" && item["work_state"] != "not_started"
+          next validation_only_preflight_evidence_errors(item)
+        end
+
+        item_errors = []
         expected_merge_status = item["work_mode"] == "mutation" ? "not_started" : "not_applicable"
         untouched_checks = item.fetch("checks", {}).values.all? do |check|
           check["status"] == "pending" && !present?(check["head_commit"]) && !present?(check["evidence"]) &&
@@ -998,9 +1004,21 @@ module FleetValidation
         end
         untouched = item["work_state"] == "not_started" && !present?(item["work_started_at"]) &&
                     !present?(item["maker_id"]) && item["result"] == "pending" &&
-                    Array(item["package_locks"]).empty? && untouched_checks &&
-                    item.dig("merge", "status") == expected_merge_status && !present?(item["evidence"])
-        "blocked preflight target #{item['id']} contains app-work state" unless untouched
+                    Array(item["package_locks"]).empty? && untouched_checks && !present?(item["evidence"])
+        unless untouched
+          item_errors << "blocked preflight target #{item['id']} contains app-work state"
+        end
+        merge = item.fetch("merge", {})
+        pristine_merge = merge["status"] == expected_merge_status && merge["authority"] == "none" &&
+                         !present?(merge["authority_evidence"]) && merge["freeze_state"] == "unknown" &&
+                         !present?(merge["merge_commit"]) && !present?(merge["evidence"])
+        unless pristine_merge
+          item_errors << "blocked preflight target #{item['id']} contains nested merge state"
+        end
+        unless pristine_reachability?(item.fetch("reachability", {}))
+          item_errors << "blocked preflight target #{item['id']} contains reachability state"
+        end
+        item_errors
       end
       errors << "blocked preflight aggregate merge status must be blocked" unless @ledger.dig("merge", "status") == "blocked"
       %w[default_branch tree_parity].each do |field|
@@ -1009,6 +1027,88 @@ module FleetValidation
         end
       end
       errors
+    end
+
+    def validation_only_preflight_evidence_errors(item)
+      errors = []
+      allowed = { "finished" => %w[passed waived], "blocked" => ["blocked"] }
+      unless Array(allowed[item["work_state"]]).include?(item["result"]) && present?(item["evidence"])
+        errors << "blocked preflight validation-only target #{item['id']} is not terminal"
+      end
+      errors << "blocked preflight validation-only target #{item['id']} has a maker" if present?(item["maker_id"])
+
+      revisions = item.fetch("revisions", {})
+      current_head = revisions["current"]
+      unless %w[audit reviewed current].all? { |field| commit_identity?(revisions[field]) } &&
+             revisions["audit"] == revisions["reviewed"] && revisions["reviewed"] == current_head &&
+             revisions["reconciliation"] == "passed"
+        errors << "blocked preflight validation-only target #{item['id']} has incomplete revision evidence"
+      end
+
+      expected = @inventory.find { |target| target["id"] == item["id"] }
+      expected_packages = Array(expected&.fetch("packages", [])).map do |package|
+        [package["ecosystem"], package["name"]]
+      end
+      locks = Array(item["package_locks"])
+      actual_packages = locks.map { |lock| [lock["ecosystem"], lock["name"]] }
+      resolved = Array(@ledger.dig("pack", "resolved_packages")).to_h do |package|
+        [[package["ecosystem"], package["name"]], [package["version"], package["source"]]]
+      end
+      invalid_locks = locks.any? do |lock|
+        !%w[ecosystem name version source].all? { |field| present?(lock[field]) } ||
+          resolved[[lock["ecosystem"], lock["name"]]] != [lock["version"], lock["source"]]
+      end
+      if (expected_packages - actual_packages).any? || actual_packages.tally.any? { |_identity, count| count > 1 } ||
+         invalid_locks
+        errors << "blocked preflight validation-only target #{item['id']} has incomplete package evidence"
+      end
+
+      checks_terminal = item.fetch("checks", {}).values.all? do |check|
+        %w[passed blocked waived].include?(check["status"]) && present?(check["evidence"]) &&
+          commit_identity?(check["head_commit"]) && check["head_commit"] == current_head
+      end
+      unless checks_terminal
+        errors << "blocked preflight validation-only target #{item['id']} has incomplete check evidence"
+      end
+
+      baseline = item.fetch("baseline", {})
+      baseline_terminal = !%w[pending unknown].include?(baseline["classification"]) &&
+                          baseline["head_commit"] == current_head && present?(baseline["evidence"])
+      unless baseline_terminal
+        errors << "blocked preflight validation-only target #{item['id']} has incomplete baseline evidence"
+      end
+      review_app = item.fetch("review_app", {})
+      review_terminal = review_app["head_commit"] == current_head && present?(review_app["evidence"]) &&
+                        validation_only_review_terminal?(item, review_app)
+      unless review_terminal
+        errors << "blocked preflight validation-only target #{item['id']} has incomplete review-app evidence"
+      end
+
+      merge = item.fetch("merge", {})
+      unless merge["status"] == "not_applicable" && merge["authority"] == "none" &&
+             !present?(merge["authority_evidence"]) && !present?(merge["merge_commit"])
+        errors << "blocked preflight validation-only target #{item['id']} contains mutation merge state"
+      end
+      unless pristine_reachability?(item.fetch("reachability", {}))
+        errors << "blocked preflight validation-only target #{item['id']} contains reachability state"
+      end
+      errors
+    end
+
+    def validation_only_review_terminal?(item, review_app)
+      case review_app["state"]
+      when "not_configured"
+        review_app["deployed_smoke"] == "waived"
+      when "configured_runnable"
+        review_app["deployed_smoke"] == "passed" ||
+          (review_app["deployed_smoke"] == "blocked") ||
+          (review_app["deployed_smoke"] == "waived" &&
+            valid_waiver?(review_app["waiver"], "#{item['id']}:review_app"))
+      when "configured_broken"
+        review_app["deployed_smoke"] == "blocked"
+      else
+        false
+      end
     end
 
     def barrier_order_errors
@@ -1456,6 +1556,9 @@ module FleetValidation
              present?(merge["merge_commit"])
             errors << "target #{item['id']} not-applicable merge retains mutation state"
           end
+          unless pristine_reachability?(item.fetch("reachability", {}))
+            errors << "target #{item['id']} non-mutation target retains reachability state"
+          end
           next errors
         end
 
@@ -1539,6 +1642,12 @@ module FleetValidation
 
     def present?(value)
       !value.nil? && !value.to_s.strip.empty?
+    end
+
+    def pristine_reachability?(reachability)
+      reachability["default_branch"] == "pending" && !present?(reachability["default_commit"]) &&
+        !present?(reachability["default_evidence"]) && reachability["tree_parity"] == "pending" &&
+        !present?(reachability["tree"]) && !present?(reachability["tree_evidence"])
     end
 
     def commit_identity?(value)

@@ -116,6 +116,8 @@ class FleetValidationGeneratorTest < Minitest::Test
           "evidence" => "no mutable branch"
         )
       end
+      next unless item["work_mode"] == "mutation"
+
       item.fetch("reachability").merge!(
         "default_branch" => "passed",
         "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
@@ -141,6 +143,59 @@ class FleetValidationGeneratorTest < Minitest::Test
       "comment_url" => "https://example.invalid/tracker-comment",
       "promotion" => "recommend"
     )
+    ledger
+  end
+
+  def blocked_preflight_ledger(generator, validation_only_evidence: false)
+    ledger = generator.ledger_template
+    completed = complete_ledger(generator)
+    ledger["pack"] = Marshal.load(Marshal.dump(completed.fetch("pack")))
+    ledger.fetch("preflight").merge!(
+      "status" => "blocked",
+      "app_work_allowed" => false,
+      "blocker_id" => "artifact-blocker",
+      "blocker_evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger.fetch("preflight").fetch("artifacts").merge!(
+      "status" => "blocked",
+      "evidence" => "public-safe artifact mismatch evidence"
+    )
+    if validation_only_evidence
+      completed_core = completed.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+      core = Marshal.load(Marshal.dump(completed_core))
+      core.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "artifact-blocker")
+      core.fetch("checks").each_value do |check|
+        check.merge!("status" => "blocked", "blocker_id" => "artifact-blocker")
+      end
+      core.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+      index = ledger.fetch("inventory").index { |item| item["work_mode"] == "validation_only" }
+      ledger.fetch("inventory")[index] = core
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "artifact-blocker",
+        "status" => "open",
+        "public_summary" => "Published candidate artifacts are incoherent",
+        "owner" => { "issue_url" => "https://example.invalid/issues/artifact-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("audit").merge!(
+      "status" => "passed",
+      "checker" => "independent-checker",
+      "maker_ids" => [],
+      "evidence" => "public-safe blocked-preflight audit"
+    )
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
+    ledger.fetch("tracker").merge!("status" => "ready", "promotion" => "blocked")
     ledger
   end
 
@@ -875,6 +930,51 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_empty schema_errors
     assert_empty semantic_errors
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_blocked_preflight_retains_legitimate_validation_only_evidence
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_empty errors
+  end
+
+  def test_blocked_preflight_rejects_nested_mutation_and_reachability_state
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge").merge!(
+      "authority" => "ask",
+      "authority_evidence" => "stale authority",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc"
+    )
+    target.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "stale reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "stale tree parity"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight target #{target.fetch('id')} contains nested merge state"
+    assert_includes errors, "blocked preflight target #{target.fetch('id')} contains reachability state"
   end
 
   def test_preflight_status_rejects_disposition_fields_from_other_states
@@ -1749,6 +1849,29 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "target #{target.fetch('id')} not-applicable merge retains mutation state"
   end
 
+  def test_non_mutation_target_cannot_retain_post_merge_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "synthetic reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "synthetic tree parity"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} non-mutation target retains reachability state"
+  end
+
   def test_blocked_closeout_rejects_an_unauthorized_recorded_merge
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -2359,6 +2482,21 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       index = manifest.fetch("repos").index(soft_track)
       assert_equal "repos[#{index}].packages[0] must name an ecosystem and package", error.message
+    end
+  end
+
+  def test_rejects_unsupported_package_ecosystems
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos").first.fetch("packages").first["ecosystem"] = "rubygems"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0].packages[0] ecosystem must be gem or npm", error.message
     end
   end
 
