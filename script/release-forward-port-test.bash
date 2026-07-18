@@ -755,6 +755,57 @@ EOF
   assert_not_contains "$changelog" "### [17.0.0]" "final header not copied"
 }
 
+# The final release section is authoritative over transient target RC wording.
+# When both describe the same shipped PR, re-home the final wording and discard
+# the RC copy along with its header. Target-only RC entries are intentionally not
+# carried forward because they can describe experiments removed before final or
+# dependency pins superseded later in the release train.
+test_final_source_wording_replaces_target_rc_copy() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Current main fix**: still unreleased. $(pr_link 100) by [a](https://github.com/a).
+
+### [17.0.0.rc.6] - 2026-07-10
+
+#### Fixed
+
+- **Render helpers no longer mutate caller-supplied option hashes**: RC wording. $(pr_link 4396) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **Final release feature**: shipped. $(pr_link 999) by [a](https://github.com/a).
+
+#### Fixed
+
+- **create_render_options no longer mutates the caller options hash**: final wording. $(pr_link 4396) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  run_changelog release/17.0.0 >/dev/null
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "create_render_options no longer mutates" "final source wording re-homed"
+  assert_not_contains "$changelog" "Render helpers no longer mutate" "target rc wording discarded"
+  assert_not_contains "$changelog" "### [17.0.0.rc.6]" "target rc header removed"
+}
+
 # A maintained release branch retains its original stable section after main has
 # already stamped those entries into history. A later branch fix must not pull
 # the entire historical release back into main's current [Unreleased].
@@ -925,6 +976,7 @@ run_test test_empty_main_unreleased_receives_entries
 run_test test_target_without_unreleased_errors_clearly
 run_test test_non_prerelease_source_does_not_touch_target_rc_section
 run_test test_final_stable_section_rehomes_into_main_unreleased
+run_test test_final_source_wording_replaces_target_rc_copy
 run_test test_final_stable_section_dedupes_against_target_history
 run_test test_dedupes_on_own_pr_trailer_not_referenced_pr
 run_test test_utf8_changelog_parses_and_round_trips_under_ascii_locale

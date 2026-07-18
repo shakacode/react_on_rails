@@ -1515,17 +1515,7 @@ class ChangelogReconciler
     # section, whose entries may already live in main's history. Exclude RC
     # sections being removed so their entries can still be re-homed before the
     # section headers disappear.
-    retained_target_entries = target[:sections]
-                              .reject { |section| removed_sections.include?(section) }
-                              .flat_map { |section| section_entries(section) }
-    seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
-    target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
-
-    added, skipped = partition_source_entries(
-      collect_source_entries(source, base_version),
-      seen_pr_numbers,
-      target_entry_texts
-    )
+    added, skipped = partition_source_against_retained_target(target, source, removed_sections, base_version)
 
     # Only re-render when there is a real change; otherwise return the target
     # changelog byte-for-byte so a no-op run never reflows existing entries.
@@ -1545,6 +1535,20 @@ class ChangelogReconciler
   end
 
   private
+
+  def partition_source_against_retained_target(target, source, removed_sections, base_version)
+    retained_target_entries = target[:sections]
+                              .reject { |section| removed_sections.include?(section) }
+                              .flat_map { |section| section_entries(section) }
+    seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
+    target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
+
+    partition_source_entries(
+      collect_source_entries(source, base_version),
+      seen_pr_numbers,
+      target_entry_texts
+    )
+  end
 
   # Collapse every release-branch source section that belongs in main's
   # [Unreleased]: the branch's own [Unreleased] first (so it wins "first seen"
