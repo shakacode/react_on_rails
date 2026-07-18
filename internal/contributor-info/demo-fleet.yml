@@ -1,7 +1,7 @@
-# Demo fleet manifest — draft list of demo repos under cross-repo upgrade
-# automation. Read by future `rake demo_fleet:*` tasks. The canonical
-# release-gate policy lives in rc-testing-plan.md; reconcile this draft manifest
-# with that plan before implementing automation.
+# Demo fleet manifest — machine-readable input for release validation prompt
+# generation and the planned cross-repo upgrade automation. The canonical
+# release-gate policy lives in rc-testing-plan.md. Generate balanced validation
+# lanes with the repo-local run-fleet-validation skill.
 #
 # Schema version is bumped on breaking changes. Consumers must check it.
 #
@@ -24,19 +24,21 @@
 #   build          — command that must succeed before deploy (asset compile).
 #   review_app     — CPFlow review-app workflow file, the status check name the
 #                    orchestrator polls, and the CPFlow app name used to derive
-#                    the review-app base URL. Set the whole block to null (or
-#                    leave `cpflow_app_name: null`) for a demo with no review-app
-#                    pipeline yet; the orchestrator then skips smoke for that
-#                    repo. `cpflow_app_name` must be non-null before a repo's
-#                    `verify: true` flag can be cleared.
+#                    the review-app base URL. Set the whole block to null for a
+#                    demo with no review-app pipeline. If the block is present,
+#                    `cpflow_app_name` must be non-null before `verify: true` can
+#                    be cleared; a null name inside the block is an unverified
+#                    placeholder. The orchestrator skips smoke when no app is set.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
 #                    The orchestrator uses this only for PR-body templating.
 #
-# Items marked `verify: true` have not been confirmed by inspecting the
-# demo repo. A one-time verification pass (per the RC plan's `*` convention)
-# must clear every verify flag before the manifest is treated as authoritative.
+# Items marked `verify: true` have not been confirmed by inspecting the demo
+# repo. Generated validation prompts include these values as provisional
+# starting data and require the worker to report exact YAML corrections. A
+# one-time verification pass must clear every flag before future orchestration
+# treats the commands as authoritative.
 
 schema_version: 1
 
@@ -138,7 +140,7 @@ repos:
     needs_pro: true
     ruby_test: bin/rails test && bin/rails test:system
     build: bin/rails react_on_rails:generate_packs && bin/shakapacker
-    smoke: [/, /news]
+    smoke: [/, /news/1]
     verify: true
 
   - name: shakacode/react-on-rails-demo-marketplace-rsc
@@ -239,7 +241,7 @@ repos:
       - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: yarn_berry
-    smoke: [/]
+    smoke: [/hello_world]
     verify: true
 
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
@@ -252,6 +254,7 @@ repos:
       - { ecosystem: npm, name: shakapacker }
     needs_pro: false
     package_manager: npm
+    ruby_test: RAILS_ENV=test bin/rails db:test:prepare test test:system
     smoke: [/]
     verify: true
 

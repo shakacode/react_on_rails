@@ -102,14 +102,20 @@ This is a common architecture question for teams that want React but are unsure 
 **React on Rails:**
 
 - Pros: unified Rails + React architecture, no mandatory separate API layer for server-rendered pages, and simpler end-to-end debugging through one app boundary.
-- Potential performance advantages: fewer cross-service hops for server-rendered requests, less API serialization/deserialization overhead, and easier coordination of caching across the stack.
+- Potential performance advantages: fewer cross-service hops for server-rendered requests, less application API serialization/deserialization overhead, and easier coordination of caching across the stack. Pro async props can keep slow queries in the active Rails request while resolving independent React Suspense boundaries as each result becomes ready.
 - Drawbacks: less organizational separation than a hard API split, and fewer opportunities to isolate frontend/backend release trains.
+
+Next.js can also stream Rails-backed sections: an async Server Component fetches a Rails endpoint behind `<Suspense>`,
+then Next streams that section when the response arrives. The Pro distinction is that eager or on-demand async props
+bridge Rails scopes, policies, caches, and query objects directly into request-scoped React Promises. That avoids
+creating and calling a separate page-data API merely to get Rails-owned data back into the server render. It is a
+meaningful advantage for Rails-centric pages, not a claim that Next.js lacks streaming or can never match the result.
 
 Choose Next.js + separate Rails backend when your priority is platform separation and API-first product architecture.
 
 Choose React on Rails when your priority is delivering substantial React UI while keeping Rails views/helpers and one integrated deployment model.
 
-If this architecture is central to your evaluation, see the dedicated guide: [Next.js with a Separate Rails Backend: Pros and Drawbacks](./nextjs-with-separate-rails-backend.md).
+If this architecture is central to your evaluation, including the async-query and streaming distinction, see the dedicated guide: [Next.js with a Separate Rails Backend: Pros and Drawbacks](./nextjs-with-separate-rails-backend.md).
 
 If React Server Components are central to your evaluation, see how the two stacks implement RSC at the architecture level — and the one ownership difference that drives the rest — in [React on Rails Pro and Next.js: RSC Architectures Compared](../../pro/react-server-components/nextjs-comparison.md).
 
@@ -171,6 +177,7 @@ In practice:
 - If you want primarily a fast bundler + HMR workflow and you are comfortable managing integration patterns yourself, Vite-centric setups can be appealing.
 - If you want stronger Rails + React integration conventions (for example helper-driven rendering, migration guidance, and integrated SSR paths), React on Rails is the broader framework choice.
 - If your decision depends on Vite performance tradeoffs, review the benchmark and matrix details in [Detailed Feature Matrix and Benchmarks](./comparison-with-alternatives.md).
+- If your question is why React on Rails itself ships on Rspack rather than Vite, that decision is argued in the open in [Why Rspack (and not Vite)?](./why-rspack.md).
 
 Official docs:
 

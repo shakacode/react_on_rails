@@ -51,6 +51,7 @@ jobs:
       run_lint: ${{ steps.detect.outputs.run_lint }}
       run_js_tests: ${{ steps.detect.outputs.run_js_tests }}
       run_ruby_tests: ${{ steps.detect.outputs.run_ruby_tests }}
+      run_gem_generator_specs: ${{ steps.detect.outputs.run_gem_generator_specs }}
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       should_run_hosted_ci: ${{ steps.hosted-ci.outputs.should_run_hosted_ci }}
@@ -82,6 +83,7 @@ jobs:
               echo "run_lint=true"
               echo "run_js_tests=true"
               echo "run_ruby_tests=true"
+              echo "run_gem_generator_specs=true"
               echo "run_dummy_tests=true"
               echo "run_generators=true"
               echo "docs_only=false"
@@ -107,6 +109,7 @@ jobs:
           LATEST_RUBY_VERSION: ${{ steps.tool-versions.outputs.ruby-minor-version }}
           MINIMUM_RUBY_VERSION: ${{ steps.tool-versions.outputs.minimum-ruby-minor-version }}
           SHOULD_USE_FULL_MATRIX: ${{ steps.hosted-ci.outputs.should_use_full_matrix }}
+          RUN_GEM_GENERATOR_SPECS: ${{ steps.detect.outputs.run_gem_generator_specs }}
         run: |
           latest_ruby_version="$LATEST_RUBY_VERSION"
           minimum_ruby_version="$MINIMUM_RUBY_VERSION"
@@ -130,15 +133,26 @@ jobs:
                 ]
               }')"
           else
-            # PR matrix: test only latest versions for fast feedback × 2 shards
-            matrix="$(jq -nc \
-              --arg latest_ruby_version "$latest_ruby_version" \
-              '{
-                "include": [
-                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
-                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"}
-                ]
-              }')"
+            # PR matrix: always run the latest unit shard, and add generator
+            # specs only when their dedicated selector requires them.
+            if [[ "$RUN_GEM_GENERATOR_SPECS" == "true" ]]; then
+              matrix="$(jq -nc \
+                --arg latest_ruby_version "$latest_ruby_version" \
+                '{
+                  "include": [
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"}
+                  ]
+                }')"
+            else
+              matrix="$(jq -nc \
+                --arg latest_ruby_version "$latest_ruby_version" \
+                '{
+                  "include": [
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"}
+                  ]
+                }')"
+            fi
           fi
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
       - name: Guard docs-only main pushes
@@ -153,10 +167,11 @@ jobs:
 
   rspec-package-tests:
     needs: detect-changes
-    # Run hosted gem tests only when hosted CI is allowed and Ruby paths changed.
+    # Run hosted gem tests only when hosted CI is allowed and Ruby or generator-spec coverage is required.
     if: |
       needs.detect-changes.outputs.should_run_hosted_ci == 'true' &&
-      needs.detect-changes.outputs.run_ruby_tests == 'true'
+      (needs.detect-changes.outputs.run_ruby_tests == 'true' ||
+       needs.detect-changes.outputs.run_gem_generator_specs == 'true')
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}

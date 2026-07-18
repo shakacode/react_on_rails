@@ -1,25 +1,103 @@
 name: ShakaPerf Release Gates
+run-name: ShakaPerf Release Gates — ${{ inputs.target_version }} on ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
 
 permissions:
   contents: read
 
 on:
   workflow_dispatch:
+    inputs:
+      target_version:
+        description: RubyGems-format release version being tested
+        required: true
+        type: string
+      candidate_sha:
+        description: Exact release-branch commit being tested
+        required: true
+        type: string
 
 concurrency:
   group: shakaperf-release-gates-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
+  candidate:
+    name: Validate ${{ inputs.target_version }} on ${{ github.ref_name }} @ ${{ inputs.candidate_sha }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      runtime_tree_fingerprint: ${{ steps.candidate.outputs.runtime_tree_fingerprint }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read runtime versions
+        id: tool-versions
+        uses: ./.github/actions/read-tool-versions
+
+      - name: Setup Ruby
+        uses: ./.github/actions/setup-ruby
+        with:
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
+          bundler-version: 2.5.4
+
+      - name: Validate exact candidate
+        id: candidate
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          ruby -rrake <<'RUBY'
+          load "rakelib/release.rake"
+
+          candidate_sha = ENV.fetch("CANDIDATE_SHA")
+          current_sha = current_git_sha!(Dir.pwd, context: "validating ShakaPerf candidate")
+          abort "Candidate SHA #{candidate_sha} no longer matches workflow HEAD #{current_sha}." \
+            unless candidate_sha == current_sha
+
+          target_version = ENV.fetch("TARGET_VERSION")
+          validate_requested_version_input!(target_version)
+          ensure_release_branch_matches_target_base!(
+            current_branch: ENV.fetch("RELEASE_BRANCH"),
+            target_gem_version: target_version
+          )
+
+          current_version = current_gem_version(Dir.pwd)
+          prepared_candidate = shakaperf_prerun_candidate(
+            monorepo_root: Dir.pwd,
+            ref: ENV.fetch("RELEASE_BRANCH"),
+            head_sha: candidate_sha
+          )
+          prepared_version = prepared_candidate&.fetch(:target_version)
+          unless target_version == current_version || target_version == prepared_version
+            abort "Target version #{target_version} is neither the checked-in version " \
+                  "#{current_version} nor the prepared changelog version #{prepared_version || 'none'}."
+          end
+
+          fingerprint = shakaperf_runtime_tree_fingerprint(monorepo_root: Dir.pwd, sha: candidate_sha)
+          abort "Unable to fingerprint ShakaPerf candidate #{candidate_sha}." unless fingerprint
+
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |output|
+            output.puts "runtime_tree_fingerprint=#{fingerprint}"
+          end
+          File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") do |summary|
+            summary.puts "Testing #{target_version} on #{ENV.fetch('RELEASE_BRANCH')} at #{candidate_sha}."
+            summary.puts "Runtime tree fingerprint: `#{fingerprint}`"
+          end
+          RUBY
+
   rsc-fouc:
-    name: RSC FOUC ShakaPerf Gate
+    name: RSC FOUC gate for ${{ inputs.target_version }} @ ${{ inputs.candidate_sha }}
+    needs: candidate
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
       RAILS_ENV: test
       NODE_ENV: test
       # Dummy value for RAILS_ENV=test; no real credentials are encrypted or persisted.
-      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc # gitleaks:allow
+      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc  # gitleaks:allow
       SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
       SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
     steps:
@@ -252,3 +330,45 @@ jobs:
               kill "$(cat "$pidfile")" 2>/dev/null || true
             fi
           done
+
+  evidence:
+    name: Record gate evidence
+    if: always() && needs.candidate.result == 'success'
+    needs:
+      - candidate
+      - rsc-fouc
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Create machine-readable evidence
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CONCLUSION: ${{ needs.rsc-fouc.result }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_ID: ${{ github.run_id }}
+          RUNTIME_TREE_FINGERPRINT: ${{ needs.candidate.outputs.runtime_tree_fingerprint }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          ruby -rjson -rtime <<'RUBY'
+          evidence = {
+            schema_version: 2,
+            run_attempt: Integer(ENV.fetch("RUN_ATTEMPT"), 10),
+            run_id: Integer(ENV.fetch("RUN_ID"), 10),
+            run_url: "https://github.com/#{ENV.fetch('GITHUB_REPOSITORY')}/actions/runs/#{ENV.fetch('RUN_ID')}",
+            branch: ENV.fetch("RELEASE_BRANCH"),
+            candidate_sha: ENV.fetch("CANDIDATE_SHA"),
+            target_version: ENV.fetch("TARGET_VERSION"),
+            conclusion: ENV.fetch("CONCLUSION"),
+            runtime_tree_fingerprint: ENV.fetch("RUNTIME_TREE_FINGERPRINT"),
+            completed_at: Time.now.utc.iso8601
+          }
+          File.write("shakaperf-release-evidence.json", "#{JSON.pretty_generate(evidence)}\n")
+          RUBY
+
+      - name: Upload ShakaPerf release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: shakaperf-release-evidence
+          path: shakaperf-release-evidence.json
+          retention-days: 30

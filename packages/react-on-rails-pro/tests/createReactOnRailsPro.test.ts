@@ -19,6 +19,8 @@
  * and calls the startup callback.
  */
 
+import type { ReactOnRailsInternal } from 'react-on-rails/types';
+
 // Mock heavy dependencies that require DOM or side effects
 jest.mock('../src/ClientSideRenderer', () => ({
   renderOrHydrateComponent: jest.fn().mockResolvedValue(undefined),
@@ -90,6 +92,16 @@ describe('createReactOnRailsPro assembly', () => {
 
       // The additional SSR capability should override the core stub
       expect(result.serverRenderReactComponent).toBe(ssrImpl);
+    });
+  });
+
+  it('exposes the streaming support capability on the typed Pro object', () => {
+    jest.isolateModules(() => {
+      const createReactOnRailsPro = require('../src/createReactOnRailsPro').default;
+      const result = createReactOnRailsPro([{ isServerStreamingSupported: () => true }]);
+      const typedResult: ReactOnRailsInternal = result;
+
+      expect(typedResult.isServerStreamingSupported()).toBe(true);
     });
   });
 

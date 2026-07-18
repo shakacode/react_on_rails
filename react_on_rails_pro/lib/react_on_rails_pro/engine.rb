@@ -130,9 +130,9 @@ module ReactOnRailsPro
         prefix = "[React on Rails Pro] #{issue}."
 
         if Rails.env.production?
-          warning = "Using React on Rails Pro in production without a valid license " \
-                    "violates the license terms."
-          Rails.logger.warn "#{prefix} #{warning} #{action}"
+          warning = "Production Use of React on Rails Pro requires a valid license. " \
+                    "If this deployment is Production Use, #{action}"
+          Rails.logger.warn "#{prefix} #{warning}"
         else
           Rails.logger.info "#{prefix} No license required for development/test environments."
         end

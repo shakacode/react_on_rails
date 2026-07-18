@@ -23,11 +23,16 @@ import { buildConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 import log from '../src/shared/log';
 import {
+  MAX_EXTERNAL_SOURCE_MAP_BYTES,
+  MAX_INLINE_SOURCE_MAP_BYTES,
+  preloadSourceMapJsonForBundle,
   PREPARE_STACK_TRACE_INSTALL_SCRIPT,
+  RAW_SOURCE_MAP_JSON_DISCARDED,
   registerBundleForSourceMaps,
   remapStackTrace,
   resolveOriginalPositionForRegistration,
   SOURCE_MAP_STACK_REMAPPER_CONTEXT_KEY,
+  unregisterBundleForSourceMaps,
 } from '../src/worker/vmSourceMapSupport';
 
 const testName = 'vmSourceMapSupport';
@@ -274,6 +279,658 @@ describe('source-mapped stack traces for VM errors', () => {
     } finally {
       readFileSyncSpy.mockRestore();
     }
+  });
+
+  describe('external source map size cap', () => {
+    // These tests use the imported MAX_EXTERNAL_SOURCE_MAP_BYTES, so the at-cap
+    // and over-cap boundary assertions below verify the exported constant is the
+    // enforced limit. Reporting the size via a `statSync` spy keeps these tests
+    // fast: writing a genuinely oversized map would mean a 50MB+ disk write per
+    // test.
+    function mockReportedSourceMapSize(mapPath: string, sizeInBytes: number) {
+      const realStatSync = fs.statSync.bind(fs);
+      // The production code stats the *realpath*, which differs from `mapPath` on
+      // macOS (/var -> /private/var), so compare against the resolved path.
+      const realMapPath = fs.realpathSync(mapPath);
+
+      return jest.spyOn(fs, 'statSync').mockImplementation(((target: fs.PathLike, options?: never) => {
+        const stats = realStatSync(target as string, options) as fs.Stats;
+        if (String(target) !== realMapPath) {
+          return stats;
+        }
+        // Preserve the prototype so `isFile()` keeps working.
+        return Object.assign(Object.create(Object.getPrototypeOf(stats) as object), stats, {
+          size: sizeInBytes,
+        }) as fs.Stats;
+      }) as typeof fs.statSync);
+    }
+
+    async function writeThrowingBundleWithExternalMap() {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      return { bundlePath, mapPath };
+    }
+
+    test('oversized explicit map does not fall through to the conventional fallback map', async () => {
+      // An oversized map must be terminal, not a miss: falling through to
+      // `<bundle>.js.map` would remap frames with a map that is not the one the
+      // bundle names, which is worse than keeping the bundled location.
+      const bundlePath = vmBundlePath(testName);
+      const explicitMapFileName = 'explicit-oversized.js.map';
+      const explicitMapPath = path.join(path.dirname(bundlePath), explicitMapFileName);
+      const fallbackMapPath = path.join(path.dirname(bundlePath), `${path.basename(bundlePath)}.map`);
+
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${explicitMapFileName}\n`);
+      await fsPromises.writeFile(
+        explicitMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
+      );
+      // A stale map left at the conventional path, pointing at a different source.
+      await fsPromises.writeFile(
+        fallbackMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+
+      const statSyncSpy = mockReportedSourceMapSize(explicitMapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // Must keep the bundled location, not silently remap through the stale map.
+        expect(result.exceptionMessage).not.toContain(REBUILT_SOURCE);
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized external map is skipped on the async preload path and warns', async () => {
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+      const readFileAsyncSpy = jest.spyOn(fsPromises, 'readFile');
+      // The readers read the realpath, not `mapPath`, so assert on the realpath —
+      // otherwise a regression that reads the map would slip past on platforms
+      // where the two differ (macOS /var -> /private/var).
+      const realMapPath = fs.realpathSync(mapPath);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // No remap: the frame keeps its bundled location instead of Boom.ts.
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+        // The whole point of the cap: the bytes are never read.
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        expect(readFileAsyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        // Assert what the warning must carry (which map, how big, the limit), not
+        // how it is worded.
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.stringContaining(path.basename(mapPath)),
+          MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
+          MAX_EXTERNAL_SOURCE_MAP_BYTES,
+        );
+      } finally {
+        readFileAsyncSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized external map is skipped on the sync lazy path when the map lands after build', async () => {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+      // No map at build time, so the preload misses and the registration stays
+      // lazy — the first error drives the synchronous read inside prepareStackTrace.
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+      const realMapPath = fs.realpathSync(mapPath);
+
+      try {
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(readFileSyncSpy).not.toHaveBeenCalledWith(realMapPath, 'utf8');
+        // Assert what the warning must carry (which map, how big, the limit), not
+        // how it is worded.
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.stringContaining(path.basename(mapPath)),
+          MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
+          MAX_EXTERNAL_SOURCE_MAP_BYTES,
+        );
+      } finally {
+        readFileSyncSpy.mockRestore();
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('external map exactly at the cap still remaps', async () => {
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      // Boundary guard: the check is `size > cap`, so `size === cap` must be read.
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        // No oversized warning for this map — matched by the map it names rather
+        // than by the message wording.
+        expect(warnSpy).not.toHaveBeenCalledWith(
+          expect.any(String),
+          expect.stringContaining(path.basename(mapPath)),
+          expect.anything(),
+          expect.anything(),
+        );
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized map found at preload is terminal and is not retried later', async () => {
+      // Retrying cannot make a map smaller, and leaving the miss retryable would
+      // let a later same-path map remap this VM generation.
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+        await runInVM('global.triggerSsrError()', bundlePath);
+
+        // The map is replaced with an under-cap one after the VM was built. The
+        // oversized answer was terminal, so this generation must not pick it up.
+        statSyncSpy.mockRestore();
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized map found on the lazy path is terminal and is not retried later', async () => {
+      // The retryable-miss path must not resurrect a generation: once this VM has
+      // seen an oversized map, a later under-cap map at the same path must not
+      // remap it.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`);
+
+      // Missing at build, so the registration stays lazy and retryable.
+      const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        await runInVM('global.triggerSsrError()', bundlePath);
+
+        // Map is now under the cap; the earlier oversized answer was terminal.
+        statSyncSpy.mockRestore();
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        expect(result.exceptionMessage).not.toContain(ORIGINAL_SOURCE);
+        expect(result.exceptionMessage).toContain(`${bundlePath}:3:`);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('an oversized fallback map does not make a late-arriving named map terminal', async () => {
+      // The named map is missing at build and arrives shortly after — a supported
+      // flow. An oversized map sitting at the conventional fallback path must not
+      // be used, but it also must not retire the retry for the named map.
+      const bundlePath = vmBundlePath(testName);
+      const namedMapFileName = 'named.js.map';
+      const namedMapPath = path.join(path.dirname(bundlePath), namedMapFileName);
+      const fallbackMapPath = path.join(path.dirname(bundlePath), `${path.basename(bundlePath)}.map`);
+
+      await writeVmBundle(`${buildThrowingBundleSource()}\n//# sourceMappingURL=${namedMapFileName}\n`);
+      // Only the oversized fallback exists at build time.
+      await fsPromises.writeFile(
+        fallbackMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const statSyncSpy = mockReportedSourceMapSize(fallbackMapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        const { runInVM } = await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        // The named map lands after the VM was built.
+        await fsPromises.writeFile(
+          namedMapPath,
+          JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))),
+        );
+
+        const result = await runInVM('global.triggerSsrError()', bundlePath);
+        expect(isErrorRenderResult(result)).toBe(true);
+        if (!isErrorRenderResult(result)) {
+          throw new Error('expected exceptionMessage result');
+        }
+        // The named map must win once it arrives...
+        expect(result.exceptionMessage).toContain(`${ORIGINAL_SOURCE}:2:3`);
+        // ...and the oversized fallback must never be substituted for it.
+        expect(result.exceptionMessage).not.toContain(REBUILT_SOURCE);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+
+    test('oversized map warns once per path across VM rebuilds', async () => {
+      // The repeat that matters is the preload, which re-checks the map on every
+      // buildVM: an app with more bundles than maxVMPoolSize rebuilds per request,
+      // so without the throttle this warns at request rate. Repeated *errors* on
+      // one VM cannot show this — the registration caches the terminal answer and
+      // never re-checks.
+      buildConfig({
+        serverBundleCachePath: serverBundleCachePath(testName),
+        supportModules: true,
+        stubTimers: false,
+        maxVMPoolSize: 1,
+      });
+
+      const { bundlePath, mapPath } = await writeThrowingBundleWithExternalMap();
+      const realMapPath = fs.realpathSync(mapPath);
+      const evictorBundlePath = path.join(serverBundleCachePath(testName), 'warn-once-evictor.js');
+      await writeBundleAt(evictorBundlePath, 'global.otherBundleLoaded = true;');
+
+      const statSyncSpy = mockReportedSourceMapSize(mapPath, MAX_EXTERNAL_SOURCE_MAP_BYTES + 1);
+      const warnSpy = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+
+      try {
+        // Build (preload warns), evict, then rebuild so preload runs a second time.
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+        await buildExecutionContext([evictorBundlePath], /* buildVmsIfNeeded */ true);
+        expect(hasVMContextForBundle(bundlePath)).toBe(false);
+        await buildExecutionContext([bundlePath], /* buildVmsIfNeeded */ true);
+
+        // Count by the data the warning carries, not its wording.
+        const oversizedWarnings = warnSpy.mock.calls.filter(
+          ([, warnedPath, warnedSize]) =>
+            warnedPath === realMapPath && warnedSize === MAX_EXTERNAL_SOURCE_MAP_BYTES + 1,
+        );
+        expect(oversizedWarnings).toHaveLength(1);
+      } finally {
+        warnSpy.mockRestore();
+        statSyncSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('single-copy source map retention (raw JSON release)', () => {
+    test('raw source-map JSON is released from the registration after the first successful parse', async () => {
+      const bundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+        buildThrowingBundleMap('bundle.js'),
+      )}\n`;
+      const bundlePath = await writeVmBundle(bundleContents);
+      const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents);
+      expect(typeof registration.sourceMapJson).toBe('string');
+
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      // The parsed copy keeps serving lookups after the raw JSON is gone.
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 4, 1)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 4,
+        column: 1,
+      });
+    });
+
+    test('inline data: map encoded URL is released after first parse; external map filename is kept', async () => {
+      // Inline map: registration holds the whole encoded data: payload, which is
+      // dead weight once the parsed map is cached. Releasing only the raw JSON
+      // (but not this URL) would leave the larger base64 copy retained.
+      const inlineBundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+        buildThrowingBundleMap('bundle.js'),
+      )}\n`;
+      const inlineBundlePath = await writeVmBundle(inlineBundleContents);
+      const inlineRegistration = registerBundleForSourceMaps(inlineBundlePath, 0, inlineBundleContents);
+      expect(typeof inlineRegistration.sourceMappingUrl).toBe('string');
+      expect(inlineRegistration.sourceMappingUrl).toEqual(expect.stringContaining('data:application/json'));
+
+      // (a) Remapping still works on first parse.
+      expect(resolveOriginalPositionForRegistration(inlineRegistration, inlineBundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+
+      // (b) The encoded inline payload is released alongside the raw JSON.
+      expect(inlineRegistration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(inlineRegistration.sourceMappingUrl).toBeNull();
+
+      // External map: sourceMappingUrl is a small relative filename the lazy read
+      // path legitimately uses, so the release must leave it intact.
+      const externalBundlePath = path.join(serverBundleCachePath(testName), 'external', 'bundle.js');
+      const externalMapFileName = `${path.basename(externalBundlePath)}.map`;
+      const externalMapPath = path.join(path.dirname(externalBundlePath), externalMapFileName);
+      const externalBundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${externalMapFileName}\n`;
+      await writeBundleAt(externalBundlePath, externalBundleContents);
+      await fsPromises.writeFile(
+        externalMapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(externalBundlePath))),
+      );
+      const externalPreload = await preloadSourceMapJsonForBundle(externalBundlePath, externalBundleContents);
+      const externalRegistration = registerBundleForSourceMaps(
+        externalBundlePath,
+        0,
+        externalBundleContents,
+        externalPreload.sourceMapJson,
+        externalPreload.retryMissingSourceMap,
+      );
+      expect(externalRegistration.sourceMappingUrl).toBe(externalMapFileName);
+
+      expect(resolveOriginalPositionForRegistration(externalRegistration, externalBundlePath, 3, 17)).toEqual(
+        {
+          source: ORIGINAL_SOURCE,
+          line: 2,
+          column: 3,
+        },
+      );
+
+      expect(externalRegistration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      // Unchanged: only the inline data: payload is released, never the filename.
+      expect(externalRegistration.sourceMappingUrl).toBe(externalMapFileName);
+    });
+
+    test('remap keeps working after the raw JSON is released and the on-disk map is overwritten', async () => {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+      // Freeze the external map JSON at registration time, as the VM build does.
+      const preloadedSourceMap = await preloadSourceMapJsonForBundle(bundlePath, bundleContents);
+      expect(typeof preloadedSourceMap.sourceMapJson).toBe('string');
+      const registration = registerBundleForSourceMaps(
+        bundlePath,
+        0,
+        bundleContents,
+        preloadedSourceMap.sourceMapJson,
+        preloadedSourceMap.retryMissingSourceMap,
+      );
+
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+
+      // A same-path rewrite must not leak into this generation's remaps.
+      await fsPromises.writeFile(
+        mapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+          source: ORIGINAL_SOURCE,
+          line: 2,
+          column: 3,
+        });
+        const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+        expect(readPaths).not.toContain(mapPath);
+        expect(readPaths).not.toContain(bundlePath);
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
+
+    test('parsed-map eviction cannot fall through to a disk re-read once the raw JSON is released', async () => {
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+      const preloadedSourceMap = await preloadSourceMapJsonForBundle(bundlePath, bundleContents);
+      const registration = registerBundleForSourceMaps(
+        bundlePath,
+        0,
+        bundleContents,
+        preloadedSourceMap.sourceMapJson,
+        preloadedSourceMap.retryMissingSourceMap,
+      );
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+
+      // Evict the parsed map while still holding the registration. The
+      // reachable production shape is a VM torn down (unregistered) while an
+      // in-flight error still holds its registration object.
+      unregisterBundleForSourceMaps(registration);
+      // Leave a valid, different map on disk: a fall-through re-read would
+      // remap this generation through it — the stale-map risk the frozen JSON
+      // exists to prevent.
+      await fsPromises.writeFile(
+        mapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+        expect(readPaths).not.toContain(mapPath);
+        expect(readPaths).not.toContain(bundlePath);
+        expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
+
+    test('lazy registration settles to the sentinel after a successful load, so eviction cannot re-read disk', async () => {
+      // A lazy registration (external map, no preloaded JSON) keeps
+      // `sourceMapJson === undefined` until its first load. Without settling it
+      // on success, a later cache eviction would re-read a newer same-path map.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const mapPath = path.join(path.dirname(bundlePath), mapFileName);
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+      await fsPromises.writeFile(mapPath, JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath))));
+
+      const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+      expect(registration.sourceMapJson).toBeUndefined();
+
+      // Successful load reads the external map from disk and settles the lazy
+      // registration to the sentinel (Finding A).
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toEqual({
+        source: ORIGINAL_SOURCE,
+        line: 2,
+        column: 3,
+      });
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+
+      // Evict the parsed cache while still holding the registration, then leave a
+      // different valid map on disk. A fall-through re-read would remap this
+      // generation through the newer map.
+      unregisterBundleForSourceMaps(registration);
+      await fsPromises.writeFile(
+        mapPath,
+        JSON.stringify(buildThrowingBundleMap(path.basename(bundlePath), REBUILT_SOURCE)),
+      );
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync');
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        const readPaths = readFileSyncSpy.mock.calls.map(([filePath]) => filePath);
+        expect(readPaths).not.toContain(mapPath);
+        expect(readPaths).not.toContain(bundlePath);
+        expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
+
+    test('corrupt inline data: map is terminal on first lookup and releases its retained payload', async () => {
+      // A data: payload that passes mime + size but decodes to non-JSON. Its JSON
+      // is validated lazily (not eagerly at build), so it is frozen as a decoded
+      // string until the first remap. That lookup fails to parse and settles
+      // terminal — an inline map is never retryable (a re-read could pick up a
+      // newer same-path generation) — and the settle releases the retained data.
+      const corruptDataUrl = 'data:application/json;charset=utf-8,not-valid-json';
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${corruptDataUrl}\n`;
+      const bundlePath = await writeVmBundle(bundleContents);
+
+      // Decoded and frozen, not eagerly validated, and not retryable.
+      const preloaded = await preloadSourceMapJsonForBundle(bundlePath, bundleContents);
+      expect(preloaded.sourceMapJson).toBe('not-valid-json');
+      expect(preloaded.retryMissingSourceMap).toBe(false);
+
+      const registration = registerBundleForSourceMaps(
+        bundlePath,
+        0,
+        bundleContents,
+        preloaded.sourceMapJson,
+        preloaded.retryMissingSourceMap,
+      );
+      expect(registration.sourceMapJson).toBe('not-valid-json');
+
+      // The invalid JSON never remaps; the terminal settle then releases both the
+      // frozen bad string and the retained encoded data: URL — nothing leaks for
+      // the pooled VM's life (Finding B), and it is not retried.
+      expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(registration.sourceMappingUrl).toBeNull();
+    });
+
+    test('retired retryable external map settles to the sentinel so eviction cannot re-read disk', async () => {
+      // A retryable external map that never arrives is retired at the retry cap.
+      // Retirement must settle sourceMapJson to the sentinel; otherwise a later
+      // parsed-cache eviction would re-read disk and could pick up a newer
+      // same-path map.
+      const bundlePath = vmBundlePath(testName);
+      const mapFileName = `${path.basename(bundlePath)}.map`;
+      const bundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=${mapFileName}\n`;
+      await writeVmBundle(bundleContents);
+
+      // No map on disk: registered retryable, sourceMappingUrl is a filename.
+      const registration = registerBundleForSourceMaps(bundlePath, 0, bundleContents, undefined, true);
+      expect(registration.sourceMapJson).toBeUndefined();
+      expect(registration.sourceMappingUrl).toBe(mapFileName);
+
+      // Exhaust the retry budget (MAX_MISSING_SOURCE_MAP_RETRIES = 5); the map
+      // never arrives, so each lookup misses and the retries retire.
+      for (let index = 0; index < 5; index += 1) {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+      }
+
+      // Retirement settled the JSON to the sentinel; the external filename is
+      // kept (not a large payload).
+      expect(registration.sourceMapJson).toBe(RAW_SOURCE_MAP_JSON_DISCARDED);
+      expect(registration.sourceMappingUrl).toBe(mapFileName);
+    });
+
+    test('oversized inline source map on the lazy lookup path is terminal, not retryable', async () => {
+      // The lazy path re-reads the bundle from disk to find its
+      // sourceMappingURL, so serve the oversized inline map via a readFileSync
+      // mock instead of writing a 50MB+ bundle to disk. The data: payload
+      // length gate fires before any decoding, so an opaque filler payload is
+      // enough.
+      const bundlePath = await writeVmBundle(`${buildThrowingBundleSource()}\n`);
+      const oversizedPayload = 'a'.repeat(MAX_INLINE_SOURCE_MAP_BYTES + 1);
+      const oversizedBundleContents = `${buildThrowingBundleSource()}\n//# sourceMappingURL=data:application/json;charset=utf-8,${oversizedPayload}\n`;
+      const validBundleContents = `${buildThrowingBundleSource()}\n${inlineSourceMapComment(
+        buildThrowingBundleMap('bundle.js'),
+      )}\n`;
+      const registration = registerBundleForSourceMaps(bundlePath, 0, undefined, undefined, true);
+
+      const realReadFileSync = fs.readFileSync.bind(fs);
+      let bundleContentsForLookup = oversizedBundleContents;
+      const readFileSyncSpy = jest.spyOn(fs, 'readFileSync').mockImplementation(((
+        target: fs.PathLike | number,
+        options?: never,
+      ) => {
+        if (String(target) === bundlePath) {
+          return bundleContentsForLookup;
+        }
+        return realReadFileSync(target as string, options);
+      }) as typeof fs.readFileSync);
+
+      try {
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        const bundleReadsAfterFirstLookup = readFileSyncSpy.mock.calls.filter(
+          ([target]) => String(target) === bundlePath,
+        ).length;
+        expect(bundleReadsAfterFirstLookup).toBeGreaterThan(0);
+
+        // Terminal means no retry churn: even when the bundle's inline map
+        // "shrinks" to a valid one (a same-path rewrite), this generation must
+        // neither re-read the bundle nor pick the new map up.
+        bundleContentsForLookup = validBundleContents;
+        expect(resolveOriginalPositionForRegistration(registration, bundlePath, 3, 17)).toBeNull();
+        expect(readFileSyncSpy.mock.calls.filter(([target]) => String(target) === bundlePath).length).toBe(
+          bundleReadsAfterFirstLookup,
+        );
+      } finally {
+        readFileSyncSpy.mockRestore();
+      }
+    });
   });
 
   test('external source map lookup retries when the map appears after VM build', async () => {

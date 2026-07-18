@@ -49,6 +49,7 @@ const PRO_ONLY_METHODS = [
   'getOrWaitForStore',
   'getOrWaitForStoreGenerator',
   'reactOnRailsStoreLoaded',
+  'isServerStreamingSupported',
   'streamServerRenderedReactComponent',
   'serverRenderRSCReactComponent',
   'addAsyncPropsCapabilityToComponentProps',
@@ -70,6 +71,7 @@ export type BaseClientObjectType = Omit<
   | 'getOrWaitForStore'
   | 'getOrWaitForStoreGenerator'
   | 'reactOnRailsStoreLoaded'
+  | 'isServerStreamingSupported'
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
   | 'addAsyncPropsCapabilityToComponentProps'

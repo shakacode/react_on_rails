@@ -467,9 +467,9 @@ module ReactOnRailsPro
                                                                          license_plan: "paid")
           end
 
-          it "includes organization name but not plan in the comment" do
+          it "keeps the organization and plan out of the public comment" do
             result = described_class.pro_attribution_comment
-            expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Acme Corp -->")
+            expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
           end
         end
       end

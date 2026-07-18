@@ -106,6 +106,11 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `.agents/skills/react-on-rails-update-changelog/SKILL.md`; a short invocation
   is `$react-on-rails-update-changelog`. For ordinary mainline changelog updates
   on `main`, use the installed/shared `$update-changelog` skill.
+- When a maintainer wants to run or inspect RC/beta validation across the demo
+  fleet, use the repo-local `.agents/skills/run-fleet-validation/SKILL.md`; a
+  short invocation is `$run-fleet-validation`. Its Ruby generator reads
+  `internal/contributor-info/demo-fleet.yml` and emits balanced, subagent-driven
+  prompts for simultaneous execution across multiple machines.
 - Default simplify model: `claude-opus-4-8`
 
 ## External Flagship Demo Coordination
@@ -460,6 +465,27 @@ non-semantic actionlint cleanup when local validation evidence documents that cl
 
 **Process gap disposition**: When an audit, review, or batch closeout finds a recurring process miss, do not add a prose-only rule by default. The issue plan or PR evidence must choose one mechanism target: `script`, `schema`, `checklist+replay`, or `park`, and record the motivating miss, replay evidence or park reason, and non-goal. `park` means the miss is plausible but not worth mechanizing now.
 
+### Release Version Ownership
+
+`bundle exec rake release[...]` owns the coordinated React on Rails product-version
+change. For ordinary RC and final preparation, agents prepare and stamp
+`CHANGELOG.md`, but must not manually bump React on Rails' own gem/npm version
+fields or create the ordinary `Bump version to ...` commit. The release task
+updates the OSS and Pro gem version files, the `version` field in all five
+`package.json` files, and the Ruby `Gemfile.lock` files in that generated commit.
+It does not run `pnpm install` or regenerate `pnpm-lock.yaml`; workspace-protocol
+dependency conversion during npm publishing is temporary and is restored afterward.
+
+If a release-preparation or dependency-pin PR changes dependency ranges or pins,
+regenerate the affected npm/pnpm lockfiles in that PR. Do not defer those lockfile
+updates to the React on Rails product-version release task.
+
+Pins for independently released dependencies are separate changes. For example,
+promoting `react-on-rails-rsc` from an RC to a stable version still requires a
+normal reviewed and tested PR that updates the generator pin, package metadata,
+and affected lockfiles before cutting the next React on Rails RC. Do not confuse
+that dependency update with manually bumping React on Rails' own version.
+
 ## Maintainer Attention Contract
 
 Maintainer attention is for judgment, not for routine progress pings or
@@ -679,7 +705,7 @@ Known residual risk: <none or concise risk>
 Finalized by: <different GitHub account or named check/app, with GitHub review/check or git-log source>
 ```
 
-Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on `main`, and get an explicit maintainer release decision before publishing the final release.
+Auto-merge threshold in accelerated RC is `8/10`. A score of `7/10` permits human merge after review, but not auto-merge. Final-release mode does not use confidence-only auto-merge: run the post-merge audit, update the changelog/release notes as needed, confirm required checks on the exact release-branch SHA being promoted, and get an explicit maintainer release decision before publishing the final release.
 
 Score from a `10/10` baseline: all checks complete, expected skips explained, changed surfaces validated, no unresolved blocker threads, no known residual risk, and an independent finalizer. A non-trivial concern is any finding that, if correct, would be a correctness bug, security issue, behavioral regression, API contract break, data-loss risk, release-process break, or credible CI/test coverage gap. Deduct 1-2 points for incomplete validation or unknown residual risk, using the larger deduction when unsure, and at least 2 points for any failed or unexplained check. Missing required validation for a changed surface is at least a 2-point deduction. Any unresolved non-trivial concern disqualifies auto-merge regardless of score. A missing independent finalizer disqualifies auto-merge regardless of score.
 
@@ -712,7 +738,7 @@ Agents should recommend PR labels based on change complexity and risk. The goal 
 - **Use `ready-for-hosted-ci`** (or ask a maintainer to comment `+ci-run-hosted`) when the PR is ready for hosted GitHub Actions confirmation. This runs the hosted workflows for the current head SHA, but `script/ci-changes-detector` still chooses the applicable suites. Opening a draft PR or requesting code review does not by itself mean hosted CI should run.
 - **Generator-sensitive PRs require hosted CI.** When `script/ci-changes-detector` sets `run_generators=true`, `ci-required / required-pr-gate` fails on ordinary pull requests until hosted CI is requested with `+ci-run-hosted`, `bin/request-hosted-ci`, or a maintainer/user-token `ready-for-hosted-ci` label. This keeps generator changes from merging after only the lightweight gate; merge queue and release-target branches already run hosted CI automatically.
 - **Use `force-full-hosted-ci`** only when a maintainer intentionally wants to bypass optimized suite selection and run every hosted suite, for example while validating CI detector changes, package manager or runtime floor changes, release/build/publishing logic, broad generator output, or another cross-cutting change where path selection itself is part of the risk. Prefer `+ci-force-full`, which also applies `ready-for-hosted-ci` and dispatches the workflows for the current head SHA.
-- **Use local M1 benchmarks** for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. GitHub-hosted push and PR-label benchmark selection is intentionally disabled because shared-runner numbers are noise-dominated and previously produced false-positive regression issues (#4038-#4044). The trusted Bencher trend comes from the dedicated local runner (`benchmarks/run-local-benchmark.rb`) and A/B comparison runner (`benchmarks/run-local-benchmark-comparison.rb`); use repeated baseline-vs-candidate samples on a quiet machine. The hosted `benchmark` workflow is manual-only (`workflow_dispatch`) for explicit diagnostics, not a merge gate or dashboard baseline updater. `ready-for-hosted-ci`, `force-full-hosted-ci`, and `benchmark*` labels do not trigger hosted benchmark suites.
+- **Use local M1 benchmarks** for performance-sensitive changes: server rendering paths, Node renderer, caching, bundle generation, asset serving/precompile behavior, concurrency/pooling, or anything expected to affect throughput, latency, memory, or bundle size. GitHub-hosted push and PR-label benchmark selection is intentionally disabled because shared-runner numbers are noise-dominated and previously produced false-positive regression issues (#4038-#4044). The trusted Bencher trend comes from the dedicated local runner (`benchmarks/run-local-benchmark.rb`) and A/B comparison runner (`benchmarks/run-local-benchmark-comparison.rb`); use repeated baseline-vs-candidate samples on a quiet machine. See `benchmarks/LOCAL_BENCHMARK.md` for the operator quickstart, quiet A/B comparison flow, and result-posting checklist. Hosted benchmark suites are manual-only (`workflow_dispatch`) diagnostics, not a merge gate or dashboard baseline updater. `ready-for-hosted-ci`, `force-full-hosted-ci`, and `benchmark*` labels do not trigger hosted benchmark suites.
 - **Remove hosted readiness when no longer needed** with `+ci-stop-hosted` if the PR returns to active iteration. Use `+ci-stop-full` when only the force-full override should be removed and optimized hosted CI should remain.
 - **Record intentional hosted-CI waivers** with `+ci-skip-hosted [optional reason]`. This is especially important for admins: the comment creates a SHA-bound audit trail without forcing docs-only or low-risk PRs to run hosted CI.
 - **Prefer comment commands for agents and batch coordinators.** A direct label added by a local human/user token can start label-triggered workflows; a label added by a GitHub workflow's `GITHUB_TOKEN` cannot. Agents should use `+ci-run-hosted` or `+ci-force-full` unless a human explicitly uses the local helper or direct label path.
@@ -902,8 +928,14 @@ source exists.
 The `main` branch must stay green. CI failures on `main` block releases:
 `rake release` refuses to publish over a red `main` unless you explicitly
 override (via `RELEASE_CI_STATUS_OVERRIDE=true` or the 4th positional arg).
-Stable releases require every check to pass; pre-releases require only the
-GitHub-branch-protection-required checks.
+Stable/final releases must not use that global override or any accelerated
+asynchronous/deferred-gate bypass. Every unwaived final gate must pass. A
+narrowly scoped final waiver is allowed only where the existing final-release
+policy explicitly permits it, with the required evidence and maintainer sign-off;
+it does not waive any other gate. For the release command's CI-status gate,
+pre-releases require only the GitHub-branch-protection-required checks. That
+narrow rule does not replace the separate RC hard gates or behavioral validation,
+and any maintainer waiver must still follow the active RC policy.
 
 Claude Code sessions get `main`'s CI status injected at session start (and
 again before `gh pr create` / pushing to `main`) via
@@ -918,9 +950,10 @@ If `main` is red:
 3. **If you're the one merging a PR**, check `main` post-merge within 30
    minutes (see `.claude/docs/main-health-monitoring.md`).
 
-**Never silently override the release CI gate.** If you set
-`RELEASE_CI_STATUS_OVERRIDE=true`, document in the PR / release notes why
-the red checks are unrelated to the release.
+**Never silently override the release CI gate.** If an RC policy permits
+`RELEASE_CI_STATUS_OVERRIDE=true`, document in the release tracker or release
+notes why the failed or missing checks are unrelated. Never use it for final
+promotion.
 
 ## Key Concept: File Suffixes vs. RSC Directive
 

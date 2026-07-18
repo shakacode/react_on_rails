@@ -200,12 +200,13 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       end
 
       it "raises on malformed header with missing tab separator" do
-        malformed = "{\"payloadType\":\"string\"}00000005\nhello"
+        malformed = "stream-header-secret\nhello"
         response = mock_ok_response(malformed)
 
-        expect do
-          request.send(:process_response_chunks, response) { |_| nil }
-        end.to raise_error(ReactOnRails::Error, /missing tab separator/)
+        expect { request.send(:process_response_chunks, response) { |_| nil } }
+          .to raise_error(ReactOnRails::LengthPrefixedParser::ParseError, /missing tab separator/) do |error|
+            expect(error.message).not_to include("stream-header-secret")
+          end
       end
 
       it "raises on invalid hex content length" do
@@ -214,16 +215,31 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
         expect do
           request.send(:process_response_chunks, response) { |_| nil }
-        end.to raise_error(ReactOnRails::Error, /Invalid content length hex/)
+        end.to raise_error(ReactOnRails::LengthPrefixedParser::ParseError, /invalid content length hex/)
       end
 
       it "raises on invalid metadata JSON" do
-        malformed = "not-json\t00000005\nhello"
+        malformed = "stream-metadata-secret\t00000005\nhello"
         response = mock_ok_response(malformed)
 
-        expect do
-          request.send(:process_response_chunks, response) { |_| nil }
-        end.to raise_error(ReactOnRails::Error, /invalid metadata JSON/)
+        expect { request.send(:process_response_chunks, response) { |_| nil } }
+          .to raise_error(ReactOnRails::LengthPrefixedParser::ParseError, /invalid metadata JSON/) do |error|
+            expect(error.message).not_to include("stream-metadata-secret")
+            expect(error.cause).to be_nil
+          end
+      end
+
+      it "classifies invalid object payload JSON without yielding it" do
+        raw_content = '{"token":"stream-object-secret"'
+        metadata = { "payloadType" => "object" }.to_json
+        malformed = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+        response = mock_ok_response(malformed)
+
+        expect { request.send(:process_response_chunks, response) { |_| nil } }
+          .to raise_error(ReactOnRails::LengthPrefixedParser::ParseError, /object payload JSON/) do |error|
+            expect(error.message).not_to include("stream-object-secret")
+            expect(error.cause).to be_nil
+          end
       end
 
       it "recovers across separate process_response_chunks calls" do
@@ -233,7 +249,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
         response1 = mock_ok_response(malformed)
         expect do
           request.send(:process_response_chunks, response1) { |_| nil }
-        end.to raise_error(ReactOnRails::Error)
+        end.to raise_error(ReactOnRails::LengthPrefixedParser::ParseError)
 
         response2 = mock_ok_response(valid)
         yielded = []

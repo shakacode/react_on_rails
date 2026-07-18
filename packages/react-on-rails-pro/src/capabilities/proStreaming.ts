@@ -16,6 +16,7 @@
 /* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
 
 import type { Readable } from 'stream';
+import { renderToPipeableStream } from 'react-on-rails/ReactDOMServer';
 import type { RenderParams } from 'react-on-rails/types';
 import streamServerRenderedReactComponent from '../streamServerRenderedReactComponent.ts';
 
@@ -25,6 +26,9 @@ import streamServerRenderedReactComponent from '../streamServerRenderedReactComp
  */
 export function createProStreamingCapability() {
   return {
+    isServerStreamingSupported(): boolean {
+      return typeof renderToPipeableStream === 'function';
+    },
     streamServerRenderedReactComponent(options: RenderParams): Readable {
       return streamServerRenderedReactComponent(options);
     },

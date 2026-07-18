@@ -29,6 +29,19 @@ RSpec.describe ReactOnRails::Dev::ServiceChecker do
       end
     end
 
+    context "when loading the local configuration" do
+      it "uses safe YAML deserialization" do
+        Tempfile.create(["safe-services", ".yml"]) do |file|
+          file.write("services: {}\n")
+          file.flush
+
+          expect(YAML).to receive(:safe_load_file).with(file.path).and_call_original
+
+          expect(described_class.check_services(config_path: file.path)).to be true
+        end
+      end
+    end
+
     context "when config file has invalid YAML" do
       it "prints warning and returns true" do
         Tempfile.create(["invalid", ".yml"]) do |file|

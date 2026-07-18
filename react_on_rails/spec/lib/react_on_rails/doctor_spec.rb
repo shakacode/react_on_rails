@@ -5242,7 +5242,7 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("config/webpack")
             File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
             File.write("config/webpack/rscWebpackConfig.js", "module.exports = {}")
-            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1-rc.0"}}')
+            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1"}}')
             File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
@@ -5283,7 +5283,7 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("config/webpack")
             File.write("config/routes.rb", "rsc_payload_route")
             File.write("config/webpack/rscWebpackConfig.js", "{}")
-            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1-rc.0"}}')
+            File.write("package.json", '{"dependencies":{"react":"~19.2.7","react-on-rails-rsc":"19.2.1"}}')
             File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
@@ -5812,9 +5812,8 @@ RSpec.describe ReactOnRails::Doctor do
       expect(described_class::RSC_MINIMUM_PACKAGE_VERSION).to eq(
         rsc_support.match(/minimumVersion:\s*'(?<version>[^']+)'/)[:version]
       )
-      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(
-        rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)[:version]
-      )
+      prerelease_match = rsc_support.match(/minimumPrereleaseVersion:\s*'(?<version>[^']+)'/)
+      expect(described_class::RSC_MINIMUM_PACKAGE_PRERELEASE_VERSION).to eq(prerelease_match&.[](:version))
       expect(described_class::RSC_SUPPORTED_PACKAGE_MAJOR).to eq(
         rsc_support.match(/supportedMajor:\s*(?<major>\d+)/)[:major].to_i
       )
@@ -5994,7 +5993,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.0.7",
                   "react-dom" => "19.0.7",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6002,7 +6001,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.0.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             example.run
@@ -6019,7 +6018,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(error_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.2.1-rc.0 requires react ^19.2.7",
+            "react-on-rails-rsc 19.2.1 requires react ^19.2.7",
             "installed react is 19.0.7"
           )
         )
@@ -6029,7 +6028,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "does not report peer compatibility success when peer checks are unexpectedly empty" do
         rsc_package = {
-          "version" => "19.2.1-rc.0",
+          "version" => "19.2.1",
           "peerDependencies" => { "react" => "^19.0.4" }
         }
         allow(doctor).to receive(:rsc_peer_check_results).and_return([])
@@ -6107,7 +6106,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.1-beta.0 is not supported by React on Rails Pro 17 RSC",
-                "or 19.2.1-rc.0 during the 17.0 RC soak"
+                "requires react-on-rails-rsc >= 19.2.1"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
@@ -6144,7 +6143,7 @@ RSpec.describe ReactOnRails::Doctor do
             expect(error_msgs).to include(
               a_string_including(
                 "react-on-rails-rsc 19.2.2-alpha.0 is not supported by React on Rails Pro 17 RSC",
-                "or 19.2.1-rc.0 during the 17.0 RC soak"
+                "requires react-on-rails-rsc >= 19.2.1"
               )
             )
             expect(doctor).not_to have_received(:capture_rsc_dist_tags)
@@ -6197,7 +6196,7 @@ RSpec.describe ReactOnRails::Doctor do
               JSON.generate(
                 "dependencies" => {
                   "react" => "19.0.7",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6229,7 +6228,7 @@ RSpec.describe ReactOnRails::Doctor do
                   "react-dom" => "19.0.7"
                 },
                 "optionalDependencies" => {
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6254,7 +6253,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.0.7",
                   "react-dom" => "19.0.7",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6262,7 +6261,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.0.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" }
             )
             stub_package_root(Dir.pwd)
@@ -6274,7 +6273,7 @@ RSpec.describe ReactOnRails::Doctor do
             warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.0.7",
+                "react-on-rails-rsc 19.2.1 is installed with unsupported React 19.0.7",
                 "React/React DOM 19.2.x with patch >= 19.2.7"
               )
             )
@@ -6292,7 +6291,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.3.0",
                   "react-dom" => "19.3.0",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6300,7 +6299,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.3.0")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             stub_package_root(Dir.pwd)
@@ -6312,7 +6311,7 @@ RSpec.describe ReactOnRails::Doctor do
             warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React 19.3.0",
+                "react-on-rails-rsc 19.2.1 is installed with unsupported React 19.3.0",
                 "React/React DOM 19.2.x with patch >= 19.2.7"
               )
             )
@@ -6330,7 +6329,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.3.0",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6338,7 +6337,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.3.0")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             stub_package_root(Dir.pwd)
@@ -6349,7 +6348,7 @@ RSpec.describe ReactOnRails::Doctor do
             error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.2.1-rc.0 is installed with unsupported React DOM 19.3.0",
+                "react-on-rails-rsc 19.2.1 is installed with unsupported React DOM 19.3.0",
                 "React/React DOM 19.2.x with patch >= 19.2.7"
               )
             )
@@ -6366,7 +6365,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.2.8",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6374,7 +6373,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.2.8")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             stub_package_root(Dir.pwd)
@@ -6385,7 +6384,7 @@ RSpec.describe ReactOnRails::Doctor do
             error_msgs = checker.messages.select { |m| m[:type] == :error }.map { |m| m[:content] }
             expect(error_msgs).to include(
               a_string_including(
-                "react-on-rails-rsc 19.2.1-rc.0 is installed with React 19.2.7 but React DOM 19.2.8",
+                "react-on-rails-rsc 19.2.1 is installed with React 19.2.7 but React DOM 19.2.8",
                 "react and react-dom to resolve to the same version"
               )
             )
@@ -6404,7 +6403,7 @@ RSpec.describe ReactOnRails::Doctor do
                 "dependencies" => {
                   "react" => "19.2.7",
                   "react-dom" => "19.2.7",
-                  "react-on-rails-rsc" => "19.2.1-rc.0"
+                  "react-on-rails-rsc" => "19.2.1"
                 }
               )
             )
@@ -6412,7 +6411,7 @@ RSpec.describe ReactOnRails::Doctor do
             install_package("react-dom", "version" => "19.2.7")
             install_package(
               "react-on-rails-rsc",
-              "version" => "19.2.1-rc.0",
+              "version" => "19.2.1",
               "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
             )
             example.run
@@ -6425,7 +6424,7 @@ RSpec.describe ReactOnRails::Doctor do
           .with(Dir.pwd)
           .and_return(
             [
-              JSON.generate("latest" => "19.0.5", "next" => "19.2.1-rc.1"),
+              JSON.generate("latest" => "19.2.1", "next" => "19.2.2-rc.1"),
               instance_double(Process::Status, success?: true)
             ]
           )
@@ -6435,7 +6434,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(warning_msgs).to include(
           a_string_including(
-            "react-on-rails-rsc 19.2.1-rc.0 is behind the npm next dist-tag 19.2.1-rc.1",
+            "react-on-rails-rsc 19.2.1 is behind the npm next dist-tag 19.2.2-rc.1",
             "React Server Components track React minor versions"
           )
         )
@@ -6724,7 +6723,7 @@ RSpec.describe ReactOnRails::Doctor do
               "dependencies" => {
                 "react" => "19.0.7",
                 "react-dom" => "19.0.7",
-                "react-on-rails-rsc" => "19.2.1-rc.0"
+                "react-on-rails-rsc" => "19.2.1"
               }
             )
           )
@@ -6732,7 +6731,7 @@ RSpec.describe ReactOnRails::Doctor do
           install_package("react-dom", "version" => "19.0.7")
           install_package(
             "react-on-rails-rsc",
-            "version" => "19.2.1-rc.0",
+            "version" => "19.2.1",
             "peerDependencies" => { "react" => "^19.2.7", "react-dom" => "^19.2.7" }
           )
           example.run
@@ -6767,7 +6766,7 @@ RSpec.describe ReactOnRails::Doctor do
       report = JSON.parse(output.join("\n"))
       rsc_check = report["checks"].find { |check| check["id"] == "react_server_components" }
       expect(rsc_check["status"]).to eq("fail")
-      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.1-rc.0 requires react ^19.2.7")
+      expect(rsc_check["message"]).to include("react-on-rails-rsc 19.2.1 requires react ^19.2.7")
       expect(report["status"]).to eq("fail")
     end
   end

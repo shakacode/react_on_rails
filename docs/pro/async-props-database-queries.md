@@ -2,6 +2,8 @@
 
 This guide covers how to safely run ActiveRecord queries inside `stream_react_component_with_async_props` blocks. It explains when you need special configuration and when you don't.
 
+> **Prerequisites:** `stream_react_component_with_async_props` requires Pro RSC support to be enabled — set `config.enable_rsc_support = true` in `config/initializers/react_on_rails_pro.rb` (it defaults to `false`) — and it must be rendered inside a [`stream_view_containing_react_components`](./streaming-ssr.md#4-render-the-view-using-the-stream_view_containing_react_components-helper) view. Without RSC support enabled the helper raises `ReactOnRailsPro::Error`; outside a streaming view it raises `ReactOnRails::Error`. The database/fiber configuration below is separate from these prerequisites.
+
 ## Quick Decision Guide
 
 | Your usage pattern                                                 | Configuration needed?                              |
@@ -77,7 +79,7 @@ Each concurrent fiber checks out its own connection. Size the pool to accommodat
 # config/database.yml
 default: &default
   adapter: postgresql
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 }.to_i * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
 ```
 
 **Formula:** `pool >= threads × (1 + max_concurrent_fibers_per_request)`
@@ -203,7 +205,7 @@ Both blocks run concurrently (Pro spawns an `Async::Task` for each). Without `is
 
 ## Summary Checklist
 
-For **one component, sequential queries** — nothing to configure:
+For **one component, sequential queries** — no extra database/fiber configuration (beyond the prerequisites above):
 
 - [x] Use ActiveRecord normally in the `emit` block
 

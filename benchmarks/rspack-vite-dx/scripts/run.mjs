@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,10 +14,12 @@ import {
   removeControlWorkspaces,
 } from './control-workspace.mjs';
 import { assertExactlyOneEntry } from './html.mjs';
+import { redactLocalPaths } from './local-paths.mjs';
 import { buildSummary } from './stats.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDirectory, '..');
+const rootAliases = [...new Set([root, await realpath(root)])];
 const sampleCount = Number(readArgument('--samples') ?? 5);
 const output = path.resolve(root, readArgument('--output') ?? 'results/latest.json');
 const tools = ['rspack', 'vite'];
@@ -231,7 +233,7 @@ async function inspectOverlay(page, messagePath, tool, runNonce) {
   return {
     compile_error_overlay_attached: matchedSelector !== null,
     matched_selector: matchedSelector,
-    overlay_text_excerpt: sanitizePath(overlayText),
+    overlay_text_excerpt: redactLocalPaths(overlayText, rootAliases),
     click_to_editor_verified: false,
     click_to_editor_note:
       'Not asserted: editor protocol registration and overlay link behavior vary by host setup.',
@@ -428,8 +430,4 @@ function readArgument(name) {
 
 function rounded(value) {
   return Math.round(value * 10) / 10;
-}
-
-function sanitizePath(value) {
-  return value?.replaceAll(root, '<benchmark-root>') ?? null;
 }

@@ -9,6 +9,51 @@ track a release-candidate trend.
 [`run-local-benchmark.rb`](run-local-benchmark.rb) runs a benchmark suite on such a machine
 and uploads to its own Bencher testbed. Tracking issue: **#4073**.
 
+## Operator quickstart: RC vs main
+
+Use this flow when a release candidate needs a credible local comparison against current
+`main`. Run it first without upload, inspect the local artifacts, then repeat with upload
+only if the machine stayed quiet and the result is worth publishing.
+
+```bash
+git fetch --tags origin main
+
+ruby benchmarks/run-local-benchmark-comparison.rb core \
+  --a-ref origin/main --a-name main \
+  --b-ref v17.0.0.rc.5 --b-name rc5 \
+  --baseline main --candidate rc5 \
+  --repetitions 5 \
+  --duration 30s \
+  --connections 10 \
+  --no-upload
+```
+
+After the run, inspect:
+
+- `bench_results/local_comparison/<timestamp>/comparison_summary.md`
+- `bench_results/local_comparison/<timestamp>/comparison_summary.json`
+- each run's `quiet_samples.json`
+
+If the machine was used during the run, or the quiet samples show contamination, discard the
+artifact directory and rerun. If the summary is credible and should become part of the
+dedicated Bencher trend, repeat the same command with `--upload` and the local Bencher
+credentials loaded:
+
+```bash
+BENCHER_API_KEY=... ruby benchmarks/run-local-benchmark-comparison.rb core \
+  --a-ref origin/main --a-name main \
+  --b-ref v17.0.0.rc.5 --b-name rc5 \
+  --baseline main --candidate rc5 \
+  --repetitions 5 \
+  --duration 30s \
+  --connections 10 \
+  --upload
+```
+
+If the machine keeps credentials in a local shell file, source that file before running the
+command. Do not commit or print local credential files. For Pro suites, load
+`REACT_ON_RAILS_PRO_LICENSE` as well.
+
 ## Why a local script (not a self-hosted runner)
 
 This is a **public** repository. A self-hosted GitHub Actions runner on a public repo is a
@@ -136,6 +181,22 @@ polluting that baseline.
 **Supported suites:** `core`, `pro` (Rails + k6), and `pro-node-renderer` (node renderer +
 Vegeta). Run all three separately for a full benchmark pass; the Pro suites require
 `REACT_ON_RAILS_PRO_LICENSE`.
+
+## Posting results
+
+Post enough context that another maintainer can tell whether the benchmark is usable without
+re-running it:
+
+- exact command, suite, refs, scenario names, repetitions, duration, and connection count;
+- artifact directory path, especially `comparison_summary.md` and `quiet_samples.json`;
+- whether upload was disabled or which Bencher testbed/branches received the upload;
+- whether the machine stayed quiet for every run, or which runs were discarded;
+- short interpretation of the largest candidate improvements/regressions and any route
+  mismatch between the refs.
+
+Do not post raw secrets, local environment files, or full terminal logs containing credentials.
+For exploratory/noisy runs, post the local artifact path and say that the run was discarded
+rather than uploading it to Bencher.
 
 ## Scheduling (nightly trend + RC)
 

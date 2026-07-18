@@ -37,6 +37,74 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
+  disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
+  `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
+  now treated as routine disconnects: logged once at `debug` (no backtrace, gated on `logging_on_server`)
+  and short-circuited so the block's remaining props are skipped silently. Previously every remaining
+  prop produced an `error`-level entry with a 5-frame backtrace, so a single disconnect spammed logs in
+  proportion to the number of props still in flight and buried genuine emit failures in the noise.
+  Genuine write failures (for example a `JSON::GeneratorError`) still log at `error` with a backtrace.
+  This mirrors the sibling `ReactOnRailsPro::Stream#log_client_disconnect` convention. Fixes
+  [Issue 4325](https://github.com/shakacode/react_on_rails/issues/4325).
+  [PR 4719](https://github.com/shakacode/react_on_rails/pull/4719) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
+  bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
+  the parsed map becomes the VM generation's single retained copy. For inline (`data:`) maps the encoded
+  URL payload (larger than the raw JSON) is released as well, so the single-copy reduction applies to both
+  external and inline maps. A registration whose raw map was released never falls back to re-reading the
+  map from disk, preserving the same-path rebuild guarantee: old VM generations keep remapping through
+  their own map even after the on-disk map is overwritten. Also makes an unusable inline (`data:`) source
+  map terminal on the lazy lookup path instead of retried, matching registration-time behavior. Partially
+  addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
+  whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is
+  not a hard memory bound: a map that grows between the size check and the read is still read in full).
+  Previously only inline (`data:`) source maps were
+  size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
+  stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
+  remapped to original sources, and the renderer logs a warning naming the map. An oversized map is never
+  substituted: the renderer will not fall back to a differently-named map alongside the bundle. When the
+  oversized map is the one the bundle names, that result is final for the VM generation and is not retried;
+  a map that merely arrives late is still retried as before. The 50MB limit matches the pre-existing cap for
+  inline maps. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **Bounded RSC browser performance fallback marks across soft navigations**: Browsers
+  that cannot preserve `PerformanceMark.detail` now retain only the 200 most recent fallback
+  entries, and React on Rails Pro clears the fallback queue during Turbo/Turbolinks page teardown.
+  The TypeScript runtime, generated inline helper, and Ruby streaming mirror share the same limit.
+  Fixes [Issue 4329](https://github.com/shakacode/react_on_rails/issues/4329).
+  [PR 4690](https://github.com/shakacode/react_on_rails/pull/4690) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Fixed webpack server-bundle builds for apps without `react-on-rails-rsc` (e.g. React 18 apps)**:
+  17.0.0.rc.9 made webpack fail with `Module not found: Can't resolve 'react-on-rails-rsc/client.node'`
+  (and `server.node`) unless the optional `react-on-rails-rsc` peer dependency was installed, because the
+  streaming path imported the RSC manifest loaders and bundlers resolve even lazy `import()` specifiers at
+  build time. The manifest stylesheet helpers now live in a module with no runtime `react-on-rails-rsc`
+  imports, and a regression test keeps every non-RSC entry graph free of them. `react-on-rails-rsc` remains
+  optional: only React Server Components (which require React 19) need it, and React on Rails Pro continues
+  to work with React 18 with RSC disabled.
+  [PR 4641](https://github.com/shakacode/react_on_rails/pull/4641) by
+  [justin808](https://github.com/justin808).
+
+- **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
+  exceptions no longer retain raw component props, generated JavaScript, or renderer parse details in log and
+  error-tracker context.
+  Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
+  Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+  [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
   clients must now send the password field before file parts; the renderer rejects and discards leading file
   parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
@@ -101,6 +169,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
+  props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact
+  coverage verifies a production Webpack build and progressive Suspense output on React 18 without
+  installing or bundling `react-on-rails-rsc`; async props and React Server Components remain React
+  19-only. Fixes [Issue 4642](https://github.com/shakacode/react_on_rails/issues/4642).
+  [PR 4658](https://github.com/shakacode/react_on_rails/pull/4658) by
+  [justin808](https://github.com/justin808).
+
 - **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
   React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
   to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain
@@ -133,6 +209,26 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
   diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
   [ihabadham](https://github.com/ihabadham).
+
+#### Changed
+
+- **[Pro]** **RSC scaffolding now installs stable `react-on-rails-rsc@19.2.1`**: The Pro package,
+  node renderer, generator, dummy app, workspace overrides, and compatibility checks now use the stable
+  package and reject prereleases below the stable peer floor. This keeps React on Rails Pro 17 on the
+  coordinated React 19.2.7 runtime while including the 19.2.1 CSS/FOUC fix. The stable artifact uses the
+  React on Rails Pro commercial terms rather than MIT and reports `SEE LICENSE IN LICENSE.md` in npm metadata.
+  [Issue 4357](https://github.com/shakacode/react_on_rails/issues/4357).
+  [PR 4670](https://github.com/shakacode/react_on_rails/pull/4670) by
+  [justin808](https://github.com/justin808).
+- **[Pro]** **Published artifacts now identify the commercial license accurately**: The Pro gem reports
+  `LicenseRef-LICENSE`, while the `react-on-rails-pro` and `react-on-rails-pro-node-renderer` npm packages
+  report `SEE LICENSE IN LICENSE.md`. All three packed artifacts include React on Rails Pro EULA v2.3 instead
+  of presenting the software as `UNLICENSED` or shipping stale terms. EULA v2.3 clarifies organization-owned
+  internal and public use, preserves free educational/demo use, and defines one product-level attribution per
+  covered HTML document. All plan types and permitted free uses now require that attribution; a valid public
+  attribution reports `Licensed` without exposing the Organization, while private server diagnostics retain it.
+  [PR 4660](https://github.com/shakacode/react_on_rails/pull/4660) by
+  [justin808](https://github.com/justin808).
 
 ### [17.0.0.rc.7] - 2026-07-06
 
