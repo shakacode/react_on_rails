@@ -32164,17 +32164,19 @@ The `config.immediate_hydration` setting in `config/initializers/react_on_rails.
 2. **Pro users:** No action needed - immediate hydration is now enabled automatically
 3. **Non-Pro users:** No action needed - standard hydration behavior continues
 
-**Component-level overrides still work:**
+**Component-level overrides (historical — accurate for v16.2.0 only):**
+
+> **⚠️ No longer supported.** In v16.2.0 you could override immediate hydration per component or per store. This option was **completely removed in v16.6.0** ([PR 2834](https://github.com/shakacode/react_on_rails/pull/2834)). The helpers now log a warning and ignore `immediate_hydration:`. Immediate hydration is automatic (enabled for Pro users, disabled for non-Pro), with no per-component override. Remove any `immediate_hydration:` keys from your `react_component` / `react_component_hash` / `redux_store` calls. The example below is retained only as a record of the v16.2.0 behavior.
 
 ```ruby
-# Override for a specific component
-<%= react_component("MyComponent", props, immediate_hydration: false) %>
+# Override for a specific component (v16.2.0 only — removed in v16.6.0)
+<%= react_component("MyComponent", props: props, immediate_hydration: false) %>
 
-# Override for a specific store
+# Override for a specific store (v16.2.0 only — removed in v16.6.0)
 <%= redux_store("MyStore", props: store_props, immediate_hydration: true) %>
 ```
 
-**Note:** If a non-Pro user explicitly sets `immediate_hydration: true`, a warning will be logged and the value will be overridden to `false`.
+**Note:** In v16.2.0, if a non-Pro user explicitly set `immediate_hydration: true`, a warning was logged and the value was overridden to `false`. As of v16.6.0 the option is ignored entirely.
 
 [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
