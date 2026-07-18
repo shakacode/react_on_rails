@@ -145,7 +145,13 @@ required-path coverage, current-head evidence, independent audit, merge authorit
 reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
 
 Every mutable target records the stable maker identity that performed its work, and the independent
-audit's maker list must exactly cover those target identities. The validation-only monorepo gate
+audit's maker list must exactly cover those target identities and retain replayable public-safe
+audit evidence. Each hard-gate check is bound to the target's exact audited, reviewed, and current
+revision. Product gem/npm versions must normalize to the selected candidate; the independently
+versioned RSC package retains its separately resolved version. Merge authority, freeze state,
+merge commit, reachability, and tree parity are recorded per mutable target, with a derived
+aggregate that can represent partial fleet merges without dropping landed-lane proof.
+The validation-only monorepo gate
 retains the exact OSS, Pro, node-renderer, RSC, and generator CLI versions exercised by its matrix,
 but it has no synthetic branch merge, per-target reachability, or tree-parity evidence.
 

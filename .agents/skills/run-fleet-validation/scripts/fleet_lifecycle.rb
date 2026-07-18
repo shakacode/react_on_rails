@@ -95,21 +95,50 @@ module FleetValidation
             "blocker_id" => nil,
             "package_locks" => [],
             "checks" => %w[install build test local_smoke hosted_ci review].to_h do |check|
-              [check, { "status" => "pending", "evidence" => nil, "waiver" => nil, "blocker_id" => nil }]
+              [
+                check,
+                {
+                  "status" => "pending",
+                  "head_commit" => nil,
+                  "evidence" => nil,
+                  "waiver" => nil,
+                  "blocker_id" => nil
+                }
+              ]
             end,
             "review_app" => {
               "state" => "unknown",
+              "head_commit" => nil,
               "evidence" => nil,
               "deployed_smoke" => "pending",
               "waiver" => nil,
               "blocker_id" => nil
             },
-            "baseline" => { "classification" => "pending", "evidence" => nil, "waiver" => nil },
+            "baseline" => {
+              "classification" => "pending",
+              "head_commit" => nil,
+              "evidence" => nil,
+              "waiver" => nil
+            },
+            "revisions" => {
+              "audit" => nil,
+              "reviewed" => nil,
+              "current" => nil,
+              "reconciliation" => "pending"
+            },
             "bases" => {
               "audit" => nil,
               "reviewed" => nil,
               "current" => nil,
               "reconciliation" => "pending"
+            },
+            "merge" => {
+              "status" => target["work_mode"] == "mutation" ? "not_started" : "not_applicable",
+              "authority" => "none",
+              "authority_evidence" => nil,
+              "freeze_state" => "unknown",
+              "merge_commit" => nil,
+              "evidence" => nil
             },
             "reachability" => {
               "default_branch" => "pending",
@@ -136,17 +165,9 @@ module FleetValidation
           "status" => "pending",
           "checker" => nil,
           "maker_ids" => [],
-          "base_commit" => nil
+          "evidence" => nil
         },
-        "merge" => {
-          "authority" => "none",
-          "authority_evidence" => nil,
-          "freeze_state" => "unknown",
-          "status" => "not_started",
-          "reviewed_base_commit" => nil,
-          "current_base_commit" => nil,
-          "base_reconciliation" => "pending"
-        },
+        "merge" => { "status" => "not_started" },
         "reachability" => {
           "default_branch" => "pending",
           "tree_parity" => "pending"
@@ -198,8 +219,8 @@ module FleetValidation
           "reachability" => object_schema(
             %w[default_branch tree_parity],
             {
-              "default_branch" => status_string,
-              "tree_parity" => status_string
+              "default_branch" => aggregate_status_schema,
+              "tree_parity" => aggregate_status_schema
             }
           ),
           "tracker" => object_schema(
@@ -303,7 +324,7 @@ module FleetValidation
       object_schema(
         %w[
           id tier work_mode maker_id work_state work_started_at result waiver blocker_id package_locks checks
-          review_app baseline bases reachability evidence
+          review_app baseline revisions bases merge reachability evidence
         ],
         {
           "id" => nonempty_string,
@@ -334,11 +355,12 @@ module FleetValidation
             end
           ),
           "review_app" => object_schema(
-            %w[state evidence deployed_smoke waiver blocker_id],
+            %w[state head_commit evidence deployed_smoke waiver blocker_id],
             {
               "state" => {
                 "enum" => %w[configured_runnable configured_broken not_configured unknown]
               },
+              "head_commit" => nullable_string,
               "evidence" => nullable_string,
               "deployed_smoke" => status_string,
               "waiver" => waiver_schema,
@@ -346,15 +368,17 @@ module FleetValidation
             }
           ),
           "baseline" => object_schema(
-            %w[classification evidence waiver],
+            %w[classification head_commit evidence waiver],
             {
               "classification" => {
                 "enum" => %w[pending clean baseline_defect candidate_regression waived unknown]
               },
+              "head_commit" => nullable_string,
               "evidence" => nullable_string,
               "waiver" => waiver_schema
             }
           ),
+          "revisions" => revision_schema,
           "bases" => object_schema(
             %w[audit reviewed current reconciliation],
             {
@@ -364,6 +388,7 @@ module FleetValidation
               "reconciliation" => status_string
             }
           ),
+          "merge" => target_merge_schema,
           "reachability" => object_schema(
             %w[default_branch default_commit default_evidence tree_parity tree tree_evidence],
             {
@@ -432,30 +457,45 @@ module FleetValidation
 
     def audit_schema
       object_schema(
-        %w[status checker maker_ids base_commit],
+        %w[status checker maker_ids evidence],
         {
           "status" => status_string,
           "checker" => nullable_string,
           "maker_ids" => { "type" => "array", "items" => nonempty_string },
-          "base_commit" => nullable_string
+          "evidence" => nullable_string
         }
       )
     end
 
     def merge_schema
       object_schema(
-        %w[
-          authority authority_evidence freeze_state status reviewed_base_commit current_base_commit
-          base_reconciliation
-        ],
+        %w[status],
+        { "status" => { "enum" => %w[not_started merged partial blocked unknown] } }
+      )
+    end
+
+    def revision_schema
+      object_schema(
+        %w[audit reviewed current reconciliation],
         {
+          "audit" => nullable_string,
+          "reviewed" => nullable_string,
+          "current" => nullable_string,
+          "reconciliation" => status_string
+        }
+      )
+    end
+
+    def target_merge_schema
+      object_schema(
+        %w[status authority authority_evidence freeze_state merge_commit evidence],
+        {
+          "status" => { "enum" => %w[not_applicable not_started authorized merged blocked unknown] },
           "authority" => { "enum" => %w[none ask auto_merge_when_gates_pass] },
           "authority_evidence" => nullable_string,
           "freeze_state" => { "enum" => %w[clear frozen conflict unknown] },
-          "status" => { "enum" => %w[not_started authorized merged blocked unknown] },
-          "reviewed_base_commit" => nullable_string,
-          "current_base_commit" => nullable_string,
-          "base_reconciliation" => status_string
+          "merge_commit" => nullable_string,
+          "evidence" => nullable_string
         }
       )
     end
@@ -471,9 +511,10 @@ module FleetValidation
 
     def evidence_status_schema
       object_schema(
-        %w[status evidence waiver blocker_id],
+        %w[status head_commit evidence waiver blocker_id],
         {
           "status" => status_string,
+          "head_commit" => nullable_string,
           "evidence" => nullable_string,
           "waiver" => waiver_schema,
           "blocker_id" => nullable_string
@@ -513,6 +554,10 @@ module FleetValidation
 
     def status_string
       { "enum" => %w[pending passed reported blocked waived unknown] }
+    end
+
+    def aggregate_status_schema
+      { "enum" => %w[pending passed partial blocked unknown] }
     end
 
     def render_lifecycle
@@ -606,11 +651,13 @@ module FleetValidation
         ledger. The checker audits every hard-gate diff, all report-only dispositions, required-path
         coverage, baseline classifications, exact-head CI/review evidence, and blocker ownership.
         Every mutable target records its maker identity; `audit.maker_ids` must exactly cover those
-        identities before independence can pass.
+        identities before independence can pass. The audit records replayable public-safe evidence,
+        and every check head must match the target's exact audited, reviewed, and current revision.
 
-        Immediately before any merge or tracker write, re-read tracker mode and freeze state. Merge only
-        with explicit merge authority and no phase/freeze conflict. Reconcile default-base movement,
-        refresh affected checks, and record the audited base in the ledger.
+        Immediately before each merge or tracker write, re-read tracker mode and freeze state. Record
+        authority, freeze state, merge commit, and evidence on that mutable target. Merge only with
+        explicit merge authority and no phase/freeze conflict. Reconcile default-base movement, refresh
+        affected checks, and record the audited base in the ledger.
 
         For each authorized lane, merge through the repository's normal reviewed path, fetch the new
         default, then prove default-branch reachability and tree parity against the audited result.
@@ -624,7 +671,8 @@ module FleetValidation
         or explicitly waived and no `UNKNOWN` remains. A failed required path closes as `BLOCKED` only
         when it records its lane, failure evidence, and an owned `blocker_id`. Waived or deferred
         blockers retain a durable owner and require structured gate, authority, evidence URL, and
-        reason fields. If any lane has already merged, its base, authority/freeze, reachability, and
+        reason fields. The aggregate merge/reachability state is derived from the per-target rows. If
+        any lane has already merged, its base, authority/freeze, merge-commit, reachability, and
         tree-parity proofs remain required even when another lane blocks overall promotion.
       MARKDOWN
     end
@@ -668,6 +716,13 @@ module FleetValidation
   end
 
   class LedgerValidator
+    PRODUCT_PACKAGES = {
+      "gem" => %w[react_on_rails react_on_rails_pro],
+      "npm" => %w[
+        react-on-rails create-react-on-rails-app react-on-rails-pro react-on-rails-pro-node-renderer
+      ]
+    }.freeze
+
     def initialize(
       ledger,
       inventory:,
@@ -700,30 +755,26 @@ module FleetValidation
       result.concat(blocker_reference_errors) if @closeout
       result.concat(preflight_errors) if @closeout
       result.concat(pack_identity_errors) if @closeout
+      result << product_candidate_version_error if @closeout && product_candidate_version_error
       result << inventory_completion_error if @closeout && inventory_completion_error
       result << work_state_result_error if @closeout && work_state_result_error
       result << package_lock_error if @closeout && package_lock_error
       result << package_version_error if @closeout && package_version_error
       result << check_evidence_error if @closeout && check_evidence_error
+      result.concat(revision_evidence_errors) if @closeout
       result.concat(waiver_evidence_errors) if @closeout
-      recorded_merge = @ledger.dig("merge", "status") == "merged"
-      merge_proofs_required = merge_eligible? || recorded_merge
-      result.concat(base_identity_errors) if @closeout && merge_proofs_required
-      result << base_movement_error if @closeout && merge_proofs_required && base_movement_error
+      result.concat(base_identity_errors) if @closeout
+      result << base_movement_error if @closeout && base_movement_error
       result.concat(independent_audit_errors) if @closeout
       result << "independent audit is not passed" if @closeout && @ledger.dig("audit", "status") != "passed"
       if @closeout && !present?(@ledger.dig("preflight", "capabilities", "restart_handoff"))
         result << "capability restart_handoff is missing"
       end
-      result.concat(reachability_errors) if @closeout && merge_proofs_required
+      result.concat(target_merge_errors) if @closeout
+      result.concat(reachability_errors) if @closeout
+      result.concat(aggregate_state_errors) if @closeout
       result.concat(tracker_errors) if @closeout
-      if @closeout && (merge_eligible? || recorded_merge) && merge_authority_error
-        result << merge_authority_error
-      end
       result << promotion_error if @closeout && promotion_error
-      if @closeout && recorded_merge && !present?(@ledger.dig("merge", "authority_evidence"))
-        result << "merged result is missing explicit authority evidence"
-      end
       result
     end
 
@@ -882,7 +933,6 @@ module FleetValidation
     end
 
     def base_movement_error
-      merge = @ledger.fetch("merge", {})
       moved = Array(@ledger["inventory"]).any? do |item|
         next false unless item["work_mode"] == "mutation"
 
@@ -890,9 +940,6 @@ module FleetValidation
         present?(bases["reviewed"]) && present?(bases["current"]) &&
           bases["reviewed"] != bases["current"] && bases["reconciliation"] != "passed"
       end
-      moved ||= present?(merge["reviewed_base_commit"]) && present?(merge["current_base_commit"]) &&
-                merge["reviewed_base_commit"] != merge["current_base_commit"] &&
-                merge["base_reconciliation"] != "passed"
       return unless moved
 
       "base moved after audit without passing reconciliation"
@@ -951,6 +998,23 @@ module FleetValidation
         errors << "pack snapshot_fingerprint does not match the current manifest"
       end
       errors
+    end
+
+    def product_candidate_version_error
+      candidate = @ledger.dig("pack", "candidate").to_s
+      match = candidate.match(/\Av?(\d+\.\d+\.\d+)(?:\.(rc|beta)\.(\d+))?\z/)
+      return "candidate #{candidate} cannot be normalized to product package versions" unless match
+
+      gem_version = candidate.delete_prefix("v")
+      npm_version = match[2] ? "#{match[1]}-#{match[2]}.#{match[3]}" : match[1]
+      expected = { "gem" => gem_version, "npm" => npm_version }
+      mismatched = Array(@ledger.dig("pack", "resolved_packages")).any? do |package|
+        names = PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+        names.include?(package["name"]) && package["version"] != expected.fetch(package["ecosystem"])
+      end
+      return unless mismatched
+
+      "resolved product package versions do not match candidate #{candidate}"
     end
 
     def inventory_completion_error
@@ -1021,15 +1085,49 @@ module FleetValidation
         next false unless item["tier"] == "hard_gate"
 
         checks = item["checks"]
+        current_head = item.dig("revisions", "current")
         !checks.is_a?(Hash) || %w[install build test local_smoke hosted_ci review].any? do |name|
           check = checks[name]
           !check.is_a?(Hash) || !%w[passed blocked waived].include?(check["status"]) ||
-            !present?(check["evidence"])
+            !present?(check["evidence"]) || !commit_identity?(check["head_commit"]) ||
+            check["head_commit"] != current_head
         end
       end
       return if count.zero?
 
-      "#{count} hard-gate target(s) have unknown or nonterminal check evidence"
+      "#{count} hard-gate target(s) check evidence is not bound to its immutable current head"
+    end
+
+    def revision_evidence_errors
+      Array(@ledger["inventory"]).flat_map do |item|
+        revisions = item.fetch("revisions", {})
+        errors = []
+        %w[audit reviewed current].each do |field|
+          errors << "target #{item['id']} #{field} revision is missing" unless commit_identity?(revisions[field])
+        end
+        if commit_identity?(revisions["audit"]) && revisions["audit"] != revisions["reviewed"]
+          errors << "target #{item['id']} audit revision does not match reviewed revision"
+        end
+        if commit_identity?(revisions["current"]) && revisions["current"] != revisions["reviewed"]
+          errors << "target #{item['id']} current revision does not match reviewed revision"
+        end
+        errors << "target #{item['id']} revision reconciliation is not passed" unless revisions["reconciliation"] == "passed"
+
+        review_app = item.fetch("review_app", {})
+        if !commit_identity?(review_app["head_commit"]) || review_app["head_commit"] != revisions["current"]
+          errors << "target #{item['id']} review-app evidence is not bound to its immutable current head"
+        end
+        baseline = item.fetch("baseline", {})
+        expected_baseline_head = if item["work_mode"] == "mutation"
+                                   item.dig("bases", "current")
+                                 else
+                                   revisions["current"]
+                                 end
+        if !commit_identity?(baseline["head_commit"]) || baseline["head_commit"] != expected_baseline_head
+          errors << "target #{item['id']} baseline evidence is not bound to its fresh-default head"
+        end
+        errors
+      end
     end
 
     def independent_audit_errors
@@ -1042,6 +1140,7 @@ module FleetValidation
       mutable_count = Array(@ledger["inventory"]).count { |item| item["work_mode"] == "mutation" }
       errors << "independent audit checker is missing" unless present?(audit["checker"])
       errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
+      errors << "independent audit evidence is missing" unless present?(audit["evidence"])
       if mutable_maker_ids.length != mutable_count || mutable_maker_ids.uniq.sort != audit_maker_ids.uniq.sort
         errors << "independent audit maker identities do not cover every mutable target"
       end
@@ -1052,19 +1151,7 @@ module FleetValidation
     end
 
     def base_identity_errors
-      audit = @ledger.fetch("audit", {})
-      merge = @ledger.fetch("merge", {})
       errors = []
-      unless commit_identity?(audit["base_commit"])
-        errors << "audit base_commit is missing or not an exact commit identity"
-      end
-      %w[reviewed_base_commit current_base_commit].each do |field|
-        errors << "merge #{field} is missing or not an exact commit identity" unless commit_identity?(merge[field])
-      end
-      if commit_identity?(audit["base_commit"]) && commit_identity?(merge["reviewed_base_commit"]) &&
-         audit["base_commit"] != merge["reviewed_base_commit"]
-        errors << "audit base_commit does not match merge reviewed_base_commit"
-      end
       Array(@ledger["inventory"]).each do |item|
         next unless item["work_mode"] == "mutation"
 
@@ -1139,14 +1226,11 @@ module FleetValidation
     end
 
     def reachability_errors
-      reachability = @ledger.fetch("reachability", {})
-      errors = %w[default_branch tree_parity].filter_map do |field|
-        "reachability #{field} is not passed" unless reachability[field] == "passed"
-      end
-      Array(@ledger["inventory"]).each do |item|
-        next unless item["work_mode"] == "mutation"
+      Array(@ledger["inventory"]).flat_map do |item|
+        next [] unless item["work_mode"] == "mutation" && item.dig("merge", "status") == "merged"
 
         target = item.fetch("reachability", {})
+        errors = []
         unless target["default_branch"] == "passed" && commit_identity?(target["default_commit"]) &&
                present?(target["default_evidence"])
           errors << "target #{item['id']} default-branch reachability evidence is incomplete"
@@ -1155,8 +1239,8 @@ module FleetValidation
                present?(target["tree_evidence"])
           errors << "target #{item['id']} tree-parity evidence is incomplete"
         end
+        errors
       end
-      errors
     end
 
     def tracker_errors
@@ -1169,15 +1253,63 @@ module FleetValidation
       errors
     end
 
-    def merge_authority_error
-      merge = @ledger.fetch("merge", {})
-      return "closeout merge status is not merged" unless merge["status"] == "merged"
+    def target_merge_errors
+      Array(@ledger["inventory"]).flat_map do |item|
+        merge = item.fetch("merge", {})
+        if item["work_mode"] != "mutation"
+          next [] if merge["status"] == "not_applicable"
 
-      authorized = %w[ask auto_merge_when_gates_pass].include?(merge["authority"])
-      conflict = merge["freeze_state"] != "clear" || @ledger.dig("pack", "tracker_mode") == "conflict"
-      return if authorized && !conflict
+          next ["target #{item['id']} must mark merge not_applicable"]
+        end
 
-      "merge is not allowed while tracker mode or freeze state conflicts"
+        errors = []
+        unless %w[merged blocked].include?(merge["status"])
+          errors << "target #{item['id']} merge disposition is not terminal"
+        end
+        if merge["status"] == "merged"
+          authorized = %w[ask auto_merge_when_gates_pass].include?(merge["authority"])
+          errors << "target #{item['id']} merged without explicit authority" unless authorized
+          errors << "target #{item['id']} merged without authority evidence" unless present?(merge["authority_evidence"])
+          errors << "target #{item['id']} merged during a freeze or phase conflict" unless merge["freeze_state"] == "clear"
+          errors << "target #{item['id']} merge commit is missing" unless commit_identity?(merge["merge_commit"])
+          errors << "target #{item['id']} merge evidence is missing" unless present?(merge["evidence"])
+        elsif merge["status"] == "blocked"
+          errors << "target #{item['id']} blocked merge disposition has no evidence" unless present?(merge["evidence"])
+        end
+        if !release_blocked? && merge["status"] != "merged"
+          errors << "target #{item['id']} merge is incomplete for a promotable release"
+        end
+        errors
+      end
+    end
+
+    def aggregate_state_errors
+      mutation_items = Array(@ledger["inventory"]).select { |item| item["work_mode"] == "mutation" }
+      merged_count = mutation_items.count { |item| item.dig("merge", "status") == "merged" }
+      expected_merge = if merged_count == mutation_items.length
+                         "merged"
+                       elsif merged_count.positive?
+                         "partial"
+                       else
+                         "blocked"
+                       end
+      expected_reachability = if expected_merge == "merged"
+                                "passed"
+                              elsif expected_merge == "partial"
+                                "partial"
+                              else
+                                "blocked"
+                              end
+      errors = []
+      unless @ledger.dig("merge", "status") == expected_merge
+        errors << "aggregate merge status does not match per-target merge states"
+      end
+      %w[default_branch tree_parity].each do |field|
+        unless @ledger.dig("reachability", field) == expected_reachability
+          errors << "aggregate reachability #{field} does not match per-target merge states"
+        end
+      end
+      errors
     end
 
     def promotion_error
@@ -1185,10 +1317,6 @@ module FleetValidation
       return unless release_blocked?
 
       "promotion cannot be recommended while release blockers remain"
-    end
-
-    def merge_eligible?
-      !release_blocked?
     end
 
     def durable_owner?(owner)

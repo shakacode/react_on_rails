@@ -100,9 +100,11 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
-The validator fails closed on stale candidates, incomplete inventory, premature app work,
-`UNKNOWN` capabilities or review-app state, retained package versions that differ from the resolved
-release snapshot, missing package/check/baseline evidence, unowned
+The validator fails closed on stale candidates, product package versions that do not normalize to
+the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
+review-app state, retained package versions that differ from the resolved release snapshot,
+check/review evidence that does not match the immutable audited/reviewed/current target revision,
+missing package/check/baseline evidence, unowned
 blockers, private-only fields, missing required paths, non-independent audit, base movement,
 authority/freeze conflict, and missing default reachability/tree parity.
 The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven
@@ -115,8 +117,10 @@ Unrelated baseline defects require the same structured waiver before promotion. 
 records its maker identity so the independent audit can prove complete maker coverage. The
 validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
 versions it exercises, but does not fabricate per-target merge or reachability evidence.
-Any merge already recorded retains its base, authority/freeze, reachability, and tree-parity proofs
-even when another lane leaves the overall release blocked.
+Every mutable target records its own merge authority, freeze state, merge commit, and evidence.
+The aggregate merge/reachability state is derived from those rows, so a partial fleet closeout
+retains proofs for every landed lane without fabricating them for blocked lanes. The independent
+audit also records replayable public-safe evidence.
 
 For the checked-in sanitized RC12 regression corpus:
 

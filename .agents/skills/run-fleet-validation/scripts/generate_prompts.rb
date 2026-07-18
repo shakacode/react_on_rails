@@ -365,6 +365,8 @@ module FleetValidation
           artifacts: do not create a bump branch or PR for it.
         - Capture dependency install, intentional lockfile diff, build/assets, target tests, required CI,
           primary route smoke, SSR/hydration, and the target's headline Pro/RSC behavior where applicable.
+          Record the immutable target head for every check; a later commit invalidates that evidence and
+          requires the audited, reviewed, and current revision plus affected checks to be refreshed.
           When review-app metadata is null/unverified, derive a repo-owned local boot/smoke command from
           target docs; do not invent a public deployment URL or claim hosted review-app smoke.
         - A confirmed candidate regression is BLOCKED and needs a linked issue. Unrelated failures remain

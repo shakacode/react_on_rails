@@ -22,6 +22,20 @@ class FleetValidationGeneratorTest < Minitest::Test
     FleetValidation::Generator.new(**defaults.merge(overrides))
   end
 
+  def resolved_packages(generator)
+    generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
+             .uniq { |package| [package["ecosystem"], package["name"]] }
+             .map do |package|
+      product_names = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+      version = if product_names.include?(package["name"])
+                  package["ecosystem"] == "gem" ? "17.0.0.rc.12" : "17.0.0-rc.12"
+                else
+                  "1.0.0"
+                end
+      package.merge("version" => version, "source" => "registry")
+    end
+  end
+
   def complete_ledger(generator)
     ledger = generator.ledger_template
     ledger.fetch("pack").merge!(
@@ -29,9 +43,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "tracker_mode" => "strict-rc",
-      "resolved_packages" => generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
-                                      .uniq { |package| [package["ecosystem"], package["name"]] }
-                                      .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
+      "resolved_packages" => resolved_packages(generator)
     )
     ledger.fetch("preflight")["status"] = "passed"
     ledger.fetch("preflight")["app_work_allowed"] = true
@@ -42,6 +54,12 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger.fetch("preflight").fetch("capabilities").transform_values! { "passed" }
     ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = "restart-safe handoff"
     ledger.fetch("inventory").each do |item|
+      revision = if item["work_mode"] == "report_only"
+                   "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                 else
+                   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 end
+      baseline_head = item["work_mode"] == "mutation" ? "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" : revision
       item.merge!(
         "maker_id" => item["work_mode"] == "mutation" ? "maker-1" : nil,
         "work_state" => "finished",
@@ -51,23 +69,53 @@ class FleetValidationGeneratorTest < Minitest::Test
       )
       expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
       item["package_locks"] = expected.fetch("packages").map do |package|
-        package.merge("version" => "1.0.0", "source" => "registry")
+        resolved = ledger.fetch("pack").fetch("resolved_packages").find do |candidate_package|
+          candidate_package.slice("ecosystem", "name") == package.slice("ecosystem", "name")
+        end
+        resolved.dup
       end
       item.fetch("checks").each_value do |check|
-        check.merge!("status" => "passed", "evidence" => "public-safe evidence")
+        check.merge!("status" => "passed", "head_commit" => revision, "evidence" => "public-safe evidence")
       end
       item.fetch("review_app").merge!(
         "state" => "not_configured",
+        "head_commit" => revision,
         "evidence" => "not configured",
         "deployed_smoke" => "waived"
       )
-      item.fetch("baseline").merge!("classification" => "clean", "evidence" => "fresh default passed")
+      item.fetch("baseline").merge!(
+        "classification" => "clean",
+        "head_commit" => baseline_head,
+        "evidence" => "fresh default passed"
+      )
+      item.fetch("revisions").merge!(
+        "audit" => revision,
+        "reviewed" => revision,
+        "current" => revision,
+        "reconciliation" => "passed"
+      )
       item.fetch("bases").merge!(
         "audit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "reviewed" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "current" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "reconciliation" => "passed"
       )
+      if item["work_mode"] == "mutation"
+        item.fetch("merge").merge!(
+          "status" => "merged",
+          "authority" => "auto_merge_when_gates_pass",
+          "authority_evidence" => "trusted batch goal",
+          "freeze_state" => "clear",
+          "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence" => "public-safe merge evidence"
+        )
+      else
+        item.fetch("merge").merge!(
+          "status" => "not_applicable",
+          "freeze_state" => "clear",
+          "evidence" => "no mutable branch"
+        )
+      end
       item.fetch("reachability").merge!(
         "default_branch" => "passed",
         "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
@@ -84,17 +132,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       "status" => "passed",
       "checker" => "independent-checker",
       "maker_ids" => ["maker-1"],
-      "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "evidence" => "public-safe independent audit report"
     )
-    ledger.fetch("merge").merge!(
-      "authority" => "auto_merge_when_gates_pass",
-      "authority_evidence" => "trusted batch goal",
-      "freeze_state" => "clear",
-      "status" => "merged",
-      "reviewed_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "current_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "base_reconciliation" => "passed"
-    )
+    ledger.fetch("merge")["status"] = "merged"
     ledger.fetch("reachability").merge!("default_branch" => "passed", "tree_parity" => "passed")
     ledger.fetch("tracker").merge!(
       "status" => "ready",
@@ -413,14 +453,6 @@ class FleetValidationGeneratorTest < Minitest::Test
         "disposition" => nil
       }
     ]
-    ledger.fetch("merge").merge!(
-      "authority" => "none",
-      "authority_evidence" => nil,
-      "status" => "blocked",
-      "reviewed_base_commit" => nil,
-      "current_base_commit" => nil
-    )
-    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
     ledger.fetch("tracker")["promotion"] = "blocked"
 
     errors = FleetValidation::LedgerValidator.new(
@@ -598,8 +630,6 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_closeout_requires_reconciliation_when_the_default_base_moves
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("merge")["reviewed_base_commit"] = "base-before"
-    ledger.fetch("merge")["current_base_commit"] = "base-after"
     target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.fetch("bases").merge!("reviewed" => "target-before", "current" => "target-after", "reconciliation" => "blocked")
 
@@ -613,12 +643,11 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "base moved after audit without passing reconciliation"
   end
 
-  def test_closeout_requires_audit_and_merge_base_identities
+  def test_closeout_requires_per_target_audit_reviewed_and_current_base_identities
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("audit")["base_commit"] = nil
-    ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
-    ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }.fetch("bases")["audit"] = nil
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil)
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -627,10 +656,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "audit base_commit is missing or not an exact commit identity"
-    assert_includes errors, "merge reviewed_base_commit is missing or not an exact commit identity"
-    assert_includes errors, "merge current_base_commit is missing or not an exact commit identity"
     assert(errors.any? { |error| error.include?("audit base is missing") })
+    assert(errors.any? { |error| error.include?("reviewed base is missing") })
+    assert(errors.any? { |error| error.include?("current base is missing") })
   end
 
   def test_generated_closeout_requires_independent_audit_authorized_merge_reachability_and_tree_parity
@@ -643,6 +671,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes closeout, "explicit merge authority"
       assert_includes closeout, "default-branch reachability"
       assert_includes closeout, "tree parity"
+      assert_includes closeout, "replayable public-safe evidence"
+      assert_includes closeout, "every check head"
+      assert_includes closeout, "merge commit"
       assert_includes closeout, "PASS`, `PARTIAL`, or `BLOCKED"
     end
   end
@@ -710,6 +741,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "independent audit is not passed"
+  end
+
+  def test_closeout_requires_replayable_independent_audit_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["evidence"] = "   "
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit evidence is missing"
   end
 
   def test_closeout_requires_a_restart_safe_capability_handoff
@@ -879,13 +925,14 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "reachability tree_parity is not passed"
+    assert_includes errors, "aggregate reachability tree_parity does not match per-target merge states"
   end
 
   def test_closeout_rejects_merge_during_a_freeze_conflict
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("merge")["freeze_state"] = "conflict"
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["freeze_state"] = "conflict"
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -895,13 +942,14 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "merge is not allowed while tracker mode or freeze state conflicts"
+    assert_includes errors, "target #{target['id']} merged during a freeze or phase conflict"
   end
 
   def test_closeout_requires_applicable_merges_to_be_complete
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("merge")["status"] = "authorized"
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["status"] = "authorized"
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -910,13 +958,14 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "closeout merge status is not merged"
+    assert_includes errors, "target #{target['id']} merge disposition is not terminal"
   end
 
   def test_closeout_requires_replayable_explicit_merge_authority_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("merge")["authority_evidence"] = nil
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["authority_evidence"] = nil
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -926,7 +975,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "merged result is missing explicit authority evidence"
+    assert_includes errors, "target #{target['id']} merged without authority evidence"
   end
 
   def test_validated_ledger_regenerates_the_append_only_tracker_matrix
@@ -1195,8 +1244,8 @@ class FleetValidationGeneratorTest < Minitest::Test
       %w[build hosted_ci install local_smoke review test],
       target.fetch("checks").keys.sort
     )
-    assert_equal %w[classification evidence waiver], target.fetch("baseline").keys.sort
-    assert_equal %w[blocker_id deployed_smoke evidence state waiver], target.fetch("review_app").keys.sort
+    assert_equal %w[classification evidence head_commit waiver], target.fetch("baseline").keys.sort
+    assert_equal %w[blocker_id deployed_smoke evidence head_commit state waiver], target.fetch("review_app").keys.sort
   end
 
   def test_closeout_requires_exact_retained_package_lock_versions_and_sources
@@ -1247,6 +1296,37 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_resolved_product_versions_must_match_the_selected_candidate
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each do |package|
+      next if package["name"] == "react-on-rails-rsc"
+
+      package["version"] = package["ecosystem"] == "gem" ? "17.0.0.rc.11" : "17.0.0-rc.11"
+    end
+    ledger.fetch("inventory").each do |item|
+      item.fetch("package_locks").each do |package|
+        next if package["name"] == "react-on-rails-rsc"
+        next unless %w[
+          react_on_rails react_on_rails_pro react-on-rails create-react-on-rails-app
+          react-on-rails-pro react-on-rails-pro-node-renderer
+        ].include?(package["name"])
+
+        package["version"] = package["ecosystem"] == "gem" ? "17.0.0.rc.11" : "17.0.0-rc.11"
+      end
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
   end
 
   def test_closeout_rejects_retained_lock_versions_that_do_not_match_the_resolved_snapshot
@@ -1397,16 +1477,18 @@ class FleetValidationGeneratorTest < Minitest::Test
         "disposition" => nil
       }
     ]
-    ledger.fetch("merge").merge!(
-      "authority" => "none",
-      "authority_evidence" => nil,
-      "status" => "blocked",
-      "reviewed_base_commit" => nil,
-      "current_base_commit" => nil
-    )
-    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
-    target.fetch("reachability").transform_values! { nil }
-    target.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.fetch("merge").merge!(
+        "status" => "blocked",
+        "authority" => "none",
+        "authority_evidence" => nil,
+        "merge_commit" => nil,
+        "evidence" => "release blocked before merge"
+      )
+      item.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    end
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
     ledger.fetch("tracker")["promotion"] = "blocked"
 
     errors = FleetValidation::LedgerValidator.new(
@@ -1434,7 +1516,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "disposition" => nil
       }
     ]
-    ledger.fetch("merge").merge!(
+    target.fetch("merge").merge!(
       "authority" => "none",
       "authority_evidence" => nil,
       "freeze_state" => "frozen",
@@ -1449,15 +1531,82 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "merge is not allowed while tracker mode or freeze state conflicts"
-    assert_includes errors, "merged result is missing explicit authority evidence"
+    assert_includes errors, "target #{target['id']} merged without explicit authority"
+    assert_includes errors, "target #{target['id']} merged without authority evidence"
+    assert_includes errors, "target #{target['id']} merged during a freeze or phase conflict"
   end
 
-  def test_closeout_binds_audited_bases_to_reviewed_revisions
+  def test_partial_merge_closeout_requires_proofs_only_for_the_lanes_that_landed
     generator = build_generator
     ledger = complete_ledger(generator)
-    ledger.fetch("audit")["base_commit"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    ledger.fetch("merge")["reviewed_base_commit"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    mutable = ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }
+    merged = mutable.first
+    blocked = mutable.last
+    mutable.each do |item|
+      item["merge"] = {
+        "status" => "blocked",
+        "authority" => "none",
+        "authority_evidence" => nil,
+        "freeze_state" => "clear",
+        "merge_commit" => nil,
+        "evidence" => "public-safe merge disposition"
+      }
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+    end
+    merged.fetch("merge").merge!(
+      "status" => "merged",
+      "authority" => "auto_merge_when_gates_pass",
+      "authority_evidence" => "trusted batch goal",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "evidence" => "public-safe merge evidence"
+    )
+    merged.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "public-safe reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "public-safe tree parity"
+    )
+    blocked.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    blocked.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    schema_errors = FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+    semantic_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty schema_errors
+    assert_empty semantic_errors
+  end
+
+  def test_closeout_binds_each_target_audit_base_to_its_reviewed_base
+    generator = build_generator
+    ledger = complete_ledger(generator)
     target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.fetch("bases").merge!(
       "audit" => "cccccccccccccccccccccccccccccccccccccccc",
@@ -1472,7 +1621,6 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert(errors.any? { |error| error.include?("audit base does not match reviewed base") })
-    assert_includes errors, "audit base_commit does not match merge reviewed_base_commit"
   end
 
   def test_same_pack_id_cannot_be_reused_for_a_different_release_snapshot
@@ -1622,9 +1770,6 @@ class FleetValidationGeneratorTest < Minitest::Test
       }
     ]
     ledger.fetch("tracker")["promotion"] = "blocked"
-    ledger.fetch("audit")["base_commit"] = nil
-    ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
-    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
     ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
       item.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil)
       item.fetch("reachability").merge!(
@@ -1644,8 +1789,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "audit base_commit is missing or not an exact commit identity"
-    assert_includes errors, "reachability default_branch is not passed"
+    assert(errors.any? { |error| error.include?("audit base is missing or not an exact commit identity") })
     assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
   end
 
@@ -1688,7 +1832,31 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "1 hard-gate target(s) have unknown or nonterminal check evidence"
+    assert_includes errors, "1 hard-gate target(s) check evidence is not bound to its immutable current head"
+  end
+
+  def test_hard_gate_checks_must_match_the_immutable_current_head
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target["revisions"] = {
+      "audit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reviewed" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "current" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reconciliation" => "passed"
+    }
+    target.fetch("checks").each_value do |check|
+      check["head_commit"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("check evidence is not bound to its immutable current head") })
   end
 
   def test_sanitized_rc12_replay_exercises_inventory_barriers_ownership_and_tracker_regeneration

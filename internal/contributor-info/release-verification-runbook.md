@@ -62,6 +62,11 @@ authorized merge, default reachability/tree parity, and tracker-matrix rendering
 prompt below remains the behavioral depth contract and a manual fallback; its evidence must still
 land in the generated ledger before closeout.
 
+The ledger binds each hard-gate check to an immutable audited/reviewed/current target revision,
+normalizes product gem/npm versions to the selected candidate, retains replayable independent-audit
+evidence, and records merge/reachability proof per mutable target. Its derived aggregate therefore
+represents partial fleet merges without discarding proof for lanes that already landed.
+
 A failed required release path closes as `BLOCKED` with lane evidence and an owned blocker reference;
 it must never be relabeled as passed or waived merely to satisfy closeout. Waived and deferred
 blockers require structured authority, evidence URL, and reason fields in addition to any durable

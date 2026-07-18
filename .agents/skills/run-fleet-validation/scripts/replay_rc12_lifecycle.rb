@@ -80,9 +80,7 @@ module FleetValidation
         "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "tracker_mode" => "strict-rc",
-        "resolved_packages" => generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
-                                      .uniq { |package| [package["ecosystem"], package["name"]] }
-                                      .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
+        "resolved_packages" => resolved_packages(generator)
       )
       ledger.fetch("preflight")["status"] = "passed"
       ledger.fetch("preflight")["app_work_allowed"] = true
@@ -101,17 +99,9 @@ module FleetValidation
         "status" => "passed",
         "checker" => "independent-checker",
         "maker_ids" => ["maker-1"],
-        "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        "evidence" => "sanitized independent audit report"
       )
-      ledger.fetch("merge").merge!(
-        "authority" => "auto_merge_when_gates_pass",
-        "authority_evidence" => "sanitized trusted batch goal",
-        "freeze_state" => "clear",
-        "status" => "merged",
-        "reviewed_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "current_base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "base_reconciliation" => "passed"
-      )
+      ledger.fetch("merge")["status"] = "merged"
       ledger.fetch("reachability").merge!("default_branch" => "passed", "tree_parity" => "passed")
       ledger.fetch("tracker").merge!(
         "status" => "ready",
@@ -121,8 +111,28 @@ module FleetValidation
       ledger
     end
 
+    def resolved_packages(generator)
+      generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
+               .uniq { |package| [package["ecosystem"], package["name"]] }
+               .map do |package|
+        product_names = LedgerValidator::PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+        version = if product_names.include?(package["name"])
+                    package["ecosystem"] == "gem" ? "17.0.0.rc.12" : "17.0.0-rc.12"
+                  else
+                    "1.0.0"
+                  end
+        package.merge("version" => version, "source" => "registry")
+      end
+    end
+
     def complete_inventory(ledger, generator)
       ledger.fetch("inventory").each do |item|
+        revision = if item["work_mode"] == "report_only"
+                     "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                   else
+                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                   end
+        baseline_head = item["work_mode"] == "mutation" ? "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" : revision
         item.merge!(
           "maker_id" => item["work_mode"] == "mutation" ? "maker-1" : nil,
           "work_state" => "finished",
@@ -132,19 +142,30 @@ module FleetValidation
         )
         expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
         item["package_locks"] = expected.fetch("packages").map do |package|
-          package.merge("version" => "1.0.0", "source" => "registry")
+          resolved = ledger.fetch("pack").fetch("resolved_packages").find do |candidate_package|
+            candidate_package.slice("ecosystem", "name") == package.slice("ecosystem", "name")
+          end
+          resolved.dup
         end
         item.fetch("checks").each_value do |check|
-          check.merge!("status" => "passed", "evidence" => "public-safe evidence")
+          check.merge!("status" => "passed", "head_commit" => revision, "evidence" => "public-safe evidence")
         end
         item.fetch("review_app").merge!(
           "state" => "not_configured",
+          "head_commit" => revision,
           "evidence" => "not configured",
           "deployed_smoke" => "waived"
         )
         item.fetch("baseline").merge!(
           "classification" => "clean",
+          "head_commit" => baseline_head,
           "evidence" => "sanitized fresh-default control"
+        )
+        item.fetch("revisions").merge!(
+          "audit" => revision,
+          "reviewed" => revision,
+          "current" => revision,
+          "reconciliation" => "passed"
         )
         item.fetch("bases").merge!(
           "audit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -152,6 +173,22 @@ module FleetValidation
           "current" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "reconciliation" => "passed"
         )
+        if item["work_mode"] == "mutation"
+          item.fetch("merge").merge!(
+            "status" => "merged",
+            "authority" => "auto_merge_when_gates_pass",
+            "authority_evidence" => "sanitized trusted batch goal",
+            "freeze_state" => "clear",
+            "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+            "evidence" => "public-safe merge evidence"
+          )
+        else
+          item.fetch("merge").merge!(
+            "status" => "not_applicable",
+            "freeze_state" => "clear",
+            "evidence" => "no mutable branch"
+          )
+        end
         item.fetch("reachability").merge!(
           "default_branch" => "passed",
           "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
