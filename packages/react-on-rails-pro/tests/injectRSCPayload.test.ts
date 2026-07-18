@@ -423,7 +423,9 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
@@ -465,7 +467,9 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'test',
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('First error');
@@ -491,6 +495,118 @@ describe('injectRSCPayload', () => {
     expect(resultStr).not.toContain(`(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`);
     expect(resultStr).not.toContain('renderingError');
     expect(resultStr).toContain(expectedPayloadPushScript('{"test": "data"}'));
+  });
+
+  it('redacts renderingError from diagnostic metadata in production', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'User 48213 not authorized for org 77',
+        stack: 'Error: User 48213 not authorized\n    at Auth (/app/components/Auth.server.tsx:12:5)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('User 48213');
+    expect(resultStr).not.toContain('not authorized');
+    expect(resultStr).not.toContain('Auth.server.tsx');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('redacts renderingError in non-development/test environments like staging', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'Internal server failure',
+        stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'staging',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Internal server failure');
+    expect(resultStr).not.toContain('server.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('redacts renderingError when railsEnv is not provided (undefined)', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'Database connection refused at 10.0.3.42:5432',
+        stack: 'Error: Database connection refused\n    at Pool (/app/lib/db.ts:18:11)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Database connection refused');
+    expect(resultStr).not.toContain('10.0.3.42');
+    expect(resultStr).not.toContain('db.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('forces hasErrors:true in production even when metadata has hasErrors:false with renderingError signal', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: false,
+      renderingError: {
+        message: 'Internal server failure',
+        stack: 'Error: Internal server failure\n    at Server (/app/lib/server.ts:42:7)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'production',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('"hasErrors":true');
+    expect(resultStr).not.toContain('Internal server failure');
+    expect(resultStr).not.toContain('server.ts');
+    expect(resultStr).not.toContain('renderingError');
+  });
+
+  it('includes full renderingError in diagnostic metadata in development', async () => {
+    const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+      hasErrors: true,
+      renderingError: {
+        message: 'useState is not a function',
+        stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
+      },
+    });
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, undefined, {
+      railsEnv: 'development',
+    });
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+    expect(resultStr).toContain('useState is not a function');
+    expect(resultStr).toContain('Broken.server.tsx');
+    expect(resultStr).toContain('renderingError');
   });
 
   it('promotes streamed RSC client chunk stylesheet preloads to gate reveal', async () => {

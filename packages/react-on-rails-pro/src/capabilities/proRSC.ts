@@ -113,8 +113,14 @@ const streamRenderRSCComponent = (
     isShellReady: true,
   };
 
-  const { pipeToTransform, readableStream, emitError, isConsumerAborted, onConsumerAbort } =
-    transformRenderStreamChunksToResultObject(renderState);
+  const {
+    pipeToTransform,
+    readableStream,
+    emitError,
+    notifyRenderingError,
+    isConsumerAborted,
+    onConsumerAbort,
+  } = transformRenderStreamChunksToResultObject(renderState);
 
   // On client disconnect the RSC render stream is aborted by cancelUpstream; also release any RSC
   // payload streams this render fetched so their upstream Rails/API work stops, and run post-SSR
@@ -129,9 +135,10 @@ const streamRenderRSCComponent = (
 
   const reportError = (error: Error): Error => {
     const diagnosticError = addRSCClientHookDiagnostic(error, componentName);
-    console.error('Error in RSC stream', diagnosticError);
     if (throwJsErrors) {
       emitError(diagnosticError);
+    } else {
+      notifyRenderingError(diagnosticError);
     }
     renderState.hasErrors = true;
     renderState.error = diagnosticError;
