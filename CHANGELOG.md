@@ -190,7 +190,9 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   client per Puma request thread, which keeps a renderer connection warm across requests. A warm client
   now transparently reconnects and retries a request a single time if it reuses a keep-alive connection
   the renderer, a load balancer, or a proxy has since idle-closed, so a stale socket no longer surfaces as
-  a render failure. Reachability failures (connection refused, host unreachable, timeouts), HTTP/2 stream
+  a render failure. The retry only covers failures that occur before the renderer returns a response; a
+  connection drop while reading the response body is not retried, so an already-executed render is never
+  silently re-run. Reachability failures (connection refused, host unreachable, timeouts), HTTP/2 stream
   resets, first-contact failures, and non-replayable upload bodies are not retried by this reconnect path;
   they continue to flow to the existing renderer request retry loop unchanged. Documentation
   for `renderer_http_pool_size` was corrected to clarify it is a per-client limit — total warm renderer

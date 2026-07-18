@@ -1715,5 +1715,134 @@ RSpec.describe ReactOnRailsPro::RendererHttpClient do
     ensure
       client&.close
     end
+
+    it "does not retry when the connection drops while reading the response body" do
+      stub_persistent_response_classes
+      # A body that raises a connection error mid-drain models a drop AFTER the renderer already
+      # returned a response and executed the render; replaying it would double-execute the render.
+      dropping_body = Object.new
+      def dropping_body.each
+        raise Errno::ECONNRESET, "connection reset while streaming the response body"
+      end
+
+      def dropping_body.close; end
+      only_client = instance_double(StaleReconnectClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = build_client
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(only_client)
+      allow(only_client).to receive(:close)
+
+      post_calls = 0
+      allow(only_client).to receive(:post) do
+        post_calls += 1
+        post_calls == 1 ? ok_response("warm") : StaleReconnectResponse.new(200, dropping_body, {})
+      end
+
+      client.post("/render", json: { rendering: 1 }) # warm the client
+
+      expect { client.post("/render", json: { rendering: 2 }) }.to raise_error(described_class::ConnectionError)
+      expect(Async::HTTP::Client).to have_received(:new).once # no reconnect: the render already ran
+      expect(only_client).to have_received(:post).twice
+    ensure
+      client&.close
+    end
+
+    it "does not retry a read timeout (IO::TimeoutError) on a warm client" do
+      stub_persistent_response_classes
+      only_client = instance_double(StaleReconnectClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = build_client
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(only_client)
+      allow(only_client).to receive(:close)
+
+      post_calls = 0
+      allow(only_client).to receive(:post) do
+        post_calls += 1
+        raise IO::TimeoutError, "read timed out" if post_calls == 2
+
+        ok_response("warm")
+      end
+
+      client.post("/render", json: { rendering: 1 }) # warm the client
+
+      expect { client.post("/render", json: { rendering: 2 }) }.to raise_error(described_class::TimeoutError)
+      expect(Async::HTTP::Client).to have_received(:new).once # timeouts flow to the outer retry loop, not here
+      expect(only_client).to have_received(:post).twice
+    ensure
+      client&.close
+    end
+
+    it "stops auto-retrying on later requests after a reconnect attempt itself fails" do
+      stub_persistent_response_classes
+      first_client = instance_double(StaleReconnectClient)
+      second_client = instance_double(StaleReconnectClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = build_client
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+      allow(Async::HTTP::Client).to receive(:new).and_return(first_client, second_client)
+      allow(first_client).to receive(:close)
+      allow(second_client).to receive(:close)
+
+      first_calls = 0
+      allow(first_client).to receive(:post) do
+        first_calls += 1
+        raise Errno::ECONNRESET, "connection reset by peer" if first_calls >= 2
+
+        ok_response("warm")
+      end
+      allow(second_client).to receive(:post).and_raise(Errno::ECONNRESET, "connection reset by peer")
+
+      client.post("/render", json: { rendering: 1 }) # warm the client on first_client
+
+      # Request 2: first_client drops -> reconnect to second_client -> also drops -> fail, warm reset.
+      expect { client.post("/render", json: { rendering: 2 }) }.to raise_error(described_class::ConnectionError)
+      # Request 3: client is no longer warm, so it fails fast with no further reconnect.
+      expect { client.post("/render", json: { rendering: 3 }) }.to raise_error(described_class::ConnectionError)
+
+      expect(Async::HTTP::Client).to have_received(:new).twice # initial + exactly one reconnect, none on req 3
+      expect(second_client).to have_received(:post).twice # req 2 retry + req 3, no reconnect between them
+    ensure
+      client&.close
+    end
+
+    it "surfaces the error without killing the worker when rebuilding the client during reconnect fails" do
+      stub_persistent_response_classes
+      first_client = instance_double(StaleReconnectClient)
+      endpoint = instance_double(Async::HTTP::Endpoint, protocol: :fake_protocol)
+
+      client = build_client
+      allow(client).to receive(:endpoint_for).and_return(endpoint)
+
+      new_calls = 0
+      allow(Async::HTTP::Client).to receive(:new) do
+        new_calls += 1
+        raise SocketError, "getaddrinfo failed" if new_calls >= 2 # the reconnect rebuild fails
+
+        first_client
+      end
+      allow(first_client).to receive(:close)
+
+      posts = 0
+      allow(first_client).to receive(:post) do
+        posts += 1
+        raise Errno::ECONNRESET, "connection reset by peer" if posts >= 2
+
+        ok_response("warm")
+      end
+
+      client.post("/render", json: { rendering: 1 }) # warm the client
+
+      # The reconnect rebuild raises: it surfaces as a ConnectionError instead of killing the worker...
+      expect { client.post("/render", json: { rendering: 2 }) }.to raise_error(described_class::ConnectionError)
+      # ...so a follow-up request still returns a deterministic error rather than hanging on a dead worker.
+      expect { client.post("/render", json: { rendering: 3 }) }.to raise_error(described_class::ConnectionError)
+    ensure
+      client&.close
+    end
   end
 end

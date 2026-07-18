@@ -419,9 +419,11 @@ Before upgrading:
   per-thread client used for non-streaming requests under standard Puma: once it has succeeded at least once, it
   transparently reconnects and retries a request with a replay-safe body (a render/JSON or empty body) a single time if
   it reuses a keep-alive connection that was idle-closed, so a stale warm socket does not surface as a render failure.
-  Non-replayable bodies (multipart asset uploads), reachability failures (connection refused, host unreachable,
-  timeouts), HTTP/2 stream resets, and first-contact failures are not retried by this reconnect path; they continue to
-  flow to the existing request retry loop (`renderer_request_retry_limit`).
+  The retry only covers failures before the renderer returns a response; a connection drop while reading the response
+  body is not retried, so an already-executed render is never silently re-run. Non-replayable bodies (multipart asset
+  uploads), reachability failures (connection refused, host unreachable, timeouts), HTTP/2 stream resets, and
+  first-contact failures are not retried by this reconnect path; they continue to flow to the existing request retry
+  loop (`renderer_request_retry_limit`).
 - Run the node renderer client from the normal Rails request path. **Note for Falcon/async-rails users:** the earlier
   advisory to keep Falcon deployments on the HTTPX renderer client is superseded; HTTPX has been removed and async-http
   now handles Falcon natively. Async Rails servers (Falcon, Puma with an async scheduler) are supported: the async-http
