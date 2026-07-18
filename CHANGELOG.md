@@ -51,6 +51,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 4722](https://github.com/shakacode/react_on_rails/pull/4722) by
   [justin808](https://github.com/justin808).
 
+- **Stopped Doctor from warning when a layout uses only one pack helper**: `rake react_on_rails:doctor`
+  no longer emits `⚠️ <layout>: has javascript_pack_tag but missing stylesheet_pack_tag` (or its mirror)
+  based purely on helper asymmetry. A JavaScript-only Shakapacker entrypoint, a CSS-only pack, and a
+  hybrid layout that loads its CSS through Propshaft `stylesheet_link_tag` are all valid, so detected pack
+  helpers are now reported informationally instead of as warnings. A fresh create-react-on-rails Rails 8
+  RSC app no longer receives a spurious layout warning. Fixes
+  [Issue 4619](https://github.com/shakacode/react_on_rails/issues/4619).
+  [PR 4724](https://github.com/shakacode/react_on_rails/pull/4724) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
   disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
   `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
