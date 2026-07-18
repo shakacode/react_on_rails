@@ -124,6 +124,7 @@ module FleetValidation
     def complete_inventory(ledger, generator)
       ledger.fetch("inventory").each do |item|
         item.merge!(
+          "maker_id" => item["work_mode"] == "mutation" ? "maker-1" : nil,
           "work_state" => "finished",
           "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
           "work_started_at" => "2026-07-18T10:01:00Z",

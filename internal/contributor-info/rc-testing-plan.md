@@ -144,6 +144,11 @@ its lane, failure evidence, and a `blocker_id` that resolves to a durable owner.
 required-path coverage, current-head evidence, independent audit, merge authority, default
 reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
 
+Every mutable target records the stable maker identity that performed its work, and the independent
+audit's maker list must exactly cover those target identities. The validation-only monorepo gate
+retains the exact OSS, Pro, node-renderer, RSC, and generator CLI versions exercised by its matrix,
+but it has no synthetic branch merge, per-target reachability, or tree-parity evidence.
+
 1. Cut the RC packages.
 2. Create or update the release-gate tracking issue from
    `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`.

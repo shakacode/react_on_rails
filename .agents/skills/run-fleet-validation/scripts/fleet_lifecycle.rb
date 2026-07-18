@@ -22,7 +22,11 @@ module FleetValidation
       "packages" => [
         { "ecosystem" => "gem", "name" => "react_on_rails" },
         { "ecosystem" => "npm", "name" => "react-on-rails" },
-        { "ecosystem" => "npm", "name" => "create-react-on-rails-app" }
+        { "ecosystem" => "npm", "name" => "create-react-on-rails-app" },
+        { "ecosystem" => "gem", "name" => "react_on_rails_pro" },
+        { "ecosystem" => "npm", "name" => "react-on-rails-pro" },
+        { "ecosystem" => "npm", "name" => "react-on-rails-pro-node-renderer" },
+        { "ecosystem" => "npm", "name" => "react-on-rails-rsc" }
       ]
     }.freeze
 
@@ -83,6 +87,7 @@ module FleetValidation
         },
         "inventory" => inventory.map do |target|
           target.slice("id", "tier", "work_mode").merge(
+            "maker_id" => nil,
             "work_state" => "not_started",
             "work_started_at" => nil,
             "result" => "pending",
@@ -297,13 +302,14 @@ module FleetValidation
     def inventory_item_schema
       object_schema(
         %w[
-          id tier work_mode work_state work_started_at result waiver blocker_id package_locks checks
+          id tier work_mode maker_id work_state work_started_at result waiver blocker_id package_locks checks
           review_app baseline bases reachability evidence
         ],
         {
           "id" => nonempty_string,
           "tier" => { "enum" => %w[hard_gate soft_track] },
           "work_mode" => { "enum" => %w[mutation validation_only report_only] },
+          "maker_id" => nullable_string,
           "work_state" => { "enum" => %w[not_started running finished blocked unknown] },
           "work_started_at" => nullable_string,
           "result" => { "enum" => %w[pending passed reported blocked waived unknown] },
@@ -599,6 +605,8 @@ module FleetValidation
         Reserve an independent checker whose identity is absent from every maker ID in the result
         ledger. The checker audits every hard-gate diff, all report-only dispositions, required-path
         coverage, baseline classifications, exact-head CI/review evidence, and blocker ownership.
+        Every mutable target records its maker identity; `audit.maker_ids` must exactly cover those
+        identities before independence can pass.
 
         Immediately before any merge or tracker write, re-read tracker mode and freeze state. Merge only
         with explicit merge authority and no phase/freeze conflict. Reconcile default-base movement,
@@ -607,7 +615,8 @@ module FleetValidation
         For each authorized lane, merge through the repository's normal reviewed path, fetch the new
         default, then prove default-branch reachability and tree parity against the audited result.
         A squash merge need not retain the maker head commit, but its resulting tree must contain the
-        audited patch.
+        audited patch. The validation-only generator/install gate creates no branch and is therefore
+        excluded from per-target merge-base, reachability, and tree-parity evidence.
 
         Validate the final ledger, regenerate the append-only tracker matrix from that exact file, and
         post it without hand-copying worker prose. End with exact `PASS`, `PARTIAL`, or `BLOCKED`
@@ -703,10 +712,12 @@ module FleetValidation
       end
       result.concat(reachability_errors) if @closeout && merge_eligible?
       result.concat(tracker_errors) if @closeout
-      result << merge_authority_error if @closeout && merge_eligible? && merge_authority_error
+      recorded_merge = @ledger.dig("merge", "status") == "merged"
+      if @closeout && (merge_eligible? || recorded_merge) && merge_authority_error
+        result << merge_authority_error
+      end
       result << promotion_error if @closeout && promotion_error
-      if @closeout && merge_eligible? && @ledger.dig("merge", "status") == "merged" &&
-         !present?(@ledger.dig("merge", "authority_evidence"))
+      if @closeout && recorded_merge && !present?(@ledger.dig("merge", "authority_evidence"))
         result << "merged result is missing explicit authority evidence"
       end
       result
@@ -859,7 +870,7 @@ module FleetValidation
     def base_movement_error
       merge = @ledger.fetch("merge", {})
       moved = Array(@ledger["inventory"]).any? do |item|
-        next false unless item["tier"] == "hard_gate"
+        next false unless item["work_mode"] == "mutation"
 
         bases = item.fetch("bases", {})
         present?(bases["reviewed"]) && present?(bases["current"]) &&
@@ -1010,9 +1021,17 @@ module FleetValidation
     def independent_audit_errors
       audit = @ledger.fetch("audit", {})
       errors = []
+      audit_maker_ids = Array(audit["maker_ids"])
+      mutable_maker_ids = Array(@ledger["inventory"]).filter_map do |item|
+        item["maker_id"] if item["work_mode"] == "mutation"
+      end
+      mutable_count = Array(@ledger["inventory"]).count { |item| item["work_mode"] == "mutation" }
       errors << "independent audit checker is missing" unless present?(audit["checker"])
-      errors << "independent audit maker identities are missing" if Array(audit["maker_ids"]).empty?
-      if present?(audit["checker"]) && Array(audit["maker_ids"]).include?(audit["checker"])
+      errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
+      if mutable_maker_ids.length != mutable_count || mutable_maker_ids.uniq.sort != audit_maker_ids.uniq.sort
+        errors << "independent audit maker identities do not cover every mutable target"
+      end
+      if present?(audit["checker"]) && audit_maker_ids.include?(audit["checker"])
         errors << "independent audit checker is also a maker"
       end
       errors
@@ -1033,7 +1052,7 @@ module FleetValidation
         errors << "audit base_commit does not match merge reviewed_base_commit"
       end
       Array(@ledger["inventory"]).each do |item|
-        next unless item["tier"] == "hard_gate"
+        next unless item["work_mode"] == "mutation"
 
         bases = item.fetch("bases", {})
         %w[audit reviewed current].each do |field|
@@ -1091,6 +1110,10 @@ module FleetValidation
            !valid_waiver?(item.dig("baseline", "waiver"), "#{item['id']}:baseline")
           errors << "target #{item['id']} waived baseline is missing structured waiver evidence"
         end
+        if item.dig("baseline", "classification") == "baseline_defect" &&
+           !valid_waiver?(item.dig("baseline", "waiver"), "#{item['id']}:baseline")
+          errors << "target #{item['id']} baseline defect is missing structured waiver evidence"
+        end
         item.fetch("checks", {}).each do |name, check|
           next unless check["status"] == "waived"
           next if valid_waiver?(check["waiver"], "#{item['id']}:#{name}")
@@ -1107,7 +1130,7 @@ module FleetValidation
         "reachability #{field} is not passed" unless reachability[field] == "passed"
       end
       Array(@ledger["inventory"]).each do |item|
-        next unless item["tier"] == "hard_gate"
+        next unless item["work_mode"] == "mutation"
 
         target = item.fetch("reachability", {})
         unless target["default_branch"] == "passed" && commit_identity?(target["default_commit"]) &&
@@ -1206,9 +1229,12 @@ module FleetValidation
         top_level_blocked = !%w[passed waived].include?(item["result"]) || item["work_state"] == "blocked"
         check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
+        unwaived_baseline_defect = item.dig("baseline", "classification") == "baseline_defect" &&
+                                   !valid_waiver?(item.dig("baseline", "waiver"), "#{item['id']}:baseline")
         review_app_blocked = item.dig("review_app", "state") == "configured_broken" ||
                              item.dig("review_app", "deployed_smoke") == "blocked"
-        top_level_blocked || check_blocked || candidate_regression || review_app_blocked
+        top_level_blocked || check_blocked || candidate_regression || unwaived_baseline_defect ||
+          review_app_blocked
       end
       required_path_blocked = @required_paths.any? do |required|
         path = Array(@ledger["required_paths"]).find { |item| item["id"] == required.fetch("id") }
@@ -1362,7 +1388,11 @@ module FleetValidation
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
         review_app_blocked = item.dig("review_app", "state") == "configured_broken" ||
                              item.dig("review_app", "deployed_smoke") == "blocked"
-        top_level_blocked || check_blocked || candidate_regression || review_app_blocked
+        baseline = item.fetch("baseline", {})
+        unwaived_baseline_defect = baseline["classification"] == "baseline_defect" &&
+                                   !structured_waiver?(baseline["waiver"], "#{item['id']}:baseline")
+        top_level_blocked || check_blocked || candidate_regression || unwaived_baseline_defect ||
+          review_app_blocked
       end
       blocked ||= paths.any? { |path| !%w[passed waived].include?(path["status"]) }
       blocked ||= blockers.any? { |blocker| !%w[resolved waived deferred].include?(blocker["status"]) }
@@ -1373,9 +1403,10 @@ module FleetValidation
         target_waived = item["result"] == "waived"
         check_waived = item.fetch("checks", {}).values.any? { |check| check["status"] == "waived" }
         baseline_waived = item.dig("baseline", "classification") == "waived"
+        baseline_defect = item.dig("baseline", "classification") == "baseline_defect"
         review_app_waived = item.dig("review_app", "deployed_smoke") == "waived" &&
                             item.dig("review_app", "state") != "not_configured"
-        target_waived || check_waived || baseline_waived || review_app_waived ||
+        target_waived || check_waived || baseline_waived || baseline_defect || review_app_waived ||
           (item["tier"] == "soft_track" && item["result"] == "blocked")
       end
       partial ||= @ledger.dig("preflight", "status") == "waived"
@@ -1391,6 +1422,11 @@ module FleetValidation
 
     def escape(value)
       value.to_s.gsub(/\s+/, " ").strip.gsub("|", "\\|").gsub("<!--", "&lt;!--").gsub("-->", "--&gt;")
+    end
+
+    def structured_waiver?(waiver, gate)
+      waiver.is_a?(Hash) && waiver["gate"] == gate &&
+        %w[authority evidence_url reason].all? { |field| !waiver[field].to_s.empty? }
     end
   end
 end

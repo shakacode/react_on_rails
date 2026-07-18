@@ -110,6 +110,10 @@ hard-gate app repositories. A blocker-owned terminal `BLOCKED` run can close wit
 merge or post-merge reachability evidence; merge-eligible runs still require both. A blocked
 required path records its lane, failure evidence, and `blocker_id`. Waived or deferred blockers
 record a structured disposition with the gate, authority, evidence URL, and public-safe reason.
+Unrelated baseline defects require the same structured waiver before promotion. Each mutable target
+records its maker identity so the independent audit can prove complete maker coverage. The
+validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
+versions it exercises, but does not fabricate per-target merge or reachability evidence.
 
 For the checked-in sanitized RC12 regression corpus:
 

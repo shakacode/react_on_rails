@@ -345,7 +345,7 @@ module FleetValidation
           and release commit CI, published
           artifacts, and the standard / Pro / Pro+RSC generator matrix are terminal green, or when
           an explicit public-safe waiver names the failed gate and authority. Record `work_started_at`
-          for every mutable target before its first write.
+          and the stable worker/coordinator `maker_id` for every mutable target before its first write.
         - Read AGENTS.md and repository-specific instructions before changing any target repo. Treat the
           manifest commands as starting data; because `verify: true` entries are provisional, confirm
           commands against the target before running or proposing a manifest correction.

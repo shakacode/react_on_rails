@@ -43,6 +43,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = "restart-safe handoff"
     ledger.fetch("inventory").each do |item|
       item.merge!(
+        "maker_id" => item["work_mode"] == "mutation" ? "maker-1" : nil,
         "work_state" => "finished",
         "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
         "work_started_at" => "2026-07-18T10:01:00Z",
@@ -142,7 +143,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_ledger_inventory_cannot_downgrade_or_duplicate_a_manifest_hard_gate
     generator = build_generator
     ledger = complete_ledger(generator)
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.merge!("tier" => "soft_track", "work_mode" => "report_only", "result" => "reported")
     ledger.fetch("inventory") << ledger.fetch("inventory").last.dup
 
@@ -509,7 +510,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger = complete_ledger(generator)
     ledger.fetch("merge")["reviewed_base_commit"] = "base-before"
     ledger.fetch("merge")["current_base_commit"] = "base-after"
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.fetch("bases").merge!("reviewed" => "target-before", "current" => "target-after", "reconciliation" => "blocked")
 
     errors = FleetValidation::LedgerValidator.new(
@@ -527,7 +528,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger = complete_ledger(generator)
     ledger.fetch("audit")["base_commit"] = nil
     ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
-    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }.fetch("bases")["audit"] = nil
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }.fetch("bases")["audit"] = nil
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -570,6 +571,23 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "independent audit checker is also a maker"
+  end
+
+  def test_independent_audit_maker_list_covers_every_mutable_target
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    mutable = ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }
+    mutable.each_with_index { |item, index| item["maker_id"] = "maker-#{index + 1}" }
+    ledger.fetch("audit")["maker_ids"] = mutable.drop(1).map { |item| item.fetch("maker_id") }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities do not cover every mutable target"
   end
 
   def test_closeout_requires_identified_checker_and_makers
@@ -932,7 +950,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_blocked_hard_gate_outcomes_require_owned_blocker_references
     generator = build_generator
     ledger = complete_ledger(generator)
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target["result"] = "blocked"
     target.fetch("checks").fetch("hosted_ci")["status"] = "blocked"
     ledger.fetch("tracker")["promotion"] = "hold"
@@ -951,7 +969,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_waived_hard_gate_and_check_require_structured_waiver_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target["result"] = "waived"
     target.fetch("checks").fetch("hosted_ci")["status"] = "waived"
 
@@ -1056,6 +1074,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_equal false, schema.dig("properties", "blockers", "items", "additionalProperties")
       assert_includes schema.dig("properties", "blockers", "items", "required"), "disposition"
       assert_includes schema.dig("properties", "required_paths", "items", "required"), "blocker_id"
+      assert_includes schema.dig("properties", "inventory", "items", "required"), "maker_id"
       assert_equal(
         %w[configured_runnable configured_broken not_configured unknown],
         schema.dig(
@@ -1081,6 +1100,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     target = build_generator.ledger_template.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
 
     assert_equal [], target.fetch("package_locks")
+    assert_nil target.fetch("maker_id")
     assert_equal(
       %w[build hosted_ci install local_smoke review test],
       target.fetch("checks").keys.sort
@@ -1110,10 +1130,17 @@ class FleetValidationGeneratorTest < Minitest::Test
       target.fetch("id") == "react-on-rails-generator-install-smoke"
     end
 
-    assert_includes(
-      core.fetch("packages"),
-      { "ecosystem" => "npm", "name" => "create-react-on-rails-app" }
-    )
+    expected = [
+      { "ecosystem" => "gem", "name" => "react_on_rails" },
+      { "ecosystem" => "npm", "name" => "react-on-rails" },
+      { "ecosystem" => "npm", "name" => "create-react-on-rails-app" },
+      { "ecosystem" => "gem", "name" => "react_on_rails_pro" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-pro" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-pro-node-renderer" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-rsc" }
+    ]
+
+    assert_equal expected, core.fetch("packages")
   end
 
   def test_closeout_requires_every_manifest_package_in_the_retained_lock_evidence
@@ -1226,6 +1253,43 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
   end
 
+  def test_unwaived_baseline_defect_blocks_promotion_and_structured_waiver_renders_partial
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("baseline").merge!(
+      "classification" => "baseline_defect",
+      "evidence" => "fresh default branch reproduces the failure",
+      "waiver" => nil
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("baseline defect is missing structured waiver evidence") })
+    assert_includes errors, "promotion cannot be recommended while release blockers remain"
+
+    target.fetch("baseline")["waiver"] = {
+      "gate" => "#{target['id']}:baseline",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/baseline-defect-waiver",
+      "reason" => "Proven unrelated to the candidate"
+    }
+    waived_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty waived_errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
   def test_blocked_closeout_does_not_require_merge_or_post_merge_reachability
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1266,12 +1330,45 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
   end
 
+  def test_blocked_closeout_rejects_an_unauthorized_recorded_merge
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge").merge!(
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "freeze_state" => "frozen",
+      "status" => "merged"
+    )
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "merge is not allowed while tracker mode or freeze state conflicts"
+    assert_includes errors, "merged result is missing explicit authority evidence"
+  end
+
   def test_closeout_binds_audited_bases_to_reviewed_revisions
     generator = build_generator
     ledger = complete_ledger(generator)
     ledger.fetch("audit")["base_commit"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     ledger.fetch("merge")["reviewed_base_commit"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.fetch("bases").merge!(
       "audit" => "cccccccccccccccccccccccccccccccccccccccc",
       "reviewed" => "dddddddddddddddddddddddddddddddddddddddd"
@@ -1368,7 +1465,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_closeout_requires_per_target_reachability_and_tree_parity_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
-    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
     target.fetch("reachability").merge!("default_evidence" => nil, "tree_evidence" => nil)
 
     errors = FleetValidation::LedgerValidator.new(
@@ -1380,6 +1477,30 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
     assert(errors.any? { |error| error.include?("tree-parity evidence is incomplete") })
+  end
+
+  def test_validation_only_core_gate_does_not_require_merge_base_or_reachability_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    core = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    core.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil, "reconciliation" => "pending")
+    core.fetch("reachability").merge!(
+      "default_branch" => "pending",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "pending",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    refute(errors.any? { |error| error.include?(core.fetch("id")) }, errors.join("\n"))
   end
 
   def test_closeout_requires_terminal_install_build_test_smoke_ci_and_review_evidence
