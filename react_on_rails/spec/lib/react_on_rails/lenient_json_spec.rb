@@ -58,21 +58,32 @@ RSpec.describe ReactOnRails::LenientJson do
       expect { described_class.parse(%({"html":})) }.to raise_error(JSON::ParserError)
     end
 
-    # Behavioral guarantee across json versions: a lone surrogate never crashes the render,
-    # and the result is valid UTF-8. Whether the underlying JSON.parse raises (and is then
-    # repaired) or silently degrades depends on the json version and surrounding bytes; either
-    # way LenientJson returns cleanly. (A lone *low* surrogate is excluded: see the class docs.)
+    it "does not pay the repair path for clean JSON without surrogate escapes" do
+      # A payload with no "\ud" escape must never be repaired: the fast path returns the
+      # original parse result object unchanged.
+      json = %({"html":"clean content, even 😀"})
+      expect(described_class.parse(json)).to eq("html" => "clean content, even 😀")
+    end
+
+    # Lone surrogates repair to U+FFFD on every json version. This covers the cases that make
+    # JSON.parse *raise* AND the ones it silently accepts (lone low, and a lone high before a
+    # non-low escape), so the result is always well-formed rather than corrupt.
     {
-      "lone high, mid-value" => %({"html":"a#{bs}ud83d b"}),
-      "lone high, end of value" => %({"html":"a#{bs}ud83d"}),
-      "lone high in a key" => %({"a#{bs}ud83d":"v"}),
-      "reversed pair" => %({"html":"#{bs}ude00#{bs}ud83d"})
-    }.each do |label, input|
-      it "does not crash and returns valid UTF-8 for a #{label}" do
-        result = nil
-        expect { result = described_class.parse(input) }.not_to raise_error
-        result.each { |k, v| expect([k, v].grep(String)).to all(be_valid_encoding) }
+      "lone high, mid-value" => [%({"html":"a#{bs}ud83d b"}), "a\u{FFFD} b"],
+      "lone high, end of value" => [%({"html":"a#{bs}ud83d"}), "a\u{FFFD}"],
+      "lone low (parses without raising)" => [%({"html":"a#{bs}ude00 b"}), "a\u{FFFD} b"],
+      "lone high before an escaped NUL" => [%({"html":"#{bs}ud83d#{bs}u0000"}), "\u{FFFD}#{0.chr}"],
+      "reversed pair" => [%({"html":"#{bs}ude00#{bs}ud83d"}), "\u{FFFD}\u{FFFD}"]
+    }.each do |label, (input, expected)|
+      it "repairs a #{label} to U+FFFD" do
+        result = described_class.parse(input)
+        expect(result["html"]).to eq(expected)
+        expect(result["html"]).to be_valid_encoding
       end
+    end
+
+    it "repairs a lone surrogate inside a key" do
+      expect(described_class.parse(%({"k#{bs}ud83d":"v"})).keys.first).to eq("k\u{FFFD}")
     end
   end
 end
