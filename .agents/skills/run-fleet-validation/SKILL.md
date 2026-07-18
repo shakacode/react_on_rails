@@ -59,8 +59,9 @@ policy/inventory manifest fails closed.
    monorepo generator gate may run before the mutation barrier.
    If an owned release-wide blocker makes the barrier impossible to open, use the terminal blocked
    preflight path instead: retain its durable `blocker_id` and public-safe `blocker_evidence`, keep
-   `APP_WORK_ALLOWED` false, leave every app target untouched, audit with an empty maker list, and
-   keep aggregate merge/reachability and tracker promotion blocked.
+   `APP_WORK_ALLOWED` false, leave every app target untouched while preserving any read-only
+   package-lock probes, audit with an empty maker list, and keep aggregate merge/reachability and
+   tracker promotion blocked.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
    Its terminal report must retain the package versions/sources and exact-head evidence for every
    check; those are observed target versions and need not equal the release snapshot. `pending` and
@@ -137,7 +138,8 @@ and public-safe reason.
 Unrelated baseline defects require the same structured waiver before promotion. Each mutable target
 records its maker identity so the independent audit can prove complete maker coverage. The
 validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
-versions it exercises, but does not fabricate per-target merge or reachability evidence.
+versions it exercises and binds all evidence to the pack's exact candidate commit, but does not
+fabricate per-target merge or reachability evidence.
 Hard-gate snapshot comparison covers those candidate-managed product packages and the separately
 resolved RSC package; independently versioned Shakapacker or Control Plane Flow dependencies retain
 their target-observed versions. Report-only package locks are evidence of the inspected target, not

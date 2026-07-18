@@ -659,8 +659,9 @@ module FleetValidation
         If an owned release-wide blocker makes opening the barrier impossible, close the pack with
         `preflight.status: blocked`, a durable `preflight.blocker_id`, public-safe
         `preflight.blocker_evidence`, and `APP_WORK_ALLOWED` still false. In that terminal path every
-        app target remains untouched, the independent audit records no maker IDs, and aggregate
-        merge/reachability plus tracker promotion remain blocked.
+        app target remains untouched, although it may retain read-only package-lock probe evidence.
+        The independent audit records no maker IDs, and aggregate merge/reachability plus tracker
+        promotion remain blocked.
 
         Before worker launch, record a machine/session capability attestation covering
         nonblocking permissions, Git and GitHub authentication, registry/network access, required toolchains,
@@ -717,7 +718,8 @@ module FleetValidation
         default, then prove default-branch reachability and tree parity against the audited result.
         A squash merge need not retain the maker head commit, but its resulting tree must contain the
         audited patch. The validation-only generator/install gate creates no branch and is therefore
-        excluded from per-target merge-base, reachability, and tree-parity evidence.
+        excluded from per-target merge-base, reachability, and tree-parity evidence, but its exact
+        audited revision must equal the pack's candidate commit.
 
         Validate the final ledger, regenerate the append-only tracker matrix from that exact file, and
         post it without hand-copying worker prose. End with exact `PASS`, `PARTIAL`, or `BLOCKED`
@@ -742,9 +744,12 @@ module FleetValidation
       end
 
       unless paths.all? do |path|
-        path.is_a?(Hash) && path["id"].to_s != "" && path["evidence_source"].to_s != ""
+        path.is_a?(Hash) && %w[id evidence_source].all? do |field|
+          path[field].is_a?(String) && !path[field].strip.empty?
+        end
       end
-        raise ManifestError, "lifecycle.required_paths must contain mappings with IDs and evidence sources"
+        raise ManifestError,
+              "lifecycle.required_paths must contain mappings with string IDs and evidence sources"
       end
 
       duplicates = paths.map { |path| path.fetch("id") }.tally.select { |_id, count| count > 1 }.keys
@@ -1050,7 +1055,7 @@ module FleetValidation
         end
         untouched = item["work_state"] == "not_started" && !present?(item["work_started_at"]) &&
                     !present?(item["maker_id"]) && item["result"] == "pending" &&
-                    Array(item["package_locks"]).empty? && untouched_checks && !present?(item["evidence"])
+                    untouched_checks && !present?(item["evidence"])
         unless untouched
           item_errors << "blocked preflight target #{item['id']} contains app-work state"
         end
@@ -1093,6 +1098,8 @@ module FleetValidation
              revisions["reconciliation"] == "passed"
         errors << "blocked preflight validation-only target #{item['id']} has incomplete revision evidence"
       end
+      candidate_revision_error = validation_only_candidate_revision_error(item, current_head)
+      errors << candidate_revision_error if candidate_revision_error
 
       expected = @inventory.find { |target| target["id"] == item["id"] }
       expected_packages = Array(expected&.fetch("packages", [])).map do |package|
@@ -1472,6 +1479,8 @@ module FleetValidation
           errors << "target #{item['id']} current revision does not match reviewed revision"
         end
         errors << "target #{item['id']} revision reconciliation is not passed" unless revisions["reconciliation"] == "passed"
+        candidate_revision_error = validation_only_candidate_revision_error(item, revisions["current"])
+        errors << candidate_revision_error if candidate_revision_error
 
         review_app = item.fetch("review_app", {})
         if !commit_identity?(review_app["head_commit"]) || review_app["head_commit"] != revisions["current"]
@@ -1755,6 +1764,15 @@ module FleetValidation
 
     def commit_identity?(value)
       value.to_s.match?(/\A[0-9a-f]{40}\z/i)
+    end
+
+    def validation_only_candidate_revision_error(item, revision)
+      candidate_commit = @ledger.dig("pack", "candidate_commit")
+      return unless item["work_mode"] == "validation_only"
+      return unless commit_identity?(revision) && commit_identity?(candidate_commit)
+      return if revision == candidate_commit
+
+      "validation-only target revision does not match the candidate commit"
     end
 
     def app_work_allowed?

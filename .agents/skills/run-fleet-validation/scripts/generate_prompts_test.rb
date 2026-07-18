@@ -1051,6 +1051,28 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_empty errors
   end
 
+  def test_blocked_preflight_retains_read_only_package_lock_probes
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    expected = generator.lifecycle_inventory.find { |item| item["id"] == target["id"] }
+    target["package_locks"] = expected.fetch("packages").map do |package|
+      ledger.fetch("pack").fetch("resolved_packages").find do |resolved|
+        resolved.slice("ecosystem", "name") == package.slice("ecosystem", "name")
+      end.dup
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+  end
+
   def test_blocked_preflight_rejects_nested_mutation_and_reachability_state
     generator = build_generator
     ledger = blocked_preflight_ledger(generator)
@@ -2514,6 +2536,56 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert(errors.any? { |error| error.include?("check evidence is not bound to its immutable current head") })
   end
 
+  def test_validation_only_evidence_must_match_the_candidate_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    wrong_commit = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("revisions").merge!(
+      "audit" => wrong_commit,
+      "reviewed" => wrong_commit,
+      "current" => wrong_commit
+    )
+    target.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+    target.fetch("review_app")["head_commit"] = wrong_commit
+    target.fetch("baseline")["head_commit"] = wrong_commit
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "validation-only target revision does not match the candidate commit"
+  end
+
+  def test_blocked_preflight_validation_only_evidence_must_match_the_candidate_commit
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    wrong_commit = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("revisions").merge!(
+      "audit" => wrong_commit,
+      "reviewed" => wrong_commit,
+      "current" => wrong_commit
+    )
+    target.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+    target.fetch("review_app")["head_commit"] = wrong_commit
+    target.fetch("baseline")["head_commit"] = wrong_commit
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "validation-only target revision does not match the candidate commit"
+  end
+
   def test_report_only_checks_must_have_terminal_current_head_evidence
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -2830,6 +2902,23 @@ class FleetValidationGeneratorTest < Minitest::Test
       end
 
       assert_equal "lifecycle.required_paths must be a nonempty array", error.message
+    end
+  end
+
+  def test_rejects_non_string_required_lifecycle_path_fields
+    %w[id evidence_source].each do |field|
+      Dir.mktmpdir do |directory|
+        manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+        manifest.fetch("lifecycle").fetch("required_paths").first[field] = 1
+        manifest_path = File.join(directory, "fleet.yml")
+        File.write(manifest_path, YAML.dump(manifest))
+
+        error = assert_raises(FleetValidation::ManifestError) do
+          build_generator(manifest_path:)
+        end
+
+        assert_equal "lifecycle.required_paths must contain mappings with string IDs and evidence sources", error.message
+      end
     end
   end
 

@@ -80,6 +80,8 @@ targets that do run must retain their inspected package versions/sources and ter
 check evidence; their observed locks need not match the candidate snapshot. Candidate matching
 applies only to candidate-managed packages on hard gates, including the separately resolved RSC
 package, not independently versioned Shakapacker or Control Plane Flow dependencies.
+Untouched app rows may retain read-only package-lock probes, and the validation-only generator gate
+must bind its revision and check evidence to the pack's exact candidate commit.
 
 This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
 which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are

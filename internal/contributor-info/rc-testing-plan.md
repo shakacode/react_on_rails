@@ -106,6 +106,8 @@ checks bound to the exact inspected head; those observed locks need not match th
 snapshot, and `pending` or `unknown` is not a completed report. Candidate snapshot matching applies
 only to candidate-managed hard-gate packages, including the separately resolved RSC package, not
 independently versioned Shakapacker or Control Plane Flow dependencies.
+Untouched app rows may retain read-only package-lock probes, while validation-only generator
+evidence must use the pack's exact candidate commit.
 
 Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
 versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
