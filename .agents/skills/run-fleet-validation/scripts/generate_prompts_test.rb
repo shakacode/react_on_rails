@@ -1019,6 +1019,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
   end
 
+  def test_blocked_preflight_requires_an_explicitly_blocked_promotion
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight tracker promotion must be blocked"
+  end
+
   def test_blocked_preflight_retains_legitimate_validation_only_evidence
     generator = build_generator
     ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
@@ -1383,6 +1399,62 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "promotion cannot be recommended while release blockers remain"
   end
 
+  def test_owned_soft_track_followup_is_partial_but_does_not_block_promotion
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "soft-followup")
+    ledger["blockers"] = [
+      {
+        "id" => "soft-followup",
+        "status" => "open",
+        "public_summary" => "Shelved demo follow-up remains open",
+        "owner" => { "issue_url" => "https://example.invalid/issues/soft-followup" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_blocker_shared_with_a_hard_gate_remains_release_gating
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    soft_target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    soft_target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "shared-blocker")
+    hard_target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    hard_target.fetch("checks").fetch("review")["blocker_id"] = "shared-blocker"
+    ledger["blockers"] = [
+      {
+        "id" => "shared-blocker",
+        "status" => "open",
+        "public_summary" => "Shared hard-gate and soft-track blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/shared-blocker" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "promotion cannot be recommended while release blockers remain"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
   def test_nested_hard_gate_failure_blocks_promotion
     generator = build_generator
     check_failure = complete_ledger(generator)
@@ -1701,13 +1773,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
   end
 
-  def test_report_only_lock_versions_match_the_resolved_snapshot
+  def test_report_only_and_independently_managed_locks_may_retain_their_own_versions
     generator = build_generator
     ledger = complete_ledger(generator)
-    lock = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
-                 .fetch("package_locks").first
-    lock["version"] = "0.0.1"
+    report_lock = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+                        .fetch("package_locks").first
+    report_lock["version"] = "16.0.0"
+    candidate_managed = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.values.flatten +
+                        ["react-on-rails-rsc"]
+    independent_lock = ledger.fetch("inventory").filter_map do |item|
+      next unless item["tier"] == "hard_gate"
 
+      item.fetch("package_locks").find do |lock|
+        !candidate_managed.include?(lock["name"])
+      end
+    end.first
+    independent_lock["version"] = "independently-managed"
     errors = FleetValidation::LedgerValidator.new(
       ledger,
       inventory: generator.lifecycle_inventory,
@@ -1715,9 +1796,9 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes(
-      errors,
-      "1 report-only target(s) retain package versions or sources outside the resolved release snapshot"
+    refute(
+      errors.any? { |error| error.include?("retain package versions or sources outside") },
+      errors.join("\n")
     )
   end
 

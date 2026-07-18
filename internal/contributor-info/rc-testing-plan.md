@@ -100,9 +100,12 @@ four-slot agent tree.
 If the release-wide preflight finds an owned terminal blocker, do not manufacture passing app
 results to finish the ledger. Keep `APP_WORK_ALLOWED` false, retain the blocker ID and public-safe
 evidence, leave every app target untouched, audit the blocked disposition with no maker IDs, and
-close aggregate merge/reachability and promotion as blocked. When report-only tracks do run, their
-closeout evidence includes retained package versions/sources and terminal checks bound to the exact
-inspected head; `pending` or `unknown` is not a completed report.
+close aggregate merge/reachability and promotion exactly as `blocked`, not `hold`. When report-only
+tracks do run, their closeout evidence includes retained package versions/sources and terminal
+checks bound to the exact inspected head; those observed locks need not match the candidate
+snapshot, and `pending` or `unknown` is not a completed report. Candidate snapshot matching applies
+only to candidate-managed hard-gate packages, including the separately resolved RSC package, not
+independently versioned Shakapacker or Control Plane Flow dependencies.
 
 Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
 versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
@@ -150,6 +153,9 @@ naming the gate, authority, evidence URL, and public-safe reason. A failed requi
 the run as `BLOCKED` only with its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
 required-path coverage, current-head evidence, independent audit, merge authority, default
 reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
+An owned blocker referenced exclusively by soft-track inventory is non-gating follow-up and renders
+the run `PARTIAL`; it becomes release-gating when preflight, a hard gate, or a required path shares
+that blocker.
 
 Every mutable target records the stable maker identity that performed its work, and the independent
 audit's maker list must exactly cover those target identities and retain replayable public-safe

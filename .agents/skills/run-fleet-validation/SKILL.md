@@ -63,7 +63,10 @@ policy/inventory manifest fails closed.
    keep aggregate merge/reachability and tracker promotion blocked.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
    Its terminal report must retain the package versions/sources and exact-head evidence for every
-   check; `pending` and `unknown` do not count as report-only closeout.
+   check; those are observed target versions and need not equal the release snapshot. `pending` and
+   `unknown` do not count as report-only closeout. An owned blocker referenced exclusively by soft
+   tracks makes the verdict `PARTIAL` but does not block promotion; the same blocker becomes
+   release-gating when preflight, a hard gate, or a required path references it.
 4. Each prompt is a separate top-level coordinator task and must use its bounded subagents as
    written. Do not launch the six prompts as children of one shared four-slot agent tree.
 5. Require each lane to write its complete schema-valid inventory fragment to its generated
@@ -117,7 +120,8 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
 
 The validator fails closed on stale candidates, product package versions that do not normalize to
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
-review-app state, retained package versions that differ from the resolved release snapshot,
+review-app state, candidate-managed hard-gate package versions that differ from the resolved release
+snapshot,
 check/review evidence that does not match the immutable audited/reviewed/current target revision,
 mutable-app check evidence that does not match the reconciled current base revision,
 missing package/check/baseline evidence, unowned
@@ -134,6 +138,10 @@ Unrelated baseline defects require the same structured waiver before promotion. 
 records its maker identity so the independent audit can prove complete maker coverage. The
 validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
 versions it exercises, but does not fabricate per-target merge or reachability evidence.
+Hard-gate snapshot comparison covers those candidate-managed product packages and the separately
+resolved RSC package; independently versioned Shakapacker or Control Plane Flow dependencies retain
+their target-observed versions. Report-only package locks are evidence of the inspected target, not
+a requirement to adopt the candidate.
 Every mutable target records its own merge authority, freeze state, merge commit, and evidence.
 The validator rejects a merged row when that same target retains a blocked result/check, candidate
 regression, or broken/blocked review app; another lane's blocker does not erase a landed lane's

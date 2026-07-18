@@ -75,8 +75,11 @@ owner.
 An owned release-wide preflight defect may also close the candidate as `BLOCKED` without fabricating
 an app run. Keep `APP_WORK_ALLOWED` false, retain the preflight blocker ID and public-safe evidence,
 leave every app target untouched, record no maker identities in the independent audit, and mark
-aggregate merge/reachability plus tracker promotion blocked. Report-only targets that do run must
-retain their inspected package versions/sources and terminal exact-head check evidence.
+aggregate merge/reachability plus tracker promotion `blocked` (not merely `hold`). Report-only
+targets that do run must retain their inspected package versions/sources and terminal exact-head
+check evidence; their observed locks need not match the candidate snapshot. Candidate matching
+applies only to candidate-managed packages on hard gates, including the separately resolved RSC
+package, not independently versioned Shakapacker or Control Plane Flow dependencies.
 
 This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
 which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are
@@ -128,6 +131,8 @@ Repos:
 - Prioritize every `hard_gate` repo first; hard-gate failures block final release readiness.
 - Then inspect every `soft_track` repo; do not let soft-track failures block final unless a
   maintainer promotes that repo.
+- Keep an owned blocker referenced exclusively by soft tracks as non-gating `PARTIAL` follow-up.
+  The same blocker is release-gating if preflight, a hard gate, or a required path also references it.
 - Treat `shakacode/hichee` and Pro details as private: public tracker comments may say
   install/build/smoke/CI passed or failed, but must not expose private logs, URLs, screenshots,
   customer data, secrets, or proprietary Pro source details.

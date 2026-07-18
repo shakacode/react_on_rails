@@ -7,6 +7,29 @@ require "time"
 module FleetValidation
   class ManifestError < StandardError; end
 
+  module BlockerScope
+    module_function
+
+    def soft_only_ids(ledger)
+      soft_items = Array(ledger["inventory"]).select { |item| item["tier"] == "soft_track" }
+      soft_ids = soft_items.flat_map { |item| target_ids(item) }
+      gating_ids = [ledger.dig("preflight", "blocker_id")]
+      gating_ids.concat(
+        Array(ledger["inventory"]).select { |item| item["tier"] == "hard_gate" }
+                                  .flat_map { |item| target_ids(item) }
+      )
+      gating_ids.concat(Array(ledger["required_paths"]).filter_map { |path| path["blocker_id"] })
+
+      (soft_ids - gating_ids.compact).uniq
+    end
+
+    def target_ids(item)
+      ids = [item["blocker_id"], item.dig("review_app", "blocker_id")]
+      ids.concat(item.fetch("checks", {}).values.filter_map { |check| check["blocker_id"] })
+      ids.compact.reject { |id| id.to_s.strip.empty? }
+    end
+  end
+
   class Lifecycle
     REQUIRED_PATH_IDS = %w[
       standard-generator pro-ssr pro-rsc rspack webpack-rsc-production ssr-rsc-html
@@ -654,9 +677,10 @@ module FleetValidation
         <<~ROW.chomp
           - `#{target.fetch('id')}` — Report only; do not mutate.
             Inspect the fresh default, current package locks, standing CI/smoke metadata, and archived or deferred disposition.
-            Retain the inspected package versions/sources and exact-head check evidence. Record
-            `reported`, `blocked`, or `waived` plus public-safe evidence in the shared ledger;
-            `pending` or `unknown` cannot close the pack.
+            Retain the inspected package versions/sources and exact-head check evidence; these
+            observed versions need not equal the release snapshot. Record `reported`, `blocked`, or
+            `waived` plus public-safe evidence in the shared ledger; `pending` or `unknown` cannot
+            close the pack.
         ROW
       end
 
@@ -665,6 +689,9 @@ module FleetValidation
 
         Run after the release-wide preflight barrier opens. These tracks complete the release inventory
         but never become candidate bump/merge lanes unless a maintainer separately changes their tier.
+        An owned blocker referenced only by these soft tracks produces `PARTIAL` follow-up state but
+        does not block promotion. A preflight, hard-gate, or required-path reference makes that blocker
+        release-gating.
 
         #{rows.join("\n")}
       MARKDOWN
@@ -698,7 +725,10 @@ module FleetValidation
         or explicitly waived and no `UNKNOWN` remains. A failed required path closes as `BLOCKED` only
         when it records its lane, failure evidence, and an owned `blocker_id`. Waived or deferred
         blockers retain a durable owner and require structured gate, authority, evidence URL, and
-        reason fields. The aggregate merge/reachability state is derived from the per-target rows. If
+        reason fields. Candidate-snapshot package matching applies to candidate-managed packages on
+        hard gates, including the separately resolved RSC package; report-only and independently
+        versioned dependency locks retain the versions observed in their target. The aggregate
+        merge/reachability state is derived from the per-target rows. If
         any lane has already merged, its base, authority/freeze, merge-commit, reachability, and
         tree-parity proofs remain required even when another lane blocks overall promotion.
       MARKDOWN
@@ -1037,6 +1067,9 @@ module FleetValidation
         item_errors
       end
       errors << "blocked preflight aggregate merge status must be blocked" unless @ledger.dig("merge", "status") == "blocked"
+      unless @ledger.dig("tracker", "promotion") == "blocked"
+        errors << "blocked preflight tracker promotion must be blocked"
+      end
       %w[default_branch tree_parity].each do |field|
         unless @ledger.dig("reachability", field) == "blocked"
           errors << "blocked preflight aggregate reachability #{field} must be blocked"
@@ -1369,18 +1402,22 @@ module FleetValidation
         [[package["ecosystem"], package["name"]], [package["version"], package["source"]]]
       end
       invalid_items = Array(@ledger["inventory"]).select do |item|
+        next false unless item["tier"] == "hard_gate"
+
         Array(item["package_locks"]).any? do |lock|
+          next false unless candidate_managed_package?(lock["ecosystem"], lock["name"])
+
           resolved[[lock["ecosystem"], lock["name"]]] != [lock["version"], lock["source"]]
         end
       end
       return if invalid_items.empty?
 
-      hard_gate_count = invalid_items.count { |item| item["tier"] == "hard_gate" }
-      if hard_gate_count.positive?
-        "#{hard_gate_count} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
-      else
-        "#{invalid_items.length} report-only target(s) retain package versions or sources outside the resolved release snapshot"
-      end
+      "#{invalid_items.length} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+    end
+
+    def candidate_managed_package?(ecosystem, name)
+      PRODUCT_PACKAGES.fetch(ecosystem, []).include?(name) ||
+        (ecosystem == "npm" && name == "react-on-rails-rsc")
     end
 
     def check_evidence_errors
@@ -1784,8 +1821,10 @@ module FleetValidation
         path = Array(@ledger["required_paths"]).find { |item| item["id"] == required.fetch("id") }
         !%w[passed waived].include?(path&.fetch("status", nil))
       end
+      soft_only_blockers = BlockerScope.soft_only_ids(@ledger)
       active_blocker = Array(@ledger["blockers"]).any? do |blocker|
-        !%w[resolved waived deferred].include?(blocker["status"])
+        !%w[resolved waived deferred].include?(blocker["status"]) &&
+          !soft_only_blockers.include?(blocker["id"])
       end
 
       hard_gate_blocked || required_path_blocked || active_blocker
@@ -1939,7 +1978,11 @@ module FleetValidation
           review_app_blocked
       end
       blocked ||= paths.any? { |path| !%w[passed waived].include?(path["status"]) }
-      blocked ||= blockers.any? { |blocker| !%w[resolved waived deferred].include?(blocker["status"]) }
+      soft_only_blockers = BlockerScope.soft_only_ids(@ledger)
+      blocked ||= blockers.any? do |blocker|
+        !%w[resolved waived deferred].include?(blocker["status"]) &&
+          !soft_only_blockers.include?(blocker["id"])
+      end
       blocked ||= @ledger.dig("tracker", "promotion") == "blocked"
       return "BLOCKED" if blocked
 

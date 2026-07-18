@@ -8,7 +8,8 @@
 # Field semantics:
 #   tier           — hard_gate | soft_track. hard_gate failures block a final
 #                    release. soft_track repos are remembered for follow-up but
-#                    do not block.
+#                    do not block; blockers referenced only by soft tracks are
+#                    non-gating PARTIAL follow-up state.
 #   packages       — which of our packages the demo consumes. Each entry must
 #                    declare an ecosystem (`gem` | `npm`) and a package name.
 #                    The orchestrator only proposes bumps for listed packages,
