@@ -292,7 +292,8 @@ module FleetValidation
            resolve and publish the shared snapshot and generator-matrix evidence. It must not start its
            assigned app mutation yet.
         2. Run [PREFLIGHT.md](PREFLIGHT.md) against that exact snapshot and record its results in
-           `result-ledger.json`.
+           `result-ledger.json`. Before remote makers start, publish its pack-bound public-safe
+           `APP_WORK_ALLOWED` tracker marker and verify that it is readable.
         3. Start the remaining prompt coordinators after the snapshot exists and preflight opens the barrier.
            Do not start the app mutation prompts before `APP_WORK_ALLOWED`; coordinators may prepare
            read-only evidence while waiting.
@@ -325,6 +326,7 @@ module FleetValidation
         #{candidate_resolution_steps(number)}
         #{tracker_resolution_steps(number)}
         #{snapshot_resolution_steps(number)}
+        #{preflight_resolution_steps}
 
         Assigned targets:
         #{targets.map { |target| render_target(target) }.join("\n")}
@@ -518,6 +520,20 @@ module FleetValidation
             artifacts or the matching tag conflict with the pinned selector, stop writes and report UNKNOWN.
         STEPS
       end
+    end
+
+    def preflight_resolution_steps
+      <<~STEPS.chomp
+        - The designated preflight runner must publish the public-safe `APP_WORK_ALLOWED` marker
+          `<!-- fleet-validation-preflight:#{@pack_id} -->` on the resolved release tracker before any
+          remote maker starts. The comment must record the exact candidate tag and commit, snapshot
+          fingerprint #{@snapshot_fingerprint}, `preflight.opened_at`, every release-wide gate's terminal
+          status and replayable evidence, and `app_work_allowed: true`.
+        - Do not start a remote mutable worker until one unique preflight marker is readable. Cross-check
+          its candidate tag and commit, snapshot fingerprint, opened_at, gate evidence, and barrier state
+          against the pack snapshot and the local ledger when accessible. Missing, duplicate, stale,
+          malformed, or mismatched markers are `UNKNOWN`: make no app write and do not trust launch timing.
+      STEPS
     end
 
     def install_command(package_manager)

@@ -50,6 +50,10 @@ policy/inventory manifest fails closed.
    pack ledger has `preflight.app_work_allowed: true` (the explicit `APP_WORK_ALLOWED` marker),
    backed by terminal-green exact-commit CI, artifacts, and the
    standard/Pro/Pro+RSC generator matrix, or an explicit policy-allowed public-safe waiver.
+   Before any remote maker starts, publish the generated pack-bound preflight marker on the release
+   tracker with the exact candidate tag/commit, manifest snapshot fingerprint, barrier timestamp,
+   and public-safe terminal gate evidence. Every remote coordinator must read and cross-check that
+   unique marker; launch timing alone never proves `APP_WORK_ALLOWED`.
    Record `preflight.opened_at` when opening the barrier and each mutable target's
    `work_started_at`; closeout rejects missing or reversed ordering evidence. The validation-only
    monorepo generator gate may run before the mutation barrier.
@@ -131,6 +135,9 @@ records its maker identity so the independent audit can prove complete maker cov
 validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
 versions it exercises, but does not fabricate per-target merge or reachability evidence.
 Every mutable target records its own merge authority, freeze state, merge commit, and evidence.
+The validator rejects a merged row when that same target retains a blocked result/check, candidate
+regression, or broken/blocked review app; another lane's blocker does not erase a landed lane's
+evidence, but a target's own failed gate can never authorize its merge.
 The aggregate merge/reachability state is derived from those rows, so a partial fleet closeout
 retains proofs for every landed lane without fabricating them for blocked lanes. The independent
 audit also records replayable public-safe evidence.

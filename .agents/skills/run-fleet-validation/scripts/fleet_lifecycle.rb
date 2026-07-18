@@ -627,6 +627,12 @@ module FleetValidation
         `preflight.app_work_allowed` to `true`; that schema-validated state is the ledger's explicit
         `APP_WORK_ALLOWED` marker. Every mutable target records `work_started_at`, which must be later
         than the barrier time. The validation-only monorepo generator gate may run before this marker.
+        Before any remote maker starts, publish a public-safe tracker comment marked
+        `<!-- fleet-validation-preflight:#{@pack_id} -->`. It must bind `APP_WORK_ALLOWED` to the exact
+        candidate tag and commit, snapshot fingerprint `#{snapshot_fingerprint}`, `preflight.opened_at`,
+        and terminal status plus replayable evidence for release CI, artifacts, and generator matrix.
+        Remote coordinators cross-check that unique marker against the published pack snapshot; an
+        absent, duplicate, stale, malformed, or mismatched marker leaves the barrier `UNKNOWN`.
         If an owned release-wide blocker makes opening the barrier impossible, close the pack with
         `preflight.status: blocked`, a durable `preflight.blocker_id`, public-safe
         `preflight.blocker_evidence`, and `APP_WORK_ALLOWED` still false. In that terminal path every
@@ -772,6 +778,7 @@ module FleetValidation
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
+      result << product_candidate_version_error if @closeout && product_candidate_version_error
       if @closeout && preflight_blocked?
         result.concat(blocker_identity_errors)
         result.concat(blocker_owner_errors)
@@ -793,7 +800,6 @@ module FleetValidation
       result.concat(blocker_reference_errors) if @closeout
       result.concat(preflight_errors) if @closeout
       result.concat(pack_identity_errors) if @closeout
-      result << product_candidate_version_error if @closeout && product_candidate_version_error
       result << inventory_completion_error if @closeout && inventory_completion_error
       result << work_state_result_error if @closeout && work_state_result_error
       result << package_lock_error if @closeout && package_lock_error
@@ -1616,6 +1622,9 @@ module FleetValidation
         end
         if merge["status"] == "merged"
           authorized = %w[ask auto_merge_when_gates_pass].include?(merge["authority"])
+          if target_blocked_gate?(item)
+            errors << "target #{item['id']} merged despite its own blocked gate outcome"
+          end
           errors << "target #{item['id']} merged without explicit authority" unless authorized
           errors << "target #{item['id']} merged without authority evidence" unless present?(merge["authority_evidence"])
           errors << "target #{item['id']} merged during a freeze or phase conflict" unless merge["freeze_state"] == "clear"
@@ -1636,6 +1645,15 @@ module FleetValidation
         end
         errors
       end
+    end
+
+    def target_blocked_gate?(item)
+      review_app = item.fetch("review_app", {})
+      item["result"] == "blocked" ||
+        item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" } ||
+        item.dig("baseline", "classification") == "candidate_regression" ||
+        review_app["state"] == "configured_broken" ||
+        review_app["deployed_smoke"] == "blocked"
     end
 
     def aggregate_state_errors

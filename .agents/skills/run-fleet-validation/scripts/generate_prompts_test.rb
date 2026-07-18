@@ -1000,6 +1000,25 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
   end
 
+  def test_blocked_preflight_still_rejects_product_versions_from_another_candidate
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each do |package|
+      product_names = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+      package["version"] = "16.0.0" if product_names.include?(package["name"])
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
+  end
+
   def test_blocked_preflight_retains_legitimate_validation_only_evidence
     generator = build_generator
     ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
@@ -2000,6 +2019,65 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "target #{target['id']} merged during a freeze or phase conflict"
   end
 
+  def test_merged_target_cannot_retain_its_own_blocked_gate_outcome
+    generator = build_generator
+    cases = {
+      "blocked result" => lambda do |target|
+        target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+      end,
+      "blocked check" => lambda do |target|
+        target.fetch("checks").fetch("hosted_ci").merge!(
+          "status" => "blocked",
+          "blocker_id" => "owned-blocker"
+        )
+      end,
+      "candidate regression" => lambda do |target|
+        target.fetch("baseline").merge!(
+          "classification" => "candidate_regression",
+          "waiver" => nil
+        )
+        target["blocker_id"] = "owned-blocker"
+      end,
+      "broken review app" => lambda do |target|
+        target.fetch("review_app").merge!(
+          "state" => "configured_broken",
+          "deployed_smoke" => "blocked",
+          "blocker_id" => "owned-blocker"
+        )
+      end
+    }
+
+    cases.each do |name, mutate|
+      ledger = complete_ledger(generator)
+      target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+      mutate.call(target)
+      ledger["blockers"] = [
+        {
+          "id" => "owned-blocker",
+          "status" => "open",
+          "public_summary" => "Sanitized target blocker",
+          "owner" => { "issue_url" => "https://example.invalid/issues/owned-blocker" },
+          "disposition" => nil
+        }
+      ]
+      ledger.fetch("tracker")["promotion"] = "blocked"
+
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        closeout: true
+      ).errors
+
+      assert_includes(
+        errors,
+        "target #{target.fetch('id')} merged despite its own blocked gate outcome",
+        name
+      )
+    end
+  end
+
   def test_partial_merge_closeout_requires_proofs_only_for_the_lanes_that_landed
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -2409,6 +2487,17 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-rsc --rsc"
     assert_includes pack, "independently resolved RSC version only in the RSC app"
     assert_includes pack, "verify: true"
+  end
+
+  def test_remote_coordinators_require_a_pack_bound_public_preflight_marker
+    generator = build_generator
+    pack = generator.render_pack
+
+    assert_includes pack, "<!-- fleet-validation-preflight:fleet-test-pack -->"
+    assert_includes pack, generator.snapshot_fingerprint
+    assert_includes pack, "publish the public-safe `APP_WORK_ALLOWED` marker"
+    assert_includes pack, "Do not start a remote mutable worker until one unique preflight marker"
+    assert_includes pack, "candidate tag and commit, snapshot fingerprint, opened_at"
   end
 
   def test_each_lane_emits_a_complete_schema_valid_inventory_fragment_for_closeout
