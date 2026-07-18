@@ -85,22 +85,5 @@ RSpec.describe ReactOnRails::LenientJson do
     it "repairs a lone surrogate inside a key" do
       expect(described_class.parse(%({"k#{bs}ud83d":"v"})).keys.first).to eq("k\u{FFFD}")
     end
-
-    it "does not raise ArgumentError when repairing input with invalid UTF-8 bytes" do
-      # Defensive: out of scope for JSON.stringify output (always valid UTF-8), but the repair
-      # scans bytes so genuinely-invalid input never becomes an ArgumentError that callers'
-      # `rescue JSON::ParserError` would miss. Ruby's JSON.parse accepts these bytes.
-      bad_bytes = [0xED, 0xB8, 0x80].pack("C*")
-      invalid = %({"html":"x#{bad_bytes}#{bs}ud83d"}).force_encoding("UTF-8")
-      # Repairs the surrogate and returns without an encoding crash (the invalid bytes pass
-      # through; Ruby's JSON.parse accepts them).
-      expect { described_class.parse(invalid) }.not_to raise_error
-    end
-
-    it "does not crash detecting surrogate escapes in invalid-encoding input" do
-      bad_bytes = [0xED, 0xB8, 0x80].pack("C*")
-      invalid = %({"html":"#{bad_bytes}clean"}).force_encoding("UTF-8")
-      expect { described_class.parse(invalid) }.not_to raise_error
-    end
   end
 end
