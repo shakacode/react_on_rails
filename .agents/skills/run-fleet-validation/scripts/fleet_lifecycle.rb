@@ -58,9 +58,10 @@ module FleetValidation
           target.slice("id", "tier", "work_mode").merge(
             "work_state" => "not_started",
             "result" => "pending",
+            "waiver" => nil,
             "package_locks" => [],
             "checks" => %w[install build test local_smoke hosted_ci review].to_h do |check|
-              [check, { "status" => "pending", "evidence" => nil }]
+              [check, { "status" => "pending", "evidence" => nil, "waiver" => nil }]
             end,
             "review_app" => { "state" => "unknown", "evidence" => nil, "deployed_smoke" => "pending" },
             "baseline" => { "classification" => "pending", "evidence" => nil },
@@ -201,7 +202,7 @@ module FleetValidation
     def inventory_item_schema
       object_schema(
         %w[
-          id tier work_mode work_state result package_locks checks review_app baseline evidence
+          id tier work_mode work_state result waiver package_locks checks review_app baseline evidence
         ],
         {
           "id" => nonempty_string,
@@ -209,6 +210,7 @@ module FleetValidation
           "work_mode" => { "enum" => %w[mutation report_only] },
           "work_state" => { "enum" => %w[not_started running finished blocked unknown] },
           "result" => { "enum" => %w[pending passed reported blocked waived unknown] },
+          "waiver" => waiver_schema,
           "package_locks" => {
             "type" => "array",
             "items" => object_schema(
@@ -289,8 +291,9 @@ module FleetValidation
       {
         "type" => %w[object null],
         "additionalProperties" => false,
-        "required" => %w[authority evidence_url reason],
+        "required" => %w[gate authority evidence_url reason],
         "properties" => {
+          "gate" => nonempty_string,
           "authority" => nonempty_string,
           "evidence_url" => nonempty_string,
           "reason" => nonempty_string
@@ -339,10 +342,11 @@ module FleetValidation
 
     def evidence_status_schema
       object_schema(
-        %w[status evidence],
+        %w[status evidence waiver],
         {
           "status" => status_string,
-          "evidence" => nullable_string
+          "evidence" => nullable_string,
+          "waiver" => waiver_schema
         }
       )
     end
@@ -500,8 +504,10 @@ module FleetValidation
       result << inventory_completion_error if @closeout && inventory_completion_error
       result << package_lock_error if @closeout && package_lock_error
       result << check_evidence_error if @closeout && check_evidence_error
+      result.concat(waiver_evidence_errors) if @closeout
+      result.concat(base_identity_errors) if @closeout
       result << base_movement_error if @closeout && base_movement_error
-      result << independent_audit_error if @closeout && independent_audit_error
+      result.concat(independent_audit_errors) if @closeout
       result << "independent audit is not passed" if @closeout && @ledger.dig("audit", "status") != "passed"
       if @closeout && !present?(@ledger.dig("preflight", "capabilities", "restart_handoff"))
         result << "capability restart_handoff is missing"
@@ -541,10 +547,26 @@ module FleetValidation
     end
 
     def inventory_errors
-      actual_ids = Array(@ledger["inventory"]).filter_map { |item| item["id"] }
-      @inventory.filter_map do |target|
-        "inventory missing target #{target.fetch('id')}" unless actual_ids.include?(target.fetch("id"))
+      actual = Array(@ledger["inventory"])
+      expected_by_id = @inventory.to_h { |target| [target.fetch("id"), target] }
+      actual_ids = actual.filter_map { |item| item["id"] }
+      errors = expected_by_id.filter_map do |id, _target|
+        "inventory missing target #{id}" unless actual_ids.include?(id)
       end
+      actual_ids.tally.each do |id, count|
+        errors << "inventory has duplicate target #{id}" if count > 1
+      end
+      (actual_ids - expected_by_id.keys).uniq.each do |id|
+        errors << "inventory has unexpected target #{id}"
+      end
+      actual.each do |item|
+        expected = expected_by_id[item["id"]]
+        next unless expected
+        next if item["tier"] == expected["tier"] && item["work_mode"] == expected["work_mode"]
+
+        errors << "inventory target #{item['id']} classification does not match manifest"
+      end
+      errors
     end
 
     def private_field_errors
@@ -599,15 +621,23 @@ module FleetValidation
 
     def preflight_errors
       preflight = @ledger.fetch("preflight", {})
-      waived = preflight["status"] == "waived" && valid_waiver?(preflight["waiver"])
-      errors = %w[release_ci artifacts generator_matrix].filter_map do |field|
-        next if preflight[field] == "passed" || waived
+      waiver = preflight["status"] == "waived" ? preflight["waiver"] : nil
+      errors = %w[release_ci generator_matrix].filter_map do |field|
+        next if preflight[field] == "passed" || valid_waiver?(waiver, field)
 
         "release-wide preflight #{field} is not passed or explicitly waived"
       end
+      unless preflight["artifacts"] == "passed"
+        message = if valid_waiver?(waiver, "artifacts")
+                    "release-wide preflight artifacts must pass and cannot be waived"
+                  else
+                    "release-wide preflight artifacts is not passed or explicitly waived"
+                  end
+        errors << message
+      end
       capabilities = preflight.fetch("capabilities", {})
       %w[status permissions git_auth github_auth registry_network toolchains host_capacity coordination].each do |field|
-        next if capabilities[field] == "passed" || waived
+        next if capabilities[field] == "passed" || valid_waiver?(waiver, "capabilities.#{field}")
 
         errors << "capability #{field} is not passed or explicitly waived"
       end
@@ -662,11 +692,42 @@ module FleetValidation
       "#{count} hard-gate target(s) have unknown or nonterminal check evidence"
     end
 
-    def independent_audit_error
+    def independent_audit_errors
       audit = @ledger.fetch("audit", {})
-      return unless Array(audit["maker_ids"]).include?(audit["checker"])
+      errors = []
+      errors << "independent audit checker is missing" unless present?(audit["checker"])
+      errors << "independent audit maker identities are missing" if Array(audit["maker_ids"]).empty?
+      if present?(audit["checker"]) && Array(audit["maker_ids"]).include?(audit["checker"])
+        errors << "independent audit checker is also a maker"
+      end
+      errors
+    end
 
-      "independent audit checker is also a maker"
+    def base_identity_errors
+      audit = @ledger.fetch("audit", {})
+      merge = @ledger.fetch("merge", {})
+      errors = []
+      errors << "audit base_commit is missing" unless present?(audit["base_commit"])
+      %w[reviewed_base_commit current_base_commit].each do |field|
+        errors << "merge #{field} is missing" unless present?(merge[field])
+      end
+      errors
+    end
+
+    def waiver_evidence_errors
+      Array(@ledger["inventory"]).flat_map do |item|
+        errors = []
+        if item["result"] == "waived" && !valid_waiver?(item["waiver"], item["id"])
+          errors << "target #{item['id']} waived result is missing structured waiver evidence"
+        end
+        item.fetch("checks", {}).each do |name, check|
+          next unless check["status"] == "waived"
+          next if valid_waiver?(check["waiver"], "#{item['id']}:#{name}")
+
+          errors << "target #{item['id']} waived check #{name} is missing structured waiver evidence"
+        end
+        errors
+      end
     end
 
     def reachability_errors
@@ -704,7 +765,7 @@ module FleetValidation
       return false unless path
       return true if path["status"] == "passed" && present?(path["lane"]) && present?(path["evidence"])
 
-      path["status"] == "waived" && valid_waiver?(path["waiver"])
+      path["status"] == "waived" && valid_waiver?(path["waiver"], path["id"])
     end
 
     def present?(value)
@@ -713,16 +774,22 @@ module FleetValidation
 
     def app_work_allowed?
       preflight = @ledger.fetch("preflight", {})
-      preflight["status"] == "passed" || (preflight["status"] == "waived" && valid_waiver?(preflight["waiver"]))
+      %w[passed waived].include?(preflight["status"]) && preflight_errors.empty?
     end
 
-    def valid_waiver?(waiver)
-      waiver.is_a?(Hash) && %w[authority evidence_url reason].all? { |field| present?(waiver[field]) }
+    def valid_waiver?(waiver, expected_gate)
+      waiver.is_a?(Hash) && waiver["gate"] == expected_gate &&
+        %w[authority evidence_url reason].all? { |field| present?(waiver[field]) }
     end
 
     def release_blocked?
       hard_gate_blocked = Array(@ledger["inventory"]).any? do |item|
-        item["tier"] == "hard_gate" && !%w[passed waived].include?(item["result"])
+        next false unless item["tier"] == "hard_gate"
+
+        top_level_blocked = !%w[passed waived].include?(item["result"])
+        check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
+        candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
+        top_level_blocked || check_blocked || candidate_regression
       end
       required_path_blocked = @required_paths.any? do |required|
         path = Array(@ledger["required_paths"]).find { |item| item["id"] == required.fetch("id") }
@@ -868,7 +935,12 @@ module FleetValidation
       blockers = Array(@ledger["blockers"])
       paths = Array(@ledger["required_paths"])
       blocked = inventory.any? do |item|
-        item["tier"] == "hard_gate" && !%w[passed waived].include?(item["result"])
+        next false unless item["tier"] == "hard_gate"
+
+        top_level_blocked = !%w[passed waived].include?(item["result"])
+        check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
+        candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
+        top_level_blocked || check_blocked || candidate_regression
       end
       blocked ||= paths.any? { |path| !%w[passed waived].include?(path["status"]) }
       blocked ||= blockers.any? { |blocker| !%w[resolved waived deferred].include?(blocker["status"]) }

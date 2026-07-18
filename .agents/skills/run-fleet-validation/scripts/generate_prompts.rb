@@ -261,11 +261,12 @@ module FleetValidation
         # Fleet validation launch index
 
         1. Run [PREFLIGHT.md](PREFLIGHT.md) and record its results in `result-ledger.json`.
-        2. Start all #{@prompt_count} prompt coordinators simultaneously after the snapshot exists.
+        2. Start prompt coordinator 1 so the release-snapshot leader can resolve and publish the shared snapshot.
+        3. Start the remaining prompt coordinators after that snapshot exists.
            Do not start the app mutation prompts before `APP_WORK_ALLOWED`; coordinators may prepare
            read-only evidence while waiting.
-        3. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.
-        4. Run [CLOSEOUT.md](CLOSEOUT.md) with an independent checker, validate `result-ledger.json`
+        4. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.
+        5. Run [CLOSEOUT.md](CLOSEOUT.md) with an independent checker, validate `result-ledger.json`
            against `result-ledger.schema.json`, and render the tracker matrix from that ledger.
 
         This layout runs at most

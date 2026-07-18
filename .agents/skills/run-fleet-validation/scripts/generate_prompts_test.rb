@@ -123,6 +123,24 @@ class FleetValidationGeneratorTest < Minitest::Test
                     .all? { |target| target.fetch("work_mode") == "report_only" })
   end
 
+  def test_ledger_inventory_cannot_downgrade_or_duplicate_a_manifest_hard_gate
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.merge!("tier" => "soft_track", "work_mode" => "report_only", "result" => "reported")
+    ledger.fetch("inventory") << ledger.fetch("inventory").last.dup
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("classification does not match manifest") })
+    assert(errors.any? { |error| error.include?("duplicate target") })
+  end
+
   def test_report_only_prompt_covers_all_five_soft_tracks_without_mutation
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
@@ -348,6 +366,24 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "base moved after audit without passing reconciliation"
   end
 
+  def test_closeout_requires_audit_and_merge_base_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["base_commit"] = nil
+    ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "audit base_commit is missing"
+    assert_includes errors, "merge reviewed_base_commit is missing"
+    assert_includes errors, "merge current_base_commit is missing"
+  end
+
   def test_generated_closeout_requires_independent_audit_authorized_merge_reachability_and_tree_parity
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
@@ -376,6 +412,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "independent audit checker is also a maker"
+  end
+
+  def test_closeout_requires_identified_checker_and_makers
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit").merge!("checker" => nil, "maker_ids" => [])
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit checker is missing"
+    assert_includes errors, "independent audit maker identities are missing"
   end
 
   def test_closeout_rejects_a_pending_independent_audit
@@ -424,6 +476,30 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "release-wide preflight artifacts is not passed or explicitly waived"
+  end
+
+  def test_published_artifact_defects_cannot_be_waived
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").merge!(
+      "status" => "waived",
+      "artifacts" => "blocked",
+      "waiver" => {
+        "gate" => "artifacts",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "sanitized"
+      }
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "release-wide preflight artifacts must pass and cannot be waived"
   end
 
   def test_empty_preflight_waiver_does_not_open_the_app_work_barrier
@@ -576,6 +652,46 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "promotion cannot be recommended while release blockers remain"
+  end
+
+  def test_nested_hard_gate_failure_blocks_promotion
+    generator = build_generator
+    check_failure = complete_ledger(generator)
+    check_failure.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("checks").fetch("hosted_ci")["status"] = "blocked"
+    regression = complete_ledger(generator)
+    regression.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+              .fetch("baseline")["classification"] = "candidate_regression"
+
+    [check_failure, regression].each do |ledger|
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_includes errors, "promotion cannot be recommended while release blockers remain"
+      assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+    end
+  end
+
+  def test_waived_hard_gate_and_check_require_structured_waiver_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target["result"] = "waived"
+    target.fetch("checks").fetch("hosted_ci")["status"] = "waived"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("waived result is missing structured waiver evidence") })
+    assert(errors.any? { |error| error.include?("waived check hosted_ci is missing structured waiver evidence") })
   end
 
   def test_ledger_cli_validates_and_renders_the_tracker_from_one_file
@@ -738,6 +854,8 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes index, "[CLOSEOUT.md](CLOSEOUT.md)"
       assert_includes index, "`result-ledger.json`"
       assert_includes index, "Do not start the app mutation prompts before `APP_WORK_ALLOWED`"
+      assert_operator index.index("Start prompt coordinator 1"), :<, index.index("Start the remaining prompt coordinators")
+      refute_includes index, "Start all 6 prompt coordinators simultaneously after the snapshot exists"
     end
   end
 
