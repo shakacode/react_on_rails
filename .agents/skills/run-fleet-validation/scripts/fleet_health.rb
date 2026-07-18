@@ -260,32 +260,52 @@ module FleetValidation
     end
 
     def smoke_status(repo, head, _checks, workflows, default_branch:)
-      shared_workflows = workflows.select do |workflow|
+      shared_callers = workflows.flat_map do |workflow|
         content = @client.content(repo, workflow.fetch("path"), ref: head)
-        shared_smoke_caller?(content)
+        shared_smoke_callers(content).map { |caller| [workflow, caller] }
       rescue StandardError
-        false
+        []
       end
-      if shared_workflows.empty?
+      if shared_callers.empty?
         return evidence_status("unknown", "No reusable fleet-smoke caller was found at the default head")
                .merge("shared_contract" => false)
       end
 
-      statuses = shared_workflows.map do |workflow|
-        shared_smoke_workflow_status(repo, head, default_branch, workflow)
+      caller_identities = shared_callers.map do |workflow, caller|
+        [workflow["path"], caller.fetch("name")]
       end
-      status = if statuses.any? { |candidate| candidate["status"] == "passed" }
+      duplicate_identities = caller_identities.tally.select { |_identity, count| count > 1 }.keys
+      unless duplicate_identities.empty?
+        evidence = duplicate_identities.map do |path, name|
+          "#{path}: ambiguous reusable caller name #{name.inspect}"
+        end.join("; ")
+        return evidence_status("unknown", evidence).merge("shared_contract" => true)
+      end
+
+      name_collisions = shared_callers.select { |_workflow, caller| caller.fetch("name_collision") }
+      unless name_collisions.empty?
+        evidence = name_collisions.map do |workflow, caller|
+          "#{workflow['path']}: caller_job=#{caller.fetch('key')} expected job name " \
+            "#{called_smoke_job_name(caller).inspect} collides with a non-reusable job"
+        end.join("; ")
+        return evidence_status("unknown", evidence).merge("shared_contract" => true)
+      end
+
+      statuses = shared_callers.map do |workflow, caller|
+        shared_smoke_workflow_status(repo, head, default_branch, workflow, caller)
+      end
+      status = if statuses.all? { |candidate| candidate["status"] == "passed" }
                  "passed"
-               elsif statuses.any? { |candidate| candidate["status"] == "unknown" }
-                 "unknown"
-               else
+               elsif statuses.any? { |candidate| candidate["status"] == "blocked" }
                  "blocked"
+               else
+                 "unknown"
                end
       evidence_status(status, statuses.filter_map { |candidate| candidate["evidence"] }.join("; "))
         .merge("shared_contract" => true)
     end
 
-    def shared_smoke_workflow_status(repo, head, default_branch, workflow)
+    def shared_smoke_workflow_status(repo, head, default_branch, workflow, caller)
       workflow_evidence = workflow["html_url"] || workflow["path"]
       workflow_id = workflow.fetch("id")
       branch = URI.encode_www_form_component(default_branch)
@@ -302,7 +322,7 @@ module FleetValidation
       ].compact.join("; ")
       return evidence_status("unknown", evidence) unless run["status"] == "completed"
 
-      smoke_job = shared_smoke_job_status(repo, run)
+      smoke_job = shared_smoke_job_status(repo, run, caller)
       status = if run["conclusion"] == "success" && smoke_job["status"] == "passed"
                  "passed"
                elsif smoke_job["status"] == "unknown"
@@ -315,29 +335,51 @@ module FleetValidation
       evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
     end
 
-    def shared_smoke_job_status(repo, run)
+    def shared_smoke_job_status(repo, run, caller)
       jobs = @client.get("/repos/#{repo}/actions/runs/#{run.fetch('id')}/jobs?per_page=100").fetch("jobs", [])
-      smoke_jobs = jobs.select { |job| job["name"].to_s.split(" / ").last == "Demo fleet smoke" }
-      return evidence_status("unknown", "called Demo fleet smoke job was not found") if smoke_jobs.empty?
+      expected_name = called_smoke_job_name(caller)
+      identity = "caller_job=#{caller.fetch('key')}; caller_name=#{caller.fetch('name')}; expected_job=#{expected_name}"
+      smoke_jobs = jobs.select { |job| job["name"] == expected_name }
+      return evidence_status("unknown", "#{identity}; called reusable smoke job was not found") if smoke_jobs.empty?
+      if smoke_jobs.length > 1
+        return evidence_status("unknown", "#{identity}; called reusable smoke job identity is ambiguous")
+      end
 
-      evidence = smoke_jobs.filter_map { |job| job["html_url"] }.join(", ")
-      return evidence_status("unknown", evidence) if smoke_jobs.any? { |job| job["status"] != "completed" }
-      return evidence_status("unknown", evidence) if smoke_jobs.any? { |job| job["conclusion"] == "skipped" }
+      smoke_job = smoke_jobs.fetch(0)
+      evidence = [identity, smoke_job["html_url"]].compact.join("; ")
+      return evidence_status("unknown", evidence) unless smoke_job["status"] == "completed"
+      return evidence_status("unknown", evidence) if smoke_job["conclusion"] == "skipped"
 
-      status = smoke_jobs.all? { |job| job["conclusion"] == "success" } ? "passed" : "blocked"
+      status = smoke_job["conclusion"] == "success" ? "passed" : "blocked"
       evidence_status(status, evidence)
     end
 
-    def shared_smoke_caller?(content)
+    def shared_smoke_callers(content)
       document = YAML.safe_load(content, permitted_classes: [], permitted_symbols: [], aliases: false)
       jobs = document.is_a?(Hash) ? document["jobs"] : nil
-      return false unless jobs.is_a?(Hash)
+      return [] unless jobs.is_a?(Hash)
 
-      jobs.values.any? do |job|
-        job.is_a?(Hash) && job["uses"].to_s.start_with?(SHARED_SMOKE_REFERENCE)
+      callers = jobs.filter_map do |key, job|
+        next unless job.is_a?(Hash) && job["uses"].to_s.start_with?(SHARED_SMOKE_REFERENCE)
+
+        name = present_string?(job["name"]) ? job.fetch("name") : key.to_s
+        { "key" => key.to_s, "name" => name }
+      end
+      local_job_names = jobs.values.filter_map do |job|
+        next unless job.is_a?(Hash)
+        next if job["uses"].to_s.start_with?(SHARED_SMOKE_REFERENCE)
+
+        job["name"] if present_string?(job["name"])
+      end
+      callers.each do |caller|
+        caller["name_collision"] = local_job_names.include?(called_smoke_job_name(caller))
       end
     rescue Psych::Exception
-      false
+      []
+    end
+
+    def called_smoke_job_name(caller)
+      "#{caller.fetch('name')} / Demo fleet smoke"
     end
 
     def review_app_status(repo, target, workflows, default_branch:, observed_at:)
@@ -983,7 +1025,7 @@ module FleetValidation
     end
 
     def commit_string
-      { "type" => "string", "pattern" => "\\A[0-9a-f]{40}\\z" }
+      { "type" => "string", "pattern" => "^[0-9a-f]{40}$" }
     end
 
     def nullable_string

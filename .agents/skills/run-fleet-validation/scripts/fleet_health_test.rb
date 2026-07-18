@@ -239,6 +239,13 @@ class FleetHealthTest < Minitest::Test
     assert(errors.any? { |error| error.include?("unexpected") })
   end
 
+  def test_schema_uses_an_ecma_262_commit_pattern
+    pattern = @contract.schema.dig("properties", "pack", "properties", "policy_commit", "pattern")
+
+    assert_equal "^[0-9a-f]{40}$", pattern
+    assert_match Regexp.new(pattern), "7d787fcc1e3fbcfd655bc8bc79401e3a657d9550"
+  end
+
   def test_markdown_escaping_preserves_literal_backslashes_and_table_delimiters
     escaped = @contract.send(:escape, "literal\\path|column`code\nnext")
 
@@ -732,6 +739,7 @@ class FleetHealthTest < Minitest::Test
           "name" => "CI",
           "jobs" => {
             "fleet" => {
+              "name" => "Fleet",
               "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
             }
           }
@@ -955,6 +963,7 @@ class FleetHealthTest < Minitest::Test
         YAML.dump(
           "jobs" => {
             "fleet" => {
+              "name" => "Fleet",
               "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
             }
           }
@@ -1020,15 +1029,139 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(responses)
     probe = FleetValidation::PublicGitHubProbe.new(client:)
+    caller = { "key" => "fleet", "name" => "Fleet" }
 
-    skipped = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow)
+    skipped = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow, caller)
     responses.fetch("/repos/#{repo}/actions/runs/4101/jobs?per_page=100")
              .fetch("jobs").first["conclusion"] = "success"
-    passed = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow)
+    passed = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow, caller)
 
     assert_equal "unknown", skipped.fetch("status")
     assert_equal "passed", passed.fetch("status")
     assert_includes passed.fetch("evidence"), "https://example.invalid/job"
+  end
+
+  def test_shared_smoke_rejects_an_unrelated_local_job_when_the_caller_is_skipped
+    repo = "sanitized/demo"
+    run = { "id" => 4101 }
+    jobs_path = "/repos/#{repo}/actions/runs/4101/jobs?per_page=100"
+    client = Struct.new(:jobs_path) do
+      def get(path)
+        raise "unexpected path" unless path == jobs_path
+
+        {
+          "jobs" => [
+            {
+              "name" => "Demo fleet smoke",
+              "status" => "completed",
+              "conclusion" => "success",
+              "html_url" => "https://example.invalid/unrelated"
+            },
+            {
+              "name" => "Fleet",
+              "status" => "completed",
+              "conclusion" => "skipped",
+              "html_url" => "https://example.invalid/skipped-caller"
+            }
+          ]
+        }
+      end
+    end.new(jobs_path)
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    caller = { "key" => "fleet", "name" => "Fleet" }
+
+    status = probe.send(:shared_smoke_job_status, repo, run, caller)
+
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "caller_job=fleet"
+    refute_includes status.fetch("evidence"), "https://example.invalid/unrelated"
+  end
+
+  def test_shared_smoke_fails_closed_on_ambiguous_caller_names
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = { "id" => 41, "path" => ".github/workflows/ci.yml" }
+    content = YAML.dump(
+      "jobs" => {
+        "fleet_a" => {
+          "name" => "Fleet",
+          "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        },
+        "fleet_b" => {
+          "name" => "Fleet",
+          "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        }
+      }
+    )
+    client = Struct.new(:content_value) do
+      def content(_repo, _path, ref:)
+        raise "wrong head" unless ref == "a" * 40
+
+        content_value
+      end
+
+      def get(_path)
+        raise "ambiguous callers must fail before run lookup"
+      end
+    end.new(content)
+
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(
+                                                 :smoke_status,
+                                                 repo,
+                                                 head,
+                                                 [],
+                                                 [workflow],
+                                                 default_branch: "main"
+                                               )
+
+    assert_equal true, status.fetch("shared_contract")
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "ambiguous reusable caller name"
+  end
+
+  def test_shared_smoke_rejects_a_local_job_name_that_spoofs_the_called_job
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = { "id" => 41, "path" => ".github/workflows/ci.yml" }
+    content = YAML.dump(
+      "jobs" => {
+        "fleet" => {
+          "name" => "Fleet",
+          "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        },
+        "spoof" => {
+          "name" => "Fleet / Demo fleet smoke",
+          "runs-on" => "ubuntu-latest",
+          "steps" => [{ "run" => "true" }]
+        }
+      }
+    )
+    client = Struct.new(:content_value) do
+      def content(_repo, _path, ref:)
+        raise "wrong head" unless ref == "a" * 40
+
+        content_value
+      end
+
+      def get(_path)
+        raise "spoofing definition must fail before run lookup"
+      end
+    end.new(content)
+
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(
+                                                 :smoke_status,
+                                                 repo,
+                                                 head,
+                                                 [],
+                                                 [workflow],
+                                                 default_branch: "main"
+                                               )
+
+    assert_equal true, status.fetch("shared_contract")
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "collides with a non-reusable job"
   end
 
   def test_shared_smoke_ignores_raw_reference_outside_jobs_uses
