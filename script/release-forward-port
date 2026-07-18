@@ -575,10 +575,11 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil)
-    source_patch_id = patch_id_for_commit(sha)
+    source_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE]
+    source_patch_id = patch_id_for_commit(sha, paths: source_paths)
 
     (candidates || patch_equivalent_target_candidates(sha, target)).any? do |target_sha|
-      patch_id_for_target_candidate(target_sha, sha) == source_patch_id &&
+      patch_id_for_target_candidate(target_sha, sha, source_paths:) == source_patch_id &&
         target_commit_live_on_target?(target_sha, target)
     end
   end
@@ -656,11 +657,13 @@ class ReleaseForwardPort
     (source_paths_for_target_diff(target, sha) - changed_paths_for_commit(sha)).any?
   end
 
-  def patch_id_for_target_candidate(target_sha, source_sha)
+  def patch_id_for_target_candidate(target_sha, source_sha, source_paths: changed_paths_for_commit(source_sha))
     parents = git("rev-list", "--parents", "-n", "1", target_sha).split.drop(1)
-    return patch_id_for_commit(target_sha) if parents.empty?
+    return patch_id_for_commit(target_sha, paths: source_paths) if parents.empty?
 
-    target_to_source_paths = target_to_source_path_map(target_sha, source_sha)
+    target_to_source_paths = target_to_source_path_map(target_sha, source_sha).select do |_target_path, source_path|
+      source_paths.include?(source_path)
+    end
     patch_id_for_commit(target_sha, target_to_source_paths:, paths: target_to_source_paths.keys)
   end
 
