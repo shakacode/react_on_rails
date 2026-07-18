@@ -195,10 +195,10 @@ module FleetValidation
     PASSING_CONCLUSIONS = %w[success neutral skipped].freeze
     DEPENDABOT_PATHS = %w[.github/dependabot.yml .github/dependabot.yaml].freeze
     MAX_PAGES = 20
-    REVIEW_APP_MAX_AGE_DAYS = 45
 
-    def initialize(client:)
+    def initialize(client:, max_default_age_days:)
       @client = client
+      @max_default_age_days = max_default_age_days
     end
 
     def observe(target, observed_at:)
@@ -479,9 +479,9 @@ module FleetValidation
 
       started_at = Time.iso8601(run["run_started_at"].to_s)
       age_seconds = Time.iso8601(observed_at) - started_at
-      return "run age exceeds #{REVIEW_APP_MAX_AGE_DAYS} days" unless age_seconds.between?(
+      return "run age exceeds #{@max_default_age_days} days" unless age_seconds.between?(
         0,
-        REVIEW_APP_MAX_AGE_DAYS * 86_400
+        @max_default_age_days * 86_400
       )
 
       nil
@@ -565,7 +565,7 @@ module FleetValidation
       %w[npm react-on-rails-rsc]
     ].freeze
 
-    attr_reader :targets
+    attr_reader :max_default_age_days, :targets
 
     def initialize(manifest:, pack_id:, release:, rsc_version:, policy_commit:, generated_at:)
       @manifest = manifest

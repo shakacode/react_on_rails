@@ -190,7 +190,10 @@ module FleetValidation
         release: options.fetch(:release),
         rsc_version: options.fetch(:rsc_version)
       )
-      probe = PublicGitHubProbe.new(client: PublicGitHubClient.new(http:))
+      probe = PublicGitHubProbe.new(
+        client: PublicGitHubClient.new(http:),
+        max_default_age_days: contract.max_default_age_days
+      )
       observations = contract.targets.to_h do |target|
         [target.fetch("id"), probe.observe(target, observed_at: options.fetch(:generated_at))]
       end

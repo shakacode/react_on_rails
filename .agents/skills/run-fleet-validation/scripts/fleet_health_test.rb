@@ -498,7 +498,7 @@ class FleetHealthTest < Minitest::Test
 
       YAML.dump(config)
     end
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     result = probe.send(:dependabot_status, repo, head, @contract.targets.first.fetch("packages"))
 
@@ -522,7 +522,7 @@ class FleetHealthTest < Minitest::Test
       requests << [path, ref]
       raise FleetValidation::MissingPublicContentError, "missing"
     end
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     result = probe.send(:dependabot_status, repo, head, @contract.targets.first.fetch("packages"))
 
@@ -682,7 +682,7 @@ class FleetHealthTest < Minitest::Test
 
       { "visibility" => "private-secret", "default_branch" => "main" }
     end
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     error = assert_raises(FleetValidation::NonPublicRepositoryError) do
       probe.observe(target, observed_at: "2026-07-18T12:00:00Z")
@@ -693,7 +693,7 @@ class FleetHealthTest < Minitest::Test
   end
 
   def test_default_ci_requires_a_successful_exact_head_check
-    probe = FleetValidation::PublicGitHubProbe.new(client: nil)
+    probe = public_github_probe(client: nil)
     skipped = {
       "name" => "Paths filtered",
       "status" => "completed",
@@ -732,7 +732,7 @@ class FleetHealthTest < Minitest::Test
         raise "unexpected page #{path}"
       end
     end.new(path, success, failure)
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     checks = probe.send(:paginated_collection, path, "check_runs")
 
@@ -748,7 +748,7 @@ class FleetHealthTest < Minitest::Test
         { "check_runs" => Array.new(100) { { "status" => "completed", "conclusion" => "success" } } }
       end
     end.new([])
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     error = assert_raises(FleetValidation::ManifestError) do
       probe.send(:paginated_collection, path, "check_runs")
@@ -821,7 +821,7 @@ class FleetHealthTest < Minitest::Test
         )
       end
     end.new(responses)
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     workflows = probe.send(:paginated_collection, path, "workflows")
     smoke = probe.send(:smoke_status, repo, head, [], workflows, default_branch: "main")
@@ -880,7 +880,7 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new(responses, [])
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
     caller = { "key" => "fleet", "name" => "Fleet" }
 
     status = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow, caller)
@@ -915,7 +915,7 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new(responses, [])
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
     caller = { "key" => "fleet", "name" => "Fleet" }
 
     status = probe.send(:shared_smoke_job_status, repo, run, caller)
@@ -946,7 +946,7 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new(responses, [])
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     status = probe.send(
       :review_workflow_status,
@@ -1035,7 +1035,7 @@ class FleetHealthTest < Minitest::Test
       end
     end
 
-    observation = FleetValidation::PublicGitHubProbe.new(client:).observe(
+    observation = public_github_probe(client:).observe(
       target,
       observed_at: "2026-07-18T12:00:00Z"
     )
@@ -1059,8 +1059,8 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(path)
     error = assert_raises(FleetValidation::ManifestError) do
-      FleetValidation::PublicGitHubProbe.new(client: malformed_client)
-                                        .send(:paginated_collection, path, "workflows")
+      public_github_probe(client: malformed_client)
+        .send(:paginated_collection, path, "workflows")
     end
     assert_includes error.message, "is not an array"
 
@@ -1071,8 +1071,8 @@ class FleetHealthTest < Minitest::Test
       { "workflows" => Array.new(100) { { "path" => ".github/workflows/filler.yml" } } }
     end
     error = assert_raises(FleetValidation::ManifestError) do
-      FleetValidation::PublicGitHubProbe.new(client: full_client)
-                                        .send(:paginated_collection, path, "workflows")
+      public_github_probe(client: full_client)
+        .send(:paginated_collection, path, "workflows")
     end
     assert_includes error.message, "pagination remained full"
     assert_equal FleetValidation::PublicGitHubProbe::MAX_PAGES, requests.length
@@ -1213,7 +1213,7 @@ class FleetHealthTest < Minitest::Test
         ] => YAML.dump(dependabot_v1_config)
       }
     )
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
 
     observation = probe.observe(target, observed_at: "2026-07-18T12:00:00Z")
 
@@ -1241,20 +1241,20 @@ class FleetHealthTest < Minitest::Test
         { "workflow_runs" => runs }
       end
     end
-    probe = FleetValidation::PublicGitHubProbe.new(
+    probe = public_github_probe(
       client: client.new([valid_review_run("conclusion" => "failure")])
     )
 
     broken = review_app_status(probe, repo, target, workflow)
-    probe = FleetValidation::PublicGitHubProbe.new(
+    probe = public_github_probe(
       client: client.new([valid_review_run("status" => "in_progress", "conclusion" => nil)])
     )
     pending = review_app_status(probe, repo, target, workflow)
-    probe = FleetValidation::PublicGitHubProbe.new(
+    probe = public_github_probe(
       client: client.new([valid_review_run("conclusion" => "skipped")])
     )
     skipped = review_app_status(probe, repo, target, workflow)
-    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([]))
+    probe = public_github_probe(client: client.new([]))
     missing_run = review_app_status(probe, repo, target, workflow)
     absent_workflow = review_app_status(probe, repo, target, nil)
 
@@ -1289,15 +1289,15 @@ class FleetHealthTest < Minitest::Test
                 "updated_at" => "2026-07-18T10:00:00Z"
               }
             ])
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :review_app_status,
-                                                 target.fetch("name"),
-                                                 target,
-                                                 [staging_workflow],
-                                                 default_branch: "main",
-                                                 observed_at: "2026-07-18T12:00:00Z"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :review_app_status,
+               target.fetch("name"),
+               target,
+               [staging_workflow],
+               default_branch: "main",
+               observed_at: "2026-07-18T12:00:00Z"
+             )
 
     assert_equal "not_applicable", status.fetch("status")
   end
@@ -1333,15 +1333,15 @@ class FleetHealthTest < Minitest::Test
                 )]
               }
             })
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :review_app_status,
-                                                 target.fetch("name"),
-                                                 target,
-                                                 [exact_workflow, cleanup_workflow],
-                                                 default_branch: "main",
-                                                 observed_at: "2026-07-18T12:00:00Z"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :review_app_status,
+               target.fetch("name"),
+               target,
+               [exact_workflow, cleanup_workflow],
+               default_branch: "main",
+               observed_at: "2026-07-18T12:00:00Z"
+             )
 
     assert_equal "passed", status.fetch("status")
     assert_includes status.fetch("evidence"), "review-run"
@@ -1363,25 +1363,25 @@ class FleetHealthTest < Minitest::Test
       end
     end
     manual = review_app_status(
-      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("event" => "workflow_dispatch")])),
+      public_github_probe(client: client.new([valid_review_run("event" => "workflow_dispatch")])),
       repo,
       target,
       workflow
     )
     mismatched_head = review_app_status(
-      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("head_sha" => "b" * 40)])),
+      public_github_probe(client: client.new([valid_review_run("head_sha" => "b" * 40)])),
       repo,
       target,
       workflow
     )
     mismatched_branch = review_app_status(
-      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("head_branch" => "other")])),
+      public_github_probe(client: client.new([valid_review_run("head_branch" => "other")])),
       repo,
       target,
       workflow
     )
     wrong_base = review_app_status(
-      FleetValidation::PublicGitHubProbe.new(
+      public_github_probe(
         client: client.new([valid_review_run(
           "pull_requests" => [{
             "head" => { "ref" => "feature/review-app", "sha" => "c" * 40 },
@@ -1394,7 +1394,7 @@ class FleetHealthTest < Minitest::Test
       workflow
     )
     stale = review_app_status(
-      FleetValidation::PublicGitHubProbe.new(
+      public_github_probe(
         client: client.new([valid_review_run("run_started_at" => "2026-04-01T10:00:00Z")])
       ),
       repo,
@@ -1407,6 +1407,34 @@ class FleetHealthTest < Minitest::Test
     assert_equal "unknown", mismatched_branch.fetch("status")
     assert_equal "unknown", wrong_base.fetch("status")
     assert_equal "unknown", stale.fetch("status")
+  end
+
+  def test_review_app_recency_uses_the_manifest_staleness_limit
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    manifest.fetch("standing_health")["max_default_age_days"] = 1
+    contract = build_contract(manifest)
+    target = contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    client = Struct.new(:run) do
+      def get(_path)
+        { "workflow_runs" => [run] }
+      end
+    end.new(valid_review_run("run_started_at" => "2026-07-16T12:00:00Z"))
+    probe = public_github_probe(
+      client:,
+      max_default_age_days: contract.max_default_age_days
+    )
+
+    status = review_app_status(probe, repo, target, workflow)
+
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "run age exceeds 1 days"
   end
 
   def test_shared_smoke_requires_an_exact_head_run_of_the_shared_workflow
@@ -1443,15 +1471,15 @@ class FleetHealthTest < Minitest::Test
       "html_url" => "https://example.invalid/unrelated"
     }
 
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :smoke_status,
-                                                 repo,
-                                                 head,
-                                                 [unrelated_check],
-                                                 [workflow],
-                                                 default_branch: "main"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :smoke_status,
+               repo,
+               head,
+               [unrelated_check],
+               [workflow],
+               default_branch: "main"
+             )
 
     assert_equal true, status.fetch("shared_contract")
     assert_equal "unknown", status.fetch("status")
@@ -1490,7 +1518,7 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new(responses)
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
     caller = { "key" => "fleet", "name" => "Fleet" }
 
     skipped = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow, caller)
@@ -1529,7 +1557,7 @@ class FleetHealthTest < Minitest::Test
         }
       end
     end.new(jobs_path)
-    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    probe = public_github_probe(client:)
     caller = { "key" => "fleet", "name" => "Fleet" }
 
     status = probe.send(:shared_smoke_job_status, repo, run, caller)
@@ -1567,15 +1595,15 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(content)
 
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :smoke_status,
-                                                 repo,
-                                                 head,
-                                                 [],
-                                                 [workflow],
-                                                 default_branch: "main"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :smoke_status,
+               repo,
+               head,
+               [],
+               [workflow],
+               default_branch: "main"
+             )
 
     assert_equal true, status.fetch("shared_contract")
     assert_equal "unknown", status.fetch("status")
@@ -1611,15 +1639,15 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(content)
 
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :smoke_status,
-                                                 repo,
-                                                 head,
-                                                 [],
-                                                 [workflow],
-                                                 default_branch: "main"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :smoke_status,
+               repo,
+               head,
+               [],
+               [workflow],
+               default_branch: "main"
+             )
 
     assert_equal true, status.fetch("shared_contract")
     assert_equal "unknown", status.fetch("status")
@@ -1663,15 +1691,15 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(content)
 
-    status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(
-                                                 :smoke_status,
-                                                 repo,
-                                                 head,
-                                                 [],
-                                                 [workflow],
-                                                 default_branch: "main"
-                                               )
+    status = public_github_probe(client:)
+             .send(
+               :smoke_status,
+               repo,
+               head,
+               [],
+               [workflow],
+               default_branch: "main"
+             )
 
     assert_equal false, status.fetch("shared_contract")
     assert_equal "unknown", status.fetch("status")
@@ -1683,7 +1711,7 @@ class FleetHealthTest < Minitest::Test
       raise "public API unavailable"
     end
 
-    observation = FleetValidation::PublicGitHubProbe.new(client:).observe(
+    observation = public_github_probe(client:).observe(
       @contract.targets.first,
       observed_at: "2026-07-18T12:00:00Z"
     )
@@ -1789,6 +1817,10 @@ class FleetHealthTest < Minitest::Test
   end
 
   private
+
+  def public_github_probe(client:, max_default_age_days: @contract.max_default_age_days)
+    FleetValidation::PublicGitHubProbe.new(client:, max_default_age_days:)
+  end
 
   def build_contract(manifest)
     FleetValidation::FleetHealth.new(
