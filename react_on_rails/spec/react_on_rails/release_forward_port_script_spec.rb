@@ -401,6 +401,26 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips source patches embedded in combined target commits that mention the source PR" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      fix_sha = commit_all(repo, "Fix release regression (#123)")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      write_file(repo, "main-only.txt", "combined target work\n")
+      commit_all(repo, "Forward-port release fixes\n\nIncludes #123 with other release work")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression (#123)")
+    end
+  end
+
   it "does not trust a source-subject mention when the target patch differs" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

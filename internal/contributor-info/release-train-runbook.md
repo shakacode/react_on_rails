@@ -316,8 +316,8 @@ git push   # or open a PR if main is protected / the fix needs review on main
   on the target branch. For already-applied patches without the footer, it uses `git cherry` as the
   candidate signal before matching the source patch-id to target history and checking for a later standard
   `git revert` of the matching target commit. Combined squash commits can make the whole-commit patch ID
-  differ, so an exact source-subject mention in target history is also a candidate signal; the helper still
-  requires a path-scoped patch-ID match before skipping the source commit.
+  differ, so an exact source-subject or source-PR mention in target history is also a candidate signal; the
+  helper still requires a path-scoped patch-ID match before skipping the source commit.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
 - Pure `CHANGELOG.md` stamp commits are skipped in code mode. After the code picks finish, run the
