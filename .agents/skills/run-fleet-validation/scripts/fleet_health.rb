@@ -333,8 +333,10 @@ module FleetValidation
       workflow_evidence = workflow["html_url"] || workflow["path"]
       workflow_id = workflow.fetch("id")
       branch = URI.encode_www_form_component(default_branch)
-      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?branch=#{branch}&per_page=20")
-                    .fetch("workflow_runs", [])
+      runs = paginated_collection(
+        "/repos/#{repo}/actions/workflows/#{workflow_id}/runs?branch=#{branch}&per_page=100",
+        "workflow_runs"
+      )
       run = runs.find { |candidate| candidate["head_sha"] == head }
       return evidence_status("unknown", "#{workflow_evidence}; no exact-head public workflow run") unless run
 
@@ -360,7 +362,10 @@ module FleetValidation
     end
 
     def shared_smoke_job_status(repo, run, caller)
-      jobs = @client.get("/repos/#{repo}/actions/runs/#{run.fetch('id')}/jobs?per_page=100").fetch("jobs", [])
+      jobs = paginated_collection(
+        "/repos/#{repo}/actions/runs/#{run.fetch('id')}/jobs?per_page=100",
+        "jobs"
+      )
       expected_name = called_smoke_job_name(caller)
       identity = "caller_job=#{caller.fetch('key')}; caller_name=#{caller.fetch('name')}; expected_job=#{expected_name}"
       smoke_jobs = jobs.select { |job| job["name"] == expected_name }
@@ -429,8 +434,10 @@ module FleetValidation
       end
 
       workflow_id = workflow.fetch("id")
-      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?event=pull_request&per_page=20")
-                    .fetch("workflow_runs", [])
+      runs = paginated_collection(
+        "/repos/#{repo}/actions/workflows/#{workflow_id}/runs?event=pull_request&per_page=100",
+        "workflow_runs"
+      )
       run = runs.find do |candidate|
         Array(candidate["pull_requests"]).any? { |pull_request| pull_request.dig("base", "ref") == default_branch }
       end

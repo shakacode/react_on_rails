@@ -764,7 +764,7 @@ class FleetHealthTest < Minitest::Test
     responses = {
       path => { "workflows" => filler },
       "#{path}&page=2" => { "workflows" => [caller, review] },
-      "/repos/#{repo}/actions/workflows/4100/runs?branch=main&per_page=20" => {
+      "/repos/#{repo}/actions/workflows/4100/runs?branch=main&per_page=100" => {
         "workflow_runs" => [{
           "id" => 4101,
           "head_sha" => head,
@@ -781,7 +781,7 @@ class FleetHealthTest < Minitest::Test
           "html_url" => "https://example.invalid/smoke-job"
         }]
       },
-      "/repos/#{repo}/actions/workflows/4200/runs?event=pull_request&per_page=20" => {
+      "/repos/#{repo}/actions/workflows/4200/runs?event=pull_request&per_page=100" => {
         "workflow_runs" => [valid_review_run]
       }
     }
@@ -820,6 +820,216 @@ class FleetHealthTest < Minitest::Test
     assert_equal 102, workflows.length
     assert_equal "passed", smoke.fetch("status")
     assert_equal "passed", review_app.fetch("status")
+  end
+
+  def test_exact_head_smoke_run_can_appear_after_the_first_page
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/ci.yml",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    runs_path = "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=100"
+    jobs_path = "/repos/#{repo}/actions/runs/4101/jobs?per_page=100"
+    filler_run = {
+      "head_sha" => "b" * 40,
+      "status" => "completed",
+      "conclusion" => "success"
+    }
+    responses = {
+      runs_path => { "workflow_runs" => Array.new(100) { filler_run.dup } },
+      "#{runs_path}&page=2" => {
+        "workflow_runs" => [{
+          "id" => 4101,
+          "head_sha" => head,
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/run"
+        }]
+      },
+      jobs_path => {
+        "jobs" => [{
+          "name" => "Fleet / Demo fleet smoke",
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/job"
+        }]
+      }
+    }
+    client = Struct.new(:responses, :requests) do
+      def get(path)
+        requests << path
+        responses.fetch(path)
+      end
+    end.new(responses, [])
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    caller = { "key" => "fleet", "name" => "Fleet" }
+
+    status = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow, caller)
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes client.requests, "#{runs_path}&page=2"
+  end
+
+  def test_called_reusable_smoke_job_can_appear_after_the_first_page
+    repo = "sanitized/demo"
+    run = { "id" => 4101 }
+    jobs_path = "/repos/#{repo}/actions/runs/4101/jobs?per_page=100"
+    filler_job = {
+      "name" => "Unrelated",
+      "status" => "completed",
+      "conclusion" => "success"
+    }
+    responses = {
+      jobs_path => { "jobs" => Array.new(100) { filler_job.dup } },
+      "#{jobs_path}&page=2" => {
+        "jobs" => [{
+          "name" => "Fleet / Demo fleet smoke",
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/job"
+        }]
+      }
+    }
+    client = Struct.new(:responses, :requests) do
+      def get(path)
+        requests << path
+        responses.fetch(path)
+      end
+    end.new(responses, [])
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+    caller = { "key" => "fleet", "name" => "Fleet" }
+
+    status = probe.send(:shared_smoke_job_status, repo, run, caller)
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes client.requests, "#{jobs_path}&page=2"
+  end
+
+  def test_eligible_review_app_run_can_appear_after_the_first_page
+    repo = "sanitized/demo"
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "state" => "active",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    runs_path = "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=100"
+    filler_run = {
+      "pull_requests" => [{ "base" => { "ref" => "develop" } }]
+    }
+    responses = {
+      runs_path => { "workflow_runs" => Array.new(100) { filler_run.dup } },
+      "#{runs_path}&page=2" => { "workflow_runs" => [valid_review_run] }
+    }
+    client = Struct.new(:responses, :requests) do
+      def get(path)
+        requests << path
+        responses.fetch(path)
+      end
+    end.new(responses, [])
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    status = probe.send(
+      :review_workflow_status,
+      repo,
+      workflow,
+      default_branch: "main",
+      observed_at: "2026-07-18T12:00:00Z"
+    )
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes client.requests, "#{runs_path}&page=2"
+  end
+
+  def test_observe_degrades_malformed_and_full_bound_nested_collections_to_unknown
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    head = "a" * 40
+    smoke_workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/ci.yml",
+      "html_url" => "https://example.invalid/smoke-workflow"
+    }
+    review_workflow = {
+      "id" => 42,
+      "path" => target.fetch("review_app_workflow"),
+      "state" => "active",
+      "html_url" => "https://example.invalid/review-workflow"
+    }
+    checks_path = "/repos/#{repo}/commits/#{head}/check-runs?per_page=100"
+    workflows_path = "/repos/#{repo}/actions/workflows?per_page=100"
+    smoke_runs_path = "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=100"
+    jobs_path = "/repos/#{repo}/actions/runs/4101/jobs?per_page=100"
+    review_runs_path = "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=100"
+    requests = []
+    client = Object.new
+    client.define_singleton_method(:get) do |path|
+      requests << path
+      case path
+      when "/repos/#{repo}"
+        { "visibility" => "public", "default_branch" => "main", "archived" => false }
+      when "/repos/#{repo}/commits/main"
+        { "sha" => head }
+      when checks_path
+        { "check_runs" => [] }
+      when workflows_path
+        { "workflows" => [smoke_workflow, review_workflow] }
+      when "/repos/#{repo}/dependency-graph/sbom"
+        {}
+      when smoke_runs_path
+        {
+          "workflow_runs" => [{
+            "id" => 4101,
+            "head_sha" => head,
+            "status" => "completed",
+            "conclusion" => "success"
+          }]
+        }
+      when jobs_path
+        { "jobs" => {} }
+      else
+        raise "unexpected path #{path}" unless path.start_with?(review_runs_path)
+
+        { "workflow_runs" => Array.new(100) { { "pull_requests" => [] } } }
+      end
+    end
+    dependabot_config = dependabot_v1_config
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "wrong head" unless ref == head
+
+      case path
+      when smoke_workflow.fetch("path")
+        YAML.dump(
+          "jobs" => {
+            "fleet" => {
+              "name" => "Fleet",
+              "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+            }
+          }
+        )
+      when review_workflow.fetch("path")
+        YAML.dump("jobs" => {})
+      when ".github/dependabot.yml"
+        YAML.dump(dependabot_config)
+      else
+        raise "unexpected content path #{path}"
+      end
+    end
+
+    observation = FleetValidation::PublicGitHubProbe.new(client:).observe(
+      target,
+      observed_at: "2026-07-18T12:00:00Z"
+    )
+
+    assert_equal head, observation.fetch("default_commit")
+    assert_equal "unknown", observation.dig("smoke", "status")
+    assert_equal "unknown", observation.dig("review_app", "status")
+    assert_includes observation.dig("smoke", "evidence"), "ManifestError"
+    assert_includes observation.dig("review_app", "evidence"), "ManifestError"
+    assert_equal FleetValidation::PublicGitHubProbe::MAX_PAGES,
+                 (requests.count { |path| path.start_with?(review_runs_path) })
   end
 
   def test_workflow_pagination_rejects_malformed_and_incomplete_pages
@@ -943,7 +1153,7 @@ class FleetHealthTest < Minitest::Test
             }
           ]
         },
-        "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=20" => {
+        "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=100" => {
           "workflow_runs" => [{
             "id" => 4101,
             "head_sha" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -961,7 +1171,7 @@ class FleetHealthTest < Minitest::Test
             "html_url" => "https://example.invalid/smoke-job"
           }]
         },
-        "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=20" => {
+        "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=100" => {
           "workflow_runs" => [valid_review_run]
         }
       },
@@ -1096,10 +1306,10 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new({
-              "/repos/#{target.fetch('name')}/actions/workflows/42/runs?event=pull_request&per_page=20" => {
+              "/repos/#{target.fetch('name')}/actions/workflows/42/runs?event=pull_request&per_page=100" => {
                 "workflow_runs" => [valid_review_run("html_url" => "https://example.invalid/review-run")]
               },
-              "/repos/#{target.fetch('name')}/actions/workflows/43/runs?event=pull_request&per_page=20" => {
+              "/repos/#{target.fetch('name')}/actions/workflows/43/runs?event=pull_request&per_page=100" => {
                 "workflow_runs" => [valid_review_run(
                   "conclusion" => "failure",
                   "html_url" => "https://example.invalid/cleanup-run"
@@ -1240,7 +1450,7 @@ class FleetHealthTest < Minitest::Test
       "html_url" => "https://example.invalid/workflow"
     }
     responses = {
-      "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=20" => {
+      "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=100" => {
         "workflow_runs" => [{
           "id" => 4101,
           "head_sha" => head,
