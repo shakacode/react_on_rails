@@ -121,8 +121,8 @@ jobs:
       NODE_ENV: test
       # Dummy value for RAILS_ENV=test; no real credentials are encrypted or
       # persisted.
-      SECRET_KEY_BASE: >- # gitleaks:allow
-        dummy-secret-key-base-for-shakaperf-rsc-fouc
+      # yamllint disable-line rule:line-length
+      SECRET_KEY_BASE: dummy-secret-key-base-for-shakaperf-rsc-fouc  # gitleaks:allow
       SHAKAPERF_CONTROL_URL: http://127.0.0.1:3000
       SHAKAPERF_EXPERIMENT_URL: http://127.0.0.1:3000
     steps:
