@@ -657,12 +657,37 @@ class ReleaseForwardPort
     return @renamed_target_path_pairs_cache.fetch(cache_key) if @renamed_target_path_pairs_cache.key?(cache_key)
 
     source_paths = paths.to_h { |path| [path, true] }
-    rename_base_refs = [git("merge-base", first_parent, sha).strip, sha].uniq
+    rename_base_refs = [optional_merge_base(first_parent, sha), sha].compact.uniq
 
     @renamed_target_path_pairs_cache[cache_key] =
       rename_base_refs.flat_map do |from_ref|
         renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
       end.uniq
+  end
+
+  def optional_merge_base(left_ref, right_ref)
+    args = ["merge-base", left_ref, right_ref]
+    stdout, stderr, status = capture_git(*args)
+    return stdout.strip if status.success?
+
+    if status.exitstatus == 1 && stdout.empty? && stderr.empty?
+      raise UsageError, shallow_history_message(left_ref, right_ref) if shallow_repository?
+
+      return
+    end
+
+    raise GitError, git_error(args, stdout, stderr, status)
+  end
+
+  def shallow_repository?
+    git("rev-parse", "--is-shallow-repository").strip == "true"
+  end
+
+  def shallow_history_message(left_ref, right_ref)
+    <<~MESSAGE.chomp
+      cannot find a merge base between #{left_ref} and #{right_ref} because repository history is shallow;
+      run `git fetch --unshallow` (or deepen the relevant refs), then rerun the forward-port
+    MESSAGE
   end
 
   def renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)

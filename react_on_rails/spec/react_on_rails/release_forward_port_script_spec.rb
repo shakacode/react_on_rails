@@ -143,6 +143,45 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "dry-runs release and target branches with unrelated root histories" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "--orphan", "release/1.0.1")
+      commit_all(repo, "Seed rewritten release history")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      fix_sha = commit_all(repo, "Fix release regression after history rewrite")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stderr).to eq("")
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression after history rewrite")
+      expect(stdout).to include("DRY RUN")
+    end
+  end
+
+  it "fails closed when shallow history prevents finding a merge base" do
+    with_release_repo do |repo|
+      main_sha = git(repo, "rev-parse", "main").strip
+      git(repo, "checkout", "--orphan", "release/1.0.1")
+      release_root_sha = commit_all(repo, "Seed shallow release history")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      commit_all(repo, "Fix release regression after shallow boundary")
+      git(repo, "checkout", "main")
+
+      git_dir = git(repo, "rev-parse", "--git-dir").strip
+      shallow_boundaries = [main_sha, release_root_sha].sort.join("\n")
+      File.write(File.join(repo, git_dir, "shallow"), "#{shallow_boundaries}\n")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).not_to be_success
+      expect(stderr).to include("repository history is shallow")
+      expect(stderr).to include("git fetch --unshallow")
+    end
+  end
+
   it "skips bare rc version bump subjects before version-drift checks" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
