@@ -1409,6 +1409,39 @@ class FleetHealthTest < Minitest::Test
     assert_equal "unknown", stale.fetch("status")
   end
 
+  def test_review_app_skips_a_newer_invalid_run_for_an_older_valid_run
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    newer_invalid = valid_review_run(
+      "head_sha" => "b" * 40,
+      "html_url" => "https://example.invalid/newer-invalid",
+      "run_started_at" => "2026-07-18T11:00:00Z",
+      "updated_at" => "2026-07-18T11:05:00Z"
+    )
+    older_valid = valid_review_run(
+      "html_url" => "https://example.invalid/older-valid",
+      "run_started_at" => "2026-07-18T10:00:00Z",
+      "updated_at" => "2026-07-18T10:05:00Z"
+    )
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end.new([newer_invalid, older_valid])
+
+    status = review_app_status(public_github_probe(client:), repo, target, workflow)
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes status.fetch("evidence"), "older-valid"
+    refute_includes status.fetch("evidence"), "newer-invalid"
+  end
+
   def test_review_app_recency_uses_the_manifest_staleness_limit
     manifest = Marshal.load(Marshal.dump(@manifest))
     manifest.fetch("standing_health")["max_default_age_days"] = 1

@@ -438,10 +438,27 @@ module FleetValidation
         "/repos/#{repo}/actions/workflows/#{workflow_id}/runs?event=pull_request&per_page=100",
         "workflow_runs"
       )
-      run = runs.find do |candidate|
-        Array(candidate["pull_requests"]).any? { |pull_request| pull_request.dig("base", "ref") == default_branch }
+      run = nil
+      rejections = []
+      runs.each_with_index do |candidate, index|
+        identity_error = review_run_identity_error(candidate, default_branch:, observed_at:)
+        if identity_error
+          rejections << "run[#{index}]: #{identity_error}"
+          next
+        end
+
+        run = candidate
+        break
       end
-      return evidence_status("unknown", "#{workflow_evidence}; no public workflow run targeting #{default_branch}") unless run
+      unless run
+        evidence = if rejections.empty?
+                     "#{workflow_evidence}; no public workflow run targeting #{default_branch}"
+                   else
+                     "#{workflow_evidence}; no identity-valid public workflow run targeting #{default_branch}; " \
+                       "rejected candidates: #{rejections.join(', ')}"
+                   end
+        return evidence_status("unknown", evidence)
+      end
 
       evidence = [
         workflow_evidence,
@@ -452,8 +469,6 @@ module FleetValidation
         ("run_started_at=#{run['run_started_at']}" if run["run_started_at"]),
         ("updated_at=#{run['updated_at']}" if run["updated_at"])
       ].compact.join("; ")
-      identity_error = review_run_identity_error(run, default_branch:, observed_at:)
-      return evidence_status("unknown", "#{evidence}; #{identity_error}") if identity_error
       return evidence_status("unknown", evidence) unless run["status"] == "completed"
 
       status = run["conclusion"] == "success" ? "passed" : "blocked"
