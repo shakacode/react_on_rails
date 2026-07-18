@@ -21,7 +21,7 @@ module FleetValidation
       File.write(File.join(output_dir, "PREFLIGHT.md"), render_preflight)
       File.write(File.join(output_dir, "REPORT-ONLY.md"), render_report_only)
       File.write(File.join(output_dir, "CLOSEOUT.md"), render_closeout)
-      File.write(File.join(output_dir, "result-ledger.json"), "#{JSON.pretty_generate(ledger_template)}\n")
+      write_ledger(File.join(output_dir, "result-ledger.json"))
       File.write(File.join(output_dir, "result-ledger.schema.json"), "#{JSON.pretty_generate(schema)}\n")
     end
 
@@ -71,6 +71,14 @@ module FleetValidation
               "reviewed" => nil,
               "current" => nil,
               "reconciliation" => "pending"
+            },
+            "reachability" => {
+              "default_branch" => "pending",
+              "default_commit" => nil,
+              "default_evidence" => nil,
+              "tree_parity" => "pending",
+              "tree" => nil,
+              "tree_evidence" => nil
             },
             "evidence" => nil
           )
@@ -130,7 +138,10 @@ module FleetValidation
               "candidate" => nullable_string,
               "candidate_commit" => nullable_string,
               "policy_commit" => nullable_string,
-              "tracker_mode" => nullable_string
+              "tracker_mode" => {
+                "type" => %w[string null],
+                "enum" => [nil, "development", "accelerated-rc", "strict-rc", "final-release"]
+              }
             }
           ),
           "preflight" => preflight_schema,
@@ -159,6 +170,17 @@ module FleetValidation
     end
 
     private
+
+    def write_ledger(path)
+      if File.exist?(path)
+        existing = JSON.parse(File.read(path))
+        return if existing.dig("pack", "pack_id") == @pack_id
+      end
+
+      File.write(path, "#{JSON.pretty_generate(ledger_template)}\n")
+    rescue JSON::ParserError => e
+      raise ManifestError, "existing result ledger is invalid JSON: #{e.message}"
+    end
 
     def build_inventory
       @manifest.fetch("repos").map do |repo|
@@ -210,7 +232,7 @@ module FleetValidation
     def inventory_item_schema
       object_schema(
         %w[
-          id tier work_mode work_state result waiver blocker_id package_locks checks review_app baseline bases evidence
+          id tier work_mode work_state result waiver blocker_id package_locks checks review_app baseline bases reachability evidence
         ],
         {
           "id" => nonempty_string,
@@ -264,6 +286,17 @@ module FleetValidation
               "reviewed" => nullable_string,
               "current" => nullable_string,
               "reconciliation" => status_string
+            }
+          ),
+          "reachability" => object_schema(
+            %w[default_branch default_commit default_evidence tree_parity tree tree_evidence],
+            {
+              "default_branch" => status_string,
+              "default_commit" => nullable_string,
+              "default_evidence" => nullable_string,
+              "tree_parity" => status_string,
+              "tree" => nullable_string,
+              "tree_evidence" => nullable_string
             }
           ),
           "evidence" => nullable_string
@@ -545,6 +578,7 @@ module FleetValidation
         result << "capability restart_handoff is missing"
       end
       result.concat(reachability_errors) if @closeout
+      result.concat(tracker_errors) if @closeout
       result << merge_authority_error if @closeout && merge_authority_error
       result << promotion_error if @closeout && promotion_error
       if @closeout && @ledger.dig("merge", "status") == "merged" &&
@@ -685,9 +719,15 @@ module FleetValidation
 
     def pack_identity_errors
       pack = @ledger.fetch("pack", {})
-      %w[candidate candidate_commit policy_commit tracker_mode].filter_map do |field|
+      errors = %w[candidate candidate_commit policy_commit tracker_mode].filter_map do |field|
         "pack #{field} is missing" unless present?(pack[field])
       end
+      %w[candidate_commit policy_commit].each do |field|
+        errors << "pack #{field} is not an exact commit identity" unless commit_identity?(pack[field])
+      end
+      allowed_modes = %w[development accelerated-rc strict-rc final-release]
+      errors << "pack tracker_mode is not allowed" unless allowed_modes.include?(pack["tracker_mode"])
+      errors
     end
 
     def inventory_completion_error
@@ -806,9 +846,33 @@ module FleetValidation
 
     def reachability_errors
       reachability = @ledger.fetch("reachability", {})
-      %w[default_branch tree_parity].filter_map do |field|
+      errors = %w[default_branch tree_parity].filter_map do |field|
         "reachability #{field} is not passed" unless reachability[field] == "passed"
       end
+      Array(@ledger["inventory"]).each do |item|
+        next unless item["tier"] == "hard_gate"
+
+        target = item.fetch("reachability", {})
+        unless target["default_branch"] == "passed" && commit_identity?(target["default_commit"]) &&
+               present?(target["default_evidence"])
+          errors << "target #{item['id']} default-branch reachability evidence is incomplete"
+        end
+        unless target["tree_parity"] == "passed" && commit_identity?(target["tree"]) &&
+               present?(target["tree_evidence"])
+          errors << "target #{item['id']} tree-parity evidence is incomplete"
+        end
+      end
+      errors
+    end
+
+    def tracker_errors
+      tracker = @ledger.fetch("tracker", {})
+      errors = []
+      errors << "tracker closeout status is not ready or posted" unless %w[ready posted].include?(tracker["status"])
+      if tracker["status"] == "posted" && !present?(tracker["comment_url"])
+        errors << "posted tracker closeout is missing comment_url"
+      end
+      errors
     end
 
     def merge_authority_error
@@ -844,6 +908,10 @@ module FleetValidation
 
     def present?(value)
       !value.nil? && !value.to_s.empty?
+    end
+
+    def commit_identity?(value)
+      value.to_s.match?(/\A[0-9a-f]{7,40}\z/i)
     end
 
     def app_work_allowed?
@@ -1026,7 +1094,13 @@ module FleetValidation
       return "BLOCKED" if blocked
 
       partial = inventory.any? do |item|
-        item["result"] == "waived" || (item["tier"] == "soft_track" && item["result"] == "blocked")
+        target_waived = item["result"] == "waived"
+        check_waived = item.fetch("checks", {}).values.any? { |check| check["status"] == "waived" }
+        target_waived || check_waived || (item["tier"] == "soft_track" && item["result"] == "blocked")
+      end
+      partial ||= @ledger.dig("preflight", "status") == "waived"
+      partial ||= %w[release_ci artifacts generator_matrix].any? do |gate|
+        @ledger.dig("preflight", gate, "status") == "waived"
       end
       partial ||= paths.any? { |path| path["status"] == "waived" }
       partial ||= blockers.any? { |blocker| %w[waived deferred].include?(blocker["status"]) }

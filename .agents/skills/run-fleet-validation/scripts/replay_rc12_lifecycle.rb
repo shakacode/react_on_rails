@@ -71,8 +71,8 @@ module FleetValidation
       ledger = generator.ledger_template
       ledger.fetch("pack").merge!(
         "candidate" => CANDIDATE,
-        "candidate_commit" => "sanitized-candidate-commit",
-        "policy_commit" => "sanitized-policy-commit",
+        "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "tracker_mode" => "strict-rc"
       )
       ledger.fetch("preflight")["status"] = "passed"
@@ -138,6 +138,14 @@ module FleetValidation
           "reviewed" => "sanitized-base",
           "current" => "sanitized-base",
           "reconciliation" => "passed"
+        )
+        item.fetch("reachability").merge!(
+          "default_branch" => "passed",
+          "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+          "default_evidence" => "public-safe evidence",
+          "tree_parity" => "passed",
+          "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+          "tree_evidence" => "public-safe evidence"
         )
       end
     end

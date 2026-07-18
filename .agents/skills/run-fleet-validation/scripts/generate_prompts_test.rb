@@ -26,8 +26,8 @@ class FleetValidationGeneratorTest < Minitest::Test
     ledger = generator.ledger_template
     ledger.fetch("pack").merge!(
       "candidate" => "v17.0.0.rc.12",
-      "candidate_commit" => "candidate-commit",
-      "policy_commit" => "policy-commit",
+      "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "tracker_mode" => "strict-rc"
     )
     ledger.fetch("preflight")["status"] = "passed"
@@ -60,6 +60,14 @@ class FleetValidationGeneratorTest < Minitest::Test
         "reviewed" => "base-commit",
         "current" => "base-commit",
         "reconciliation" => "passed"
+      )
+      item.fetch("reachability").merge!(
+        "default_branch" => "passed",
+        "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+        "default_evidence" => "public-safe evidence",
+        "tree_parity" => "passed",
+        "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+        "tree_evidence" => "public-safe evidence"
       )
     end
     ledger.fetch("required_paths").each do |path|
@@ -568,6 +576,27 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "pack policy_commit is missing"
   end
 
+  def test_closeout_rejects_unknown_snapshot_identities_and_tracker_modes
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").merge!(
+      "candidate_commit" => "unknown",
+      "policy_commit" => "pending",
+      "tracker_mode" => "unknown"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack candidate_commit is not an exact commit identity"
+    assert_includes errors, "pack policy_commit is not an exact commit identity"
+    assert_includes errors, "pack tracker_mode is not allowed"
+  end
+
   def test_closeout_rejects_unknown_default_reachability_or_tree_parity
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -663,6 +692,34 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes FleetValidation::TrackerRenderer.new(partial).render, "Verdict: PARTIAL"
     assert_includes FleetValidation::TrackerRenderer.new(blocked).render, "Verdict: BLOCKED"
+  end
+
+  def test_check_and_preflight_waivers_render_partial
+    generator = build_generator
+    check_waiver = complete_ledger(generator)
+    target = check_waiver.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    check = target.fetch("checks").fetch("hosted_ci")
+    check["status"] = "waived"
+    check["waiver"] = {
+      "gate" => "#{target['id']}:hosted_ci",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "sanitized"
+    }
+    preflight_waiver = complete_ledger(generator)
+    preflight_waiver.fetch("preflight").merge!(
+      "status" => "waived",
+      "waiver" => {
+        "gate" => "release_ci",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "sanitized"
+      }
+    )
+    preflight_waiver.fetch("preflight").fetch("release_ci")["status"] = "waived"
+
+    assert_includes FleetValidation::TrackerRenderer.new(check_waiver).render, "Verdict: PARTIAL"
+    assert_includes FleetValidation::TrackerRenderer.new(preflight_waiver).render, "Verdict: PARTIAL"
   end
 
   def test_promotion_recommendation_is_rejected_while_a_blocker_remains_active
@@ -782,6 +839,30 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_closeout_requires_terminal_tracker_state_and_posted_comment_identity
+    generator = build_generator
+    pending = complete_ledger(generator)
+    pending.fetch("tracker").merge!("status" => "pending", "comment_url" => nil)
+    posted = complete_ledger(generator)
+    posted.fetch("tracker").merge!("status" => "posted", "comment_url" => nil)
+
+    pending_errors = FleetValidation::LedgerValidator.new(
+      pending,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+    posted_errors = FleetValidation::LedgerValidator.new(
+      posted,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes pending_errors, "tracker closeout status is not ready or posted"
+    assert_includes posted_errors, "posted tracker closeout is missing comment_url"
+  end
+
   def test_result_ledger_schema_closes_public_blocker_and_review_app_shapes
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
@@ -869,6 +950,23 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 inventory target(s) are unknown or nonterminal"
+  end
+
+  def test_closeout_requires_per_target_reachability_and_tree_parity_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("reachability").merge!("default_evidence" => nil, "tree_evidence" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
+    assert(errors.any? { |error| error.include?("tree-parity evidence is incomplete") })
   end
 
   def test_closeout_requires_terminal_install_build_test_smoke_ci_and_review_evidence
@@ -980,6 +1078,21 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_equal 4, lane_files.length
       assert_empty Dir.glob(File.join(directory, "m1", "*-fleet-lane.md"))
       assert(lane_files.all? { |path| File.read(path).include?("replacement-pack") })
+    end
+  end
+
+  def test_regenerating_the_same_pack_preserves_its_existing_result_ledger
+    Dir.mktmpdir do |directory|
+      generator = build_generator
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      generator.write_pack(directory)
+
+      assert_equal "v17.0.0.rc.12", JSON.parse(File.read(ledger_path)).dig("pack", "candidate")
     end
   end
 
