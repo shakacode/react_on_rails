@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "find"
-require "open3"
 require "optparse"
 require "pathname"
 require "yaml"
@@ -172,7 +171,7 @@ module AgentWorkflowDriftManifest
   end
 
   def git_capture(root, *arguments)
-    Open3.capture3(
+    PrBatchGitProbeEnv.capture3(
       PrBatchGitProbeEnv.probe_env,
       "git",
       "--no-replace-objects",
@@ -180,7 +179,7 @@ module AgentWorkflowDriftManifest
       root,
       *arguments
     )
-  rescue SystemCallError => e
+  rescue SystemCallError, PrBatchGitProbeEnv::TimeoutError => e
     ["", e.message, Struct.new(:success?).new(false)]
   end
 

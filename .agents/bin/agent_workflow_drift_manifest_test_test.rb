@@ -120,6 +120,27 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     refute_includes output, "\n  - FAKE_OK"
   end
 
+  def test_pinned_git_timeout_fails_closed_with_a_sanitized_diagnostic
+    revision = "a" * 40
+    errors = []
+    timeout_message = "Git probe timed out after 10 seconds\n  - FAKE_OK"
+    timed_out_capture = lambda do |*_arguments, **_options|
+      raise PrBatchGitProbeEnv::TimeoutError, timeout_message
+    end
+
+    source_files = with_stubbed_git_capture(timed_out_capture) do
+      AgentWorkflowDriftManifest.pinned_source_files("/tmp/pinned-source", revision, errors)
+    end
+
+    assert_empty source_files
+    assert_equal ["cannot enumerate pinned source tree #{revision}: #{timeout_message}"], errors
+
+    output = StringIO.new
+    AgentWorkflowDriftManifest.render_errors(output, errors)
+    assert_includes output.string, "timed out after 10 seconds\\n  - FAKE_OK"
+    refute_includes output.string, "\n  - FAKE_OK"
+  end
+
   def test_every_explicit_exclusion_has_a_reviewed_reason
     refute_empty AgentWorkflowDriftManifest::EXCLUSIONS
     AgentWorkflowDriftManifest::EXCLUSIONS.each_value { |reason| refute_empty reason.strip }
@@ -131,6 +152,14 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     output = StringIO.new
     AgentWorkflowDriftManifest.render_errors(output, [diagnostic])
     output.string
+  end
+
+  def with_stubbed_git_capture(replacement)
+    original = PrBatchGitProbeEnv.method(:capture3)
+    PrBatchGitProbeEnv.define_singleton_method(:capture3, replacement)
+    yield
+  ensure
+    PrBatchGitProbeEnv.define_singleton_method(:capture3, original)
   end
 
   def baseline_source_files
