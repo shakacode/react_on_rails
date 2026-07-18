@@ -1613,6 +1613,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--manifest", MANIFEST,
         "--ledger", ledger_path,
         "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
         "--render-tracker", tracker_path
       )
@@ -1638,6 +1639,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         ledger_path,
         "--expected-pack-id",
         "fleet-test-pack",
+        "--expected-release-selector",
+        "latest RC or beta",
         "--expected-candidate",
         "v17.0.0.rc.12"
       )
@@ -1672,6 +1675,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         VALIDATOR,
         "--manifest", MANIFEST,
         "--ledger", ledger_path,
+        "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12"
       )
       _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
@@ -1680,6 +1684,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--manifest", MANIFEST,
         "--ledger", ledger_path,
         "--expected-pack-id", "another-pack",
+        "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12"
       )
 
@@ -1687,6 +1692,45 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes missing_stderr, "missing argument: --expected-pack-id"
       refute mismatch_status.success?
       assert_includes mismatch_stderr, "pack ID mismatch: expected another-pack, got fleet-test-pack"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_release_selector
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      ledger.fetch("pack")["release_selector"] = "v17.0.0.rc.12"
+      pinned = build_generator(release_selector: "v17.0.0.rc.12")
+      ledger.fetch("pack")["snapshot_fingerprint"] = pinned.snapshot_fingerprint
+      ledger.fetch("preflight").fetch("public_marker")["snapshot_fingerprint"] = pinned.snapshot_fingerprint
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-release-selector"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr, "pack snapshot_fingerprint does not match the current manifest"
     end
   end
 
@@ -2095,7 +2139,14 @@ class FleetValidationGeneratorTest < Minitest::Test
         "merge_commit" => nil,
         "evidence" => "release blocked before merge"
       )
-      item.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
     end
     ledger.fetch("merge")["status"] = "blocked"
     ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
@@ -2159,6 +2210,68 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "target #{target.fetch('id')} not-applicable merge retains mutation state"
+  end
+
+  def test_closeout_requires_terminal_state_for_blocked_and_non_mutation_merges
+    generator = build_generator
+    blocked = complete_ledger(generator)
+    blocked_target = blocked.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    blocked_target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    blocked_target.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    blocked_target.fetch("merge").merge!(
+      "status" => "blocked",
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "freeze_state" => "unknown",
+      "merge_commit" => nil,
+      "evidence" => "release blocked before merge"
+    )
+    blocked_target.fetch("reachability").merge!(
+      "default_branch" => "unknown",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "unknown",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+    blocked["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/owned" },
+        "disposition" => nil
+      }
+    ]
+    blocked.fetch("merge")["status"] = "partial"
+    blocked.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    blocked.fetch("tracker")["promotion"] = "blocked"
+
+    blocked_errors = FleetValidation::LedgerValidator.new(
+      blocked,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes blocked_errors, "target #{blocked_target.fetch('id')} blocked merge freeze state is unresolved"
+    assert_includes blocked_errors, "target #{blocked_target.fetch('id')} blocked merge retains unresolved reachability"
+
+    non_mutation = complete_ledger(generator)
+    non_mutation_target = non_mutation.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    non_mutation_target.fetch("merge")["freeze_state"] = "unknown"
+
+    non_mutation_errors = FleetValidation::LedgerValidator.new(
+      non_mutation,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes non_mutation_errors,
+                    "target #{non_mutation_target.fetch('id')} not-applicable merge disposition is incomplete"
   end
 
   def test_non_mutation_target_cannot_retain_post_merge_reachability
@@ -2942,7 +3055,10 @@ class FleetValidationGeneratorTest < Minitest::Test
       end
 
       index = manifest.fetch("repos").index(soft_track)
-      assert_equal "repos[#{index}].packages[0] must name an ecosystem and package", error.message
+      assert_equal(
+        "repos[#{index}].packages[0] must name an ecosystem and nonblank string package",
+        error.message
+      )
     end
   end
 
@@ -3014,6 +3130,24 @@ class FleetValidationGeneratorTest < Minitest::Test
         end
 
         assert_equal "lifecycle.required_paths must contain mappings with string IDs and evidence sources", error.message
+      end
+    end
+  end
+
+  def test_rejects_non_string_or_blank_manifest_package_names
+    [123, "   "].each do |invalid_name|
+      Dir.mktmpdir do |directory|
+        manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+        manifest.fetch("repos").find { |repo| repo["tier"] == "soft_track" }
+                .fetch("packages").first["name"] = invalid_name
+        manifest_path = File.join(directory, "fleet.yml")
+        File.write(manifest_path, YAML.dump(manifest))
+
+        error = assert_raises(FleetValidation::ManifestError) do
+          build_generator(manifest_path:)
+        end
+
+        assert_match(/must name an ecosystem and nonblank string package/, error.message)
       end
     end
   end

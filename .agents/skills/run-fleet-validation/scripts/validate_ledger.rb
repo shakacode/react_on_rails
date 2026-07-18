@@ -15,6 +15,7 @@ module FleetValidation
         manifest_path: "internal/contributor-info/demo-fleet.yml",
         ledger_path: nil,
         expected_pack_id: nil,
+        expected_release_selector: nil,
         expected_candidate: nil,
         tracker_path: nil
       }
@@ -23,14 +24,14 @@ module FleetValidation
       raise OptionParser::MissingArgument, "--ledger" unless options[:ledger_path]
       raise OptionParser::MissingArgument, "--expected-candidate" unless options[:expected_candidate]
       raise OptionParser::MissingArgument, "--expected-pack-id" unless options[:expected_pack_id]
+      raise OptionParser::MissingArgument, "--expected-release-selector" unless options[:expected_release_selector]
 
       manifest = YAML.safe_load_file(options.fetch(:manifest_path), aliases: false)
       ledger = JSON.parse(File.read(options.fetch(:ledger_path)))
-      pack = ledger.is_a?(Hash) && ledger["pack"].is_a?(Hash) ? ledger["pack"] : {}
       lifecycle = Lifecycle.new(
         manifest:,
         pack_id: options.fetch(:expected_pack_id),
-        release_selector: pack["release_selector"].to_s
+        release_selector: options.fetch(:expected_release_selector)
       )
       errors = SchemaValidator.new(lifecycle.schema).errors(ledger)
       unless errors.empty?
@@ -71,6 +72,9 @@ module FleetValidation
         parser.on("--ledger PATH", "Result ledger JSON path") { |value| options[:ledger_path] = value }
         parser.on("--expected-pack-id ID", "Require this exact generated pack ID") do |value|
           options[:expected_pack_id] = value
+        end
+        parser.on("--expected-release-selector SELECTOR", "Require this exact generated release selector") do |value|
+          options[:expected_release_selector] = value
         end
         parser.on("--expected-candidate TAG", "Require this exact candidate") do |value|
           options[:expected_candidate] = value

@@ -118,11 +118,14 @@ that same file:
 ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
   --expected-pack-id PACK_ID \
+  --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
   --expected-candidate vX.Y.Z.rc.N \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
-The validator fails closed on stale pack IDs or candidates, missing/duplicate/mismatched public
+The expected pack ID and generated release selector come from the checker-held launch record, not
+from the ledger under review. The validator fails closed on stale pack IDs, selectors, or candidates,
+missing/duplicate/mismatched public
 preflight markers, product package versions that do not normalize to
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
 review-app state, candidate-managed hard-gate package versions that differ from the resolved release

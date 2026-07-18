@@ -188,8 +188,10 @@ module FleetValidation
       end
 
       packages.each_with_index do |package, package_index|
-        unless package.is_a?(Hash) && package["ecosystem"].to_s != "" && package["name"].to_s != ""
-          raise ManifestError, "repos[#{index}].packages[#{package_index}] must name an ecosystem and package"
+        unless package.is_a?(Hash) && package["ecosystem"].to_s != "" &&
+               package["name"].is_a?(String) && !package["name"].strip.empty?
+          raise ManifestError,
+                "repos[#{index}].packages[#{package_index}] must name an ecosystem and nonblank string package"
         end
         unless %w[gem npm].include?(package["ecosystem"])
           raise ManifestError, "repos[#{index}].packages[#{package_index}] ecosystem must be gem or npm"

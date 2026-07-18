@@ -759,7 +759,11 @@ module FleetValidation
         versioned dependency locks retain the versions observed in their target. The aggregate
         merge/reachability state is derived from the per-target rows. If
         any lane has already merged, its base, authority/freeze, merge-commit, reachability, and
-        tree-parity proofs remain required even when another lane blocks overall promotion.
+        tree-parity proofs remain required even when another lane blocks overall promotion. An
+        unmerged blocked lane retains pristine pending reachability with no stale proof fields, while
+        a non-mutation lane records an evidenced, freeze-clear `not_applicable` merge disposition.
+        Supply both the expected pack ID and generated release selector from the independent launch
+        record when validating; never derive the expected snapshot identity from the ledger itself.
       MARKDOWN
     end
 
@@ -1690,6 +1694,9 @@ module FleetValidation
              present?(merge["merge_commit"])
             errors << "target #{item['id']} not-applicable merge retains mutation state"
           end
+          unless merge["freeze_state"] == "clear" && present?(merge["evidence"])
+            errors << "target #{item['id']} not-applicable merge disposition is incomplete"
+          end
           unless pristine_reachability?(item.fetch("reachability", {}))
             errors << "target #{item['id']} non-mutation target retains reachability state"
           end
@@ -1712,12 +1719,21 @@ module FleetValidation
           errors << "target #{item['id']} merge evidence is missing" unless present?(merge["evidence"])
         elsif merge["status"] == "blocked"
           errors << "target #{item['id']} blocked merge disposition has no evidence" unless present?(merge["evidence"])
+          if merge["authority"] != "none" || present?(merge["authority_evidence"])
+            errors << "target #{item['id']} blocked merge retains mutation authority"
+          end
+          unless merge["freeze_state"] == "clear"
+            errors << "target #{item['id']} blocked merge freeze state is unresolved"
+          end
           if present?(merge["merge_commit"])
             errors << "target #{item['id']} blocked merge retains a merge commit"
           end
           reachability = item.fetch("reachability", {})
           if reachability["default_branch"] == "passed" || reachability["tree_parity"] == "passed"
             errors << "target #{item['id']} blocked merge retains successful reachability"
+          end
+          unless pristine_reachability?(reachability)
+            errors << "target #{item['id']} blocked merge retains unresolved reachability"
           end
         end
         if !release_blocked? && merge["status"] != "merged"
