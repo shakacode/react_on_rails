@@ -311,7 +311,7 @@ ReactOnRails.configure do |config|
   #
   # The helper parameter (`immediate_hydration:` key in `react_component`, `react_component_hash`,
   # `redux_store`, and the streaming helpers) was removed later in v16.6.0. Passing it now logs a
-  # one-time deprecation warning and is ignored.
+  # one-time warning and is ignored.
   #
   # The `data-immediate-hydration` HTML attribute is no longer rendered on component
   # elements as of v16.6.0. Remove any CSS/JS selectors or test assertions that target it.

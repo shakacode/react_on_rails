@@ -14,13 +14,13 @@ The `config.immediate_hydration` setting was removed in v16.2.0. Assigning it in
 
 **Helper parameter:** ⚠️ REMOVED in v16.6.0 — logs a one-time warning, then ignored
 
-The `immediate_hydration:` key passed to `react_component`, `react_component_hash`, `redux_store`, `stream_react_component`, or `buffered_stream_react_component` was removed in v16.6.0. Passing it now logs a one-time deprecation warning (once per helper per process) and the value is dropped. Delete the key from all helper calls.
+The `immediate_hydration:` key passed to `react_component`, `react_component_hash`, `redux_store`, `stream_react_component`, or `buffered_stream_react_component` was removed in v16.6.0. Passing it now logs a one-time warning (once per helper per process) and the value is dropped. Delete the key from all helper calls.
 
 **Rendered HTML attribute:** ⚠️ REMOVED in v16.6.0
 
 The `data-immediate-hydration` attribute that was previously emitted on hydrated/streamed component elements is no longer rendered. If you have CSS/JS selectors (e.g. `[data-immediate-hydration]`) or test assertions targeting it, remove them.
 
-**Behavior:** React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro users are not affected.
+**Behavior:** React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro apps are still affected by the removals above (the config raises and the helper parameter is ignored), but their hydration behavior is otherwise unchanged — immediate hydration is disabled for non-Pro and was never a per-component option.
 
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 
