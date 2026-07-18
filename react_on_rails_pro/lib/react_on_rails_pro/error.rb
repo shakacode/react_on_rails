@@ -24,4 +24,9 @@ module ReactOnRailsPro
             "This is unexpected behavior."
     end
   end
+
+  # Distinguishes a missing renderer bundle from other artifact-construction
+  # failures so cache-key callers can preserve the established missing-RSC
+  # fallback without swallowing unrelated configuration or companion errors.
+  class MissingRendererBundleError < Error; end
 end

@@ -29,6 +29,18 @@ RequestDetails = Struct.new(:original_url, :env)
 module StreamingTestHelpers
   def render_to_string(*args); end
   def response; end
+
+  def test_server_artifact_id
+    "rorp-v2-s-#{'a' * 64}"
+  end
+
+  def test_rsc_artifact_id
+    "rorp-v2-r-#{'b' * 64}"
+  end
+
+  def test_server_render_url_pattern
+    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[a-f0-9]{32}\z}
+  end
 end
 
 describe ReactOnRailsProHelper do
@@ -819,8 +831,7 @@ describe ReactOnRailsProHelper do
       stub_pro_bundle_hashes
 
       chunks_read.clear
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count:) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count:) do |yielder|
         if mock_chunks.is_a?(Async::Queue)
           loop do
             chunk = mock_chunks.dequeue
@@ -840,8 +851,8 @@ describe ReactOnRailsProHelper do
 
     def stub_pro_bundle_hashes
       allow(ReactOnRailsPro::Utils).to receive_messages(
-        bundle_hash: "#{'a' * 32}-test",
-        rsc_bundle_hash: "#{'b' * 32}-test"
+        bundle_hash: test_server_artifact_id,
+        rsc_bundle_hash: test_rsc_artifact_id
       )
     end
 
@@ -2983,12 +2994,13 @@ describe ReactOnRailsProHelper do
       mocked_response = instance_double(ActionDispatch::Response)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive_messages(server_bundle_hash: test_server_artifact_id, rsc_bundle_hash: test_rsc_artifact_id)
 
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: 1) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count: 1) do |yielder|
         chunks.each do |chunk|
           yielder.call(to_length_prefixed(chunk))
         end

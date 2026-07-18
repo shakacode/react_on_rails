@@ -18,6 +18,38 @@ require_relative "../spec_helper"
 module ReactOnRailsPro
   module ServerRenderingPool # rubocop:disable Metrics/ModuleLength
     RSpec.describe NodeRenderingPool do
+      describe "artifact IDs" do
+        before do
+          described_class.instance_variable_set(:@server_bundle_hash, nil)
+          described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+        end
+
+        after do
+          described_class.instance_variable_set(:@server_bundle_hash, nil)
+          described_class.instance_variable_set(:@rsc_bundle_hash, nil)
+        end
+
+        it "refreshes server and RSC IDs in development mode" do
+          allow(ReactOnRails.configuration).to receive(:development_mode).and_return(true)
+          allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
+
+          expect([described_class.server_bundle_hash, described_class.server_bundle_hash])
+            .to eq(%w[server-one server-two])
+          expect([described_class.rsc_bundle_hash, described_class.rsc_bundle_hash]).to eq(%w[rsc-one rsc-two])
+        end
+
+        it "memoizes server and RSC IDs when development mode is disabled" do
+          allow(ReactOnRails.configuration).to receive(:development_mode).and_return(false)
+          allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("server-one", "server-two")
+          allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_hash).and_return("rsc-one", "rsc-two")
+
+          expect([described_class.server_bundle_hash, described_class.server_bundle_hash])
+            .to eq(%w[server-one server-one])
+          expect([described_class.rsc_bundle_hash, described_class.rsc_bundle_hash]).to eq(%w[rsc-one rsc-one])
+        end
+      end
+
       describe ".eval_js" do
         let(:render_options) { instance_double(ReactOnRails::ReactComponent::RenderOptions) }
         let(:render_path) { "/bundles/123/render/abc" }
@@ -29,8 +61,9 @@ module ReactOnRailsPro
 
         before do
           allow(described_class).to receive(:prepare_render_path).and_return(render_path)
+          allow(render_options).to receive(:rsc_payload_streaming?).and_return(false)
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, "console.log('x')", false)
+            .with(render_path, "console.log('x')", false, bundle_role: :server)
             .and_return(response)
           allow(ReactOnRailsPro.configuration).to receive(:renderer_use_fallback_exec_js).and_return(false)
         end
@@ -42,6 +75,42 @@ module ReactOnRailsPro
             ReactOnRailsPro::Error,
             /Renderer rejected malformed request or hit an unhandled VM error: 400:\n#{Regexp.escape(response_body)}/
           )
+        end
+
+        it "reuses the operation artifact snapshot when retrying a normal render after 410" do
+          server_artifact = instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :server,
+            id: "server-id-before-drift"
+          )
+          rsc_artifact = instance_double(
+            ReactOnRailsPro::RendererArtifact,
+            role: :rsc,
+            id: "rsc-id-before-companion-drift"
+          )
+          artifacts = [server_artifact, rsc_artifact]
+          send_bundle_response = instance_double(
+            ReactOnRailsPro::RendererHttpClient::Response,
+            status: ReactOnRailsPro::STATUS_SEND_BUNDLE,
+            body: "Bundle not found"
+          )
+          success_response = instance_double(
+            ReactOnRailsPro::RendererHttpClient::Response,
+            status: 200,
+            body: "rendered"
+          )
+          allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+          allow(render_options).to receive(:internal_option)
+            .with(:renderer_artifact_snapshot)
+            .and_return(artifacts)
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, "console.log('x')", false, bundle_role: :server, artifacts:)
+            .and_return(send_bundle_response)
+          allow(ReactOnRailsPro::Request).to receive(:render_code)
+            .with(render_path, "console.log('x')", true, bundle_role: :server, artifacts:)
+            .and_return(success_response)
+
+          expect(described_class.eval_js("console.log('x')", render_options)).to eq("rendered")
         end
       end
 
@@ -58,6 +127,7 @@ module ReactOnRailsPro
 
         before do
           allow(render_options).to receive(:set_option)
+          allow(render_options).to receive(:rsc_payload_streaming?).and_return(false)
           allow(described_class).to receive(:prepare_render_path).and_return(render_path)
           allow(ReactOnRailsPro.configuration).to receive(:renderer_use_fallback_exec_js).and_return(false)
         end
@@ -68,7 +138,7 @@ module ReactOnRailsPro
             "Original error:\nConnection refused - connect(2) for 127.0.0.1:3800\n"
           )
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, false)
+            .with(render_path, js_code, false, bundle_role: :server)
             .and_raise(renderer_error)
 
           expect do
@@ -92,10 +162,10 @@ module ReactOnRailsPro
           )
 
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, false)
+            .with(render_path, js_code, false, bundle_role: :server)
             .and_return(send_bundle_response)
           allow(ReactOnRailsPro::Request).to receive(:render_code)
-            .with(render_path, js_code, true)
+            .with(render_path, js_code, true, bundle_role: :server)
             .and_raise(bundle_load_error)
 
           expect do
@@ -135,12 +205,26 @@ module ReactOnRailsPro
           before do
             allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
             allow(render_options).to receive(:rsc_payload_streaming?).and_return(true)
+            allow(render_options).to receive(:internal_option)
+              .with(:renderer_artifact_snapshot)
+              .and_return(nil)
           end
 
           it "uses RSC bundle hash instead of server bundle hash" do
             path = described_class.prepare_incremental_render_path(js_code, render_options)
 
             expect(path).to eq("/bundles/rsc456/incremental-render/abc123")
+          end
+
+          it "uses the operation snapshot RSC ID instead of rereading a volatile pool ID" do
+            rsc_artifact = instance_double(ReactOnRailsPro::RendererArtifact, role: :rsc, id: "rsc-snapshot")
+            allow(render_options).to receive(:internal_option)
+              .with(:renderer_artifact_snapshot)
+              .and_return([rsc_artifact])
+
+            path = described_class.prepare_incremental_render_path(js_code, render_options)
+
+            expect(path).to eq("/bundles/rsc-snapshot/incremental-render/abc123")
           end
         end
       end
@@ -186,6 +270,7 @@ module ReactOnRailsPro
                 async_props_block:,
                 pull_enabled: false,
                 push_props: nil,
+                is_rsc_payload: false,
                 rsc_stream_observability: false
               )
           end
@@ -207,6 +292,7 @@ module ReactOnRailsPro
                 async_props_block:,
                 pull_enabled: true,
                 push_props: [],
+                is_rsc_payload: false,
                 rsc_stream_observability: false
               )
           end

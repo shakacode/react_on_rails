@@ -49,13 +49,15 @@ The currently-deployed Rails server already has every bundle and companion asset
 ReactOnRailsPro.configure do |config|
   config.rolling_deploy_adapter      = ReactOnRailsPro::RollingDeployAdapters::Http
   config.rolling_deploy_token        = ENV.fetch("ROLLING_DEPLOY_TOKEN")    # shared secret, ≥ 32 bytes
-  config.rolling_deploy_previous_url = ENV["ROLLING_DEPLOY_PREVIOUS_URL"]   # base URL of the still-running deployment
+  config.rolling_deploy_previous_urls = ENV["ROLLING_DEPLOY_PREVIOUS_URLS"] # comma-delimited or an Array
 end
 ```
 
 - **`rolling_deploy_token`** — the shared bearer token ("password"). Generate one with `SecureRandom.hex(32)` and set the **same** value on both the running server (which authenticates incoming pulls) and the build CI (which sends it). The config validator rejects tokens shorter than 32 bytes.
-- **`rolling_deploy_previous_url`** — the base URL where the previous deployment is reachable **from the build CI**, e.g. `https://app.example.com/react_on_rails_pro/rolling_deploy`. The adapter appends `/manifest` and `/bundles/:hash`. Leave it unset (or empty) to disable discovery on that build.
+- **`rolling_deploy_previous_urls`** — one or more previous-deployment URLs reachable **from the build CI**. It accepts an Array, a comma-delimited String, or one String. Use a bare origin such as `https://old.example.com` to inherit `rolling_deploy_mount_path`, or include an explicit path such as `https://old.example.com/internal/rolling-deploy` to preserve that path. Order is retained and duplicates are removed. Leave it unset (or empty) to disable discovery on that build. The singular `rolling_deploy_previous_url` remains supported for compatibility, but configuring both singular and plural values is an error.
 - **`rolling_deploy_mount_path`** — the Rails path where the Pro engine auto-mounts the bundle-serving endpoint when the built-in HTTP adapter is configured. Defaults to `/react_on_rails_pro/rolling_deploy`. Set it to a custom path when your previous deployment is reachable elsewhere, or set it to `nil`/blank to opt out of auto-mounting and draw the routes yourself.
+
+Previous URLs must use HTTP or HTTPS and include a host. Credentials, query strings, and fragments are rejected. A bare origin also requires a nonblank `rolling_deploy_mount_path`; use an explicit path when the local engine mount is disabled.
 
 ### 2. Server endpoint auto-mount
 
@@ -72,10 +74,10 @@ end
 
 That exposes two authenticated endpoints under the mount path (default `/react_on_rails_pro/rolling_deploy`):
 
-| Endpoint             | Returns                                                                                                                   |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET /manifest`      | JSON: `{ hashes: [...], rsc_enabled: true\|false, generated_at: "ISO8601", protocol_version: 1 }` for the current deploy. |
-| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that hash's companion assets.                                      |
+| Endpoint             | Returns                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /manifest`      | JSON with `hashes`, `rsc_enabled`, `generated_at`, `protocol_version: 2`, and `artifact_identity: { scheme: "rorp-v2-sha256", version: 2 }` for the current deploy. Older protocol-v1 manifests remain readable. |
+| `GET /bundles/:hash` | `application/gzip` tarball containing `bundle.js` plus that artifact ID's exact companion assets.                                                                                                                |
 
 The auto-mounted routes are prepended ahead of application routes, so terminal catch-all routes do not shadow the endpoint. They also use an internal route-helper prefix, so apps that still have an older manual mount at the default path keep booting while you remove the redundant manual route.
 
@@ -120,13 +122,18 @@ ReactOnRailsPro::RollingDeploy::BundlesController.draw_routes(
 - The `:hash` parameter is matched against an **allowlist** of the current deployment's real bundle hashes — anything else returns `404` before touching the filesystem.
 - Responses carry `Cache-Control: no-store`, `Pragma: no-cache`, and `X-Content-Type-Options: nosniff`.
 - Tarball extraction is **path-traversal-proofed**, accepts regular files only, and enforces a 200 MB uncompressed cap (zip-bomb guard).
+- Discovery and download use monotonic overall deadlines as well as capped per-request connection/read timeouts, so a slow sequence of origins cannot reset the operation's wall-clock budget.
 
 > [!WARNING]
-> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure `rolling_deploy_previous_url` always uses `https://` in production environments.
+> **Use HTTPS in production.** The token is a bearer credential. Over plain HTTP to a non-loopback host the adapter logs a warning that the token is being sent over an unencrypted connection; a hard HTTPS gate is planned for a follow-up release. Until then, ensure every `rolling_deploy_previous_urls` entry uses `https://` in production environments.
 
 ### Companion assets are handled automatically
 
 Each bundle hash ships with the companion assets built alongside it — `loadable-stats.json`, plus `react-client-manifest.json` and `react-server-client-manifest.json` when RSC is enabled. They map chunk and component IDs to the exact asset URLs that hash's build produced, so serving a draining hash with the **wrong** build's manifests would break client-side hydration. The HTTP adapter packs each hash's companions into the same tarball, so this stays correct with no work on your part. (Custom adapters must return them explicitly — see [Companion assets](./rolling-deploy-custom-adapters.md#companion-assets).)
+
+Current Pro artifact IDs begin with `rorp-v2-` and identify the role, bundle bytes, companion destination names, and companion bytes together. Changing only a manifest or `loadable-stats.json` therefore produces a new ID and invalidates fragment and renderer caches consistently. With multiple previous origins, duplicate legacy/protocol-v1 hashes are omitted because their payload provenance is ambiguous. Duplicate v2 IDs are safe to try in configured order because every downloaded payload is recomputed and rejected unless it matches the requested ID.
+
+Verified v2 previous-deploy payloads are always staged as captured files, even when pre-seeding uses `MODE=symlink`, because the adapter's source paths may change or disappear after their bytes are verified. Legacy/protocol-v1 payloads continue to honor symlink mode.
 
 ## Deploy the renderer before Rails
 
