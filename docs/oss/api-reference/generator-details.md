@@ -163,7 +163,7 @@ The default applies only to fresh installs. If `config/shakapacker.yml` already 
 
 - Rspack core packages (`@rspack/core`, `@rspack/cli`)
 - Rspack-specific plugins (`@rspack/plugin-react-refresh`, `rspack-manifest-plugin`)
-- Shakapacker configured with `assets_bundler: 'rspack'` and `webpack_loader: 'swc'`
+- Shakapacker configured with `assets_bundler: 'rspack'` and `javascript_transpiler: 'swc'`
 
 **Switching bundlers after installation:**
 

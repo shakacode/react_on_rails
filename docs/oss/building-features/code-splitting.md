@@ -202,7 +202,7 @@ const ServerApp = (props, railsContext) => {
   // __dirname is going to be the directory where the server-bundle.js exists
   // Note, React on Rails Pro automatically copies the loadable-stats.json to the same place as the
   // server-bundle.js. Thus, the __dirname of this code is where we can find loadable-stats.json.
-  // Be sure to configure ReactOnRailsPro.config.assets_top_copy to this file.
+  // Be sure to configure ReactOnRailsPro's `config.assets_to_copy` to this file.
   const statsFile = path.resolve(__dirname, 'loadable-stats.json');
 
   // This object is used to search filenames by corresponding chunk names.
@@ -235,7 +235,7 @@ ReactOnRails.register({
 
 ### React on Rails Pro
 
-You must set `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
+You must set `config.assets_to_copy` so that the node-renderer will have access to the loadable-stats.json.
 
 ```ruby
   config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")

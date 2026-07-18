@@ -4552,7 +4552,7 @@ Rspack configuration is controlled via `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 The `bin/switch-bundler` script automatically updates this configuration when switching bundlers.
@@ -6094,7 +6094,7 @@ const ServerApp = (props, railsContext) => {
   // __dirname is going to be the directory where the server-bundle.js exists
   // Note, React on Rails Pro automatically copies the loadable-stats.json to the same place as the
   // server-bundle.js. Thus, the __dirname of this code is where we can find loadable-stats.json.
-  // Be sure to configure ReactOnRailsPro.config.assets_top_copy to this file.
+  // Be sure to configure ReactOnRailsPro's `config.assets_to_copy` to this file.
   const statsFile = path.resolve(__dirname, 'loadable-stats.json');
 
   // This object is used to search filenames by corresponding chunk names.
@@ -6127,7 +6127,7 @@ ReactOnRails.register({
 
 ### React on Rails Pro
 
-You must set `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
+You must set `config.assets_to_copy` so that the node-renderer will have access to the loadable-stats.json.
 
 ```ruby
   config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")
@@ -13445,7 +13445,7 @@ When running tests in parallel (with `parallel_tests` gem):
 
 ```yaml
 - name: Compile test assets
-  run: RAILS_ENV=test bundle exec rake react_on_rails:assets:compile_environment
+  run: RAILS_ENV=test NODE_ENV=test bin/shakapacker
 
 - name: Run tests
   run: bundle exec rspec
@@ -17667,7 +17667,7 @@ To avoid the initial round trip to get a bundle on the renderer, you can pre-sta
 See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
 
 For same-dyno / same-filesystem deployments such as Heroku, the legacy
-`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is still appropriate. It pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Prefer `react_on_rails_pro:pre_seed_renderer_cache` for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
+`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is deprecated: it emits a deprecation warning and delegates to `react_on_rails_pro:pre_seed_renderer_cache` with `MODE=symlink`. That mode pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Use `MODE=copy` (the default) for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
 
 If you're not using the default cache location, set `RENDERER_SERVER_BUNDLE_CACHE_PATH` so the files stage into the right place. `RENDERER_BUNDLE_PATH` remains a deprecated compatibility alias.
 
@@ -17676,10 +17676,7 @@ Then you can use the rake task: `react_on_rails_pro:pre_seed_renderer_cache MODE
 You might do something like this:
 
 ```ruby
-Rake::Task["assets:precompile"]
-    .clear_prerequisites
-    .enhance([:environment, "react_on_rails:assets:compile_environment"])
-    .enhance do
+Rake::Task["assets:precompile"].enhance do
   ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
 end
 ```
@@ -20415,7 +20412,7 @@ The default applies only to fresh installs. If `config/shakapacker.yml` already 
 
 - Rspack core packages (`@rspack/core`, `@rspack/cli`)
 - Rspack-specific plugins (`@rspack/plugin-react-refresh`, `rspack-manifest-plugin`)
-- Shakapacker configured with `assets_bundler: 'rspack'` and `webpack_loader: 'swc'`
+- Shakapacker configured with `assets_bundler: 'rspack'` and `javascript_transpiler: 'swc'`
 
 **Switching bundlers after installation:**
 
@@ -22658,9 +22655,12 @@ Some operations require a working Rails environment:
 
 | react_on_rails | Shakapacker | Webpack | Node.js |
 | -------------- | ----------- | ------- | ------- |
+| v17.x          | >= 6.0      | v5      | 20-22   |
 | v16.x          | >= 6.0      | v5      | 20-22   |
 | v14.x          | >= 6.0      | v5      | 18-20   |
 | v13.x          | >= 6.0      | v5      | 16-18   |
+
+The Webpack column lists Webpack compatibility only. React on Rails v17 also supports Rspack as the assets bundler via Shakapacker's `assets_bundler: 'rspack'`.
 
 ### Common Upgrade Issues
 
@@ -24949,7 +24949,7 @@ Enable Rspack in `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 ## Troubleshooting
@@ -25119,7 +25119,7 @@ This document describes the migration from Babel to SWC for JavaScript/TypeScrip
 
 ## What is SWC?
 
-SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. Shakapacker 9.0+ uses SWC as the default transpiler.
+SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. SWC is available in Shakapacker 9.0+: Rspack projects use SWC by default, while Webpack projects default to Babel and opt in via `javascript_transpiler: swc` as shown below.
 
 ## Prerequisites
 
