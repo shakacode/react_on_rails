@@ -2,17 +2,23 @@
 
 require "json"
 require "digest"
+require "time"
 
 module FleetValidation
   class ManifestError < StandardError; end
 
   class Lifecycle
+    REQUIRED_PATH_IDS = %w[
+      standard-generator pro-ssr pro-rsc rspack webpack-rsc-production ssr-rsc-html
+      client-navigation-interaction
+    ].freeze
+
     CORE_INVENTORY_TARGET = {
       "id" => "react-on-rails-generator-install-smoke",
       "name" => "react_on_rails generator/install smoke",
       "headline" => "Monorepo generator and install smoke",
       "tier" => "hard_gate",
-      "work_mode" => "mutation",
+      "work_mode" => "validation_only",
       "packages" => [
         { "ecosystem" => "gem", "name" => "react_on_rails" },
         { "ecosystem" => "npm", "name" => "react-on-rails" },
@@ -58,6 +64,7 @@ module FleetValidation
         "preflight" => {
           "status" => "pending",
           "app_work_allowed" => false,
+          "opened_at" => nil,
           "waiver" => nil,
           "release_ci" => { "status" => "pending", "evidence" => nil },
           "artifacts" => { "status" => "pending", "evidence" => nil },
@@ -77,6 +84,7 @@ module FleetValidation
         "inventory" => inventory.map do |target|
           target.slice("id", "tier", "work_mode").merge(
             "work_state" => "not_started",
+            "work_started_at" => nil,
             "result" => "pending",
             "waiver" => nil,
             "blocker_id" => nil,
@@ -84,7 +92,13 @@ module FleetValidation
             "checks" => %w[install build test local_smoke hosted_ci review].to_h do |check|
               [check, { "status" => "pending", "evidence" => nil, "waiver" => nil, "blocker_id" => nil }]
             end,
-            "review_app" => { "state" => "unknown", "evidence" => nil, "deployed_smoke" => "pending" },
+            "review_app" => {
+              "state" => "unknown",
+              "evidence" => nil,
+              "deployed_smoke" => "pending",
+              "waiver" => nil,
+              "blocker_id" => nil
+            },
             "baseline" => { "classification" => "pending", "evidence" => nil, "waiver" => nil },
             "bases" => {
               "audit" => nil,
@@ -238,13 +252,14 @@ module FleetValidation
 
     def preflight_schema
       fields = %w[
-        status app_work_allowed waiver release_ci artifacts generator_matrix capabilities
+        status app_work_allowed opened_at waiver release_ci artifacts generator_matrix capabilities
       ]
       object_schema(
         fields,
         {
           "status" => { "enum" => %w[pending passed waived blocked unknown] },
           "app_work_allowed" => { "type" => "boolean" },
+          "opened_at" => nullable_string,
           "waiver" => waiver_schema,
           "release_ci" => preflight_gate_schema,
           "artifacts" => preflight_gate_schema,
@@ -273,13 +288,15 @@ module FleetValidation
     def inventory_item_schema
       object_schema(
         %w[
-          id tier work_mode work_state result waiver blocker_id package_locks checks review_app baseline bases reachability evidence
+          id tier work_mode work_state work_started_at result waiver blocker_id package_locks checks
+          review_app baseline bases reachability evidence
         ],
         {
           "id" => nonempty_string,
           "tier" => { "enum" => %w[hard_gate soft_track] },
-          "work_mode" => { "enum" => %w[mutation report_only] },
+          "work_mode" => { "enum" => %w[mutation validation_only report_only] },
           "work_state" => { "enum" => %w[not_started running finished blocked unknown] },
+          "work_started_at" => nullable_string,
           "result" => { "enum" => %w[pending passed reported blocked waived unknown] },
           "waiver" => waiver_schema,
           "blocker_id" => nullable_string,
@@ -302,13 +319,15 @@ module FleetValidation
             end
           ),
           "review_app" => object_schema(
-            %w[state evidence deployed_smoke],
+            %w[state evidence deployed_smoke waiver blocker_id],
             {
               "state" => {
                 "enum" => %w[configured_runnable configured_broken not_configured unknown]
               },
               "evidence" => nullable_string,
-              "deployed_smoke" => status_string
+              "deployed_smoke" => status_string,
+              "waiver" => waiver_schema,
+              "blocker_id" => nullable_string
             }
           ),
           "baseline" => object_schema(
@@ -528,8 +547,10 @@ module FleetValidation
         An explicit public-safe waiver may replace a failed gate only when the release policy allows
         it and the ledger records the authority and evidence URL. Missing, pending, conflicting, stale,
         or `UNKNOWN` evidence does not open the barrier.
-        After validating those gates and capabilities, set `preflight.app_work_allowed` to `true`;
-        that schema-validated boolean is the ledger's explicit `APP_WORK_ALLOWED` marker.
+        After validating those gates and capabilities, record `preflight.opened_at` and set
+        `preflight.app_work_allowed` to `true`; that schema-validated state is the ledger's explicit
+        `APP_WORK_ALLOWED` marker. Every mutable target records `work_started_at`, which must be later
+        than the barrier time. The validation-only monorepo generator gate may run before this marker.
 
         Before worker launch, record a machine/session capability attestation covering
         nonblocking permissions, Git and GitHub authentication, registry/network access, required toolchains,
@@ -585,10 +606,26 @@ module FleetValidation
     end
 
     def build_required_paths
-      lifecycle = @manifest.fetch("lifecycle", {})
-      paths = lifecycle.fetch("required_paths", [])
-      unless paths.is_a?(Array) && paths.all? { |path| path.is_a?(Hash) && path["id"].to_s != "" }
-        raise ManifestError, "lifecycle.required_paths must contain mappings with IDs"
+      lifecycle = @manifest["lifecycle"]
+      paths = lifecycle["required_paths"] if lifecycle.is_a?(Hash)
+      unless paths.is_a?(Array) && !paths.empty?
+        raise ManifestError, "lifecycle.required_paths must be a nonempty array"
+      end
+
+      unless paths.all? do |path|
+        path.is_a?(Hash) && path["id"].to_s != "" && path["evidence_source"].to_s != ""
+      end
+        raise ManifestError, "lifecycle.required_paths must contain mappings with IDs and evidence sources"
+      end
+
+      duplicates = paths.map { |path| path.fetch("id") }.tally.select { |_id, count| count > 1 }.keys
+      unless duplicates.empty?
+        raise ManifestError, "lifecycle.required_paths IDs must be unique: #{duplicates.join(', ')}"
+      end
+
+      missing = REQUIRED_PATH_IDS - paths.map { |path| path.fetch("id") }
+      unless missing.empty?
+        raise ManifestError, "lifecycle.required_paths is missing required IDs: #{missing.join(', ')}"
       end
 
       paths.map(&:dup)
@@ -624,7 +661,8 @@ module FleetValidation
       result.concat(inventory_errors)
       result.concat(private_field_errors)
       result << "app work started before APP_WORK_ALLOWED" if app_work_started? && !app_work_allowed?
-      result << review_app_error if review_app_error
+      result.concat(review_app_errors)
+      result.concat(barrier_order_errors)
       result.concat(required_path_errors) if @closeout
       result.concat(blocker_owner_errors) if @closeout
       result.concat(blocker_reference_errors) if @closeout
@@ -663,12 +701,15 @@ module FleetValidation
     end
 
     def candidate_error
-      return unless @expected_candidate
+      expected = @expected_candidate
+      release_selector = @ledger.dig("pack", "release_selector")
+      expected ||= release_selector unless release_selector == "latest RC or beta"
+      return unless expected
 
       actual = @ledger.fetch("pack", {})["candidate"]
-      return if actual == @expected_candidate
+      return if actual == expected
 
-      "candidate mismatch: expected #{@expected_candidate}, got #{actual || 'missing'}"
+      "candidate mismatch: expected #{expected}, got #{actual || 'missing'}"
     end
 
     def capability_errors
@@ -713,18 +754,60 @@ module FleetValidation
       end
     end
 
-    def review_app_error
+    def review_app_errors
+      errors = []
       count = Array(@ledger["inventory"]).count do |item|
         item["work_state"] != "not_started" && item.dig("review_app", "state").to_s.casecmp("unknown").zero?
       end
-      return if count.zero?
+      errors << "review app capability UNKNOWN for #{count} started target(s)" unless count.zero?
+      return errors unless @closeout
 
-      "review app capability UNKNOWN for #{count} started target(s)"
+      Array(@ledger["inventory"]).each do |item|
+        review_app = item.fetch("review_app", {})
+        state = review_app["state"]
+        evidence = present?(review_app["evidence"])
+        passed = review_app["deployed_smoke"] == "passed" && evidence
+        blocked = review_app["deployed_smoke"] == "blocked" && evidence
+        waived = review_app["deployed_smoke"] == "waived" &&
+                 valid_waiver?(review_app["waiver"], "#{item['id']}:review_app")
+        terminal = case state
+                   when "not_configured"
+                     review_app["deployed_smoke"] == "waived" && evidence
+                   when "configured_runnable"
+                     passed || blocked || waived
+                   when "configured_broken"
+                     blocked
+                   end
+        errors << "target #{item['id']} review-app smoke is not terminal" unless terminal
+      end
+      errors
+    end
+
+    def barrier_order_errors
+      opened_at = timestamp(@ledger.dig("preflight", "opened_at"))
+      Array(@ledger["inventory"]).filter_map do |item|
+        next unless item["work_mode"] == "mutation" && item["work_state"] != "not_started"
+
+        started_at = timestamp(item["work_started_at"])
+        if !opened_at || !started_at
+          "target #{item['id']} is missing replayable barrier/work-start ordering evidence"
+        elsif started_at <= opened_at
+          "target #{item['id']} started before the preflight barrier opened"
+        end
+      end
     end
 
     def required_path_errors
       paths = Array(@ledger["required_paths"])
-      @required_paths.flat_map do |required|
+      errors = []
+      paths.filter_map { |path| path["id"] }.tally.each do |id, count|
+        errors << "required paths contain duplicate ID #{id}" if count > 1
+      end
+      expected_ids = @required_paths.map { |path| path.fetch("id") }
+      (paths.filter_map { |path| path["id"] } - expected_ids).uniq.each do |id|
+        errors << "required paths contain unexpected ID #{id}"
+      end
+      errors + @required_paths.flat_map do |required|
         path = paths.find { |item| item["id"] == required.fetch("id") }
         errors = []
         if path && path["evidence_source"] != required["evidence_source"]
@@ -786,12 +869,13 @@ module FleetValidation
 
         errors << "capability #{field} is not passed or explicitly waived"
       end
+      errors << "capability restart_handoff is missing" unless present?(capabilities["restart_handoff"])
       errors
     end
 
     def pack_identity_errors
       pack = @ledger.fetch("pack", {})
-      errors = %w[candidate candidate_commit policy_commit tracker_mode].filter_map do |field|
+      errors = %w[candidate candidate_commit policy_commit tracker_mode snapshot_fingerprint].filter_map do |field|
         "pack #{field} is missing" unless present?(pack[field])
       end
       %w[candidate_commit policy_commit].each do |field|
@@ -799,6 +883,19 @@ module FleetValidation
       end
       allowed_modes = %w[development accelerated-rc strict-rc final-release]
       errors << "pack tracker_mode is not allowed" unless allowed_modes.include?(pack["tracker_mode"])
+      expected_packages = @inventory.select { |target| target["tier"] == "hard_gate" }
+                                    .flat_map { |target| Array(target["packages"]) }
+                                    .map { |package| [package["ecosystem"], package["name"]] }
+                                    .uniq
+      resolved_packages = Array(pack["resolved_packages"])
+      actual_packages = resolved_packages.map { |package| [package["ecosystem"], package["name"]] }
+      if (expected_packages - actual_packages).any? ||
+         resolved_packages.any? { |package| !present?(package["version"]) || !present?(package["source"]) }
+        errors << "pack resolved package snapshot is incomplete"
+      end
+      if actual_packages.tally.any? { |_identity, count| count > 1 }
+        errors << "pack resolved package snapshot contains duplicate identities"
+      end
       if @expected_snapshot_fingerprint && pack["snapshot_fingerprint"] != @expected_snapshot_fingerprint
         errors << "pack snapshot_fingerprint does not match the current manifest"
       end
@@ -845,7 +942,7 @@ module FleetValidation
 
         actual = locks.map { |lock| [lock["ecosystem"], lock["name"]] }
         expected = expected_by_id.fetch(item["id"], []).map { |package| [package["ecosystem"], package["name"]] }
-        (expected - actual).any?
+        (expected - actual).any? || actual.tally.any? { |_identity, total| total > 1 }
       end
       return if count.zero?
 
@@ -854,18 +951,18 @@ module FleetValidation
 
     def package_version_error
       resolved = Array(@ledger.dig("pack", "resolved_packages")).to_h do |package|
-        [[package["ecosystem"], package["name"]], package["version"]]
+        [[package["ecosystem"], package["name"]], [package["version"], package["source"]]]
       end
       count = Array(@ledger["inventory"]).count do |item|
         next false unless item["tier"] == "hard_gate"
 
         Array(item["package_locks"]).any? do |lock|
-          resolved[[lock["ecosystem"], lock["name"]]] != lock["version"]
+          resolved[[lock["ecosystem"], lock["name"]]] != [lock["version"], lock["source"]]
         end
       end
       return if count.zero?
 
-      "#{count} hard-gate target(s) retain package versions outside the resolved release snapshot"
+      "#{count} hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
     end
 
     def check_evidence_error
@@ -935,6 +1032,10 @@ module FleetValidation
         end
         item.fetch("checks", {}).each do |name, check|
           references << ["check #{name}", check["blocker_id"]] if check["status"] == "blocked"
+        end
+        review_app = item.fetch("review_app", {})
+        if review_app["state"] == "configured_broken" || review_app["deployed_smoke"] == "blocked"
+          references << ["review app", review_app["blocker_id"]]
         end
         references.filter_map do |label, blocker_id|
           blocker = blockers[blocker_id]
@@ -1042,7 +1143,9 @@ module FleetValidation
     def app_work_allowed?
       preflight = @ledger.fetch("preflight", {})
       preflight["app_work_allowed"] == true &&
-        %w[passed waived].include?(preflight["status"]) && preflight_errors.empty?
+        timestamp(preflight["opened_at"]) &&
+        %w[passed waived].include?(preflight["status"]) &&
+        preflight_errors.empty? && pack_identity_errors.empty? && candidate_error.nil?
     end
 
     def valid_waiver?(waiver, expected_gate)
@@ -1054,6 +1157,12 @@ module FleetValidation
       gate.is_a?(Hash) && gate["status"] == "passed" && present?(gate["evidence"])
     end
 
+    def timestamp(value)
+      Time.iso8601(value.to_s)
+    rescue ArgumentError
+      nil
+    end
+
     def release_blocked?
       hard_gate_blocked = Array(@ledger["inventory"]).any? do |item|
         next false unless item["tier"] == "hard_gate"
@@ -1061,7 +1170,9 @@ module FleetValidation
         top_level_blocked = !%w[passed waived].include?(item["result"]) || item["work_state"] == "blocked"
         check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
-        top_level_blocked || check_blocked || candidate_regression
+        review_app_blocked = item.dig("review_app", "state") == "configured_broken" ||
+                             item.dig("review_app", "deployed_smoke") == "blocked"
+        top_level_blocked || check_blocked || candidate_regression || review_app_blocked
       end
       required_path_blocked = @required_paths.any? do |required|
         path = Array(@ledger["required_paths"]).find { |item| item["id"] == required.fetch("id") }
@@ -1213,7 +1324,9 @@ module FleetValidation
         top_level_blocked = !%w[passed waived].include?(item["result"]) || item["work_state"] == "blocked"
         check_blocked = item.fetch("checks", {}).values.any? { |check| check["status"] == "blocked" }
         candidate_regression = item.dig("baseline", "classification") == "candidate_regression"
-        top_level_blocked || check_blocked || candidate_regression
+        review_app_blocked = item.dig("review_app", "state") == "configured_broken" ||
+                             item.dig("review_app", "deployed_smoke") == "blocked"
+        top_level_blocked || check_blocked || candidate_regression || review_app_blocked
       end
       blocked ||= paths.any? { |path| !%w[passed waived].include?(path["status"]) }
       blocked ||= blockers.any? { |blocker| !%w[resolved waived deferred].include?(blocker["status"]) }
@@ -1224,7 +1337,9 @@ module FleetValidation
         target_waived = item["result"] == "waived"
         check_waived = item.fetch("checks", {}).values.any? { |check| check["status"] == "waived" }
         baseline_waived = item.dig("baseline", "classification") == "waived"
-        target_waived || check_waived || baseline_waived ||
+        review_app_waived = item.dig("review_app", "deployed_smoke") == "waived" &&
+                            item.dig("review_app", "state") != "not_configured"
+        target_waived || check_waived || baseline_waived || review_app_waived ||
           (item["tier"] == "soft_track" && item["result"] == "blocked")
       end
       partial ||= @ledger.dig("preflight", "status") == "waived"

@@ -35,6 +35,7 @@ class FleetValidationGeneratorTest < Minitest::Test
     )
     ledger.fetch("preflight")["status"] = "passed"
     ledger.fetch("preflight")["app_work_allowed"] = true
+    ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00Z"
     %w[release_ci artifacts generator_matrix].each do |gate|
       ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
     end
@@ -44,6 +45,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       item.merge!(
         "work_state" => "finished",
         "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
+        "work_started_at" => "2026-07-18T10:01:00Z",
         "evidence" => "public-safe evidence"
       )
       expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
@@ -131,7 +133,8 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_equal 8, (inventory.count { |target| target.fetch("tier") == "hard_gate" })
     assert_equal 5, (inventory.count { |target| target.fetch("tier") == "soft_track" })
-    assert(inventory.any? { |target| target.fetch("id") == "react-on-rails-generator-install-smoke" })
+    core = inventory.find { |target| target.fetch("id") == "react-on-rails-generator-install-smoke" }
+    assert_equal "validation_only", core.fetch("work_mode")
     assert(inventory.select { |target| target.fetch("tier") == "soft_track" }
                     .all? { |target| target.fetch("work_mode") == "report_only" })
   end
@@ -224,7 +227,7 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_ledger_blocks_app_work_until_release_preflight_passes_or_is_waived
     generator = build_generator
     ledger = generator.ledger_template
-    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }["work_state"] = "running"
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }["work_state"] = "running"
 
     errors = FleetValidation::LedgerValidator.new(
       ledger,
@@ -248,6 +251,42 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes errors, "app work started before APP_WORK_ALLOWED"
     assert_empty FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+  end
+
+  def test_app_work_allowed_requires_the_exact_pack_snapshot_and_restart_handoff
+    generator = build_generator
+    missing_snapshot = complete_ledger(generator)
+    missing_snapshot.fetch("pack")["candidate_commit"] = nil
+    missing_handoff = complete_ledger(generator)
+    missing_handoff.fetch("preflight").fetch("capabilities")["restart_handoff"] = nil
+
+    [missing_snapshot, missing_handoff].each do |ledger|
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        expected_snapshot_fingerprint: generator.snapshot_fingerprint
+      ).errors
+
+      assert_includes errors, "app work started before APP_WORK_ALLOWED"
+    end
+  end
+
+  def test_closeout_preserves_barrier_before_work_start_ordering
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["work_started_at"] = "2026-07-18T09:59:00Z"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("started before the preflight barrier opened") })
   end
 
   def test_ledger_fails_closed_when_a_report_only_soft_track_is_missing
@@ -318,6 +357,26 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes unknown_errors, "review app capability UNKNOWN for 1 started target(s)"
     refute_includes absent_errors, "review app capability UNKNOWN for 1 started target(s)"
+  end
+
+  def test_closeout_requires_terminal_evidence_for_configured_review_apps
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("review_app").merge!(
+      "state" => "configured_runnable",
+      "deployed_smoke" => "pending",
+      "evidence" => "configuration found"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("review-app smoke is not terminal") })
   end
 
   def test_closeout_fails_when_required_web_pack_rsc_path_has_no_evidence_or_waiver
@@ -957,7 +1016,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       target.fetch("checks").keys.sort
     )
     assert_equal %w[classification evidence waiver], target.fetch("baseline").keys.sort
-    assert_equal %w[deployed_smoke evidence state], target.fetch("review_app").keys.sort
+    assert_equal %w[blocker_id deployed_smoke evidence state waiver], target.fetch("review_app").keys.sort
   end
 
   def test_closeout_requires_exact_retained_package_lock_versions_and_sources
@@ -1017,7 +1076,27 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "1 hard-gate target(s) retain package versions outside the resolved release snapshot"
+    assert_includes(
+      errors,
+      "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+    )
+  end
+
+  def test_closeout_rejects_retained_lock_sources_that_do_not_match_the_resolved_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    lock = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("package_locks").first
+    lock["source"] = "git-or-path-override"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
   end
 
   def test_closeout_rejects_nonterminal_work_and_blank_result_or_baseline_evidence
@@ -1422,6 +1501,102 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       assert_equal "repos[0] tier must be hard_gate or soft_track", error.message
     end
+  end
+
+  def test_rejects_a_manifest_without_required_lifecycle_paths
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.delete("lifecycle")
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "lifecycle.required_paths must be a nonempty array", error.message
+    end
+  end
+
+  def test_lifecycle_invariant_families_fail_closed_table
+    generator = build_generator
+    cases = [
+      {
+        name: "exact snapshot identity",
+        mutate: ->(ledger) { ledger.fetch("pack")["candidate_commit"] = nil },
+        expected: "app work started before APP_WORK_ALLOWED"
+      },
+      {
+        name: "resolved artifact snapshot",
+        mutate: ->(ledger) { ledger.fetch("pack")["resolved_packages"] = [] },
+        expected: "app work started before APP_WORK_ALLOWED"
+      },
+      {
+        name: "transition ordering",
+        mutate: lambda do |ledger|
+          ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }["work_started_at"] =
+            "2026-07-18T09:59:00Z"
+        end,
+        expected: "started before the preflight barrier opened"
+      },
+      {
+        name: "terminal review evidence",
+        mutate: lambda do |ledger|
+          ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }.fetch("review_app").merge!(
+            "state" => "configured_runnable",
+            "deployed_smoke" => "pending"
+          )
+        end,
+        expected: "review-app smoke is not terminal"
+      },
+      {
+        name: "complete inventory",
+        mutate: ->(ledger) { ledger.fetch("inventory").pop },
+        expected: "inventory missing target"
+      },
+      {
+        name: "restart equivalence",
+        mutate: lambda do |ledger|
+          ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = nil
+        end,
+        expected: "app work started before APP_WORK_ALLOWED"
+      }
+    ]
+
+    cases.each do |test_case|
+      ledger = complete_ledger(generator)
+      test_case.fetch(:mutate).call(ledger)
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+        closeout: true
+      ).errors
+
+      assert(
+        errors.any? { |error| error.include?(test_case.fetch(:expected)) },
+        "#{test_case.fetch(:name)} did not fail closed:\n#{errors.join("\n")}"
+      )
+    end
+
+    read_only = complete_ledger(generator)
+    read_only.fetch("preflight")["app_work_allowed"] = false
+    read_only.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.merge!("work_state" => "not_started", "work_started_at" => nil)
+    end
+    core = read_only.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    core["work_state"] = "running"
+    errors = FleetValidation::LedgerValidator.new(
+      read_only,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint
+    ).errors
+
+    refute_includes errors, "app work started before APP_WORK_ALLOWED"
   end
 
   def test_rejects_a_hard_gate_missing_a_required_field

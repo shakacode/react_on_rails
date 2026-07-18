@@ -80,6 +80,7 @@ module FleetValidation
       )
       ledger.fetch("preflight")["status"] = "passed"
       ledger.fetch("preflight")["app_work_allowed"] = true
+      ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00Z"
       %w[release_ci artifacts generator_matrix].each do |gate|
         ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
       end
@@ -119,6 +120,7 @@ module FleetValidation
         item.merge!(
           "work_state" => "finished",
           "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
+          "work_started_at" => "2026-07-18T10:01:00Z",
           "evidence" => "public-safe evidence"
         )
         expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }

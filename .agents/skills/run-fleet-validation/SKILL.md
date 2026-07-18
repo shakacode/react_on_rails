@@ -47,6 +47,9 @@ candidate or policy/inventory manifest fails closed.
    pack ledger has `preflight.app_work_allowed: true` (the explicit `APP_WORK_ALLOWED` marker),
    backed by terminal-green exact-commit CI, artifacts, and the
    standard/Pro/Pro+RSC generator matrix, or an explicit policy-allowed public-safe waiver.
+   Record `preflight.opened_at` when opening the barrier and each mutable target's
+   `work_started_at`; closeout rejects missing or reversed ordering evidence. The validation-only
+   monorepo generator gate may run before the mutation barrier.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
 4. Each prompt is a separate top-level coordinator task and must use its bounded subagents as
    written. Do not launch the six prompts as children of one shared four-slot agent tree.

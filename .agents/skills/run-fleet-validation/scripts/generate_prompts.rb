@@ -142,7 +142,14 @@ module FleetValidation
           raise ManifestError, "repos[#{index}] tier must be hard_gate or soft_track"
         end
 
-        next unless repo["tier"] == "hard_gate"
+        if repo["tier"] == "soft_track"
+          %w[name headline].each do |field|
+            unless repo[field].is_a?(String) && !repo[field].empty?
+              raise ManifestError, "repos[#{index}] soft track is missing #{field}"
+            end
+          end
+          next
+        end
 
         validate_hard_gate_repo!(defaults.merge(repo), index)
       end
@@ -188,7 +195,7 @@ module FleetValidation
     end
 
     def validate_target_ids!
-      ids = @targets.map { |target| stable_target_id(target) }
+      ids = @lifecycle_inventory.map { |target| target.fetch("id") }
       raise ManifestError, "target names must have non-empty stable IDs" if ids.any?(&:empty?)
 
       duplicates = ids.tally.select { |_id, count| count > 1 }.keys
@@ -334,9 +341,11 @@ module FleetValidation
         Execution contract:
         - Do not start app mutation work until `preflight.app_work_allowed: true` records the
           `APP_WORK_ALLOWED` marker in the pack-specific release-wide preflight ledger. The marker
-          is valid only when release commit CI, published
+          is valid only when `preflight.opened_at` records when the exact snapshot barrier opened
+          and release commit CI, published
           artifacts, and the standard / Pro / Pro+RSC generator matrix are terminal green, or when
-          an explicit public-safe waiver names the failed gate and authority.
+          an explicit public-safe waiver names the failed gate and authority. Record `work_started_at`
+          for every mutable target before its first write.
         - Read AGENTS.md and repository-specific instructions before changing any target repo. Treat the
           manifest commands as starting data; because `verify: true` entries are provisional, confirm
           commands against the target before running or proposing a manifest correction.
