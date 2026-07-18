@@ -38,6 +38,16 @@ type FormFields = Record<string, unknown>;
 type FormAutoContentResult = {
   payload: FormData | Readable;
   headers: Record<string, string>;
+  // The underlying `form-data` instance. Exposed so tests that need raw multipart
+  // bytes (`form.getBuffer()`) or byte-offset inspection can build their form
+  // through this one shim instead of importing `form-data` directly.
+  //
+  // NOTE: `form` equals the wire `payload` only for multipart requests (a
+  // file/Buffer/stream field is present). For a no-file request the wire `payload`
+  // is the urlencoded body below, so `form` is the multipart view of the same
+  // fields, not the bytes actually sent — do not read `form.getBuffer()` on a
+  // no-file result and expect the transmitted payload.
+  form: FormData;
 };
 
 function hasOwn(o: unknown, field: string): boolean {
@@ -104,6 +114,7 @@ export default function formAutoContent(json: FormFields): FormAutoContentResult
     return {
       payload: form,
       headers: form.getHeaders() as Record<string, string>,
+      form,
     };
   }
 
@@ -125,5 +136,6 @@ export default function formAutoContent(json: FormFields): FormAutoContentResult
   return {
     payload: Readable.from(stringify(urlencoded as Record<string, string>)),
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    form,
   };
 }
