@@ -65,7 +65,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   `JSON.stringify` can emit a lone surrogate escape (for example `\uD83D` with no paired low
   surrogate) from corrupted user data, database-encoding issues, or upstream API responses.
   Ruby's `JSON.parse` rejects a lone high surrogate with `JSON::ParserError: incomplete
-  surrogate pair`, so such content crashed the entire server render instead of passing through
+surrogate pair`, so such content crashed the entire server render instead of passing through
   for the browser to display. The render-result parsers now retry once with unpaired surrogates
   replaced by the Unicode replacement character (U+FFFD) — this only runs after a parse failure,
   so the happy path is unchanged. Covers the length-prefixed object-payload and metadata paths

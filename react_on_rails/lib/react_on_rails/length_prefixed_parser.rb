@@ -21,11 +21,12 @@ module ReactOnRails
     # MIRROR VALUES END
     private_constant :CONTROL_MESSAGE_TYPES
 
-    # Matches a single \uXXXX escape, optionally paired with the following \uXXXX
-    # escape so a valid high+low surrogate pair can be recognized as one unit.
-    SURROGATE_ESCAPE_PAIR = /\\u[0-9a-fA-F]{4}(?:\\u[0-9a-fA-F]{4})?/
-    SURROGATE_ESCAPE_CODE = /\\u([0-9a-fA-F]{4})/
-    private_constant :SURROGATE_ESCAPE_PAIR, :SURROGATE_ESCAPE_CODE
+    # The six-character JSON escape for U+FFFD, emitted for a lone surrogate.
+    # Kept as an ASCII escape (not a literal multibyte char) so sanitized output
+    # stays valid regardless of the input string's encoding, which may be binary.
+    REPLACEMENT_CHAR_ESCAPE = '\ufffd'
+    FOUR_HEX_DIGITS = /\A[0-9a-fA-F]{4}\z/
+    private_constant :REPLACEMENT_CHAR_ESCAPE, :FOUR_HEX_DIGITS
 
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
     # Used by the non-streaming rendering path where ExecJS/node renderer returns a single result.
@@ -67,26 +68,85 @@ module ReactOnRails
       JSON.parse(sanitize_unpaired_surrogates(str))
     end
 
-    # Replaces unpaired \uXXXX surrogate escapes with the U+FFFD replacement
-    # escape (�), leaving valid high+low pairs intact. The replacement is an
-    # ASCII \u escape (not a literal multibyte char) so the output stays valid
-    # regardless of the input string's encoding, which may be binary.
+    # Replaces only genuinely LONE \uXXXX surrogate escapes with the U+FFFD
+    # replacement escape, leaving everything else byte-for-byte intact.
     #
-    # Best-effort recovery for already-malformed input; it is not a general JSON
-    # validator and does not distinguish surrogate escapes inside string literals
-    # from other contexts (JSON only permits \u escapes inside strings, so this is
-    # safe in practice). Adjacent all-escaped surrogates in pathological input may
-    # be re-paired greedily, but the result is always valid UTF-8 and never crashes.
+    # This walks the string left to right rather than using a global regex so it
+    # gets three things right that a naive gsub does not:
+    #   * Backslash parity — a "\u..." is a real escape only when the backslash
+    #     before "u" is itself unescaped. In "\\uD83D" the backslash is escaped,
+    #     so "uD83D" is literal text and must not be rewritten. Consuming "\\" as
+    #     one unit makes the following "u" an ordinary character.
+    #   * Pairing — a high surrogate (U+D800..U+DBFF) is kept only when it is
+    #     immediately followed by a low surrogate (U+DC00..U+DFFF); the valid pair
+    #     passes through untouched. A high surrogate followed by anything else, and
+    #     a low surrogate not preceded by a high one, are lone and replaced.
+    #   * No over-consumption — a non-surrogate escape (e.g. "A") is never
+    #     swallowed as part of a pair.
+    #
+    # The replacement is an ASCII \u escape (not a literal multibyte char) so the
+    # output stays valid regardless of the input string's encoding, which may be
+    # binary. Best-effort recovery for already-malformed input, so it runs only on
+    # the JSON::ParserError retry path and never on the happy path.
     def self.sanitize_unpaired_surrogates(str)
-      str.gsub(SURROGATE_ESCAPE_PAIR) do |seq|
-        codes = seq.scan(SURROGATE_ESCAPE_CODE).flatten.map { |hex| hex.to_i(16) }
-        if codes.length == 2 && codes[0].between?(0xD800, 0xDBFF) && codes[1].between?(0xDC00, 0xDFFF)
-          seq # valid surrogate pair — leave untouched
-        else
-          codes.map { |code| code.between?(0xD800, 0xDFFF) ? '\ufffd' : format('\\u%04x', code) }.join
-        end
+      out = String.new(encoding: str.encoding)
+      index = 0
+      length = str.length
+
+      while index < length
+        chunk, advance = next_sanitized_token(str, index, length)
+        out << chunk
+        index += advance
       end
+
+      out
     end
+
+    # Returns [text_to_emit, characters_consumed] for the token at +index+.
+    def self.next_sanitized_token(str, index, length)
+      code = unicode_escape_codepoint(str, index, length)
+      return non_escape_token(str, index, length) if code.nil?
+      return surrogate_token(str, index, length, code) if code.between?(0xD800, 0xDFFF)
+
+      [str[index, 6], 6] # ordinary non-surrogate \uXXXX escape
+    end
+    private_class_method :next_sanitized_token
+
+    # A "\X" escape is consumed as one unit so an escaped backslash can't be
+    # misread as the start of a \u escape; any other character is verbatim.
+    def self.non_escape_token(str, index, length)
+      return [str[index, 2], 2] if str[index] == "\\" && index + 1 < length
+
+      [str[index], 1]
+    end
+    private_class_method :non_escape_token
+
+    # A high surrogate is kept only when immediately followed by a low surrogate;
+    # otherwise it (or a lone low surrogate) becomes the U+FFFD replacement escape.
+    def self.surrogate_token(str, index, length, code)
+      if code.between?(0xD800, 0xDBFF)
+        low = unicode_escape_codepoint(str, index + 6, length)
+        return [str[index, 12], 12] if low&.between?(0xDC00, 0xDFFF)
+      end
+
+      [REPLACEMENT_CHAR_ESCAPE, 6]
+    end
+    private_class_method :surrogate_token
+
+    # Returns the codepoint of a genuine six-character \uXXXX escape starting at
+    # +index+, or nil when +index+ does not begin one. Callers reach this position
+    # only after two-character "\X" escapes have been consumed as a unit, so a
+    # leading backslash here is always unescaped (odd backslash parity).
+    def self.unicode_escape_codepoint(str, index, length)
+      return nil unless index + 6 <= length
+      return nil unless str[index] == "\\" && str[index + 1] == "u"
+
+      hex = str[index + 2, 4]
+      return nil unless hex.match?(FOUR_HEX_DIGITS)
+
+      hex.to_i(16)
+    end
+    private_class_method :unicode_escape_codepoint
 
     def initialize
       # Binary encoding ensures correct byte-position arithmetic regardless of payload encoding.

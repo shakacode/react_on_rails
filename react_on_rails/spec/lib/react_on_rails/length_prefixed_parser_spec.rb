@@ -306,6 +306,49 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
     end
   end
 
+  # Regression for issue #4710 review (codex / greptile P1): the sanitizer must
+  # replace only genuinely lone surrogates, never mis-pair across fields and
+  # never rewrite an escaped backslash's literal text. Asserted through the
+  # sanitize+parse pipeline so the produced characters are deterministic.
+  describe ".sanitize_unpaired_surrogates lone-surrogate precision" do
+    def recovered(raw_json)
+      JSON.parse(described_class.sanitize_unpaired_surrogates(raw_json))
+    end
+
+    it "does not mis-pair a lone surrogate with a following field's data" do
+      # A lone high surrogate in "bad" must not consume the "ok" field: "ok"
+      # still decodes to A + U+1F600, and only "bad" becomes U+FFFD.
+      result = recovered('{"bad":"\uD83D","ok":"A😀"}')
+      expect(result).to eq("bad" => "�", "ok" => "A\u{1F600}")
+    end
+
+    it "respects backslash parity: an escaped backslash before u is literal text" do
+      # JSON "\\uD83D" is an escaped backslash followed by literal "uD83D" (it
+      # decodes to the 6 characters \uD83D), not a unicode escape. It must be
+      # preserved byte-for-byte even though the sibling "bad" field carries a
+      # real lone surrogate that triggers the sanitize retry.
+      result = recovered('{"lit":"\\\\uD83D","bad":"\uD83D"}')
+      expect(result).to eq("lit" => '\\uD83D', "bad" => "�")
+    end
+
+    it "keeps a valid surrogate pair that is adjacent to a lone surrogate" do
+      # Escaped valid pair followed by a lone high surrogate: the pair survives
+      # as U+1F600 and only the trailing lone high surrogate becomes U+FFFD.
+      result = recovered('{"h":"😀\uD83D"}')
+      expect(result["h"]).to eq("\u{1F600}�")
+    end
+
+    it "replaces each of two adjacent lone high surrogates" do
+      result = recovered('{"h":"\uD83D\uD83D"}')
+      expect(result["h"]).to eq("��")
+    end
+
+    it "replaces a lone low surrogate" do
+      result = recovered('{"h":"x\uDE00y"}')
+      expect(result["h"]).to eq("x�y")
+    end
+  end
+
   describe "lone surrogates in an object payload" do
     it "does not crash and yields valid, renderable content" do
       raw_content = '{"html":"Hello \uD83D world","consoleReplayScript":""}'
