@@ -391,6 +391,24 @@ module ReactOnRails
       # `// default …` comment, so comment reflow/reword/removal can't no-op it.
       DEFAULT_BUILD_BRANCH_ANCHOR = /\n(\s*\}\s*else\s*\{[^}]*?#{DEFAULT_RESULT_ARRAY})/
 
+      # Pre-transform "source" shapes the gsub_file rewrites target (as opposed to
+      # the "already applied" markers above). Each is whitespace/semicolon tolerant
+      # and anchored to a complete statement so it can't match inside a larger
+      # construct; every rewrite is applied via replace_single_match so an
+      # incidental extra match in a customized file can't corrupt it.
+      #
+      # SERVER_WEBPACK_CONFIG_IMPORT tolerates a destructured `{ default: … }` or a
+      # plain binding AND an optional trailing `.default`
+      # (`require('./serverWebpackConfig').default;`), and captures through the end
+      # of the statement so the RSC import is inserted AFTER the complete require —
+      # never before a trailing `.default`, which would produce invalid JS.
+      SERVER_WEBPACK_CONFIG_IMPORT =
+        %r{(const\s+(?:\{[^\}]*\}|\w+)\s*=\s*require\(\s*'\./serverWebpackConfig'\s*\)(?:\s*\.\s*default)?\s*;?)}
+      SERVER_CONFIG_INVOCATION = /^(\s*const\s+serverConfig\s*=\s*serverWebpackConfig\(\s*\)\s*;?)\s*$/
+      ENVSPECIFIC_DEFAULT_CALL = /envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;?/
+      DEFAULT_BUNDLES_LOG =
+        /console\.log\(\s*'\[React on Rails\] Creating both client and server bundles\.'\s*\)\s*;?/
+
       def update_server_client_or_both_for_rsc
         config_path = resolve_server_client_or_both_path
         return unless config_path
@@ -405,28 +423,25 @@ module ReactOnRails
         # transform whose output would flip a later guard, or re-read `content`.
         content = File.read(File.join(destination_root, config_path))
 
+        # Insert the RSC import AFTER the complete server import statement
+        # (SERVER_WEBPACK_CONFIG_IMPORT captures through an optional `.default;`).
         unless content.match?(RSC_WEBPACK_CONFIG_IMPORT)
-          server_import_pattern =
-            %r{(const\s+(?:\{[^\}]*\}|\w+)\s*=\s*require\('\./serverWebpackConfig'\)\s*;?)}
-          gsub_file(
-            config_path,
-            server_import_pattern,
+          replace_single_match(
+            config_path, content, SERVER_WEBPACK_CONFIG_IMPORT,
             "\\1\nconst rscWebpackConfig = require('./rscWebpackConfig');"
           )
         end
 
         unless content.match?(RSC_CONFIG_DECLARATION)
-          gsub_file(
-            config_path,
-            /^(\s*const serverConfig = serverWebpackConfig\(\)\s*;?)$/,
+          replace_single_match(
+            config_path, content, SERVER_CONFIG_INVOCATION,
             "\\1\n\n  const rscConfig = rscWebpackConfig();"
           )
         end
 
         unless content.match?(ENVSPECIFIC_RSC_CALL)
-          gsub_file(
-            config_path,
-            /envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;?/,
+          replace_single_match(
+            config_path, content, ENVSPECIFIC_DEFAULT_CALL,
             "envSpecific(clientConfig, serverConfig, rscConfig);"
           )
         end
@@ -439,41 +454,45 @@ module ReactOnRails
       def insert_rsc_bundle_only_branch(config_path, content)
         return if content.match?(RSC_BUNDLE_ONLY_BRANCH)
 
-        # Only splice in the branch when exactly one default-build branch is
-        # identifiable. Thor's gsub_file replaces every match, so bailing on 0 or
-        # 2+ matches guards against inserting into an unintended branch (safe
-        # no-op → surfaced by check_rsc_scob_config / manual review instead).
-        return unless content.scan(DEFAULT_BUILD_BRANCH_ANCHOR).length == 1
-
         rsc_bundle_handling = <<~JS.chomp
           } else if (process.env.RSC_BUNDLE_ONLY) {
               // eslint-disable-next-line no-console
               console.log('[React on Rails] Creating only the RSC bundle.');
               result = rscConfig;
         JS
-        gsub_file(
-          config_path,
-          DEFAULT_BUILD_BRANCH_ANCHOR,
+        # Splice in the branch only when exactly one default-build branch is
+        # identifiable (replace_single_match bails on 0 or 2+).
+        replace_single_match(
+          config_path, content, DEFAULT_BUILD_BRANCH_ANCHOR,
           "\n  #{rsc_bundle_handling}\n\\1"
         )
       end
 
       def update_scob_default_bundle_output(config_path, content)
         unless content.match?(RSC_BUNDLES_LOG)
-          gsub_file(
-            config_path,
-            /console\.log\('\[React on Rails\] Creating both client and server bundles\.'\)\s*;?/,
+          replace_single_match(
+            config_path, content, DEFAULT_BUNDLES_LOG,
             "console.log('[React on Rails] Creating client, server, and RSC bundles.');"
           )
         end
 
         return if content.match?(RSC_RESULT_ARRAY)
 
-        gsub_file(
-          config_path,
-          DEFAULT_RESULT_ARRAY,
+        replace_single_match(
+          config_path, content, DEFAULT_RESULT_ARRAY,
           "result = [clientConfig, serverConfig, rscConfig];"
         )
+      end
+
+      # Apply a gsub_file rewrite only when `pattern` matches exactly once in the
+      # pre-run snapshot. Thor's gsub_file rewrites every textual match, so bailing
+      # on 0 or 2+ matches keeps a customized file (an incidental extra match, or a
+      # missing anchor) from being corrupted — a miss is surfaced by
+      # check_rsc_scob_config / manual review rather than silently mis-edited.
+      def replace_single_match(config_path, content, pattern, replacement)
+        return unless content.scan(pattern).length == 1
+
+        gsub_file(config_path, pattern, replacement)
       end
 
       def update_server_webpack_config_for_rsc

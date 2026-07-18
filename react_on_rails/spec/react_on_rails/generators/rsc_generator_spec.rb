@@ -5260,6 +5260,66 @@ describe RscGenerator, type: :generator do
       # The pre-RSC 2-arg call must be gone (that shape leaves lazyCompilation on).
       expect(result).not_to match(/envSpecific\(\s*clientConfig\s*,\s*serverConfig\s*\)\s*;/)
     end
+
+    it "inserts the RSC import after a `.default` server import (valid JS, not before the property access)" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # Customized server import using a trailing `.default`. The RSC import must
+      # land AFTER the full statement, never before `.default;` (which would
+      # produce `require('./serverWebpackConfig')\nconst rscWebpackConfig...;.default;`).
+      with_default = server_client_or_both_content(destructured_import: false)
+                     .sub("const serverWebpackConfig = require('./serverWebpackConfig');",
+                          "const serverWebpackConfig = require('./serverWebpackConfig').default;")
+      simulate_existing_file(config_path, with_default)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include(
+        "const serverWebpackConfig = require('./serverWebpackConfig').default;\n" \
+        "const rscWebpackConfig = require('./rscWebpackConfig');"
+      )
+      # No corrupted `);.default;` sequence, and exactly one RSC import.
+      expect(result).not_to include(");.default")
+      expect(result.scan("const rscWebpackConfig = require('./rscWebpackConfig');").length).to eq(1)
+    end
+
+    it "recognizes a whitespace-spaced server require and inserts the RSC import" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      spaced = server_client_or_both_content(destructured_import: false)
+               .sub("const serverWebpackConfig = require('./serverWebpackConfig');",
+                    "const serverWebpackConfig = require( './serverWebpackConfig' );")
+      simulate_existing_file(config_path, spaced)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      expect(result).to include("const rscWebpackConfig = require('./rscWebpackConfig');")
+      # Inserted immediately after the (spaced) server import, not elsewhere.
+      expect(result).to match(
+        %r{require\(\s*'\./serverWebpackConfig'\s*\);\nconst rscWebpackConfig = require\('\./rscWebpackConfig'\);}
+      )
+    end
+
+    it "bails (no corruption) when the default-bundle result array has an incidental second match" do
+      config_path = "config/webpack/ServerClientOrBoth.js"
+      # A customized file with an extra `result = [clientConfig, serverConfig]`
+      # elsewhere. gsub_file would rewrite BOTH; replace_single_match must bail so
+      # nothing is corrupted, and the verifier surfaces the un-applied transform.
+      doubled = server_client_or_both_content(destructured_import: true)
+                .sub("  let result;",
+                     "  let result;\n  result = [clientConfig, serverConfig]; // incidental")
+      simulate_existing_file(config_path, doubled)
+
+      generator.send(:update_server_client_or_both_for_rsc)
+
+      result = File.read(File.join(destination_root, config_path))
+      # Neither 2-element array was rewritten to the 3-element RSC-aware form.
+      expect(result.scan("result = [clientConfig, serverConfig, rscConfig]").length).to eq(0)
+      expect(result.scan(/result\s*=\s*\[clientConfig, serverConfig\]/).length).to eq(2)
+      # The un-applied transform is surfaced, not silently masked.
+      missing = generator.send(:check_rsc_scob_config)
+      expect(missing).to include("RSC-aware default result array in ServerClientOrBoth.js")
+    end
   end
 
   # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
