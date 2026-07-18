@@ -65,16 +65,21 @@ The command verifies both `react_on_rails` gems and all four unified-version npm
 independently versioned `react-on-rails-rsc`, before inspecting public default heads. It writes
 `fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`. Currency uses only direct
 root `DEPENDS_ON` packages from each public SPDX SBOM and rejects mixed direct versions; missing
-root identity fails closed. CI and reusable-smoke evidence remains exact-default-head, while
-PR-only review-app capability uses the exact `standing_health.review_app_workflow` public path and
-its latest public run URL and timestamp. Staging, cleanup, delete, help, and promotion workflows
-never substitute for that path. Active public targets block on missing, stale, failed, or unknown
-required evidence.
+root identity fails closed. npm prereleases use the repository's dot-to-hyphen ecosystem
+normalization. CI remains exact-default-head. Reusable-smoke evidence requires a successful
+exact-head execution of the workflow that actually calls the shared contract; required commands
+must be nonblank and required stages must all succeed. PR-only review-app capability uses the exact
+`standing_health.review_app_workflow` public path and a recent `pull_request` run whose base branch,
+head branch, and head SHA agree with its public PR metadata. Staging, cleanup, delete, help, and
+promotion workflows never substitute for that path. GitHub archival of an active target is
+surfaced as blocking manifest drift. Active public targets block on missing, stale, failed, or
+unknown required evidence.
 Report-only and archived targets retain findings without blocking the aggregate. The scheduled
 `.github/workflows/demo-fleet-health.yml` run uploads the same three evidence files.
 
-The Dependabot v1 evaluation is deliberately narrow: weekly enabled Bundler/npm/GitHub Actions
-coverage plus grouped React on Rails gem/npm updates. Do not substitute a generic Renovate preset.
+The Dependabot v1 evaluation is deliberately narrow: the same enabled weekly root entry must
+provide Bundler/npm/GitHub Actions coverage, with React on Rails grouping on the qualifying gem/npm
+entry. Do not substitute a generic Renovate preset.
 
 ## Launch and coordinate
 

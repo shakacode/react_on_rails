@@ -54,8 +54,27 @@ jobs:
         with:
           node-version: ${{ inputs['node-version'] }}
 
+      - name: Validate required commands
+        id: validate
+        continue-on-error: true
+        env:
+          INSTALL_COMMAND: ${{ inputs['install-command'] }}
+          BUILD_COMMAND: ${{ inputs['build-command'] }}
+          SMOKE_COMMAND: ${{ inputs['smoke-command'] }}
+        run: |
+          ruby -e '
+            required = {
+              "install-command" => ENV.fetch("INSTALL_COMMAND"),
+              "build-command" => ENV.fetch("BUILD_COMMAND"),
+              "smoke-command" => ENV.fetch("SMOKE_COMMAND")
+            }
+            blank = required.filter_map { |name, command| name if command.strip.empty? }
+            abort("Required workflow commands are blank: #{blank.join(", ")}") unless blank.empty?
+          '
+
       - name: Install dependencies
         id: install
+        if: ${{ steps.validate.outcome == 'success' }}
         continue-on-error: true
         env:
           COMMAND: ${{ inputs['install-command'] }}
@@ -63,7 +82,7 @@ jobs:
 
       - name: Run tests
         id: test
-        if: ${{ inputs['test-command'] != '' }}
+        if: ${{ steps.validate.outcome == 'success' && inputs['test-command'] != '' }}
         continue-on-error: true
         env:
           COMMAND: ${{ inputs['test-command'] }}
@@ -71,6 +90,7 @@ jobs:
 
       - name: Build application
         id: build
+        if: ${{ steps.validate.outcome == 'success' }}
         continue-on-error: true
         env:
           COMMAND: ${{ inputs['build-command'] }}
@@ -78,6 +98,7 @@ jobs:
 
       - name: Run local smoke
         id: smoke
+        if: ${{ steps.validate.outcome == 'success' }}
         continue-on-error: true
         env:
           COMMAND: ${{ inputs['smoke-command'] }}
@@ -88,6 +109,7 @@ jobs:
         env:
           HEAD_SHA: ${{ github.sha }}
           REPOSITORY: ${{ github.repository }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
           INSTALL_OUTCOME: ${{ steps.install.outcome }}
           TEST_OUTCOME: ${{ steps.test.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
@@ -95,18 +117,22 @@ jobs:
         run: |
           ruby -rjson -e '
             outcomes = {
+              "validate" => ENV.fetch("VALIDATE_OUTCOME"),
               "install" => ENV.fetch("INSTALL_OUTCOME"),
               "test" => ENV.fetch("TEST_OUTCOME"),
               "build" => ENV.fetch("BUILD_OUTCOME"),
               "smoke" => ENV.fetch("SMOKE_OUTCOME")
             }
+            required_passed = %w[validate install build smoke].all? do |step|
+              outcomes.fetch(step) == "success"
+            end
+            test_passed = %w[success skipped].include?(outcomes.fetch("test"))
             evidence = {
               "schema_version" => 1,
               "repository" => ENV.fetch("REPOSITORY"),
               "head_sha" => ENV.fetch("HEAD_SHA"),
               "outcomes" => outcomes,
-              "status" => outcomes.values.none? { |value| value == "failure" } ?
-                "passed" : "blocked"
+              "status" => required_passed && test_passed ? "passed" : "blocked"
             }
             rendered = "#{JSON.pretty_generate(evidence)}\n"
             File.write("fleet-smoke-evidence.json", rendered)

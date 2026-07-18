@@ -98,12 +98,18 @@ After stable publication, generate a fresh public standing-health pack with
 `check_fleet_health.rb --live --release v17.0.0 --rsc-version 19.2.1`. The command verifies those
 exact public registry artifacts across both gems, all four unified-version npm packages, and the
 independently versioned RSC package. Direct-lock currency comes only from root `DEPENDS_ON` SPDX
-relationships; mixed direct versions block and missing root identity fails closed. Default CI and
-smoke stay bound to public default heads, while PR-only review-app capability uses the exact
-`standing_health.review_app_workflow` public path and its latest public run URL and timestamp.
-Staging, cleanup, delete, help, and promotion workflows never substitute for that path. Keep
-soft-track and archived findings report-only. This pack is evidence for fleet currency and
-capability drift; it is not a replacement for the candidate ledger or a release-promotion signal.
+relationships; mixed direct versions block and missing root identity fails closed. npm
+prereleases use ecosystem-normalized hyphen notation. Default CI stays bound to the public default
+head. Smoke passes only after the workflow containing the shared smoke contract succeeds for that
+exact head, with nonblank required commands and every required stage successful. PR-only
+review-app capability uses the exact `standing_health.review_app_workflow` public path and a recent
+`pull_request` run whose base branch, head branch, and head SHA agree with its PR metadata. Staging,
+cleanup, delete, help, and promotion workflows never substitute for that path. GitHub archival of
+an active target blocks as manifest drift. Dependabot requires one enabled weekly root entry per
+required ecosystem; separate disabled, non-root, or differently scheduled entries cannot combine
+into a pass. Keep soft-track and archived findings report-only. This pack is evidence for fleet
+currency and capability drift; it is not a replacement for the candidate ledger or a
+release-promotion signal.
 
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.

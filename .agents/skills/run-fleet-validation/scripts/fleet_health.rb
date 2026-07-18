@@ -9,6 +9,15 @@ require "yaml"
 require_relative "fleet_lifecycle"
 
 module FleetValidation
+  module ProductVersion
+    module_function
+
+    def normalize(release, ecosystem)
+      version = release.delete_prefix("v")
+      ecosystem == "npm" ? version.gsub(/\.((?:rc|beta))\.(\d+)\z/, '-\\1.\\2') : version
+    end
+  end
+
   class PublicRegistryResolver
     RUBYGEMS = "https://rubygems.org"
     NPM = "https://registry.npmjs.org"
@@ -26,22 +35,23 @@ module FleetValidation
     end
 
     def resolve(release:, rsc_version:)
-      product_version = release.delete_prefix("v")
+      gem_version = ProductVersion.normalize(release, "gem")
+      npm_version = ProductVersion.normalize(release, "npm")
       gem_artifacts = PRODUCT_GEMS.map do |name|
         versions = @fetcher.call("#{RUBYGEMS}/api/v1/versions/#{name}.json")
-        unless Array(versions).any? { |entry| entry["number"] == product_version && entry["yanked"] != true }
-          raise ManifestError, "#{name} #{product_version} is not a public non-yanked RubyGems artifact"
+        unless Array(versions).any? { |entry| entry["number"] == gem_version && entry["yanked"] != true }
+          raise ManifestError, "#{name} #{gem_version} is not a public non-yanked RubyGems artifact"
         end
 
-        registry_artifact("gem", name, product_version, RUBYGEMS)
+        registry_artifact("gem", name, gem_version, RUBYGEMS)
       end
       npm_artifacts = PRODUCT_NPM.map do |name|
         document = @fetcher.call("#{NPM}/#{name}")
-        unless document.fetch("versions", {}).key?(product_version)
-          raise ManifestError, "#{name} #{product_version} is not a public npm artifact"
+        unless document.fetch("versions", {}).key?(npm_version)
+          raise ManifestError, "#{name} #{npm_version} is not a public npm artifact"
         end
 
-        registry_artifact("npm", name, product_version, NPM)
+        registry_artifact("npm", name, npm_version, NPM)
       end
       npm_rsc = @fetcher.call("#{NPM}/#{RSC_NPM}")
       unless npm_rsc.fetch("versions", {}).key?(rsc_version)
@@ -135,13 +145,29 @@ module FleetValidation
           next
         end
 
-        findings << "#{ecosystem}:not-weekly" unless entries.any? { |entry| entry.dig("schedule", "interval") == "weekly" }
-        if entries.all? { |entry| entry.fetch("open-pull-requests-limit", 1).zero? }
-          findings << "#{ecosystem}:version-updates-disabled"
+        root_entries = entries.select { |entry| root_directory?(entry) }
+        if root_entries.empty?
+          findings << "#{ecosystem}:root-missing"
+          next
         end
+
+        enabled_root_entries = root_entries.reject { |entry| entry.fetch("open-pull-requests-limit", 1).zero? }
+        if enabled_root_entries.empty?
+          findings << "#{ecosystem}:version-updates-disabled"
+          next
+        end
+
+        weekly_root_entries = enabled_root_entries.select do |entry|
+          entry.dig("schedule", "interval") == "weekly"
+        end
+        if weekly_root_entries.empty?
+          findings << "#{ecosystem}:not-weekly"
+          next
+        end
+
         next if ecosystem == "github-actions"
 
-        patterns = entries.flat_map do |entry|
+        patterns = weekly_root_entries.flat_map do |entry|
           entry.fetch("groups", {}).values.flat_map { |group| Array(group["patterns"]) }
         end
         expected_prefix = ecosystem == "bundler" ? "react_on_rails" : "react-on-rails"
@@ -155,11 +181,16 @@ module FleetValidation
         "findings" => findings
       }
     end
+
+    def root_directory?(entry)
+      entry["directory"] == "/" || Array(entry["directories"]).include?("/")
+    end
   end
 
   class PublicGitHubProbe
     SHARED_SMOKE_REFERENCE = "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@"
     PASSING_CONCLUSIONS = %w[success neutral skipped].freeze
+    REVIEW_APP_MAX_AGE_DAYS = 45
 
     def initialize(client:)
       @client = client
@@ -178,11 +209,12 @@ module FleetValidation
         "default_branch" => default_branch,
         "default_commit" => head,
         "default_commit_at" => commit.dig("commit", "committer", "date"),
+        "repository_archived" => metadata["archived"] == true,
         "observed_at" => observed_at,
         "package_versions" => package_versions(repo),
         "default_ci" => check_status(checks),
-        "smoke" => smoke_status(repo, head, checks, workflows),
-        "review_app" => review_app_status(repo, target, workflows),
+        "smoke" => smoke_status(repo, head, checks, workflows, default_branch:),
+        "review_app" => review_app_status(repo, target, workflows, default_branch:, observed_at:),
         "dependabot" => dependabot_status(repo, head, target.fetch("packages"))
       }
     rescue StandardError => e
@@ -214,23 +246,57 @@ module FleetValidation
       evidence_status(status, evidence_urls(checks))
     end
 
-    def smoke_status(repo, head, checks, workflows)
-      smoke_workflows = workflows.select { |workflow| smoke_name?(workflow["name"]) || smoke_name?(workflow["path"]) }
-      smoke_checks = checks.select { |check| smoke_name?(check["name"]) }
-      status = check_status(smoke_checks)
-      shared_contract = smoke_workflows.any? do |workflow|
+    def smoke_status(repo, head, _checks, workflows, default_branch:)
+      candidate_workflows = workflows.select do |workflow|
+        smoke_name?(workflow["name"]) || smoke_name?(workflow["path"])
+      end
+      shared_workflows = candidate_workflows.select do |workflow|
         @client.content(repo, workflow.fetch("path"), ref: head).include?(SHARED_SMOKE_REFERENCE)
       rescue StandardError
         false
       end
-      status.merge(
-        "shared_contract" => shared_contract,
-        "evidence" => [status["evidence"], smoke_workflows.map { |workflow| workflow["path"] }.join(", ")]
-          .reject { |value| value.to_s.empty? }.join("; ")
-      )
+      if shared_workflows.empty?
+        return evidence_status("unknown", "No reusable fleet-smoke caller was found at the default head")
+               .merge("shared_contract" => false)
+      end
+
+      statuses = shared_workflows.map do |workflow|
+        shared_smoke_workflow_status(repo, head, default_branch, workflow)
+      end
+      status = if statuses.any? { |candidate| candidate["status"] == "passed" }
+                 "passed"
+               elsif statuses.any? { |candidate| candidate["status"] == "unknown" }
+                 "unknown"
+               else
+                 "blocked"
+               end
+      evidence_status(status, statuses.filter_map { |candidate| candidate["evidence"] }.join("; "))
+        .merge("shared_contract" => true)
     end
 
-    def review_app_status(repo, target, workflows)
+    def shared_smoke_workflow_status(repo, head, default_branch, workflow)
+      workflow_evidence = workflow["html_url"] || workflow["path"]
+      workflow_id = workflow.fetch("id")
+      branch = URI.encode_www_form_component(default_branch)
+      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?branch=#{branch}&per_page=20")
+                    .fetch("workflow_runs", [])
+      run = runs.find { |candidate| candidate["head_sha"] == head }
+      return evidence_status("unknown", "#{workflow_evidence}; no exact-head public workflow run") unless run
+
+      evidence = [
+        workflow_evidence,
+        run["html_url"],
+        "head_sha=#{run['head_sha']}",
+        ("updated_at=#{run['updated_at']}" if run["updated_at"])
+      ].compact.join("; ")
+      return evidence_status("unknown", evidence) unless run["status"] == "completed"
+
+      evidence_status(run["conclusion"] == "success" ? "passed" : "blocked", evidence)
+    rescue StandardError => e
+      evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
+    end
+
+    def review_app_status(repo, target, workflows, default_branch:, observed_at:)
       if target.fetch("review_app") == "not_required"
         return evidence_status("not_applicable", "Review app is not required by public fleet policy")
       end
@@ -243,32 +309,67 @@ module FleetValidation
       workflow = workflows.find { |candidate| candidate["path"] == workflow_path }
       return evidence_status("unknown", "Configured review-app workflow was not found: #{workflow_path}") unless workflow
 
-      review_workflow_status(repo, workflow)
+      review_workflow_status(repo, workflow, default_branch:, observed_at:)
     end
 
-    def review_workflow_status(repo, workflow)
+    def review_workflow_status(repo, workflow, default_branch:, observed_at:)
       workflow_evidence = workflow["html_url"] || workflow["path"]
       unless workflow["state"] == "active"
         return evidence_status("blocked", "#{workflow_evidence}; state=#{workflow['state'] || 'unknown'}")
       end
 
       workflow_id = workflow.fetch("id")
-      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?per_page=1")
+      runs = @client.get("/repos/#{repo}/actions/workflows/#{workflow_id}/runs?event=pull_request&per_page=20")
                     .fetch("workflow_runs", [])
-      return evidence_status("unknown", "#{workflow_evidence}; no public workflow run") if runs.empty?
+      run = runs.find do |candidate|
+        Array(candidate["pull_requests"]).any? { |pull_request| pull_request.dig("base", "ref") == default_branch }
+      end
+      return evidence_status("unknown", "#{workflow_evidence}; no public workflow run targeting #{default_branch}") unless run
 
-      run = runs.first
       evidence = [
         workflow_evidence,
         run["html_url"],
+        ("event=#{run['event']}" if run["event"]),
+        ("head_branch=#{run['head_branch']}" if run["head_branch"]),
+        ("head_sha=#{run['head_sha']}" if run["head_sha"]),
+        ("run_started_at=#{run['run_started_at']}" if run["run_started_at"]),
         ("updated_at=#{run['updated_at']}" if run["updated_at"])
       ].compact.join("; ")
+      identity_error = review_run_identity_error(run, default_branch:, observed_at:)
+      return evidence_status("unknown", "#{evidence}; #{identity_error}") if identity_error
       return evidence_status("unknown", evidence) unless run["status"] == "completed"
 
-      status = PASSING_CONCLUSIONS.include?(run["conclusion"]) ? "passed" : "blocked"
+      status = run["conclusion"] == "success" ? "passed" : "blocked"
       evidence_status(status, evidence)
     rescue StandardError => e
       evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
+    end
+
+    def review_run_identity_error(run, default_branch:, observed_at:)
+      return "event is not pull_request" unless run["event"] == "pull_request"
+
+      pull_request = Array(run["pull_requests"]).find do |candidate|
+        candidate.dig("base", "ref") == default_branch
+      end
+      return "run is not bound to a pull request targeting #{default_branch}" unless pull_request
+      unless present_string?(run["head_branch"]) && run["head_branch"] == pull_request.dig("head", "ref")
+        return "head branch does not match the pull request"
+      end
+      unless run["head_sha"].to_s.match?(/\A[0-9a-f]{40}\z/) &&
+             run["head_sha"] == pull_request.dig("head", "sha")
+        return "head SHA does not match the pull request"
+      end
+
+      started_at = Time.iso8601(run["run_started_at"].to_s)
+      age_seconds = Time.iso8601(observed_at) - started_at
+      return "run age exceeds #{REVIEW_APP_MAX_AGE_DAYS} days" unless age_seconds.between?(
+        0,
+        REVIEW_APP_MAX_AGE_DAYS * 86_400
+      )
+
+      nil
+    rescue ArgumentError
+      "run start or observation time is invalid"
     end
 
     def dependabot_status(repo, head, packages)
@@ -293,6 +394,7 @@ module FleetValidation
         "default_branch" => nil,
         "default_commit" => nil,
         "default_commit_at" => nil,
+        "repository_archived" => nil,
         "observed_at" => observed_at,
         "package_versions" => [],
         "default_ci" => evidence_status("unknown", reason),
@@ -308,6 +410,10 @@ module FleetValidation
 
     def evidence_urls(checks)
       checks.filter_map { |check| check["html_url"] }.uniq.join(", ")
+    end
+
+    def present_string?(value)
+      value.is_a?(String) && !value.empty?
     end
 
     def smoke_name?(value)
@@ -545,8 +651,10 @@ module FleetValidation
       review_app = normalize_evidence_status(observation["review_app"])
       dependabot = normalize_dependabot_status(observation["dependabot"])
       staleness = evaluate_staleness(observation["default_commit_at"])
+      repository_archived = boolean_or_nil(observation["repository_archived"])
 
       if target.fetch("disposition") == "active"
+        findings << "repository_archived" if repository_archived
         findings << "default_ci" unless default_ci.fetch("status") == "passed"
         findings << "smoke" unless smoke.fetch("status") == "passed" && smoke.fetch("shared_contract")
         if target.fetch("review_app") == "required" && review_app.fetch("status") != "passed"
@@ -564,6 +672,7 @@ module FleetValidation
         "default_branch" => nullable_string_value(observation["default_branch"]),
         "default_commit" => nullable_string_value(observation["default_commit"]),
         "default_commit_at" => nullable_string_value(observation["default_commit_at"]),
+        "repository_archived" => repository_archived,
         "observed_at" => nullable_string_value(observation["observed_at"]),
         "currency" => currency,
         "default_ci" => default_ci,
@@ -633,8 +742,7 @@ module FleetValidation
     end
 
     def normalized_release(ecosystem)
-      version = @release.delete_prefix("v")
-      ecosystem == "npm" ? version.gsub(/\.((?:rc|beta))\.(\d+)\z/, '-\\1.\\2') : version
+      ProductVersion.normalize(@release, ecosystem)
     end
 
     def normalize_evidence_status(value)
@@ -680,7 +788,8 @@ module FleetValidation
     def render_summary(evidence)
       rows = evidence.fetch("targets").map do |target|
         findings = target.fetch("findings")
-        "| `#{escape(target.fetch('id'))}` | #{target.fetch('disposition')} | #{target.fetch('status')} | " \
+        archived = target["repository_archived"].nil? ? "unknown" : target["repository_archived"]
+        "| `#{escape(target.fetch('id'))}` | #{target.fetch('disposition')} | #{archived} | #{target.fetch('status')} | " \
           "#{findings.empty? ? 'none' : findings.join(', ')} |"
       end
       <<~MARKDOWN
@@ -691,8 +800,8 @@ module FleetValidation
         RSC: `#{escape(evidence.dig('pack', 'rsc_version'))}`
         Aggregate: **#{escape(evidence.dig('aggregate', 'status').upcase)}**
 
-        | Target | Disposition | Status | Findings |
-        | --- | --- | --- | --- |
+        | Target | Disposition | GitHub archived | Status | Findings |
+        | --- | --- | --- | --- | --- |
         #{rows.join("\n")}
       MARKDOWN
     end
@@ -700,8 +809,8 @@ module FleetValidation
     def target_schema
       object_schema(
         %w[
-          id name tier disposition default_branch default_commit default_commit_at observed_at currency default_ci smoke
-          review_app dependabot staleness status findings
+          id name tier disposition default_branch default_commit default_commit_at repository_archived observed_at currency
+          default_ci smoke review_app dependabot staleness status findings
         ],
         {
           "id" => nonempty_string,
@@ -711,6 +820,7 @@ module FleetValidation
           "default_branch" => nullable_string,
           "default_commit" => nullable_string,
           "default_commit_at" => nullable_string,
+          "repository_archived" => { "type" => %w[boolean null] },
           "observed_at" => nullable_string,
           "currency" => currency_schema,
           "default_ci" => evidence_status_schema,
@@ -835,6 +945,10 @@ module FleetValidation
       present?(value) ? value : nil
     end
 
+    def boolean_or_nil(value)
+      value if [true, false].include?(value)
+    end
+
     def present?(value)
       !value.nil? && (!value.respond_to?(:empty?) || !value.empty?)
     end
@@ -863,7 +977,10 @@ module FleetValidation
     end
 
     def escape(value)
-      value.to_s.gsub("|", "\\|").gsub("<!--", "&lt;!--").gsub("-->", "--&gt;")
+      value.to_s.gsub("\\") { "\\\\" }
+           .gsub("|", "\\|")
+           .gsub("<!--", "&lt;!--")
+           .gsub("-->", "--&gt;")
     end
   end
 end

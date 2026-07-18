@@ -85,6 +85,21 @@ class FleetHealthTest < Minitest::Test
     assert_equal ["sanitized-active-drifted"], evidence.dig("aggregate", "blocking_targets")
   end
 
+  def test_active_repository_archival_is_surfaced_as_blocking_manifest_drift
+    observations = Marshal.load(Marshal.dump(@observations))
+    observations.fetch("sanitized-active-current")["repository_archived"] = true
+
+    evidence = @contract.evaluate(
+      observations:,
+      registry_artifacts: stable_registry_artifacts
+    )
+    current = target(evidence, "sanitized-active-current")
+
+    assert_equal true, current.fetch("repository_archived")
+    assert_includes current.fetch("findings"), "repository_archived"
+    assert_equal "blocked", current.fetch("status")
+  end
+
   def test_registry_artifacts_must_be_exact_stable_public_versions
     artifacts = stable_registry_artifacts
     artifacts[0]["version"] = "17.0.0.rc.12"
@@ -160,6 +175,13 @@ class FleetHealthTest < Minitest::Test
     errors = FleetValidation::SchemaValidator.new(@contract.schema).errors(evidence)
 
     assert(errors.any? { |error| error.include?("unexpected") })
+  end
+
+  def test_markdown_escaping_preserves_literal_backslashes_and_table_delimiters
+    escaped = @contract.send(:escape, 'literal\path|column')
+
+    assert_equal 3, escaped.count("\\")
+    assert_includes escaped, '\|'
   end
 
   def test_writes_a_machine_readable_pack_and_human_summary
@@ -249,6 +271,60 @@ class FleetHealthTest < Minitest::Test
     assert_equal "passed", passed.fetch("status")
     assert_equal "blocked", blocked.fetch("status")
     assert_includes blocked.fetch("findings"), "npm:version-updates-disabled"
+  end
+
+  def test_dependabot_v1_requires_one_enabled_weekly_root_entry
+    config = dependabot_v1_config
+    npm = config.fetch("updates").find { |entry| entry["package-ecosystem"] == "npm" }
+    npm["open-pull-requests-limit"] = 0
+    config.fetch("updates") << npm.merge(
+      "schedule" => { "interval" => "daily" },
+      "open-pull-requests-limit" => 5
+    )
+
+    result = FleetValidation::DependabotV1.evaluate(
+      config,
+      [{ "ecosystem" => "npm", "name" => "react-on-rails" }]
+    )
+
+    assert_equal "blocked", result.fetch("status")
+    assert_includes result.fetch("findings"), "npm:not-weekly"
+  end
+
+  def test_dependabot_v1_rejects_weekly_coverage_outside_the_root
+    config = dependabot_v1_config
+    npm = config.fetch("updates").find { |entry| entry["package-ecosystem"] == "npm" }
+    npm["directory"] = "/docs"
+    config.fetch("updates") << npm.merge(
+      "directory" => "/",
+      "schedule" => { "interval" => "daily" }
+    )
+
+    result = FleetValidation::DependabotV1.evaluate(
+      config,
+      [{ "ecosystem" => "npm", "name" => "react-on-rails" }]
+    )
+
+    assert_equal "blocked", result.fetch("status")
+    assert_includes result.fetch("findings"), "npm:not-weekly"
+  end
+
+  def test_dependabot_v1_requires_product_grouping_on_an_enabled_weekly_root_entry
+    config = dependabot_v1_config
+    npm = config.fetch("updates").find { |entry| entry["package-ecosystem"] == "npm" }
+    npm["open-pull-requests-limit"] = 0
+    config.fetch("updates") << npm.merge(
+      "groups" => {},
+      "open-pull-requests-limit" => 5
+    )
+
+    result = FleetValidation::DependabotV1.evaluate(
+      config,
+      [{ "ecosystem" => "npm", "name" => "react-on-rails" }]
+    )
+
+    assert_equal "blocked", result.fetch("status")
+    assert_includes result.fetch("findings"), "npm:product-group-missing"
   end
 
   def test_public_sbom_parser_extracts_gem_and_npm_versions
@@ -347,11 +423,33 @@ class FleetHealthTest < Minitest::Test
     assert_equal 7, @contract.schema.dig("properties", "registry", "properties", "artifacts", "minItems")
   end
 
+  def test_public_registry_resolver_normalizes_npm_prerelease_versions
+    resolver = FleetValidation::PublicRegistryResolver.new(fetcher: lambda do |url|
+      if URI(url).host == "rubygems.org"
+        [{ "number" => "17.0.0.rc.12", "yanked" => false }]
+      else
+        { "versions" => { "17.0.0-rc.12" => {}, "19.2.1" => {} } }
+      end
+    end)
+
+    artifacts = resolver.resolve(release: "v17.0.0.rc.12", rsc_version: "19.2.1")
+
+    assert_equal(
+      Array.new(4, "17.0.0-rc.12"),
+      artifacts.select { |artifact| artifact["ecosystem"] == "npm" && artifact["name"] != "react-on-rails-rsc" }
+               .map { |artifact| artifact.fetch("version") }
+    )
+    assert_equal(
+      Array.new(2, "17.0.0.rc.12"),
+      artifacts.select { |artifact| artifact["ecosystem"] == "gem" }.map { |artifact| artifact.fetch("version") }
+    )
+  end
+
   def test_public_registry_resolver_rejects_an_incomplete_product_suite
     resolver = FleetValidation::PublicRegistryResolver.new(fetcher: lambda do |url|
       next [] if url.end_with?("react_on_rails_pro.json")
 
-      if url.include?("rubygems.org")
+      if URI(url).host == "rubygems.org"
         [{ "number" => "17.0.0", "yanked" => false }]
       else
         { "versions" => { "17.0.0" => {}, "19.2.1" => {} } }
@@ -432,7 +530,12 @@ class FleetHealthTest < Minitest::Test
         },
         "/repos/#{repo}/actions/workflows?per_page=100" => {
           "workflows" => [
-            { "path" => ".github/workflows/demo-fleet-smoke.yml", "name" => "Demo fleet smoke" },
+            {
+              "id" => 41,
+              "path" => ".github/workflows/demo-fleet-smoke.yml",
+              "name" => "Demo fleet smoke",
+              "html_url" => "https://example.invalid/smoke-workflow"
+            },
             {
               "id" => 42,
               "path" => ".github/workflows/cpflow-deploy-review-app.yml",
@@ -442,15 +545,17 @@ class FleetHealthTest < Minitest::Test
             }
           ]
         },
-        "/repos/#{repo}/actions/workflows/42/runs?per_page=1" => {
-          "workflow_runs" => [
-            {
-              "status" => "completed",
-              "conclusion" => "success",
-              "html_url" => "https://example.invalid/review-app-run",
-              "updated_at" => "2026-07-18T10:00:00Z"
-            }
-          ]
+        "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=20" => {
+          "workflow_runs" => [{
+            "head_sha" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status" => "completed",
+            "conclusion" => "success",
+            "html_url" => "https://example.invalid/smoke-run",
+            "updated_at" => "2026-07-18T10:00:00Z"
+          }]
+        },
+        "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=20" => {
+          "workflow_runs" => [valid_review_run]
         }
       },
       {
@@ -471,6 +576,7 @@ class FleetHealthTest < Minitest::Test
     observation = probe.observe(target, observed_at: "2026-07-18T12:00:00Z")
 
     assert_equal "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", observation.fetch("default_commit")
+    assert_equal false, observation.fetch("repository_archived")
     assert_equal "passed", observation.dig("default_ci", "status")
     assert_equal true, observation.dig("smoke", "shared_contract")
     assert_equal "passed", observation.dig("review_app", "status")
@@ -493,26 +599,26 @@ class FleetHealthTest < Minitest::Test
         { "workflow_runs" => runs }
       end
     end
-    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([
-                                                                        {
-                                                                          "status" => "completed",
-                                                                          "conclusion" => "failure",
-                                                                          "html_url" => "https://example.invalid/run",
-                                                                          "updated_at" => "2026-07-18T10:00:00Z"
-                                                                        }
-                                                                      ]))
+    probe = FleetValidation::PublicGitHubProbe.new(
+      client: client.new([valid_review_run("conclusion" => "failure")])
+    )
 
-    broken = probe.send(:review_app_status, repo, target, [workflow])
-    probe = FleetValidation::PublicGitHubProbe.new(client: client.new([
-                                                                        { "status" => "in_progress", "html_url" => "https://example.invalid/run", "updated_at" => "2026-07-18T11:00:00Z" }
-                                                                      ]))
-    pending = probe.send(:review_app_status, repo, target, [workflow])
+    broken = review_app_status(probe, repo, target, workflow)
+    probe = FleetValidation::PublicGitHubProbe.new(
+      client: client.new([valid_review_run("status" => "in_progress", "conclusion" => nil)])
+    )
+    pending = review_app_status(probe, repo, target, workflow)
+    probe = FleetValidation::PublicGitHubProbe.new(
+      client: client.new([valid_review_run("conclusion" => "skipped")])
+    )
+    skipped = review_app_status(probe, repo, target, workflow)
     probe = FleetValidation::PublicGitHubProbe.new(client: client.new([]))
-    missing_run = probe.send(:review_app_status, repo, target, [workflow])
-    absent_workflow = probe.send(:review_app_status, repo, target, [])
+    missing_run = review_app_status(probe, repo, target, workflow)
+    absent_workflow = review_app_status(probe, repo, target, nil)
 
     assert_equal "blocked", broken.fetch("status")
     assert_equal "unknown", pending.fetch("status")
+    assert_equal "blocked", skipped.fetch("status")
     assert_equal "unknown", missing_run.fetch("status")
     assert_equal "unknown", absent_workflow.fetch("status")
   end
@@ -542,7 +648,14 @@ class FleetHealthTest < Minitest::Test
               }
             ])
     status = FleetValidation::PublicGitHubProbe.new(client:)
-                                               .send(:review_app_status, target.fetch("name"), target, [staging_workflow])
+                                               .send(
+                                                 :review_app_status,
+                                                 target.fetch("name"),
+                                                 target,
+                                                 [staging_workflow],
+                                                 default_branch: "main",
+                                                 observed_at: "2026-07-18T12:00:00Z"
+                                               )
 
     assert_equal "not_applicable", status.fetch("status")
   end
@@ -568,25 +681,14 @@ class FleetHealthTest < Minitest::Test
         responses.fetch(path)
       end
     end.new({
-              "/repos/#{target.fetch('name')}/actions/workflows/42/runs?per_page=1" => {
-                "workflow_runs" => [
-                  {
-                    "status" => "completed",
-                    "conclusion" => "success",
-                    "html_url" => "https://example.invalid/review-run",
-                    "updated_at" => "2026-07-18T10:00:00Z"
-                  }
-                ]
+              "/repos/#{target.fetch('name')}/actions/workflows/42/runs?event=pull_request&per_page=20" => {
+                "workflow_runs" => [valid_review_run("html_url" => "https://example.invalid/review-run")]
               },
-              "/repos/#{target.fetch('name')}/actions/workflows/43/runs?per_page=1" => {
-                "workflow_runs" => [
-                  {
-                    "status" => "completed",
-                    "conclusion" => "failure",
-                    "html_url" => "https://example.invalid/cleanup-run",
-                    "updated_at" => "2026-07-18T11:00:00Z"
-                  }
-                ]
+              "/repos/#{target.fetch('name')}/actions/workflows/43/runs?event=pull_request&per_page=20" => {
+                "workflow_runs" => [valid_review_run(
+                  "conclusion" => "failure",
+                  "html_url" => "https://example.invalid/cleanup-run"
+                )]
               }
             })
     status = FleetValidation::PublicGitHubProbe.new(client:)
@@ -594,12 +696,117 @@ class FleetHealthTest < Minitest::Test
                                                  :review_app_status,
                                                  target.fetch("name"),
                                                  target,
-                                                 [exact_workflow, cleanup_workflow]
+                                                 [exact_workflow, cleanup_workflow],
+                                                 default_branch: "main",
+                                                 observed_at: "2026-07-18T12:00:00Z"
                                                )
 
     assert_equal "passed", status.fetch("status")
     assert_includes status.fetch("evidence"), "review-run"
     refute_includes status.fetch("evidence"), "cleanup-run"
+  end
+
+  def test_review_app_rejects_non_pr_mismatched_and_stale_runs
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end
+    manual = review_app_status(
+      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("event" => "workflow_dispatch")])),
+      repo,
+      target,
+      workflow
+    )
+    mismatched_head = review_app_status(
+      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("head_sha" => "b" * 40)])),
+      repo,
+      target,
+      workflow
+    )
+    mismatched_branch = review_app_status(
+      FleetValidation::PublicGitHubProbe.new(client: client.new([valid_review_run("head_branch" => "other")])),
+      repo,
+      target,
+      workflow
+    )
+    wrong_base = review_app_status(
+      FleetValidation::PublicGitHubProbe.new(
+        client: client.new([valid_review_run(
+          "pull_requests" => [{
+            "head" => { "ref" => "feature/review-app", "sha" => "c" * 40 },
+            "base" => { "ref" => "release/17.0.0" }
+          }]
+        )])
+      ),
+      repo,
+      target,
+      workflow
+    )
+    stale = review_app_status(
+      FleetValidation::PublicGitHubProbe.new(
+        client: client.new([valid_review_run("run_started_at" => "2026-04-01T10:00:00Z")])
+      ),
+      repo,
+      target,
+      workflow
+    )
+
+    assert_equal "unknown", manual.fetch("status")
+    assert_equal "unknown", mismatched_head.fetch("status")
+    assert_equal "unknown", mismatched_branch.fetch("status")
+    assert_equal "unknown", wrong_base.fetch("status")
+    assert_equal "unknown", stale.fetch("status")
+  end
+
+  def test_shared_smoke_requires_an_exact_head_run_of_the_shared_workflow
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/smoke-caller.yml",
+      "name" => "Fleet smoke caller",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    client = Struct.new(:contents) do
+      def content(_repo, _path, ref:)
+        raise "wrong head" unless ref == "a" * 40
+
+        "uses: shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+      end
+
+      def get(_path)
+        { "workflow_runs" => [] }
+      end
+    end.new({})
+    unrelated_check = {
+      "name" => "Unrelated smoke",
+      "status" => "completed",
+      "conclusion" => "success",
+      "html_url" => "https://example.invalid/unrelated"
+    }
+
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(
+                                                 :smoke_status,
+                                                 repo,
+                                                 head,
+                                                 [unrelated_check],
+                                                 [workflow],
+                                                 default_branch: "main"
+                                               )
+
+    assert_equal true, status.fetch("shared_contract")
+    assert_equal "unknown", status.fetch("status")
+    refute_includes status.fetch("evidence"), "unrelated"
   end
 
   def test_public_github_probe_degrades_a_target_failure_to_unknown
@@ -628,6 +835,51 @@ class FleetHealthTest < Minitest::Test
     refute_includes workflow, "secrets: inherit"
   end
 
+  def test_reusable_smoke_workflow_rejects_blank_required_commands
+    step = reusable_smoke_steps.find { |candidate| candidate["name"] == "Validate required commands" }
+    assert step, "workflow must validate required commands before execution"
+
+    env = {
+      "INSTALL_COMMAND" => "bundle install",
+      "BUILD_COMMAND" => " ",
+      "SMOKE_COMMAND" => "bin/smoke"
+    }
+    _stdout, _stderr, status = Open3.capture3(env, "bash", "-lc", step.fetch("run"))
+
+    refute status.success?
+  end
+
+  def test_reusable_smoke_evidence_requires_success_for_every_required_stage
+    step = reusable_smoke_steps.find { |candidate| candidate["name"] == "Write exact-head smoke evidence" }
+    assert step
+    env = {
+      "HEAD_SHA" => "a" * 40,
+      "REPOSITORY" => "sanitized/demo",
+      "VALIDATE_OUTCOME" => "success",
+      "INSTALL_OUTCOME" => "cancelled",
+      "TEST_OUTCOME" => "skipped",
+      "BUILD_OUTCOME" => "success",
+      "SMOKE_OUTCOME" => "success"
+    }
+
+    Dir.mktmpdir do |directory|
+      _stdout, stderr, status = Open3.capture3(env, "bash", "-lc", step.fetch("run"), chdir: directory)
+      assert status.success?, stderr
+      evidence = JSON.parse(File.read(File.join(directory, "fleet-smoke-evidence.json")))
+
+      assert_equal "blocked", evidence.fetch("status")
+    end
+
+    env["INSTALL_OUTCOME"] = "success"
+    Dir.mktmpdir do |directory|
+      _stdout, stderr, status = Open3.capture3(env, "bash", "-lc", step.fetch("run"), chdir: directory)
+      assert status.success?, stderr
+      evidence = JSON.parse(File.read(File.join(directory, "fleet-smoke-evidence.json")))
+
+      assert_equal "passed", evidence.fetch("status")
+    end
+  end
+
   def test_scheduled_health_workflow_runs_live_scan_and_uploads_the_pack
     workflow = File.read(SCHEDULED_HEALTH)
 
@@ -641,8 +893,40 @@ class FleetHealthTest < Minitest::Test
 
   private
 
+  def reusable_smoke_steps
+    YAML.safe_load_file(REUSABLE_SMOKE, aliases: false).dig("jobs", "smoke", "steps")
+  end
+
   def target(evidence, id)
     evidence.fetch("targets").find { |candidate| candidate.fetch("id") == id }
+  end
+
+  def review_app_status(probe, repo, target, workflow)
+    probe.send(
+      :review_app_status,
+      repo,
+      target,
+      workflow ? [workflow] : [],
+      default_branch: "main",
+      observed_at: "2026-07-18T12:00:00Z"
+    )
+  end
+
+  def valid_review_run(overrides = {})
+    {
+      "event" => "pull_request",
+      "status" => "completed",
+      "conclusion" => "success",
+      "head_branch" => "feature/review-app",
+      "head_sha" => "c" * 40,
+      "run_started_at" => "2026-07-18T10:00:00Z",
+      "updated_at" => "2026-07-18T10:05:00Z",
+      "html_url" => "https://example.invalid/review-app-run",
+      "pull_requests" => [{
+        "head" => { "ref" => "feature/review-app", "sha" => "c" * 40 },
+        "base" => { "ref" => "main" }
+      }]
+    }.merge(overrides)
   end
 
   def stable_registry_artifacts
