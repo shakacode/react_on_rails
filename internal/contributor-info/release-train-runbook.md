@@ -628,7 +628,7 @@ replace — the rake promotion guards (`stable_release_branch_allowed?`,
 only `--dry-run` until the wrapper contract above is implemented:
 
 ```bash
-script/release-finish promote 17.0.0 --dry-run   # prints every command, executes nothing
+script/release-finish promote 17.0.0 --dry-run   # checks current remote state; performs no release writes
 # BLOCKED: do not run normal mode without the repository-owned lifetime/fencing wrapper.
 ```
 
@@ -738,7 +738,7 @@ git push   # push main directly or push the exact forward-port PR branch
 # If a PR is required, complete its exact-head gates, then in the merger's shell:
 FORWARD_PORT_PR="${FORWARD_PORT_PR:?set the forward-port PR number or URL}"
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-gh pr merge "${FORWARD_PORT_PR}" --merge   # stop if this would queue or defer the merge
+gh pr merge "${FORWARD_PORT_PR}" --rebase   # stop if this would queue or defer the merge
 # 2. Delete the ephemeral branch — the tags are the durable record.
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push origin --delete release/17.0.0
@@ -828,7 +828,7 @@ audited manual path instead:
    # If a PR is required, complete its exact-head gates, then:
    SELECTIVE_CLOSEOUT_PR="${SELECTIVE_CLOSEOUT_PR:?set the selective-closeout PR number or URL}"
    require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-   gh pr merge "${SELECTIVE_CLOSEOUT_PR}" --merge   # stop if this would queue or defer the merge
+   gh pr merge "${SELECTIVE_CLOSEOUT_PR}" --rebase   # stop if this would queue or defer the merge
    ```
 
    Refetch `origin/main` and the exact release ref with the explicit tracking
