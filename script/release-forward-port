@@ -32,6 +32,8 @@ class ReleaseForwardPort
   CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
   NARRATED_CHERRY_PICK_PATTERN =
     /cherry-picked\s+(?:main\s+)?(?:squash\s+)?commit\s+`?(?<sha>[0-9a-f]{40})`?\s+with\s+`?-x`?/i
+  NARRATED_FORWARD_PORT_PATTERN =
+    /^\s*-\s+cherry-picked\b.*\bwith\s+`?(?:git\s+)?cherry-pick\s+-x`?\s*$/i
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
@@ -260,6 +262,9 @@ class ReleaseForwardPort
 
   def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
     identity_candidates = target_history_source_identity_candidates(subject, target)
+    return "already forward-ported to #{target} via narrated cherry-pick -x evidence with no later target revert" if
+      identity_candidates.any? { |target_sha| narrated_forward_port_commit_live?(target_sha, target) }
+
     return patch_equivalent_skip_reason_message(target) if
       identity_candidates.any? &&
       patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
@@ -287,6 +292,11 @@ class ReleaseForwardPort
 
     @target_identity_mention_cache[cache_key] =
       git_lines("log", target, "--fixed-strings", "--grep", source_identity, "--format=%H")
+  end
+
+  def narrated_forward_port_commit_live?(sha, target)
+    body = git("log", "-1", "--format=%B", sha)
+    body.match?(NARRATED_FORWARD_PORT_PATTERN) && target_commit_live_on_target?(sha, target)
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)

@@ -459,6 +459,35 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "trusts a live target commit that narrates its conflict-resolved forward-port" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "base\nrelease-adapted fix\n")
+      fix_sha = commit_all(repo, "Fix release regression (#123)")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "app.txt", "base\nnewer main fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port release regression (#999)",
+        "-m",
+        "- cherry-picked the merged #123 squash commit with `git cherry-pick -x`"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("narrated cherry-pick -x evidence")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression (#123)")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
+    end
+  end
+
   it "skips no-footer target patches that rename the source path" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
