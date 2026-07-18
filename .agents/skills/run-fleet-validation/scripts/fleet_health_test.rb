@@ -13,6 +13,10 @@ class FleetHealthTest < Minitest::Test
   CHECK_FLEET_HEALTH = File.expand_path("check_fleet_health.rb", __dir__)
   REUSABLE_SMOKE = File.expand_path("../../../../.github/workflows/demo-fleet-smoke.yml", __dir__)
   SCHEDULED_HEALTH = File.expand_path("../../../../.github/workflows/demo-fleet-health.yml", __dir__)
+  SKILL = File.expand_path("../SKILL.md", __dir__)
+  RC_PLAN = File.expand_path("../../../../internal/contributor-info/rc-testing-plan.md", __dir__)
+  RELEASE_RUNBOOK = File.expand_path("../../../../internal/contributor-info/release-verification-runbook.md", __dir__)
+  RUBY_SETUP_SHA = "9eb537ca036ebaed86729dcb9309076e4c5c3b74"
 
   def setup
     fixture = YAML.safe_load_file(FIXTURE, aliases: false)
@@ -58,6 +62,43 @@ class FleetHealthTest < Minitest::Test
     assert_includes error.message, "review_app_workflow"
   end
 
+  def test_manifest_rejects_unknown_package_ecosystems_and_names
+    unknown_name = Marshal.load(Marshal.dump(@manifest))
+    unknown_name.fetch("repos").first.fetch("packages") << {
+      "ecosystem" => "npm",
+      "name" => "react-on-rail"
+    }
+    error = assert_raises(FleetValidation::ManifestError) { build_contract(unknown_name) }
+    assert_includes error.message, "react-on-rail"
+
+    unknown_ecosystem = Marshal.load(Marshal.dump(@manifest))
+    unknown_ecosystem.fetch("repos").first.fetch("packages") << {
+      "ecosystem" => "cargo",
+      "name" => "react-on-rails"
+    }
+    error = assert_raises(FleetValidation::ManifestError) { build_contract(unknown_ecosystem) }
+    assert_includes error.message, "cargo"
+  end
+
+  def test_manifest_allows_intentional_non_product_packages
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    packages = [
+      { "ecosystem" => "gem", "name" => "shakapacker" },
+      { "ecosystem" => "gem", "name" => "cpflow" },
+      { "ecosystem" => "npm", "name" => "shakapacker" },
+      { "ecosystem" => "npm", "name" => "shakapacker-rspack" }
+    ]
+    manifest.fetch("repos").first.fetch("packages").concat(packages)
+
+    contract = build_contract(manifest)
+
+    assert_includes contract.targets.first.fetch("packages"), { "ecosystem" => "gem", "name" => "cpflow" }
+    assert_includes contract.targets.first.fetch("packages"), {
+      "ecosystem" => "npm",
+      "name" => "shakapacker-rspack"
+    }
+  end
+
   def test_active_drift_blocks_aggregate_while_soft_and_archived_targets_are_report_only
     evidence = @contract.evaluate(
       observations: @observations,
@@ -81,8 +122,27 @@ class FleetHealthTest < Minitest::Test
     assert_equal "blocked", drifted.dig("staleness", "status")
     assert_equal "reported", report_only.fetch("status")
     assert_equal "reported", archived.fetch("status")
+    assert_equal %w[currency default_ci smoke dependabot staleness], report_only.fetch("findings")
+    assert_equal %w[default_ci smoke dependabot staleness], archived.fetch("findings")
     assert_equal "blocked", evidence.dig("aggregate", "status")
     assert_equal ["sanitized-active-drifted"], evidence.dig("aggregate", "blocking_targets")
+  end
+
+  def test_report_only_target_retains_required_review_app_drift_without_blocking
+    manifest = Marshal.load(Marshal.dump(@manifest))
+    report_only = manifest.fetch("repos").find { |repo| repo["name"] == "sanitized/report-only" }
+    report_only.fetch("standing_health").merge!(
+      "review_app" => "required",
+      "review_app_workflow" => ".github/workflows/cpflow-deploy-review-app.yml"
+    )
+    contract = build_contract(manifest)
+
+    evidence = contract.evaluate(observations: @observations, registry_artifacts: stable_registry_artifacts)
+    target = target(evidence, "sanitized-report-only")
+
+    assert_equal "reported", target.fetch("status")
+    assert_includes target.fetch("findings"), "review_app"
+    refute_includes evidence.dig("aggregate", "blocking_targets"), "sanitized-report-only"
   end
 
   def test_active_repository_archival_is_surfaced_as_blocking_manifest_drift
@@ -178,10 +238,12 @@ class FleetHealthTest < Minitest::Test
   end
 
   def test_markdown_escaping_preserves_literal_backslashes_and_table_delimiters
-    escaped = @contract.send(:escape, 'literal\path|column')
+    escaped = @contract.send(:escape, "literal\\path|column`code\nnext")
 
-    assert_equal 3, escaped.count("\\")
+    assert_equal 4, escaped.count("\\")
     assert_includes escaped, '\|'
+    assert_includes escaped, '\`'
+    refute_includes escaped, "\n"
   end
 
   def test_writes_a_machine_readable_pack_and_human_summary
@@ -200,7 +262,7 @@ class FleetHealthTest < Minitest::Test
   end
 
   def test_sanitized_rc12_replay_detects_standing_health_drift
-    stdout, stderr, status = Open3.capture3("ruby", RC12_REPLAY)
+    stdout, stderr, status = Open3.capture3("bundle", "exec", "ruby", RC12_REPLAY)
 
     assert status.success?, stderr
     assert_includes stdout, "SANITIZED_RC12_FLEET_HEALTH_REPLAY_PASS"
@@ -219,7 +281,7 @@ class FleetHealthTest < Minitest::Test
       File.write(registry_path, YAML.dump(stable_registry_artifacts))
 
       _stdout, stderr, status = Open3.capture3(
-        "ruby", CHECK_FLEET_HEALTH,
+        "bundle", "exec", "ruby", CHECK_FLEET_HEALTH,
         "--manifest", manifest_path,
         "--observations", observations_path,
         "--registry-artifacts", registry_path,
@@ -462,6 +524,47 @@ class FleetHealthTest < Minitest::Test
     assert_includes error.message, "react_on_rails_pro"
   end
 
+  def test_public_github_probe_stops_after_non_public_metadata
+    target = @contract.targets.first
+    requests = []
+    client = Object.new
+    client.define_singleton_method(:get) do |path|
+      requests << path
+      raise "non-metadata read attempted" unless requests.one?
+
+      { "visibility" => "private-secret", "default_branch" => "main" }
+    end
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    error = assert_raises(FleetValidation::ManifestError) do
+      probe.observe(target, observed_at: "2026-07-18T12:00:00Z")
+    end
+
+    assert_equal ["/repos/#{target.fetch('name')}"], requests
+    assert_equal "FleetValidation::NonPublicRepositoryError", error.class.name
+    refute_includes error.message, "private-secret"
+  end
+
+  def test_default_ci_requires_a_successful_exact_head_check
+    probe = FleetValidation::PublicGitHubProbe.new(client: nil)
+    skipped = {
+      "name" => "Paths filtered",
+      "status" => "completed",
+      "conclusion" => "skipped",
+      "html_url" => "https://example.invalid/skipped"
+    }
+    success = skipped.merge(
+      "name" => "CI",
+      "conclusion" => "success",
+      "html_url" => "https://example.invalid/success"
+    )
+    pending = success.merge("status" => "in_progress", "conclusion" => nil)
+
+    assert_equal "unknown", probe.send(:check_status, [skipped]).fetch("status")
+    assert_equal "passed", probe.send(:check_status, [skipped, success]).fetch("status")
+    assert_equal "unknown", probe.send(:check_status, [success, pending]).fetch("status")
+  end
+
   def test_public_github_probe_binds_health_evidence_to_the_default_head
     target = @contract.targets.first
     repo = target.fetch("name")
@@ -475,7 +578,7 @@ class FleetHealthTest < Minitest::Test
       end
     end.new(
       {
-        "/repos/#{repo}" => { "default_branch" => "main", "archived" => false },
+        "/repos/#{repo}" => { "visibility" => "public", "default_branch" => "main", "archived" => false },
         "/repos/#{repo}/commits/main" => {
           "sha" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "commit" => { "committer" => { "date" => "2026-07-17T12:00:00Z" } }
@@ -563,7 +666,14 @@ class FleetHealthTest < Minitest::Test
           repo,
           ".github/workflows/demo-fleet-smoke.yml",
           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        ] => "uses: shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main",
+        ] => YAML.dump(
+          "name" => "CI",
+          "jobs" => {
+            "fleet" => {
+              "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+            }
+          }
+        ),
         [
           repo,
           ".github/dependabot.yml",
@@ -772,15 +882,21 @@ class FleetHealthTest < Minitest::Test
     head = "a" * 40
     workflow = {
       "id" => 41,
-      "path" => ".github/workflows/smoke-caller.yml",
-      "name" => "Fleet smoke caller",
+      "path" => ".github/workflows/ci.yml",
+      "name" => "CI",
       "html_url" => "https://example.invalid/workflow"
     }
     client = Struct.new(:contents) do
       def content(_repo, _path, ref:)
         raise "wrong head" unless ref == "a" * 40
 
-        "uses: shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        YAML.dump(
+          "jobs" => {
+            "fleet" => {
+              "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+            }
+          }
+        )
       end
 
       def get(_path)
@@ -809,6 +925,57 @@ class FleetHealthTest < Minitest::Test
     refute_includes status.fetch("evidence"), "unrelated"
   end
 
+  def test_shared_smoke_ignores_raw_reference_outside_jobs_uses
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/smoke.yml",
+      "name" => "Smoke",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    content = YAML.dump(
+      "jobs" => {
+        "smoke" => {
+          "runs-on" => "ubuntu-latest",
+          "steps" => [{
+            "run" => "echo shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+          }]
+        }
+      }
+    )
+    client = Struct.new(:content_value) do
+      def content(_repo, _path, ref:)
+        raise "wrong head" unless ref == "a" * 40
+
+        content_value
+      end
+
+      def get(_path)
+        {
+          "workflow_runs" => [{
+            "head_sha" => "a" * 40,
+            "status" => "completed",
+            "conclusion" => "success"
+          }]
+        }
+      end
+    end.new(content)
+
+    status = FleetValidation::PublicGitHubProbe.new(client:)
+                                               .send(
+                                                 :smoke_status,
+                                                 repo,
+                                                 head,
+                                                 [],
+                                                 [workflow],
+                                                 default_branch: "main"
+                                               )
+
+    assert_equal false, status.fetch("shared_contract")
+    assert_equal "unknown", status.fetch("status")
+  end
+
   def test_public_github_probe_degrades_a_target_failure_to_unknown
     client = Object.new
     def client.get(_path)
@@ -830,9 +997,11 @@ class FleetHealthTest < Minitest::Test
 
     assert_includes workflow, "workflow_call:"
     assert_includes workflow, "contents: read"
+    assert_includes workflow, "ruby/setup-ruby@#{RUBY_SETUP_SHA}"
     assert_includes workflow, "fleet-smoke-evidence-${{ github.sha }}"
     assert_includes workflow, '"head_sha"'
     refute_includes workflow, "secrets: inherit"
+    refute_includes workflow, "bundle exec ruby"
   end
 
   def test_reusable_smoke_workflow_rejects_blank_required_commands
@@ -885,13 +1054,42 @@ class FleetHealthTest < Minitest::Test
 
     assert_includes workflow, "schedule:"
     assert_includes workflow, "workflow_dispatch:"
+    assert_includes workflow, "ruby/setup-ruby@#{RUBY_SETUP_SHA}"
+    assert_includes workflow, "bundler-cache: true"
+    assert_includes workflow, 'bundle exec ruby "$HEALTH_SCRIPT"'
+    assert_includes workflow, "bundle exec ruby -rjson"
     assert_includes workflow, "check_fleet_health.rb"
     assert_includes workflow, "--live"
     assert_includes workflow, "actions/upload-artifact@v4"
     assert_includes workflow, "fleet-health.json"
   end
 
+  def test_central_fleet_health_docs_use_the_repo_bundle
+    skill = File.read(SKILL)
+    rc_plan = File.read(RC_PLAN)
+    runbook = File.read(RELEASE_RUNBOOK)
+
+    refute_match(/^\s*ruby .*fleet_health/m, skill)
+    refute_match(/^\s*ruby .*check_fleet_health/m, skill)
+    assert_includes skill, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb"
+    assert_includes rc_plan, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
+    assert_includes runbook, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
+    assert_includes runbook, '--policy-commit "$(git rev-parse HEAD)"'
+    assert_includes runbook, "--output-dir tmp/fleet-health-v17"
+  end
+
   private
+
+  def build_contract(manifest)
+    FleetValidation::FleetHealth.new(
+      manifest:,
+      pack_id: "manifest-test",
+      release: "v17.0.0",
+      rsc_version: "19.2.1",
+      policy_commit: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      generated_at: "2026-07-18T12:00:00Z"
+    )
+  end
 
   def reusable_smoke_steps
     YAML.safe_load_file(REUSABLE_SMOKE, aliases: false).dig("jobs", "smoke", "steps")

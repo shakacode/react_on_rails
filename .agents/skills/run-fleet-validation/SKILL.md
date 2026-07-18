@@ -12,7 +12,7 @@ Generate the prompt pack from the manifest instead of copying repository lists i
 From the React on Rails repository root, run:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
   --prompts 6 \
   --output-dir tmp/fleet-validation-prompts
@@ -52,7 +52,7 @@ For the v17 stable line:
 
 ```bash
 GITHUB_TOKEN="$(gh auth token)" \
-  ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
     --live \
     --release v17.0.0 \
     --rsc-version 19.2.1 \
@@ -156,7 +156,7 @@ The independent checker validates the exact ledger and renders the append-only t
 that same file:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
   --expected-pack-id PACK_ID \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
@@ -211,8 +211,8 @@ audit also records replayable public-safe evidence.
 For the checked-in sanitized RC12 regression corpus:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 ```
 
 ## Validate changes to this skill
@@ -220,10 +220,10 @@ ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 Run both checks after changing the generator or prompt contract:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts_test.rb
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
-ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb
-ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts_test.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" \
   .agents/skills/run-fleet-validation
 ```

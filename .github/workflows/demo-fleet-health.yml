@@ -26,9 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74  # v1
         with:
           ruby-version: "3.3"
+          bundler-cache: true
 
       - name: Generate public standing-health evidence
         env:
@@ -37,7 +38,7 @@ jobs:
           RSC_VERSION: ${{ inputs['rsc-version'] || '19.2.1' }}
         run: |
           HEALTH_SCRIPT=".agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
-          ruby "$HEALTH_SCRIPT" \
+          bundle exec ruby "$HEALTH_SCRIPT" \
             --live \
             --release "$RELEASE" \
             --rsc-version "$RSC_VERSION" \
@@ -61,7 +62,7 @@ jobs:
       - name: Enforce active public target health
         if: always()
         run: |
-          ruby -rjson -e '
+          bundle exec ruby -rjson -e '
             path = "tmp/fleet-health/fleet-health.json"
             evidence = JSON.parse(File.read(path))
             exit(evidence.dig("aggregate", "status") == "passed" ? 0 : 1)

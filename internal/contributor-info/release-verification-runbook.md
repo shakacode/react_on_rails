@@ -94,8 +94,19 @@ which detects drift between releases. Hosted-CI dispatch and generator-CI routin
 also dependencies, not substitutes: they shorten individual gates but do not own blocker
 identities, combined audit, merge authority, or promotion closeout.
 
-After stable publication, generate a fresh public standing-health pack with
-`check_fleet_health.rb --live --release v17.0.0 --rsc-version 19.2.1`. The command verifies those
+After stable publication, generate a fresh public standing-health pack:
+
+```bash
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  --live \
+  --release v17.0.0 \
+  --rsc-version 19.2.1 \
+  --pack-id "fleet-health-v17-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --policy-commit "$(git rev-parse HEAD)" \
+  --output-dir tmp/fleet-health-v17
+```
+
+The command verifies those
 exact public registry artifacts across both gems, all four unified-version npm packages, and the
 independently versioned RSC package. Direct-lock currency comes only from root `DEPENDS_ON` SPDX
 relationships; mixed direct versions block and missing root identity fails closed. npm

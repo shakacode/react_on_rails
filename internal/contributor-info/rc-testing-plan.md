@@ -81,7 +81,7 @@ default, report-only soft-track coverage, a durable result ledger/schema, and in
 From the repository root, run:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
   --prompts 6 \
   --output-dir tmp/fleet-validation-prompts
@@ -144,7 +144,7 @@ The standing-health implementation uses the same canonical manifest but a separa
 schema and evidence pack:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
   --live \
   --release v17.0.0 \
   --rsc-version 19.2.1 \
@@ -162,7 +162,7 @@ The checker validates one public-safe `result-ledger.json` and renders the appen
 matrix from that exact file:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --ledger tmp/fleet-validation-prompts/result-ledger.json \
   --expected-pack-id PACK_ID \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \

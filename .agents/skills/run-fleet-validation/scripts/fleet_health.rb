@@ -9,6 +9,8 @@ require "yaml"
 require_relative "fleet_lifecycle"
 
 module FleetValidation
+  class NonPublicRepositoryError < ManifestError; end
+
   module ProductVersion
     module_function
 
@@ -199,6 +201,10 @@ module FleetValidation
     def observe(target, observed_at:)
       repo = target.fetch("name")
       metadata = @client.get("/repos/#{repo}")
+      unless metadata["visibility"] == "public"
+        raise NonPublicRepositoryError, "Standing-health target is not publicly visible"
+      end
+
       default_branch = metadata.fetch("default_branch")
       commit = @client.get("/repos/#{repo}/commits/#{default_branch}")
       head = commit.fetch("sha")
@@ -217,6 +223,8 @@ module FleetValidation
         "review_app" => review_app_status(repo, target, workflows, default_branch:, observed_at:),
         "dependabot" => dependabot_status(repo, head, target.fetch("packages"))
       }
+    rescue NonPublicRepositoryError
+      raise
     rescue StandardError => e
       unknown_observation(observed_at, e.message)
     end
@@ -233,25 +241,28 @@ module FleetValidation
       return evidence_status("unknown", "No current-head check runs found") if checks.empty?
 
       pending = checks.any? { |check| check["status"] != "completed" }
-      failures = checks.reject do |check|
-        check["status"] == "completed" && PASSING_CONCLUSIONS.include?(check["conclusion"])
+      failures = checks.select do |check|
+        check["status"] == "completed" && !PASSING_CONCLUSIONS.include?(check["conclusion"])
+      end
+      successes = checks.count do |check|
+        check["status"] == "completed" && check["conclusion"] == "success"
       end
       status = if pending
                  "unknown"
-               elsif failures.empty?
+               elsif failures.any?
+                 "blocked"
+               elsif successes.positive?
                  "passed"
                else
-                 "blocked"
+                 "unknown"
                end
       evidence_status(status, evidence_urls(checks))
     end
 
     def smoke_status(repo, head, _checks, workflows, default_branch:)
-      candidate_workflows = workflows.select do |workflow|
-        smoke_name?(workflow["name"]) || smoke_name?(workflow["path"])
-      end
-      shared_workflows = candidate_workflows.select do |workflow|
-        @client.content(repo, workflow.fetch("path"), ref: head).include?(SHARED_SMOKE_REFERENCE)
+      shared_workflows = workflows.select do |workflow|
+        content = @client.content(repo, workflow.fetch("path"), ref: head)
+        shared_smoke_caller?(content)
       rescue StandardError
         false
       end
@@ -294,6 +305,18 @@ module FleetValidation
       evidence_status(run["conclusion"] == "success" ? "passed" : "blocked", evidence)
     rescue StandardError => e
       evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
+    end
+
+    def shared_smoke_caller?(content)
+      document = YAML.safe_load(content, permitted_classes: [], permitted_symbols: [], aliases: false)
+      jobs = document.is_a?(Hash) ? document["jobs"] : nil
+      return false unless jobs.is_a?(Hash)
+
+      jobs.values.any? do |job|
+        job.is_a?(Hash) && job["uses"].to_s.start_with?(SHARED_SMOKE_REFERENCE)
+      end
+    rescue Psych::Exception
+      false
     end
 
     def review_app_status(repo, target, workflows, default_branch:, observed_at:)
@@ -415,10 +438,6 @@ module FleetValidation
     def present_string?(value)
       value.is_a?(String) && !value.empty?
     end
-
-    def smoke_name?(value)
-      value.to_s.match?(/smoke/i)
-    end
   end
 
   class FleetHealth
@@ -427,6 +446,10 @@ module FleetValidation
       "npm" => %w[
         react-on-rails react-on-rails-pro react-on-rails-pro-node-renderer create-react-on-rails-app
       ]
+    }.freeze
+    ALLOWED_PACKAGES = {
+      "gem" => (PRODUCT_PACKAGES.fetch("gem") + %w[shakapacker cpflow]).freeze,
+      "npm" => (PRODUCT_PACKAGES.fetch("npm") + %w[react-on-rails-rsc shakapacker shakapacker-rspack]).freeze
     }.freeze
     PUBLIC_REGISTRY_ARTIFACTS = [
       %w[gem react_on_rails],
@@ -558,9 +581,8 @@ module FleetValidation
           raise ManifestError, "standing_health.#{field} must be a nonnegative integer"
         end
       end
-      return if @manifest["repos"].is_a?(Array)
-
-      raise ManifestError, "repos must be an array"
+      repos = @manifest["repos"]
+      raise ManifestError, "repos must be an array" unless repos.is_a?(Array)
     end
 
     def build_targets
@@ -594,7 +616,7 @@ module FleetValidation
           "disposition" => disposition,
           "review_app" => review_app,
           "review_app_workflow" => review_app_workflow,
-          "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
+          "packages" => validated_packages(repo)
         }
       end
       archived = Array(@manifest.dig("standing_health", "archived_targets")).map do |repo|
@@ -609,7 +631,7 @@ module FleetValidation
           "disposition" => "archived",
           "review_app" => "not_required",
           "review_app_workflow" => nil,
-          "packages" => Array(repo["packages"]).map { |package| package.slice("ecosystem", "name") }
+          "packages" => validated_packages(repo)
         }
       end
       selected.concat(archived)
@@ -622,6 +644,18 @@ module FleetValidation
 
     def exact_workflow_path?(value)
       value.is_a?(String) && value.match?(%r{\A\.github/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml\z})
+    end
+
+    def validated_packages(repo)
+      Array(repo["packages"]).map do |package|
+        ecosystem = package["ecosystem"] if package.is_a?(Hash)
+        name = package["name"] if package.is_a?(Hash)
+        unless present?(ecosystem) && present?(name) && ALLOWED_PACKAGES.fetch(ecosystem, []).include?(name)
+          raise ManifestError, "#{repo['name']} has unsupported package #{ecosystem}:#{name}"
+        end
+
+        { "ecosystem" => ecosystem, "name" => name }
+      end
     end
 
     def evaluate_registry(artifacts)
@@ -653,16 +687,14 @@ module FleetValidation
       staleness = evaluate_staleness(observation["default_commit_at"])
       repository_archived = boolean_or_nil(observation["repository_archived"])
 
-      if target.fetch("disposition") == "active"
-        findings << "repository_archived" if repository_archived
-        findings << "default_ci" unless default_ci.fetch("status") == "passed"
-        findings << "smoke" unless smoke.fetch("status") == "passed" && smoke.fetch("shared_contract")
-        if target.fetch("review_app") == "required" && review_app.fetch("status") != "passed"
-          findings << "review_app"
-        end
-        findings << "dependabot" unless dependabot.fetch("status") == "passed"
-        findings << "staleness" unless staleness.fetch("status") == "passed"
+      findings << "repository_archived" if target.fetch("disposition") == "active" && repository_archived
+      findings << "default_ci" unless default_ci.fetch("status") == "passed"
+      findings << "smoke" unless smoke.fetch("status") == "passed" && smoke.fetch("shared_contract")
+      if target.fetch("review_app") == "required" && review_app.fetch("status") != "passed"
+        findings << "review_app"
       end
+      findings << "dependabot" unless dependabot.fetch("status") == "passed"
+      findings << "staleness" unless staleness.fetch("status") == "passed"
 
       {
         "id" => target.fetch("id"),
@@ -978,6 +1010,8 @@ module FleetValidation
 
     def escape(value)
       value.to_s.gsub("\\") { "\\\\" }
+           .gsub(/[\r\n]+/, " ")
+           .gsub("`") { "\\`" }
            .gsub("|", "\\|")
            .gsub("<!--", "&lt;!--")
            .gsub("-->", "--&gt;")
