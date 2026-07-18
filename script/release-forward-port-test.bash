@@ -755,6 +755,58 @@ EOF
   assert_not_contains "$changelog" "### [17.0.0]" "final header not copied"
 }
 
+# A maintained release branch retains its original stable section after main has
+# already stamped those entries into history. A later branch fix must not pull
+# the entire historical release back into main's current [Unreleased].
+test_final_stable_section_dedupes_against_target_history() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Changed
+
+- **Current main work**: still unreleased. $(pr_link 1100) by [a](https://github.com/a).
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **Original stable feature**: already shipped. $(pr_link 999) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Post-release branch fix**: newly forward-ported. $(pr_link 1200) by [a](https://github.com/a).
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **Original stable feature**: already shipped. $(pr_link 999) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  local out
+  out="$(run_changelog release/17.0.0)"
+  assert_contains "$out" "1 entry to add, 1 entry already present" "historical dedupe summary"
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "Post-release branch fix" "new branch fix re-homed"
+  local occurrences
+  occurrences="$(grep -c "Original stable feature" CHANGELOG.md)"
+  [ "$occurrences" -eq 1 ] || fail "expected 1 historical stable entry, got $occurrences"
+}
+
 # De-duplication keys on the entry's OWN PR (the "[PR NNNN](...) by [author]"
 # trailer), not on a PR it merely references. An entry that references PR 4227 but
 # is itself PR 4234 must dedupe against main's PR 4234, and must NOT dedupe against
@@ -873,6 +925,7 @@ run_test test_empty_main_unreleased_receives_entries
 run_test test_target_without_unreleased_errors_clearly
 run_test test_non_prerelease_source_does_not_touch_target_rc_section
 run_test test_final_stable_section_rehomes_into_main_unreleased
+run_test test_final_stable_section_dedupes_against_target_history
 run_test test_dedupes_on_own_pr_trailer_not_referenced_pr
 run_test test_utf8_changelog_parses_and_round_trips_under_ascii_locale
 run_test test_default_mode_unchanged_without_flag

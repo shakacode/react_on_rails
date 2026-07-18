@@ -1510,8 +1510,16 @@ class ChangelogReconciler
     removed_sections = stray_rc_sections(target, base_version)
 
     target_entries = section_entries(find_unreleased(target))
-    seen_pr_numbers = target_entries.filter_map(&:pr_number).to_set
-    target_entry_texts = target_entries.to_set { |entry| normalize_text(entry.text) }
+    # De-duplicate against every section that will remain on main, not only the
+    # current [Unreleased]. A maintained release branch retains its stable
+    # section, whose entries may already live in main's history. Exclude RC
+    # sections being removed so their entries can still be re-homed before the
+    # section headers disappear.
+    retained_target_entries = target[:sections]
+                              .reject { |section| removed_sections.include?(section) }
+                              .flat_map { |section| section_entries(section) }
+    seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
+    target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
 
     added, skipped = partition_source_entries(
       collect_source_entries(source, base_version),
