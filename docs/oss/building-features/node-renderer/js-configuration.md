@@ -53,6 +53,8 @@ available default ENV values if you wire them into your own launch script.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
 1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
+1. **maxVMPoolSize** (default: `2`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Maximum number of VM contexts to keep in memory. Typically only two contexts are needed — one for the server bundle and one for React Server Components (RSC) if enabled. Older contexts are removed when this limit is reached. Must be a positive integer.
 
 Deprecated options:
 
@@ -295,7 +297,7 @@ Example response:
 ```json
 {
   "node_version": "v20.17.0",
-  "renderer_version": "1.4.2"
+  "renderer_version": "17.0.0"
 }
 ```
 

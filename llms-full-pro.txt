@@ -630,7 +630,7 @@ Before upgrading:
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.7` (relaxed from the `16.7.0.rc.0` floor of `jwt >= 3.2.0`), so apps still pinned to jwt 2.x can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer will continue to do so. If your Gemfile pins `jwt` below 2.7 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` uses `jwt` for offline license validation. Current versions require `jwt >= 2.5, < 4`, so apps still pinned to a compatible jwt 2.x release can bundle without upgrading. Apps that can resolve `jwt 3.2.0` or newer in the 3.x line will continue to do so; jwt 4.x is not supported. If your Gemfile pins `jwt` below 2.5 (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
@@ -2880,6 +2880,8 @@ SOURCE: docs/pro/async-props-database-queries.md
 
 This guide covers how to safely run ActiveRecord queries inside `stream_react_component_with_async_props` blocks. It explains when you need special configuration and when you don't.
 
+> **Prerequisites:** `stream_react_component_with_async_props` requires Pro RSC support to be enabled — set `config.enable_rsc_support = true` in `config/initializers/react_on_rails_pro.rb` (it defaults to `false`) — and it must be rendered inside a [`stream_view_containing_react_components`](./streaming-ssr.md#4-render-the-view-using-the-stream_view_containing_react_components-helper) view. Without RSC support enabled the helper raises `ReactOnRailsPro::Error`; outside a streaming view it raises `ReactOnRails::Error`. The database/fiber configuration below is separate from these prerequisites.
+
 ## Quick Decision Guide
 
 | Your usage pattern                                                 | Configuration needed?                              |
@@ -2955,7 +2957,7 @@ Each concurrent fiber checks out its own connection. Size the pool to accommodat
 # config/database.yml
 default: &default
   adapter: postgresql
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 }.to_i * (1 + ENV.fetch("MAX_CONCURRENT_FIBERS_PER_REQUEST") { 3 }.to_i) %>
 ```
 
 **Formula:** `pool >= threads × (1 + max_concurrent_fibers_per_request)`
@@ -3081,7 +3083,7 @@ Both blocks run concurrently (Pro spawns an `Async::Task` for each). Without `is
 
 ## Summary Checklist
 
-For **one component, sequential queries** — nothing to configure:
+For **one component, sequential queries** — no extra database/fiber configuration (beyond the prerequisites above):
 
 - [x] Use ActiveRecord normally in the `emit` block
 
@@ -4211,6 +4213,40 @@ end %>
 
 A `cached_react_component_hash` variant is also available for cases where you need to extract metadata (like `<title>`) from the rendered output.
 
+### Additional Cached Helpers
+
+React on Rails Pro provides additional cached helpers for streaming, async, and RSC rendering. All share the same caching options (`cache_key`, `cache_tags`, `cache_options`, `:if`/`:unless`) as `cached_react_component`:
+
+| Helper                                   | Use case                                                                 | Prerequisites                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `cached_stream_react_component`          | Cache streamed React 18 components with Suspense                         | Requires `stream_view_containing_react_components`                   |
+| `cached_buffered_stream_react_component` | Cache streamed output as buffered HTML (no streaming setup needed)       | —                                                                    |
+| `cached_static_rsc_component`            | Cache static RSC pages with sidecar packs (strips RSC bootstrap scripts) | Requires `enable_rsc_support = true`                                 |
+| `cached_async_react_component`           | Cache async-rendered components                                          | Requires `AsyncRendering` concern and `enable_async_react_rendering` |
+
+```erb
+<%# Streaming with caching %>
+<%= cached_stream_react_component("StreamedApp", cache_key: [@user]) do
+  { user: @user.to_props }
+end %>
+
+<%# Buffered streaming (no ActionController::Live needed) %>
+<%= cached_buffered_stream_react_component("BufferedApp", cache_key: [@post]) do
+  { post: @post.to_props }
+end %>
+
+<%# Static RSC (strips RSC bootstrap scripts for fully static pages) %>
+<%= cached_static_rsc_component("StaticPage", cache_key: [@page]) do
+  { page: @page.to_props }
+end %>
+
+<%# Async rendering with caching (cache hits return immediately) %>
+<% card = cached_async_react_component("ProductCard", cache_key: [@product]) { @product.to_props } %>
+<%= card.value %>
+```
+
+> **Note:** `cached_static_rsc_component` strips only the embedded RSC payload bootstrap scripts, not general component pack scripts. For fully static pages with no client interactivity, also pass `auto_load_bundle: false` and load your explicit sidecar pack separately.
+
 ### Rails Context And Render Order
 
 Fragment-cached helpers cache the final rendered HTML. That HTML includes the Rails context tag only when the helper call that populated the cache was the first component render in that request. If the same cached fragment is later served in a different view order, the page can either miss the Rails context tag or include a duplicate one.
@@ -4651,6 +4687,11 @@ If you are using **v4.0.0** or later, enable the profiler by setting `profile_se
 ```ruby
 config.profile_server_rendering_js_code = true
 ```
+
+> **Prerequisites:**
+>
+> - **ExecJS renderer only**: This setting only applies when `server_renderer == "ExecJS"` (the default). If you're using the Pro Node Renderer, this setting has no effect — use the [Chrome DevTools profiling method](#profiling-the-pro-node-renderer) above instead.
+> - **Node or V8 ExecJS runtime**: The ExecJS runtime must be Node or V8. Set this via the `EXECJS_RUNTIME` environment variable (e.g., `EXECJS_RUNTIME=Node`). Other runtimes will raise a configuration error.
 
 Then, run the app you are profiling and open some pages in it. You will find log files named `isolate-0x*.log` in the root of your app. Use the following command to analyze the log files:
 
@@ -5432,9 +5473,9 @@ This entry indicates that the `ToggleContainer` client component is included in 
 
 ### CSS Links for `'use client'` Boundaries
 
-React on Rails Pro reads CSS metadata from the RSC client manifest and emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the RSC payload. React hoists those stylesheet links into `<head>` and delays committing the corresponding streamed content until the stylesheets are ready, which prevents a flash of unstyled content for client components behind RSC boundaries.
+React on Rails Pro emits `<link rel="stylesheet" data-precedence="rsc-css">` entries into the streamed RSC payload for the CSS of client components rendered behind RSC boundaries. Those links are flushed ahead of the streamed content that needs them, so the browser normally loads the stylesheet before that content is revealed; React on Rails Pro's hydration prep then moves the links into `<head>`. The linked pipeline covers the 100ms fail-open case.
 
-The current resolver works from the manifest alone, so it emits CSS for every `'use client'` module entry in the manifest instead of only the client references encountered by one render. This is intentional for now: CSS modules and component-scoped styles remain safe, but global CSS imported by a client component can apply on an RSC page that did not render that component. Because these stylesheet links are render-blocking, avoid importing page-specific global CSS from broad client-component entry points until `react-on-rails-rsc` can attach CSS at the rendered client-reference boundary.
+React on Rails Pro discovers those stylesheet hrefs through two complementary mechanisms that converge on the same `rsc-css` link format: a manifest-backed `preinit` hint emitted during Flight rendering, and a per-render scan of the Flight chunks that maps the referenced `clientN` chunks to their CSS assets from the client build's `loadable-stats.json`. Either way the emission is request/chunk driven: a stylesheet is linked only when the current render references the corresponding client chunk — not for every `'use client'` module in the manifest. Shared or broad chunks can still pull shared/global CSS into that page's render-blocking `rsc-css` group, so keep client boundaries thin. See [CSS and Styling in RSC](./css-and-styling.md#where-the-late-css-comes-from-two-paths-one-bucket) for the full FOUC-prevention pipeline.
 
 If you want to change the file name of the `react-client-manifest.json` file, you can do so by setting the `clientManifestFilename` option in the `react-on-rails-rsc/WebpackPlugin` plugin as follows:
 
@@ -5452,8 +5493,8 @@ config.plugins.push(
 And because React on Rails Pro uploads the `react-client-manifest.json` file to the renderer while uploading the server bundle and it expects it to be named `react-client-manifest.json`, you need to tell React on Rails Pro that the name is changed to `client-components-webpack-manifest.json`.
 
 ```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
   config.react_client_manifest_file = "client-components-webpack-manifest.json"
 end
 ```
@@ -5553,7 +5594,7 @@ end
 If you customize the route path, ensure the `rsc_payload_generation_url_path` config matches:
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_payload_generation_url_path = "flight-payload"
 end
@@ -7493,7 +7534,11 @@ Create a new file `config/webpack/rscWebpackConfig.js`:
 // use the same config as serverWebpackConfig.js but add the RSC loader
 const { existsSync } = require('fs');
 const { dirname, resolve } = require('path');
-const serverWebpackConfig = require('./serverWebpackConfig');
+const serverWebpackModule = require('./serverWebpackConfig');
+// Backward compatibility:
+// - New Pro config exports: { default: configureServer, extractLoader }
+// - Legacy config exports: module.exports = configureServer
+const serverWebpackConfig = serverWebpackModule.default || serverWebpackModule;
 const reactPackageRoot = dirname(require.resolve('react/package.json'));
 // React 19+ ships these react-server entry files alongside the standard entries.
 const resolveReactServerEntry = (entryFilename) => {
@@ -7507,23 +7552,21 @@ const resolveReactServerEntry = (entryFilename) => {
   return entryPath;
 };
 
-// Function that extracts a specific loader from a webpack rule
-function extractLoader(rule, loaderName) {
-  return rule.use.find((item) => {
-    let testValue;
-
-    if (typeof item === 'string') {
-      testValue = item;
-    } else if (typeof item.loader === 'string') {
-      testValue = item.loader;
-    }
-
-    return testValue.includes(loaderName);
+// Function that extracts a specific loader from a webpack rule.
+// Prefer the helper exported by the Pro server config when present; otherwise fall back.
+const extractLoader =
+  serverWebpackModule.extractLoader ||
+  ((rule, loaderName) => {
+    if (!Array.isArray(rule.use)) return null;
+    return rule.use.find((item) => {
+      const testValue = typeof item === 'string' ? item : item.loader;
+      return testValue && testValue.includes(loaderName);
+    });
   });
-}
 
 const configureRsc = () => {
-  const rscConfig = serverWebpackConfig();
+  // Pass true to skip the RSC manifest plugin - the RSC bundle doesn't need it.
+  const rscConfig = serverWebpackConfig(true);
 
   // Update the entry name to be `rsc-bundle` instead of `server-bundle`
   const rscEntry = {
@@ -7531,14 +7574,31 @@ const configureRsc = () => {
   };
   rscConfig.entry = rscEntry;
 
-  // Add the RSC loader before the babel loader
+  // Add the RSC WebpackLoader to the JS rule's loader chain.
+  // This loader replaces 'use client' files with registerClientReference proxies in the RSC bundle.
+  // Webpack loaders execute right-to-left, so appending makes the RSC loader run first (before babel/swc).
   const rules = rscConfig.module.rules;
   rules.forEach((rule) => {
-    if (Array.isArray(rule.use)) {
-      // Ensure this loader runs before the JS loader (Babel loader in this case) to properly exclude client components from the RSC bundle.
-      // If your project uses a different JS loader, insert it before that loader instead.
-      const babelLoader = extractLoader(rule, 'babel-loader');
-      if (babelLoader) {
+    if (typeof rule.use === 'function') {
+      // SWC transpiler defines rule.use as a function: use: ({ resource }) => getSwcLoaderConfig(resource)
+      // Wrap it to append the RSC WebpackLoader to the returned loader(s).
+      const originalUse = rule.use;
+      // Must use `function` (not arrow) so `.call(this, data)` forwards webpack's context.
+      rule.use = function rscLoaderWrapper(data) {
+        const result = originalUse.call(this, data);
+        const resultArray = Array.isArray(result) ? result : result ? [result] : [];
+        const resolvedRule = { use: resultArray };
+        const jsLoader =
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
+        if (jsLoader) {
+          return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
+        }
+        return result;
+      };
+    } else if (Array.isArray(rule.use)) {
+      // Babel transpiler defines rule.use as a static array.
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
+      if (jsLoader) {
         rule.use.push({
           loader: 'react-on-rails-rsc/WebpackLoader',
         });
@@ -7583,6 +7643,10 @@ const configureRsc = () => {
 module.exports = configureRsc;
 ```
 
+> **Note:** This config uses the same core RSC webpack patterns as the template that ships with the `react_on_rails:rsc` generator, which is the canonical, maintained version. Two details matter here: `serverWebpackConfig(true)` skips the RSC manifest plugin (the RSC bundle must not inherit it — this requires the `rscBundle` guard added to `serverWebpackConfig.js` in step 5), and the loader insertion handles both `babel-loader` and `swc-loader` (including SWC's function-form `rule.use`) so SWC projects still get the RSC loader. If your project transpiles JS with a loader other than Babel or SWC, add its name to the `extractLoader(...)` checks — otherwise the RSC loader is silently not inserted for that rule and the RSC bundle will not exclude `'use client'` modules.
+>
+> These minimal snippets intentionally omit **scoped client-reference discovery**. Because `RSCWebpackPlugin` is used without a `clientReferences` option, it falls back to a **broad scan** of every `'use client'` module — the original, working behavior. The generator additionally wires the reference-discovery build (`bin/shakapacker-precompile-hook` generates a scoped `ssr-generated/rsc-client-references.json`) so only the client references actually reachable through the server-component graph are bundled. Scoped discovery is a build-time optimization, not a correctness requirement for this manual setup. For that production-grade wiring, generate the config with `react_on_rails:rsc` or follow [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md).
+
 Add the new RSC Webpack configuration to the bundle configuration returned by `webpackConfig` function in `config/webpack/ServerClientOrBoth.js` file:
 
 ```js
@@ -7623,7 +7687,7 @@ This change will make the bundling process generate a new bundle named `rsc-bund
 Then, we need to tell React on Rails to upload the `rsc-bundle.js` file to the renderer while uploading the server bundle.
 
 ```ruby
-# config/initializers/react_on_rails.rb
+# config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.rsc_bundle_js_file = "rsc-bundle.js"
 end
@@ -7654,16 +7718,26 @@ module.exports = configureClient;
 const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
 // existing code...
 
-const configureServer = () => {
+// Accept an `rscBundle` flag so the RSC bundle can reuse this config without the
+// client-manifest plugin. `rscWebpackConfig.js` calls `serverWebpackConfig(true)`;
+// the regular server build calls it with no argument (`rscBundle` defaults to `false`).
+const configureServer = (rscBundle = false) => {
   // existing code...
 
-  config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  // The RSC bundle must not inherit the client-manifest plugin, so only add it
+  // for the actual server bundle. Without this guard the `serverWebpackConfig(true)`
+  // call in `rscWebpackConfig.js` has no effect and the RSC bundle still gets the plugin.
+  if (!rscBundle) {
+    config.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+  }
 
   return config;
 };
 
 module.exports = configureServer;
 ```
+
+> **Note:** The `react_on_rails:rsc` generator's Pro config exports `{ default: configureServer, extractLoader }` and updates its importers to destructure that shape, but this minimal manual snippet keeps the simple function export so existing `serverWebpackConfig()` consumers (such as your `ServerClientOrBoth.js`) keep working. The `rscWebpackConfig.js` snippet above already tolerates both export shapes.
 
 ## Create a React Server Component
 
@@ -8648,14 +8722,9 @@ This happens because React on Rails by default adds the scripts that hydrate com
 
 This default behavior was kept for backward compatibility, as there were previously race conditions that could occur when using `async` scripts before the page fully loaded. However, these race conditions have been fixed in the latest React on Rails release.
 
-To enable true selective hydration, we need to configure React on Rails to load scripts as `async` scripts by setting `generated_component_packs_loading_strategy: :async` in the initializer:
+To enable selective hydration for streamed Pro/RSC pages, generated component packs need to load with `async` script loading (`generated_component_packs_loading_strategy: :async`). In React on Rails Pro apps on Shakapacker ≥ 8.2.0, this is already the default when the setting is unset, so no initializer change is needed for the Pro/RSC setup in this guide.
 
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.generated_component_packs_loading_strategy = :async
-end
-```
+> **Note:** `:async` script loading is a Pro capability in React on Rails' supported configuration. In non-Pro apps, `bin/rails react_on_rails:doctor` reports explicit `config.generated_component_packs_loading_strategy = :async` as unsupported and recommends upgrading to Pro or using `:defer` / `:sync`. On Shakapacker < 8.2.0, async script loading is unavailable; setting `:async` raises during configuration validation, so upgrade Shakapacker first.
 
 Now, when you run the page, you can see that while the Long Waiting Component is loading ⏳, the other components are interactive ✨🖱️
 

@@ -6,7 +6,7 @@ This document describes the migration from Babel to SWC for JavaScript/TypeScrip
 
 ## What is SWC?
 
-SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. Shakapacker 9.0+ uses SWC as the default transpiler.
+SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. SWC is available in Shakapacker 9.0+: Rspack projects use SWC by default, while Webpack projects default to Babel and opt in via `javascript_transpiler: swc` as shown below.
 
 ## Prerequisites
 

@@ -1,5 +1,8 @@
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 function read(path) {
   return fs.readFileSync(path, 'utf8');
@@ -13,6 +16,55 @@ function assertDoesNotMatch(name, text, pattern) {
   assert.doesNotMatch(text, pattern, `${name} unexpectedly matches ${pattern}`);
 }
 
+function extractRunScript(workflow, stepName) {
+  const lines = workflow.split('\n');
+  const stepIndex = lines.findIndex((line) => line.trim() === `- name: ${stepName}`);
+  assert.notEqual(stepIndex, -1, `workflow is missing the ${stepName} step`);
+
+  const runIndex = lines.findIndex((line, index) => index > stepIndex && line.trim() === 'run: |');
+  assert.notEqual(runIndex, -1, `${stepName} is missing its run block`);
+
+  const blockIndent = lines[runIndex].match(/^\s*/)[0].length + 2;
+  const scriptLines = [];
+  for (const line of lines.slice(runIndex + 1)) {
+    if (line.trim() === '') {
+      scriptLines.push('');
+    } else if (line.match(/^\s*/)[0].length < blockIndent) {
+      break;
+    } else {
+      scriptLines.push(line.slice(blockIndent));
+    }
+  }
+
+  return scriptLines.join('\n');
+}
+
+function runGemMatrix(script, { full, generators }) {
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'gem-tests-matrix-'));
+  const outputPath = path.join(temporaryDirectory, 'github-output');
+
+  try {
+    childProcess.execFileSync('bash', ['-c', script], {
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: outputPath,
+        LATEST_RUBY_VERSION: '3.4',
+        MINIMUM_RUBY_VERSION: '3.2',
+        SHOULD_USE_FULL_MATRIX: String(full),
+        RUN_GEM_GENERATOR_SPECS: String(generators),
+      },
+      stdio: 'pipe',
+    });
+    const matrixOutput = read(outputPath)
+      .split('\n')
+      .find((line) => line.startsWith('matrix='));
+    assert.ok(matrixOutput, 'gem matrix script did not write a matrix output');
+    return JSON.parse(matrixOutput.slice('matrix='.length));
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
@@ -20,6 +72,18 @@ const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 const claudeWorkflow = read('.github/workflows/claude.yml');
 const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
 const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
+const gemTestsWorkflow = read('.github/workflows/gem-tests.yml');
+const hostedWorkflowFiles = [
+  'lint-js-and-ruby.yml',
+  'package-js-tests.yml',
+  'gem-tests.yml',
+  'integration-tests.yml',
+  'precompile-check.yml',
+  'examples.yml',
+  'playwright.yml',
+  'pro-integration-tests.yml',
+  'pro-test-package-and-gem.yml',
+];
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -117,6 +181,78 @@ assertMatches(
   /const isTrustedReleaseTarget = isReleaseTarget[\s\S]*!isDependabotPullRequest \|\| trustedDependabotHostedRequest/,
 );
 assertMatches('Dependabot trusted-dispatch retry', hostedSelectorsAction, /const maxAttempts = 4/);
+assertMatches(
+  'release-target full-matrix selector contract',
+  hostedSelectorsAction,
+  /shouldUseFullMatrix = [\s\S]*isTrustedReleaseTarget/,
+);
+for (const workflowFile of hostedWorkflowFiles) {
+  const workflow = read(`.github/workflows/${workflowFile}`);
+  assertMatches(`${workflowFile} pull-request trigger`, workflow, /\n\s{2}pull_request:/);
+  assertMatches(
+    `${workflowFile} hosted selector`,
+    workflow,
+    /uses: \.\/\.github\/actions\/hosted-ci-selectors/,
+  );
+  assertMatches(`${workflowFile} hosted gate`, workflow, /should_run_hosted_ci/);
+}
+
+assertMatches(
+  'gem generator-spec detector output',
+  gemTestsWorkflow,
+  /run_gem_generator_specs: \$\{\{ steps\.detect\.outputs\.run_gem_generator_specs \}\}/,
+);
+assertMatches(
+  'gem generator-spec force-full override',
+  gemTestsWorkflow,
+  /echo "run_gem_generator_specs=true"/,
+);
+assertMatches(
+  'gem generator-spec matrix input',
+  gemTestsWorkflow,
+  /RUN_GEM_GENERATOR_SPECS: \$\{\{ steps\.detect\.outputs\.run_gem_generator_specs \}\}/,
+);
+assertMatches(
+  'gem generator-spec job gate',
+  gemTestsWorkflow,
+  /needs\.detect-changes\.outputs\.run_ruby_tests == 'true' \|\|\s+needs\.detect-changes\.outputs\.run_gem_generator_specs == 'true'/,
+);
+assertMatches('gem matrix keeps failure evidence', gemTestsWorkflow, /strategy:\n\s+fail-fast: false/);
+assertMatches(
+  'full matrix event policy',
+  hostedSelectorsAction,
+  /const shouldUseFullMatrix = shouldForceFullHostedCi \|\|\s+isPushToMain \|\|\s+isMergeGroup \|\|\s+isTrustedReleaseTarget/,
+);
+
+const gemMatrixScript = extractRunScript(gemTestsWorkflow, 'Set gem tests matrix');
+const latestUnit = { 'ruby-version': '3.4', 'dependency-level': 'latest', shard: 'unit' };
+const latestGenerators = {
+  'ruby-version': '3.4',
+  'dependency-level': 'latest',
+  shard: 'generators',
+};
+const minimumUnit = { 'ruby-version': '3.2', 'dependency-level': 'minimum', shard: 'unit' };
+const minimumGenerators = {
+  'ruby-version': '3.2',
+  'dependency-level': 'minimum',
+  shard: 'generators',
+};
+
+assert.deepEqual(
+  runGemMatrix(gemMatrixScript, { full: false, generators: false }).include,
+  [latestUnit],
+  'optimized non-generator PR matrix should keep only the latest unit shard',
+);
+assert.deepEqual(
+  runGemMatrix(gemMatrixScript, { full: false, generators: true }).include,
+  [latestGenerators, latestUnit],
+  'optimized generator PR matrix should keep the latest generator and unit shards',
+);
+assert.deepEqual(
+  runGemMatrix(gemMatrixScript, { full: true, generators: false }).include,
+  [latestGenerators, latestUnit, minimumGenerators, minimumUnit],
+  'main, merge-group, release-target, and force-full matrices should retain both dependency levels and shards',
+);
 
 assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);
 assertMatches(

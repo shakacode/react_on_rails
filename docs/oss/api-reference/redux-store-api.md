@@ -31,7 +31,7 @@ A good example of this would be something like a notifications counter in a head
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each needs to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
-You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note: this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStoreGenerators` method. Note: this is a **store generator**, meaning that it is a function that takes `(props, railsContext)` and returns a store:
 
 ```js
 function appStore(props, railsContext) {
@@ -40,7 +40,7 @@ function appStore(props, railsContext) {
   return myAppStore;
 }
 
-ReactOnRails.registerStore({
+ReactOnRails.registerStoreGenerators({
   appStore,
 });
 ```
@@ -57,7 +57,7 @@ return (
 );
 ```
 
-From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
+From your Rails view, you can use the provided helper `redux_store(store_name, props: {})` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
 
 **app/views/layouts/application.html.erb**
 
@@ -92,7 +92,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
 `redux_store(store_name, props: {})`
 
 - **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
-  1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
+  1. You'll call `ReactOnRails.registerStoreGenerators({storeName})` in the same place that you register your components.
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 - **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
@@ -100,9 +100,9 @@ For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://git
 
 ## View Helper
 
-`redux_store(store_name, props: {})`
+`redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil)`
 
-This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
+The view helper accepts the controller extension arguments plus `defer:` and `auto_load_bundle:`. Use `defer: true` to render the store hydration data later through `redux_store_hydration_data`; use `auto_load_bundle:` to auto-load the generated store pack (defaults to `ReactOnRails.configuration.auto_load_bundle`). These two keywords are view-helper-only and are rejected by the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
 
 `redux_store_hydration_data`
 

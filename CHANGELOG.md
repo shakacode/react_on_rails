@@ -24,6 +24,124 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
+  disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
+  `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
+  now treated as routine disconnects: logged once at `debug` (no backtrace, gated on `logging_on_server`)
+  and short-circuited so the block's remaining props are skipped silently. Previously every remaining
+  prop produced an `error`-level entry with a 5-frame backtrace, so a single disconnect spammed logs in
+  proportion to the number of props still in flight and buried genuine emit failures in the noise.
+  Genuine write failures (for example a `JSON::GeneratorError`) still log at `error` with a backtrace.
+  This mirrors the sibling `ReactOnRailsPro::Stream#log_client_disconnect` convention. Fixes
+  [Issue 4325](https://github.com/shakacode/react_on_rails/issues/4325).
+  [PR 4719](https://github.com/shakacode/react_on_rails/pull/4719) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
+  bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
+  the parsed map becomes the VM generation's single retained copy. For inline (`data:`) maps the encoded
+  URL payload (larger than the raw JSON) is released as well, so the single-copy reduction applies to both
+  external and inline maps. A registration whose raw map was released never falls back to re-reading the
+  map from disk, preserving the same-path rebuild guarantee: old VM generations keep remapping through
+  their own map even after the on-disk map is overwritten. Also makes an unusable inline (`data:`) source
+  map terminal on the lazy lookup path instead of retried, matching registration-time behavior. Partially
+  addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
+  whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is
+  not a hard memory bound: a map that grows between the size check and the read is still read in full).
+  Previously only inline (`data:`) source maps were
+  size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
+  stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
+  remapped to original sources, and the renderer logs a warning naming the map. An oversized map is never
+  substituted: the renderer will not fall back to a differently-named map alongside the bundle. When the
+  oversized map is the one the bundle names, that result is final for the VM generation and is not retried;
+  a map that merely arrives late is still retried as before. The 50MB limit matches the pre-existing cap for
+  inline maps. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
+- **[Pro]** **Bounded RSC browser performance fallback marks across soft navigations**: Browsers
+  that cannot preserve `PerformanceMark.detail` now retain only the 200 most recent fallback
+  entries, and React on Rails Pro clears the fallback queue during Turbo/Turbolinks page teardown.
+  The TypeScript runtime, generated inline helper, and Ruby streaming mirror share the same limit.
+  Fixes [Issue 4329](https://github.com/shakacode/react_on_rails/issues/4329).
+  [PR 4690](https://github.com/shakacode/react_on_rails/pull/4690) by
+  [justin808](https://github.com/justin808).
+
+- **Redacted sensitive server-render error context and tightened Ruby request helpers**: Server-render
+  exceptions no longer retain raw component props, generated JavaScript, or renderer parse details in log and
+  error-tracker context.
+  Development service checks now use safe YAML loading, and Pro renderer asset queries encode filenames.
+  Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
+  [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
+  clients must now send the password field before file parts; the renderer rejects and discards leading file
+  parts before creating upload storage. Uploads now enforce a 100 MB total request limit across files, fields,
+  and multipart framing, plus a 1,000-part cap and a matching per-file cap. Password comparisons use fixed-length
+  digests to avoid leaking the configured password length. Fixes
+  [Issue 4596](https://github.com/shakacode/react_on_rails/issues/4596).
+  [PR 4623](https://github.com/shakacode/react_on_rails/pull/4623) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro] RSC migration diagnostics require graph-derived client references**: The RSC generator's
+  doctor now reports custom or legacy `clientReferences` values as missing the generated
+  manifest-backed resolver, and the migration guide shows how to print the canonical CommonJS
+  resolver and run it in custom ESM webpack configs with a tested compatibility prelude. Fixes
+  [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
+  [PR 4625](https://github.com/shakacode/react_on_rails/pull/4625) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
+  removes the embedded RSC payload initializer from the hydration root, relocates leading streamed
+  RSC resource tags out of the root before React attaches, and wraps the default RSC provider path in
+  the same null Suspense boundary used by the server stream. This prevents recoverable hydration
+  mismatches on streamed RSC apps such as the flagship demo. Fixes
+  [Issue 4525](https://github.com/shakacode/react_on_rails/issues/4525). [PR 4532](https://github.com/shakacode/react_on_rails/pull/4532) by [justin808](https://github.com/justin808).
+
+#### Added
+
+- **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
+  React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
+  to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain
+  the open-source-only default. Explicit `--pro`, `--no-pro`, `--rsc`, `--no-rsc`, and `--standard-only`
+  choices skip the prompt. The doctor and post-install guidance now show the Pro upgrade path when Pro is
+  off. Fixes [Issue 4604](https://github.com/shakacode/react_on_rails/issues/4604) in
+  [PR 4615](https://github.com/shakacode/react_on_rails/pull/4615) by
+  [justin808](https://github.com/justin808).
+
+- **Agent-legible doctor contract**: `bin/rails react_on_rails:doctor FORMAT=json` now includes stable
+  check IDs, explicit severity and documentation fields, a nullable field reserved for diagnosis-specific
+  safe mechanical fix commands,
+  and self-contained remediation prompts. The versioned schema, deterministic ordering, and exit-code
+  behavior are documented for CI and coding-agent integrations. Fixes
+  [Issue 4602](https://github.com/shakacode/react_on_rails/issues/4602).
+  [PR 4611](https://github.com/shakacode/react_on_rails/pull/4611) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Optional authorization callback for RSC payload routes**: Apps can configure
+  `rsc_payload_authorizer` to reject payload requests before component props are parsed or rendered.
+  Existing behavior remains unchanged when the callback is unset, and the RSC security docs now explain
+  the public endpoint boundary and app-controller authorization seam.
+  Fixes [Issue 4595](https://github.com/shakacode/react_on_rails/issues/4595).
+  [PR 4621](https://github.com/shakacode/react_on_rails/pull/4621) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro] Configurable license-token secret sources**: Rails applications can now provide a paid
+  license through `config.license_token`, including from Rails credentials, while standalone Node
+  renderers can use the `licenseToken` option. Explicit nonblank configuration takes precedence over
+  `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
+  diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
+  [ihabadham](https://github.com/ihabadham).
+
 ### [17.0.0] - 2026-07-16
 
 - **[Pro]** **Healthy incremental streams no longer log premature close-hook timeout warnings**: The

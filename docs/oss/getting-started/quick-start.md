@@ -139,7 +139,7 @@ With React on Rails auto-bundling, you don't need manual registration! Just add 
 
 <p>Here's a React component embedded in this Rails view:</p>
 
-<%= react_component("SimpleCounter", { initialCount: 5 }, { auto_load_bundle: true }) %>
+<%= react_component("SimpleCounter", props: { initialCount: 5 }, auto_load_bundle: true) %>
 ```
 
 The generated layouts already include these tags. If you add React on Rails to another layout, make sure the `<head>` section includes:

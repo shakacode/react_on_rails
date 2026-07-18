@@ -538,6 +538,152 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#prepare_github_release_context" do
+    it "compacts GitHub references so oversized release notes fit without dropping entries" do
+      entries = Array.new(800) do |index|
+        number = index + 1
+        "- Change #{number}. [PR #{number}](https://github.com/shakacode/react_on_rails/pull/#{number}) " \
+          "by [alice](https://github.com/alice). " \
+          "Fixes [Issue #{number}](https://github.com/shakacode/react_on_rails/issues/#{number})."
+      end
+      changelog_notes = entries.join("\n")
+      expect(changelog_notes.length).to be > GITHUB_RELEASE_BODY_MAX_LENGTH
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes].length).to be <= GITHUB_RELEASE_BODY_MAX_LENGTH
+      expect(context[:notes]).to include("- Change 1. #1 by [alice](/alice). Fixes #1.")
+      expect(context[:notes]).to include("- Change 800. #800 by [alice](/alice). Fixes #800.")
+    end
+
+    it "compacts profile links for maximum-length GitHub usernames" do
+      username = "a#{'b' * 38}"
+      changelog_notes = "- Change by [#{username}](https://github.com/#{username})."
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes]).to eq("- Change by [#{username}](/#{username}).")
+    end
+
+    it "keeps multibyte notes within GitHub's character limit unchanged" do
+      changelog_notes = "#### Added\n\n- #{'🧪' * 100_000}"
+      expect(changelog_notes.length).to be < GITHUB_RELEASE_BODY_MAX_LENGTH
+      expect(changelog_notes.bytesize).to be > GITHUB_RELEASE_BODY_MAX_LENGTH
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes]).to eq(changelog_notes)
+    end
+
+    it "renders retained excerpts without letting Markdown delimiters span the omission" do
+      changelog_notes = <<~MARKDOWN
+        #### Added
+
+        - Before code
+
+        ```ruby
+        puts "<release>"
+        #{'x' * 130_000}
+        ```
+
+        #### Security
+
+        - Final security note
+      MARKDOWN
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+      omission_index = context[:notes].index("Some changelog entries were omitted")
+      before_omission = context[:notes][0...omission_index]
+
+      expect(context[:notes]).to include("Beginning of release notes (excerpt)")
+      expect(context[:notes]).to include("End of release notes (excerpt)")
+      expect(context[:notes]).to include("&lt;release&gt;")
+      expect(before_omission.scan("<pre>").length).to eq(before_omission.scan("</pre>").length)
+      expect(context[:notes].scan("<pre>").length).to eq(context[:notes].scan("</pre>").length)
+    end
+
+    it "keeps the beginning and end when notes remain oversized after compaction" do
+      entries = Array.new(1_000) do |index|
+        "- Change #{index + 1}: #{'release detail ' * 12}"
+      end
+      changelog_notes = "#### Breaking Changes\n\n#{entries.join("\n")}\n\n#### Security\n\n- Final security note"
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes].length).to be <= GITHUB_RELEASE_BODY_MAX_LENGTH
+      expect(context[:notes]).to include("#### Breaking Changes")
+      expect(context[:notes]).to include("#### Security")
+      expect(context[:notes]).to include("Some changelog entries were omitted")
+      expect(context[:notes]).to include("blob/v17.0.0/CHANGELOG.md")
+    end
+
+    it "keeps the beginning and end of a single oversized changelog entry" do
+      changelog_notes = "- First release detail #{'🧪' * 150_000} final release detail"
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes].length).to be <= GITHUB_RELEASE_BODY_MAX_LENGTH
+      expect(context[:notes]).to be_valid_encoding
+      expect(context[:notes]).to start_with("#### Beginning of release notes (excerpt)")
+      expect(context[:notes]).to include("- First release detail")
+      expect(context[:notes]).to include("Some changelog entries were omitted")
+      expect(context[:notes]).to include("final release detail")
+      expect(context[:notes]).to include("#### End of release notes (excerpt)")
+    end
+
+    it "reserves fallback wrappers and separators within the character limit" do
+      unreserved_characters = GITHUB_RELEASE_BODY_MAX_LENGTH - github_release_omission("v17.0.0").length
+      suffix_budget = unreserved_characters - (unreserved_characters * 3 / 4)
+      changelog_notes = "- #{'x' * ((suffix_budget * 5) - 2)}"
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+
+      context = prepare_github_release_context(monorepo_root: "/tmp/repo", gem_version: "17.0.0")
+
+      expect(context[:notes].length).to be <= GITHUB_RELEASE_BODY_MAX_LENGTH
+    end
+  end
+
+  describe "#publish_or_update_github_release" do
+    it "reports the GitHub-only recovery command when publication fails" do
+      release_context = {
+        notes: "#### Fixed\n\n- Release fix",
+        prerelease: false,
+        tag: "v17.0.0",
+        title: "v17.0.0"
+      }
+      allow(self).to receive(:ensure_git_tag_exists!)
+      allow(self).to receive(:system).and_return(false, false)
+
+      expect do
+        publish_or_update_github_release(
+          monorepo_root: "/tmp/repo",
+          release_context:,
+          dry_run: false
+        )
+      end.to raise_error(SystemExit, /bundle exec rake "sync_github_release\[17\.0\.0\]"/)
+    end
+  end
+
   describe "#confirm_release!" do
     it "refuses a stable release with no changelog content before prompting even when input would confirm" do
       allow(self).to receive(:extract_changelog_section)
@@ -581,6 +727,21 @@ RSpec.describe "release.rake helper methods" do
       expect do
         confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
       end.to output(/Changelog: ✓ section found.*Proceed with release\?/m).to_stdout
+    end
+
+    it "prepares oversized GitHub notes before confirming irreversible publication" do
+      entry = "- Change. [PR 123](https://github.com/shakacode/react_on_rails/pull/123) " \
+              "by [alice](https://github.com/alice). " \
+              "Fixes [Issue 456](https://github.com/shakacode/react_on_rails/issues/456).\n"
+      changelog_notes = entry * 1_000
+      allow(self).to receive(:extract_changelog_section)
+        .with(changelog_path: "/tmp/repo/CHANGELOG.md", version: "17.0.0")
+        .and_return(changelog_notes)
+      allow($stdin).to receive(:gets).and_return("y\n")
+
+      expect do
+        confirm_release!(version: "17.0.0", monorepo_root: "/tmp/repo")
+      end.to output(/GitHub:    ✓ release body prepared before publishing \(\d+ → \d+ characters\)/).to_stdout
     end
   end
 

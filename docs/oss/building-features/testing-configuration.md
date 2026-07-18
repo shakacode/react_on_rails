@@ -1183,7 +1183,7 @@ When running tests in parallel (with `parallel_tests` gem):
 
 ```yaml
 - name: Compile test assets
-  run: RAILS_ENV=test bundle exec rake react_on_rails:assets:compile_environment
+  run: RAILS_ENV=test NODE_ENV=test bin/shakapacker
 
 - name: Run tests
   run: bundle exec rspec
