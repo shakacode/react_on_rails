@@ -150,13 +150,16 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
   --expected-candidate vX.Y.Z.rc.N \
   --expected-candidate-commit CANDIDATE_COMMIT_SHA \
+  --expected-policy-commit POLICY_COMMIT_SHA \
+  --expected-tracker-mode TRACKER_MODE \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
 Every nonterminal blocker needs a durable issue or public-safe tracker-only reason before closeout.
-The independently supplied expected pack ID, generated release selector, candidate tag, and source
-commit, plus the ledger's unique public preflight-marker record, must match the exact candidate
-snapshot before any distributed app work can validate.
+The independently supplied expected pack ID, generated release selector, candidate tag, source
+commit, policy commit, and tracker mode, plus the ledger's unique public preflight-marker record,
+must match the exact candidate snapshot before any distributed app work can validate. The rendered
+tracker path must remain distinct from the durable ledger path.
 Resolved package entries use the canonical `registry` source so local workspace/path overrides
 cannot stand in for published artifacts. Blocked outcomes must reference active owned blockers, and
 tracker promotion must be `blocked` exactly when a release blocker remains; `hold` is only a

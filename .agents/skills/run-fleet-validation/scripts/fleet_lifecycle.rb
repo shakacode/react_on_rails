@@ -770,11 +770,12 @@ module FleetValidation
         merge/reachability state is derived from the per-target rows. If
         any lane has already merged, its base, authority/freeze, merge-commit, reachability, and
         tree-parity proofs remain required even when another lane blocks overall promotion. An
-        unmerged blocked lane retains pristine pending reachability with no stale proof fields, while
-        a non-mutation lane records an evidenced, freeze-clear `not_applicable` merge disposition.
-        Supply the expected pack ID, generated release selector, candidate tag, and candidate source
-        commit from the independent launch record when validating; never derive the expected snapshot
-        identity from the ledger itself.
+        unmerged blocked lane retains pristine pending reachability with no stale proof fields and
+        records the terminal freeze reread as `clear`, `frozen`, or `conflict`, never `unknown`.
+        A non-mutation lane records an evidenced, freeze-clear `not_applicable` merge disposition.
+        Supply the expected pack ID, generated release selector, candidate tag, candidate source
+        commit, policy commit, and tracker mode from the independent launch record when validating;
+        never derive the expected snapshot identity from the ledger itself.
       MARKDOWN
     end
 
@@ -835,8 +836,10 @@ module FleetValidation
       expected_candidate: nil,
       expected_candidate_commit: nil,
       expected_pack_id: nil,
+      expected_policy_commit: nil,
       expected_release_selector: nil,
       expected_snapshot_fingerprint: nil,
+      expected_tracker_mode: nil,
       closeout: false
     )
       @ledger = ledger
@@ -845,8 +848,10 @@ module FleetValidation
       @expected_candidate = expected_candidate
       @expected_candidate_commit = expected_candidate_commit
       @expected_pack_id = expected_pack_id
+      @expected_policy_commit = expected_policy_commit
       @expected_release_selector = expected_release_selector
       @expected_snapshot_fingerprint = expected_snapshot_fingerprint
+      @expected_tracker_mode = expected_tracker_mode
       @closeout = closeout
     end
 
@@ -1408,6 +1413,13 @@ module FleetValidation
         errors << "pack candidate commit mismatch: expected #{@expected_candidate_commit}, " \
                   "got #{pack['candidate_commit']}"
       end
+      if @expected_policy_commit && pack["policy_commit"] != @expected_policy_commit
+        errors << "pack policy commit mismatch: expected #{@expected_policy_commit}, " \
+                  "got #{pack['policy_commit']}"
+      end
+      if @expected_tracker_mode && pack["tracker_mode"] != @expected_tracker_mode
+        errors << "pack tracker mode mismatch: expected #{@expected_tracker_mode}, got #{pack['tracker_mode']}"
+      end
       errors
     end
 
@@ -1781,7 +1793,7 @@ module FleetValidation
           if merge["authority"] != "none" || present?(merge["authority_evidence"])
             errors << "target #{item['id']} blocked merge retains mutation authority"
           end
-          unless merge["freeze_state"] == "clear"
+          unless %w[clear frozen conflict].include?(merge["freeze_state"])
             errors << "target #{item['id']} blocked merge freeze state is unresolved"
           end
           if present?(merge["merge_commit"])

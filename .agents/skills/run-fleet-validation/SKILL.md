@@ -122,12 +122,15 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
   --expected-candidate vX.Y.Z.rc.N \
   --expected-candidate-commit CANDIDATE_COMMIT_SHA \
+  --expected-policy-commit POLICY_COMMIT_SHA \
+  --expected-tracker-mode TRACKER_MODE \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
-The expected pack ID, generated release selector, candidate tag, and candidate source commit come
-from the checker-held launch record, not from the ledger under review. The validator fails closed
-on stale pack IDs, selectors, candidates, or candidate commits,
+The expected pack ID, generated release selector, candidate tag, candidate source commit, policy
+commit, and tracker mode come from the checker-held launch record, not from the ledger under review.
+The tracker output path must be distinct from the ledger path. The validator fails closed on stale
+pack IDs, selectors, candidates, candidate commits, policy commits, or tracker modes,
 missing/duplicate/mismatched public
 preflight markers, product package versions that do not normalize to
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or

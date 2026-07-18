@@ -1603,7 +1603,10 @@ class FleetValidationGeneratorTest < Minitest::Test
     soft_target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
     soft_target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "shared-blocker")
     hard_target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
-    hard_target.fetch("checks").fetch("review")["blocker_id"] = "shared-blocker"
+    hard_target.fetch("checks").fetch("review").merge!(
+      "status" => "blocked",
+      "blocker_id" => "shared-blocker"
+    )
     ledger["blockers"] = [
       {
         "id" => "shared-blocker",
@@ -1701,6 +1704,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
         "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc",
         "--render-tracker", tracker_path
       )
 
@@ -1730,7 +1735,11 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-candidate",
         "v17.0.0.rc.12",
         "--expected-candidate-commit",
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode",
+        "strict-rc"
       )
 
       refute status.success?
@@ -1765,7 +1774,9 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--ledger", ledger_path,
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
-        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
       )
       _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
         RbConfig.ruby,
@@ -1775,7 +1786,9 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-pack-id", "another-pack",
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
-        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
       )
 
       refute missing_status.success?
@@ -1815,7 +1828,9 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-pack-id", "fleet-test-pack",
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
-        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
       )
 
       refute missing_status.success?
@@ -1863,7 +1878,9 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-pack-id", "fleet-test-pack",
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
-        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
       )
 
       refute missing_status.success?
@@ -1872,6 +1889,81 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes mismatch_stderr,
                       "pack candidate commit mismatch: expected aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, " \
                       "got #{wrong_commit}"
+    end
+  end
+
+  def test_closeout_enforces_external_policy_commit_and_tracker_mode
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_policy_commit: "f" * 40,
+      expected_tracker_mode: "final-release",
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "pack policy commit mismatch: expected #{'f' * 40}, " \
+                    "got bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    assert_includes errors, "pack tracker mode mismatch: expected final-release, got strict-rc"
+  end
+
+  def test_ledger_cli_requires_external_policy_commit_and_tracker_mode
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+      common = [
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+
+      _stdout, policy_stderr, policy_status = Open3.capture3(*common)
+      _stdout, mode_stderr, mode_status = Open3.capture3(
+        *common,
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      )
+
+      refute policy_status.success?
+      assert_includes policy_stderr, "missing argument: --expected-policy-commit"
+      refute mode_status.success?
+      assert_includes mode_stderr, "missing argument: --expected-tracker-mode"
+    end
+  end
+
+  def test_ledger_cli_rejects_tracker_output_that_resolves_to_the_ledger_path_without_writing
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+      original_ledger = File.binread(ledger_path)
+
+      _stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc",
+        "--render-tracker", File.join(directory, ".", "ledger.json")
+      )
+
+      refute status.success?
+      assert_includes stderr, "--render-tracker must resolve to a different path than --ledger"
+      assert_equal original_ledger, File.binread(ledger_path)
     end
   end
 
@@ -2473,6 +2565,51 @@ class FleetValidationGeneratorTest < Minitest::Test
                     "target #{non_mutation_target.fetch('id')} not-applicable merge disposition is incomplete"
   end
 
+  def test_blocked_mutation_merge_accepts_every_terminal_freeze_state
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge").merge!(
+      "status" => "blocked",
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "merge_commit" => nil,
+      "evidence" => "release blocked before merge"
+    )
+    target.fetch("reachability").merge!(
+      "default_branch" => "pending",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "pending",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "release-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/release-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    %w[clear frozen conflict].each do |freeze_state|
+      ledger.dig("inventory", ledger.fetch("inventory").index(target), "merge")["freeze_state"] = freeze_state
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_empty errors, "#{freeze_state}: #{errors.join('; ')}"
+    end
+  end
+
   def test_non_mutation_target_cannot_retain_post_merge_reachability
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -3033,7 +3170,8 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert status.success?, stderr
     assert_includes stdout, "hard_gates=8"
     assert_includes stdout, "soft_tracks=5"
-    assert_includes stdout, "required_path=webpack-rsc-production:scheduled"
+    assert_includes stdout, "required_path=webpack-rsc-production:passed"
+    refute_includes stdout, "required_path=webpack-rsc-production:scheduled"
     assert_includes stdout, "unowned_blockers_rejected=6"
     assert_includes stdout, "tracker_rows=13"
     assert_includes stdout, "tracker_verdict=PARTIAL"
@@ -3063,6 +3201,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "create-react-on-rails-app@RESOLVED_NPM_VERSION fleet-rsc --rsc"
     assert_includes pack, "independently resolved RSC version only in the RSC app"
     assert_includes pack, "verify: true"
+  end
+
+  def test_generated_snapshot_launch_record_round_trips_policy_and_tracker_anchors_to_checker
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      index = File.read(File.join(directory, "INDEX.md"))
+      prompts = Dir.glob(File.join(directory, "*", "*-fleet-lane.md")).map { |path| File.read(path) }.join("\n")
+
+      assert_includes prompts, "`policy_commit: FULL_POLICY_COMMIT_SHA`"
+      assert_includes prompts, "`tracker_mode: INITIAL_TRACKER_MODE`"
+      assert_includes prompts, "copy both exact values from that unique snapshot comment"
+      assert_includes index, "never from `result-ledger.json`"
+      assert_includes index, '--expected-policy-commit "$EXPECTED_POLICY_COMMIT"'
+      assert_includes index, '--expected-tracker-mode "$EXPECTED_TRACKER_MODE"'
+    end
   end
 
   def test_remote_coordinators_require_a_pack_bound_public_preflight_marker

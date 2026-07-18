@@ -4,6 +4,7 @@
 require "fileutils"
 require "optparse"
 require "securerandom"
+require "shellwords"
 require "yaml"
 require_relative "fleet_lifecycle"
 
@@ -301,7 +302,25 @@ module FleetValidation
            read-only evidence while waiting.
         4. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.
         5. Run [CLOSEOUT.md](CLOSEOUT.md) with an independent checker, validate `result-ledger.json`
-           against `result-ledger.schema.json`, and render the tracker matrix from that ledger.
+           against `result-ledger.schema.json`, and render the tracker matrix from that ledger. The
+           checker must copy the policy commit and initial tracker mode from the unique public snapshot
+           comment, never from `result-ledger.json`, before running:
+
+           ```bash
+           EXPECTED_CANDIDATE=RESOLVED_CANDIDATE_TAG
+           EXPECTED_CANDIDATE_COMMIT=RESOLVED_CANDIDATE_COMMIT
+           EXPECTED_POLICY_COMMIT=FULL_POLICY_COMMIT_SHA
+           EXPECTED_TRACKER_MODE=INITIAL_TRACKER_MODE
+           ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+             --ledger result-ledger.json \
+             --expected-pack-id #{Shellwords.escape(@pack_id)} \
+             --expected-release-selector #{Shellwords.escape(@release_selector)} \
+             --expected-candidate "$EXPECTED_CANDIDATE" \
+             --expected-candidate-commit "$EXPECTED_CANDIDATE_COMMIT" \
+             --expected-policy-commit "$EXPECTED_POLICY_COMMIT" \
+             --expected-tracker-mode "$EXPECTED_TRACKER_MODE" \
+             --render-tracker tracker-closeout.md
+           ```
 
         This layout runs at most
         #{(@prompt_count.to_f / @machines.length).ceil} prompts on one machine; use the exact allocation
@@ -482,17 +501,27 @@ module FleetValidation
           - Derive the independently released `react-on-rails-rsc` version separately from the tagged
             product manifests and the release tracker, then verify that exact RSC artifact is published.
             Never require it to share the React on Rails product version.
+          - Before any lane changes tracker state, resolve the exact release policy/default commit and
+            initial tracker mode from trusted repository/tracker state. Do not derive either from the
+            result ledger.
           - Post one tracker snapshot comment marked `<!-- fleet-validation-snapshot:#{@pack_id} -->` with
-            the exact tag, normalized gem/npm product versions, RSC version, commit SHA, and resolution time.
-            Heartbeat/close the snapshot claim only after the public-safe comment is readable.
+            the exact tag, normalized gem/npm product versions, RSC version, candidate commit SHA,
+            resolution time, `policy_commit: FULL_POLICY_COMMIT_SHA`, and
+            `tracker_mode: INITIAL_TRACKER_MODE`. Replace both placeholders with the exact resolved
+            values. The independent checker must
+            copy both exact values from that unique snapshot comment rather than the ledger.
+            Heartbeat/close the snapshot claim only after the
+            public-safe comment is readable.
         STEPS
       else
         <<~STEPS.chomp
           - Do not select a candidate independently. Wait up to five minutes for the tracker comment marked
             `<!-- fleet-validation-snapshot:#{@pack_id} -->` from coordinator 1, then use its exact tag,
-            product gem/npm versions, independently versioned RSC pin, and commit SHA for the whole lane.
-            Cross-check those artifacts and tag before mutation. If the snapshot is absent, malformed, or
-            inconsistent, report UNKNOWN and make no writes.
+            product gem/npm versions, independently versioned RSC pin, candidate commit, policy commit,
+            and initial tracker mode for the whole lane. Cross-check those artifacts and tag before
+            mutation. The independent checker must
+            copy both exact values from that unique snapshot comment rather than the ledger.
+            If the snapshot is absent, malformed, or inconsistent, report UNKNOWN and make no writes.
         STEPS
       end
     end

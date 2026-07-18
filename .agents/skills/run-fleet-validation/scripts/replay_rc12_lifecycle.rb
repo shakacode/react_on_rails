@@ -12,6 +12,8 @@ module FleetValidation
     CANDIDATE = "v17.0.0.rc.12"
     CANDIDATE_COMMIT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     PACK_ID = "rc12-sanitized"
+    POLICY_COMMIT = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    TRACKER_MODE = "strict-rc"
 
     def run
       generator = Generator.new(
@@ -52,9 +54,12 @@ module FleetValidation
 
       hard_gates = generator.lifecycle_inventory.count { |target| target["tier"] == "hard_gate" }
       soft_tracks = generator.lifecycle_inventory.count { |target| target["tier"] == "soft_track" }
+      required_path = ledger.fetch("required_paths").find { |path| path["id"] == "webpack-rsc-production" }
+      raise "webpack-rsc-production path missing from validated ledger" unless required_path
+
       puts "hard_gates=#{hard_gates}"
       puts "soft_tracks=#{soft_tracks}"
-      puts "required_path=webpack-rsc-production:scheduled"
+      puts "required_path=#{required_path.fetch('id')}:#{required_path.fetch('status')}"
       puts "unowned_blockers_rejected=#{rejected}"
       puts "tracker_rows=#{tracker_rows}"
       puts "tracker_verdict=PARTIAL"
@@ -74,7 +79,9 @@ module FleetValidation
         expected_release_selector: CANDIDATE,
         expected_candidate: CANDIDATE,
         expected_candidate_commit: CANDIDATE_COMMIT,
+        expected_policy_commit: POLICY_COMMIT,
         expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+        expected_tracker_mode: TRACKER_MODE,
         closeout: true
       )
     end
@@ -84,8 +91,8 @@ module FleetValidation
       ledger.fetch("pack").merge!(
         "candidate" => CANDIDATE,
         "candidate_commit" => CANDIDATE_COMMIT,
-        "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "tracker_mode" => "strict-rc",
+        "policy_commit" => POLICY_COMMIT,
+        "tracker_mode" => TRACKER_MODE,
         "resolved_packages" => resolved_packages(generator)
       )
       ledger.fetch("preflight")["status"] = "passed"
