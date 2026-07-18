@@ -3,7 +3,6 @@
 require_relative "spec_helper"
 require "shakapacker"
 
-# Verification-only touch for the post-merge unit-row selector exercise.
 # rubocop:disable Metrics/ModuleLength
 
 module ReactOnRails
@@ -38,6 +37,8 @@ module ReactOnRails
       end
 
       it "does not throw if the generated assets dir is blank with shakapacker" do
+        expect(described_class.name).to eq("ReactOnRails::Configuration")
+
         expect do
           ReactOnRails.configure do |config|
             config.generated_assets_dir = ""
