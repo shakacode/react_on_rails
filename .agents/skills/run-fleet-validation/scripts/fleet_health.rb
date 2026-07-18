@@ -9,6 +9,7 @@ require "yaml"
 require_relative "fleet_lifecycle"
 
 module FleetValidation
+  class MissingPublicContentError < ManifestError; end
   class NonPublicRepositoryError < ManifestError; end
 
   module ProductVersion
@@ -192,6 +193,7 @@ module FleetValidation
   class PublicGitHubProbe
     SHARED_SMOKE_REFERENCE = "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@"
     PASSING_CONCLUSIONS = %w[success neutral skipped].freeze
+    DEPENDABOT_PATHS = %w[.github/dependabot.yml .github/dependabot.yaml].freeze
     MAX_PAGES = 20
     REVIEW_APP_MAX_AGE_DAYS = 45
 
@@ -481,13 +483,13 @@ module FleetValidation
     end
 
     def dependabot_status(repo, head, packages)
-      content = @client.content(repo, ".github/dependabot.yml", ref: head)
+      content, path = dependabot_content(repo, head)
       config = YAML.safe_load(content, permitted_classes: [], permitted_symbols: [], aliases: false)
       result = DependabotV1.evaluate(config, packages)
       {
         "status" => result.fetch("status"),
         "policy" => "v1",
-        "evidence" => result.fetch("findings").empty? ? ".github/dependabot.yml" : result.fetch("findings").join(", ")
+        "evidence" => result.fetch("findings").empty? ? path : result.fetch("findings").join(", ")
       }
     rescue StandardError => e
       {
@@ -495,6 +497,16 @@ module FleetValidation
         "policy" => "v1",
         "evidence" => "Dependabot v1 config unavailable: #{e.class}"
       }
+    end
+
+    def dependabot_content(repo, head)
+      DEPENDABOT_PATHS.each do |path|
+        return [@client.content(repo, path, ref: head), path]
+      rescue MissingPublicContentError
+        next
+      end
+
+      raise MissingPublicContentError, "No supported Dependabot config path is readable"
     end
 
     def unknown_observation(observed_at, reason)

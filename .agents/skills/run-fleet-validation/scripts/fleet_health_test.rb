@@ -350,6 +350,25 @@ class FleetHealthTest < Minitest::Test
     assert_equal "SocketError: temporary DNS failure", error.message
   end
 
+  def test_public_github_client_translates_only_missing_content_responses
+    status = 404
+    http = Object.new
+    http.define_singleton_method(:json) do |_url|
+      raise FleetValidation::PublicHTTPResponseError.new(status, "request failed")
+    end
+    client = FleetValidation::PublicGitHubClient.new(http:)
+
+    assert_raises(FleetValidation::MissingPublicContentError) do
+      client.content("sanitized/demo", ".github/dependabot.yml", ref: "a" * 40)
+    end
+
+    status = 500
+    error = assert_raises(FleetValidation::PublicHTTPResponseError) do
+      client.content("sanitized/demo", ".github/dependabot.yml", ref: "a" * 40)
+    end
+    assert_equal 500, error.status
+  end
+
   def test_cli_explicit_versions_override_manifest_defaults
     options = { release: "v18.0.0", rsc_version: "20.0.0" }
 
@@ -448,6 +467,57 @@ class FleetHealthTest < Minitest::Test
 
     assert_equal "blocked", result.fetch("status")
     assert_includes result.fetch("findings"), "npm:product-group-missing"
+  end
+
+  def test_dependabot_status_falls_back_to_the_supported_yaml_path
+    repo = "sanitized/demo"
+    head = "a" * 40
+    requests = []
+    config = dependabot_v1_config
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      requests << [path, ref]
+      raise FleetValidation::MissingPublicContentError, "missing" if path == ".github/dependabot.yml"
+
+      YAML.dump(config)
+    end
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    result = probe.send(:dependabot_status, repo, head, @contract.targets.first.fetch("packages"))
+
+    assert_equal "passed", result.fetch("status")
+    assert_equal ".github/dependabot.yaml", result.fetch("evidence")
+    assert_equal(
+      [
+        [".github/dependabot.yml", head],
+        [".github/dependabot.yaml", head]
+      ],
+      requests
+    )
+  end
+
+  def test_dependabot_status_fails_closed_when_both_supported_paths_are_unavailable
+    repo = "sanitized/demo"
+    head = "a" * 40
+    requests = []
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      requests << [path, ref]
+      raise FleetValidation::MissingPublicContentError, "missing"
+    end
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    result = probe.send(:dependabot_status, repo, head, @contract.targets.first.fetch("packages"))
+
+    assert_equal "blocked", result.fetch("status")
+    assert_includes result.fetch("evidence"), "MissingPublicContentError"
+    assert_equal(
+      [
+        [".github/dependabot.yml", head],
+        [".github/dependabot.yaml", head]
+      ],
+      requests
+    )
   end
 
   def test_public_sbom_parser_extracts_gem_and_npm_versions

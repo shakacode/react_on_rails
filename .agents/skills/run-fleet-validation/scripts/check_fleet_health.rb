@@ -15,6 +15,15 @@ require_relative "fleet_health"
 module FleetValidation
   class TransientPublicRequestError < StandardError; end
 
+  class PublicHTTPResponseError < ManifestError
+    attr_reader :status
+
+    def initialize(status, message)
+      @status = status.to_i
+      super(message)
+    end
+  end
+
   class PublicHTTPClient
     USER_AGENT = "react-on-rails-fleet-health/1"
 
@@ -33,7 +42,10 @@ module FleetValidation
         http.request(request)
       end
       unless response.is_a?(Net::HTTPSuccess)
-        raise ManifestError, "public HTTP GET #{uri} failed with #{response.code}"
+        raise PublicHTTPResponseError.new(
+          response.code,
+          "public HTTP GET #{uri} failed with #{response.code}"
+        )
       end
 
       JSON.parse(response.body)
@@ -61,6 +73,10 @@ module FleetValidation
       raise ManifestError, "#{repo}:#{path} is not a file" unless result["type"] == "file"
 
       Base64.decode64(result.fetch("content"))
+    rescue PublicHTTPResponseError => e
+      raise unless e.status == 404
+
+      raise MissingPublicContentError, "#{repo}:#{path} is unavailable"
     end
   end
 
