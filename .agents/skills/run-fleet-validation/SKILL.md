@@ -44,7 +44,8 @@ candidate or policy/inventory manifest fails closed.
    assigned app mutation.
 2. Run `PREFLIGHT.md` against that snapshot, then start the remaining prompt coordinators.
    No app mutation worker may start before the
-   pack ledger has `APP_WORK_ALLOWED`, backed by terminal-green exact-commit CI, artifacts, and the
+   pack ledger has `preflight.app_work_allowed: true` (the explicit `APP_WORK_ALLOWED` marker),
+   backed by terminal-green exact-commit CI, artifacts, and the
    standard/Pro/Pro+RSC generator matrix, or an explicit policy-allowed public-safe waiver.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
 4. Each prompt is a separate top-level coordinator task and must use its bounded subagents as

@@ -24,17 +24,24 @@ module FleetValidation
 
       manifest = YAML.safe_load_file(options.fetch(:manifest_path), aliases: false)
       ledger = JSON.parse(File.read(options.fetch(:ledger_path)))
+      pack = ledger.is_a?(Hash) && ledger["pack"].is_a?(Hash) ? ledger["pack"] : {}
       lifecycle = Lifecycle.new(
         manifest:,
-        pack_id: ledger.dig("pack", "pack_id").to_s,
-        release_selector: ledger.dig("pack", "release_selector").to_s
+        pack_id: pack["pack_id"].to_s,
+        release_selector: pack["release_selector"].to_s
       )
       errors = SchemaValidator.new(lifecycle.schema).errors(ledger)
+      unless errors.empty?
+        errors.each { |error| warn "ERROR: #{error}" }
+        return 1
+      end
+
       errors.concat(LedgerValidator.new(
         ledger,
         inventory: lifecycle.inventory,
         required_paths: lifecycle.required_paths,
         expected_candidate: options[:expected_candidate],
+        expected_snapshot_fingerprint: lifecycle.snapshot_fingerprint,
         closeout: true
       ).errors)
 

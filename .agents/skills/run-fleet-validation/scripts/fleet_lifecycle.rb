@@ -15,16 +15,20 @@ module FleetValidation
       "work_mode" => "mutation",
       "packages" => [
         { "ecosystem" => "gem", "name" => "react_on_rails" },
-        { "ecosystem" => "npm", "name" => "react-on-rails" }
+        { "ecosystem" => "npm", "name" => "react-on-rails" },
+        { "ecosystem" => "npm", "name" => "create-react-on-rails-app" }
       ]
     }.freeze
 
-    attr_reader :inventory, :required_paths
+    attr_reader :inventory, :required_paths, :snapshot_fingerprint
 
     def initialize(manifest:, pack_id:, release_selector:)
       @manifest = manifest
       @pack_id = pack_id
       @release_selector = release_selector
+      @snapshot_fingerprint = Digest::SHA256.hexdigest(
+        JSON.generate("release_selector" => @release_selector, "manifest" => @manifest)
+      )
       @inventory = build_inventory
       @required_paths = build_required_paths
     end
@@ -53,6 +57,7 @@ module FleetValidation
         },
         "preflight" => {
           "status" => "pending",
+          "app_work_allowed" => false,
           "waiver" => nil,
           "release_ci" => { "status" => "pending", "evidence" => nil },
           "artifacts" => { "status" => "pending", "evidence" => nil },
@@ -189,19 +194,27 @@ module FleetValidation
       }
     end
 
+    def validate_existing_ledger(path)
+      return unless File.exist?(path)
+
+      existing = JSON.parse(File.read(path))
+      existing_pack = existing.fetch("pack", {})
+      return unless existing_pack["pack_id"] == @pack_id
+      return if existing_pack["release_selector"] == @release_selector &&
+                existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
+
+      raise ManifestError, "existing result ledger belongs to a different release snapshot"
+    rescue JSON::ParserError => e
+      raise ManifestError, "existing result ledger is invalid JSON: #{e.message}"
+    end
+
     private
 
     def write_ledger(path)
+      validate_existing_ledger(path)
       if File.exist?(path)
         existing = JSON.parse(File.read(path))
-        existing_pack = existing.fetch("pack", {})
-        if existing_pack["pack_id"] == @pack_id
-          same_snapshot = existing_pack["release_selector"] == @release_selector &&
-                          existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
-          return if same_snapshot
-
-          raise ManifestError, "existing result ledger belongs to a different release snapshot"
-        end
+        return if existing.dig("pack", "pack_id") == @pack_id
       end
 
       File.write(path, "#{JSON.pretty_generate(ledger_template)}\n")
@@ -225,12 +238,13 @@ module FleetValidation
 
     def preflight_schema
       fields = %w[
-        status waiver release_ci artifacts generator_matrix capabilities
+        status app_work_allowed waiver release_ci artifacts generator_matrix capabilities
       ]
       object_schema(
         fields,
         {
           "status" => { "enum" => %w[pending passed waived blocked unknown] },
+          "app_work_allowed" => { "type" => "boolean" },
           "waiver" => waiver_schema,
           "release_ci" => preflight_gate_schema,
           "artifacts" => preflight_gate_schema,
@@ -514,6 +528,8 @@ module FleetValidation
         An explicit public-safe waiver may replace a failed gate only when the release policy allows
         it and the ledger records the authority and evidence URL. Missing, pending, conflicting, stale,
         or `UNKNOWN` evidence does not open the barrier.
+        After validating those gates and capabilities, set `preflight.app_work_allowed` to `true`;
+        that schema-validated boolean is the ledger's explicit `APP_WORK_ALLOWED` marker.
 
         Before worker launch, record a machine/session capability attestation covering
         nonblocking permissions, Git and GitHub authentication, registry/network access, required toolchains,
@@ -581,23 +597,22 @@ module FleetValidation
     def slug(value)
       value.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
     end
-
-    def snapshot_fingerprint
-      @snapshot_fingerprint ||= Digest::SHA256.hexdigest(
-        JSON.generate(
-          "release_selector" => @release_selector,
-          "manifest" => @manifest
-        )
-      )
-    end
   end
 
   class LedgerValidator
-    def initialize(ledger, inventory:, required_paths:, expected_candidate: nil, closeout: false)
+    def initialize(
+      ledger,
+      inventory:,
+      required_paths:,
+      expected_candidate: nil,
+      expected_snapshot_fingerprint: nil,
+      closeout: false
+    )
       @ledger = ledger
       @inventory = inventory
       @required_paths = required_paths
       @expected_candidate = expected_candidate
+      @expected_snapshot_fingerprint = expected_snapshot_fingerprint
       @closeout = closeout
     end
 
@@ -709,11 +724,17 @@ module FleetValidation
 
     def required_path_errors
       paths = Array(@ledger["required_paths"])
-      @required_paths.filter_map do |required|
+      @required_paths.flat_map do |required|
         path = paths.find { |item| item["id"] == required.fetch("id") }
-        next if path_evidenced?(path)
+        errors = []
+        if path && path["evidence_source"] != required["evidence_source"]
+          errors << "required path #{required.fetch('id')} evidence_source does not match manifest"
+        end
+        unless path_evidenced?(path)
+          errors << "required path #{required.fetch('id')} has no passing evidence or waiver"
+        end
 
-        "required path #{required.fetch('id')} has no passing evidence or waiver"
+        errors
       end
     end
 
@@ -778,6 +799,9 @@ module FleetValidation
       end
       allowed_modes = %w[development accelerated-rc strict-rc final-release]
       errors << "pack tracker_mode is not allowed" unless allowed_modes.include?(pack["tracker_mode"])
+      if @expected_snapshot_fingerprint && pack["snapshot_fingerprint"] != @expected_snapshot_fingerprint
+        errors << "pack snapshot_fingerprint does not match the current manifest"
+      end
       errors
     end
 
@@ -1012,12 +1036,13 @@ module FleetValidation
     end
 
     def commit_identity?(value)
-      value.to_s.match?(/\A[0-9a-f]{7,40}\z/i)
+      value.to_s.match?(/\A[0-9a-f]{40}\z/i)
     end
 
     def app_work_allowed?
       preflight = @ledger.fetch("preflight", {})
-      %w[passed waived].include?(preflight["status"]) && preflight_errors.empty?
+      preflight["app_work_allowed"] == true &&
+        %w[passed waived].include?(preflight["status"]) && preflight_errors.empty?
     end
 
     def valid_waiver?(waiver, expected_gate)
@@ -1092,11 +1117,12 @@ module FleetValidation
     def type_matches?(value, type)
       {
         "array" => Array,
+        "boolean" => [TrueClass, FalseClass],
         "integer" => Integer,
         "null" => NilClass,
         "object" => Hash,
         "string" => String
-      }.fetch(type).then { |klass| value.is_a?(klass) }
+      }.fetch(type).then { |klass| Array(klass).any? { |candidate| value.is_a?(candidate) } }
     end
 
     def validate_object(value, schema, path)

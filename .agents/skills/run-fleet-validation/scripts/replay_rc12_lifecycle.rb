@@ -79,6 +79,7 @@ module FleetValidation
                                       .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
       )
       ledger.fetch("preflight")["status"] = "passed"
+      ledger.fetch("preflight")["app_work_allowed"] = true
       %w[release_ci artifacts generator_matrix].each do |gate|
         ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
       end

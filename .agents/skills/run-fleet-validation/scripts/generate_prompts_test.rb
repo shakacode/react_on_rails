@@ -34,6 +34,7 @@ class FleetValidationGeneratorTest < Minitest::Test
                                       .map { |package| package.merge("version" => "1.0.0", "source" => "registry") }
     )
     ledger.fetch("preflight")["status"] = "passed"
+    ledger.fetch("preflight")["app_work_allowed"] = true
     %w[release_ci artifacts generator_matrix].each do |gate|
       ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
     end
@@ -194,7 +195,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       assert_includes preflight, "restart-safe handoff"
       assert_includes preflight,
                       "configured/runnable, configured/broken, not configured, or `UNKNOWN`"
-      assert_includes maker_prompt, "Do not start app mutation work until `APP_WORK_ALLOWED`"
+      assert_includes maker_prompt, "`preflight.app_work_allowed: true` records the"
     end
   end
 
@@ -232,6 +233,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "app work started before APP_WORK_ALLOWED"
+  end
+
+  def test_app_work_allowed_is_an_explicit_schema_validated_ledger_marker
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["app_work_allowed"] = false
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "app work started before APP_WORK_ALLOWED"
+    assert_empty FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
   end
 
   def test_ledger_fails_closed_when_a_report_only_soft_track_is_missing
@@ -601,6 +617,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "pack tracker_mode is not allowed"
   end
 
+  def test_closeout_requires_full_length_commit_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack")["candidate_commit"] = "abc1234"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack candidate_commit is not an exact commit identity"
+  end
+
   def test_closeout_rejects_unknown_default_reachability_or_tree_parity
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -830,6 +861,29 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_ledger_cli_reports_schema_errors_without_running_crashing_semantic_validation
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory")[0] = "malformed"
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      _stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--ledger",
+        ledger_path,
+        "--expected-candidate",
+        "v17.0.0.rc.12"
+      )
+
+      refute status.success?
+      assert_includes stderr, "$.inventory[0] has invalid type"
+      refute_includes stderr, "NoMethodError"
+    end
+  end
+
   def test_ledger_cli_requires_an_external_expected_candidate
     generator = build_generator
     Dir.mktmpdir do |directory|
@@ -920,6 +974,17 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_core_generator_gate_tracks_the_published_cli_version
+    core = build_generator.lifecycle_inventory.find do |target|
+      target.fetch("id") == "react-on-rails-generator-install-smoke"
+    end
+
+    assert_includes(
+      core.fetch("packages"),
+      { "ecosystem" => "npm", "name" => "create-react-on-rails-app" }
+    )
   end
 
   def test_closeout_requires_every_manifest_package_in_the_retained_lock_evidence
@@ -1076,11 +1141,43 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_same_pack_id_cannot_be_reused_for_a_different_release_snapshot
     Dir.mktmpdir do |directory|
       build_generator(release_selector: "v17.0.0.rc.12").write_pack(directory)
+      old_index = File.read(File.join(directory, "INDEX.md"))
       regenerated = build_generator(release_selector: "v17.0.0.rc.13")
 
       error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
       assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+      assert_equal old_index, File.read(File.join(directory, "INDEX.md"))
     end
+  end
+
+  def test_closeout_rejects_a_ledger_from_a_different_manifest_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_snapshot_fingerprint: "different-fingerprint",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack snapshot_fingerprint does not match the current manifest"
+  end
+
+  def test_closeout_binds_required_paths_to_manifest_evidence_sources
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("required_paths").first["evidence_source"] = "unrelated-source"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("evidence_source does not match manifest") })
   end
 
   def test_same_pack_id_cannot_be_reused_after_manifest_policy_changes
@@ -1309,6 +1406,21 @@ class FleetValidationGeneratorTest < Minitest::Test
       end
 
       assert_equal "repos[0] must be a mapping", error.message
+    end
+  end
+
+  def test_rejects_an_unsupported_repository_tier
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos").first["tier"] = "hard-gate"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0] tier must be hard_gate or soft_track", error.message
     end
   end
 

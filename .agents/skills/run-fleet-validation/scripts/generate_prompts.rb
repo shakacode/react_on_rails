@@ -16,7 +16,7 @@ module FleetValidation
   }.freeze
 
   class Generator
-    attr_reader :assignments, :lifecycle_inventory, :required_paths
+    attr_reader :assignments, :lifecycle_inventory, :required_paths, :snapshot_fingerprint
 
     def initialize(manifest_path:, prompt_count:, machines:, release_selector:, pack_id: nil)
       @manifest_path = manifest_path
@@ -29,6 +29,7 @@ module FleetValidation
       @lifecycle = Lifecycle.new(manifest: @manifest, pack_id: @pack_id, release_selector: @release_selector)
       @lifecycle_inventory = @lifecycle.inventory
       @required_paths = @lifecycle.required_paths
+      @snapshot_fingerprint = @lifecycle.snapshot_fingerprint
       @targets = build_targets
       validate_target_ids!
       @assignments = assign_machines(build_lanes)
@@ -68,6 +69,7 @@ module FleetValidation
     end
 
     def write_pack(output_dir)
+      @lifecycle.validate_existing_ledger(File.join(output_dir, "result-ledger.json"))
       FileUtils.mkdir_p(output_dir)
       clear_generated_prompts(output_dir)
       rendered_prompts = []
@@ -136,6 +138,9 @@ module FleetValidation
 
       @manifest.fetch("repos").each_with_index do |repo, index|
         raise ManifestError, "repos[#{index}] must be a mapping" unless repo.is_a?(Hash)
+        unless %w[hard_gate soft_track].include?(repo["tier"])
+          raise ManifestError, "repos[#{index}] tier must be hard_gate or soft_track"
+        end
 
         next unless repo["tier"] == "hard_gate"
 
@@ -327,8 +332,9 @@ module FleetValidation
            needed to resolve disagreement. Never convert missing evidence into a pass.
 
         Execution contract:
-        - Do not start app mutation work until `APP_WORK_ALLOWED` is present in the pack-specific
-          release-wide preflight ledger. The marker is valid only when release commit CI, published
+        - Do not start app mutation work until `preflight.app_work_allowed: true` records the
+          `APP_WORK_ALLOWED` marker in the pack-specific release-wide preflight ledger. The marker
+          is valid only when release commit CI, published
           artifacts, and the standard / Pro / Pro+RSC generator matrix are terminal green, or when
           an explicit public-safe waiver names the failed gate and authority.
         - Read AGENTS.md and repository-specific instructions before changing any target repo. Treat the
