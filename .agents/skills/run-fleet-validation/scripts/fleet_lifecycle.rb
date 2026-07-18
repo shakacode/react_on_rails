@@ -756,7 +756,10 @@ module FleetValidation
         blockers retain a durable owner and require structured gate, authority, evidence URL, and
         reason fields. Candidate-snapshot package matching applies to candidate-managed packages on
         hard gates, including the separately resolved RSC package; report-only and independently
-        versioned dependency locks retain the versions observed in their target. The aggregate
+        versioned dependency locks retain the versions observed in their target. The resolved release
+        snapshot uses the canonical `registry` source; local workspace or path overrides cannot prove
+        published-artifact readiness. Blocked outcomes reference active owned blockers, and tracker
+        promotion cannot claim `BLOCKED` when no release blocker remains. The aggregate
         merge/reachability state is derived from the per-target rows. If
         any lane has already merged, its base, authority/freeze, merge-commit, reachability, and
         tree-parity proofs remain required even when another lane blocks overall promotion. An
@@ -1371,6 +1374,9 @@ module FleetValidation
       if actual_packages.tally.any? { |_identity, count| count > 1 }
         errors << "pack resolved package snapshot contains duplicate identities"
       end
+      if resolved_packages.any? { |package| package["source"] != "registry" }
+        errors << "pack resolved package snapshot contains unpublished sources"
+      end
       if @expected_snapshot_fingerprint && pack["snapshot_fingerprint"] != @expected_snapshot_fingerprint
         errors << "pack snapshot_fingerprint does not match the current manifest"
       end
@@ -1611,7 +1617,9 @@ module FleetValidation
       preflight_errors = []
       if preflight_blocked?
         blocker = blockers[@ledger.dig("preflight", "blocker_id")]
-        unless blocker && durable_owner?(blocker["owner"])
+        if blocker && durable_owner?(blocker["owner"])
+          preflight_errors << inactive_blocker_error("blocked preflight", blocker) unless active_blocker?(blocker)
+        else
           preflight_errors << "blocked preflight has no owned blocker reference"
         end
       end
@@ -1629,7 +1637,11 @@ module FleetValidation
         end
         references.filter_map do |label, blocker_id|
           blocker = blockers[blocker_id]
-          next if blocker && durable_owner?(blocker["owner"])
+          if blocker && durable_owner?(blocker["owner"])
+            next if active_blocker?(blocker)
+
+            next inactive_blocker_error("target #{item['id']} blocked #{label}", blocker)
+          end
 
           "target #{item['id']} blocked #{label} has no owned blocker reference"
         end
@@ -1638,7 +1650,11 @@ module FleetValidation
         next unless path["status"] == "blocked"
 
         blocker = blockers[path["blocker_id"]]
-        next if blocker && durable_owner?(blocker["owner"])
+        if blocker && durable_owner?(blocker["owner"])
+          next if active_blocker?(blocker)
+
+          next inactive_blocker_error("required path #{path['id']} blocked result", blocker)
+        end
 
         "required path #{path['id']} blocked result has no owned blocker reference"
       end
@@ -1693,6 +1709,9 @@ module FleetValidation
       errors << "tracker closeout status is not ready or posted" unless %w[ready posted].include?(tracker["status"])
       if tracker["status"] == "posted" && !present?(tracker["comment_url"])
         errors << "posted tracker closeout is missing comment_url"
+      end
+      if tracker["promotion"] == "blocked" && !release_blocked?
+        errors << "tracker promotion is blocked without a release blocker"
       end
       errors
     end
@@ -1805,6 +1824,14 @@ module FleetValidation
       return false unless owner.is_a?(Hash)
 
       %w[issue_url waiver_url public_tracker_reason].any? { |key| present?(owner[key]) }
+    end
+
+    def active_blocker?(blocker)
+      %w[open pending blocked unknown].include?(blocker["status"])
+    end
+
+    def inactive_blocker_error(subject, blocker)
+      "#{subject} references inactive blocker #{blocker['id']}"
     end
 
     def path_terminally_evidenced?(path)

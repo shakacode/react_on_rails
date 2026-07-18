@@ -131,11 +131,12 @@ missing/duplicate/mismatched public
 preflight markers, product package versions that do not normalize to
 the selected candidate, incomplete inventory, premature app work, `UNKNOWN` capabilities or
 review-app state, candidate-managed hard-gate package versions that differ from the resolved release
-snapshot,
+snapshot, resolved snapshots that name unpublished package sources,
 check/review evidence that does not match the immutable audited/reviewed/current target revision,
 mutable-app check evidence that does not match the reconciled current base revision,
 missing package/check/baseline evidence, unowned
-blockers, blockers whose status remains `UNKNOWN`, private-only fields, missing required paths,
+blockers, inactive blockers still referenced by blocked outcomes, blockers whose status remains
+`UNKNOWN`, contradictory tracker promotion, private-only fields, missing required paths,
 non-independent audit, base movement,
 authority/freeze conflict, and missing default reachability/tree parity.
 The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven

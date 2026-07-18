@@ -1512,6 +1512,32 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
   end
 
+  def test_blocked_soft_track_outcome_cannot_reference_a_resolved_blocker
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "soft_track" }
+    target.fetch("checks").fetch("hosted_ci").merge!("status" => "blocked", "blocker_id" => "resolved-blocker")
+    ledger["blockers"] = [
+      {
+        "id" => "resolved-blocker",
+        "status" => "resolved",
+        "public_summary" => "The blocker was resolved after this stale observation",
+        "owner" => { "issue_url" => "https://example.invalid/issues/resolved" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "target #{target.fetch('id')} blocked check hosted_ci references inactive blocker resolved-blocker"
+  end
+
   def test_blocker_shared_with_a_hard_gate_remains_release_gating
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1814,6 +1840,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes posted_errors, "posted tracker closeout is missing comment_url"
   end
 
+  def test_tracker_cannot_claim_blocked_when_all_release_gates_are_promotable
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "tracker promotion is blocked without a release blocker"
+  end
+
   def test_result_ledger_schema_closes_public_blocker_and_review_app_shapes
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
@@ -1952,6 +1993,24 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
+  end
+
+  def test_resolved_candidate_snapshot_requires_published_registry_sources
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each { |package| package["source"] = "local-workspace" }
+    ledger.fetch("inventory").each do |item|
+      item.fetch("package_locks").each { |package| package["source"] = "local-workspace" }
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack resolved package snapshot contains unpublished sources"
   end
 
   def test_closeout_rejects_retained_lock_versions_that_do_not_match_the_resolved_snapshot
