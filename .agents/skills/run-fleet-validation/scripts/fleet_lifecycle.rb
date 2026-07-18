@@ -623,7 +623,9 @@ module FleetValidation
         semantics. A promotion recommendation is allowed only when every required release path is green
         or explicitly waived and no `UNKNOWN` remains. A failed required path closes as `BLOCKED` only
         when it records its lane, failure evidence, and an owned `blocker_id`. Waived or deferred
-        blockers require structured gate, authority, evidence URL, and reason fields.
+        blockers retain a durable owner and require structured gate, authority, evidence URL, and
+        reason fields. If any lane has already merged, its base, authority/freeze, reachability, and
+        tree-parity proofs remain required even when another lane blocks overall promotion.
       MARKDOWN
     end
 
@@ -703,16 +705,17 @@ module FleetValidation
       result << package_version_error if @closeout && package_version_error
       result << check_evidence_error if @closeout && check_evidence_error
       result.concat(waiver_evidence_errors) if @closeout
-      result.concat(base_identity_errors) if @closeout && merge_eligible?
-      result << base_movement_error if @closeout && merge_eligible? && base_movement_error
+      recorded_merge = @ledger.dig("merge", "status") == "merged"
+      merge_proofs_required = merge_eligible? || recorded_merge
+      result.concat(base_identity_errors) if @closeout && merge_proofs_required
+      result << base_movement_error if @closeout && merge_proofs_required && base_movement_error
       result.concat(independent_audit_errors) if @closeout
       result << "independent audit is not passed" if @closeout && @ledger.dig("audit", "status") != "passed"
       if @closeout && !present?(@ledger.dig("preflight", "capabilities", "restart_handoff"))
         result << "capability restart_handoff is missing"
       end
-      result.concat(reachability_errors) if @closeout && merge_eligible?
+      result.concat(reachability_errors) if @closeout && merge_proofs_required
       result.concat(tracker_errors) if @closeout
-      recorded_merge = @ledger.dig("merge", "status") == "merged"
       if @closeout && (merge_eligible? || recorded_merge) && merge_authority_error
         result << merge_authority_error
       end
@@ -732,15 +735,15 @@ module FleetValidation
     end
 
     def candidate_error
-      expected = @expected_candidate
       release_selector = @ledger.dig("pack", "release_selector")
-      expected ||= release_selector unless release_selector == "latest RC or beta"
-      return unless expected
-
       actual = @ledger.fetch("pack", {})["candidate"]
-      return if actual == expected
+      if release_selector != "latest RC or beta" && actual != release_selector
+        return "candidate mismatch: pinned selector #{release_selector}, got #{actual || 'missing'}"
+      end
+      return unless @expected_candidate
+      return if actual == @expected_candidate
 
-      "candidate mismatch: expected #{expected}, got #{actual || 'missing'}"
+      "candidate mismatch: expected #{@expected_candidate}, got #{actual || 'missing'}"
     end
 
     def capability_errors
@@ -817,7 +820,7 @@ module FleetValidation
     def barrier_order_errors
       opened_at = timestamp(@ledger.dig("preflight", "opened_at"))
       Array(@ledger["inventory"]).filter_map do |item|
-        next unless item["work_mode"] == "mutation" && item["work_state"] != "not_started"
+        next if item["work_mode"] == "validation_only" || item["work_state"] == "not_started"
 
         started_at = timestamp(item["work_started_at"])
         if !opened_at || !started_at
@@ -853,17 +856,19 @@ module FleetValidation
     end
 
     def blocker_owner_errors
-      Array(@ledger["blockers"]).filter_map do |blocker|
+      Array(@ledger["blockers"]).flat_map do |blocker|
         status = blocker["status"]
-        if %w[waived deferred].include?(status)
-          next if valid_waiver?(blocker["disposition"], blocker["id"])
-
-          next "blocker #{blocker['id'] || 'missing-id'} is missing structured #{status} disposition evidence"
+        errors = []
+        if %w[waived deferred].include?(status) &&
+           !valid_waiver?(blocker["disposition"], blocker["id"])
+          errors << "blocker #{blocker['id'] || 'missing-id'} " \
+                    "is missing structured #{status} disposition evidence"
         end
-        next if status == "resolved"
-        next if durable_owner?(blocker["owner"])
+        if status != "resolved" && !durable_owner?(blocker["owner"])
+          errors << "blocker #{blocker['id'] || 'missing-id'} has no durable owner"
+        end
 
-        "blocker #{blocker['id'] || 'missing-id'} has no durable owner"
+        errors
       end
     end
 

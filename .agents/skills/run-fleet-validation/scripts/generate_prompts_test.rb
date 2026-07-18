@@ -317,7 +317,7 @@ class FleetValidationGeneratorTest < Minitest::Test
       expected_candidate: "v17.0.0.rc.12"
     ).errors
 
-    assert_includes errors, "candidate mismatch: expected v17.0.0.rc.12, got v17.0.0.rc.11"
+    assert_includes errors, "candidate mismatch: pinned selector v17.0.0.rc.12, got v17.0.0.rc.11"
   end
 
   def test_ledger_rejects_unknown_coordination_or_machine_capabilities
@@ -480,6 +480,36 @@ class FleetValidationGeneratorTest < Minitest::Test
 
     assert_includes errors, "blocker waived-blocker is missing structured waived disposition evidence"
     assert_includes errors, "blocker deferred-blocker is missing structured deferred disposition evidence"
+  end
+
+  def test_waived_and_deferred_blockers_require_durable_owners_in_addition_to_dispositions
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = %w[waived deferred].map do |status|
+      {
+        "id" => "#{status}-blocker",
+        "status" => status,
+        "public_summary" => "Sanitized #{status} blocker",
+        "owner" => nil,
+        "disposition" => {
+          "gate" => "#{status}-blocker",
+          "authority" => "maintainer",
+          "evidence_url" => "https://example.invalid/dispositions/#{status}",
+          "reason" => "Sanitized disposition"
+        }
+      }
+    end
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker waived-blocker has no durable owner"
+    assert_includes errors, "blocker deferred-blocker has no durable owner"
   end
 
   def test_public_ledger_rejects_private_blocker_fields
@@ -1415,6 +1445,22 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_external_expected_candidate_does_not_override_a_pinned_selector
+    generator = build_generator(release_selector: "v17.0.0.rc.11")
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "candidate mismatch: pinned selector v17.0.0.rc.11, got v17.0.0.rc.12"
+  end
+
   def test_closeout_rejects_a_ledger_from_a_different_manifest_snapshot
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1501,6 +1547,71 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     refute(errors.any? { |error| error.include?(core.fetch("id")) }, errors.join("\n"))
+  end
+
+  def test_recorded_merges_retain_base_and_reachability_proofs_when_another_lane_blocks
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "later-blocker",
+        "status" => "open",
+        "public_summary" => "Another lane blocked after merges",
+        "owner" => { "issue_url" => "https://example.invalid/issues/later" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "blocked"
+    ledger.fetch("audit")["base_commit"] = nil
+    ledger.fetch("merge").merge!("reviewed_base_commit" => nil, "current_base_commit" => nil)
+    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil)
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "audit base_commit is missing or not an exact commit identity"
+    assert_includes errors, "reachability default_branch is not passed"
+    assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
+  end
+
+  def test_report_only_tracks_retain_post_preflight_work_start_ordering
+    generator = build_generator
+    missing = complete_ledger(generator)
+    missing.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["work_started_at"] = nil
+    early = complete_ledger(generator)
+    early.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["work_started_at"] =
+      "2026-07-18T09:59:00Z"
+
+    missing_errors = FleetValidation::LedgerValidator.new(
+      missing,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+    early_errors = FleetValidation::LedgerValidator.new(
+      early,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(missing_errors.any? { |error| error.include?("missing replayable barrier/work-start ordering evidence") })
+    assert(early_errors.any? { |error| error.include?("started before the preflight barrier opened") })
   end
 
   def test_closeout_requires_terminal_install_build_test_smoke_ci_and_review_evidence

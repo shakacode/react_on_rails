@@ -138,9 +138,9 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
 ```
 
 Every nonterminal blocker needs a durable issue or public-safe tracker-only reason before closeout.
-Waived and deferred blockers additionally need a structured disposition naming the gate, authority,
-evidence URL, and public-safe reason. A failed required path may close the run as `BLOCKED` only with
-its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
+Waived and deferred blockers additionally retain a durable owner and need a structured disposition
+naming the gate, authority, evidence URL, and public-safe reason. A failed required path may close
+the run as `BLOCKED` only with its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
 required-path coverage, current-head evidence, independent audit, merge authority, default
 reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
 
