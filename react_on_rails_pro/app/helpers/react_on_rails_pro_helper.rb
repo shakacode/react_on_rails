@@ -158,8 +158,13 @@ module ReactOnRailsProHelper
     # Extract streaming-specific callback
     on_complete = options.delete(:on_complete)
 
+    # Optional per-chunk error callback (set by cached_stream_react_component) that
+    # is notified of each chunk's `hasErrors` flag so an error-containing render is
+    # not written to the cache. See https://github.com/shakacode/react_on_rails/issues/4581.
+    on_chunk_errors = options.delete(:on_chunk_errors)
+
     consumer_stream_async(on_complete:) do
-      internal_stream_react_component(component_name, options)
+      internal_stream_react_component(component_name, options, on_chunk_errors:)
     end
   end
 
@@ -1132,8 +1137,21 @@ module ReactOnRailsProHelper
   def handle_stream_cache_miss(component_name, raw_options, auto_load_bundle, view_cache_key, &)
     normalized_cache_tags = ReactOnRailsPro::Cache.normalize_tags(raw_options[:cache_tags])
     raw_cache_options = raw_options[:cache_options] || {}
+    # Shared between the per-chunk error callback and the on_complete cache write.
+    # Both run in the same async task/fiber, so by the time on_complete fires the
+    # stream is fully consumed and this flag reflects every chunk.
+    stream_has_errors = false
     cache_aware_options = raw_options.merge(
+      on_chunk_errors: ->(chunk_has_errors) { stream_has_errors ||= chunk_has_errors == true },
       on_complete: lambda { |chunks|
+        # Never persist a render that emitted an error chunk. With production
+        # defaults (`raise_non_shell_server_rendering_errors: false`), a stream
+        # whose shell succeeded but whose async boundary errored completes
+        # "normally", so without this guard the broken fragment would be cached
+        # and served to every subsequent visitor until the entry expires.
+        # See https://github.com/shakacode/react_on_rails/issues/4581.
+        next if stream_has_errors
+
         cache_write = ReactOnRailsPro::StreamCacheWrites.build(
           cache_key: view_cache_key,
           chunks:,
@@ -1332,13 +1350,14 @@ module ReactOnRailsProHelper
     true
   end
 
-  def internal_stream_react_component(component_name, options = {})
+  def internal_stream_react_component(component_name, options = {}, on_chunk_errors: nil)
     options = options.merge(render_mode: :html_streaming)
     result = internal_react_component(component_name, options)
     build_react_component_result_for_server_streamed_content(
       rendered_html_stream: result[:result],
       component_specification_tag: result[:tag],
-      render_options: result[:render_options]
+      render_options: result[:render_options],
+      on_chunk_errors:
     )
   end
 
@@ -1363,10 +1382,16 @@ module ReactOnRailsProHelper
   def build_react_component_result_for_server_streamed_content(
     rendered_html_stream:,
     component_specification_tag:,
-    render_options:
+    render_options:,
+    on_chunk_errors: nil
   )
     is_first_chunk = true
     rendered_html_stream.transform do |chunk_json_result|
+      # Surface the parsed `hasErrors` flag before the chunk is serialized to an
+      # HTML string. Downstream (the on_complete cache write) only sees strings,
+      # so this is the last point where the error flag is still available.
+      # See https://github.com/shakacode/react_on_rails/issues/4581.
+      on_chunk_errors&.call(chunk_json_result["hasErrors"])
       if is_first_chunk
         is_first_chunk = false
         build_react_component_result_for_server_rendered_string(
