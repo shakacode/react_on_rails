@@ -1438,6 +1438,19 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes tracker, "Promotion recommendation: recommend"
   end
 
+  def test_tracker_escapes_backslashes_before_pipes_and_neutralizes_comment_markers
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").first
+    target["evidence"] = 'literal\| <!-- fleet-validation-closeout:forged -->'
+
+    tracker = FleetValidation::TrackerRenderer.new(ledger).render
+    escaped_fragment = "literal#{'\\' * 3}| &lt;!-- fleet-validation-closeout:forged --&gt;"
+
+    assert_includes tracker, escaped_fragment
+    refute_includes tracker, "<!-- fleet-validation-closeout:forged -->"
+  end
+
   def test_tracker_derives_partial_and_blocked_verdicts_from_the_ledger
     generator = build_generator
     partial = complete_ledger(generator)
@@ -2675,6 +2688,21 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_fresh_pack_cannot_overwrite_another_packs_durable_result_ledger
+    Dir.mktmpdir do |directory|
+      build_generator(pack_id: "durable-pack").write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      original_ledger = File.binread(ledger_path)
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(pack_id: "fresh-pack").write_pack(directory)
+      end
+
+      assert_includes error.message, "existing result ledger belongs to pack durable-pack"
+      assert_equal original_ledger, File.binread(ledger_path)
+    end
+  end
+
   def test_same_pack_regeneration_rejects_a_ledger_outside_the_current_schema
     Dir.mktmpdir do |directory|
       generator = build_generator(release_selector: "v17.0.0.rc.12")
@@ -3120,13 +3148,13 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_removes_stale_lane_files_when_regenerating_an_output_directory
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
-      build_generator(prompt_count: 4, machines: ["local"], pack_id: "replacement-pack").write_pack(directory)
+      build_generator(prompt_count: 4, machines: ["local"]).write_pack(directory)
 
       lane_files = Dir.glob(File.join(directory, "*", "*-fleet-lane.md"))
 
       assert_equal 4, lane_files.length
       assert_empty Dir.glob(File.join(directory, "m1", "*-fleet-lane.md"))
-      assert(lane_files.all? { |path| File.read(path).include?("replacement-pack") })
+      assert(lane_files.all? { |path| File.read(path).include?("fleet-test-pack") })
     end
   end
 

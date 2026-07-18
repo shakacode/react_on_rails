@@ -275,7 +275,12 @@ module FleetValidation
 
       existing = JSON.parse(File.read(path))
       existing_pack = existing.fetch("pack", {})
-      return unless existing_pack["pack_id"] == @pack_id
+      existing_pack_id = existing_pack["pack_id"]
+      unless existing_pack_id == @pack_id
+        raise ManifestError,
+              "existing result ledger belongs to pack #{existing_pack_id || '<missing>'}; " \
+              "refusing to overwrite it with pack #{@pack_id}"
+      end
 
       schema_errors = SchemaValidator.new(schema).errors(existing)
       unless schema_errors.empty?
@@ -774,6 +779,7 @@ module FleetValidation
     end
 
     def build_required_paths
+      paths = nil
       lifecycle = @manifest["lifecycle"]
       paths = lifecycle["required_paths"] if lifecycle.is_a?(Hash)
       unless paths.is_a?(Array) && !paths.empty?
@@ -1946,6 +1952,7 @@ module FleetValidation
     end
 
     def terminal_preflight_waiver?(preflight, waiver)
+      gate = nil
       gate = waiver["gate"] if waiver.is_a?(Hash)
       if %w[release_ci generator_matrix].include?(gate)
         valid_preflight_waiver?(waiver, gate, preflight[gate])
@@ -2175,7 +2182,11 @@ module FleetValidation
     end
 
     def escape(value)
-      value.to_s.gsub(/\s+/, " ").strip.gsub("|", "\\|").gsub("<!--", "&lt;!--").gsub("-->", "--&gt;")
+      value.to_s.gsub(/\s+/, " ").strip
+           .gsub("\\") { "\\\\" }
+           .gsub("|", "\\|")
+           .gsub("<!--", "&lt;!--")
+           .gsub("-->", "--&gt;")
     end
 
     def structured_waiver?(waiver, gate)

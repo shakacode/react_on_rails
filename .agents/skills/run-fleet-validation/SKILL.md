@@ -38,7 +38,8 @@ ledger only when a pinned release selector matches the ledger's resolved candida
 manifest fingerprint still matches. Once a dynamic `latest RC or beta` pack has resolved its
 candidate, reuse its existing generated files or create a fresh pack; regeneration cannot safely
 prove that the dynamic selector still resolves to the same candidate. A changed candidate or
-policy/inventory manifest fails closed.
+policy/inventory manifest fails closed. Generate a fresh pack in a fresh output directory; one pack
+must never replace another pack's durable result ledger.
 
 ## Launch and coordinate
 
