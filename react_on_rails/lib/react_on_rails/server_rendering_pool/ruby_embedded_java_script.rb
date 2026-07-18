@@ -3,6 +3,7 @@
 require "open-uri"
 require "execjs"
 require "react_on_rails/length_prefixed_parser"
+require "react_on_rails/lenient_json"
 
 module ReactOnRails
   module ServerRenderingPool
@@ -420,7 +421,8 @@ module ReactOnRails
           result = if result_string.to_s.include?("\t")
                      ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
                    else
-                     JSON.parse(result_string.to_s)
+                     # LenientJson repairs lone-surrogate escapes the JS renderer can emit (#4710).
+                     ReactOnRails::LenientJson.parse(result_string.to_s)
                    end
           replay_console_to_rails_logger(result, render_options)
           result

@@ -124,6 +124,32 @@ RSpec.describe ReactOnRails::LengthPrefixedParser do
         /expected exactly one length-prefixed chunk but found 2/
       )
     end
+
+    # A single backslash, so "#{bs}ud83d" is the literal six-character JSON escape \ud83d
+    # a JS renderer emits when a string is truncated mid-surrogate-pair. The lone surrogate
+    # must not crash the render; the exact repair is covered in lenient_json_spec.rb. See #4710.
+    bs = "\\"
+
+    it "tolerates a lone surrogate in the metadata instead of failing the render" do
+      raw_content = "<div>valid html</div>"
+      metadata = %({"payloadType":"string","consoleReplayScript":"","note":"bad #{bs}ud83d"})
+      payload = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+
+      result = nil
+      expect { result = described_class.parse_one_chunk_result(payload) }.not_to raise_error
+      expect(result["html"]).to eq(raw_content)
+      expect(result["note"]).to be_valid_encoding
+    end
+
+    it "tolerates a lone surrogate in an object payload instead of failing the render" do
+      raw_content = %({"componentHtml":"a#{bs}ud83d b"})
+      metadata = { "payloadType" => "object", "consoleReplayScript" => "" }.to_json
+      payload = "#{metadata}\t#{raw_content.bytesize.to_s(16)}\n#{raw_content}"
+
+      result = nil
+      expect { result = described_class.parse_one_chunk_result(payload) }.not_to raise_error
+      expect(result["html"]["componentHtml"]).to be_valid_encoding
+    end
   end
 
   describe "control messages (messageType)" do
