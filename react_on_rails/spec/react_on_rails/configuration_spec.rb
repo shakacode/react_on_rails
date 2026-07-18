@@ -3,6 +3,7 @@
 require_relative "spec_helper"
 require "shakapacker"
 
+# Verification-only touch for the post-merge unit-row selector exercise.
 # rubocop:disable Metrics/ModuleLength
 
 module ReactOnRails
