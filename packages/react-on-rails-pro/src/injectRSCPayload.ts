@@ -110,6 +110,11 @@ function createRSCDiagnosticScript(
   // Full diagnostics are reported server-side via the streaming error reporter (Sentry/Honeybadger).
   // Fail-closed: unknown or missing railsEnv defaults to redacted (safe for a security gate).
   const showFullDiagnostics = railsEnv === 'development' || railsEnv === 'test';
+  // The two branches normalize `hasErrors` differently on purpose. The redacted (production)
+  // branch forces `hasErrors: true` so a chunk that only tripped `hasRenderingErrorSignal`
+  // (server sent `hasErrors: false` but a non-blank message/stack) still emits a positive
+  // generic signal for error boundaries. The development/test branch instead passes the raw
+  // metadata through unchanged to preserve the exact historical dev payload shape for debugging.
   const clientPayload = showFullDiagnostics ? { hasErrors, renderingError } : { hasErrors: true };
   return createScriptTag(
     `${cacheKeyDiagnosticObject(cacheKey)}||=${JSON.stringify(clientPayload)}`,
