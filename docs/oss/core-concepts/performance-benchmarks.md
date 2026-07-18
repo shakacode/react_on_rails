@@ -131,7 +131,6 @@ A cache-optimized landing page often looks like this:
 <% append_stylesheet_pack_tag("generated/WelcomePage") %>
 <%= preload_pack_asset("generated/WelcomePage.css") %>
 <%= rendered["componentHtml"] %>
-<%= content_for :script_tags, rendered["consoleReplayScript"] %>
 ```
 
 In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
