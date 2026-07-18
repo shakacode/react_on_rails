@@ -1139,7 +1139,8 @@ class ReleaseForwardPort
     source_changelog = changelog_at(source, label: "source")
     target_changelog = changelog_at(target, label: "target")
 
-    reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:)
+    release_version = release_version_from_ref(source)
+    reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:, release_version:)
     result = reconciler.reconcile
 
     print_changelog_reconciliation_plan(source, target, result)
@@ -1153,6 +1154,10 @@ class ReleaseForwardPort
   rescue ChangelogReconciler::ReconcileError => e
     # Map the reconciler's own error onto the shared GitError exit path.
     raise GitError, e.message
+  end
+
+  def release_version_from_ref(ref)
+    ref.match(%r{(?:\A|/)release/(?<version>\d+\.\d+\.\d+)\z})&.[](:version)
   end
 
   def apply_changelog_reconciliation(target, result)
@@ -1434,13 +1439,14 @@ end
 
 # Re-homes release-branch CHANGELOG.md entries into the target's [Unreleased]
 # section. On a release branch a fix's entry lives under an RC header
-# (### [17.0.0.rc.1]); on main it belongs under ### [Unreleased]. A plain
+# (### [17.0.0.rc.1]) or, after final stamping, the matching stable header
+# (### [17.0.0]); on main it belongs under ### [Unreleased]. A plain
 # cherry-pick -x of the fix commit drags the RC-header context and either
 # conflicts or lands the entry in the wrong section. This reconciler is the
 # changelog restructure half of the forward-port: it collapses every entry from
-# the release branch's rc.N sections plus its own [Unreleased] into the target's
-# [Unreleased], de-duplicated by PR number against the target's existing entries,
-# and drops any RC-header section a prior pick left on the target.
+# the release branch's matching stable/rc.N sections plus its own [Unreleased]
+# into the target's [Unreleased], de-duplicated by PR number against the target's
+# existing entries, and drops any RC-header section a prior pick left on the target.
 #
 # The parsing approach intentionally mirrors react_on_rails/rakelib/update_changelog.rake
 # (parse_changelog_sections / changelog_section_blocks / consolidate_changelog_blocks)
@@ -1490,9 +1496,10 @@ class ChangelogReconciler
     end
   end
 
-  def initialize(source_changelog:, target_changelog:)
+  def initialize(source_changelog:, target_changelog:, release_version: nil)
     @source_changelog = source_changelog
     @target_changelog = target_changelog
+    @release_version = release_version
   end
 
   def reconcile
@@ -1533,9 +1540,11 @@ class ChangelogReconciler
 
   # Collapse every release-branch source section that belongs in main's
   # [Unreleased]: the branch's own [Unreleased] first (so it wins "first seen"
-  # ordering), then each rc.N / prerelease section for the active base version.
+  # ordering), then the final stable section and each prerelease section for the
+  # active base version.
   def collect_source_entries(source, base_version)
     sections = [find_unreleased(source)].compact
+    sections += stable_sections(source, base_version)
     sections += prerelease_sections(source, base_version)
     blocks = sections.flat_map { |section| section_blocks(section[:body]) }
     entries_from_blocks(consolidate_blocks(blocks))
@@ -1634,14 +1643,12 @@ class ChangelogReconciler
     text.to_s.gsub(/\s+/, " ").strip
   end
 
-  # The active release line is defined by the SOURCE branch's prerelease sections.
-  # We must NOT fall back to the target's RC base: if the source has no prerelease
-  # sections, there is nothing to re-home and no basis to claim a target RC section
-  # belongs to this line, so the run is a clean no-op (handled by the empty-base
-  # guards in prerelease_sections / stray_rc_sections). Forward-porting from a
-  # non-prerelease ref such as release/16.6.0 must not reach into main's RC base.
+  # Prefer the version named by release/X.Y.Z. Final stamping removes RC headers,
+  # so the source ref is the durable way to identify the stable section to re-home.
+  # For arbitrary source refs, retain the prerelease-section inference fallback.
+  # Never infer from the target: an unrelated target RC section must stay intact.
   def source_release_base_version(source)
-    highest_prerelease_base(source)
+    @release_version || highest_prerelease_base(source)
   end
 
   def highest_prerelease_base(parsed)
@@ -1666,6 +1673,12 @@ class ChangelogReconciler
   # reconciliation must drop so entries live only under [Unreleased] on main.
   def stray_rc_sections(target, base_version)
     prerelease_sections(target, base_version)
+  end
+
+  def stable_sections(parsed, base_version)
+    return [] unless base_version
+
+    parsed[:sections].select { |section| section[:version] == base_version }
   end
 
   # Prerelease (rc.N / beta.N / ...) sections in `parsed` whose base equals

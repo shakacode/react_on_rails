@@ -716,6 +716,45 @@ EOF
   assert_contains "$changelog" "Backport on 16.6 branch" "backport written under unreleased"
 }
 
+# Final stamping collapses the active RC sections into ### [X.Y.Z]. The
+# reconciler must still move those final entries to main's [Unreleased].
+test_final_stable_section_rehomes_into_main_unreleased() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Fixed
+
+- **Existing main fix**: here. $(pr_link 100) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **Final release feature**: shipped. $(pr_link 999) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  local out
+  out="$(run_changelog release/17.0.0)"
+  assert_contains "$out" "Final release feature" "final entry planned"
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "Final release feature" "final entry re-homed"
+  assert_not_contains "$changelog" "### [17.0.0]" "final header not copied"
+}
+
 # De-duplication keys on the entry's OWN PR (the "[PR NNNN](...) by [author]"
 # trailer), not on a PR it merely references. An entry that references PR 4227 but
 # is itself PR 4234 must dedupe against main's PR 4234, and must NOT dedupe against
@@ -833,6 +872,7 @@ run_test test_hash_shorthand_pr_reference_dedupes
 run_test test_empty_main_unreleased_receives_entries
 run_test test_target_without_unreleased_errors_clearly
 run_test test_non_prerelease_source_does_not_touch_target_rc_section
+run_test test_final_stable_section_rehomes_into_main_unreleased
 run_test test_dedupes_on_own_pr_trailer_not_referenced_pr
 run_test test_utf8_changelog_parses_and_round_trips_under_ascii_locale
 run_test test_default_mode_unchanged_without_flag
