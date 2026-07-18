@@ -650,11 +650,20 @@ class FleetHealthTest < Minitest::Test
         },
         "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=20" => {
           "workflow_runs" => [{
+            "id" => 4101,
             "head_sha" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "status" => "completed",
             "conclusion" => "success",
             "html_url" => "https://example.invalid/smoke-run",
             "updated_at" => "2026-07-18T10:00:00Z"
+          }]
+        },
+        "/repos/#{repo}/actions/runs/4101/jobs?per_page=100" => {
+          "jobs" => [{
+            "name" => "Fleet / Demo fleet smoke",
+            "status" => "completed",
+            "conclusion" => "success",
+            "html_url" => "https://example.invalid/smoke-job"
           }]
         },
         "/repos/#{repo}/actions/workflows/42/runs?event=pull_request&per_page=20" => {
@@ -923,6 +932,50 @@ class FleetHealthTest < Minitest::Test
     assert_equal true, status.fetch("shared_contract")
     assert_equal "unknown", status.fetch("status")
     refute_includes status.fetch("evidence"), "unrelated"
+  end
+
+  def test_shared_smoke_requires_the_called_reusable_job_to_succeed
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = {
+      "id" => 41,
+      "path" => ".github/workflows/ci.yml",
+      "html_url" => "https://example.invalid/workflow"
+    }
+    responses = {
+      "/repos/#{repo}/actions/workflows/41/runs?branch=main&per_page=20" => {
+        "workflow_runs" => [{
+          "id" => 4101,
+          "head_sha" => head,
+          "status" => "completed",
+          "conclusion" => "success",
+          "html_url" => "https://example.invalid/run"
+        }]
+      },
+      "/repos/#{repo}/actions/runs/4101/jobs?per_page=100" => {
+        "jobs" => [{
+          "name" => "Fleet / Demo fleet smoke",
+          "status" => "completed",
+          "conclusion" => "skipped",
+          "html_url" => "https://example.invalid/job"
+        }]
+      }
+    }
+    client = Struct.new(:responses) do
+      def get(path)
+        responses.fetch(path)
+      end
+    end.new(responses)
+    probe = FleetValidation::PublicGitHubProbe.new(client:)
+
+    skipped = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow)
+    responses.fetch("/repos/#{repo}/actions/runs/4101/jobs?per_page=100")
+             .fetch("jobs").first["conclusion"] = "success"
+    passed = probe.send(:shared_smoke_workflow_status, repo, head, "main", workflow)
+
+    assert_equal "unknown", skipped.fetch("status")
+    assert_equal "passed", passed.fetch("status")
+    assert_includes passed.fetch("evidence"), "https://example.invalid/job"
   end
 
   def test_shared_smoke_ignores_raw_reference_outside_jobs_uses

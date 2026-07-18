@@ -302,9 +302,30 @@ module FleetValidation
       ].compact.join("; ")
       return evidence_status("unknown", evidence) unless run["status"] == "completed"
 
-      evidence_status(run["conclusion"] == "success" ? "passed" : "blocked", evidence)
+      smoke_job = shared_smoke_job_status(repo, run)
+      status = if run["conclusion"] == "success" && smoke_job["status"] == "passed"
+                 "passed"
+               elsif smoke_job["status"] == "unknown"
+                 "unknown"
+               else
+                 "blocked"
+               end
+      evidence_status(status, [evidence, smoke_job["evidence"]].compact.join("; "))
     rescue StandardError => e
       evidence_status("unknown", "#{workflow_evidence}; workflow run unavailable: #{e.class}")
+    end
+
+    def shared_smoke_job_status(repo, run)
+      jobs = @client.get("/repos/#{repo}/actions/runs/#{run.fetch('id')}/jobs?per_page=100").fetch("jobs", [])
+      smoke_jobs = jobs.select { |job| job["name"].to_s.split(" / ").last == "Demo fleet smoke" }
+      return evidence_status("unknown", "called Demo fleet smoke job was not found") if smoke_jobs.empty?
+
+      evidence = smoke_jobs.filter_map { |job| job["html_url"] }.join(", ")
+      return evidence_status("unknown", evidence) if smoke_jobs.any? { |job| job["status"] != "completed" }
+      return evidence_status("unknown", evidence) if smoke_jobs.any? { |job| job["conclusion"] == "skipped" }
+
+      status = smoke_jobs.all? { |job| job["conclusion"] == "success" } ? "passed" : "blocked"
+      evidence_status(status, evidence)
     end
 
     def shared_smoke_caller?(content)
