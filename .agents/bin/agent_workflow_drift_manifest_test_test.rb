@@ -85,12 +85,53 @@ class AgentWorkflowDriftManifestTest < Minitest::Test
     end
   end
 
+  def test_failure_diagnostics_escape_control_bytes_before_rendering
+    output = render_injected_diagnostic("malicious\e[31m\n  - FAKE_OK")
+
+    assert_includes output, 'malicious\u{001B}[31m\n  - FAKE_OK'
+    refute_includes output, "\e"
+    refute_includes output, "\n  - FAKE_OK"
+  end
+
+  def test_failure_diagnostics_escape_bidi_controls_before_rendering
+    output = render_injected_diagnostic("safe\u202Etxt\u2066  - FAKE_OK")
+
+    assert_includes output, 'safe\u{202E}txt\u{2066}  - FAKE_OK'
+    refute_includes output, "\u202E"
+    refute_includes output, "\u2066"
+  end
+
+  def test_failure_diagnostics_escape_unicode_line_separators_before_rendering
+    output = render_injected_diagnostic("safe\u2028  - FAKE_LINE\u2029  - FAKE_PARAGRAPH")
+
+    assert_includes output, 'safe\u{2028}  - FAKE_LINE\u{2029}  - FAKE_PARAGRAPH'
+    refute_includes output, "\u2028"
+    refute_includes output, "\u2029"
+  end
+
+  def test_failure_diagnostics_replace_non_utf8_bytes_before_rendering
+    diagnostic = "safe\xFF\n  - FAKE_OK".b.force_encoding(Encoding::UTF_8)
+
+    output = render_injected_diagnostic(diagnostic)
+
+    assert_predicate output, :valid_encoding?
+    assert_includes output, "safe\uFFFD\\n  - FAKE_OK"
+    refute_includes output.b, "\xFF".b
+    refute_includes output, "\n  - FAKE_OK"
+  end
+
   def test_every_explicit_exclusion_has_a_reviewed_reason
     refute_empty AgentWorkflowDriftManifest::EXCLUSIONS
     AgentWorkflowDriftManifest::EXCLUSIONS.each_value { |reason| refute_empty reason.strip }
   end
 
   private
+
+  def render_injected_diagnostic(diagnostic)
+    output = StringIO.new
+    AgentWorkflowDriftManifest.render_errors(output, [diagnostic])
+    output.string
+  end
 
   def baseline_source_files
     @baseline_source_files ||= (

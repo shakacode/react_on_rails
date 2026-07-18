@@ -12,6 +12,7 @@ module AgentWorkflowDriftManifest
   module_function
 
   REVISION_PATTERN = /\A[0-9a-f]{40}\z/i
+  UNSAFE_OUTPUT_CHARACTER_PATTERN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/
 
   REQUIRED_EXPLICIT_PATHS = %w[
     .rubocop.yml
@@ -68,9 +69,26 @@ module AgentWorkflowDriftManifest
       return 0
     end
 
-    output.puts "AGENT_WORKFLOW_MANIFEST_COMPLETENESS_FAIL (#{errors.uniq.length})"
-    errors.uniq.sort.each { |error| output.puts "  - #{error}" }
+    render_errors(output, errors)
     1
+  end
+
+  def render_errors(output, errors)
+    sanitized_errors = errors.map { |error| sanitize_diagnostic(error) }.uniq.sort
+    output.puts "AGENT_WORKFLOW_MANIFEST_COMPLETENESS_FAIL (#{sanitized_errors.length})"
+    sanitized_errors.each { |error| output.puts "  - #{error}" }
+  end
+
+  def sanitize_diagnostic(value)
+    safe_value = value.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+    safe_value.gsub(UNSAFE_OUTPUT_CHARACTER_PATTERN) do |character|
+      case character
+      when "\t" then "\\t"
+      when "\n" then "\\n"
+      when "\r" then "\\r"
+      else format("\\u{%04X}", character.ord)
+      end
+    end
   end
 
   def load_manifest(path, errors)

@@ -1,6 +1,6 @@
 ---
 version: 1
-source_revision: 4bb0c1e4944276e271799fd179e0c166b54ef4dc
+source_revision: 1958648b70a450aa67c15b833428485d17021045
 files:
 - source: ".rubocop.yml"
   consumer: ".agents/.rubocop.yml"

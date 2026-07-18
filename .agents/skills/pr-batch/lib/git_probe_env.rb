@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require "open3"
 require "shellwords"
-require "timeout"
+require "tempfile"
 
 module PrBatchGitProbeEnv
   GIT_TIMEOUT_SECONDS = Integer(ENV.fetch("PR_BATCH_GIT_PROBE_TIMEOUT_SECONDS", "10"))
+  TimeoutError = Class.new(StandardError)
 
   # Keep this fallback in sync with `git rev-parse --local-env-vars` for the
   # oldest supported Git; it is used only when the dynamic query fails.
@@ -47,13 +47,63 @@ module PrBatchGitProbeEnv
 
   def local_env_vars
     @local_env_vars ||= begin
-      stdout, _stderr, status = Timeout.timeout(GIT_TIMEOUT_SECONDS) do
-        Open3.capture3("git", "rev-parse", "--local-env-vars")
-      end
+      stdout, _stderr, status = capture3({}, "git", "rev-parse", "--local-env-vars")
       names = status.success? ? stdout.force_encoding("UTF-8").scrub.lines.map(&:strip).reject(&:empty?) : []
       names.empty? ? LOCAL_ENV_VARS_FALLBACK : names
     rescue StandardError
       LOCAL_ENV_VARS_FALLBACK
+    end
+  end
+
+  def capture3(env, *command, stdin_data: nil, timeout_seconds: GIT_TIMEOUT_SECONDS)
+    Tempfile.create("git-probe-stdin") do |stdin|
+      Tempfile.create("git-probe-stdout") do |stdout|
+        Tempfile.create("git-probe-stderr") do |stderr|
+          [stdin, stdout, stderr].each(&:binmode)
+          stdin.write(stdin_data) if stdin_data
+          stdin.rewind
+          pid = Process.spawn(env, *command, in: stdin, out: stdout, err: stderr, pgroup: true)
+          status = wait_for_process(pid, timeout_seconds)
+          unless status
+            terminate_process_group(pid)
+            status = :terminated
+            raise TimeoutError, "Git probe timed out after #{timeout_seconds} seconds"
+          end
+
+          stdout.rewind
+          stderr.rewind
+          return [stdout.read, stderr.read, status]
+        ensure
+          terminate_process_group(pid) if pid && !status
+        end
+      end
+    end
+  end
+
+  def wait_for_process(pid, timeout_seconds)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+    loop do
+      waited = Process.waitpid2(pid, Process::WNOHANG)
+      return waited[1] if waited
+
+      remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      return nil unless remaining.positive?
+
+      sleep [0.01, remaining].min
+    end
+  rescue Errno::ECHILD
+    nil
+  end
+
+  def terminate_process_group(pid)
+    Process.kill("KILL", -pid)
+  rescue Errno::ESRCH
+    nil
+  ensure
+    begin
+      Process.waitpid2(pid)
+    rescue Errno::ECHILD
+      nil
     end
   end
 
