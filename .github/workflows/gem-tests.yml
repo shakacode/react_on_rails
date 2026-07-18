@@ -226,10 +226,12 @@ jobs:
           cd react_on_rails
           if [[ "$SHARD" == generators-* ]]; then
             shard_number="${SHARD#generators-}"
+            # Keep this aligned with the generators-1/2/3 rows in both matrix branches above.
             shard_count=3
             shard_index="$((shard_number - 1))"
             manifest_path="${RUNNER_TEMP}/generator-shard-${shard_number}.opts"
 
+            # Rebuild from each job's exact checkout; never share a manifest across jobs or heads.
             bundle exec ruby -rrspec/core -rdigest -e '
               shard_index = Integer(ARGV.fetch(0))
               shard_count = Integer(ARGV.fetch(1))
@@ -261,6 +263,7 @@ jobs:
               visit_group = lambda do |group|
                 hooks = group.hooks
                 owns_context_hook = %i[before after].any? do |position|
+                  # RSpec has no public hook-enumeration API; fail loudly if this private seam changes.
                   !hooks.send(:all_hooks_for, position, :context).empty?
                 end
 
