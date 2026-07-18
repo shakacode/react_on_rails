@@ -265,6 +265,7 @@ class ReleaseForwardPort
     return "already forward-ported to #{target} via narrated cherry-pick -x evidence with no later target revert" if
       identity_candidates.any? { |target_sha| narrated_forward_port_commit_live?(target_sha, target) }
 
+    identity_candidates.concat(target_history_source_provenance_candidates(sha, target)).uniq!
     return patch_equivalent_skip_reason_message(target) if
       identity_candidates.any? &&
       patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
@@ -294,9 +295,26 @@ class ReleaseForwardPort
       git_lines("log", target, "--fixed-strings", "--grep", source_identity, "--format=%H")
   end
 
+  def target_history_source_provenance_candidates(sha, target)
+    body = git("log", "-1", "--format=%B", sha)
+    source_identities = body.each_line.filter_map do |line|
+      next unless line.match?(/\b(?:backports?|source\s+PR|main\s+PR|merged\s+in)\b/i)
+
+      line.scan(/#\d+/)
+    end.flatten.uniq
+
+    source_identities.flat_map do |source_identity|
+      target_history_commits_mentioning(source_identity, target)
+    end.uniq
+  end
+
   def narrated_forward_port_commit_live?(sha, target)
     body = git("log", "-1", "--format=%B", sha)
-    body.match?(NARRATED_FORWARD_PORT_PATTERN) && target_commit_live_on_target?(sha, target)
+    subject = subject_for_commit(sha)
+    narrated =
+      body.match?(NARRATED_FORWARD_PORT_PATTERN) ||
+      (subject&.match?(/\AForward-port\b/i) && body.match?(/`git cherry-pick -x`/i))
+    narrated && target_commit_live_on_target?(sha, target)
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)

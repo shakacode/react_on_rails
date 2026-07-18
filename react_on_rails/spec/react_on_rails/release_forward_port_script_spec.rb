@@ -475,7 +475,8 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Forward-port release regression (#999)",
         "-m",
-        "- cherry-picked the merged #123 squash commit with `git cherry-pick -x`"
+        "Release PR #123 must be forward-ported with `git cherry-pick -x`.\n\n" \
+        "The conflict resolution preserves newer main behavior."
       )
 
       stdout, stderr, status =
@@ -485,6 +486,36 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("narrated cherry-pick -x evidence")
       expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression (#123)")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
+    end
+  end
+
+  it "uses source-body backport PR references to find exact target patches" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      write_file(repo, "main-only.txt", "combined target work\n")
+      commit_all(repo, "Fix release regression on main (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Backports merged source PR #123 to the release train."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
     end
   end
 
