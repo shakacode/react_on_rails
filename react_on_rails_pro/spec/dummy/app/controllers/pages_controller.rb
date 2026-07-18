@@ -14,6 +14,7 @@
 # https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md
 
 class PagesController < ApplicationController # rubocop:disable Metrics/ClassLength
+  include ActionController::Live
   include ReactOnRailsPro::RSCPayloadRenderer
   include RscPostsPageOverRedisHelper
   include ReactOnRailsPro::AsyncRendering
@@ -297,7 +298,51 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def selective_hydration_demo
-    render "/pages/selective_hydration_demo"
+    stream_view_containing_react_components(template: "/pages/selective_hydration_demo")
+  end
+
+  def selective_hydration_cached # rubocop:disable Metrics/AbcSize
+    # Stream pre-cached section files with delays using ActionController::Live
+    # This simulates serving cached SSR content with progressive streaming
+    delay_seconds = (params[:delay] || 5).to_i
+    cache_dir = Rails.root.join("public", "cache", "selective_hydration_demo")
+
+    # Find all section files
+    section_files = Dir.glob(cache_dir.join("section*.html")).sort_by do |f|
+      f.match(/section(\d+)/)[1].to_i
+    end
+
+    if section_files.empty?
+      response.stream.write "No cached sections found. Run: rake section_cache:generate[/selective_hydration_demo,4,5]"
+      response.stream.close
+      return
+    end
+
+    # Get current CSP nonce for this request
+    current_nonce = content_security_policy_nonce
+
+    # Set headers for streaming
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+
+    # Stream sections with delays using Live streaming
+    section_files.each_with_index do |section_path, index|
+      # Wait before sending this section (except first)
+      sleep(delay_seconds) if index.positive?
+
+      # Read section content and replace cached nonce with current nonce
+      content = File.read(section_path)
+      # Replace any nonce="..." with the current request's nonce
+      content = content.gsub(/nonce="[^"]*"/, "nonce=\"#{current_nonce}\"")
+
+      # Stream the content immediately
+      response.stream.write(content)
+
+      Rails.logger.info "[SectionCache] Sent section #{index}: #{File.basename(section_path)}"
+    end
+  ensure
+    response.stream.close
   end
 
   def loadable_component

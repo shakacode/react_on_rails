@@ -1,3 +1,5 @@
+// import statement added by react_on_rails:generate_packs rake task
+import '../generated/server-bundle-generated';
 /*
  * Copyright (c) 2025-2026 ShakaCode LLC - React on Rails Pro (commercial license)
  *
@@ -16,8 +18,8 @@
 // Shows the mapping from the exported object to the name used by the server rendering.
 import ReactOnRails from 'react-on-rails-pro';
 
-// SelectiveHydrationDemo (only the main component is registered - child components are imported by it)
-import SelectiveHydrationDemo from '../ror-auto-load-components/SelectiveHydrationDemo.jsx';
+// SelectiveHydrationDemo is registered as a server component via generated/SelectiveHydrationDemo.js
+// Do NOT register it here - it would conflict with RSC registration
 
 // Example of server rendering with no React
 import HelloString from '../non_react/HelloString';
@@ -31,7 +33,6 @@ if (process.env.NODE_ENV === 'test') {
 
 ReactOnRails.register({
   HelloString,
-  SelectiveHydrationDemo,
 });
 
 ReactOnRails.registerStore({
