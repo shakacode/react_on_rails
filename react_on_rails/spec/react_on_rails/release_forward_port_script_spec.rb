@@ -840,6 +840,36 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips adapted backports that narrate their live target cherry-pick origin" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression on main")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nrelease-adapted fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression fix",
+        "-m",
+        "Cherry-picked main squash commit\n`#{main_fix_sha}` with `-x`."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{release_fix_sha[0, 12]} Backport release regression fix")
+      expect(stdout).to include("already forward-ported to main via cherry-pick -x evidence")
+      expect(stdout).to include("Nothing to cherry-pick")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
+    end
+  end
+
   it "picks release commits cherry-picked from target merge commits that were later reverted" do
     with_release_repo do |repo|
       base_sha = git(repo, "rev-parse", "HEAD").strip

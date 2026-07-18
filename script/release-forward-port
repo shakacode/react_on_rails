@@ -30,6 +30,8 @@ class ReleaseForwardPort
   HUNKLESS_PATCH_ID_PREFIX = "__hunkless_patch__:"
   CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
   CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
+  NARRATED_CHERRY_PICK_PATTERN =
+    /cherry-picked\s+(?:main\s+)?(?:squash\s+)?commit\s+`?(?<sha>[0-9a-f]{40})`?\s+with\s+`?-x`?/i
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
@@ -538,7 +540,7 @@ class ReleaseForwardPort
 
   def cherry_pick_origin(sha)
     body = git("log", "-1", "--format=%B", sha)
-    match = body.match(CHERRY_PICK_FOOTER_PATTERN)
+    match = body.match(CHERRY_PICK_FOOTER_PATTERN) || body.match(NARRATED_CHERRY_PICK_PATTERN)
     match && match[:sha]
   end
 
