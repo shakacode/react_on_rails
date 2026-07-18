@@ -7,8 +7,9 @@ require "open3"
 require "tempfile"
 
 ROOT = File.expand_path("../../..", __dir__)
+SOURCE_ROOT = File.expand_path(ENV.fetch("AGENT_WORKFLOWS_SOURCE_ROOT", ROOT))
 HELPER = File.expand_path("stage-dependency-gate", __dir__)
-REPLAY_FIXTURES = File.expand_path("../fixtures/stage-dependency-gate-replays.json", __dir__)
+REPLAY_FIXTURES = File.join(SOURCE_ROOT, "skills/pr-batch/fixtures/stage-dependency-gate-replays.json")
 SHA_A = "1111111111111111111111111111111111111111"
 SHA_B = "2222222222222222222222222222222222222222"
 BASE_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -48,6 +49,14 @@ TRUSTED_PLAN_CALL = '--trusted-plan "${STAGE_DEPENDENCY_PLAN_PATH}"'
 TRUSTED_PLAN_ID_CALL = '--trusted-plan-id "${STAGE_DEPENDENCY_PLAN_ID}"'
 
 class StageDependencyGateTest < Minitest::Test
+  def require_pack_source!(*paths)
+    missing = paths.reject { |path| File.file?(File.join(SOURCE_ROOT, path)) }
+    return if missing.empty?
+
+    skip "shared-pack source contract unavailable in this consumer checkout: #{missing.join(', ')}; " \
+         "set AGENT_WORKFLOWS_SOURCE_ROOT to the exact pinned pack checkout"
+  end
+
   def test_instruction_surfaces_resolve_and_invoke_the_portable_helper
     surfaces = %w[
       skills/pr-batch/SKILL.md
@@ -55,9 +64,10 @@ class StageDependencyGateTest < Minitest::Test
       skills/triage/SKILL.md
       workflows/pr-processing.md
     ]
+    require_pack_source!(*surfaces)
 
     surfaces.each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8")
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8")
       normalized_text = text.gsub(/\s+/, " ").strip
       HELPER_RESOLUTION_RULES.each do |rule|
         assert_includes normalized_text, rule, "#{path} is missing helper resolution rule: #{rule}"
@@ -68,20 +78,30 @@ class StageDependencyGateTest < Minitest::Test
   end
 
   def test_direct_single_target_entry_synthesizes_a_verified_manifest_without_a_handoff
+    require_pack_source!("skills/pr-batch/SKILL.md", "workflows/pr-processing.md")
+
     %w[skills/pr-batch/SKILL.md workflows/pr-processing.md].each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_includes text, SINGLE_TARGET_MANIFEST_CONTRACT, "#{path} is missing direct single-target synthesis"
     end
   end
 
   def test_triage_handoffs_deliver_the_complete_manifest_or_a_durable_reference
+    require_pack_source!("skills/triage/SKILL.md", "workflows/pr-processing.md")
+
     %w[skills/triage/SKILL.md workflows/pr-processing.md].each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_includes text, TRIAGE_MANIFEST_HANDOFF_CONTRACT, "#{path} is missing the triage manifest handoff"
     end
   end
 
   def test_backend_dependency_facts_defer_lifecycle_permissions_to_the_typed_gate
+    require_pack_source!(
+      "workflows/pr-processing.md",
+      "skills/pr-batch/SKILL.md",
+      "skills/plan-pr-batch/SKILL.md"
+    )
+
     permissions_for = lambda do |type|
       result = evaluate_with_matching_plan(
         "contract" => "stage-dependency-gate",
@@ -113,10 +133,10 @@ class StageDependencyGateTest < Minitest::Test
     assert merge_permissions.fetch("push")
     refute merge_permissions.fetch("merge")
 
-    workflow = File.read(File.join(ROOT, "workflows/pr-processing.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
+    workflow = File.read(File.join(SOURCE_ROOT, "workflows/pr-processing.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
     assert_includes workflow, BACKEND_TYPED_GATE_CONTRACT
     %w[workflows/pr-processing.md skills/pr-batch/SKILL.md].each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_includes text, REQUIRED_DEPENDENCY_CLOSEOUT_CONTRACT,
                       "#{path} must keep readiness/closeout behind terminal dependency satisfaction"
     end
@@ -127,7 +147,7 @@ class StageDependencyGateTest < Minitest::Test
       skills/plan-pr-batch/SKILL.md
     ]
     compact_surfaces.each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8")
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8")
       assert_includes text, COMPACT_BACKEND_TYPED_GATE_CONTRACT, "#{path} must defer known facts to the typed gate"
       refute_includes text, LEGACY_COMPACT_BACKEND_STOP, "#{path} must not blanket-stop known pending edges"
     end
@@ -148,6 +168,7 @@ class StageDependencyGateTest < Minitest::Test
       skills/triage/SKILL.md
       docs/coordination-backend.md
     ]
+    require_pack_source!(*manifest_surfaces, "CONTEXT.md")
     preparation_fields = %w[
       source_patch_inspection
       collision_domain_mapping
@@ -157,7 +178,7 @@ class StageDependencyGateTest < Minitest::Test
     ]
 
     manifest_surfaces.each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_match(/immutable pre-launch trusted plan.*`id`.*`from`.*`to`.*`type`/i, text,
                    "#{path} must pin the immutable edge tuple in a separate trusted plan")
       preparation_fields.each do |field|
@@ -166,7 +187,7 @@ class StageDependencyGateTest < Minitest::Test
     end
 
     %w[workflows/pr-processing.md skills/pr-batch/SKILL.md].each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_includes text,
                       "Missing, empty, or `UNKNOWN` maker/checker identity permits read-only discovery only " \
                       "and blocks hosted CI and every mutation.",
@@ -176,7 +197,7 @@ class StageDependencyGateTest < Minitest::Test
                       "#{path} must not allow in-place edge retyping"
     end
 
-    context = File.read(File.join(ROOT, "CONTEXT.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
+    context = File.read(File.join(SOURCE_ROOT, "CONTEXT.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
     assert_includes context, "immutable pre-launch trusted plan"
     assert_includes context, "Preparation replay"
   end
@@ -189,9 +210,10 @@ class StageDependencyGateTest < Minitest::Test
       skills/triage/SKILL.md
       docs/coordination-backend.md
     ]
+    require_pack_source!(*surfaces)
 
     surfaces.each do |path|
-      text = File.read(File.join(ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
+      text = File.read(File.join(SOURCE_ROOT, path), encoding: "UTF-8").gsub(/\s+/, " ").strip
       assert_includes text, "`stage-dependency-plan`", "#{path} must name the separate trusted plan contract"
       assert_includes text, TRUSTED_PLAN_CALL, "#{path} must pass the persisted plan separately"
       assert_includes text, TRUSTED_PLAN_ID_CALL, "#{path} must pin the coordinator-approved plan identity"
@@ -199,7 +221,7 @@ class StageDependencyGateTest < Minitest::Test
                       "#{path} must keep mutable tuple copies out of the live contract"
     end
 
-    canonical = File.read(File.join(ROOT, "workflows/pr-processing.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
+    canonical = File.read(File.join(SOURCE_ROOT, "workflows/pr-processing.md"), encoding: "UTF-8").gsub(/\s+/, " ").strip
     assert_includes canonical,
                     "Backend `n/a` uses the same durable coordinator-owned local plan file; storage is a seam, " \
                     "not helper state."
@@ -1016,6 +1038,8 @@ class StageDependencyGateTest < Minitest::Test
   end
 
   def test_hostile_and_motivating_replay_fixtures
+    require_pack_source!("skills/pr-batch/fixtures/stage-dependency-gate-replays.json")
+
     fixture = JSON.parse(File.read(REPLAY_FIXTURES, encoding: "UTF-8"))
     assert_equal "stage-dependency-gate-replays", fixture.fetch("contract")
     assert_equal 1, fixture.fetch("version")
@@ -1068,6 +1092,8 @@ class StageDependencyGateTest < Minitest::Test
   end
 
   def test_durable_replays_carry_separate_trusted_plans_without_hidden_completion
+    require_pack_source!("skills/pr-batch/fixtures/stage-dependency-gate-replays.json")
+
     fixture = JSON.parse(File.read(REPLAY_FIXTURES, encoding: "UTF-8"))
 
     fixture.fetch("cases").each do |test_case|

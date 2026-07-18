@@ -140,7 +140,13 @@ files:
   mode: identical
 - source: skills/pr-batch/bin/stage-dependency-gate-test.rb
   consumer: ".agents/skills/pr-batch/bin/stage-dependency-gate-test.rb"
-  mode: identical
+  mode: overlay
+  reason: React on Rails does not duplicate shared skill instructions or pack-only
+    replay fixtures, so consumer-local runs explicitly skip those source-contract
+    cases unless bound to the exact pinned pack checkout.
+  consumer_mode: '100755'
+  source_sha256: a5fc550dbaf779d89fb249c6191e42b187e3899aeefbafa46c830d5840daa226
+  consumer_sha256: f1d7394b5c22b37c35dc699b75f698ede4c37d606550f6f742fb0a6ff85a81df
 - source: skills/pr-batch/lib/git_probe_env.rb
   consumer: ".agents/skills/pr-batch/lib/git_probe_env.rb"
   mode: identical

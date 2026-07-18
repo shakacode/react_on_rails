@@ -70,6 +70,8 @@ jobs:
         # yamllint disable rule:line-length
         run: |
           ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root .agent-workflows-source
+          AGENT_WORKFLOWS_SOURCE_ROOT=.agent-workflows-source \
+            ruby .agents/skills/pr-batch/bin/stage-dependency-gate-test.rb
           .agent-workflows-source/bin/check-agent-workflow-drift \
             --manifest .agents/agent-workflow-drift.yml \
             --source-root .agent-workflows-source \
