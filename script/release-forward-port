@@ -18,6 +18,10 @@ class ReleaseForwardPort
     \Abump\s+version\s+to\s+v?
     (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
   /ix
+  PRERELEASE_PACKAGE_PIN_SUBJECT = /
+    \bpackage\s+pin\s+to\s+v?
+    (?<stable_version>\d+\.\d+\.\d+)[.-](?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?\b
+  /ix
   PRERELEASE_RANKS = {
     "dev" => 0,
     "test" => 1,
@@ -223,6 +227,8 @@ class ReleaseForwardPort
   end
 
   def build_plan(commits, target, target_version, patch_equivalent_commits)
+    @source_plan_commits = commits
+    @source_plan_positions = commits.each_with_index.to_h
     commits.map do |sha|
       subject = git("log", "-1", "--format=%s", sha).strip
       skip_decision = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
@@ -350,6 +356,9 @@ class ReleaseForwardPort
              "stale release output"
     end
 
+    superseded_pin_reason = superseded_prerelease_package_pin_reason(sha, subject, target)
+    return superseded_pin_reason if superseded_pin_reason
+
     return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
       rc_version_bump?(subject)
 
@@ -365,6 +374,38 @@ class ReleaseForwardPort
 
   def rc_version_bump?(subject)
     subject.match?(RC_VERSION_BUMP_SUBJECT)
+  end
+
+  def superseded_prerelease_package_pin_reason(sha, subject, target)
+    match = subject.match(PRERELEASE_PACKAGE_PIN_SUBJECT)
+    return unless match
+
+    stable_sha = later_stable_package_pin_commit(sha, match[:stable_version], target)
+    return unless stable_sha
+
+    "prerelease package pin is superseded by later stable source commit #{stable_sha[0, 12]} already present on " \
+      "#{target}"
+  end
+
+  def later_stable_package_pin_commit(sha, stable_version, target)
+    position = @source_plan_positions&.fetch(sha, nil)
+    return unless position
+
+    superseded_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    @source_plan_commits.drop(position + 1).find do |later_sha|
+      later_subject = subject_for_commit(later_sha).to_s
+      next unless later_subject.match?(/\bstable\b/i) && later_subject.include?(stable_version)
+
+      later_paths = changed_paths_for_commit(later_sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+      (superseded_paths - later_paths).empty? && source_commit_provenance_present_on_target?(later_sha, target)
+    end
+  end
+
+  def source_commit_provenance_present_on_target?(sha, target)
+    subject = subject_for_commit(sha).to_s
+    source_narrated_pr_origin_on_target?(sha, target) ||
+      already_forward_ported_with_x?(sha, target) ||
+      !targeted_patch_equivalent_skip_reason(sha, subject, target).nil?
   end
 
   def merge_commit?(sha)

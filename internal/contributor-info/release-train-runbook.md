@@ -317,7 +317,18 @@ git push   # or open a PR if main is protected / the fix needs review on main
   candidate signal before matching the source patch-id to target history and checking for a later standard
   `git revert` of the matching target commit. Combined squash commits can make the whole-commit patch ID
   differ, so an exact source-subject or source-PR mention in target history is also a candidate signal; the
-  helper still requires a path-scoped patch-ID match before skipping the source commit.
+  helper still requires a path-scoped patch-ID match before skipping the source commit. When a release
+  backport body explicitly names its upstream PR, the helper can use a zero-context path-scoped match so
+  harmless neighboring context drift does not hide an otherwise identical patch.
+- Adapted backports can record stronger provenance instead of byte-equivalent patches. The helper recognizes
+  a narrated main commit SHA cherry-picked with `-x`, an explicit upstream PR in a release backport body, or
+  a target `Forward-port ...` commit that names the release PR and records `git cherry-pick -x`. It skips only
+  while the identified target commit remains live; a later standard revert makes the source eligible again.
+- Generated-only `llms-full.txt` / `llms-full-pro.txt` commits are skipped because release artifacts can be
+  stale relative to current target documentation. Regenerate both files from the resolved target sources.
+- An interim prerelease package pin is skipped only when a later stable source commit names the same stable
+  version, covers every non-changelog/non-generated path of the interim pin, and is independently proven live
+  on the target. This prevents replaying an obsolete RC dependency over an already-forward-ported stable pin.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
 - Pure `CHANGELOG.md` stamp commits are skipped in code mode. After the code picks finish, run the

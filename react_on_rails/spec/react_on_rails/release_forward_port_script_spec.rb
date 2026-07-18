@@ -198,6 +198,39 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips prerelease package pins superseded by a live stable forward-port" do
+    with_release_repo do |repo|
+      base_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "package.txt", "widget=2.0.0-rc.1\n")
+      prerelease_sha = commit_all(repo, "Update Widget package pin to 2.0.0-rc.1 (#10)")
+      write_file(repo, "package.txt", "widget=2.0.0\n")
+      commit_all(repo, "Adopt stable Widget 2.0.0 (#11)")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "package.txt", "widget=2.0.0\n")
+      git(repo, "add", "package.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port stable Widget (#12)",
+        "-m",
+        "- cherry-picked the merged #11 squash commit with `git cherry-pick -x`"
+      )
+      expect(git(repo, "merge-base", "release/1.0.1", "main").strip).to eq(base_sha)
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{prerelease_sha[0, 12]} Update Widget package pin to 2.0.0-rc.1 (#10)")
+      expect(stdout).to include("prerelease package pin is superseded by later stable source commit")
+      expect(stdout).not_to include("PICK #{prerelease_sha[0, 12]}")
+    end
+  end
+
   it "skips reverts of skipped rc version bump commits" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -586,7 +619,7 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Backport release regression (#456)",
         "-m",
-        "Backports merged source PR #123 to the release train."
+        "Source PR: #123"
       )
       release_fix_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
