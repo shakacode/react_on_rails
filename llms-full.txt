@@ -6831,8 +6831,8 @@ Use this matrix to decide which approach to use:
 ## Prerequisites
 
 - **React 19** — native metadata hoisting is a React 19 feature
-- **React on Rails 15+** — for basic `react_component` usage
-- **React on Rails Pro 4+** — for `stream_react_component` and RSC support
+- **React on Rails 16.2.0+** — for basic `react_component` usage (16.2.0+ is the currently supported, version-aligned line)
+- **React on Rails Pro** — for `stream_react_component` and RSC support. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`.
 
 ## References
 
@@ -15474,7 +15474,7 @@ SOURCE: docs/oss/building-features/node-renderer/basics.md
 
 ## Requirements
 
-- You must use React on Rails v11.0.7 or higher.
+- You must use **React on Rails Pro** v16.4.0 or higher.
 
 ## Install the Gem and the Node Module
 
@@ -15511,10 +15511,11 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    - `RENDERER_ALL_WORKERS_RESTART_INTERVAL`
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
-2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
+2. Configure ENV values and run your launch script. For example:
    ```bash
-   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node-renderer
+   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node renderer/node-renderer.js
    ```
+   Or via a script you define in package.json, e.g. `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
 ## JavaScript Configuration File
@@ -15743,6 +15744,8 @@ available default ENV values if you wire them into your own launch script.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
 1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
+1. **maxVMPoolSize** (default: `2`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Maximum number of VM contexts to keep in memory. Typically only two contexts are needed — one for the server bundle and one for React Server Components (RSC) if enabled. Older contexts are removed when this limit is reached. Must be a positive integer.
 
 Deprecated options:
 
@@ -15985,7 +15988,7 @@ Example response:
 ```json
 {
   "node_version": "v20.17.0",
-  "renderer_version": "1.4.2"
+  "renderer_version": "17.0.0"
 }
 ```
 
@@ -23099,15 +23102,16 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
-  - Minimum Ruby version: 3.2 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 20
+  - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
+  - Minimum Node.js version: 18
+  - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
 ### Migration Steps
 
 1. **Update Dependencies**
 
-   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
+   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest stable release and substitute accordingly.
 
    ```ruby
    # Gemfile
@@ -25442,7 +25446,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) with the node renderer. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -25650,7 +25654,7 @@ These mistakes account for the majority of setup failures:
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with React on Rails 15+
+- [React on Rails Pro](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails (current public releases, 16.2.0+, are version-aligned)
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
@@ -25700,7 +25704,7 @@ After these steps, every component is still a Client Component (because of the `
 
 Before starting, ensure you have:
 
-- **React on Rails Pro 4+** with **React on Rails 15+**
+- **React on Rails Pro** and **React on Rails** installed at the same version — current public releases (16.2.0+) are version-aligned, and the Pro gem depends on the exact matching `react_on_rails` release
 - **React 19.2.x** (`react` and `react-dom` both at 19.2.x with patch `>= 19.2.7` for the React on Rails Pro 17 RSC path)
 - **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
@@ -31968,7 +31972,7 @@ SOURCE: docs/oss/upgrading/release-notes/16.0.0.md
 
 # React on Rails 16.0.0 Release Notes
 
-Also see the [Changelog for 16.0.0](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#1600---2025-01-xx).
+Also see the [Changelog for 16.0.0](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#1600---2025-09-16).
 
 **Note: Version 15.0.0 has been retracted. Please upgrade directly from v14 to v16.**
 
@@ -32451,7 +32455,7 @@ Removed obsolete minimum version checks (6.5.1) and example generation pinning (
 - **Multiple License Plan Types**: License validation now supports plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334).
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326).
 
-See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the full list of changes.
+See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the full list of changes.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.4.0
@@ -32484,7 +32488,7 @@ Then run `bundle install` and your package manager's install command.
 
 ## Highlights
 
-This is a large release with significant improvements to the install generator, development workflow, and Pro stability. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the full list of changes.
+This is a large release with significant improvements to the install generator, development workflow, and Pro stability. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the full list of changes.
 
 ### Generator Improvements
 
@@ -32514,5 +32518,5 @@ This is a large release with significant improvements to the install generator, 
 
 ### Bug Fixes
 
-Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
+Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 
