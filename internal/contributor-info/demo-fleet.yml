@@ -42,6 +42,25 @@
 
 schema_version: 1
 
+lifecycle:
+  # Release-path coverage is independent from repository tier. Every required
+  # path needs a generated lane/evidence source or an explicit public waiver.
+  required_paths:
+    - id: standard-generator
+      evidence_source: core_generator
+    - id: pro-ssr
+      evidence_source: core_generator
+    - id: pro-rsc
+      evidence_source: core_generator
+    - id: rspack
+      evidence_source: fleet
+    - id: webpack-rsc-production
+      evidence_source: release_must_have
+    - id: ssr-rsc-html
+      evidence_source: fleet
+    - id: client-navigation-interaction
+      evidence_source: fleet
+
 # Bounded parallelism for a single release/freshness run. Caps wall time at the
 # slowest repo rather than the sum of all repos. Override per-run with the
 # DEMO_FLEET_CONCURRENCY env var (read by the demo_fleet:* Rake tasks).

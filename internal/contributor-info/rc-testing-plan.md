@@ -73,9 +73,10 @@ The tracking issue is the single source of truth for:
 ### Fast parallel launch
 
 Use the repo-local `$run-fleet-validation` skill to avoid hand-copying the fleet or pinning a
-candidate into six separate prompts. Its generator reads the hard gates from `demo-fleet.yml`,
-adds the monorepo generator/install gate, and emits six self-contained coordinator prompts
-balanced three-per-machine by default:
+candidate into six separate prompts. Its generator reads the complete `demo-fleet.yml` inventory,
+adds the monorepo generator/install gate and required release-path axes, and emits a lifecycle pack:
+release/capability preflight, six hard-gate coordinator prompts balanced three-per-machine by
+default, report-only soft-track coverage, a durable result ledger/schema, and independent closeout.
 
 From the repository root, run:
 
@@ -87,16 +88,24 @@ ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
 ```
 
 The default prompt contract resolves the **latest RC or beta** when each lane starts. Use
-`--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Launch every prompt listed in
-`tmp/fleet-validation-prompts/INDEX.md` simultaneously. Each prompt coordinates bounded subagents:
-one read-only live-evidence pass plus one isolated execution worker per assigned target. With the
-default partition, no coordinator receives more than two execution targets. Run each prompt as a
-separate top-level task; do not place all six under one shared four-slot agent tree.
+`--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Follow
+`tmp/fleet-validation-prompts/INDEX.md`: run `PREFLIGHT.md`, start the prompt coordinators, run
+`REPORT-ONLY.md`, then reserve a maker-independent checker for `CLOSEOUT.md`. Each prompt
+coordinates bounded subagents: one read-only live-evidence pass plus one isolated execution worker
+per assigned target. With the default partition, no coordinator receives more than two execution
+targets. Run each prompt as a separate top-level task; do not place all six under one shared
+four-slot agent tree.
 
 Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
 versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
 five prompts may start simultaneously but must wait for that exact marker before mutation. This
 prevents a newly published candidate from splitting a staggered launch across versions.
+
+The release-wide barrier also requires exact-commit CI, registry/tarball coherence, and the
+published standard/Pro/Pro+RSC generator matrix to be terminal green, or an explicit public-safe
+waiver allowed by this plan. Machine/session capability attestation and target capability/baseline
+probes run before expensive app work. Review-app state is classified as configured/runnable,
+configured/broken, not configured, or `UNKNOWN`; absence is recorded instead of inventing a deploy.
 
 Each lane must acquire or resume an authoritative coordination claim before creating a mutable app
 checkout. It must reuse live candidate ownership first and use the pack's generated fallback claim
@@ -107,8 +116,28 @@ concurrently rewrite the issue body. Generate a fresh pack and snapshot identity
 replacement candidate, even when the manifest is unchanged. Within one exact-candidate run, reuse
 that pack ID and rerun only the prompt files that own affected targets.
 
-The generated prompts accelerate the fleet hard gates; they do not replace the independent
-behavioral lanes in `release-verification-runbook.md` or the maintainer's final go/no-go decision.
+The candidate-scoped lifecycle is distinct from standing fleet-health automation: standing health
+detects currency/staleness between releases, while this pack proves one exact candidate and closes
+its release tracker. It is also distinct from hosted-CI dispatch and generator-routing
+optimizations: those shorten individual gates but do not supply inventory, blocker ownership,
+independent audit, merge/reachability, or closeout. The generated pack does not replace the
+independent behavioral lanes in `release-verification-runbook.md` or the maintainer's final
+promotion decision.
+
+The checker validates one public-safe `result-ledger.json` and renders the append-only tracker
+matrix from that exact file:
+
+```bash
+ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+  --ledger tmp/fleet-validation-prompts/result-ledger.json \
+  --expected-candidate vX.Y.Z.rc.N \
+  --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
+```
+
+Every nonterminal blocker needs a durable issue, explicit waiver/deferral, or public-safe
+tracker-only reason before closeout. Missing ownership, required-path coverage, current-head
+evidence, independent audit, merge authority, default reachability, tree parity, or any `UNKNOWN`
+keeps the ledger non-passing.
 
 1. Cut the RC packages.
 2. Create or update the release-gate tracking issue from

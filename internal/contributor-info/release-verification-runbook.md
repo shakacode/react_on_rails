@@ -55,6 +55,18 @@ Use this prompt to update the demo fleet for an RC or final release. It compleme
 [`demo-fleet.yml`](demo-fleet.yml) block final release readiness, while soft-track repos are
 inspected and filed as follow-up unless a maintainer explicitly promotes them.
 
+For a coordinated candidate run, prefer the repo-local `$run-fleet-validation` lifecycle pack.
+That pack owns candidate snapshotting, the release-wide preflight barrier, complete hard/soft
+inventory, capability and baseline probes, the public-safe result ledger, independent audit,
+authorized merge, default reachability/tree parity, and tracker-matrix rendering. The long-form
+prompt below remains the behavioral depth contract and a manual fallback; its evidence must still
+land in the generated ledger before closeout.
+
+This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
+which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are
+also dependencies, not substitutes: they shorten individual gates but do not own blocker
+identities, combined audit, merge authority, or promotion closeout.
+
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
 

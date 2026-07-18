@@ -5,6 +5,7 @@ require "fileutils"
 require "optparse"
 require "securerandom"
 require "yaml"
+require_relative "fleet_lifecycle"
 
 module FleetValidation
   CORE_GATE = {
@@ -14,10 +15,8 @@ module FleetValidation
     "weight" => 5
   }.freeze
 
-  class ManifestError < StandardError; end
-
   class Generator
-    attr_reader :assignments
+    attr_reader :assignments, :lifecycle_inventory, :required_paths
 
     def initialize(manifest_path:, prompt_count:, machines:, release_selector:, pack_id: nil)
       @manifest_path = manifest_path
@@ -27,6 +26,9 @@ module FleetValidation
       @pack_id = pack_id || default_pack_id
       @manifest = load_manifest
       validate_options!
+      @lifecycle = Lifecycle.new(manifest: @manifest, pack_id: @pack_id, release_selector: @release_selector)
+      @lifecycle_inventory = @lifecycle.inventory
+      @required_paths = @lifecycle.required_paths
       @targets = build_targets
       validate_target_ids!
       @assignments = assign_machines(build_lanes)
@@ -57,6 +59,14 @@ module FleetValidation
       MARKDOWN
     end
 
+    def ledger_template
+      @lifecycle.ledger_template
+    end
+
+    def ledger_schema
+      @lifecycle.schema
+    end
+
     def write_pack(output_dir)
       FileUtils.mkdir_p(output_dir)
       clear_generated_prompts(output_dir)
@@ -74,6 +84,7 @@ module FleetValidation
       end
 
       File.write(File.join(output_dir, "INDEX.md"), render_index(rendered_prompts))
+      @lifecycle.write_artifacts(output_dir)
     end
 
     private
@@ -249,7 +260,15 @@ module FleetValidation
       <<~MARKDOWN
         # Fleet validation launch index
 
-        Start all #{@prompt_count} prompts simultaneously. This layout runs at most
+        1. Run [PREFLIGHT.md](PREFLIGHT.md) and record its results in `result-ledger.json`.
+        2. Start all #{@prompt_count} prompt coordinators simultaneously after the snapshot exists.
+           Do not start the app mutation prompts before `APP_WORK_ALLOWED`; coordinators may prepare
+           read-only evidence while waiting.
+        3. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.
+        4. Run [CLOSEOUT.md](CLOSEOUT.md) with an independent checker, validate `result-ledger.json`
+           against `result-ledger.schema.json`, and render the tracker matrix from that ledger.
+
+        This layout runs at most
         #{(@prompt_count.to_f / @machines.length).ceil} prompts on one machine; use the exact allocation
         below. Do not share mutable app checkouts between prompts.
 
@@ -304,6 +323,10 @@ module FleetValidation
            needed to resolve disagreement. Never convert missing evidence into a pass.
 
         Execution contract:
+        - Do not start app mutation work until `APP_WORK_ALLOWED` is present in the pack-specific
+          release-wide preflight ledger. The marker is valid only when release commit CI, published
+          artifacts, and the standard / Pro / Pro+RSC generator matrix are terminal green, or when
+          an explicit public-safe waiver names the failed gate and authority.
         - Read AGENTS.md and repository-specific instructions before changing any target repo. Treat the
           manifest commands as starting data; because `verify: true` entries are provisional, confirm
           commands against the target before running or proposing a manifest correction.
