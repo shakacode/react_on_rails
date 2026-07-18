@@ -64,6 +64,26 @@ exclude_exact_source_line() {
   done
 }
 
+exclude_type_only_dangerously_set_inner_html() {
+  # React types dangerouslySetInnerHTML as `{ __html: string | TrustedHTML }`. A TypeScript
+  # type/interface member such as `type Props = { dangerouslySetInnerHTML: { __html: string } };`
+  # is a declaration, not a runtime raw-HTML sink, so drop object-property matches whose __html
+  # value is a bare TypeScript type token rather than a runtime expression. Real sinks assign a
+  # variable/expression (e.g. `{ __html: userHtml }`), never the literal identifier
+  # `string`/`TrustedHTML`. (Destructuring aliases like `{ dangerouslySetInnerHTML: forwarded }`
+  # are already excluded upstream because the sink pattern requires a `{ ... __html` object value.)
+  local match
+  local source_line
+  while IFS= read -r match; do
+    source_line="${match#*:}"
+    if printf '%s\n' "$source_line" \
+      | grep -Eq -- 'dangerouslySetInnerHTML[[:space:]]*:[[:space:]]*\{[[:space:]]*__html[[:space:]]*:[[:space:]]*(string|TrustedHTML)([[:space:]]*\|[[:space:]]*(string|TrustedHTML))*[[:space:]]*\}'; then
+      continue
+    fi
+    printf '%s\n' "$match"
+  done
+}
+
 exclude_parser_only_replace_line() {
   local match
   local script_token_count
@@ -94,7 +114,7 @@ case "$FILE" in
       WARNING="$(cat <<EOF
 ⚠️  rsc-guardrails: the edited Ruby RSC stream source contains script emission.
 Preserve ERB::Util.json_escape for JavaScript values and ERB::Util.html_escape for CSP nonces.
-Keep the Ruby stream specs aligned with the TypeScript browser-performance-mark helper.
+Never interpolate RSC payload or prop values into the inline script without those escaping helpers.
 Matched line(s): $RUBY_MATCH_LINES
 EOF
 )"
@@ -108,6 +128,16 @@ esac
 
 # Scan script-tag text separately so parser-only and exact sanctioned shapes can be excluded without
 # ever suppressing a raw-HTML sink that happens to share the same line.
+#
+# MAINTENANCE CONTRACT: the SAFE_*_LINE constants below are exact, byte-for-byte copies of specific
+# lines in packages/react-on-rails-pro/src/injectRSCPayload.ts. They MUST be kept in sync with that
+# source — a prettier re-wrap, a rename, or a trailing comment on any of these lines will stop the
+# exemption from matching, and this advisory (never-blocking) hook will then emit a false-positive
+# warning the next time the file is edited. Exact-match is deliberate over a looser structural
+# signature (e.g. "escapeScript( before </script>"): for a security guardrail, a slightly noisy
+# false positive on sanctioned code is far safer than a structural pattern that could silently
+# exempt a genuinely unsafe emitter that happens to resemble the sanctioned shape. If you reformat
+# injectRSCPayload.ts, update these strings (the focused hook regression suite will catch drift).
 SAFE_LAST_INDEX_LINE="const scriptStartIndex = htmlString.lastIndexOf('<script', revealCallIndex);"
 SAFE_DOUBLE_ESCAPE_PATTERN_LINE='const SCRIPT_DOUBLE_ESCAPE_OPEN_PATTERN = /<script(?=[\s>/])/gi;'
 SAFE_SCAN_OVERLAP_LINE="const SCRIPT_SCAN_OVERLAP_LENGTH = Math.max('<!--'.length, '-->'.length, '<script'.length, '</script'.length);"
@@ -129,12 +159,16 @@ case "$FILE" in
 esac
 
 # Raw-HTML sinks are never allowlisted. Keep this scan independent from script/parser filtering.
-DANGEROUSLY_SET_INNER_HTML_PATTERN="dangerouslySetInnerHTML[[:space:]]*(=([^=]|\$)|:)"
+# The dangerouslySetInnerHTML branch matches a JSX assignment (`={...}`) or an object-property sink
+# whose value is a `{ ... __html }` object literal. Requiring the object value excludes destructuring
+# aliases (`{ dangerouslySetInnerHTML: forwarded }`) and property reads/forwarding, which emit no HTML.
+DANGEROUSLY_SET_INNER_HTML_PATTERN="dangerouslySetInnerHTML[[:space:]]*(=([^=]|\$)|:[[:space:]]*\\{[^}]*__html)"
 RAW_HTML_PROPERTY_PATTERN="(\\.(inner|outer)HTML|\\[[[:space:]]*['\"](inner|outer)HTML['\"][[:space:]]*\\])"
 ASSIGNMENT_OPERATOR_PATTERN='([-+*/%&|^?]|[*][*]|<<|>>|>>>|&&|[|][|]|[?][?])?='
 SINK_PATTERN="${DANGEROUSLY_SET_INNER_HTML_PATTERN}|${RAW_HTML_PROPERTY_PATTERN}[[:space:]]*${ASSIGNMENT_OPERATOR_PATTERN}([^=]|\$)|insertAdjacentHTML|document\\.write\\("
 SINK_MATCHES="$(grep -nE -- "$SINK_PATTERN" "$FILE" 2>/dev/null \
-  | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' || true)"
+  | grep -vE '^[0-9]+:[[:space:]]*(\*|//|/\*)' \
+  | exclude_type_only_dangerously_set_inner_html || true)"
 
 # A line may match both scans; merge in line order and remove exact duplicates.
 MATCHES="$(printf '%s\n%s\n' "$SCRIPT_MATCHES" "$SINK_MATCHES" \
