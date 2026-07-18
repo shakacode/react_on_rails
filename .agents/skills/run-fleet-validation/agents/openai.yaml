@@ -1,4 +1,4 @@
 interface:
   display_name: "Run Fleet Validation"
-  short_description: "Generate parallel release fleet validation lanes"
-  default_prompt: "Use $run-fleet-validation to generate and coordinate the latest RC or beta fleet-validation prompts."
+  short_description: "Run release fleet validation through durable closeout"
+  default_prompt: "Use $run-fleet-validation to generate and coordinate the latest RC or beta through preflight, fleet evidence, independent audit, and ledger-driven closeout."

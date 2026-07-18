@@ -8,7 +8,8 @@
 # Field semantics:
 #   tier           — hard_gate | soft_track. hard_gate failures block a final
 #                    release. soft_track repos are remembered for follow-up but
-#                    do not block.
+#                    do not block; blockers referenced only by soft tracks are
+#                    non-gating PARTIAL follow-up state.
 #   packages       — which of our packages the demo consumes. Each entry must
 #                    declare an ecosystem (`gem` | `npm`) and a package name.
 #                    The orchestrator only proposes bumps for listed packages,
@@ -41,6 +42,25 @@
 # treats the commands as authoritative.
 
 schema_version: 1
+
+lifecycle:
+  # Release-path coverage is independent from repository tier. Every required
+  # path needs a generated lane/evidence source or an explicit public waiver.
+  required_paths:
+    - id: standard-generator
+      evidence_source: core_generator
+    - id: pro-ssr
+      evidence_source: core_generator
+    - id: pro-rsc
+      evidence_source: core_generator
+    - id: rspack
+      evidence_source: fleet
+    - id: webpack-rsc-production
+      evidence_source: release_must_have
+    - id: ssr-rsc-html
+      evidence_source: fleet
+    - id: client-navigation-interaction
+      evidence_source: fleet
 
 # Bounded parallelism for a single release/freshness run. Caps wall time at the
 # slowest repo rather than the sum of all repos. Override per-run with the

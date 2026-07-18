@@ -2,11 +2,14 @@
 # frozen_string_literal: true
 
 require "minitest/autorun"
+require "open3"
 require "tmpdir"
 require_relative "generate_prompts"
 
 class FleetValidationGeneratorTest < Minitest::Test
   MANIFEST = File.expand_path("../../../../internal/contributor-info/demo-fleet.yml", __dir__)
+  VALIDATOR = File.expand_path("validate_ledger.rb", __dir__)
+  RC12_REPLAY = File.expand_path("replay_rc12_lifecycle.rb", __dir__)
 
   def build_generator(**overrides)
     defaults = {
@@ -17,6 +20,197 @@ class FleetValidationGeneratorTest < Minitest::Test
       pack_id: "fleet-test-pack"
     }
     FleetValidation::Generator.new(**defaults.merge(overrides))
+  end
+
+  def resolved_packages(generator)
+    generator.lifecycle_inventory.flat_map { |target| target.fetch("packages") }
+             .uniq { |package| [package["ecosystem"], package["name"]] }
+             .map do |package|
+      product_names = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+      version = if product_names.include?(package["name"])
+                  package["ecosystem"] == "gem" ? "17.0.0.rc.12" : "17.0.0-rc.12"
+                else
+                  "1.0.0"
+                end
+      package.merge("version" => version, "source" => "registry")
+    end
+  end
+
+  def complete_ledger(generator)
+    ledger = generator.ledger_template
+    ledger.fetch("pack").merge!(
+      "candidate" => "v17.0.0.rc.12",
+      "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tracker_mode" => "strict-rc",
+      "resolved_packages" => resolved_packages(generator)
+    )
+    ledger.fetch("preflight")["status"] = "passed"
+    ledger.fetch("preflight")["app_work_allowed"] = true
+    ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00Z"
+    ledger.fetch("preflight")["public_marker"] = {
+      "status" => "unique",
+      "pack_id" => ledger.dig("pack", "pack_id"),
+      "candidate" => ledger.dig("pack", "candidate"),
+      "candidate_commit" => ledger.dig("pack", "candidate_commit"),
+      "snapshot_fingerprint" => generator.snapshot_fingerprint,
+      "opened_at" => "2026-07-18T10:00:00Z",
+      "evidence" => "public-safe unique marker evidence"
+    }
+    %w[release_ci artifacts generator_matrix].each do |gate|
+      ledger.fetch("preflight").fetch(gate).merge!("status" => "passed", "evidence" => "public-safe evidence")
+    end
+    ledger.fetch("preflight").fetch("capabilities").transform_values! { "passed" }
+    ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = "restart-safe handoff"
+    ledger.fetch("inventory").each do |item|
+      revision = if item["work_mode"] == "report_only"
+                   "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                 else
+                   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                 end
+      baseline_head = item["work_mode"] == "mutation" ? "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" : revision
+      item.merge!(
+        "maker_id" => item["work_mode"] == "mutation" ? "maker-1" : nil,
+        "work_state" => "finished",
+        "result" => item["tier"] == "hard_gate" ? "passed" : "reported",
+        "work_started_at" => "2026-07-18T10:01:00Z",
+        "evidence" => "public-safe evidence"
+      )
+      expected = generator.lifecycle_inventory.find { |target| target["id"] == item["id"] }
+      item["package_locks"] = expected.fetch("packages").map do |package|
+        resolved = ledger.fetch("pack").fetch("resolved_packages").find do |candidate_package|
+          candidate_package.slice("ecosystem", "name") == package.slice("ecosystem", "name")
+        end
+        resolved.dup
+      end
+      item.fetch("checks").each_value do |check|
+        check.merge!(
+          "status" => "passed",
+          "head_commit" => revision,
+          "base_commit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "evidence" => "public-safe evidence"
+        )
+      end
+      item.fetch("review_app").merge!(
+        "state" => "not_configured",
+        "head_commit" => revision,
+        "evidence" => "not configured",
+        "deployed_smoke" => "waived"
+      )
+      item.fetch("baseline").merge!(
+        "classification" => "clean",
+        "head_commit" => baseline_head,
+        "evidence" => "fresh default passed"
+      )
+      item.fetch("revisions").merge!(
+        "audit" => revision,
+        "reviewed" => revision,
+        "current" => revision,
+        "reconciliation" => "passed"
+      )
+      item.fetch("bases").merge!(
+        "audit" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "reviewed" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "current" => "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "reconciliation" => "passed"
+      )
+      if item["work_mode"] == "mutation"
+        item.fetch("merge").merge!(
+          "status" => "merged",
+          "authority" => "auto_merge_when_gates_pass",
+          "authority_evidence" => "trusted batch goal",
+          "freeze_state" => "clear",
+          "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence" => "public-safe merge evidence"
+        )
+      else
+        item.fetch("merge").merge!(
+          "status" => "not_applicable",
+          "freeze_state" => "clear",
+          "evidence" => "no mutable branch"
+        )
+      end
+      next unless item["work_mode"] == "mutation"
+
+      item.fetch("reachability").merge!(
+        "default_branch" => "passed",
+        "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+        "default_evidence" => "public-safe evidence",
+        "tree_parity" => "passed",
+        "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+        "tree_evidence" => "public-safe evidence"
+      )
+    end
+    ledger.fetch("required_paths").each do |path|
+      path.merge!("status" => "passed", "lane" => "sanitized-lane", "evidence" => "public-safe evidence")
+    end
+    ledger.fetch("audit").merge!(
+      "status" => "passed",
+      "checker" => "independent-checker",
+      "maker_ids" => ["maker-1"],
+      "evidence" => "public-safe independent audit report"
+    )
+    ledger.fetch("merge")["status"] = "merged"
+    ledger.fetch("reachability").merge!("default_branch" => "passed", "tree_parity" => "passed")
+    ledger.fetch("tracker").merge!(
+      "status" => "ready",
+      "comment_url" => "https://example.invalid/tracker-comment",
+      "promotion" => "recommend"
+    )
+    ledger
+  end
+
+  def blocked_preflight_ledger(generator, validation_only_evidence: false)
+    ledger = generator.ledger_template
+    completed = complete_ledger(generator)
+    ledger["pack"] = Marshal.load(Marshal.dump(completed.fetch("pack")))
+    ledger.fetch("preflight").merge!(
+      "status" => "blocked",
+      "app_work_allowed" => false,
+      "blocker_id" => "artifact-blocker",
+      "blocker_evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger.fetch("preflight").fetch("artifacts").merge!(
+      "status" => "blocked",
+      "evidence" => "public-safe artifact mismatch evidence"
+    )
+    if validation_only_evidence
+      completed_core = completed.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+      core = Marshal.load(Marshal.dump(completed_core))
+      core.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "artifact-blocker")
+      core.fetch("checks").each_value do |check|
+        check.merge!("status" => "blocked", "blocker_id" => "artifact-blocker")
+      end
+      core.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+      index = ledger.fetch("inventory").index { |item| item["work_mode"] == "validation_only" }
+      ledger.fetch("inventory")[index] = core
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "artifact-blocker",
+        "status" => "open",
+        "public_summary" => "Published candidate artifacts are incoherent",
+        "owner" => { "issue_url" => "https://example.invalid/issues/artifact-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("audit").merge!(
+      "status" => "passed",
+      "checker" => "independent-checker",
+      "maker_ids" => [],
+      "evidence" => "public-safe blocked-preflight audit"
+    )
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
+    ledger.fetch("tracker").merge!("status" => "ready", "promotion" => "blocked")
+    ledger
   end
 
   def test_balances_six_prompts_across_two_machines
@@ -44,6 +238,2946 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_equal assigned_names.length, assigned_names.uniq.length
   end
 
+  def test_lifecycle_inventory_includes_every_hard_gate_and_report_only_soft_track
+    inventory = build_generator.lifecycle_inventory
+
+    assert_equal 8, (inventory.count { |target| target.fetch("tier") == "hard_gate" })
+    assert_equal 5, (inventory.count { |target| target.fetch("tier") == "soft_track" })
+    core = inventory.find { |target| target.fetch("id") == "react-on-rails-generator-install-smoke" }
+    assert_equal "validation_only", core.fetch("work_mode")
+    assert(inventory.select { |target| target.fetch("tier") == "soft_track" }
+                    .all? { |target| target.fetch("work_mode") == "report_only" })
+  end
+
+  def test_ledger_inventory_cannot_downgrade_or_duplicate_a_manifest_hard_gate
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.merge!("tier" => "soft_track", "work_mode" => "report_only", "result" => "reported")
+    ledger.fetch("inventory") << ledger.fetch("inventory").last.dup
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("classification does not match manifest") })
+    assert(errors.any? { |error| error.include?("duplicate target") })
+  end
+
+  def test_report_only_prompt_covers_all_five_soft_tracks_without_mutation
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      report_only = File.read(File.join(directory, "REPORT-ONLY.md"))
+
+      assert_equal 5, (report_only.lines.count { |line| line.include?("Report only; do not mutate") })
+      assert_includes report_only, "fresh default"
+      assert_includes report_only, "archived or deferred disposition"
+    end
+  end
+
+  def test_writes_lifecycle_inventory_and_closeout_artifacts
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+
+      %w[LIFECYCLE.md PREFLIGHT.md REPORT-ONLY.md CLOSEOUT.md result-ledger.json result-ledger.schema.json].each do |name|
+        assert File.exist?(File.join(directory, name)), "expected generated #{name}"
+      end
+    end
+  end
+
+  def test_declares_required_web_pack_rsc_path_before_closeout
+    required_path_ids = build_generator.required_paths.map { |path| path.fetch("id") }
+
+    assert_includes required_path_ids, "webpack-rsc-production"
+  end
+
+  def test_generated_preflight_is_a_terminal_barrier_with_restart_safe_capability_evidence
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      preflight = File.read(File.join(directory, "PREFLIGHT.md"))
+      maker_prompt = Dir.glob(File.join(directory, "*", "*-fleet-lane.md")).min.then { |path| File.read(path) }
+
+      assert_includes preflight, "APP_WORK_ALLOWED"
+      assert_includes preflight, "release commit CI"
+      assert_includes preflight, "registry and tarball artifacts"
+      assert_includes preflight, "standard / Pro / Pro+RSC generator matrix"
+      assert_includes preflight, "nonblocking permissions"
+      assert_includes preflight, "restart-safe handoff"
+      assert_includes preflight,
+                      "configured/runnable, configured/broken, not configured, or `UNKNOWN`"
+      assert_includes maker_prompt, "`preflight.app_work_allowed: true` records the"
+    end
+  end
+
+  def test_lifecycle_artifact_orders_snapshot_preflight_inventory_audit_merge_and_closeout
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      lifecycle = File.read(File.join(directory, "LIFECYCLE.md"))
+
+      phases = [
+        "Phase 0 — snapshot",
+        "Phase 1 — capability preflight",
+        "Phase 2 — release-wide barrier",
+        "Phase 3 — fleet execution",
+        "Phase 4 — independent audit",
+        "Phase 5 — authorized merge",
+        "Phase 6 — reachability and tree parity",
+        "Phase 7 — tracker closeout"
+      ]
+      phases.each_cons(2) do |first, second|
+        assert_operator lifecycle.index(first), :<, lifecycle.index(second)
+      end
+      assert_includes lifecycle, "webpack-rsc-production"
+    end
+  end
+
+  def test_ledger_blocks_app_work_until_release_preflight_passes_or_is_waived
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }["work_state"] = "running"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "app work started before APP_WORK_ALLOWED"
+  end
+
+  def test_app_work_allowed_is_an_explicit_schema_validated_ledger_marker
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["app_work_allowed"] = false
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "app work started before APP_WORK_ALLOWED"
+    assert_empty FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+  end
+
+  def test_app_work_allowed_requires_a_unique_pack_bound_public_marker
+    generator = build_generator
+    mutations = [
+      ->(marker) { marker["status"] = "duplicate" },
+      ->(marker) { marker["pack_id"] = "another-pack" },
+      ->(marker) { marker["candidate"] = "v17.0.0.rc.11" },
+      ->(marker) { marker["candidate_commit"] = "ffffffffffffffffffffffffffffffffffffffff" },
+      ->(marker) { marker["snapshot_fingerprint"] = "stale-fingerprint" },
+      ->(marker) { marker["opened_at"] = "2026-07-18T09:00:00Z" },
+      ->(marker) { marker["evidence"] = nil }
+    ]
+
+    mutations.each do |mutate|
+      ledger = complete_ledger(generator)
+      mutate.call(ledger.fetch("preflight").fetch("public_marker"))
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths
+      ).errors
+
+      assert_includes errors, "public preflight marker is not unique and snapshot-bound"
+    end
+  end
+
+  def test_app_work_allowed_requires_the_exact_pack_snapshot_and_restart_handoff
+    generator = build_generator
+    missing_snapshot = complete_ledger(generator)
+    missing_snapshot.fetch("pack")["candidate_commit"] = nil
+    missing_handoff = complete_ledger(generator)
+    missing_handoff.fetch("preflight").fetch("capabilities")["restart_handoff"] = nil
+
+    [missing_snapshot, missing_handoff].each do |ledger|
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        expected_snapshot_fingerprint: generator.snapshot_fingerprint
+      ).errors
+
+      assert_includes errors, "app work started before APP_WORK_ALLOWED"
+    end
+  end
+
+  def test_closeout_preserves_barrier_before_work_start_ordering
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["work_started_at"] = "2026-07-18T09:59:00Z"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("started before the preflight barrier opened") })
+  end
+
+  def test_lifecycle_timestamps_require_explicit_offsets
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["opened_at"] = "2026-07-18T10:00:00"
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["work_started_at"] = "2026-07-18T10:01:00"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "preflight opened_at must be an ISO8601 timestamp with an explicit offset"
+    assert_includes errors, "target #{target.fetch('id')} work_started_at must be an ISO8601 timestamp with an explicit offset"
+  end
+
+  def test_ledger_fails_closed_when_a_report_only_soft_track_is_missing
+    generator = build_generator
+    ledger = generator.ledger_template
+    removed = ledger.fetch("inventory").find { |item| item["tier"] == "soft_track" }
+    ledger.fetch("inventory").delete(removed)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "inventory missing target #{removed.fetch('id')}"
+  end
+
+  def test_ledger_rejects_a_stale_candidate_pack
+    generator = build_generator(release_selector: "v17.0.0.rc.12")
+    ledger = generator.ledger_template
+    ledger.fetch("pack")["candidate"] = "v17.0.0.rc.11"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12"
+    ).errors
+
+    assert_includes errors, "candidate mismatch: pinned selector v17.0.0.rc.12, got v17.0.0.rc.11"
+  end
+
+  def test_ledger_rejects_unknown_coordination_or_machine_capabilities
+    generator = build_generator
+    ledger = generator.ledger_template
+    capabilities = ledger.fetch("preflight").fetch("capabilities")
+    capabilities["coordination"] = "unknown"
+    capabilities["permissions"] = "unknown"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "capability coordination is UNKNOWN"
+    assert_includes errors, "capability permissions is UNKNOWN"
+  end
+
+  def test_review_app_capability_accepts_not_configured_but_rejects_unknown_after_work_starts
+    generator = build_generator
+    unknown_ledger = generator.ledger_template
+    unknown_ledger.fetch("preflight")["status"] = "passed"
+    target = unknown_ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target["work_state"] = "running"
+    unknown_errors = FleetValidation::LedgerValidator.new(
+      unknown_ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    target.fetch("review_app")["state"] = "not_configured"
+    absent_errors = FleetValidation::LedgerValidator.new(
+      unknown_ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes unknown_errors, "review app capability UNKNOWN for 1 started target(s)"
+    refute_includes absent_errors, "review app capability UNKNOWN for 1 started target(s)"
+  end
+
+  def test_closeout_requires_terminal_evidence_for_configured_review_apps
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("review_app").merge!(
+      "state" => "configured_runnable",
+      "deployed_smoke" => "pending",
+      "evidence" => "configuration found"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("review-app smoke is not terminal") })
+  end
+
+  def test_closeout_fails_when_required_web_pack_rsc_path_has_no_evidence_or_waiver
+    generator = build_generator
+    ledger = generator.ledger_template
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "required path webpack-rsc-production has no passing, blocked, or waived evidence"
+  end
+
+  def test_owned_blocked_required_path_can_close_with_a_blocked_verdict
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    path = ledger.fetch("required_paths").find { |item| item["id"] == "webpack-rsc-production" }
+    path.merge!(
+      "status" => "blocked",
+      "lane" => "sanitized-lane",
+      "evidence" => "candidate path failed",
+      "blocker_id" => "required-path-blocker"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "required-path-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized required path failure",
+        "owner" => { "issue_url" => "https://example.invalid/issues/required-path" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_all_six_sanitized_closeout_blockers_require_durable_owners
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger["blockers"] = (1..6).map do |number|
+      {
+        "id" => "blocker-#{number}",
+        "status" => "open",
+        "public_summary" => "Sanitized closeout blocker #{number}",
+        "owner" => nil,
+        "disposition" => nil
+      }
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors.grep(/has no durable owner/)
+
+    assert_equal 6, errors.length
+  end
+
+  def test_waived_and_deferred_blockers_require_structured_disposition_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = %w[waived deferred].map do |status|
+      {
+        "id" => "#{status}-blocker",
+        "status" => status,
+        "public_summary" => "Sanitized #{status} blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/#{status}" },
+        "disposition" => nil
+      }
+    end
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker waived-blocker is missing structured waived disposition evidence"
+    assert_includes errors, "blocker deferred-blocker is missing structured deferred disposition evidence"
+  end
+
+  def test_waived_and_deferred_blockers_require_durable_owners_in_addition_to_dispositions
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = %w[waived deferred].map do |status|
+      {
+        "id" => "#{status}-blocker",
+        "status" => status,
+        "public_summary" => "Sanitized #{status} blocker",
+        "owner" => nil,
+        "disposition" => {
+          "gate" => "#{status}-blocker",
+          "authority" => "maintainer",
+          "evidence_url" => "https://example.invalid/dispositions/#{status}",
+          "reason" => "Sanitized disposition"
+        }
+      }
+    end
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker waived-blocker has no durable owner"
+    assert_includes errors, "blocker deferred-blocker has no durable owner"
+  end
+
+  def test_whitespace_only_blocker_ownership_and_disposition_evidence_is_rejected
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "deferred-blocker",
+        "status" => "deferred",
+        "public_summary" => "Sanitized deferred blocker",
+        "owner" => { "public_tracker_reason" => "   " },
+        "disposition" => {
+          "gate" => "deferred-blocker",
+          "authority" => "   ",
+          "evidence_url" => "   ",
+          "reason" => "   "
+        }
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker deferred-blocker is missing structured deferred disposition evidence"
+    assert_includes errors, "blocker deferred-blocker has no durable owner"
+  end
+
+  def test_closeout_rejects_duplicate_blocker_ids
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "duplicate-blocker",
+        "status" => "resolved",
+        "public_summary" => "First sanitized blocker",
+        "owner" => nil,
+        "disposition" => nil
+      },
+      {
+        "id" => "duplicate-blocker",
+        "status" => "resolved",
+        "public_summary" => "Second sanitized blocker",
+        "owner" => nil,
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker IDs must be unique: duplicate-blocker"
+  end
+
+  def test_closeout_rejects_unknown_blocker_status_even_with_a_durable_owner
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "uncertain-blocker",
+        "status" => "unknown",
+        "public_summary" => "Public-safe state is still unknown",
+        "owner" => { "issue_url" => "https://example.invalid/issues/uncertain-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker uncertain-blocker remains UNKNOWN at closeout"
+  end
+
+  def test_public_ledger_rejects_private_blocker_fields
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger["blockers"] = [
+      {
+        "id" => "blocker-1",
+        "status" => "open",
+        "public_summary" => "Sanitized blocker",
+        "owner" => { "public_tracker_reason" => "Public identity cannot be exposed" },
+        "disposition" => nil,
+        "deployment_url" => "redacted"
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "blocker blocker-1 contains forbidden private field deployment_url"
+  end
+
+  def test_closeout_requires_reconciliation_when_the_default_base_moves
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases").merge!("reviewed" => "target-before", "current" => "target-after", "reconciliation" => "blocked")
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "base moved after audit without passing reconciliation"
+  end
+
+  def test_closeout_requires_checks_to_be_bound_to_the_reconciled_current_base
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    reconciled_base = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("bases").merge!("current" => reconciled_base, "reconciliation" => "passed")
+    target.fetch("baseline")["head_commit"] = reconciled_base
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "target #{target.fetch('id')} check evidence is not bound to its reconciled current base"
+  end
+
+  def test_closeout_requires_per_target_audit_reviewed_and_current_base_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("audit base is missing") })
+    assert(errors.any? { |error| error.include?("reviewed base is missing") })
+    assert(errors.any? { |error| error.include?("current base is missing") })
+  end
+
+  def test_generated_closeout_requires_independent_audit_authorized_merge_reachability_and_tree_parity
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      closeout = File.read(File.join(directory, "CLOSEOUT.md"))
+
+      assert_includes closeout, "independent checker"
+      assert_includes closeout, "tracker mode and freeze"
+      assert_includes closeout, "explicit merge authority"
+      assert_includes closeout, "default-branch reachability"
+      assert_includes closeout, "tree parity"
+      assert_includes closeout, "replayable public-safe evidence"
+      assert_includes closeout, "every check head"
+      assert_includes closeout, "merge commit"
+      assert_includes closeout, "PASS`, `PARTIAL`, or `BLOCKED"
+    end
+  end
+
+  def test_closeout_rejects_a_checker_that_was_also_a_maker
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["checker"] = "maker-1"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit checker is also a maker"
+  end
+
+  def test_independent_audit_rejects_noncanonical_actor_identities_and_compares_them_canonically
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item["maker_id"] = "same-agent "
+    end
+    ledger.fetch("audit").merge!(
+      "checker" => "same-agent",
+      "maker_ids" => ["same-agent "]
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit actor identities must be canonical nonblank strings"
+    assert_includes errors, "independent audit checker is also a maker"
+  end
+
+  def test_independent_audit_maker_list_covers_every_mutable_target
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    mutable = ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }
+    mutable.each_with_index { |item, index| item["maker_id"] = "maker-#{index + 1}" }
+    ledger.fetch("audit")["maker_ids"] = mutable.drop(1).map { |item| item.fetch("maker_id") }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities do not cover every mutable target"
+  end
+
+  def test_independent_audit_rejects_blank_maker_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item["maker_id"] = "   "
+    end
+    ledger.fetch("audit")["maker_ids"] = ["   "]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities contain blank values"
+  end
+
+  def test_independent_audit_rejects_duplicate_maker_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["maker_ids"] = %w[maker-1 maker-1]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit maker identities must be unique"
+  end
+
+  def test_closeout_requires_identified_checker_and_makers
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit").merge!("checker" => nil, "maker_ids" => [])
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit checker is missing"
+    assert_includes errors, "independent audit maker identities are missing"
+  end
+
+  def test_closeout_rejects_a_pending_independent_audit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["status"] = "pending"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit is not passed"
+  end
+
+  def test_closeout_requires_replayable_independent_audit_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("audit")["evidence"] = "   "
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit evidence is missing"
+  end
+
+  def test_closeout_requires_a_restart_safe_capability_handoff
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "capability restart_handoff is missing"
+  end
+
+  def test_closeout_requires_all_release_wide_preflight_gates_to_pass
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").fetch("artifacts")["status"] = "unknown"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "release-wide preflight artifacts is not passed or explicitly waived"
+  end
+
+  def test_owned_preflight_blocker_can_close_without_opening_the_app_work_barrier
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger.fetch("pack").merge!(
+      "candidate" => "v17.0.0.rc.12",
+      "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "tracker_mode" => "strict-rc",
+      "resolved_packages" => resolved_packages(generator)
+    )
+    ledger.fetch("preflight").merge!(
+      "status" => "blocked",
+      "app_work_allowed" => false,
+      "blocker_id" => "artifact-blocker",
+      "blocker_evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger.fetch("preflight").fetch("artifacts").merge!(
+      "status" => "blocked",
+      "evidence" => "public-safe artifact mismatch evidence"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "artifact-blocker",
+        "status" => "open",
+        "public_summary" => "Published candidate artifacts are incoherent",
+        "owner" => { "issue_url" => "https://example.invalid/issues/artifact-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("audit").merge!(
+      "status" => "passed",
+      "checker" => "independent-checker",
+      "maker_ids" => [],
+      "evidence" => "public-safe blocked-preflight audit"
+    )
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
+    ledger.fetch("tracker").merge!("status" => "ready", "promotion" => "blocked")
+
+    schema_errors = FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+    semantic_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_empty schema_errors
+    assert_empty semantic_errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_blocked_preflight_still_rejects_product_versions_from_another_candidate
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each do |package|
+      product_names = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.fetch(package["ecosystem"], [])
+      package["version"] = "16.0.0" if product_names.include?(package["name"])
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
+  end
+
+  def test_blocked_preflight_requires_an_explicitly_blocked_promotion
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight tracker promotion must be blocked"
+  end
+
+  def test_blocked_preflight_rejects_a_retained_app_work_allowed_public_marker
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("preflight")["public_marker"] = {
+      "status" => "unique",
+      "pack_id" => ledger.dig("pack", "pack_id"),
+      "candidate" => ledger.dig("pack", "candidate"),
+      "candidate_commit" => ledger.dig("pack", "candidate_commit"),
+      "snapshot_fingerprint" => ledger.dig("pack", "snapshot_fingerprint"),
+      "opened_at" => "2026-07-18T10:00:00Z",
+      "evidence" => "stale published APP_WORK_ALLOWED marker"
+    }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight public marker must remain pristine and unpublished"
+  end
+
+  def test_blocked_preflight_retains_legitimate_validation_only_evidence
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_empty errors
+  end
+
+  def test_blocked_preflight_retains_read_only_package_lock_probes
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    expected = generator.lifecycle_inventory.find { |item| item["id"] == target["id"] }
+    target["package_locks"] = expected.fetch("packages").map do |package|
+      ledger.fetch("pack").fetch("resolved_packages").find do |resolved|
+        resolved.slice("ecosystem", "name") == package.slice("ecosystem", "name")
+      end.dup
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+  end
+
+  def test_blocked_preflight_rejects_nested_mutation_and_reachability_state
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge").merge!(
+      "authority" => "ask",
+      "authority_evidence" => "stale authority",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc"
+    )
+    target.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "stale reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "stale tree parity"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight target #{target.fetch('id')} contains nested merge state"
+    assert_includes errors, "blocked preflight target #{target.fetch('id')} contains reachability state"
+  end
+
+  def test_preflight_status_rejects_disposition_fields_from_other_states
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight")["waiver"] = {
+      "gate" => "release_ci",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "Sanitized stale disposition"
+    }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "passed preflight retains disposition fields from another state"
+  end
+
+  def test_published_artifact_defects_cannot_be_waived
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").merge!(
+      "status" => "waived",
+      "waiver" => {
+        "gate" => "artifacts",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "sanitized"
+      }
+    )
+    ledger.fetch("preflight").fetch("artifacts")["status"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "release-wide preflight artifacts must pass and cannot be waived"
+  end
+
+  def test_release_wide_preflight_passes_require_retained_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").fetch("release_ci")["evidence"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "release-wide preflight release_ci is not passed or explicitly waived"
+  end
+
+  def test_empty_preflight_waiver_does_not_open_the_app_work_barrier
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger.fetch("preflight").merge!("status" => "waived", "waiver" => {})
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }["work_state"] = "running"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths
+    ).errors
+
+    assert_includes errors, "app work started before APP_WORK_ALLOWED"
+  end
+
+  def test_preflight_waiver_requires_a_terminal_failed_gate_with_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("preflight").merge!(
+      "status" => "waived",
+      "waiver" => {
+        "gate" => "release_ci",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "Sanitized waiver"
+      }
+    )
+    ledger.fetch("preflight").fetch("release_ci").merge!("status" => "unknown", "evidence" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "waived preflight has no terminal failed gate with replayable evidence"
+    assert_includes errors, "release-wide preflight release_ci is not passed or explicitly waived"
+  end
+
+  def test_closeout_rejects_unknown_or_nonterminal_inventory_results
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").first["result"] = "unknown"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) are unknown or nonterminal"
+  end
+
+  def test_closeout_requires_candidate_policy_and_default_snapshot_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack")["policy_commit"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack policy_commit is missing"
+  end
+
+  def test_closeout_rejects_unknown_snapshot_identities_and_tracker_modes
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").merge!(
+      "candidate_commit" => "unknown",
+      "policy_commit" => "pending",
+      "tracker_mode" => "unknown"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack candidate_commit is not an exact commit identity"
+    assert_includes errors, "pack policy_commit is not an exact commit identity"
+    assert_includes errors, "pack tracker_mode is not allowed"
+  end
+
+  def test_closeout_requires_full_length_commit_identities
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack")["candidate_commit"] = "abc1234"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack candidate_commit is not an exact commit identity"
+  end
+
+  def test_closeout_rejects_unknown_default_reachability_or_tree_parity
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("reachability")["tree_parity"] = "unknown"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "aggregate reachability tree_parity does not match per-target merge states"
+  end
+
+  def test_closeout_rejects_merge_during_a_freeze_conflict
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["freeze_state"] = "conflict"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target['id']} merged during a freeze or phase conflict"
+  end
+
+  def test_closeout_requires_applicable_merges_to_be_complete
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["status"] = "authorized"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target['id']} merge disposition is not terminal"
+  end
+
+  def test_closeout_requires_replayable_explicit_merge_authority_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["authority_evidence"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target['id']} merged without authority evidence"
+  end
+
+  def test_validated_ledger_regenerates_the_append_only_tracker_matrix
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    validator = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    )
+
+    assert_empty validator.errors
+
+    tracker = FleetValidation::TrackerRenderer.new(ledger).render
+
+    assert_includes tracker, "<!-- fleet-validation-closeout:fleet-test-pack -->"
+    assert_includes tracker, "Verdict: PASS"
+    assert_equal 13, (tracker.lines.count { |line| line.match?(/\| (hard_gate|soft_track) \|/) })
+    assert_includes tracker, "## Required release paths"
+    assert_includes tracker, "## Blocker ownership"
+    assert_includes tracker, "Promotion recommendation: recommend"
+  end
+
+  def test_tracker_escapes_backslashes_before_pipes_and_neutralizes_comment_markers
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").first
+    target["evidence"] = 'literal\| <!-- fleet-validation-closeout:forged -->'
+
+    tracker = FleetValidation::TrackerRenderer.new(ledger).render
+    escaped_fragment = "literal#{'\\' * 3}| &lt;!-- fleet-validation-closeout:forged --&gt;"
+
+    assert_includes tracker, escaped_fragment
+    refute_includes tracker, "<!-- fleet-validation-closeout:forged -->"
+  end
+
+  def test_tracker_derives_partial_and_blocked_verdicts_from_the_ledger
+    generator = build_generator
+    partial = complete_ledger(generator)
+    partial.fetch("inventory").find { |item| item["tier"] == "soft_track" }["result"] = "blocked"
+    blocked = complete_ledger(generator)
+    blocked.fetch("inventory").find { |item| item["tier"] == "hard_gate" }["result"] = "blocked"
+
+    assert_includes FleetValidation::TrackerRenderer.new(partial).render, "Verdict: PARTIAL"
+    assert_includes FleetValidation::TrackerRenderer.new(blocked).render, "Verdict: BLOCKED"
+  end
+
+  def test_check_and_preflight_waivers_render_partial
+    generator = build_generator
+    check_waiver = complete_ledger(generator)
+    target = check_waiver.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    check = target.fetch("checks").fetch("hosted_ci")
+    check["status"] = "waived"
+    check["waiver"] = {
+      "gate" => "#{target['id']}:hosted_ci",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "sanitized"
+    }
+    preflight_waiver = complete_ledger(generator)
+    preflight_waiver.fetch("preflight").merge!(
+      "status" => "waived",
+      "waiver" => {
+        "gate" => "release_ci",
+        "authority" => "maintainer",
+        "evidence_url" => "https://example.invalid/waiver",
+        "reason" => "sanitized"
+      }
+    )
+    preflight_waiver.fetch("preflight").fetch("release_ci")["status"] = "waived"
+
+    assert_includes FleetValidation::TrackerRenderer.new(check_waiver).render, "Verdict: PARTIAL"
+    assert_includes FleetValidation::TrackerRenderer.new(preflight_waiver).render, "Verdict: PARTIAL"
+  end
+
+  def test_promotion_recommendation_is_rejected_while_a_blocker_remains_active
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "sanitized-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized active blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "promotion cannot be recommended while release blockers remain"
+  end
+
+  def test_owned_soft_track_followup_is_partial_but_does_not_block_promotion
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "soft-followup")
+    ledger["blockers"] = [
+      {
+        "id" => "soft-followup",
+        "status" => "open",
+        "public_summary" => "Shelved demo follow-up remains open",
+        "owner" => { "issue_url" => "https://example.invalid/issues/soft-followup" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_nested_soft_track_blocker_renders_partial_without_blocking_promotion
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("checks").fetch("hosted_ci").merge!(
+      "status" => "blocked",
+      "blocker_id" => "soft-check-followup"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "soft-check-followup",
+        "status" => "open",
+        "public_summary" => "Soft-track hosted CI follow-up",
+        "owner" => { "issue_url" => "https://example.invalid/issues/soft-check-followup" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_blocked_soft_track_outcome_cannot_reference_a_resolved_blocker
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "soft_track" }
+    target.fetch("checks").fetch("hosted_ci").merge!("status" => "blocked", "blocker_id" => "resolved-blocker")
+    ledger["blockers"] = [
+      {
+        "id" => "resolved-blocker",
+        "status" => "resolved",
+        "public_summary" => "The blocker was resolved after this stale observation",
+        "owner" => { "issue_url" => "https://example.invalid/issues/resolved" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "target #{target.fetch('id')} blocked check hosted_ci references inactive blocker resolved-blocker"
+  end
+
+  def test_blocker_shared_with_a_hard_gate_remains_release_gating
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    soft_target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    soft_target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "shared-blocker")
+    hard_target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    hard_target.fetch("checks").fetch("review").merge!(
+      "status" => "blocked",
+      "blocker_id" => "shared-blocker"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "shared-blocker",
+        "status" => "open",
+        "public_summary" => "Shared hard-gate and soft-track blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/shared-blocker" },
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "promotion cannot be recommended while release blockers remain"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_nested_hard_gate_failure_blocks_promotion
+    generator = build_generator
+    check_failure = complete_ledger(generator)
+    check_failure.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("checks").fetch("hosted_ci")["status"] = "blocked"
+    regression = complete_ledger(generator)
+    regression.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+              .fetch("baseline")["classification"] = "candidate_regression"
+
+    [check_failure, regression].each do |ledger|
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_includes errors, "promotion cannot be recommended while release blockers remain"
+      assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+    end
+  end
+
+  def test_blocked_hard_gate_outcomes_require_owned_blocker_references
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["result"] = "blocked"
+    target.fetch("checks").fetch("hosted_ci")["status"] = "blocked"
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("blocked result has no owned blocker reference") })
+    assert(errors.any? { |error| error.include?("blocked check hosted_ci has no owned blocker reference") })
+  end
+
+  def test_waived_hard_gate_and_check_require_structured_waiver_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target["result"] = "waived"
+    target.fetch("checks").fetch("hosted_ci")["status"] = "waived"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("waived result is missing structured waiver evidence") })
+    assert(errors.any? { |error| error.include?("waived check hosted_ci is missing structured waiver evidence") })
+  end
+
+  def test_ledger_cli_validates_and_renders_the_tracker_from_one_file
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      tracker_path = File.join(directory, "tracker.md")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+
+      stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc",
+        "--render-tracker", tracker_path
+      )
+
+      assert status.success?, stderr
+      assert_includes stdout, "VALID fleet result ledger"
+      assert File.exist?(tracker_path)
+    end
+  end
+
+  def test_ledger_cli_reports_schema_errors_without_running_crashing_semantic_validation
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory")[0] = "malformed"
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      _stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--ledger",
+        ledger_path,
+        "--expected-pack-id",
+        "fleet-test-pack",
+        "--expected-release-selector",
+        "latest RC or beta",
+        "--expected-candidate",
+        "v17.0.0.rc.12",
+        "--expected-candidate-commit",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode",
+        "strict-rc"
+      )
+
+      refute status.success?
+      assert_includes stderr, "$.inventory[0] has invalid type"
+      refute_includes stderr, "NoMethodError"
+    end
+  end
+
+  def test_ledger_cli_requires_an_external_expected_candidate
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+
+      _stdout, stderr, status = Open3.capture3(RbConfig.ruby, VALIDATOR, "--manifest", MANIFEST, "--ledger", ledger_path)
+
+      refute status.success?
+      assert_includes stderr, "missing argument: --expected-candidate"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_expected_pack_id
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
+      )
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "another-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-pack-id"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr, "pack ID mismatch: expected another-pack, got fleet-test-pack"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_release_selector
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      ledger.fetch("pack")["release_selector"] = "v17.0.0.rc.12"
+      pinned = build_generator(release_selector: "v17.0.0.rc.12")
+      ledger.fetch("pack")["snapshot_fingerprint"] = pinned.snapshot_fingerprint
+      ledger.fetch("preflight").fetch("public_marker")["snapshot_fingerprint"] = pinned.snapshot_fingerprint
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-release-selector"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr,
+                      "pack release selector mismatch: expected latest RC or beta, got v17.0.0.rc.12"
+      assert_includes mismatch_stderr, "pack snapshot_fingerprint does not match the current manifest"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_candidate_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      wrong_commit = "f" * 40
+      ledger.fetch("pack")["candidate_commit"] = wrong_commit
+      ledger.fetch("preflight").fetch("public_marker")["candidate_commit"] = wrong_commit
+      core = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+      core.fetch("revisions").merge!("audit" => wrong_commit, "reviewed" => wrong_commit, "current" => wrong_commit)
+      core.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+      core.fetch("review_app")["head_commit"] = wrong_commit
+      core.fetch("baseline")["head_commit"] = wrong_commit
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-candidate-commit"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr,
+                      "pack candidate commit mismatch: expected aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, " \
+                      "got #{wrong_commit}"
+    end
+  end
+
+  def test_closeout_enforces_external_policy_commit_and_tracker_mode
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_policy_commit: "f" * 40,
+      expected_tracker_mode: "final-release",
+      closeout: true
+    ).errors
+
+    assert_includes errors,
+                    "pack policy commit mismatch: expected #{'f' * 40}, " \
+                    "got bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    assert_includes errors, "pack tracker mode mismatch: expected final-release, got strict-rc"
+  end
+
+  def test_ledger_cli_requires_external_policy_commit_and_tracker_mode
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+      common = [
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+
+      _stdout, policy_stderr, policy_status = Open3.capture3(*common)
+      _stdout, mode_stderr, mode_status = Open3.capture3(
+        *common,
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      )
+
+      refute policy_status.success?
+      assert_includes policy_stderr, "missing argument: --expected-policy-commit"
+      refute mode_status.success?
+      assert_includes mode_stderr, "missing argument: --expected-tracker-mode"
+    end
+  end
+
+  def test_ledger_cli_rejects_tracker_output_that_resolves_to_the_ledger_path_without_writing
+    generator = build_generator
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(complete_ledger(generator)))
+      original_ledger = File.binread(ledger_path)
+
+      _stdout, stderr, status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--expected-policy-commit", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "--expected-tracker-mode", "strict-rc",
+        "--render-tracker", File.join(directory, ".", "ledger.json")
+      )
+
+      refute status.success?
+      assert_includes stderr, "--render-tracker must resolve to a different path than --ledger"
+      assert_equal original_ledger, File.binread(ledger_path)
+    end
+  end
+
+  def test_closeout_requires_terminal_tracker_state_and_posted_comment_identity
+    generator = build_generator
+    pending = complete_ledger(generator)
+    pending.fetch("tracker").merge!("status" => "pending", "comment_url" => nil)
+    posted = complete_ledger(generator)
+    posted.fetch("tracker").merge!("status" => "posted", "comment_url" => nil)
+
+    pending_errors = FleetValidation::LedgerValidator.new(
+      pending,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+    posted_errors = FleetValidation::LedgerValidator.new(
+      posted,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes pending_errors, "tracker closeout status is not ready or posted"
+    assert_includes posted_errors, "posted tracker closeout is missing comment_url"
+  end
+
+  def test_tracker_cannot_claim_blocked_when_all_release_gates_are_promotable
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "tracker promotion is blocked without a release blocker"
+  end
+
+  def test_tracker_must_claim_blocked_when_a_release_blocker_remains
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "release-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/release-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "tracker promotion must be blocked while a release blocker remains"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_result_ledger_schema_closes_public_blocker_and_review_app_shapes
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      schema = JSON.parse(File.read(File.join(directory, "result-ledger.schema.json")))
+
+      assert_equal false, schema.dig("properties", "blockers", "items", "additionalProperties")
+      assert_includes schema.dig("properties", "blockers", "items", "required"), "disposition"
+      assert_includes schema.dig("properties", "required_paths", "items", "required"), "blocker_id"
+      assert_includes schema.dig("properties", "inventory", "items", "required"), "maker_id"
+      assert_equal(
+        %w[configured_runnable configured_broken not_configured unknown],
+        schema.dig(
+          "properties", "inventory", "items", "properties", "review_app", "properties", "state", "enum"
+        )
+      )
+    end
+  end
+
+  def test_schema_validator_rejects_unknown_fields_and_invalid_enums
+    generator = build_generator
+    ledger = generator.ledger_template
+    ledger["unexpected"] = true
+    ledger.fetch("inventory").first.fetch("review_app")["state"] = "invented"
+
+    errors = FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+
+    assert_includes errors, "$ has unsupported field unexpected"
+    assert_includes errors, "$.inventory[0].review_app.state is not an allowed value"
+  end
+
+  def test_ledger_template_has_exact_package_check_baseline_and_review_app_evidence_slots
+    target = build_generator.ledger_template.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+
+    assert_equal [], target.fetch("package_locks")
+    assert_nil target.fetch("maker_id")
+    assert_equal(
+      %w[build hosted_ci install local_smoke review test],
+      target.fetch("checks").keys.sort
+    )
+    assert(target.fetch("checks").values.all? { |check| check.key?("base_commit") })
+    assert_equal %w[classification evidence head_commit waiver], target.fetch("baseline").keys.sort
+    assert_equal %w[blocker_id deployed_smoke evidence head_commit state waiver], target.fetch("review_app").keys.sort
+  end
+
+  def test_closeout_requires_exact_retained_package_lock_versions_and_sources
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }["package_locks"] = []
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_core_generator_gate_tracks_the_published_cli_version
+    core = build_generator.lifecycle_inventory.find do |target|
+      target.fetch("id") == "react-on-rails-generator-install-smoke"
+    end
+
+    expected = [
+      { "ecosystem" => "gem", "name" => "react_on_rails" },
+      { "ecosystem" => "npm", "name" => "react-on-rails" },
+      { "ecosystem" => "npm", "name" => "create-react-on-rails-app" },
+      { "ecosystem" => "gem", "name" => "react_on_rails_pro" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-pro" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-pro-node-renderer" },
+      { "ecosystem" => "npm", "name" => "react-on-rails-rsc" }
+    ]
+
+    assert_equal expected, core.fetch("packages")
+  end
+
+  def test_closeout_requires_every_manifest_package_in_the_retained_lock_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" && item["package_locks"].length > 1 }
+    target.fetch("package_locks").pop
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) are missing retained package lock evidence"
+  end
+
+  def test_report_only_targets_require_retained_package_lock_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["package_locks"] = []
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) are missing retained package lock evidence"
+  end
+
+  def test_resolved_product_versions_must_match_the_selected_candidate
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each do |package|
+      next if package["name"] == "react-on-rails-rsc"
+
+      package["version"] = package["ecosystem"] == "gem" ? "17.0.0.rc.11" : "17.0.0-rc.11"
+    end
+    ledger.fetch("inventory").each do |item|
+      item.fetch("package_locks").each do |package|
+        next if package["name"] == "react-on-rails-rsc"
+        next unless %w[
+          react_on_rails react_on_rails_pro react-on-rails create-react-on-rails-app
+          react-on-rails-pro react-on-rails-pro-node-renderer
+        ].include?(package["name"])
+
+        package["version"] = package["ecosystem"] == "gem" ? "17.0.0.rc.11" : "17.0.0-rc.11"
+      end
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "resolved product package versions do not match candidate v17.0.0.rc.12"
+  end
+
+  def test_resolved_candidate_snapshot_requires_published_registry_sources
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("pack").fetch("resolved_packages").each { |package| package["source"] = "local-workspace" }
+    ledger.fetch("inventory").each do |item|
+      item.fetch("package_locks").each { |package| package["source"] = "local-workspace" }
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack resolved package snapshot contains unpublished sources"
+  end
+
+  def test_closeout_rejects_retained_lock_versions_that_do_not_match_the_resolved_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    lock = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("package_locks").first
+    lock["version"] = "0.0.1"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes(
+      errors,
+      "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+    )
+  end
+
+  def test_closeout_rejects_retained_lock_sources_that_do_not_match_the_resolved_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    lock = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+                 .fetch("package_locks").first
+    lock["source"] = "git-or-path-override"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) retain package versions or sources outside the resolved release snapshot"
+  end
+
+  def test_report_only_and_independently_managed_locks_may_retain_their_own_versions
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    report_lock = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+                        .fetch("package_locks").first
+    report_lock["version"] = "16.0.0"
+    candidate_managed = FleetValidation::LedgerValidator::PRODUCT_PACKAGES.values.flatten +
+                        ["react-on-rails-rsc"]
+    independent_lock = ledger.fetch("inventory").filter_map do |item|
+      next unless item["tier"] == "hard_gate"
+
+      item.fetch("package_locks").find do |lock|
+        !candidate_managed.include?(lock["name"])
+      end
+    end.first
+    independent_lock["version"] = "independently-managed"
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    refute(
+      errors.any? { |error| error.include?("retain package versions or sources outside") },
+      errors.join("\n")
+    )
+  end
+
+  def test_target_check_path_and_blocker_dispositions_match_their_statuses
+    generator = build_generator
+    waiver = {
+      "gate" => "stale",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/waiver",
+      "reason" => "Sanitized stale disposition"
+    }
+    cases = [
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first["waiver"] = waiver },
+        expected: "target result passed retains disposition fields from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first.fetch("checks").fetch("install")["blocker_id"] = "stale" },
+        expected: "target check install passed retains disposition fields from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("inventory").first.fetch("baseline")["waiver"] = waiver },
+        expected: "target baseline clean retains a waiver from another state"
+      },
+      {
+        mutate: ->(ledger) { ledger.fetch("required_paths").first["blocker_id"] = "stale" },
+        expected: "required path passed retains disposition fields from another state"
+      },
+      {
+        mutate: lambda do |ledger|
+          ledger["blockers"] = [
+            {
+              "id" => "open-blocker",
+              "status" => "open",
+              "public_summary" => "Sanitized open blocker",
+              "owner" => { "issue_url" => "https://example.invalid/issues/open" },
+              "disposition" => waiver.merge("gate" => "open-blocker")
+            }
+          ]
+          ledger.fetch("tracker")["promotion"] = "blocked"
+        end,
+        expected: "blocker open-blocker open status retains a waiver disposition"
+      }
+    ]
+
+    cases.each do |test_case|
+      ledger = complete_ledger(generator)
+      test_case.fetch(:mutate).call(ledger)
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_includes errors, test_case.fetch(:expected)
+    end
+  end
+
+  def test_closeout_rejects_nonterminal_work_and_blank_result_or_baseline_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").first
+    target["work_state"] = "not_started"
+    target["evidence"] = nil
+    target.fetch("baseline")["evidence"] = nil
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) are unknown or nonterminal"
+  end
+
+  def test_closeout_rejects_a_blocked_work_state_with_a_passing_result
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }["work_state"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 inventory target(s) have inconsistent work-state/result combinations"
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_closeout_requires_structured_baseline_waiver_and_renders_partial
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("baseline").merge!("classification" => "waived", "waiver" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("waived baseline is missing structured waiver evidence") })
+    target.fetch("baseline")["waiver"] = {
+      "gate" => "#{target['id']}:baseline",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/baseline-waiver",
+      "reason" => "sanitized"
+    }
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_unwaived_baseline_defect_blocks_promotion_and_structured_waiver_renders_partial
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("baseline").merge!(
+      "classification" => "baseline_defect",
+      "evidence" => "fresh default branch reproduces the failure",
+      "waiver" => nil
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("baseline defect is missing structured waiver evidence") })
+    assert_includes errors, "promotion cannot be recommended while release blockers remain"
+
+    target.fetch("baseline")["waiver"] = {
+      "gate" => "#{target['id']}:baseline",
+      "authority" => "maintainer",
+      "evidence_url" => "https://example.invalid/baseline-defect-waiver",
+      "reason" => "Proven unrelated to the candidate"
+    }
+    waived_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty waived_errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: PARTIAL"
+  end
+
+  def test_blocked_closeout_does_not_require_merge_or_post_merge_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    target.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.fetch("merge").merge!(
+        "status" => "blocked",
+        "authority" => "none",
+        "authority_evidence" => nil,
+        "merge_commit" => nil,
+        "evidence" => "release blocked before merge"
+      )
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+    end
+    ledger.fetch("merge")["status"] = "blocked"
+    ledger.fetch("reachability").merge!("default_branch" => "blocked", "tree_parity" => "blocked")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    refute(errors.any? { |error| error.match?(/merge status|reachability|base is missing/) }, errors.join("\n"))
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
+  end
+
+  def test_blocked_merge_cannot_retain_a_merge_commit_or_successful_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge")["status"] = "blocked"
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/owned" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} blocked merge retains a merge commit"
+    assert_includes errors, "target #{target.fetch('id')} blocked merge retains successful reachability"
+  end
+
+  def test_not_applicable_merge_cannot_retain_mutation_authority_or_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("merge").merge!(
+      "authority" => "ask",
+      "authority_evidence" => "stale mutation authority",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} not-applicable merge retains mutation state"
+  end
+
+  def test_closeout_requires_terminal_state_for_blocked_and_non_mutation_merges
+    generator = build_generator
+    blocked = complete_ledger(generator)
+    blocked_target = blocked.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    blocked_target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    blocked_target.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    blocked_target.fetch("merge").merge!(
+      "status" => "blocked",
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "freeze_state" => "unknown",
+      "merge_commit" => nil,
+      "evidence" => "release blocked before merge"
+    )
+    blocked_target.fetch("reachability").merge!(
+      "default_branch" => "unknown",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "unknown",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+    blocked["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/owned" },
+        "disposition" => nil
+      }
+    ]
+    blocked.fetch("merge")["status"] = "partial"
+    blocked.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    blocked.fetch("tracker")["promotion"] = "blocked"
+
+    blocked_errors = FleetValidation::LedgerValidator.new(
+      blocked,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes blocked_errors, "target #{blocked_target.fetch('id')} blocked merge freeze state is unresolved"
+    assert_includes blocked_errors, "target #{blocked_target.fetch('id')} blocked merge retains unresolved reachability"
+
+    non_mutation = complete_ledger(generator)
+    non_mutation_target = non_mutation.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    non_mutation_target.fetch("merge")["freeze_state"] = "unknown"
+
+    non_mutation_errors = FleetValidation::LedgerValidator.new(
+      non_mutation,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes non_mutation_errors,
+                    "target #{non_mutation_target.fetch('id')} not-applicable merge disposition is incomplete"
+  end
+
+  def test_blocked_mutation_merge_accepts_every_terminal_freeze_state
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("merge").merge!(
+      "status" => "blocked",
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "merge_commit" => nil,
+      "evidence" => "release blocked before merge"
+    )
+    target.fetch("reachability").merge!(
+      "default_branch" => "pending",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "pending",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "release-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/release-blocker" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    %w[clear frozen conflict].each do |freeze_state|
+      ledger.dig("inventory", ledger.fetch("inventory").index(target), "merge")["freeze_state"] = freeze_state
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        closeout: true
+      ).errors
+
+      assert_empty errors, "#{freeze_state}: #{errors.join('; ')}"
+    end
+  end
+
+  def test_non_mutation_target_cannot_retain_post_merge_reachability
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "synthetic reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "synthetic tree parity"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} non-mutation target retains reachability state"
+  end
+
+  def test_blocked_closeout_rejects_an_unauthorized_recorded_merge
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+    target.fetch("merge").merge!(
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "freeze_state" => "frozen",
+      "status" => "merged"
+    )
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target['id']} merged without explicit authority"
+    assert_includes errors, "target #{target['id']} merged without authority evidence"
+    assert_includes errors, "target #{target['id']} merged during a freeze or phase conflict"
+  end
+
+  def test_merged_target_cannot_retain_its_own_blocked_gate_outcome
+    generator = build_generator
+    cases = {
+      "blocked result" => lambda do |target|
+        target.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+      end,
+      "blocked check" => lambda do |target|
+        target.fetch("checks").fetch("hosted_ci").merge!(
+          "status" => "blocked",
+          "blocker_id" => "owned-blocker"
+        )
+      end,
+      "candidate regression" => lambda do |target|
+        target.fetch("baseline").merge!(
+          "classification" => "candidate_regression",
+          "waiver" => nil
+        )
+        target["blocker_id"] = "owned-blocker"
+      end,
+      "broken review app" => lambda do |target|
+        target.fetch("review_app").merge!(
+          "state" => "configured_broken",
+          "deployed_smoke" => "blocked",
+          "blocker_id" => "owned-blocker"
+        )
+      end
+    }
+
+    cases.each do |name, mutate|
+      ledger = complete_ledger(generator)
+      target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+      mutate.call(target)
+      ledger["blockers"] = [
+        {
+          "id" => "owned-blocker",
+          "status" => "open",
+          "public_summary" => "Sanitized target blocker",
+          "owner" => { "issue_url" => "https://example.invalid/issues/owned-blocker" },
+          "disposition" => nil
+        }
+      ]
+      ledger.fetch("tracker")["promotion"] = "blocked"
+
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        closeout: true
+      ).errors
+
+      assert_includes(
+        errors,
+        "target #{target.fetch('id')} merged despite its own blocked gate outcome",
+        name
+      )
+    end
+  end
+
+  def test_partial_merge_closeout_requires_proofs_only_for_the_lanes_that_landed
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    mutable = ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }
+    merged = mutable.first
+    blocked = mutable.last
+    mutable.each do |item|
+      item["merge"] = {
+        "status" => "blocked",
+        "authority" => "none",
+        "authority_evidence" => nil,
+        "freeze_state" => "clear",
+        "merge_commit" => nil,
+        "evidence" => "public-safe merge disposition"
+      }
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+    end
+    merged.fetch("merge").merge!(
+      "status" => "merged",
+      "authority" => "auto_merge_when_gates_pass",
+      "authority_evidence" => "trusted batch goal",
+      "merge_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "evidence" => "public-safe merge evidence"
+    )
+    merged.fetch("reachability").merge!(
+      "default_branch" => "passed",
+      "default_commit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "default_evidence" => "public-safe reachability",
+      "tree_parity" => "passed",
+      "tree" => "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_evidence" => "public-safe tree parity"
+    )
+    blocked.merge!("work_state" => "blocked", "result" => "blocked", "blocker_id" => "owned-blocker")
+    blocked.fetch("checks").each_value do |check|
+      check.merge!("status" => "blocked", "blocker_id" => "owned-blocker")
+    end
+    ledger["blockers"] = [
+      {
+        "id" => "owned-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized release blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge")["status"] = "partial"
+    ledger.fetch("reachability").merge!("default_branch" => "partial", "tree_parity" => "partial")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    schema_errors = FleetValidation::SchemaValidator.new(generator.ledger_schema).errors(ledger)
+    semantic_errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty schema_errors
+    assert_empty semantic_errors
+  end
+
+  def test_closeout_binds_each_target_audit_base_to_its_reviewed_base
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases").merge!(
+      "audit" => "cccccccccccccccccccccccccccccccccccccccc",
+      "reviewed" => "dddddddddddddddddddddddddddddddddddddddd"
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("audit base does not match reviewed base") })
+  end
+
+  def test_same_pack_id_cannot_be_reused_for_a_different_release_snapshot
+    Dir.mktmpdir do |directory|
+      build_generator(release_selector: "v17.0.0.rc.12").write_pack(directory)
+      old_index = File.read(File.join(directory, "INDEX.md"))
+      regenerated = build_generator(release_selector: "v17.0.0.rc.13")
+
+      error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
+      assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+      assert_equal old_index, File.read(File.join(directory, "INDEX.md"))
+    end
+  end
+
+  def test_fresh_pack_cannot_overwrite_another_packs_durable_result_ledger
+    Dir.mktmpdir do |directory|
+      build_generator(pack_id: "durable-pack").write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      original_ledger = File.binread(ledger_path)
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(pack_id: "fresh-pack").write_pack(directory)
+      end
+
+      assert_includes error.message, "existing result ledger belongs to pack durable-pack"
+      assert_equal original_ledger, File.binread(ledger_path)
+    end
+  end
+
+  def test_same_pack_regeneration_rejects_a_ledger_outside_the_current_schema
+    Dir.mktmpdir do |directory|
+      generator = build_generator(release_selector: "v17.0.0.rc.12")
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      ledger.delete("tracker")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      error = assert_raises(FleetValidation::ManifestError) { generator.write_pack(directory) }
+
+      assert_includes error.message, "existing result ledger does not match the current schema"
+    end
+  end
+
+  def test_dynamic_selector_pack_cannot_reuse_a_resolved_candidate_barrier
+    Dir.mktmpdir do |directory|
+      generator = build_generator
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      ledger.fetch("preflight")["app_work_allowed"] = true
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      old_index = File.read(File.join(directory, "INDEX.md"))
+
+      error = assert_raises(FleetValidation::ManifestError) { generator.write_pack(directory) }
+
+      assert_includes error.message, "resolved dynamic candidate cannot be safely reused"
+      assert_equal old_index, File.read(File.join(directory, "INDEX.md"))
+    end
+  end
+
+  def test_external_expected_candidate_does_not_override_a_pinned_selector
+    generator = build_generator(release_selector: "v17.0.0.rc.11")
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "candidate mismatch: pinned selector v17.0.0.rc.11, got v17.0.0.rc.12"
+  end
+
+  def test_closeout_rejects_a_ledger_from_a_different_manifest_snapshot
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_snapshot_fingerprint: "different-fingerprint",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "pack snapshot_fingerprint does not match the current manifest"
+  end
+
+  def test_closeout_binds_required_paths_to_manifest_evidence_sources
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("required_paths").first["evidence_source"] = "unrelated-source"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("evidence_source does not match manifest") })
+  end
+
+  def test_same_pack_id_cannot_be_reused_after_manifest_policy_changes
+    Dir.mktmpdir do |directory|
+      build_generator(release_selector: "v17.0.0.rc.12").write_pack(directory)
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("defaults")["build"] = "changed sanitized build command"
+      manifest_path = File.join(directory, "changed-manifest.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+      regenerated = build_generator(
+        manifest_path:,
+        release_selector: "v17.0.0.rc.12"
+      )
+
+      error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
+      assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+    end
+  end
+
+  def test_closeout_requires_per_target_reachability_and_tree_parity_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("reachability").merge!("default_evidence" => nil, "tree_evidence" => nil)
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
+    assert(errors.any? { |error| error.include?("tree-parity evidence is incomplete") })
+  end
+
+  def test_mutation_base_reconciliation_must_be_explicitly_passed_even_without_base_movement
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }
+    target.fetch("bases")["reconciliation"] = "reported"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "target #{target.fetch('id')} base reconciliation is not passed"
+  end
+
+  def test_validation_only_core_gate_does_not_require_merge_base_or_reachability_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    core = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    core.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil, "reconciliation" => "pending")
+    core.fetch("reachability").merge!(
+      "default_branch" => "pending",
+      "default_commit" => nil,
+      "default_evidence" => nil,
+      "tree_parity" => "pending",
+      "tree" => nil,
+      "tree_evidence" => nil
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    refute(errors.any? { |error| error.include?(core.fetch("id")) }, errors.join("\n"))
+  end
+
+  def test_recorded_merges_retain_base_and_reachability_proofs_when_another_lane_blocks
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "later-blocker",
+        "status" => "open",
+        "public_summary" => "Another lane blocked after merges",
+        "owner" => { "issue_url" => "https://example.invalid/issues/later" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "blocked"
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.fetch("bases").merge!("audit" => nil, "reviewed" => nil, "current" => nil)
+      item.fetch("reachability").merge!(
+        "default_branch" => "pending",
+        "default_commit" => nil,
+        "default_evidence" => nil,
+        "tree_parity" => "pending",
+        "tree" => nil,
+        "tree_evidence" => nil
+      )
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("audit base is missing or not an exact commit identity") })
+    assert(errors.any? { |error| error.include?("default-branch reachability evidence is incomplete") })
+  end
+
+  def test_report_only_tracks_retain_post_preflight_work_start_ordering
+    generator = build_generator
+    missing = complete_ledger(generator)
+    missing.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["work_started_at"] = nil
+    early = complete_ledger(generator)
+    early.fetch("inventory").find { |item| item["work_mode"] == "report_only" }["work_started_at"] =
+      "2026-07-18T09:59:00Z"
+
+    missing_errors = FleetValidation::LedgerValidator.new(
+      missing,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+    early_errors = FleetValidation::LedgerValidator.new(
+      early,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(missing_errors.any? { |error| error.include?("missing replayable barrier/work-start ordering evidence") })
+    assert(early_errors.any? { |error| error.include?("started before the preflight barrier opened") })
+  end
+
+  def test_closeout_requires_terminal_install_build_test_smoke_ci_and_review_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target.fetch("checks").fetch("hosted_ci")["status"] = "unknown"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 hard-gate target(s) check evidence is not bound to its immutable current head"
+  end
+
+  def test_hard_gate_checks_must_match_the_immutable_current_head
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }
+    target["revisions"] = {
+      "audit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reviewed" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "current" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reconciliation" => "passed"
+    }
+    target.fetch("checks").each_value do |check|
+      check["head_commit"] = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert(errors.any? { |error| error.include?("check evidence is not bound to its immutable current head") })
+  end
+
+  def test_validation_only_evidence_must_match_the_candidate_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    wrong_commit = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("revisions").merge!(
+      "audit" => wrong_commit,
+      "reviewed" => wrong_commit,
+      "current" => wrong_commit
+    )
+    target.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+    target.fetch("review_app")["head_commit"] = wrong_commit
+    target.fetch("baseline")["head_commit"] = wrong_commit
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "validation-only target revision does not match the candidate commit"
+  end
+
+  def test_blocked_preflight_validation_only_evidence_must_match_the_candidate_commit
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator, validation_only_evidence: true)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    wrong_commit = "ffffffffffffffffffffffffffffffffffffffff"
+    target.fetch("revisions").merge!(
+      "audit" => wrong_commit,
+      "reviewed" => wrong_commit,
+      "current" => wrong_commit
+    )
+    target.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+    target.fetch("review_app")["head_commit"] = wrong_commit
+    target.fetch("baseline")["head_commit"] = wrong_commit
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "validation-only target revision does not match the candidate commit"
+  end
+
+  def test_report_only_checks_must_have_terminal_current_head_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    target = ledger.fetch("inventory").find { |item| item["work_mode"] == "report_only" }
+    target.fetch("checks").each_value do |check|
+      check.merge!("status" => "unknown", "head_commit" => nil, "evidence" => nil)
+    end
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "1 report-only target(s) have unknown or stale check evidence"
+  end
+
+  def test_sanitized_rc12_replay_exercises_inventory_barriers_ownership_and_tracker_regeneration
+    stdout, stderr, status = Open3.capture3(RbConfig.ruby, RC12_REPLAY)
+
+    assert status.success?, stderr
+    assert_includes stdout, "hard_gates=8"
+    assert_includes stdout, "soft_tracks=5"
+    assert_includes stdout, "required_path=webpack-rsc-production:passed"
+    refute_includes stdout, "required_path=webpack-rsc-production:scheduled"
+    assert_includes stdout, "unowned_blockers_rejected=6"
+    assert_includes stdout, "tracker_rows=13"
+    assert_includes stdout, "tracker_verdict=PARTIAL"
+    assert_includes stdout, "SANITIZED_RC12_REPLAY_PASS"
+  end
+
   def test_generated_prompts_are_dynamic_and_require_bounded_subagents
     pack = build_generator.render_pack
 
@@ -69,6 +3203,45 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes pack, "verify: true"
   end
 
+  def test_generated_snapshot_launch_record_round_trips_policy_and_tracker_anchors_to_checker
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      index = File.read(File.join(directory, "INDEX.md"))
+      prompts = Dir.glob(File.join(directory, "*", "*-fleet-lane.md")).map { |path| File.read(path) }.join("\n")
+
+      assert_includes prompts, "`policy_commit: FULL_POLICY_COMMIT_SHA`"
+      assert_includes prompts, "`tracker_mode: INITIAL_TRACKER_MODE`"
+      assert_includes prompts, "copy both exact values from that unique snapshot comment"
+      assert_includes index, "never from `result-ledger.json`"
+      assert_includes index, '--expected-policy-commit "$EXPECTED_POLICY_COMMIT"'
+      assert_includes index, '--expected-tracker-mode "$EXPECTED_TRACKER_MODE"'
+    end
+  end
+
+  def test_remote_coordinators_require_a_pack_bound_public_preflight_marker
+    generator = build_generator
+    pack = generator.render_pack
+
+    assert_includes pack, "<!-- fleet-validation-preflight:fleet-test-pack -->"
+    assert_includes pack, generator.snapshot_fingerprint
+    assert_includes pack, "publish the public-safe `APP_WORK_ALLOWED` marker"
+    assert_includes pack, "Do not start a remote mutable worker until one unique preflight marker"
+    assert_includes pack, "candidate tag and commit, snapshot fingerprint, opened_at"
+  end
+
+  def test_each_lane_emits_a_complete_schema_valid_inventory_fragment_for_closeout
+    pack = build_generator.render_pack
+
+    assert_includes pack, "complete schema-valid `inventory` row"
+    assert_includes pack, "Do not return only a prose summary"
+    assert_includes pack, "id, tier, work_mode, maker_id, work_state, work_started_at, result, waiver, blocker_id,"
+    assert_includes pack, "package_locks, checks, review_app, baseline, revisions, bases, merge, reachability, and evidence"
+    assert_includes pack, "`lane-result-1.json`"
+    assert_includes pack, "`lane-result-6.json`"
+    assert_includes pack, "atomically merge the row into `result-ledger.json`"
+    assert_includes pack, "exact JSON fragment"
+  end
+
   def test_rejects_machine_names_that_collide_as_paths
     error = assert_raises(FleetValidation::ManifestError) do
       build_generator(machines: ["M 1", "m-1"])
@@ -87,6 +3260,34 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_index_launches_preflight_before_makers_and_closeout_after_ledger_validation
+    Dir.mktmpdir do |directory|
+      build_generator.write_pack(directory)
+      index = File.read(File.join(directory, "INDEX.md"))
+
+      assert_includes index, "[PREFLIGHT.md](PREFLIGHT.md)"
+      assert_includes index, "[REPORT-ONLY.md](REPORT-ONLY.md)"
+      assert_includes index, "[CLOSEOUT.md](CLOSEOUT.md)"
+      assert_includes index, "`result-ledger.json`"
+      assert_includes index, "Do not start the app mutation prompts before `APP_WORK_ALLOWED`"
+      assert_operator index.index("Start prompt coordinator 1"), :<, index.index("[PREFLIGHT.md](PREFLIGHT.md)")
+      assert_operator index.index("[PREFLIGHT.md](PREFLIGHT.md)"), :<, index.index("Start the remaining prompt coordinators")
+      refute_includes index, "Start all 6 prompt coordinators simultaneously after the snapshot exists"
+    end
+  end
+
+  def test_core_matrix_gate_is_always_assigned_to_coordinator_one
+    (4..8).each do |prompt_count|
+      generator = build_generator(prompt_count:)
+      first_targets = generator.send(:ordered_assignments).first.fetch(:targets)
+
+      assert(
+        first_targets.any? { |target| target["kind"] == "core" },
+        "expected core gate in coordinator 1 with #{prompt_count} prompts"
+      )
+    end
+  end
+
   def test_index_describes_an_uneven_machine_allocation_as_a_maximum
     Dir.mktmpdir do |directory|
       build_generator(prompt_count: 5).write_pack(directory)
@@ -100,13 +3301,28 @@ class FleetValidationGeneratorTest < Minitest::Test
   def test_removes_stale_lane_files_when_regenerating_an_output_directory
     Dir.mktmpdir do |directory|
       build_generator.write_pack(directory)
-      build_generator(prompt_count: 4, machines: ["local"], pack_id: "replacement-pack").write_pack(directory)
+      build_generator(prompt_count: 4, machines: ["local"]).write_pack(directory)
 
       lane_files = Dir.glob(File.join(directory, "*", "*-fleet-lane.md"))
 
       assert_equal 4, lane_files.length
       assert_empty Dir.glob(File.join(directory, "m1", "*-fleet-lane.md"))
-      assert(lane_files.all? { |path| File.read(path).include?("replacement-pack") })
+      assert(lane_files.all? { |path| File.read(path).include?("fleet-test-pack") })
+    end
+  end
+
+  def test_regenerating_the_same_pack_preserves_its_existing_result_ledger
+    Dir.mktmpdir do |directory|
+      generator = build_generator(release_selector: "v17.0.0.rc.12")
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      generator.write_pack(directory)
+
+      assert_equal "v17.0.0.rc.12", JSON.parse(File.read(ledger_path)).dig("pack", "candidate")
     end
   end
 
@@ -176,6 +3392,212 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       assert_equal "repos[0] must be a mapping", error.message
     end
+  end
+
+  def test_rejects_an_unsupported_repository_tier
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos").first["tier"] = "hard-gate"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0] tier must be hard_gate or soft_track", error.message
+    end
+  end
+
+  def test_rejects_malformed_soft_track_package_entries
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      soft_track = manifest.fetch("repos").find { |repo| repo["tier"] == "soft_track" }
+      soft_track["packages"] = ["react-on-rails"]
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      index = manifest.fetch("repos").index(soft_track)
+      assert_equal(
+        "repos[#{index}].packages[0] must name an ecosystem and nonblank string package",
+        error.message
+      )
+    end
+  end
+
+  def test_rejects_unsupported_package_ecosystems
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.fetch("repos").first.fetch("packages").first["ecosystem"] = "rubygems"
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "repos[0].packages[0] ecosystem must be gem or npm", error.message
+    end
+  end
+
+  def test_hard_gate_inventory_uses_the_same_default_derived_packages_as_its_prompt
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      repo = manifest.fetch("repos").first
+      packages = repo.delete("packages")
+      manifest.fetch("defaults")["packages"] = packages
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      generator = build_generator(manifest_path:)
+      inventory = generator.lifecycle_inventory.find { |target| target["id"] == "shakacode-hichee" }
+
+      assert_equal packages, inventory.fetch("packages")
+      assert_includes generator.render_pack, "gem:react_on_rails"
+    end
+  end
+
+  def test_rejects_blank_release_selectors_before_writing_a_pack
+    error = assert_raises(FleetValidation::ManifestError) do
+      build_generator(release_selector: "   ")
+    end
+
+    assert_equal "release selector must be nonempty", error.message
+  end
+
+  def test_rejects_a_manifest_without_required_lifecycle_paths
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      manifest.delete("lifecycle")
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      assert_equal "lifecycle.required_paths must be a nonempty array", error.message
+    end
+  end
+
+  def test_rejects_non_string_required_lifecycle_path_fields
+    %w[id evidence_source].each do |field|
+      Dir.mktmpdir do |directory|
+        manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+        manifest.fetch("lifecycle").fetch("required_paths").first[field] = 1
+        manifest_path = File.join(directory, "fleet.yml")
+        File.write(manifest_path, YAML.dump(manifest))
+
+        error = assert_raises(FleetValidation::ManifestError) do
+          build_generator(manifest_path:)
+        end
+
+        assert_equal "lifecycle.required_paths must contain mappings with string IDs and evidence sources", error.message
+      end
+    end
+  end
+
+  def test_rejects_non_string_or_blank_manifest_package_names
+    [123, "   "].each do |invalid_name|
+      Dir.mktmpdir do |directory|
+        manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+        manifest.fetch("repos").find { |repo| repo["tier"] == "soft_track" }
+                .fetch("packages").first["name"] = invalid_name
+        manifest_path = File.join(directory, "fleet.yml")
+        File.write(manifest_path, YAML.dump(manifest))
+
+        error = assert_raises(FleetValidation::ManifestError) do
+          build_generator(manifest_path:)
+        end
+
+        assert_match(/must name an ecosystem and nonblank string package/, error.message)
+      end
+    end
+  end
+
+  def test_lifecycle_invariant_families_fail_closed_table
+    generator = build_generator
+    cases = [
+      {
+        name: "exact snapshot identity",
+        mutate: ->(ledger) { ledger.fetch("pack")["candidate_commit"] = nil },
+        expected: "app work started before APP_WORK_ALLOWED"
+      },
+      {
+        name: "resolved artifact snapshot",
+        mutate: ->(ledger) { ledger.fetch("pack")["resolved_packages"] = [] },
+        expected: "app work started before APP_WORK_ALLOWED"
+      },
+      {
+        name: "transition ordering",
+        mutate: lambda do |ledger|
+          ledger.fetch("inventory").find { |item| item["work_mode"] == "mutation" }["work_started_at"] =
+            "2026-07-18T09:59:00Z"
+        end,
+        expected: "started before the preflight barrier opened"
+      },
+      {
+        name: "terminal review evidence",
+        mutate: lambda do |ledger|
+          ledger.fetch("inventory").find { |item| item["tier"] == "hard_gate" }.fetch("review_app").merge!(
+            "state" => "configured_runnable",
+            "deployed_smoke" => "pending"
+          )
+        end,
+        expected: "review-app smoke is not terminal"
+      },
+      {
+        name: "complete inventory",
+        mutate: ->(ledger) { ledger.fetch("inventory").pop },
+        expected: "inventory missing target"
+      },
+      {
+        name: "restart equivalence",
+        mutate: lambda do |ledger|
+          ledger.fetch("preflight").fetch("capabilities")["restart_handoff"] = nil
+        end,
+        expected: "app work started before APP_WORK_ALLOWED"
+      }
+    ]
+
+    cases.each do |test_case|
+      ledger = complete_ledger(generator)
+      test_case.fetch(:mutate).call(ledger)
+      errors = FleetValidation::LedgerValidator.new(
+        ledger,
+        inventory: generator.lifecycle_inventory,
+        required_paths: generator.required_paths,
+        expected_candidate: "v17.0.0.rc.12",
+        expected_snapshot_fingerprint: generator.snapshot_fingerprint,
+        closeout: true
+      ).errors
+
+      assert(
+        errors.any? { |error| error.include?(test_case.fetch(:expected)) },
+        "#{test_case.fetch(:name)} did not fail closed:\n#{errors.join("\n")}"
+      )
+    end
+
+    read_only = complete_ledger(generator)
+    read_only.fetch("preflight")["app_work_allowed"] = false
+    read_only.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item.merge!("work_state" => "not_started", "work_started_at" => nil)
+    end
+    core = read_only.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+    core["work_state"] = "running"
+    errors = FleetValidation::LedgerValidator.new(
+      read_only,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      expected_snapshot_fingerprint: generator.snapshot_fingerprint
+    ).errors
+
+    refute_includes errors, "app work started before APP_WORK_ALLOWED"
   end
 
   def test_rejects_a_hard_gate_missing_a_required_field

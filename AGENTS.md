@@ -109,8 +109,10 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
 - When a maintainer wants to run or inspect RC/beta validation across the demo
   fleet, use the repo-local `.agents/skills/run-fleet-validation/SKILL.md`; a
   short invocation is `$run-fleet-validation`. Its Ruby generator reads
-  `internal/contributor-info/demo-fleet.yml` and emits balanced, subagent-driven
-  prompts for simultaneous execution across multiple machines.
+  `internal/contributor-info/demo-fleet.yml` and emits a complete lifecycle pack:
+  release/capability preflight, balanced subagent-driven hard-gate prompts,
+  report-only soft-track coverage, a durable result ledger/schema, independent
+  audit, authorized merge, reachability/tree-parity proof, and tracker closeout.
 - Default simplify model: `claude-opus-4-8`
 
 ## External Flagship Demo Coordination
