@@ -148,6 +148,7 @@ module FleetValidation
               raise ManifestError, "repos[#{index}] soft track is missing #{field}"
             end
           end
+          validate_package_entries!(repo.fetch("packages", []), index)
           next
         end
 
@@ -175,7 +176,15 @@ module FleetValidation
         raise ManifestError, "repos[#{index}] hard gate smoke entries must be non-empty strings"
       end
 
-      repo.fetch("packages").each_with_index do |package, package_index|
+      validate_package_entries!(repo.fetch("packages"), index)
+    end
+
+    def validate_package_entries!(packages, index)
+      unless packages.is_a?(Array)
+        raise ManifestError, "repos[#{index}] packages must be an array"
+      end
+
+      packages.each_with_index do |package, package_index|
         unless package.is_a?(Hash) && package["ecosystem"].to_s != "" && package["name"].to_s != ""
           raise ManifestError, "repos[#{index}].packages[#{package_index}] must name an ecosystem and package"
         end
@@ -251,7 +260,8 @@ module FleetValidation
 
     def ordered_assignments
       assignments.sort_by do |assignment|
-        [@machines.index(assignment.fetch(:machine)), -assignment.fetch(:weight)]
+        has_core_gate = assignment.fetch(:targets).any? { |target| target["kind"] == "core" }
+        [has_core_gate ? 0 : 1, @machines.index(assignment.fetch(:machine)), -assignment.fetch(:weight)]
       end
     end
 

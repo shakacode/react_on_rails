@@ -512,6 +512,66 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "blocker deferred-blocker has no durable owner"
   end
 
+  def test_whitespace_only_blocker_ownership_and_disposition_evidence_is_rejected
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "deferred-blocker",
+        "status" => "deferred",
+        "public_summary" => "Sanitized deferred blocker",
+        "owner" => { "public_tracker_reason" => "   " },
+        "disposition" => {
+          "gate" => "deferred-blocker",
+          "authority" => "   ",
+          "evidence_url" => "   ",
+          "reason" => "   "
+        }
+      }
+    ]
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker deferred-blocker is missing structured deferred disposition evidence"
+    assert_includes errors, "blocker deferred-blocker has no durable owner"
+  end
+
+  def test_closeout_rejects_duplicate_blocker_ids
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = [
+      {
+        "id" => "duplicate-blocker",
+        "status" => "resolved",
+        "public_summary" => "First sanitized blocker",
+        "owner" => nil,
+        "disposition" => nil
+      },
+      {
+        "id" => "duplicate-blocker",
+        "status" => "resolved",
+        "public_summary" => "Second sanitized blocker",
+        "owner" => nil,
+        "disposition" => nil
+      }
+    ]
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker IDs must be unique: duplicate-blocker"
+  end
+
   def test_public_ledger_rejects_private_blocker_fields
     generator = build_generator
     ledger = generator.ledger_template
@@ -1703,6 +1763,18 @@ class FleetValidationGeneratorTest < Minitest::Test
     end
   end
 
+  def test_core_matrix_gate_is_always_assigned_to_coordinator_one
+    (4..8).each do |prompt_count|
+      generator = build_generator(prompt_count:)
+      first_targets = generator.send(:ordered_assignments).first.fetch(:targets)
+
+      assert(
+        first_targets.any? { |target| target["kind"] == "core" },
+        "expected core gate in coordinator 1 with #{prompt_count} prompts"
+      )
+    end
+  end
+
   def test_index_describes_an_uneven_machine_allocation_as_a_maximum
     Dir.mktmpdir do |directory|
       build_generator(prompt_count: 5).write_pack(directory)
@@ -1821,6 +1893,23 @@ class FleetValidationGeneratorTest < Minitest::Test
       end
 
       assert_equal "repos[0] tier must be hard_gate or soft_track", error.message
+    end
+  end
+
+  def test_rejects_malformed_soft_track_package_entries
+    Dir.mktmpdir do |directory|
+      manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+      soft_track = manifest.fetch("repos").find { |repo| repo["tier"] == "soft_track" }
+      soft_track["packages"] = ["react-on-rails"]
+      manifest_path = File.join(directory, "fleet.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+
+      error = assert_raises(FleetValidation::ManifestError) do
+        build_generator(manifest_path:)
+      end
+
+      index = manifest.fetch("repos").index(soft_track)
+      assert_equal "repos[#{index}].packages[0] must name an ecosystem and package", error.message
     end
   end
 

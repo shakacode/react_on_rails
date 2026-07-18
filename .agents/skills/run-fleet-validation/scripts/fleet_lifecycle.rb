@@ -695,6 +695,7 @@ module FleetValidation
       result.concat(review_app_errors)
       result.concat(barrier_order_errors)
       result.concat(required_path_errors) if @closeout
+      result.concat(blocker_identity_errors) if @closeout
       result.concat(blocker_owner_errors) if @closeout
       result.concat(blocker_reference_errors) if @closeout
       result.concat(preflight_errors) if @closeout
@@ -870,6 +871,14 @@ module FleetValidation
 
         errors
       end
+    end
+
+    def blocker_identity_errors
+      ids = Array(@ledger["blockers"]).map { |blocker| blocker["id"] }
+      duplicates = ids.tally.select { |_id, count| count > 1 }.keys
+      return [] if duplicates.empty?
+
+      ["blocker IDs must be unique: #{duplicates.join(', ')}"]
     end
 
     def base_movement_error
@@ -1197,7 +1206,7 @@ module FleetValidation
     end
 
     def present?(value)
-      !value.nil? && !value.to_s.empty?
+      !value.nil? && !value.to_s.strip.empty?
     end
 
     def commit_identity?(value)
