@@ -851,6 +851,28 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_includes errors, "independent audit checker is also a maker"
   end
 
+  def test_independent_audit_rejects_noncanonical_actor_identities_and_compares_them_canonically
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger.fetch("inventory").select { |item| item["work_mode"] == "mutation" }.each do |item|
+      item["maker_id"] = "same-agent "
+    end
+    ledger.fetch("audit").merge!(
+      "checker" => "same-agent",
+      "maker_ids" => ["same-agent "]
+    )
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "independent audit actor identities must be canonical nonblank strings"
+    assert_includes errors, "independent audit checker is also a maker"
+  end
+
   def test_independent_audit_maker_list_covers_every_mutable_target
     generator = build_generator
     ledger = complete_ledger(generator)
@@ -1067,6 +1089,30 @@ class FleetValidationGeneratorTest < Minitest::Test
     ).errors
 
     assert_includes errors, "blocked preflight tracker promotion must be blocked"
+  end
+
+  def test_blocked_preflight_rejects_a_retained_app_work_allowed_public_marker
+    generator = build_generator
+    ledger = blocked_preflight_ledger(generator)
+    ledger.fetch("preflight")["public_marker"] = {
+      "status" => "unique",
+      "pack_id" => ledger.dig("pack", "pack_id"),
+      "candidate" => ledger.dig("pack", "candidate"),
+      "candidate_commit" => ledger.dig("pack", "candidate_commit"),
+      "snapshot_fingerprint" => ledger.dig("pack", "snapshot_fingerprint"),
+      "opened_at" => "2026-07-18T10:00:00Z",
+      "evidence" => "stale published APP_WORK_ALLOWED marker"
+    }
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      expected_candidate: "v17.0.0.rc.12",
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocked preflight public marker must remain pristine and unpublished"
   end
 
   def test_blocked_preflight_retains_legitimate_validation_only_evidence

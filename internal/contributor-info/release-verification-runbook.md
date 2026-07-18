@@ -79,8 +79,9 @@ owner.
 
 An owned release-wide preflight defect may also close the candidate as `BLOCKED` without fabricating
 an app run. Keep `APP_WORK_ALLOWED` false, retain the preflight blocker ID and public-safe evidence,
-leave every app target untouched, record no maker identities in the independent audit, and mark
-aggregate merge/reachability plus tracker promotion `blocked` (not merely `hold`). Report-only
+leave every app target untouched, keep the public marker pristine and unpublished, record no maker
+identities in the independent audit, and mark aggregate merge/reachability plus tracker promotion
+`blocked` (not merely `hold`). Report-only
 targets that do run must retain their inspected package versions/sources and terminal exact-head
 check evidence; their observed locks need not match the candidate snapshot. Candidate matching
 applies only to candidate-managed packages on hard gates, including the separately resolved RSC

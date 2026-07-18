@@ -686,7 +686,8 @@ module FleetValidation
         If an owned release-wide blocker makes opening the barrier impossible, close the pack with
         `preflight.status: blocked`, a durable `preflight.blocker_id`, public-safe
         `preflight.blocker_evidence`, and `APP_WORK_ALLOWED` still false. In that terminal path every
-        app target remains untouched, although it may retain read-only package-lock probe evidence.
+        app target remains untouched, although it may retain read-only package-lock probe evidence,
+        and the public marker remains pristine `pending` state with no publication fields or evidence.
         The independent audit records no maker IDs, and aggregate merge/reachability plus tracker
         promotion remain blocked.
 
@@ -732,9 +733,10 @@ module FleetValidation
         Reserve an independent checker whose identity is absent from every maker ID in the result
         ledger. The checker audits every hard-gate diff, all report-only dispositions, required-path
         coverage, baseline classifications, exact-head CI/review evidence, and blocker ownership.
-        Every mutable target records its maker identity; `audit.maker_ids` must exactly cover those
-        identities before independence can pass. The audit records replayable public-safe evidence,
-        and every check head must match the target's exact audited, reviewed, and current revision.
+        Every mutable target records its canonical nonblank maker identity; `audit.maker_ids` must
+        exactly cover those identities, and the checker must remain different after canonical
+        comparison. The audit records replayable public-safe evidence, and every check head must match
+        the target's exact audited, reviewed, and current revision.
 
         Immediately before each merge or tracker write, re-read tracker mode and freeze state. Record
         authority, freeze state, merge commit, and evidence on that mutable target. Merge only with
@@ -1085,7 +1087,16 @@ module FleetValidation
     end
 
     def blocked_preflight_state_errors
-      errors = Array(@ledger["inventory"]).flat_map do |item|
+      marker = @ledger.dig("preflight", "public_marker")
+      pristine_marker = marker.is_a?(Hash) && marker["status"] == "pending" &&
+                        %w[pack_id candidate candidate_commit snapshot_fingerprint opened_at evidence].all? do |field|
+                          marker[field].nil?
+                        end
+      errors = []
+      unless pristine_marker
+        errors << "blocked preflight public marker must remain pristine and unpublished"
+      end
+      errors.concat(Array(@ledger["inventory"]).flat_map do |item|
         if item["work_mode"] == "validation_only" && item["work_state"] != "not_started"
           next validation_only_preflight_evidence_errors(item)
         end
@@ -1113,7 +1124,7 @@ module FleetValidation
           item_errors << "blocked preflight target #{item['id']} contains reachability state"
         end
         item_errors
-      end
+      end)
       errors << "blocked preflight aggregate merge status must be blocked" unless @ledger.dig("merge", "status") == "blocked"
       unless @ledger.dig("tracker", "promotion") == "blocked"
         errors << "blocked preflight tracker promotion must be blocked"
@@ -1559,32 +1570,38 @@ module FleetValidation
     def independent_audit_errors
       audit = @ledger.fetch("audit", {})
       errors = []
-      audit_maker_ids = Array(audit["maker_ids"])
+      raw_audit_maker_ids = Array(audit["maker_ids"])
       raw_mutable_maker_ids = Array(@ledger["inventory"]).filter_map do |item|
         item["maker_id"] if item["work_mode"] == "mutation"
       end
+      raw_actor_identities = [audit["checker"]] + raw_audit_maker_ids + raw_mutable_maker_ids
+      if raw_actor_identities.compact.any? { |identity| !canonical_actor_identity?(identity) }
+        errors << "independent audit actor identities must be canonical nonblank strings"
+      end
+      checker_identity = canonical_actor_identity(audit["checker"])
+      audit_maker_ids = raw_audit_maker_ids.filter_map { |identity| canonical_actor_identity(identity) }
+      mutable_maker_ids = raw_mutable_maker_ids.filter_map { |identity| canonical_actor_identity(identity) }
       mutable_count = Array(@ledger["inventory"]).count { |item| item["work_mode"] == "mutation" }
-      errors << "independent audit checker is missing" unless present?(audit["checker"])
+      errors << "independent audit checker is missing" unless checker_identity
       errors << "independent audit evidence is missing" unless present?(audit["evidence"])
       if preflight_blocked?
-        unless raw_mutable_maker_ids.none? { |maker_id| present?(maker_id) } && audit_maker_ids.empty?
+        unless mutable_maker_ids.empty? && raw_audit_maker_ids.empty?
           errors << "blocked preflight audit must not claim maker identities"
         end
       else
-        errors << "independent audit maker identities are missing" if audit_maker_ids.empty?
+        errors << "independent audit maker identities are missing" if raw_audit_maker_ids.empty?
         if audit_maker_ids.length != audit_maker_ids.uniq.length
           errors << "independent audit maker identities must be unique"
         end
-        if raw_mutable_maker_ids.any? { |maker_id| !present?(maker_id) } ||
-           audit_maker_ids.any? { |maker_id| !present?(maker_id) }
+        if raw_mutable_maker_ids.any? { |maker_id| canonical_actor_identity(maker_id).nil? } ||
+           raw_audit_maker_ids.any? { |maker_id| canonical_actor_identity(maker_id).nil? }
           errors << "independent audit maker identities contain blank values"
         end
-        mutable_maker_ids = raw_mutable_maker_ids.select { |maker_id| present?(maker_id) }
         if mutable_maker_ids.length != mutable_count || mutable_maker_ids.uniq.sort != audit_maker_ids.uniq.sort
           errors << "independent audit maker identities do not cover every mutable target"
         end
       end
-      if present?(audit["checker"]) && audit_maker_ids.include?(audit["checker"])
+      if checker_identity && audit_maker_ids.include?(checker_identity)
         errors << "independent audit checker is also a maker"
       end
       errors
@@ -1832,6 +1849,18 @@ module FleetValidation
 
     def active_blocker?(blocker)
       %w[open pending blocked unknown].include?(blocker["status"])
+    end
+
+    def canonical_actor_identity(value)
+      return unless value.is_a?(String)
+
+      identity = value.strip
+      identity unless identity.empty?
+    end
+
+    def canonical_actor_identity?(value)
+      canonical = canonical_actor_identity(value)
+      canonical && value == canonical
     end
 
     def inactive_blocker_error(subject, blocker)

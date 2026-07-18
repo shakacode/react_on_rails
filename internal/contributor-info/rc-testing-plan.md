@@ -99,8 +99,9 @@ four-slot agent tree.
 
 If the release-wide preflight finds an owned terminal blocker, do not manufacture passing app
 results to finish the ledger. Keep `APP_WORK_ALLOWED` false, retain the blocker ID and public-safe
-evidence, leave every app target untouched, audit the blocked disposition with no maker IDs, and
-close aggregate merge/reachability and promotion exactly as `blocked`, not `hold`. When report-only
+evidence, leave every app target untouched, keep the public marker pristine and unpublished, audit
+the blocked disposition with no maker IDs, and close aggregate merge/reachability and promotion
+exactly as `blocked`, not `hold`. When report-only
 tracks do run, their closeout evidence includes retained package versions/sources and terminal
 checks bound to the exact inspected head; those observed locks need not match the candidate
 snapshot, and `pending` or `unknown` is not a completed report. Candidate snapshot matching applies
@@ -169,7 +170,8 @@ An owned blocker referenced exclusively by soft-track inventory is non-gating fo
 the run `PARTIAL`; it becomes release-gating when preflight, a hard gate, or a required path shares
 that blocker.
 
-Every mutable target records the stable maker identity that performed its work, and the independent
+Every mutable target records the stable canonical nonblank maker identity that performed its work,
+and the independent checker must differ from every maker after canonical comparison. The independent
 audit's maker list must exactly cover those target identities and retain replayable public-safe
 audit evidence. Each hard-gate check is bound to the target's exact audited, reviewed, and current
 revision. Product gem/npm versions must normalize to the selected candidate; the independently

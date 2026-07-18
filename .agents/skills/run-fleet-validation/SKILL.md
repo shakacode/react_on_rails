@@ -62,8 +62,8 @@ policy/inventory manifest fails closed.
    If an owned release-wide blocker makes the barrier impossible to open, use the terminal blocked
    preflight path instead: retain its durable `blocker_id` and public-safe `blocker_evidence`, keep
    `APP_WORK_ALLOWED` false, leave every app target untouched while preserving any read-only
-   package-lock probes, audit with an empty maker list, and keep aggregate merge/reachability and
-   tracker promotion blocked.
+   package-lock probes, keep `preflight.public_marker` pristine and unpublished, audit with an empty
+   maker list, and keep aggregate merge/reachability and tracker promotion blocked.
 3. Run `REPORT-ONLY.md` so every soft track receives a disposition without a bump or merge.
    Its terminal report must retain the package versions/sources and exact-head evidence for every
    check; those are observed target versions and need not equal the release snapshot. `pending` and
@@ -147,7 +147,8 @@ required path records its lane, failure evidence, and `blocker_id`. Waived or de
 retain a durable owner and record a structured disposition with the gate, authority, evidence URL,
 and public-safe reason.
 Unrelated baseline defects require the same structured waiver before promotion. Each mutable target
-records its maker identity so the independent audit can prove complete maker coverage. The
+records a canonical nonblank maker identity so the independent audit can prove complete maker
+coverage and compare the checker against every maker without whitespace aliases. The
 validation-only core gate retains the OSS, Pro, node-renderer, RSC, and generator CLI package
 versions it exercises and binds all evidence to the pack's exact candidate commit, but does not
 fabricate per-target merge or reachability evidence.
