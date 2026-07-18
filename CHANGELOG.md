@@ -559,13 +559,6 @@ surrogate pair`, so such content crashed the entire server render instead of pas
   [PR 4389](https://github.com/shakacode/react_on_rails/pull/4389) by
   [justin808](https://github.com/justin808).
 
-- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
-  bypasses renders that use async props, so per-request async stream output cannot be replayed from
-  another request's cached stream. Fixes
-  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
-  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
-  [justin808](https://github.com/justin808).
-
 - **Preload links stay compatible with older Shakapacker**: `react_on_rails_preload_links` now
   skips SRI attributes when Shakapacker does not expose integrity settings, avoiding a
   `NoMethodError` while still emitting preload hints. Fixes
@@ -866,6 +859,16 @@ surrogate pair`, so such content crashed the entire server render instead of pas
 - **[Pro]** **Removed the `--rsc-pro` install generator flag**: `--rsc` already implies Pro, so the separate mode was unnecessary. Behaviors previously gated on `--rsc-pro` (Pro verification checklist, prerelease install note, exact Pro gem pin on prereleases) now fire on `--rsc` installs. See also [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104), which tracks unrelated silent-failure bugs in the Pro upgrade automation. [PR 3105](https://github.com/shakacode/react_on_rails/pull/3105) by [ihabadham](https://github.com/ihabadham).
 
 #### Security
+
+- **[Pro]** **Async-props prerender stream cache isolation**: Pro prerender stream caching now
+  bypasses renders that use async props, keeping per-request async stream output isolated from
+  prerender-cache hits. Prerelease builds `v16.7.0.rc.0` through `v16.7.0.rc.3` and
+  `v17.0.0.rc.0` through `v17.0.0.rc.6` included async-props streaming before this fix; no stable tag
+  contains the affected async-props feature. Upgrade to React on Rails 17.0.0 or later before enabling
+  global prerender caching on async-props streaming pages. Fixes
+  [Issue 4359](https://github.com/shakacode/react_on_rails/issues/4359).
+  [PR 4376](https://github.com/shakacode/react_on_rails/pull/4376) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro]** **Hardened Node Renderer password lifecycle**: The protocol-mismatch (412) response no longer echoes the request body verbatim — only non-sensitive field names are returned, so a mismatched `password` is never reflected back. The Pro install generator now provisions a random 64-hex-character renderer password instead of the publicly-known `devPassword` default, and production startup now logs a non-blocking warning for known-weak or short (< 16 character) renderer passwords. Fixes [Issue 3397](https://github.com/shakacode/react_on_rails/issues/3397). [PR 3399](https://github.com/shakacode/react_on_rails/pull/3399) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
