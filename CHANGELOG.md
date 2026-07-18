@@ -213,6 +213,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
+- **[Pro]** **RSC agent guardrails installer**: New
+  `rake react_on_rails:install_rsc_agent_guardrails` task (also run automatically by the RSC
+  generator) installs a Claude Code `rsc-app-safety` skill and an advisory hook into a host app's
+  `.claude/`, steering AI coding agents away from React Server Components API footguns (mounting the
+  RSC payload route without authentication, trusting server-component props, exposing the Node
+  renderer, leaking secrets). Idempotent and safe to re-run after upgrades.
+  [PR 4606](https://github.com/shakacode/react_on_rails/pull/4606) by
+  [justin808](https://github.com/justin808).
+
 - **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
   props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact
   coverage verifies a production Webpack build and progressive Suspense output on React 18 without
