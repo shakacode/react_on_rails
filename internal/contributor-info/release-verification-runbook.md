@@ -94,6 +94,12 @@ which detects drift between releases. Hosted-CI dispatch and generator-CI routin
 also dependencies, not substitutes: they shorten individual gates but do not own blocker
 identities, combined audit, merge authority, or promotion closeout.
 
+After stable publication, generate a fresh public standing-health pack with
+`check_fleet_health.rb --live --release v17.0.0 --rsc-version 19.2.1`. The command verifies those
+exact public registry artifacts and binds default-health evidence to current public default heads.
+Keep soft-track and archived findings report-only. This pack is evidence for fleet currency and
+capability drift; it is not a replacement for the candidate ledger or a release-promotion signal.
+
 ```text
 You are updating the React on Rails demo fleet for {{RELEASE_REF}}.
 

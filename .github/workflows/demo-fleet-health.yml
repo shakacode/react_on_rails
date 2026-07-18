@@ -1,0 +1,68 @@
+name: Public demo fleet standing health
+
+"on":
+  schedule:
+    - cron: "23 16 * * 1"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Stable React on Rails tag
+        required: false
+        type: string
+        default: v17.0.0
+      rsc-version:
+        description: Stable react-on-rails-rsc version
+        required: false
+        type: string
+        default: 19.2.1
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  standing-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Generate public standing-health evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release || 'v17.0.0' }}
+          RSC_VERSION: ${{ inputs['rsc-version'] || '19.2.1' }}
+        run: |
+          HEALTH_SCRIPT=".agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
+          ruby "$HEALTH_SCRIPT" \
+            --live \
+            --release "$RELEASE" \
+            --rsc-version "$RSC_VERSION" \
+            --pack-id "fleet-health-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --policy-commit "$GITHUB_SHA" \
+            --generated-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --output-dir tmp/fleet-health
+
+      - name: Upload standing-health evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: >-
+            public-demo-fleet-health-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tmp/fleet-health/fleet-health.json
+            tmp/fleet-health/fleet-health.schema.json
+            tmp/fleet-health/fleet-health.md
+          if-no-files-found: error
+
+      - name: Enforce active public target health
+        if: always()
+        run: |
+          ruby -rjson -e '
+            path = "tmp/fleet-health/fleet-health.json"
+            evidence = JSON.parse(File.read(path))
+            exit(evidence.dig("aggregate", "status") == "passed" ? 0 : 1)
+          '

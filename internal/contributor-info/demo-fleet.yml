@@ -43,6 +43,20 @@
 
 schema_version: 1
 
+standing_health:
+  # Standing health is intentionally public-only and independent from the
+  # candidate lifecycle below. Only repos with `standing_health.public: true`
+  # are queried. Archived targets are retained here as report-only catalog
+  # evidence and never become release mutation lanes.
+  schema_version: 1
+  max_minor_lag: 1
+  max_default_age_days: 45
+  dependabot_policy: v1
+  archived_targets:
+    - name: shakacode/react-on-rails-rsc-demo
+      headline: Retired manual RSC generator demo
+      packages: []
+
 lifecycle:
   # Release-path coverage is independent from repository tier. Every required
   # path needs a generated lane/evidence source or an explicit public waiver.
@@ -123,6 +137,10 @@ repos:
   - name: shakacode/react-on-rails-demo-flagship
     tier: hard_gate
     headline: Flagship Pro + RSC happy path
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -148,6 +166,10 @@ repos:
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
     tier: hard_gate
     headline: RSC streaming with comment trees
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -166,6 +188,10 @@ repos:
   - name: shakacode/react-on-rails-demo-marketplace-rsc
     tier: hard_gate
     headline: RSC product grid + filter
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -183,6 +209,10 @@ repos:
   - name: shakacode/react-on-rails-demo-gumroad-rsc
     tier: hard_gate
     headline: RSC dashboards + performance
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -199,6 +229,10 @@ repos:
   - name: shakacode/react-webpack-rails-tutorial
     tier: hard_gate
     headline: Pro + RSC tutorial reference app
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -218,6 +252,10 @@ repos:
   - name: shakacode/react-on-rails-starter-tanstack
     tier: hard_gate
     headline: TanStack Pro + RSC starter example
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -237,6 +275,10 @@ repos:
   - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
     tier: soft_track
     headline: RSC + server-rendered markdown
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -254,6 +296,10 @@ repos:
   - name: shakacode/react-on-rails-demo-ssr-hmr
     tier: soft_track
     headline: SSR + HMR coexistence
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -267,6 +313,10 @@ repos:
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
     tier: soft_track
     headline: On-demand bundle loading
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -281,6 +331,10 @@ repos:
   - name: shakacode/react-on-rails-example-open-flights
     tier: soft_track
     headline: Larger migrated app (search + map)
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -294,6 +348,10 @@ repos:
   - name: shakacode/react-on-rails-example-migration
     tier: soft_track
     headline: react-rails → React on Rails migration
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }

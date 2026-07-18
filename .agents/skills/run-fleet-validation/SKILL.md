@@ -1,6 +1,6 @@
 ---
 name: run-fleet-validation
-description: Generate and coordinate the complete React on Rails release fleet lifecycle from internal/contributor-info/demo-fleet.yml. Use when a maintainer wants to validate the latest RC or beta, split fleet work across machines or agent sessions, inspect fleet progress, or run fail-closed release closeout from a durable result ledger.
+description: Generate and coordinate the complete React on Rails release fleet lifecycle or public-only standing-health evidence from internal/contributor-info/demo-fleet.yml. Use when a maintainer wants to validate an RC/beta/final, inspect fleet currency/default health, split release work across machines, or run fail-closed closeout.
 ---
 
 # Run Fleet Validation
@@ -40,6 +40,36 @@ candidate, reuse its existing generated files or create a fresh pack; regenerati
 prove that the dynamic selector still resolves to the same candidate. A changed candidate or
 policy/inventory manifest fails closed. Generate a fresh pack in a fresh output directory; one pack
 must never replace another pack's durable result ledger.
+
+## Generate public standing-health evidence
+
+Standing health is a sibling contract, not a shortened candidate closeout. It reads only manifest
+entries explicitly marked `standing_health.public: true` plus the manifest's archived public
+targets. It never queries or emits a non-public lane, never mutates a demo repository, and never
+turns archived or `soft_track` entries into blocking targets.
+
+For the v17 stable line:
+
+```bash
+GITHUB_TOKEN="$(gh auth token)" \
+  ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+    --live \
+    --release v17.0.0 \
+    --rsc-version 19.2.1 \
+    --pack-id "fleet-health-v17-$(date -u +%Y%m%dT%H%M%SZ)" \
+    --policy-commit "$(git rev-parse HEAD)" \
+    --output-dir tmp/fleet-health-v17
+```
+
+The command verifies the exact public RubyGems/npm artifacts before inspecting public default
+heads. It writes `fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`, binding
+currency, CI, reusable-smoke adoption, review-app capability, staleness, and Dependabot v1 evidence
+to exact public default commits. Active public targets block on missing, stale, failed, or unknown
+required evidence. Report-only and archived targets retain findings without blocking the aggregate.
+The scheduled `.github/workflows/demo-fleet-health.yml` run uploads the same three artifacts.
+
+The Dependabot v1 evaluation is deliberately narrow: weekly enabled Bundler/npm/GitHub Actions
+coverage plus grouped React on Rails gem/npm updates. Do not substitute a generic Renovate preset.
 
 ## Launch and coordinate
 
@@ -172,6 +202,7 @@ For the checked-in sanitized RC12 regression corpus:
 
 ```bash
 ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 ```
 
 ## Validate changes to this skill
@@ -181,6 +212,8 @@ Run both checks after changing the generator or prompt contract:
 ```bash
 ruby .agents/skills/run-fleet-validation/scripts/generate_prompts_test.rb
 ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_lifecycle.rb
+ruby .agents/skills/run-fleet-validation/scripts/fleet_health_test.rb
+ruby .agents/skills/run-fleet-validation/scripts/replay_rc12_fleet_health.rb
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" \
   .agents/skills/run-fleet-validation
 ```
