@@ -79,6 +79,7 @@ jobs:
           bash script/ci-required-hosted-gate-test.bash
           bash script/lint-mirrored-blocks-test.bash
           ruby script/ci_required_merge_group_gate_test.rb
+          node --test .github/workflows/ci-commands.test.cjs
           node .github/workflows/hosted-ci-safety.test.cjs
           ruby script/pr_merge_ledger_test.rb
           ruby .agents/skills/pr-batch/bin/pr-ci-readiness-test.rb

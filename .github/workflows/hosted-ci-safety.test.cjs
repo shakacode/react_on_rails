@@ -73,6 +73,17 @@ const claudeWorkflow = read('.github/workflows/claude.yml');
 const shakaperfReleaseGateWorkflow = read('.github/workflows/shakaperf-release-gates.yml');
 const rspackViteDxWorkflow = read('.github/workflows/rspack-vite-dx.yml');
 const gemTestsWorkflow = read('.github/workflows/gem-tests.yml');
+const hostedWorkflowFiles = [
+  'lint-js-and-ruby.yml',
+  'package-js-tests.yml',
+  'gem-tests.yml',
+  'integration-tests.yml',
+  'precompile-check.yml',
+  'examples.yml',
+  'playwright.yml',
+  'pro-integration-tests.yml',
+  'pro-test-package-and-gem.yml',
+];
 
 assertMatches(
   'hosted-ci-label-dispatch trigger',
@@ -170,6 +181,21 @@ assertMatches(
   /const isTrustedReleaseTarget = isReleaseTarget[\s\S]*!isDependabotPullRequest \|\| trustedDependabotHostedRequest/,
 );
 assertMatches('Dependabot trusted-dispatch retry', hostedSelectorsAction, /const maxAttempts = 4/);
+assertMatches(
+  'release-target full-matrix selector contract',
+  hostedSelectorsAction,
+  /shouldUseFullMatrix = [\s\S]*isTrustedReleaseTarget/,
+);
+for (const workflowFile of hostedWorkflowFiles) {
+  const workflow = read(`.github/workflows/${workflowFile}`);
+  assertMatches(`${workflowFile} pull-request trigger`, workflow, /\n\s{2}pull_request:/);
+  assertMatches(
+    `${workflowFile} hosted selector`,
+    workflow,
+    /uses: \.\/\.github\/actions\/hosted-ci-selectors/,
+  );
+  assertMatches(`${workflowFile} hosted gate`, workflow, /should_run_hosted_ci/);
+}
 
 assertMatches(
   'gem generator-spec detector output',
