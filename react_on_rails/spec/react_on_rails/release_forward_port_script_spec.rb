@@ -381,6 +381,43 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "skips source patches embedded in combined target commits that mention the source subject" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      write_file(repo, "main-only.txt", "combined target work\n")
+      commit_all(repo, "Forward-port release fixes\n\nIncludes: Fix release regression")
+      commit_count = git(repo, "rev-list", "--count", "main").strip
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("patch already exists on main according to target history")
+      expect(stdout).to include("DRY RUN")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(git(repo, "rev-list", "--count", "main").strip).to eq(commit_count)
+    end
+  end
+
+  it "does not trust a source-subject mention when the target patch differs" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      write_file(repo, "app.txt", "base\ndifferent target fix\n")
+      write_file(repo, "main-only.txt", "combined target work\n")
+      commit_all(repo, "Discuss release forward-port\n\nCandidate: Fix release regression")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(stdout).not_to include("patch already exists on main according to target history")
+    end
+  end
+
   it "skips no-footer target patches that rename the source path" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

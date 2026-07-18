@@ -253,14 +253,27 @@ class ReleaseForwardPort
     # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
-    patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+    patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
   end
 
-  def patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
-    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
+  def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
+    candidate_signal =
+      patch_equivalent_commits[sha] ||
+      target_has_renamed_source_paths?(target, sha) ||
+      target_history_mentions_source_subject?(subject, target)
+    return unless candidate_signal
     return unless patch_equivalent_commit_present_on_target?(sha, target)
 
     "patch already exists on #{target} according to target history with no later standard revert"
+  end
+
+  def target_history_mentions_source_subject?(subject, target)
+    @target_subject_mention_cache ||= {}
+    cache_key = [subject, target]
+    return @target_subject_mention_cache.fetch(cache_key) if @target_subject_mention_cache.key?(cache_key)
+
+    @target_subject_mention_cache[cache_key] =
+      git_lines("log", target, "--fixed-strings", "--grep", subject, "--format=%H", "-n", "1").any?
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)
@@ -637,7 +650,7 @@ class ReleaseForwardPort
     return patch_id_for_commit(target_sha) if parents.empty?
 
     target_to_source_paths = target_to_source_path_map(target_sha, source_sha)
-    patch_id_for_commit(target_sha, target_to_source_paths:)
+    patch_id_for_commit(target_sha, target_to_source_paths:, paths: target_to_source_paths.keys)
   end
 
   def source_paths_for_target_diff(first_parent, sha)
@@ -707,19 +720,20 @@ class ReleaseForwardPort
     @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
   end
 
-  def patch_id_for_commit(sha, target_to_source_paths: {})
+  def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil)
     # git show --format= emits diff-only output. git patch-id still hashes the
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
-    patch =
-      git(
-        "show",
-        "--no-ext-diff",
-        "--format=",
-        "--full-index",
-        rename_detection_option(target_to_source_paths),
-        sha
-      ).b
+    args = [
+      "show",
+      "--no-ext-diff",
+      "--format=",
+      "--full-index",
+      rename_detection_option(target_to_source_paths),
+      sha
+    ]
+    args.push("--", *paths) if paths
+    patch = git(*args).b
     patch = normalize_patch_paths(patch, target_to_source_paths)
     patch_id_for_patch(patch, sha)
   end
