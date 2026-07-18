@@ -19288,6 +19288,15 @@ ReactOnRailsPro.configure do |config|
   # Default is false
   config.enable_rsc_support = true
 
+  # Optional authorization callback for the mounted RSC payload endpoint.
+  # It receives the Rails controller and the requested component name before
+  # props are parsed or rendering begins. A false or nil result returns 403.
+  # Default is nil, which preserves the endpoint's existing allow-all behavior.
+  allowed_rsc_components = %w[AccountPage DashboardPage].freeze
+  config.rsc_payload_authorizer = lambda do |controller, component_name|
+    controller.session[:user_id].present? && allowed_rsc_components.include?(component_name)
+  end
+
   # Path to the RSC bundle file (relative to webpack output directory or absolute path)
   # The RSC bundle contains only server components and references to client components.
   # It's generated using the RSC Webpack Loader which transforms client components into
@@ -21802,6 +21811,49 @@ Every item below maps to a configuration option or behavior verified in this rep
 
 ## React Server Components advisory posture (Pro)
 
+### Secure the RSC payload endpoint
+
+The endpoint is opt-in: React on Rails Pro does not mount it unless your routes call `rsc_payload_route`.
+The RSC generator adds that route when you opt into RSC. Once mounted, treat it as a public API: the URL
+contains a client-controlled component name and the `props` query parameter is also untrusted. Do not use
+either value as proof that a user may read a record, tenant, or internal component.
+
+Configure an authorizer to check the Rails session and restrict independently renderable components. The
+callback runs before props JSON is parsed or rendering starts. Returning `false` or `nil` responds with
+`403 Forbidden`; leaving the option unset preserves the existing allow-all behavior.
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+allowed_rsc_components = %w[AccountPage DashboardPage].freeze
+
+ReactOnRailsPro.configure do |config|
+  config.rsc_payload_authorizer = lambda do |controller, component_name|
+    controller.session[:user_id].present? && allowed_rsc_components.include?(component_name)
+  end
+end
+```
+
+For policy libraries or application-wide controller filters, route to an app-owned controller instead:
+
+```ruby
+# app/controllers/rsc_payload_controller.rb
+class RscPayloadController < ApplicationController
+  include ReactOnRailsPro::RSCPayloadRenderer
+
+  before_action :authenticate_user!
+end
+
+# config/routes.rb
+rsc_payload_route controller: "rsc_payload"
+```
+
+The shipped default payload controller inherits from `ActionController::Base`, not your
+`ApplicationController`, so your application's filters do not apply to it automatically. Whichever seam
+you use, derive identity and permissions from the session and database. Never authorize from RSC props;
+the browser can alter them before every payload request.
+
+### Track upstream RSC advisories
+
 RSC support in React on Rails Pro is built directly on React's Flight packages: the
 `react-on-rails-rsc` package wraps React's `react-server-dom-webpack`. Vulnerabilities in those upstream
 packages therefore apply to this stack, and the project's response is enforced in code:
@@ -22981,6 +23033,7 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
     - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
     - `config.defer_generated_component_packs = false` → **delete the line.** The old option was truthy-gated — only `= true` did anything (it set `:defer`); `= false` was a no-op that fell through to the default strategy. Deleting the line preserves that behavior. Set `config.generated_component_packs_loading_strategy = :sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
     - The default strategy (when you don't set one) is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
+- **The inert `config.server_render_method` option was removed.** The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
 
 ### Migration Steps
 
@@ -23000,7 +23053,13 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
    npm install   # or: yarn install / pnpm install
    ```
 
-4. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
+4. Remove every removed configuration option from `config/initializers/react_on_rails.rb` **before booting**. Any of the options listed in the Breaking Changes above (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`, `config.server_render_method`) now raises `NoMethodError` at boot. Run the doctor task, which flags each remaining option with the exact fix:
+
+   ```bash
+   bin/rake react_on_rails:doctor
+   ```
+
+5. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
    baseline bump can activate cops that were previously inactive:
 
    ```bash
