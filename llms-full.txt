@@ -496,7 +496,7 @@ With React on Rails auto-bundling, you don't need manual registration! Just add 
 
 <p>Here's a React component embedded in this Rails view:</p>
 
-<%= react_component("SimpleCounter", { initialCount: 5 }, { auto_load_bundle: true }) %>
+<%= react_component("SimpleCounter", props: { initialCount: 5 }, auto_load_bundle: true) %>
 ```
 
 The generated layouts already include these tags. If you add React on Rails to another layout, make sure the `<head>` section includes:
@@ -1745,7 +1745,7 @@ You must configure bundler entry points and manually register each component.
 ### Modern Auto-Bundling (Recommended)
 
 ```erb
-<%= react_component("HelloWorld", { name: "World" }, { auto_load_bundle: true }) %>
+<%= react_component("HelloWorld", props: { name: "World" }, auto_load_bundle: true) %>
 ```
 
 With auto-bundling enabled:
@@ -3688,8 +3688,8 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
-      <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
-      <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+      <%= react_component("FooComponentOne", auto_load_bundle: true) %>
+      <%= react_component("BarComponentOne", auto_load_bundle: true) %>
 
       <% append_javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("SpecialComponentNotToAutoLoadBundle", {}) %>
@@ -3737,7 +3737,7 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 
 **How it works:**
 
-1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
+1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props: props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
 
 2. **Layout renders appended bundles**: The empty `<%= stylesheet_pack_tag %>` and `<%= javascript_pack_tag %>` calls in your layout are where the appended component bundles get rendered.
 
@@ -3748,8 +3748,8 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 If your view contains:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, auto_load_bundle: true) %>
-<%= react_component("HeavyMarkdownEditor", @editor_props, auto_load_bundle: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, auto_load_bundle: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, auto_load_bundle: true) %>
 ```
 
 React on Rails automatically generates HTML equivalent to:
@@ -3928,13 +3928,13 @@ end
 `app/views/hello_world/index.html.erb`:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, prerender: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 ```
 
 `app/views/hello_world/editor.html.erb`:
 
 ```erb
-<%= react_component("HeavyMarkdownEditor", @editor_props, prerender: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, prerender: true) %>
 ```
 
 ### 7. Generate Bundles
@@ -4937,7 +4937,6 @@ A cache-optimized landing page often looks like this:
 <% append_stylesheet_pack_tag("generated/WelcomePage") %>
 <%= preload_pack_asset("generated/WelcomePage.css") %>
 <%= rendered["componentHtml"] %>
-<%= content_for :script_tags, rendered["consoleReplayScript"] %>
 ```
 
 In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
@@ -19939,7 +19938,7 @@ A good example of this would be something like a notifications counter in a head
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each needs to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
-You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note: this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStoreGenerators` method. Note: this is a **store generator**, meaning that it is a function that takes `(props, railsContext)` and returns a store:
 
 ```js
 function appStore(props, railsContext) {
@@ -19948,7 +19947,7 @@ function appStore(props, railsContext) {
   return myAppStore;
 }
 
-ReactOnRails.registerStore({
+ReactOnRails.registerStoreGenerators({
   appStore,
 });
 ```
@@ -19965,7 +19964,7 @@ return (
 );
 ```
 
-From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
+From your Rails view, you can use the provided helper `redux_store(store_name, props: {})` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
 
 **app/views/layouts/application.html.erb**
 
@@ -20000,7 +19999,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
 `redux_store(store_name, props: {})`
 
 - **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
-  1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
+  1. You'll call `ReactOnRails.registerStoreGenerators({storeName})` in the same place that you register your components.
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 - **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
@@ -20008,9 +20007,9 @@ For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://git
 
 ## View Helper
 
-`redux_store(store_name, props: {})`
+`redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil)`
 
-This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
+The view helper accepts the controller extension arguments plus `defer:` and `auto_load_bundle:`. Use `defer: true` to render the store hydration data later through `redux_store_hydration_data`; use `auto_load_bundle:` to auto-load the generated store pack (defaults to `ReactOnRails.configuration.auto_load_bundle`). These two keywords are view-helper-only and are rejected by the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
 
 `redux_store_hydration_data`
 
@@ -20056,7 +20055,7 @@ end %>
 
 ### `cached_react_component_hash(component_name, options = {}, &block)`
 
-Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true` (required because the hash return value splits server-rendered HTML from the console replay script). Returns a hash with `"html"` and `"consoleReplayScript"` keys.
+Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true` because the render function must return an object of HTML strings. Returns a hash whose `"componentHtml"` key holds the server-rendered HTML; when console replay is enabled, the replay script is embedded in that value. The hash also includes any additional keys your render function returns.
 
 Same caching options as `cached_react_component`.
 
@@ -20065,8 +20064,7 @@ Same caching options as `cached_react_component`.
               cache_key: [@user, @post]) do
   { user: @user.as_json }
 end %>
-<%= result["html"] %>
-<%= content_for :script_tags, result["consoleReplayScript"] %>
+<%= result["componentHtml"] %>
 ```
 
 ### `stream_react_component(component_name, options = {})`
@@ -20254,7 +20252,7 @@ SOURCE: docs/oss/api-reference/generator-details.md
 
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off, with two exceptions: the bundler (**fresh installs now default to Rspack**, so pass `--no-rspack`, or its alias `--webpack`, if you want Webpack instead) and `--agent-files` (on by default — pass `--no-agent-files` to skip writing the AI-agent guidance files). Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -20264,12 +20262,14 @@ Usage:
 
 Options:
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
-      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
       [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
-      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
-      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
+      [--agent-files], [--no-agent-files]          # Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true
+      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer
+      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro)
+      [--standard-only], [--no-standard-only]      # Install only the open-source package; cannot be combined with --pro or --rsc
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
