@@ -68,8 +68,9 @@ evidence, and records merge/reachability proof per mutable target. Its derived a
 represents partial fleet merges without discarding proof for lanes that already landed.
 Distributed app work additionally requires a `preflight.public_marker` record with unique status,
 exact pack/candidate/commit/fingerprint/opened-at identity, and replayable public-safe evidence.
-Closeout validation receives the expected pack ID and generated release selector independently
-rather than trusting the ledger to redefine its own snapshot identity.
+Closeout validation receives the expected pack ID, generated release selector, candidate tag, and
+candidate source commit independently rather than trusting the ledger to redefine its own snapshot
+identity.
 
 A failed required release path closes as `BLOCKED` with lane evidence and an owned blocker reference;
 it must never be relabeled as passed or waived merely to satisfy closeout. Waived and deferred

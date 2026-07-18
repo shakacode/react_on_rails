@@ -10,6 +10,8 @@ module FleetValidation
 
     FIXTURE = File.expand_path("../fixtures/rc12-sanitized.yml", __dir__)
     CANDIDATE = "v17.0.0.rc.12"
+    CANDIDATE_COMMIT = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    PACK_ID = "rc12-sanitized"
 
     def run
       generator = Generator.new(
@@ -17,7 +19,7 @@ module FleetValidation
         prompt_count: 6,
         machines: %w[local m1],
         release_selector: CANDIDATE,
-        pack_id: "rc12-sanitized"
+        pack_id: PACK_ID
       )
       ledger = completed_ledger(generator)
       ledger["blockers"] = six_unowned_blockers
@@ -68,8 +70,11 @@ module FleetValidation
         ledger,
         inventory: generator.lifecycle_inventory,
         required_paths: generator.required_paths,
-        expected_pack_id: ledger.dig("pack", "pack_id"),
+        expected_pack_id: PACK_ID,
+        expected_release_selector: CANDIDATE,
         expected_candidate: CANDIDATE,
+        expected_candidate_commit: CANDIDATE_COMMIT,
+        expected_snapshot_fingerprint: generator.snapshot_fingerprint,
         closeout: true
       )
     end
@@ -78,7 +83,7 @@ module FleetValidation
       ledger = generator.ledger_template
       ledger.fetch("pack").merge!(
         "candidate" => CANDIDATE,
-        "candidate_commit" => "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "candidate_commit" => CANDIDATE_COMMIT,
         "policy_commit" => "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "tracker_mode" => "strict-rc",
         "resolved_packages" => resolved_packages(generator)

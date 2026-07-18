@@ -1615,6 +1615,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-pack-id", "fleet-test-pack",
         "--expected-release-selector", "latest RC or beta",
         "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "--render-tracker", tracker_path
       )
 
@@ -1642,7 +1643,9 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--expected-release-selector",
         "latest RC or beta",
         "--expected-candidate",
-        "v17.0.0.rc.12"
+        "v17.0.0.rc.12",
+        "--expected-candidate-commit",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       )
 
       refute status.success?
@@ -1676,7 +1679,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--manifest", MANIFEST,
         "--ledger", ledger_path,
         "--expected-release-selector", "latest RC or beta",
-        "--expected-candidate", "v17.0.0.rc.12"
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       )
       _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
         RbConfig.ruby,
@@ -1685,7 +1689,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--ledger", ledger_path,
         "--expected-pack-id", "another-pack",
         "--expected-release-selector", "latest RC or beta",
-        "--expected-candidate", "v17.0.0.rc.12"
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       )
 
       refute missing_status.success?
@@ -1724,13 +1729,64 @@ class FleetValidationGeneratorTest < Minitest::Test
         "--ledger", ledger_path,
         "--expected-pack-id", "fleet-test-pack",
         "--expected-release-selector", "latest RC or beta",
-        "--expected-candidate", "v17.0.0.rc.12"
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       )
 
       refute missing_status.success?
       assert_includes missing_stderr, "missing argument: --expected-release-selector"
       refute mismatch_status.success?
+      assert_includes mismatch_stderr,
+                      "pack release selector mismatch: expected latest RC or beta, got v17.0.0.rc.12"
       assert_includes mismatch_stderr, "pack snapshot_fingerprint does not match the current manifest"
+    end
+  end
+
+  def test_ledger_cli_requires_and_enforces_an_external_candidate_commit
+    generator = build_generator
+    ledger = complete_ledger(generator)
+
+    Dir.mktmpdir do |directory|
+      ledger_path = File.join(directory, "ledger.json")
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, missing_stderr, missing_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12"
+      )
+
+      wrong_commit = "f" * 40
+      ledger.fetch("pack")["candidate_commit"] = wrong_commit
+      ledger.fetch("preflight").fetch("public_marker")["candidate_commit"] = wrong_commit
+      core = ledger.fetch("inventory").find { |item| item["work_mode"] == "validation_only" }
+      core.fetch("revisions").merge!("audit" => wrong_commit, "reviewed" => wrong_commit, "current" => wrong_commit)
+      core.fetch("checks").each_value { |check| check["head_commit"] = wrong_commit }
+      core.fetch("review_app")["head_commit"] = wrong_commit
+      core.fetch("baseline")["head_commit"] = wrong_commit
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+
+      _stdout, mismatch_stderr, mismatch_status = Open3.capture3(
+        RbConfig.ruby,
+        VALIDATOR,
+        "--manifest", MANIFEST,
+        "--ledger", ledger_path,
+        "--expected-pack-id", "fleet-test-pack",
+        "--expected-release-selector", "latest RC or beta",
+        "--expected-candidate", "v17.0.0.rc.12",
+        "--expected-candidate-commit", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      )
+
+      refute missing_status.success?
+      assert_includes missing_stderr, "missing argument: --expected-candidate-commit"
+      refute mismatch_status.success?
+      assert_includes mismatch_stderr,
+                      "pack candidate commit mismatch: expected aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, " \
+                      "got #{wrong_commit}"
     end
   end
 

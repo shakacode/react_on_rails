@@ -148,13 +148,14 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --expected-pack-id PACK_ID \
   --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
   --expected-candidate vX.Y.Z.rc.N \
+  --expected-candidate-commit CANDIDATE_COMMIT_SHA \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
 Every nonterminal blocker needs a durable issue or public-safe tracker-only reason before closeout.
-The independently supplied expected pack ID and generated release selector, plus the ledger's unique
-public preflight-marker record, must match the exact candidate snapshot before any distributed app
-work can validate.
+The independently supplied expected pack ID, generated release selector, candidate tag, and source
+commit, plus the ledger's unique public preflight-marker record, must match the exact candidate
+snapshot before any distributed app work can validate.
 Waived and deferred blockers additionally retain a durable owner and need a structured disposition
 naming the gate, authority, evidence URL, and public-safe reason. A failed required path may close
 the run as `BLOCKED` only with its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,

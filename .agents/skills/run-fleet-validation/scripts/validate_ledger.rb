@@ -17,6 +17,7 @@ module FleetValidation
         expected_pack_id: nil,
         expected_release_selector: nil,
         expected_candidate: nil,
+        expected_candidate_commit: nil,
         tracker_path: nil
       }
       parser = option_parser(options)
@@ -25,6 +26,7 @@ module FleetValidation
       raise OptionParser::MissingArgument, "--expected-candidate" unless options[:expected_candidate]
       raise OptionParser::MissingArgument, "--expected-pack-id" unless options[:expected_pack_id]
       raise OptionParser::MissingArgument, "--expected-release-selector" unless options[:expected_release_selector]
+      raise OptionParser::MissingArgument, "--expected-candidate-commit" unless options[:expected_candidate_commit]
 
       manifest = YAML.safe_load_file(options.fetch(:manifest_path), aliases: false)
       ledger = JSON.parse(File.read(options.fetch(:ledger_path)))
@@ -44,7 +46,9 @@ module FleetValidation
         inventory: lifecycle.inventory,
         required_paths: lifecycle.required_paths,
         expected_pack_id: options[:expected_pack_id],
+        expected_release_selector: options[:expected_release_selector],
         expected_candidate: options[:expected_candidate],
+        expected_candidate_commit: options[:expected_candidate_commit],
         expected_snapshot_fingerprint: lifecycle.snapshot_fingerprint,
         closeout: true
       ).errors)
@@ -78,6 +82,9 @@ module FleetValidation
         end
         parser.on("--expected-candidate TAG", "Require this exact candidate") do |value|
           options[:expected_candidate] = value
+        end
+        parser.on("--expected-candidate-commit SHA", "Require this exact candidate source commit") do |value|
+          options[:expected_candidate_commit] = value
         end
         parser.on("--render-tracker PATH", "Write append-only tracker Markdown") do |value|
           options[:tracker_path] = value

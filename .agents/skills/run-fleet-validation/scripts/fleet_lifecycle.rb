@@ -762,8 +762,9 @@ module FleetValidation
         tree-parity proofs remain required even when another lane blocks overall promotion. An
         unmerged blocked lane retains pristine pending reachability with no stale proof fields, while
         a non-mutation lane records an evidenced, freeze-clear `not_applicable` merge disposition.
-        Supply both the expected pack ID and generated release selector from the independent launch
-        record when validating; never derive the expected snapshot identity from the ledger itself.
+        Supply the expected pack ID, generated release selector, candidate tag, and candidate source
+        commit from the independent launch record when validating; never derive the expected snapshot
+        identity from the ledger itself.
       MARKDOWN
     end
 
@@ -821,7 +822,9 @@ module FleetValidation
       inventory:,
       required_paths:,
       expected_candidate: nil,
+      expected_candidate_commit: nil,
       expected_pack_id: nil,
+      expected_release_selector: nil,
       expected_snapshot_fingerprint: nil,
       closeout: false
     )
@@ -829,7 +832,9 @@ module FleetValidation
       @inventory = inventory
       @required_paths = required_paths
       @expected_candidate = expected_candidate
+      @expected_candidate_commit = expected_candidate_commit
       @expected_pack_id = expected_pack_id
+      @expected_release_selector = expected_release_selector
       @expected_snapshot_fingerprint = expected_snapshot_fingerprint
       @closeout = closeout
     end
@@ -1371,6 +1376,14 @@ module FleetValidation
       end
       if @expected_pack_id && pack["pack_id"] != @expected_pack_id
         errors << "pack ID mismatch: expected #{@expected_pack_id}, got #{pack['pack_id']}"
+      end
+      if @expected_release_selector && pack["release_selector"] != @expected_release_selector
+        errors << "pack release selector mismatch: expected #{@expected_release_selector}, " \
+                  "got #{pack['release_selector']}"
+      end
+      if @expected_candidate_commit && pack["candidate_commit"] != @expected_candidate_commit
+        errors << "pack candidate commit mismatch: expected #{@expected_candidate_commit}, " \
+                  "got #{pack['candidate_commit']}"
       end
       errors
     end
