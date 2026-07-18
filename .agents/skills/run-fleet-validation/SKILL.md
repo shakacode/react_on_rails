@@ -34,8 +34,11 @@ balances weighted lanes across the named machines. The same pack also inventorie
 
 Every replacement candidate needs a freshly generated pack and ID; pass `--pack-id ID` only when
 regenerating files for the same exact candidate run. Same-pack regeneration preserves the result
-ledger only when both the release selector and complete manifest fingerprint still match; a changed
-candidate or policy/inventory manifest fails closed.
+ledger only when a pinned release selector matches the ledger's resolved candidate and the complete
+manifest fingerprint still matches. Once a dynamic `latest RC or beta` pack has resolved its
+candidate, reuse its existing generated files or create a fresh pack; regeneration cannot safely
+prove that the dynamic selector still resolves to the same candidate. A changed candidate or
+policy/inventory manifest fails closed.
 
 ## Launch and coordinate
 
@@ -104,7 +107,9 @@ blockers, private-only fields, missing required paths, non-independent audit, ba
 authority/freeze conflict, and missing default reachability/tree parity.
 The monorepo generator/install smoke is a first-class hard-gate ledger row in addition to the seven
 hard-gate app repositories. A blocker-owned terminal `BLOCKED` run can close without inventing a
-merge or post-merge reachability evidence; merge-eligible runs still require both.
+merge or post-merge reachability evidence; merge-eligible runs still require both. A blocked
+required path records its lane, failure evidence, and `blocker_id`. Waived or deferred blockers
+record a structured disposition with the gate, authority, evidence URL, and public-safe reason.
 
 For the checked-in sanitized RC12 regression corpus:
 

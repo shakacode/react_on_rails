@@ -390,7 +390,47 @@ class FleetValidationGeneratorTest < Minitest::Test
       closeout: true
     ).errors
 
-    assert_includes errors, "required path webpack-rsc-production has no passing evidence or waiver"
+    assert_includes errors, "required path webpack-rsc-production has no passing, blocked, or waived evidence"
+  end
+
+  def test_owned_blocked_required_path_can_close_with_a_blocked_verdict
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    path = ledger.fetch("required_paths").find { |item| item["id"] == "webpack-rsc-production" }
+    path.merge!(
+      "status" => "blocked",
+      "lane" => "sanitized-lane",
+      "evidence" => "candidate path failed",
+      "blocker_id" => "required-path-blocker"
+    )
+    ledger["blockers"] = [
+      {
+        "id" => "required-path-blocker",
+        "status" => "open",
+        "public_summary" => "Sanitized required path failure",
+        "owner" => { "issue_url" => "https://example.invalid/issues/required-path" },
+        "disposition" => nil
+      }
+    ]
+    ledger.fetch("merge").merge!(
+      "authority" => "none",
+      "authority_evidence" => nil,
+      "status" => "blocked",
+      "reviewed_base_commit" => nil,
+      "current_base_commit" => nil
+    )
+    ledger.fetch("reachability").merge!("default_branch" => "pending", "tree_parity" => "pending")
+    ledger.fetch("tracker")["promotion"] = "blocked"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_empty errors
+    assert_includes FleetValidation::TrackerRenderer.new(ledger).render, "Verdict: BLOCKED"
   end
 
   def test_all_six_sanitized_closeout_blockers_require_durable_owners
@@ -401,7 +441,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "id" => "blocker-#{number}",
         "status" => "open",
         "public_summary" => "Sanitized closeout blocker #{number}",
-        "owner" => nil
+        "owner" => nil,
+        "disposition" => nil
       }
     end
 
@@ -415,6 +456,31 @@ class FleetValidationGeneratorTest < Minitest::Test
     assert_equal 6, errors.length
   end
 
+  def test_waived_and_deferred_blockers_require_structured_disposition_evidence
+    generator = build_generator
+    ledger = complete_ledger(generator)
+    ledger["blockers"] = %w[waived deferred].map do |status|
+      {
+        "id" => "#{status}-blocker",
+        "status" => status,
+        "public_summary" => "Sanitized #{status} blocker",
+        "owner" => { "issue_url" => "https://example.invalid/issues/#{status}" },
+        "disposition" => nil
+      }
+    end
+    ledger.fetch("tracker")["promotion"] = "hold"
+
+    errors = FleetValidation::LedgerValidator.new(
+      ledger,
+      inventory: generator.lifecycle_inventory,
+      required_paths: generator.required_paths,
+      closeout: true
+    ).errors
+
+    assert_includes errors, "blocker waived-blocker is missing structured waived disposition evidence"
+    assert_includes errors, "blocker deferred-blocker is missing structured deferred disposition evidence"
+  end
+
   def test_public_ledger_rejects_private_blocker_fields
     generator = build_generator
     ledger = generator.ledger_template
@@ -424,6 +490,7 @@ class FleetValidationGeneratorTest < Minitest::Test
         "status" => "open",
         "public_summary" => "Sanitized blocker",
         "owner" => { "public_tracker_reason" => "Public identity cannot be exposed" },
+        "disposition" => nil,
         "deployment_url" => "redacted"
       }
     ]
@@ -824,7 +891,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "id" => "sanitized-blocker",
         "status" => "open",
         "public_summary" => "Sanitized active blocker",
-        "owner" => { "issue_url" => "https://example.invalid/issues/1" }
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
       }
     ]
 
@@ -986,6 +1054,8 @@ class FleetValidationGeneratorTest < Minitest::Test
       schema = JSON.parse(File.read(File.join(directory, "result-ledger.schema.json")))
 
       assert_equal false, schema.dig("properties", "blockers", "items", "additionalProperties")
+      assert_includes schema.dig("properties", "blockers", "items", "required"), "disposition"
+      assert_includes schema.dig("properties", "required_paths", "items", "required"), "blocker_id"
       assert_equal(
         %w[configured_runnable configured_broken not_configured unknown],
         schema.dig(
@@ -1169,7 +1239,8 @@ class FleetValidationGeneratorTest < Minitest::Test
         "id" => "owned-blocker",
         "status" => "open",
         "public_summary" => "Sanitized release blocker",
-        "owner" => { "issue_url" => "https://example.invalid/issues/1" }
+        "owner" => { "issue_url" => "https://example.invalid/issues/1" },
+        "disposition" => nil
       }
     ]
     ledger.fetch("merge").merge!(
@@ -1225,6 +1296,24 @@ class FleetValidationGeneratorTest < Minitest::Test
 
       error = assert_raises(FleetValidation::ManifestError) { regenerated.write_pack(directory) }
       assert_includes error.message, "existing result ledger belongs to a different release snapshot"
+      assert_equal old_index, File.read(File.join(directory, "INDEX.md"))
+    end
+  end
+
+  def test_dynamic_selector_pack_cannot_reuse_a_resolved_candidate_barrier
+    Dir.mktmpdir do |directory|
+      generator = build_generator
+      generator.write_pack(directory)
+      ledger_path = File.join(directory, "result-ledger.json")
+      ledger = JSON.parse(File.read(ledger_path))
+      ledger.fetch("pack")["candidate"] = "v17.0.0.rc.12"
+      ledger.fetch("preflight")["app_work_allowed"] = true
+      File.write(ledger_path, JSON.pretty_generate(ledger))
+      old_index = File.read(File.join(directory, "INDEX.md"))
+
+      error = assert_raises(FleetValidation::ManifestError) { generator.write_pack(directory) }
+
+      assert_includes error.message, "resolved dynamic candidate cannot be safely reused"
       assert_equal old_index, File.read(File.join(directory, "INDEX.md"))
     end
   end
@@ -1407,7 +1496,7 @@ class FleetValidationGeneratorTest < Minitest::Test
 
   def test_regenerating_the_same_pack_preserves_its_existing_result_ledger
     Dir.mktmpdir do |directory|
-      generator = build_generator
+      generator = build_generator(release_selector: "v17.0.0.rc.12")
       generator.write_pack(directory)
       ledger_path = File.join(directory, "result-ledger.json")
       ledger = JSON.parse(File.read(ledger_path))

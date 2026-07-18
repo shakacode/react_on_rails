@@ -122,7 +122,8 @@ module FleetValidation
             "status" => "pending",
             "lane" => nil,
             "evidence" => nil,
-            "waiver" => nil
+            "waiver" => nil,
+            "blocker_id" => nil
           )
         end,
         "blockers" => [],
@@ -214,8 +215,16 @@ module FleetValidation
       existing = JSON.parse(File.read(path))
       existing_pack = existing.fetch("pack", {})
       return unless existing_pack["pack_id"] == @pack_id
-      return if existing_pack["release_selector"] == @release_selector &&
-                existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
+
+      same_snapshot = existing_pack["release_selector"] == @release_selector &&
+                      existing_pack["snapshot_fingerprint"] == snapshot_fingerprint
+      if same_snapshot && resolved_candidate_reusable?(existing)
+        return
+      elsif same_snapshot
+        raise ManifestError,
+              "existing result ledger's resolved dynamic candidate cannot be safely reused; " \
+              "pin the exact candidate or generate a fresh pack"
+      end
 
       raise ManifestError, "existing result ledger belongs to a different release snapshot"
     rescue JSON::ParserError => e
@@ -367,21 +376,22 @@ module FleetValidation
 
     def required_path_schema
       object_schema(
-        %w[id evidence_source status lane evidence waiver],
+        %w[id evidence_source status lane evidence waiver blocker_id],
         {
           "id" => nonempty_string,
           "evidence_source" => nonempty_string,
           "status" => status_string,
           "lane" => nullable_string,
           "evidence" => nullable_string,
-          "waiver" => waiver_schema
+          "waiver" => waiver_schema,
+          "blocker_id" => nullable_string
         }
       )
     end
 
     def blocker_schema
       object_schema(
-        %w[id status public_summary owner],
+        %w[id status public_summary owner disposition],
         {
           "id" => nonempty_string,
           "status" => { "enum" => %w[open pending blocked unknown resolved waived deferred] },
@@ -394,7 +404,8 @@ module FleetValidation
               "waiver_url" => nonempty_string,
               "public_tracker_reason" => nonempty_string
             }
-          }
+          },
+          "disposition" => waiver_schema
         }
       )
     end
@@ -601,7 +612,9 @@ module FleetValidation
         Validate the final ledger, regenerate the append-only tracker matrix from that exact file, and
         post it without hand-copying worker prose. End with exact `PASS`, `PARTIAL`, or `BLOCKED`
         semantics. A promotion recommendation is allowed only when every required release path is green
-        or explicitly waived and no `UNKNOWN` remains.
+        or explicitly waived and no `UNKNOWN` remains. A failed required path closes as `BLOCKED` only
+        when it records its lane, failure evidence, and an owned `blocker_id`. Waived or deferred
+        blockers require structured gate, authority, evidence URL, and reason fields.
       MARKDOWN
     end
 
@@ -633,6 +646,13 @@ module FleetValidation
 
     def slug(value)
       value.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
+    end
+
+    def resolved_candidate_reusable?(ledger)
+      candidate = ledger.dig("pack", "candidate")
+      return !ledger.dig("preflight", "app_work_allowed") if candidate.nil?
+
+      candidate == @release_selector
     end
   end
 
@@ -813,8 +833,8 @@ module FleetValidation
         if path && path["evidence_source"] != required["evidence_source"]
           errors << "required path #{required.fetch('id')} evidence_source does not match manifest"
         end
-        unless path_evidenced?(path)
-          errors << "required path #{required.fetch('id')} has no passing evidence or waiver"
+        unless path_terminally_evidenced?(path)
+          errors << "required path #{required.fetch('id')} has no passing, blocked, or waived evidence"
         end
 
         errors
@@ -823,7 +843,13 @@ module FleetValidation
 
     def blocker_owner_errors
       Array(@ledger["blockers"]).filter_map do |blocker|
-        next if %w[resolved waived deferred].include?(blocker["status"])
+        status = blocker["status"]
+        if %w[waived deferred].include?(status)
+          next if valid_waiver?(blocker["disposition"], blocker["id"])
+
+          next "blocker #{blocker['id'] || 'missing-id'} is missing structured #{status} disposition evidence"
+        end
+        next if status == "resolved"
         next if durable_owner?(blocker["owner"])
 
         "blocker #{blocker['id'] || 'missing-id'} has no durable owner"
@@ -1025,7 +1051,7 @@ module FleetValidation
 
     def blocker_reference_errors
       blockers = Array(@ledger["blockers"]).to_h { |blocker| [blocker["id"], blocker] }
-      Array(@ledger["inventory"]).flat_map do |item|
+      inventory_errors = Array(@ledger["inventory"]).flat_map do |item|
         references = []
         if item["result"] == "blocked" || item.dig("baseline", "classification") == "candidate_regression"
           references << ["result", item["blocker_id"]]
@@ -1044,6 +1070,15 @@ module FleetValidation
           "target #{item['id']} blocked #{label} has no owned blocker reference"
         end
       end
+      path_errors = Array(@ledger["required_paths"]).filter_map do |path|
+        next unless path["status"] == "blocked"
+
+        blocker = blockers[path["blocker_id"]]
+        next if blocker && durable_owner?(blocker["owner"])
+
+        "required path #{path['id']} blocked result has no owned blocker reference"
+      end
+      inventory_errors + path_errors
     end
 
     def waiver_evidence_errors
@@ -1125,9 +1160,10 @@ module FleetValidation
       %w[issue_url waiver_url public_tracker_reason].any? { |key| present?(owner[key]) }
     end
 
-    def path_evidenced?(path)
+    def path_terminally_evidenced?(path)
       return false unless path
       return true if path["status"] == "passed" && present?(path["lane"]) && present?(path["evidence"])
+      return true if path["status"] == "blocked" && present?(path["lane"]) && present?(path["evidence"])
 
       path["status"] == "waived" && valid_waiver?(path["waiver"], path["id"])
     end
@@ -1176,7 +1212,7 @@ module FleetValidation
       end
       required_path_blocked = @required_paths.any? do |required|
         path = Array(@ledger["required_paths"]).find { |item| item["id"] == required.fetch("id") }
-        !path_evidenced?(path)
+        !%w[passed waived].include?(path&.fetch("status", nil))
       end
       active_blocker = Array(@ledger["blockers"]).any? do |blocker|
         !%w[resolved waived deferred].include?(blocker["status"])

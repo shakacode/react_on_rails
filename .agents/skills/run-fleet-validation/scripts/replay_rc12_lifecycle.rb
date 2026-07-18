@@ -27,6 +27,12 @@ module FleetValidation
       ledger.fetch("blockers").each_with_index do |blocker, index|
         blocker["status"] = "deferred"
         blocker["owner"] = { "issue_url" => "https://example.invalid/issues/#{index + 1}" }
+        blocker["disposition"] = {
+          "gate" => blocker.fetch("id"),
+          "authority" => "release-owner",
+          "evidence_url" => "https://example.invalid/issues/#{index + 1}",
+          "reason" => "Public-safe sanitized deferral"
+        }
       end
       ledger.fetch("tracker")["promotion"] = "hold"
       final_errors = validator(generator, ledger).errors
@@ -162,7 +168,8 @@ module FleetValidation
           "id" => "blocker-#{number}",
           "status" => "open",
           "public_summary" => "Sanitized RC12 closeout blocker #{number}",
-          "owner" => nil
+          "owner" => nil,
+          "disposition" => nil
         }
       end
     end

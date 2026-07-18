@@ -115,7 +115,9 @@ not pack ID, so independently generated packs cannot race. Each lane then reuses
 idempotent marker comment per stable target identity to the tracking issue. Lanes must not
 concurrently rewrite the issue body. Generate a fresh pack and snapshot identity for every
 replacement candidate, even when the manifest is unchanged. Within one exact-candidate run, reuse
-that pack ID and rerun only the prompt files that own affected targets.
+the existing prompt files for affected targets. Regenerate a same-ID pack only when its original
+selector was pinned to the exact resolved candidate; after a dynamic `latest RC or beta` selector
+resolves, regeneration fails closed because it cannot prove that the selector has not advanced.
 
 The candidate-scoped lifecycle is distinct from standing fleet-health automation: standing health
 detects currency/staleness between releases, while this pack proves one exact candidate and closes
@@ -135,10 +137,12 @@ ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
   --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
 ```
 
-Every nonterminal blocker needs a durable issue, explicit waiver/deferral, or public-safe
-tracker-only reason before closeout. Missing ownership, required-path coverage, current-head
-evidence, independent audit, merge authority, default reachability, tree parity, or any `UNKNOWN`
-keeps the ledger non-passing.
+Every nonterminal blocker needs a durable issue or public-safe tracker-only reason before closeout.
+Waived and deferred blockers additionally need a structured disposition naming the gate, authority,
+evidence URL, and public-safe reason. A failed required path may close the run as `BLOCKED` only with
+its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
+required-path coverage, current-head evidence, independent audit, merge authority, default
+reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
 
 1. Cut the RC packages.
 2. Create or update the release-gate tracking issue from

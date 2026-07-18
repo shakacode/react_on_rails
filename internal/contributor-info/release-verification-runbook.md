@@ -62,6 +62,11 @@ authorized merge, default reachability/tree parity, and tracker-matrix rendering
 prompt below remains the behavioral depth contract and a manual fallback; its evidence must still
 land in the generated ledger before closeout.
 
+A failed required release path closes as `BLOCKED` with lane evidence and an owned blocker reference;
+it must never be relabeled as passed or waived merely to satisfy closeout. Waived and deferred
+blockers require structured authority, evidence URL, and reason fields in addition to any durable
+owner.
+
 This candidate-scoped orchestration does not replace standing fleet-health/currency automation,
 which detects drift between releases. Hosted-CI dispatch and generator-CI routing improvements are
 also dependencies, not substitutes: they shorten individual gates but do not own blocker
