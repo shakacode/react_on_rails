@@ -125,6 +125,49 @@ describe('rsc-guardrails hook', () => {
     });
   });
 
+  it('warns for prettier-split multiline dangerouslySetInnerHTML object sinks', () => {
+    [
+      // Object-property sink whose { ... __html } literal is split across lines.
+      'const props = {\n  dangerouslySetInnerHTML: {\n    __html: userHtml,\n  },\n};\n',
+      // Same split shape, non-variable real sinks (member access, call, interpolated template).
+      'const props = { dangerouslySetInnerHTML: {\n  __html: data.body,\n} };\n',
+      'const props = { dangerouslySetInnerHTML: {\n  __html: renderHtml(input),\n} };\n',
+      'const props = { dangerouslySetInnerHTML: {\n  __html: `<b>${userHtml}</b>`,\n} };\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('multilineSink.tsx', source);
+
+      // The property line (where the object literal opens) is flagged, not the __html line.
+      expect(guardrailWarningContext(output)).toMatch(/Matched line\(s\): \d/);
+    });
+  });
+
+  it('warns for a prettier-split multiline JSX dangerouslySetInnerHTML sink', () => {
+    const output = runRSCGuardrailsHook(
+      'multilineJsxSink.tsx',
+      'const element = (\n  <div\n    dangerouslySetInnerHTML={{\n      __html: userHtml,\n    }}\n  />\n);\n',
+    );
+
+    expect(guardrailWarningContext(output)).toContain('Matched line(s): 3');
+  });
+
+  it('does not warn for prettier-split multiline SAFE dangerouslySetInnerHTML forms', () => {
+    [
+      // Type-only declarations split across lines (React types __html as string | TrustedHTML).
+      'type Props = {\n  dangerouslySetInnerHTML: {\n    __html: string;\n  };\n};\n',
+      'interface Props {\n  dangerouslySetInnerHTML: {\n    __html: string | TrustedHTML;\n  };\n}\n',
+      // Non-user-controlled literal values (single/double quoted, non-interpolated template).
+      "const props = { dangerouslySetInnerHTML: {\n  __html: 'safe',\n} };\n",
+      'const props = { dangerouslySetInnerHTML: {\n  __html: "safe",\n} };\n',
+      'const props = { dangerouslySetInnerHTML: {\n  __html: `<hr/>`,\n} };\n',
+      // Multiline destructuring alias — no object value, not a sink.
+      'const {\n  dangerouslySetInnerHTML: forwarded,\n} = props;\n',
+    ].forEach((source) => {
+      const output = runRSCGuardrailsHook('multilineSafe.tsx', source);
+
+      expect(output).toBe('');
+    });
+  });
+
   it('warns for compound raw-HTML assignments', () => {
     ['+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '^=', '|='].forEach((operator) => {
       const output = runRSCGuardrailsHook(
