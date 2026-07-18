@@ -6,15 +6,15 @@ name: Public demo fleet standing health
   workflow_dispatch:
     inputs:
       release:
-        description: Stable React on Rails tag
+        description: Stable React on Rails tag; blank uses demo-fleet.yml
         required: false
         type: string
-        default: v17.0.0
+        default: ""
       rsc-version:
-        description: Stable react-on-rails-rsc version
+        description: Stable react-on-rails-rsc version; blank uses demo-fleet.yml
         required: false
         type: string
-        default: 19.2.1
+        default: ""
 
 permissions:
   actions: read
@@ -26,22 +26,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ruby/setup-ruby@9eb537ca036ebaed86729dcb9309076e4c5c3b74  # v1
+      - uses: ./.github/actions/setup-bundle
         with:
+          working-directory: .
           ruby-version: "3.3"
-          bundler-cache: true
 
       - name: Generate public standing-health evidence
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          RELEASE: ${{ inputs.release || 'v17.0.0' }}
-          RSC_VERSION: ${{ inputs['rsc-version'] || '19.2.1' }}
+          RELEASE_OVERRIDE: ${{ inputs.release || '' }}
+          RSC_VERSION_OVERRIDE: ${{ inputs['rsc-version'] || '' }}
         run: |
           HEALTH_SCRIPT=".agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
+          VERSION_ARGS=()
+          if [[ -n "$RELEASE_OVERRIDE" ]]; then
+            VERSION_ARGS+=(--release "$RELEASE_OVERRIDE")
+          fi
+          if [[ -n "$RSC_VERSION_OVERRIDE" ]]; then
+            VERSION_ARGS+=(--rsc-version "$RSC_VERSION_OVERRIDE")
+          fi
           bundle exec ruby "$HEALTH_SCRIPT" \
             --live \
-            --release "$RELEASE" \
-            --rsc-version "$RSC_VERSION" \
+            "${VERSION_ARGS[@]}" \
             --pack-id "fleet-health-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --policy-commit "$GITHUB_SHA" \
             --generated-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \

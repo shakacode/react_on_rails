@@ -5,17 +5,22 @@ require "optparse"
 require "base64"
 require "json"
 require "net/http"
+require "openssl"
 require "securerandom"
+require "timeout"
 require "uri"
 require "yaml"
 require_relative "fleet_health"
 
 module FleetValidation
+  class TransientPublicRequestError < StandardError; end
+
   class PublicHTTPClient
     USER_AGENT = "react-on-rails-fleet-health/1"
 
-    def initialize(github_token: ENV["GITHUB_TOKEN"])
+    def initialize(github_token: ENV["GITHUB_TOKEN"], transport: Net::HTTP)
       @github_token = github_token
+      @transport = transport
     end
 
     def json(url)
@@ -24,7 +29,7 @@ module FleetValidation
       request["Accept"] = "application/vnd.github+json"
       request["User-Agent"] = USER_AGENT
       request["Authorization"] = "Bearer #{@github_token}" if @github_token && uri.host == "api.github.com"
-      response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 30) do |http|
+      response = @transport.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 30) do |http|
         http.request(request)
       end
       unless response.is_a?(Net::HTTPSuccess)
@@ -34,6 +39,8 @@ module FleetValidation
       JSON.parse(response.body)
     rescue JSON::ParserError => e
       raise ManifestError, "public HTTP GET #{url} returned invalid JSON: #{e.message}"
+    rescue SocketError, SystemCallError, Timeout::Error, EOFError, OpenSSL::SSL::SSLError => e
+      raise TransientPublicRequestError, "#{e.class}: #{e.message}"
     end
   end
 
@@ -60,7 +67,7 @@ module FleetValidation
   module FleetHealthCLI
     module_function
 
-    def run(argv)
+    def run(argv, http: nil)
       options = {
         manifest_path: "internal/contributor-info/demo-fleet.yml",
         observations_path: nil,
@@ -75,9 +82,10 @@ module FleetValidation
       }
       parser = option_parser(options)
       parser.parse!(argv)
-      require_options!(options)
 
       manifest = load_yaml(options.fetch(:manifest_path))
+      apply_manifest_versions!(options, manifest)
+      require_options!(options)
       contract = FleetHealth.new(
         manifest:,
         pack_id: options[:pack_id] || "fleet-health-#{SecureRandom.hex(4)}",
@@ -86,12 +94,15 @@ module FleetValidation
         policy_commit: options.fetch(:policy_commit),
         generated_at: options.fetch(:generated_at)
       )
-      observations, registry_artifacts = evidence_inputs(options, contract)
+      observations, registry_artifacts = evidence_inputs(options, contract, http:)
       evidence = contract.evaluate(observations:, registry_artifacts:)
       contract.write_pack(options.fetch(:output_dir), evidence)
       puts "Wrote public fleet health pack to #{options.fetch(:output_dir)}"
       puts "Aggregate: #{evidence.dig('aggregate', 'status')}"
       0
+    rescue TransientPublicRequestError => e
+      warn "ERROR: live public request failed: #{e.message}"
+      1
     rescue Errno::ENOENT, Psych::Exception, ManifestError, OptionParser::ParseError => e
       warn "ERROR: #{e.message}"
       warn parser
@@ -141,11 +152,16 @@ module FleetValidation
             "--live or both --observations and --registry-artifacts"
     end
 
+    def apply_manifest_versions!(options, manifest)
+      options[:release] ||= manifest.dig("standing_health", "stable_release")
+      options[:rsc_version] ||= manifest.dig("standing_health", "rsc_version")
+    end
+
     def load_yaml(path)
       YAML.safe_load_file(path, permitted_classes: [], permitted_symbols: [], aliases: false)
     end
 
-    def evidence_inputs(options, contract)
+    def evidence_inputs(options, contract, http: nil)
       unless options[:live]
         return [
           load_yaml(options.fetch(:observations_path)),
@@ -153,7 +169,7 @@ module FleetValidation
         ]
       end
 
-      http = PublicHTTPClient.new
+      http ||= PublicHTTPClient.new
       registry = PublicRegistryResolver.new(fetcher: ->(url) { http.json(url) }).resolve(
         release: options.fetch(:release),
         rsc_version: options.fetch(:rsc_version)

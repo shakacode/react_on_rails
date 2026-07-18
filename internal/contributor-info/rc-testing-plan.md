@@ -146,13 +146,14 @@ schema and evidence pack:
 ```bash
 bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
   --live \
-  --release v17.0.0 \
-  --rsc-version 19.2.1 \
-  --pack-id "fleet-health-v17-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
   --policy-commit "$(git rev-parse HEAD)" \
-  --output-dir tmp/fleet-health-v17
+  --output-dir tmp/fleet-health-stable
 ```
 
+The scheduled/default stable versions come from `standing_health.stable_release` and
+`standing_health.rsc_version` in the manifest. Pass explicit version flags only for a manual
+historical or forward-looking probe.
 Only explicitly public standing-health entries are queried. Active public targets gate the
 standing-health result; soft-track and archived targets are report-only. The evidence records
 exact-default-head currency, CI, reusable-smoke adoption, review-app capability, staleness, and

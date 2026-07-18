@@ -48,19 +48,19 @@ entries explicitly marked `standing_health.public: true` plus the manifest's arc
 targets. It never queries or emits a non-public lane, never mutates a demo repository, and never
 turns archived or `soft_track` entries into blocking targets.
 
-For the v17 stable line:
+The manifest's `standing_health.stable_release` and `standing_health.rsc_version` fields are the
+authoritative scheduled defaults:
 
 ```bash
 GITHUB_TOKEN="$(gh auth token)" \
   bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
     --live \
-    --release v17.0.0 \
-    --rsc-version 19.2.1 \
-    --pack-id "fleet-health-v17-$(date -u +%Y%m%dT%H%M%SZ)" \
+    --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
     --policy-commit "$(git rev-parse HEAD)" \
-    --output-dir tmp/fleet-health-v17
+    --output-dir tmp/fleet-health-stable
 ```
 
+Pass `--release` and/or `--rsc-version` only for an intentional manual override.
 The command verifies both `react_on_rails` gems and all four unified-version npm packages, plus the
 independently versioned `react-on-rails-rsc`, before inspecting public default heads. It writes
 `fleet-health.json`, `fleet-health.schema.json`, and `fleet-health.md`. Currency uses only direct

@@ -94,16 +94,15 @@ which detects drift between releases. Hosted-CI dispatch and generator-CI routin
 also dependencies, not substitutes: they shorten individual gates but do not own blocker
 identities, combined audit, merge authority, or promotion closeout.
 
-After stable publication, generate a fresh public standing-health pack:
+After stable publication, update `standing_health.stable_release` and `standing_health.rsc_version`
+in `demo-fleet.yml`, then generate a fresh public standing-health pack:
 
 ```bash
 bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
   --live \
-  --release v17.0.0 \
-  --rsc-version 19.2.1 \
-  --pack-id "fleet-health-v17-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
   --policy-commit "$(git rev-parse HEAD)" \
-  --output-dir tmp/fleet-health-v17
+  --output-dir tmp/fleet-health-stable
 ```
 
 The command verifies those

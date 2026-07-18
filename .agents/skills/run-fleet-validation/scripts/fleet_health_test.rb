@@ -6,6 +6,7 @@ require "open3"
 require "tmpdir"
 require "yaml"
 require_relative "fleet_health"
+require_relative "check_fleet_health"
 
 class FleetHealthTest < Minitest::Test
   FIXTURE = File.expand_path("../fixtures/rc12-health-drift.yml", __dir__)
@@ -16,6 +17,7 @@ class FleetHealthTest < Minitest::Test
   SKILL = File.expand_path("../SKILL.md", __dir__)
   RC_PLAN = File.expand_path("../../../../internal/contributor-info/rc-testing-plan.md", __dir__)
   RELEASE_RUNBOOK = File.expand_path("../../../../internal/contributor-info/release-verification-runbook.md", __dir__)
+  MANIFEST = File.expand_path("../../../../internal/contributor-info/demo-fleet.yml", __dir__)
   RUBY_SETUP_SHA = "9eb537ca036ebaed86729dcb9309076e4c5c3b74"
 
   def setup
@@ -285,8 +287,6 @@ class FleetHealthTest < Minitest::Test
         "--manifest", manifest_path,
         "--observations", observations_path,
         "--registry-artifacts", registry_path,
-        "--release", "v17.0.0",
-        "--rsc-version", "19.2.1",
         "--pack-id", "offline-test",
         "--policy-commit", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "--generated-at", "2026-07-18T12:00:00Z",
@@ -294,8 +294,62 @@ class FleetHealthTest < Minitest::Test
       )
 
       assert status.success?, stderr
-      assert File.exist?(File.join(output_dir, "fleet-health.json"))
+      evidence = JSON.parse(File.read(File.join(output_dir, "fleet-health.json")))
+      assert_equal "v17.0.0", evidence.dig("pack", "release")
+      assert_equal "19.2.1", evidence.dig("pack", "rsc_version")
     end
+  end
+
+  def test_live_cli_reports_transient_network_errors_without_a_backtrace
+    Dir.mktmpdir do |directory|
+      manifest = Marshal.load(Marshal.dump(@manifest))
+      manifest.fetch("standing_health").merge!(
+        "stable_release" => "v17.0.0",
+        "rsc_version" => "19.2.1"
+      )
+      manifest_path = File.join(directory, "manifest.yml")
+      File.write(manifest_path, YAML.dump(manifest))
+      client = Object.new
+      client.define_singleton_method(:json) do |_url|
+        raise FleetValidation::TransientPublicRequestError, "SocketError: temporary DNS failure"
+      end
+      result = nil
+      arguments = [
+        "--manifest", manifest_path,
+        "--live",
+        "--policy-commit", "e" * 40,
+        "--output-dir", File.join(directory, "pack")
+      ]
+
+      _stdout, stderr = capture_io do
+        result = FleetValidation::FleetHealthCLI.run(arguments, http: client)
+      end
+
+      assert_equal 1, result
+      assert_match(/\AERROR: live public request failed: SocketError: temporary DNS failure\n\z/, stderr)
+      refute_includes stderr, CHECK_FLEET_HEALTH
+    end
+  end
+
+  def test_public_http_client_wraps_only_transient_transport_errors
+    transport = Object.new
+    transport.define_singleton_method(:start) { |*_args, **_kwargs| raise SocketError, "temporary DNS failure" }
+    client = FleetValidation::PublicHTTPClient.new(github_token: nil, transport:)
+
+    error = assert_raises(FleetValidation::TransientPublicRequestError) do
+      client.json("https://registry.npmjs.org/react-on-rails")
+    end
+
+    assert_equal "SocketError: temporary DNS failure", error.message
+  end
+
+  def test_cli_explicit_versions_override_manifest_defaults
+    options = { release: "v18.0.0", rsc_version: "20.0.0" }
+
+    FleetValidation::FleetHealthCLI.apply_manifest_versions!(options, @manifest)
+
+    assert_equal "v18.0.0", options.fetch(:release)
+    assert_equal "20.0.0", options.fetch(:rsc_version)
   end
 
   def test_dependabot_v1_requires_enabled_weekly_coverage_for_each_ecosystem
@@ -536,12 +590,11 @@ class FleetHealthTest < Minitest::Test
     end
     probe = FleetValidation::PublicGitHubProbe.new(client:)
 
-    error = assert_raises(FleetValidation::ManifestError) do
+    error = assert_raises(FleetValidation::NonPublicRepositoryError) do
       probe.observe(target, observed_at: "2026-07-18T12:00:00Z")
     end
 
     assert_equal ["/repos/#{target.fetch('name')}"], requests
-    assert_equal "FleetValidation::NonPublicRepositoryError", error.class.name
     refute_includes error.message, "private-secret"
   end
 
@@ -1104,17 +1157,24 @@ class FleetHealthTest < Minitest::Test
 
   def test_scheduled_health_workflow_runs_live_scan_and_uploads_the_pack
     workflow = File.read(SCHEDULED_HEALTH)
+    manifest = YAML.safe_load_file(MANIFEST, aliases: false)
 
     assert_includes workflow, "schedule:"
     assert_includes workflow, "workflow_dispatch:"
-    assert_includes workflow, "ruby/setup-ruby@#{RUBY_SETUP_SHA}"
-    assert_includes workflow, "bundler-cache: true"
+    assert_includes workflow, "uses: ./.github/actions/setup-bundle"
+    refute_includes workflow, "uses: ruby/setup-ruby@"
+    assert_includes workflow, "RELEASE_OVERRIDE"
+    assert_includes workflow, "RSC_VERSION_OVERRIDE"
+    refute_includes workflow, "default: v17.0.0"
+    refute_includes workflow, "default: 19.2.1"
     assert_includes workflow, 'bundle exec ruby "$HEALTH_SCRIPT"'
     assert_includes workflow, "bundle exec ruby -rjson"
     assert_includes workflow, "check_fleet_health.rb"
     assert_includes workflow, "--live"
     assert_includes workflow, "actions/upload-artifact@v4"
     assert_includes workflow, "fleet-health.json"
+    assert_match(/\Av\d+\.\d+\.\d+\z/, manifest.dig("standing_health", "stable_release"))
+    assert Gem::Version.correct?(manifest.dig("standing_health", "rsc_version"))
   end
 
   def test_central_fleet_health_docs_use_the_repo_bundle
@@ -1128,7 +1188,7 @@ class FleetHealthTest < Minitest::Test
     assert_includes rc_plan, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
     assert_includes runbook, "bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb"
     assert_includes runbook, '--policy-commit "$(git rev-parse HEAD)"'
-    assert_includes runbook, "--output-dir tmp/fleet-health-v17"
+    assert_includes runbook, "--output-dir tmp/fleet-health-stable"
   end
 
   private

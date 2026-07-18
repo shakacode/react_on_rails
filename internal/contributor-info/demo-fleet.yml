@@ -33,6 +33,9 @@
 #   standing_health.review_app_workflow
 #                  — exact public workflow path used for standing review-app
 #                    evidence when `standing_health.review_app: required`.
+#   standing_health.stable_release / rsc_version
+#                  — authoritative stable versions used by scheduled public
+#                    health checks when no manual workflow override is supplied.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
@@ -52,6 +55,8 @@ standing_health:
   # are queried. Archived targets are retained here as report-only catalog
   # evidence and never become release mutation lanes.
   schema_version: 1
+  stable_release: v17.0.0
+  rsc_version: 19.2.1
   max_minor_lag: 1
   max_default_age_days: 45
   dependabot_policy: v1

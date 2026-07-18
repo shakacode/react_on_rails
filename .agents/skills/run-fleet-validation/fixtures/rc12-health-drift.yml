@@ -2,6 +2,8 @@ manifest:
   schema_version: 1
   standing_health:
     schema_version: 1
+    stable_release: v17.0.0
+    rsc_version: 19.2.1
     max_minor_lag: 1
     max_default_age_days: 45
     dependabot_policy: v1
