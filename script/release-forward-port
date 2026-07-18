@@ -257,29 +257,34 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
-    candidate_signal =
-      patch_equivalent_commits[sha] ||
-      target_has_renamed_source_paths?(target, sha) ||
-      target_history_mentions_source_identity?(subject, target)
-    return unless candidate_signal
+    identity_candidates = target_history_source_identity_candidates(subject, target)
+    return patch_equivalent_skip_reason_message(target) if
+      identity_candidates.any? &&
+      patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
+
+    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
     return unless patch_equivalent_commit_present_on_target?(sha, target)
 
+    patch_equivalent_skip_reason_message(target)
+  end
+
+  def patch_equivalent_skip_reason_message(target)
     "patch already exists on #{target} according to target history with no later standard revert"
   end
 
-  def target_history_mentions_source_identity?(subject, target)
-    ([subject] + subject.scan(/#\d+/)).uniq.any? do |source_identity|
-      target_history_mentions?(source_identity, target)
-    end
+  def target_history_source_identity_candidates(subject, target)
+    ([subject] + subject.scan(/#\d+/)).uniq.flat_map do |source_identity|
+      target_history_commits_mentioning(source_identity, target)
+    end.uniq
   end
 
-  def target_history_mentions?(source_identity, target)
+  def target_history_commits_mentioning(source_identity, target)
     @target_identity_mention_cache ||= {}
     cache_key = [source_identity, target]
     return @target_identity_mention_cache.fetch(cache_key) if @target_identity_mention_cache.key?(cache_key)
 
     @target_identity_mention_cache[cache_key] =
-      git_lines("log", target, "--fixed-strings", "--grep", source_identity, "--format=%H", "-n", "1").any?
+      git_lines("log", target, "--fixed-strings", "--grep", source_identity, "--format=%H")
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)
@@ -569,10 +574,10 @@ class ReleaseForwardPort
     end.uniq
   end
 
-  def patch_equivalent_commit_present_on_target?(sha, target)
+  def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil)
     source_patch_id = patch_id_for_commit(sha)
 
-    patch_equivalent_target_candidates(sha, target).any? do |target_sha|
+    (candidates || patch_equivalent_target_candidates(sha, target)).any? do |target_sha|
       patch_id_for_target_candidate(target_sha, sha) == source_patch_id &&
         target_commit_live_on_target?(target_sha, target)
     end
