@@ -34,6 +34,8 @@ const toLengthPrefixedWithMetadata = (content: string, metadata: Record<string, 
 const rscPayloadKey = 'test-fun4a7ngv9-test-node';
 const rscPayloadKeyReference = `[${JSON.stringify(rscPayloadKey)}]`;
 const rscPayloadScriptMarker = 'data-react-on-rails-rsc-payload="true"';
+const secretRenderingErrorMessage = 'ROR_DIAGNOSTIC_SECRET_MESSAGE_7f9c2e';
+const secretRenderingErrorStack = 'ROR_DIAGNOSTIC_SECRET_STACK_4b1a8d';
 const expectedInitializationScript = `<script ${rscPayloadScriptMarker}>delete (self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference};(self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]</script>`;
 const expectedPayloadPushScript = (chunk: string) =>
   `<script ${rscPayloadScriptMarker}>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})${rscPayloadKeyReference}||=[]).push(${JSON.stringify(
@@ -385,33 +387,67 @@ describe('injectRSCPayload', () => {
     }
   });
 
-  it('injects RSC diagnostic metadata without exposing unrelated stream metadata', async () => {
+  it.each(['development', 'test'])(
+    'injects RSC diagnostic metadata in the explicit %s environment without exposing unrelated stream metadata',
+    async (railsEnv) => {
+      const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
+        hasErrors: true,
+        renderingError: {
+          message: secretRenderingErrorMessage,
+          stack: secretRenderingErrorStack,
+        },
+        consoleReplayScript: '<script>console.log("replay")</script>',
+        serializedProps: { token: 'do-not-serialize' },
+      });
+      const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
+      const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+      const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+        railsEnv,
+        rscClientChunkStylesheetHrefsByChunkName: new Map(),
+      });
+      const resultStr = await collectStreamData(result);
+
+      expect(resultStr).toContain(
+        `<script ${rscPayloadScriptMarker}>(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`,
+      );
+      expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
+      expect(resultStr).toContain('["test-fun4a7ngv9-test-node"]||=');
+      expect(resultStr).toContain(secretRenderingErrorMessage);
+      expect(resultStr).toContain(secretRenderingErrorStack);
+      expect(resultStr).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
+      expect(resultStr).not.toContain('serializedProps');
+      expect(resultStr).not.toContain('do-not-serialize');
+      expect(resultStr).not.toContain('consoleReplayScript');
+    },
+  );
+
+  it.each([
+    ['production', 'production'],
+    ['missing', undefined],
+  ])('redacts RSC rendering error details when railsEnv is %s', async (_name, railsEnv) => {
     const mockRSC = createMockRSCStreamWithMetadata('{"test": "data"}', {
       hasErrors: true,
       renderingError: {
-        message: 'useState is not a function',
-        stack: 'TypeError: useState is not a function\n    at Broken (/app/components/Broken.server.tsx:7:3)',
+        message: secretRenderingErrorMessage,
+        stack: secretRenderingErrorStack,
       },
-      consoleReplayScript: '<script>console.log("replay")</script>',
-      serializedProps: { token: 'do-not-serialize' },
     });
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      railsEnv,
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      `<script ${rscPayloadScriptMarker}>(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||=`,
+      `<script ${rscPayloadScriptMarker}>(self.REACT_ON_RAILS_RSC_ERRORS||={})${rscPayloadKeyReference}||={"hasErrors":true}</script>`,
     );
-    expect(resultStr).toContain('REACT_ON_RAILS_RSC_ERRORS');
-    expect(resultStr).toContain('["test-fun4a7ngv9-test-node"]||=');
-    expect(resultStr).toContain('useState is not a function');
-    expect(resultStr).toContain('/app/components/Broken.server.tsx');
-    expect(resultStr).toContain('REACT_ON_RAILS_RSC_PAYLOADS');
-    expect(resultStr).not.toContain('serializedProps');
-    expect(resultStr).not.toContain('do-not-serialize');
-    expect(resultStr).not.toContain('consoleReplayScript');
+    expect(resultStr).not.toContain('renderingError');
+    expect(resultStr).not.toContain(secretRenderingErrorMessage);
+    expect(resultStr).not.toContain(secretRenderingErrorStack);
   });
 
   it('keeps the first RSC diagnostic metadata for a payload key', async () => {
@@ -440,7 +476,10 @@ describe('injectRSCPayload', () => {
     const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
-    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const result = injectWithOptions(mockHTML, rscRequestTracker, domNodeId, {
+      railsEnv: 'development',
+      rscClientChunkStylesheetHrefsByChunkName: new Map(),
+    });
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain('First error');
