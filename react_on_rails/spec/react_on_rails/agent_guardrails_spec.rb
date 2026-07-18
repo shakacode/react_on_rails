@@ -588,6 +588,44 @@ module ReactOnRails
       end
     end
 
+    it "accepts scoped Devise and custom application authentication callbacks" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+
+      callbacks = %w[
+        authenticate_admin_user! authenticate_api_user! authenticate_customer!
+        authorize_resource! require_authentication verify_authenticated!
+      ]
+      callbacks.each do |callback|
+        File.write(controller_path, "before_action :#{callback}\ninclude RSCPayloadRenderer\n")
+
+        stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+        expect(status).to be_success
+        expect(stdout).to be_empty, "expected :#{callback} to count as authentication"
+        expect(stderr).to be_empty
+      end
+    end
+
+    it "still warns for callbacks that only look authentication-adjacent" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+
+      # verify_authenticity_token is Rails CSRF protection, not authentication, and must not
+      # silence the advisory. The rest are ordinary unrelated callbacks.
+      %w[verify_authenticity_token set_locale track_analytics require_admin_notes].each do |callback|
+        File.write(controller_path, "before_action :#{callback}\ninclude RSCPayloadRenderer\n")
+
+        stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+        expect(status).to be_success
+        expect(additional_context(stdout))
+          .to include("shows no before_action/authentication"), "expected :#{callback} not to count"
+      end
+    end
+
     it "accepts prepended and appended authentication callbacks" do
       described_class.install(@app_root)
       controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
@@ -727,6 +765,26 @@ module ReactOnRails
       expect(File.read(legacy_hook_path)).to eq("custom legacy hook\n")
       expect(File.exist?(File.join(claude_dir, "skills/rsc-app-safety/SKILL.md"))).to be false
       expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
+    end
+
+    it "does not tell users to register a hook file that was never installed" do
+      claude_dir = File.join(@app_root, ".claude")
+      FileUtils.mkdir_p(claude_dir)
+      File.write(File.join(claude_dir, "settings.json"), "{ not valid json ")
+      message = nil
+
+      begin
+        described_class.install(@app_root)
+      rescue described_class::Error => e
+        message = e.message
+      end
+
+      # The install aborts before any file is copied, so the recovery has to be "fix and re-run"
+      # rather than "register this hook manually" — the hook script does not exist yet.
+      expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
+      expect(message).to include("does not exist yet")
+      expect(message).to include("react_on_rails:install_rsc_agent_guardrails")
+      expect(message).not_to match(/Add this .*hook manually/)
     end
 
     it "raises rather than clobbering valid JSON with an unsupported settings shape" do

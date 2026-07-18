@@ -10,11 +10,24 @@
 require "json"
 require "ripper"
 
+# Recognizing a callback as authentication only silences the advisory, so this stays deliberately
+# conservative: an over-broad match turns a false positive into a false negative, which is the more
+# dangerous direction for a security guardrail.
+#
+# A trailing `!`/`?` is the discriminating signal for the open-ended forms. Devise and friends
+# generate bang callbacks per scope (`authenticate_admin_user!`, `authenticate_api_user!`,
+# `authenticate_customer!`), and app-defined auth callbacks follow the same convention, so any
+# `authenticate*`/`authorize*` name that ends in a bang counts. Without a bang the name must come
+# from the narrow allowlist, which keeps unrelated callbacks such as `authenticate_analytics_session`
+# and `authorize_for_metrics` from reading as authentication.
 AUTH_NAME = /
   (?:
+    authenticate(?:_\w+)?[!?] |
+    authorize(?:_\w+)?[!?] |
     authenticate(?:_(?:user|account|admin|member|session))? |
     authorize(?:_(?:request|access|user))? |
-    require_(?:login|user)
+    require_(?:login|user|authentication|authorization) |
+    verify_authenticat(?:ed|ion)
   )[!?]?
 /x
 AUTH_CALLBACK_NAME = "(?:prepend_|append_)?before_action"

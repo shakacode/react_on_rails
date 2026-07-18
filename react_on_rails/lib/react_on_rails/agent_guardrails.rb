@@ -176,9 +176,15 @@ module ReactOnRails
         hooks.nil? || (hooks.is_a?(Array) && hooks.all?(Hash))
       end
 
+      # Settings are validated before anything is copied, so reaching here means NOTHING was
+      # installed — including #{HOOK_REL}. The recovery therefore has to be "fix the settings and
+      # re-run", not "register the hook manually": the hook script does not exist yet, so pointing
+      # Claude at it would leave the advisory guardrail silently disabled.
       def invalid_settings_message
-        "#{SETTINGS_REL} is not valid JSON for Claude settings, so it was left untouched. Add this " \
-          "PostToolUse (#{HOOK_MATCHER}) command hook manually: #{HOOK_COMMAND} #{HOOK_ARGS.join(' ')}"
+        "#{SETTINGS_REL} is not valid JSON for Claude settings, so it was left untouched and no " \
+          "guardrail files were installed (#{HOOK_REL} does not exist yet). Fix or remove " \
+          "#{SETTINGS_REL}, then re-run `rake react_on_rails:install_rsc_agent_guardrails` to " \
+          "install the hook and register it as a PostToolUse (#{HOOK_MATCHER}) command hook."
       end
 
       def hook_registered?(settings)
