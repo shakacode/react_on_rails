@@ -16,6 +16,8 @@
 import path from 'path';
 import fs from 'fs';
 import vm from 'vm';
+import { Readable } from 'stream';
+import { types as utilTypes } from 'util';
 import {
   uploadedBundlePath,
   createUploadedBundle,
@@ -30,6 +32,7 @@ import {
 import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
+import * as errorReporter from '../src/shared/errorReporter';
 
 const testName = 'vm';
 const uploadedBundlePathForTest = () => uploadedBundlePath(testName);
@@ -828,5 +831,116 @@ describe('buildVM and runInVM', () => {
       const result = await runInVM2('global.testVar', bundle);
       expect(result).toBe('test value');
     });
+  });
+});
+
+// Reception side of the RSC observability fix (#4629 PR #4631): when runInVM returns a
+// readable render stream, it attaches a custom 'renderingError' listener plus a WeakSet
+// dedup so rendering errors reach the error reporter (Sentry/Honeybadger) even with the
+// default throwJsErrors:false, and the same Error object is never reported twice across
+// the 'renderingError' and standard 'error' events. These tests drive that path through a
+// real VM whose rendering request returns a stream, then emit events on the original
+// stream (the one runInVM attaches its listeners to, before handleStreamError wraps it).
+describe('runInVM stream error reporting (renderingError listener + WeakSet dedup)', () => {
+  const streamTestName = 'vmStreamErrors';
+  const streamBundlePath = () => uploadedBundlePath(streamTestName);
+
+  let messageSpy: jest.SpyInstance;
+  const activeStreams: Readable[] = [];
+
+  beforeEach(async () => {
+    await resetForTest(streamTestName);
+    messageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    activeStreams.forEach((stream) => {
+      if (!stream.destroyed) stream.destroy();
+    });
+    activeStreams.length = 0;
+    messageSpy.mockRestore();
+  });
+
+  // Build a VM whose rendering request returns a Readable stream and hands the test both
+  // the ORIGINAL stream (the one runInVM attaches its listeners to) and a genuine VM-realm
+  // Error. A VM-realm Error is a real Error (`util.types.isNativeError` is true) but fails
+  // the worker-realm `instanceof Error` check because it comes from the VM realm's own
+  // `Error.prototype` — the exact case codex flagged where `new Error(String(error))` used
+  // to discard the original message and stack.
+  async function buildStreamReturningVM() {
+    const captured: { stream?: Readable; vmError?: unknown } = {};
+    const config = getConfig();
+    config.additionalContext = {
+      __TestReadable: Readable,
+      __captureStreamHandles: (stream: Readable, vmError: unknown) => {
+        captured.stream = stream;
+        captured.vmError = vmError;
+      },
+    };
+    await createUploadedBundle(streamTestName);
+    const { runInVM } = await buildExecutionContext([streamBundlePath()], /* buildVmsIfNeeded */ true);
+    const renderingRequest = [
+      '(function () {',
+      '  const stream = new __TestReadable({ read() {} });',
+      "  __captureStreamHandles(stream, new Error('VM realm stream failure'));",
+      '  return stream;',
+      '})()',
+    ].join('\n');
+    const wrapper = (await runInVM(renderingRequest, streamBundlePath())) as unknown as Readable;
+    activeStreams.push(wrapper);
+    if (captured.stream) activeStreams.push(captured.stream);
+    return { wrapper, stream: captured.stream as Readable, vmError: captured.vmError };
+  }
+
+  it('reports a renderingError stream event to the error reporter', async () => {
+    const { stream, vmError } = await buildStreamReturningVM();
+
+    stream.emit('renderingError', vmError);
+
+    expect(messageSpy).toHaveBeenCalledTimes(1);
+    expect(messageSpy.mock.calls[0][0]).toContain('VM realm stream failure');
+  });
+
+  it('preserves a genuine VM-realm Error message and stack instead of wrapping it', async () => {
+    const { stream, vmError } = await buildStreamReturningVM();
+
+    // Confirms the realm boundary: this is a real Error but not a worker-realm instance.
+    expect(utilTypes.isNativeError(vmError)).toBe(true);
+    expect(vmError instanceof Error).toBe(false);
+    const originalStack = (vmError as { stack: string }).stack;
+
+    stream.emit('renderingError', vmError);
+
+    const reported = messageSpy.mock.calls[0][0] as string;
+    // Message preserved verbatim (not a `String(error)` "Error: Error: ..." double-wrap).
+    expect(reported).toContain('VM realm stream failure');
+    // The reporter received the error's own stack frames, not a vm.ts wrapper frame.
+    const originalFrame = originalStack
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('at '));
+    expect(originalFrame).toBeDefined();
+    expect(reported).toContain(originalFrame as string);
+  });
+
+  it('dedups the SAME Error instance across renderingError and error events (reported once)', async () => {
+    const { stream, vmError } = await buildStreamReturningVM();
+
+    stream.emit('renderingError', vmError);
+    stream.emit('error', vmError);
+
+    expect(messageSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports two DISTINCT Error instances separately', async () => {
+    const { stream } = await buildStreamReturningVM();
+
+    stream.emit('renderingError', new Error('first stream failure'));
+    stream.emit('renderingError', new Error('second stream failure'));
+
+    expect(messageSpy).toHaveBeenCalledTimes(2);
+    const messages = messageSpy.mock.calls.map((call) => call[0] as string).join('\n');
+    expect(messages).toContain('first stream failure');
+    expect(messages).toContain('second stream failure');
   });
 });

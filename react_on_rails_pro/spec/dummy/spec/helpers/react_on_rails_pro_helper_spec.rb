@@ -29,6 +29,18 @@ RequestDetails = Struct.new(:original_url, :env)
 module StreamingTestHelpers
   def render_to_string(*args); end
   def response; end
+
+  def test_server_artifact_id
+    "rorp-v2-s-#{'a' * 64}"
+  end
+
+  def test_rsc_artifact_id
+    "rorp-v2-r-#{'b' * 64}"
+  end
+
+  def test_server_render_url_pattern
+    %r{\Ahttp://localhost:3800/bundles/#{Regexp.escape(test_server_artifact_id)}/render/[a-f0-9]{32}\z}
+  end
 end
 
 describe ReactOnRailsProHelper do
@@ -819,8 +831,7 @@ describe ReactOnRailsProHelper do
       stub_pro_bundle_hashes
 
       chunks_read.clear
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count:) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count:) do |yielder|
         if mock_chunks.is_a?(Async::Queue)
           loop do
             chunk = mock_chunks.dequeue
@@ -840,8 +851,8 @@ describe ReactOnRailsProHelper do
 
     def stub_pro_bundle_hashes
       allow(ReactOnRailsPro::Utils).to receive_messages(
-        bundle_hash: "#{'a' * 32}-test",
-        rsc_bundle_hash: "#{'b' * 32}-test"
+        bundle_hash: test_server_artifact_id,
+        rsc_bundle_hash: test_rsc_artifact_id
       )
     end
 
@@ -1477,6 +1488,59 @@ describe ReactOnRailsProHelper do
         second_run_chunks = run_stream
         expect(chunks_read.count).to eq(0)
         expect(second_run_chunks).to eq(first_run_chunks)
+      end
+
+      # Regression for https://github.com/shakacode/react_on_rails/issues/4581.
+      #
+      # A shell-ready render whose async boundary errors emits a chunk with
+      # hasErrors: true but still completes "normally" under production defaults
+      # (raise_non_shell_server_rendering_errors: false, set in the dummy app).
+      # The broken fragment must NOT be written to the view-level stream cache.
+      context "when a streamed chunk reports render errors" do # rubocop:disable RSpec/MultipleMemoizedHelpers
+        let(:error_chunks) do
+          [
+            { html: "<div>Chunk 1: shell ok</div>", consoleReplayScript: "",
+              hasErrors: false, isShellReady: true },
+            { html: "<div>Chunk 2: broken boundary</div>", consoleReplayScript: "",
+              hasErrors: true, isShellReady: true }
+          ]
+        end
+
+        it "does not write the error-containing stream to the cache" do
+          mock_request_and_response(error_chunks)
+          render_with_cached_stream
+
+          run_stream
+
+          # The whole stream was consumed (no exception aborted it) ...
+          expect(chunks_read.count).to eq(error_chunks.count)
+          # ... yet nothing was cached because a chunk reported hasErrors.
+          expect(cache_data).to be_empty
+        end
+
+        it "re-renders on the next request instead of serving a cached broken fragment" do
+          mock_request_and_response(error_chunks, count: 2)
+          render_with_cached_stream
+
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+
+          # Second request: because the first render was not cached, this is a
+          # MISS again and hits Node rather than replaying the broken fragment.
+          reset_stream_buffers
+          @rendered_rails_context = nil
+          run_stream
+          expect(chunks_read.count).to eq(error_chunks.count)
+        end
+
+        it "still caches a clean stream (control)" do
+          mock_request_and_response
+          render_with_cached_stream
+
+          run_stream
+
+          expect(cache_data).not_to be_empty
+        end
       end
 
       it "serves a HIT on the second render when cache_options includes a namespace" do
@@ -2930,12 +2994,13 @@ describe ReactOnRailsProHelper do
       mocked_response = instance_double(ActionDispatch::Response)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
       allow(self).to receive(:response).and_return(mocked_response)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive_messages(server_bundle_hash: test_server_artifact_id, rsc_bundle_hash: test_rsc_artifact_id)
 
       install_renderer_http_client_mock("http://localhost:3800")
       clear_stream_mocks
 
-      mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
-                              count: 1) do |yielder|
+      mock_streaming_response(test_server_render_url_pattern, 200, count: 1) do |yielder|
         chunks.each do |chunk|
           yielder.call(to_length_prefixed(chunk))
         end

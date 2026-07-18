@@ -125,6 +125,11 @@ If you are using **v4.0.0** or later, enable the profiler by setting `profile_se
 config.profile_server_rendering_js_code = true
 ```
 
+> **Prerequisites:**
+>
+> - **ExecJS renderer only**: This setting only applies when `server_renderer == "ExecJS"` (the default). If you're using the Pro Node Renderer, this setting has no effect — use the [Chrome DevTools profiling method](#profiling-the-pro-node-renderer) above instead.
+> - **Node or V8 ExecJS runtime**: The ExecJS runtime must be Node or V8. Set this via the `EXECJS_RUNTIME` environment variable (e.g., `EXECJS_RUNTIME=Node`). Other runtimes will raise a configuration error.
+
 Then, run the app you are profiling and open some pages in it. You will find log files named `isolate-0x*.log` in the root of your app. Use the following command to analyze the log files:
 
 ```bash

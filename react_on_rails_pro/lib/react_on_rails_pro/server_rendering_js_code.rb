@@ -15,6 +15,7 @@
 
 module ReactOnRailsPro
   module ServerRenderingJsCode
+    RENDERER_ARTIFACT_SNAPSHOT_OPTION = :renderer_artifact_snapshot
     PLAIN_STREAMING_RENDER_FUNCTION_NAME =
       "ReactOnRails.isServerStreamingSupported() ? " \
       "'streamServerRenderedReactComponent' : 'serverRenderReactComponent'"
@@ -28,7 +29,7 @@ module ReactOnRailsPro
       # Returns the JavaScript code that defines the generateRSCPayload function.
       # It also adds necessary information to the railsContext to generate the RSC payload for any component in the app.
       # @return [String] JavaScript code for RSC payload generation
-      def generate_rsc_payload_js_function(render_options)
+      def generate_rsc_payload_js_function(render_options, artifacts: nil)
         return "" unless ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
 
         if render_options.rsc_payload_streaming?
@@ -51,7 +52,7 @@ module ReactOnRailsPro
         <<-JS
         railsContext.serverSideRSCPayloadParameters = {
           renderingRequest,
-          rscBundleHash: #{ReactOnRailsPro::Utils.rsc_bundle_hash.to_json},
+          rscBundleHash: #{rsc_artifact_id(render_options, artifacts).to_json},
         }
         const runOnOtherBundle = globalThis.runOnOtherBundle;
         const generateRSCPayload = function generateRSCPayload(componentName, props, railsContext) {
@@ -110,7 +111,7 @@ module ReactOnRailsPro
       # @param render_options [Object] Options that control the rendering behavior
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
-        rsc_support_enabled = ReactOnRailsPro.configuration.enable_rsc_support
+        rsc_support_enabled, artifacts = rendering_artifact_context(render_options)
         render_function_name =
           if rsc_support_enabled && render_options.streaming?
             # Select appropriate function based on whether the rendering request is running on server or rsc bundle
@@ -146,7 +147,7 @@ module ReactOnRailsPro
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
           #{streaming_params}
-          #{generate_rsc_payload_js_function(render_options)}
+          #{generate_rsc_payload_js_function(render_options, artifacts:)}
           #{ssr_pre_hook_js}
           #{redux_stores}
           var usedProps = typeof props === 'undefined' ? #{props_string} : props;
@@ -163,6 +164,49 @@ module ReactOnRailsPro
           });
         })()
         JS
+      end
+
+      private
+
+      def rendering_artifact_context(render_options)
+        [
+          ReactOnRailsPro.configuration.enable_rsc_support,
+          capture_renderer_artifact_snapshot(render_options)
+        ]
+      end
+
+      def capture_renderer_artifact_snapshot(render_options)
+        config = ReactOnRailsPro.configuration
+        return unless config.enable_rsc_support && config.node_renderer?
+
+        artifacts = build_renderer_artifact_snapshot
+        render_options.set_option(RENDERER_ARTIFACT_SNAPSHOT_OPTION, artifacts)
+        artifacts
+      end
+
+      def build_renderer_artifact_snapshot
+        unless ReactOnRails.configuration.development_mode
+          # Outside development, the renderer pool owns process-stable artifact IDs. Keep warm renderer requests
+          # lightweight; Request resolves these identities to captured bytes only if the renderer asks for an upload.
+          node_pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+          return [
+            RendererArtifact::Identity.new(role: :server, id: node_pool.server_bundle_hash),
+            RendererArtifact::Identity.new(role: :rsc, id: node_pool.rsc_bundle_hash)
+          ].freeze
+        end
+
+        ReactOnRailsPro::Utils.renderer_artifacts(
+          action_description: "preparing server render",
+          roles: %i[server rsc]
+        ).freeze
+      end
+
+      def rsc_artifact_id(render_options, artifacts)
+        artifacts ||= render_options.internal_option(RENDERER_ARTIFACT_SNAPSHOT_OPTION)
+        artifact = Array(artifacts).find { |candidate| candidate.role == :rsc }
+        return artifact.id if artifact
+
+        ReactOnRailsPro::Utils.rsc_bundle_hash
       end
     end
   end

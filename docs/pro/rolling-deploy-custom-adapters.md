@@ -21,18 +21,18 @@ Each deploy plays two roles. It **publishes** its own bundles so a _future_ depl
 
 ## Companion assets
 
-Each bundle hash has **companion assets** built in lockstep:
+Each renderer artifact ID has **companion assets** built in lockstep:
 
 - `loadable-stats.json` — maps chunk IDs → asset URLs.
 - `react-client-manifest.json`, `react-server-client-manifest.json` (when RSC enabled) — map component IDs → chunk paths.
 
 If the renderer handles a request for bundle `abc` but reads the **new** build's manifests, it emits HTML referencing chunk URLs that the old deployment's asset pipeline never produced → client-side hydration breakage, chunk 404s.
 
-**Therefore: each seeded bundle hash must carry its own companion assets.** The adapter's `fetch(hash)` method returns bundle + assets together so the caller can't forget.
+**Therefore: each seeded artifact ID must carry its own companion assets.** The adapter's `fetch(hash)` method returns bundle + assets together so the caller can't forget. Current `rorp-v2-*` IDs identify the role, bundle bytes, companion destination basenames, and companion bytes as one value; a companion-only change creates a new ID.
 
 ## The adapter protocol
 
-Each **bundle hash** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** hashes — `server_bundle_hash` and `rsc_bundle_hash`. The protocol is opaque about which kind of bundle a hash represents; the adapter just stores and retrieves files keyed by hash.
+Each **artifact ID** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** IDs through the compatibility APIs `server_bundle_hash` and `rsc_bundle_hash`. Adapters must treat each value as an opaque safe cache key and store the bundle plus its complete companion set under it.
 
 When RSC is enabled, publication calls `upload` once for the server bundle hash and once for the RSC bundle hash. Both calls receive the same companion `assets:` list from that build (`loadable-stats.json` plus RSC manifests). Store those files with each hash; do not filter the assets by bundle type, because `fetch(hash)` must return a complete local cache entry for whichever hash is requested.
 

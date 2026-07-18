@@ -112,31 +112,44 @@ module ReactOnRailsPro
 
       publish_bundles(adapter)
     rescue StandardError => e
-      # Outer rescue catches anything raised by the setup-side calls below
-      # (collect_assets, server_bundle_hash, rsc_bundle_js_file_path). Per the
-      # rolling-deploy contract, a failed upload must degrade the next deploy's
-      # seeding — not fail *this* deploy's assets:precompile.
+      # Role-scoped construction/publication failures are handled inside
+      # publish_artifact so the other role can still publish. Keep this outer
+      # fallback for failures before role isolation (for example, configuration
+      # access) so rolling-deploy publication never fails assets:precompile.
       warn "[ReactOnRailsPro] rolling_deploy_adapter publication failed: #{e.class}: #{e.message}. " \
            "Next deploy's rolling-deploy seeding may degrade; precompile continuing."
     end
 
     def self.publish_bundles(adapter)
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      # Companion manifests are generated for the deploy as a whole, so server
-      # and RSC hashes from the same build intentionally share this asset set.
-      assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
+      roles = [:server]
+      roles << :rsc if ReactOnRailsPro.configuration.enable_rsc_support
+      roles.each { |role| publish_artifact(adapter, role) }
+    end
 
-      # Defer the hash computation behind a block: `bundle_hash` reads the bundle
-      # file (`File.mtime` in dev/test, `Digest::MD5.file` for non-content-hashed
-      # names), so evaluating it eagerly as an argument would let a missing
-      # bundle raise and bypass the per-bundle warning path.
-      server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      publish_bundle_if_present(adapter, server_bundle, assets, "server") { pool.server_bundle_hash }
+    def self.publish_artifact(adapter, role)
+      bundle_label = role == :rsc ? "RSC" : "server"
+      artifacts = ReactOnRailsPro::Utils.renderer_artifacts(
+        action_description: "publishing rolling-deploy #{bundle_label} artifact",
+        roles: [role]
+      )
+      artifact = artifacts.find { |candidate| candidate.role == role }
+      unless artifact
+        raise ReactOnRailsPro::Error,
+              "No current renderer artifact is configured for role #{role.inspect}"
+      end
 
-      return unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      publish_bundle_if_present(adapter, rsc_bundle, assets, "RSC") { pool.rsc_bundle_hash }
+      artifact.with_materialized_files(bundle_name: "#{artifact.id}.js") do |bundle, companions|
+        publish_bundle_if_present(
+          adapter,
+          bundle.to_s,
+          companions.values.map(&:to_s),
+          bundle_label
+        ) { artifact.id }
+      end
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] rolling_deploy_adapter publication failed: #{bundle_label} bundle: " \
+           "#{e.class}: #{e.message}. Next deploy's rolling-deploy seeding for this role may degrade; " \
+           "precompile continuing."
     end
 
     # Some collected companion assets may be absent or point at non-file paths.
@@ -230,6 +243,7 @@ module ReactOnRailsPro
     end
     private_class_method :publish_current_bundle_if_configured,
                          :publish_bundles,
+                         :publish_artifact,
                          :filter_existing_assets,
                          :warn_skipped_invalid_assets,
                          :warn_if_unavailable_required_rsc_assets,

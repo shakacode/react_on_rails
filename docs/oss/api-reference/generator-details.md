@@ -1,6 +1,6 @@
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off, with two exceptions: the bundler (**fresh installs now default to Rspack**, so pass `--no-rspack`, or its alias `--webpack`, if you want Webpack instead) and `--agent-files` (on by default — pass `--no-agent-files` to skip writing the AI-agent guidance files). Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -10,12 +10,14 @@ Usage:
 
 Options:
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
-      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
       [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
-      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
-      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
+      [--agent-files], [--no-agent-files]          # Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true
+      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer
+      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro)
+      [--standard-only], [--no-standard-only]      # Install only the open-source package; cannot be combined with --pro or --rsc
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -161,7 +163,7 @@ The default applies only to fresh installs. If `config/shakapacker.yml` already 
 
 - Rspack core packages (`@rspack/core`, `@rspack/cli`)
 - Rspack-specific plugins (`@rspack/plugin-react-refresh`, `rspack-manifest-plugin`)
-- Shakapacker configured with `assets_bundler: 'rspack'` and `webpack_loader: 'swc'`
+- Shakapacker configured with `assets_bundler: 'rspack'` and `javascript_transpiler: 'swc'`
 
 **Switching bundlers after installation:**
 

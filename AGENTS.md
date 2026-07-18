@@ -106,6 +106,11 @@ React on Rails is a Ruby gem + npm package that integrates React with Ruby on Ra
   `.agents/skills/react-on-rails-update-changelog/SKILL.md`; a short invocation
   is `$react-on-rails-update-changelog`. For ordinary mainline changelog updates
   on `main`, use the installed/shared `$update-changelog` skill.
+- When a maintainer wants to run or inspect RC/beta validation across the demo
+  fleet, use the repo-local `.agents/skills/run-fleet-validation/SKILL.md`; a
+  short invocation is `$run-fleet-validation`. Its Ruby generator reads
+  `internal/contributor-info/demo-fleet.yml` and emits balanced, subagent-driven
+  prompts for simultaneous execution across multiple machines.
 - Default simplify model: `claude-opus-4-8`
 
 ## External Flagship Demo Coordination

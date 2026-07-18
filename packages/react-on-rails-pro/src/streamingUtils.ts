@@ -35,7 +35,7 @@ import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 
 type BufferedEvent = {
-  event: 'data' | 'error' | 'end';
+  event: 'data' | 'error' | 'end' | 'renderingError';
   data: unknown;
 };
 
@@ -80,6 +80,8 @@ const bufferStream = (stream: Readable) => {
           this.push(data);
         } else if (event === 'error') {
           this.emit('error', data);
+        } else if (event === 'renderingError') {
+          this.emit('renderingError', data);
         } else {
           this.push(null);
         }
@@ -102,6 +104,13 @@ const bufferStream = (stream: Readable) => {
         bufferedStream.emit('error', error);
       } else {
         bufferedEvents.push({ event: 'error', data: error });
+      }
+    },
+    notifyRenderingError: (error: Error) => {
+      if (startedReading) {
+        bufferedStream.emit('renderingError', error);
+      } else {
+        bufferedEvents.push({ event: 'renderingError', data: error });
       }
     },
   };
@@ -145,7 +154,11 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   // 2. If an error is emitted into the transformStream, it would cause the render to fail
   // 3. By wrapping in Readable.from(), we can explicitly emit errors into the readableStream without affecting the transformStream
   // Note: Readable.from can merge multiple chunks into a single chunk, so we need to ensure that we can separate them later
-  const { stream: readableStream, emitError: emitRenderError } = bufferStream(transformStream);
+  const {
+    stream: readableStream,
+    emitError: emitRenderError,
+    notifyRenderingError: notifyRenderError,
+  } = bufferStream(transformStream);
 
   // Set once the consumer has abandoned the output stream before the render finished (issue #3885).
   const consumerAbortHandlers: Array<() => void> = [];
@@ -162,6 +175,13 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       return;
     }
     emitRenderError(error);
+  };
+
+  const notifyRenderingError = (error: Error) => {
+    if (consumerAborted) {
+      return;
+    }
+    notifyRenderError(error);
   };
 
   // Abort a render source if it can (ReactDOM `PipeableStream`), otherwise destroy it. Check that
@@ -275,6 +295,7 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
     pipeToTransform,
     writeChunk,
     emitError,
+    notifyRenderingError,
     endStream,
     onConsumerAbort,
     isConsumerAborted,
@@ -375,16 +396,19 @@ export const streamServerRenderedComponent = <T, P extends RenderParams>(
 
     return renderStrategy(reactRenderingResult, optionsWithStreamingCapabilities, streamingTrackers);
   } catch (e) {
-    const { readableStream, pipeToTransform, emitError } = transformRenderStreamChunksToResultObject({
-      hasErrors: true,
-      isShellReady: false,
-      result: null,
-    });
+    const { readableStream, pipeToTransform, emitError, notifyRenderingError } =
+      transformRenderStreamChunksToResultObject({
+        hasErrors: true,
+        isShellReady: false,
+        result: null,
+      });
+    const error = convertToError(e);
     if (throwJsErrors) {
-      emitError(e);
+      emitError(error);
+    } else {
+      notifyRenderingError(error);
     }
 
-    const error = convertToError(e);
     const htmlResultStream = handleError({ e: error, name: componentName, serverSide: true });
     pipeToTransform(htmlResultStream);
     return readableStream as T;

@@ -70,6 +70,46 @@ The tracking issue is the single source of truth for:
 
 ## RC Validation Workflow
 
+### Fast parallel launch
+
+Use the repo-local `$run-fleet-validation` skill to avoid hand-copying the fleet or pinning a
+candidate into six separate prompts. Its generator reads the hard gates from `demo-fleet.yml`,
+adds the monorepo generator/install gate, and emits six self-contained coordinator prompts
+balanced three-per-machine by default:
+
+From the repository root, run:
+
+```bash
+ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+  --machines local,m1 \
+  --prompts 6 \
+  --output-dir tmp/fleet-validation-prompts
+```
+
+The default prompt contract resolves the **latest RC or beta** when each lane starts. Use
+`--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Launch every prompt listed in
+`tmp/fleet-validation-prompts/INDEX.md` simultaneously. Each prompt coordinates bounded subagents:
+one read-only live-evidence pass plus one isolated execution worker per assigned target. With the
+default partition, no coordinator receives more than two execution targets. Run each prompt as a
+separate top-level task; do not place all six under one shared four-slot agent tree.
+
+Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
+versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
+five prompts may start simultaneously but must wait for that exact marker before mutation. This
+prevents a newly published candidate from splitting a staggered launch across versions.
+
+Each lane must acquire or resume an authoritative coordination claim before creating a mutable app
+checkout. It must reuse live candidate ownership first and use the pack's generated fallback claim
+target only when no lane exists. Fallback identity is stable by resolved candidate plus repository,
+not pack ID, so independently generated packs cannot race. Each lane then reuses or updates existing bump PRs and posts one
+idempotent marker comment per stable target identity to the tracking issue. Lanes must not
+concurrently rewrite the issue body. Generate a fresh pack and snapshot identity for every
+replacement candidate, even when the manifest is unchanged. Within one exact-candidate run, reuse
+that pack ID and rerun only the prompt files that own affected targets.
+
+The generated prompts accelerate the fleet hard gates; they do not replace the independent
+behavioral lanes in `release-verification-runbook.md` or the maintainer's final go/no-go decision.
+
 1. Cut the RC packages.
 2. Create or update the release-gate tracking issue from
    `.github/ISSUE_TEMPLATE/rc-release-tracking.yml`.
@@ -438,10 +478,15 @@ For each hard-gate app PR:
 For the `react_on_rails` generator/install gate:
 
 ```bash
-bundle exec rspec react_on_rails/spec/react_on_rails/generators
+(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators)
 pnpm run build
 CREATE_ROR_SMOKE_SCOPE=oss packages/create-react-on-rails-app/scripts/smoke-test-local-gems.sh
 ```
+
+Also run the published three-mode matrix from the candidate-specific section above in a separate
+scratch directory with no local overrides. The gate does not pass unless `--standard`, default Pro,
+and `--rsc` installs all build and smoke with the exact candidate locks and independently resolved RSC
+lock where applicable.
 
 If a command fails for an environmental reason, record the failure and file or link a follow-up
 issue. Do not silently mark the gate as passed.

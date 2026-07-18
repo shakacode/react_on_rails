@@ -37,6 +37,94 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro]** **Streaming caches no longer persist error-containing renders**: When a streamed render
+  emits a chunk with `hasErrors: true` (for example a Suspense boundary whose async data fetch hit a
+  transient failure on that one request), the resulting chunk set is no longer written to
+  `Rails.cache`. Under production defaults (`raise_non_shell_server_rendering_errors: false`), a stream
+  whose shell rendered but whose async boundary errored completes "normally", so both stream cache-write
+  paths (`ReactOnRailsPro::StreamCache` for prerender caching and `cached_stream_react_component`'s
+  view-level cache) previously persisted the broken fragment and served it from cache to every
+  subsequent visitor on that key until the entry expired — turning a single transient failure into a
+  persistent outage for that component. Both paths now detect the error chunk and skip the cache write;
+  clean renders are still cached. Fixes
+  [Issue 4581](https://github.com/shakacode/react_on_rails/issues/4581).
+  [PR 4722](https://github.com/shakacode/react_on_rails/pull/4722) by
+  [justin808](https://github.com/justin808).
+
+- **Stopped Doctor from warning when a layout uses only one pack helper**: `rake react_on_rails:doctor`
+  no longer emits `⚠️ <layout>: has javascript_pack_tag but missing stylesheet_pack_tag` (or its mirror)
+  based purely on helper asymmetry. A JavaScript-only Shakapacker entrypoint, a CSS-only pack, and a
+  hybrid layout that loads its CSS through Propshaft `stylesheet_link_tag` are all valid, so detected pack
+  helpers are now reported informationally instead of as warnings. A fresh create-react-on-rails Rails 8
+  RSC app no longer receives a spurious layout warning. Fixes
+  [Issue 4619](https://github.com/shakacode/react_on_rails/issues/4619).
+  [PR 4724](https://github.com/shakacode/react_on_rails/pull/4724) by
+  [justin808](https://github.com/justin808).
+
+- **Stopped server rendering from crashing on unpaired UTF-16 surrogates**: JavaScript's
+  `JSON.stringify` can emit a lone surrogate escape (for example `\uD83D` with no paired low
+  surrogate) from corrupted user data, database-encoding issues, or upstream API responses.
+  Ruby's `JSON.parse` rejects a lone high surrogate with `JSON::ParserError: incomplete
+surrogate pair`, so such content crashed the entire server render instead of passing through
+  for the browser to display. The render-result parsers now retry once with unpaired surrogates
+  replaced by the Unicode replacement character (U+FFFD) — this only runs after a parse failure,
+  so the happy path is unchanged. Covers the length-prefixed object-payload and metadata paths
+  plus the legacy JSON fallback for older bundles. Fixes
+  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
+  [PR 4726](https://github.com/shakacode/react_on_rails/pull/4726) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
+  disconnects mid-render, or a `stream_react_component_with_async_props` block keeps emitting after
+  `renderComplete` winds the connection down, writes to the already-closed renderer request stream are
+  now treated as routine disconnects: logged once at `debug` (no backtrace, gated on `logging_on_server`)
+  and short-circuited so the block's remaining props are skipped silently. Previously every remaining
+  prop produced an `error`-level entry with a 5-frame backtrace, so a single disconnect spammed logs in
+  proportion to the number of props still in flight and buried genuine emit failures in the noise.
+  Genuine write failures (for example a `JSON::GeneratorError`) still log at `error` with a backtrace.
+  This mirrors the sibling `ReactOnRailsPro::Stream#log_client_disconnect` convention. Fixes
+  [Issue 4325](https://github.com/shakacode/react_on_rails/issues/4325).
+  [PR 4719](https://github.com/shakacode/react_on_rails/pull/4719) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Stopped retaining both raw and parsed source maps per pooled Node renderer VM**: Once a
+  bundle's source map is parsed on first use, the raw map JSON (up to 50MB under the cap) is released and
+  the parsed map becomes the VM generation's single retained copy. For inline (`data:`) maps the encoded
+  URL payload (larger than the raw JSON) is released as well, so the single-copy reduction applies to both
+  external and inline maps. A registration whose raw map was released never falls back to re-reading the
+  map from disk, preserving the same-path rebuild guarantee: old VM generations keep remapping through
+  their own map even after the on-disk map is overwritten. Also makes an unusable inline (`data:`) source
+  map terminal on the lazy lookup path instead of retried, matching registration-time behavior. Partially
+  addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4711](https://github.com/shakacode/react_on_rails/pull/4711) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Made Node renderer cache identities cover complete artifacts and hardened multi-origin rolling deploys**:
+  Renderer IDs now bind the server/RSC role, bundle bytes, and the final companion-file names and bytes, so
+  manifest-only and `loadable-stats.json` changes invalidate fragment, upload, pre-seed, and runtime caches together.
+  The built-in HTTP adapter accepts ordered plural previous URLs, normalizes bare origins through the configured mount,
+  preserves explicit paths, rejects ambiguous legacy hashes across origins, verifies every v2 payload before staging,
+  and enforces monotonic operation deadlines. Fixes
+  [Issue 4620](https://github.com/shakacode/react_on_rails/issues/4620).
+  [PR 4701](https://github.com/shakacode/react_on_rails/pull/4701) by
+  [justin808](https://github.com/justin808).
+
+- **[Pro]** **Capped the size of external source maps read by the Node renderer**: External `.map` files
+  whose on-disk size exceeds 50MB are skipped by a pre-read size gate rather than read into memory (this is
+  not a hard memory bound: a map that grows between the size check and the read is still read in full).
+  Previously only inline (`data:`) source maps were
+  size-capped, so a large external map was read and retained for the life of each pooled VM. Behavior change:
+  stack frames for a bundle whose external map exceeds the cap keep their bundled locations instead of being
+  remapped to original sources, and the renderer logs a warning naming the map. An oversized map is never
+  substituted: the renderer will not fall back to a differently-named map alongside the bundle. When the
+  oversized map is the one the bundle names, that result is final for the VM generation and is not retried;
+  a map that merely arrives late is still retried as before. The 50MB limit matches the pre-existing cap for
+  inline maps. Partially addresses
+  [Issue 4313](https://github.com/shakacode/react_on_rails/issues/4313).
+  [PR 4688](https://github.com/shakacode/react_on_rails/pull/4688) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Bounded RSC browser performance fallback marks across soft navigations**: Browsers
   that cannot preserve `PerformanceMark.detail` now retain only the 200 most recent fallback
   entries, and React on Rails Pro clears the fallback queue during Turbo/Turbolinks page teardown.
@@ -63,6 +151,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Fixes [Issue 4597](https://github.com/shakacode/react_on_rails/issues/4597).
   [PR 4624](https://github.com/shakacode/react_on_rails/pull/4624) by
   [justin808](https://github.com/justin808).
+
+- **[Pro]** **RSC render errors no longer leak server details into client DOM**: In production, the
+  `REACT_ON_RAILS_RSC_ERRORS` inline script now emits only `{ hasErrors: true }` — the full error
+  message, stack trace, and file paths are redacted. Uses an allowlist (development/test show full
+  diagnostics) so custom envs like staging default to redacted. RSC rendering errors are now also
+  reported to error reporters (Sentry/Honeybadger) even with the default `throwJsErrors: false`
+  config, via a custom `'renderingError'` stream event. Fixes
+  [Issue 4629](https://github.com/shakacode/react_on_rails/issues/4629).
+  [PR 4631](https://github.com/shakacode/react_on_rails/pull/4631) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Hardened Node renderer authentication and multipart uploads**: Authenticated multipart
   clients must now send the password field before file parts; the renderer rejects and discards leading file
@@ -876,7 +974,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **RSC client manifest restored when only `registerServerComponent/client` is in the pack graph**: `wrapServerComponentRenderer/client` now directly imports `react-on-rails-rsc/client.browser` as a side-effect import. Previously the client runtime was only reachable through a three-level transitive chain (`wrapServerComponentRenderer/client` → `getReactServerComponent.client` → `react-on-rails-rsc/client.browser`). Tooling that severed any link in that chain (tree-shaking, transpiler quirks, custom `NormalModuleReplacement`, externals) caused `RSCWebpackPlugin` to emit `Client runtime at react-on-rails-rsc/client was not found. React Server Components module map file react-client-manifest.json was not created.` and silently skip the manifest, breaking RSC hydration on the Pro Node Renderer. The direct import keeps the runtime resource in the module graph so the plugin always emits `react-client-manifest.json`. Fixes [#3366](https://github.com/shakacode/react_on_rails/issues/3366). [PR 3368](https://github.com/shakacode/react_on_rails/pull/3368) by [justin808](https://github.com/justin808).
 - **[Pro]** **Updated Fastify in the Node Renderer for CVE-2026-33806**: Raised the direct `fastify` dependency to 5.8.5 so user-provided Fastify server options, including `trustProxy`, pick up the upstream security fix. [PR 3152](https://github.com/shakacode/react_on_rails/pull/3152) by [dependabot\[bot\]](https://github.com/apps/dependabot).
 - **[Pro]** **TanStack Router hydration no longer bails to a full client re-render**: TanStack Router SSR pages no longer discard server-rendered HTML during hydration because the client tree now renders `RouterProvider` with the same shape as the server output. Post-hydration navigation still waits for matched lazy route chunks before `router.load()`. [PR 3213](https://github.com/shakacode/react_on_rails/pull/3213) by [Seifeldin7](https://github.com/Seifeldin7).
-- **[Pro]** **Widened ruby-jwt support to `jwt >= 2.7`**: React on Rails Pro relaxes the previous `~> 2.7` cap to `jwt >= 2.7`, so applications can resolve the patched ruby-jwt 3.2.0+ release for the empty-key HMAC advisory while apps still on jwt 2.x remain compatible. [PR 3322](https://github.com/shakacode/react_on_rails/pull/3322), [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **Widened ruby-jwt support to `jwt >= 2.5, < 4`**: React on Rails Pro relaxes the previous `~> 2.7` cap to `jwt >= 2.5, < 4`, so applications can resolve the patched ruby-jwt 3.2.0+ release for the empty-key HMAC advisory while apps on jwt 2.5+ in the 2.x line remain compatible. [PR 3322](https://github.com/shakacode/react_on_rails/pull/3322) and [PR 3344](https://github.com/shakacode/react_on_rails/pull/3344) by [ihabadham](https://github.com/ihabadham) and [PR 3320](https://github.com/shakacode/react_on_rails/pull/3320) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Pro migration generator rewrites all base-package references and preserves Gemfile pins**: `rails generate react_on_rails:pro` now rewrites Jest/Vitest mock helpers (`jest.mock`, `vi.mock`, `requireActual`/`importActual`, and the rest) and TypeScript `declare module 'react-on-rails'` blocks alongside its existing `import`/`require`/dynamic-import handling, and the Gemfile swap now preserves the user's existing version pin (and other gem options) instead of overwriting them with the running gem's version. `react_on_rails:doctor` is widened to match: it also flags stale side-effect imports (`import 'react-on-rails';`), Jest/Vitest mock helpers, and `declare module` blocks, and the new side-effect-import pattern keeps the doctor a superset of the rewriter so anything the rewriter doesn't reach gets surfaced. Closes [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104). [PR 3232](https://github.com/shakacode/react_on_rails/pull/3232) by [justin808](https://github.com/justin808).
 - **[Pro]** **Pro migration scans TypeScript 4.7 `.mts` and `.cts` modules**: `react_on_rails:doctor` and the Pro migration rewriter now include `.mts`/`.cts` source files (and their `.d.mts`/`.d.cts` declaration counterparts) when looking for stale `react-on-rails` references, matching the existing `.mjs`/`.cjs` coverage. Fixes [Issue 3250](https://github.com/shakacode/react_on_rails/issues/3250). [PR 3334](https://github.com/shakacode/react_on_rails/pull/3334) by [justin808](https://github.com/justin808).
 - **Doctor now honors nested JavaScript package roots**: `react_on_rails:doctor` now checks package-manager lockfiles, `package.json`, and installed React from the configured `node_modules_location`, reducing false diagnostics for legacy apps that keep dependencies under `client/`. The Vite migration guide now documents the supported thin-wrapper pattern for those layouts. Note: a missing `package.json` at the configured `node_modules_location` now emits a warning instead of being silently skipped, so apps misconfigured against a nonexistent path will see new diagnostics on upgrade. Fixes [Issue 3205](https://github.com/shakacode/react_on_rails/issues/3205). [PR 3220](https://github.com/shakacode/react_on_rails/pull/3220) by [justin808](https://github.com/justin808).

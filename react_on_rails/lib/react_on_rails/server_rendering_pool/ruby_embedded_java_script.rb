@@ -420,7 +420,10 @@ module ReactOnRails
           result = if result_string.to_s.include?("\t")
                      ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
                    else
-                     JSON.parse(result_string.to_s)
+                     # Legacy JSON format from older bundles: parse leniently so a lone
+                     # UTF-16 surrogate emitted by JS JSON.stringify (which Ruby's
+                     # JSON.parse rejects) degrades to U+FFFD instead of crashing SSR.
+                     ReactOnRails::LengthPrefixedParser.parse_json_lenient(result_string.to_s)
                    end
           replay_console_to_rails_logger(result, render_options)
           result

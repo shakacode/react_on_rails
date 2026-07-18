@@ -1148,12 +1148,16 @@ module ReactOnRails
 
         layout_name = File.basename(layout_file, ".html.erb")
 
+        # Report detected pack helpers informationally. A JavaScript-only entrypoint
+        # (no emitted CSS), a CSS-only pack, or a hybrid layout that loads CSS via
+        # Propshaft `stylesheet_link_tag` are all valid, so helper asymmetry is not a
+        # warning. See https://github.com/shakacode/react_on_rails/issues/4619.
         if has_stylesheet && has_javascript
           checker.add_info("  ✅ #{layout_name}: has both stylesheet_pack_tag and javascript_pack_tag")
         elsif has_stylesheet
-          checker.add_warning("  ⚠️  #{layout_name}: has stylesheet_pack_tag but missing javascript_pack_tag")
+          checker.add_info("  ℹ️  #{layout_name}: has stylesheet_pack_tag")
         elsif has_javascript
-          checker.add_warning("  ⚠️  #{layout_name}: has javascript_pack_tag but missing stylesheet_pack_tag")
+          checker.add_info("  ℹ️  #{layout_name}: has javascript_pack_tag")
         else
           checker.add_info("  ℹ️  #{layout_name}: no pack tags found")
         end

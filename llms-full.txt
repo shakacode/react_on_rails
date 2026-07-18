@@ -496,7 +496,7 @@ With React on Rails auto-bundling, you don't need manual registration! Just add 
 
 <p>Here's a React component embedded in this Rails view:</p>
 
-<%= react_component("SimpleCounter", { initialCount: 5 }, { auto_load_bundle: true }) %>
+<%= react_component("SimpleCounter", props: { initialCount: 5 }, auto_load_bundle: true) %>
 ```
 
 The generated layouts already include these tags. If you add React on Rails to another layout, make sure the `<head>` section includes:
@@ -1745,7 +1745,7 @@ You must configure bundler entry points and manually register each component.
 ### Modern Auto-Bundling (Recommended)
 
 ```erb
-<%= react_component("HelloWorld", { name: "World" }, { auto_load_bundle: true }) %>
+<%= react_component("HelloWorld", props: { name: "World" }, auto_load_bundle: true) %>
 ```
 
 With auto-bundling enabled:
@@ -2185,6 +2185,7 @@ In practice:
 - If you want primarily a fast bundler + HMR workflow and you are comfortable managing integration patterns yourself, Vite-centric setups can be appealing.
 - If you want stronger Rails + React integration conventions (for example helper-driven rendering, migration guidance, and integrated SSR paths), React on Rails is the broader framework choice.
 - If your decision depends on Vite performance tradeoffs, review the benchmark and matrix details in [Detailed Feature Matrix and Benchmarks](./comparison-with-alternatives.md).
+- If your question is why React on Rails itself ships on Rspack rather than Vite, that decision is argued in the open in [Why Rspack (and not Vite)?](./why-rspack.md).
 
 Official docs:
 
@@ -2223,6 +2224,113 @@ That is especially important if your decision depends on:
 - [OSS vs Pro](./oss-vs-pro.md)
 - [Upgrading to Pro](../../pro/upgrading-to-pro.md)
 - [Detailed Feature Matrix and Benchmarks](./comparison-with-alternatives.md)
+
+================================================================================
+PAGE: https://reactonrails.com/docs/getting-started/why-rspack
+SOURCE: docs/oss/getting-started/why-rspack.md
+================================================================================
+
+# Why Rspack (and not Vite)?
+
+Teams evaluating React on Rails against the popular `inertia_rails` + `vite_ruby` stack ask this question constantly, and it deserves a direct answer rather than a dodge. Choosing Rspack over Vite is a deliberate, recorded architecture decision — [ADR-0001: Rspack answers Vite](https://github.com/shakacode/react_on_rails/blob/main/internal/adr/0001-rspack-answers-vite.md) — not an accident of history. This page lays out the reasoning, the evidence we have published so far, what that evidence does and does not show, and the concrete conditions under which we would revisit the decision.
+
+## The Short Answer
+
+React on Rails Pro's React Server Components (RSC) pipeline is built on the webpack/rspack plugin contract. That pipeline is production-proven on Webpack, and as of **17.0.0 the Rspack implementation of the same contract is supported** — Rspack is the default bundler for fresh installs, the generator scaffolds the native `RSCRspackPlugin`, and an end-to-end CI gate builds the three bundles with Rspack and proves RSC routes render and hydrate ([#3488](https://github.com/shakacode/react_on_rails/issues/3488) tracks further production hardening). Vite has no implementation of this pipeline at all. That asymmetry is the decision: the Rspack RSC path is the same plugin contract the pipeline already targets — now shipped and CI-gated — while adopting Vite as the runtime bundler would mean rebuilding the pipeline on a different plugin architecture, at a time when RSC-on-Vite is still stabilizing across the wider ecosystem.
+
+Rather than split the bundler story, the decision recorded in the ADR is to invest in Rspack developer-experience parity, measure the gaps honestly, and answer the Vite question in the open. This is a position we expect to keep re-testing, not a permanent verdict — see [What Would Change Our Minds](#what-would-change-our-minds) below.
+
+## The RSC Pipeline Is a Bundler Plugin Contract
+
+React on Rails Pro's RSC implementation uses a three-bundle architecture: a client bundle, a server (SSR) bundle, and an RSC bundle. Coordinating those bundles is the job of the [`react-on-rails-rsc`](https://www.npmjs.com/package/react-on-rails-rsc) npm package, and every piece of it speaks the webpack/rspack plugin contract:
+
+- **Manifest plugins.** `react-on-rails-rsc/WebpackPlugin` and the rspack-native `react-on-rails-rsc/RspackPlugin` (`RSCRspackPlugin`) hook the bundler's compilation to emit the client and server component manifests — the JSON files that map `'use client'` component modules to the chunks that contain them. Both plugins emit the same manifest schema, so the RSC runtime resolves client references identically under either bundler.
+- **The `'use client'` loader.** `react-on-rails-rsc/WebpackLoader` transforms client component files into client reference proxies inside the RSC bundle. It is written against the webpack loader interface, which rspack also implements.
+- **Flight chunk handling.** The RSC payload (React's Flight format) streams client reference metadata to the browser, and the runtime uses the manifests to load the matching client chunks. The chunk naming and manifest lookup are products of the webpack/rspack compilation model.
+
+Because every layer targets the webpack/rspack contract, moving the RSC pipeline from webpack to Rspack is an incremental swap rather than a rewrite: the same loader runs under both bundlers, and the native `RSCRspackPlugin` uses only standard rspack public APIs. To be precise about where that swap stands today: both the Webpack and Rspack RSC pipelines are supported. Webpack is the longer-proven path; the Rspack path shipped in 17.0.0 with Rspack as the default bundler, the native `RSCRspackPlugin`, and an end-to-end CI gate (`dummy-app-rspack-rsc-runtime-gate`) that builds all three bundles and proves RSC routes hydrate under Rspack — see [Rspack Compatibility with React Server Components](../../pro/react-server-components/rspack-compatibility.md) and [issue #3488](https://github.com/shakacode/react_on_rails/issues/3488) for status and remaining hardening. Supporting Vite would not be a swap at all: Vite does not run plugins written against the webpack/rspack compilation contract, so the manifest plugins, the loader integration, and the flight chunk handling would all need a from-scratch Vite implementation — precisely the ground the wider RSC-on-Vite ecosystem is still stabilizing.
+
+The ADR also records why the halfway options were rejected: supporting Vite only for the non-RSC tier would permanently split the bundler story and double the support and CI matrix for the tier that differentiates React on Rails least, and saying nothing at all would leave a constant evaluator question unanswered.
+
+For how the RSC pipeline works in detail, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).
+
+## What We Have Measured So Far
+
+We publish our comparison evidence rather than asserting it. As of July 2026, the published evidence is a **bare-JavaScript control-tier benchmark** — matched, minimal Rspack and Vite dev setups with no Rails, no React transforms, and no framework integration — recorded on a single Apple M5 Max run with 5 samples per metric. Full harness, raw samples, and methodology: [`benchmarks/rspack-vite-dx`](https://github.com/shakacode/react_on_rails/tree/main/benchmarks/rspack-vite-dx) ([RESULTS.md](https://github.com/shakacode/react_on_rails/blob/main/benchmarks/rspack-vite-dx/RESULTS.md), merged in [PR #4612](https://github.com/shakacode/react_on_rails/pull/4612)).
+
+| Metric                   | Rspack median (min–max) | Vite median (min–max) | Verdict   |
+| ------------------------ | ----------------------: | --------------------: | --------- |
+| Cold start to HTTP ready |  242.3 ms (235.2–258.8) |  244 ms (242.8–250.2) | wash      |
+| Browser-observed HMR     |     77.4 ms (76.2–79.6) |  72.6 ms (24.3–181.4) | ambiguous |
+
+| Surface check         | Rspack     | Vite         |
+| --------------------- | ---------- | ------------ |
+| Compile-error overlay | observed   | not observed |
+| Click-to-editor       | not tested | not tested   |
+| Explicit config lines | 12         | 2            |
+
+Read the verdicts as recorded: cold start was a **wash**, and the HMR comparison is **ambiguous** because the Vite samples had a much wider spread (24.3–181.4 ms) than the Rspack samples. The compile-error overlay row means Rspack's overlay was observed in that run and Vite's was not — it is a single-run observation, not an overlay-parity conclusion. Vite clearly won the explicit-config-lines count, 2 to 12.
+
+**What these numbers do not show.** The control tier deliberately isolates the bundlers from everything else, so it says nothing about:
+
+- generated Rails applications (React on Rails + Shakapacker/Rspack vs `inertia_rails` + `vite_ruby`)
+- Rails startup, `vite_ruby`, or Inertia integration behavior
+- React transforms or Fast Refresh
+- runtime-error overlays or click-to-editor integration
+- onboarding or setup effort
+
+This page therefore makes **no claims about Rails-tier performance or developer-experience parity**. Those claims wait for Rails-tier evidence.
+
+:::info Rails-tier measurements are in progress
+
+The Rails-tier comparison — pinned, matched generated Rails starter pairs with raw samples — is tracked by [#4600 (Rspack DX parity bar vs Vite)](https://github.com/shakacode/react_on_rails/issues/4600) and its child issues: [#4695 (Rails-tier benchmark package)](https://github.com/shakacode/react_on_rails/issues/4695), [#4696 (error-overlay parity + click-to-editor verification)](https://github.com/shakacode/react_on_rails/issues/4696), and [#4697 (zero-config surface reduction)](https://github.com/shakacode/react_on_rails/issues/4697). As results land there, this page will be updated to cite them.
+
+:::
+
+## What Vite Does Genuinely Well
+
+An honest positioning page has to say this part out loud:
+
+- **The dev-server model.** Vite's native-ESM dev server with on-demand transforms is a genuinely elegant architecture, and it is a large part of why Vite's dev loop has the reputation it does.
+- **Ecosystem and defaults.** A large share of the frontend ecosystem — templates, component libraries, meta-frameworks, tutorials — assumes Vite first. Being the default has real compounding value: more examples, more Stack Overflow answers, more plugins built against Vite's plugin API.
+- **Config minimalism.** In our own control benchmark, the Vite setup needed 2 explicit config lines to Rspack's 12. That six-fold difference is measured, ours, and worth copying — [#4697](https://github.com/shakacode/react_on_rails/issues/4697) tracks driving the generated Rspack config surface down.
+
+## What Would Change Our Minds
+
+The ADR records explicit revisit triggers, so the decision cannot silently ossify:
+
+- **Evaluator evidence** that bundler choice is a primary reason teams bounce off React on Rails.
+- **RSC-on-Vite reaching production maturity upstream.** The ADR's watch items: `@vitejs/plugin-rsc`, official under the vitejs org and already the base for React Router's RSC framework mode, but pre-1.0; and Rspack 2.x's own built-in experimental RSC support (distinct from our shipped native `RSCRspackPlugin` — we do not use Rspack's built-in path), whose evolution we continue to track for the hardening work in [#3488](https://github.com/shakacode/react_on_rails/issues/3488). We track state, not promises — neither project's future pace is something this page predicts.
+
+Meanwhile, [#2552 (bundler-neutral config file naming)](https://github.com/shakacode/react_on_rails/issues/2552), planned for the 18.0 cycle, renames `*WebpackConfig.js`-style files to bundler-neutral names so that a future bundler addition — Vite or anything else — does not require another breaking rename cycle. The door stays open by design.
+
+The ADR closes with a self-enforcing clause worth repeating here: if Rspack DX parity claims stop being true, this page and the decision behind it both come up for review.
+
+## Common Objections
+
+### "Vite's HMR is faster"
+
+Our control-tier measurement could not confirm a winner: browser-observed HMR medians were 77.4 ms (Rspack) vs 72.6 ms (Vite), with the Vite spread wide enough (24.3–181.4 ms) that the recorded verdict is _ambiguous_. React Fast Refresh timing in generated Rails apps has not been measured yet — that is [#4695](https://github.com/shakacode/react_on_rails/issues/4695). Until that evidence exists, we make no HMR speed claim in either direction, and you should be skeptical of anyone who does without publishing samples.
+
+### "Vite's plugin ecosystem is bigger"
+
+For app-level tooling, both ecosystems are large. Rspack targets compatibility with the webpack plugin and loader API, which is the API the Rails/Shakapacker world has built against for years — so the relevant comparison for a React on Rails app is less "Vite plugins vs Rspack plugins" than "does the webpack-contract tooling you already use carry over" (check the [Rspack compatibility documentation](https://rspack.dev/guide/compatibility/plugin) for specific plugins). The plugin that decides our architecture is the RSC manifest/loader tooling described above, and that exists for webpack and rspack only.
+
+### "Everyone uses Vite — you're swimming upstream"
+
+Defaults matter, and we take this seriously — it is why the ADR, the measurement program, and this page exist at all. But adopting a bundler with no implementation of the RSC pipeline would trade an evaluation-stage objection for a from-scratch rewrite of the tier that most differentiates React on Rails. The costs of not being the default are real and mostly social (fewer copy-paste examples); we spend that cost deliberately and work to shrink it with measured DX parity ([#4600](https://github.com/shakacode/react_on_rails/issues/4600)) and lower switching friction ([#2552](https://github.com/shakacode/react_on_rails/issues/2552)).
+
+### "Why not support both bundlers?"
+
+The ADR considered exactly this and rejected it for the 17.x cycle: Vite for the standard (non-RSC) tier only would permanently fork the bundler story, double the support and CI matrix, and spend that effort on the tier where React on Rails is least differentiated. One well-supported bundler contract, measured against the alternative in the open, is the better trade while the RSC-on-Vite ground is still moving.
+
+## Related Pages
+
+- [Comparing React on Rails to Alternatives](./comparing-react-on-rails-to-alternatives.md) — the broader decision guide, including Inertia and Next.js
+- [Migrate from `vite_rails`](../migrating/migrating-from-vite-rails.md) — the mechanics, if you decide to move
+- [Migrating from Webpack to Rspack](../migrating/migrating-from-webpack-to-rspack.md)
+- [Webpack Configuration](../core-concepts/webpack-configuration.md)
+- [Rspack Compatibility with React Server Components](../../pro/react-server-components/rspack-compatibility.md)
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/getting-started/common-issues
@@ -3580,8 +3688,8 @@ For example, if you wanted to utilize our file-system based entrypoint generatio
    4. You no longer need to register the React components within the `ReactOnRails.configuration.components_subdirectory` nor directly add their bundles. For example, you can have a Rails view using three components:
 
       ```erb
-      <%= react_component("FooComponentOne", {}, auto_load_bundle: true) %>
-      <%= react_component("BarComponentOne", {}, auto_load_bundle: true) %>
+      <%= react_component("FooComponentOne", auto_load_bundle: true) %>
+      <%= react_component("BarComponentOne", auto_load_bundle: true) %>
 
       <% append_javascript_pack_tag('SpecialComponentNotToAutoLoadBundle') %>
       <%= react_component("SpecialComponentNotToAutoLoadBundle", {}) %>
@@ -3629,7 +3737,7 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 
 **How it works:**
 
-1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
+1. **Component calls automatically append bundles**: When you use `<%= react_component("ComponentName", props: props, auto_load_bundle: true) %>` in a view, React on Rails automatically calls `append_javascript_pack_tag "generated/ComponentName"` and `append_stylesheet_pack_tag "generated/ComponentName"` (in static/production modes).
 
 2. **Layout renders appended bundles**: The empty `<%= stylesheet_pack_tag %>` and `<%= javascript_pack_tag %>` calls in your layout are where the appended component bundles get rendered.
 
@@ -3640,8 +3748,8 @@ When using `auto_load_bundle: true`, your Rails layout needs to include empty pa
 If your view contains:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, auto_load_bundle: true) %>
-<%= react_component("HeavyMarkdownEditor", @editor_props, auto_load_bundle: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, auto_load_bundle: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, auto_load_bundle: true) %>
 ```
 
 React on Rails automatically generates HTML equivalent to:
@@ -3820,13 +3928,13 @@ end
 `app/views/hello_world/index.html.erb`:
 
 ```erb
-<%= react_component("HelloWorld", @hello_world_props, prerender: true) %>
+<%= react_component("HelloWorld", props: @hello_world_props, prerender: true) %>
 ```
 
 `app/views/hello_world/editor.html.erb`:
 
 ```erb
-<%= react_component("HeavyMarkdownEditor", @editor_props, prerender: true) %>
+<%= react_component("HeavyMarkdownEditor", props: @editor_props, prerender: true) %>
 ```
 
 ### 7. Generate Bundles
@@ -4444,7 +4552,7 @@ Rspack configuration is controlled via `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 The `bin/switch-bundler` script automatically updates this configuration when switching bundlers.
@@ -4829,7 +4937,6 @@ A cache-optimized landing page often looks like this:
 <% append_stylesheet_pack_tag("generated/WelcomePage") %>
 <%= preload_pack_asset("generated/WelcomePage.css") %>
 <%= rendered["componentHtml"] %>
-<%= content_for :script_tags, rendered["consoleReplayScript"] %>
 ```
 
 In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
@@ -5987,7 +6094,7 @@ const ServerApp = (props, railsContext) => {
   // __dirname is going to be the directory where the server-bundle.js exists
   // Note, React on Rails Pro automatically copies the loadable-stats.json to the same place as the
   // server-bundle.js. Thus, the __dirname of this code is where we can find loadable-stats.json.
-  // Be sure to configure ReactOnRailsPro.config.assets_top_copy to this file.
+  // Be sure to configure ReactOnRailsPro's `config.assets_to_copy` to this file.
   const statsFile = path.resolve(__dirname, 'loadable-stats.json');
 
   // This object is used to search filenames by corresponding chunk names.
@@ -6020,7 +6127,7 @@ ReactOnRails.register({
 
 ### React on Rails Pro
 
-You must set `config.assets_top_copy` so that the node-renderer will have access to the loadable-stats.json.
+You must set `config.assets_to_copy` so that the node-renderer will have access to the loadable-stats.json.
 
 ```ruby
   config.assets_to_copy = Rails.root.join("public", "webpack", Rails.env, "loadable-stats.json")
@@ -6724,8 +6831,8 @@ Use this matrix to decide which approach to use:
 ## Prerequisites
 
 - **React 19** — native metadata hoisting is a React 19 feature
-- **React on Rails 15+** — for basic `react_component` usage
-- **React on Rails Pro 4+** — for `stream_react_component` and RSC support
+- **React on Rails 16.2.0+** — for basic `react_component` usage (16.2.0+ is the currently supported, version-aligned line)
+- **React on Rails Pro** — for `stream_react_component` and RSC support. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`.
 
 ## References
 
@@ -13338,7 +13445,7 @@ When running tests in parallel (with `parallel_tests` gem):
 
 ```yaml
 - name: Compile test assets
-  run: RAILS_ENV=test bundle exec rake react_on_rails:assets:compile_environment
+  run: RAILS_ENV=test NODE_ENV=test bin/shakapacker
 
 - name: Run tests
   run: bundle exec rspec
@@ -15367,7 +15474,7 @@ SOURCE: docs/oss/building-features/node-renderer/basics.md
 
 ## Requirements
 
-- You must use React on Rails v11.0.7 or higher.
+- You must use **React on Rails Pro** v16.4.0 or higher.
 
 ## Install the Gem and the Node Module
 
@@ -15404,10 +15511,11 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    - `RENDERER_ALL_WORKERS_RESTART_INTERVAL`
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
-2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
+2. Configure ENV values and run your launch script. For example:
    ```bash
-   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node-renderer
+   RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles node renderer/node-renderer.js
    ```
+   Or via a script you define in package.json, e.g. `pnpm run node-renderer` (see [JavaScript Configuration File](#javascript-configuration-file) below).
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
 
 ## JavaScript Configuration File
@@ -15419,7 +15527,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
+2. Make sure you have **Node.js 20+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**. The default setup bundles Fastify 5, which requires Node.js 20+ — on Node.js 18 the renderer exits at startup unless you pin Fastify 4 via your package manager's dependency-override mechanism (npm [`overrides`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides), Yarn/Bun [`resolutions`](https://yarnpkg.com/configuration/manifest#resolutions), or pnpm [`pnpm.overrides`](https://pnpm.io/package_json#pnpmoverrides)). (The package's `engines.node` floor is `>=18.19.0`, which applies only to that Fastify 4 path.)
 3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
    npm init -y
@@ -15636,6 +15744,8 @@ available default ENV values if you wire them into your own launch script.
    Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
 1. **enableHealthEndpoints** - (default: `false`; set `RENDERER_ENABLE_HEALTH_ENDPOINTS` to `true`, `TRUE`, `yes`, `YES`, or `1` to enable) - If set to `true`, the renderer registers built-in, unauthenticated `GET /health` (liveness) and `GET /ready` (readiness) probe endpoints with status-only response bodies. See [Health and Readiness Endpoints](./health-checks.md) for semantics and working Kubernetes/ECS probe examples (the renderer's h2c listener cannot be probed with HTTP/1.1 `httpGet` probes).
+1. **replayServerAsyncOperationLogs** (default: `process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS` if set, otherwise `true` when `NODE_ENV=development`, `false` in other environments) - If set to `true`, enables replay of console logs from asynchronous server operations. If `false`, only logs that occur before any awaited asynchronous operations are replayed. Note: unlike `password`, this option only checks `NODE_ENV`, not `RAILS_ENV` — async log replay is a JS debugging concern, so it keys off the JS runtime environment alone.
+1. **maxVMPoolSize** (default: `2`; set via `MAX_VM_POOL_SIZE` env var, parsed as integer) - Maximum number of VM contexts to keep in memory. Typically only two contexts are needed — one for the server bundle and one for React Server Components (RSC) if enabled. Older contexts are removed when this limit is reached. Must be a positive integer.
 
 Deprecated options:
 
@@ -15878,7 +15988,7 @@ Example response:
 ```json
 {
   "node_version": "v20.17.0",
-  "renderer_version": "1.4.2"
+  "renderer_version": "17.0.0"
 }
 ```
 
@@ -17560,7 +17670,7 @@ To avoid the initial round trip to get a bundle on the renderer, you can pre-sta
 See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
 
 For same-dyno / same-filesystem deployments such as Heroku, the legacy
-`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is still appropriate. It pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Prefer `react_on_rails_pro:pre_seed_renderer_cache` for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
+`react_on_rails_pro:pre_stage_bundle_for_node_renderer` task is deprecated: it emits a deprecation warning and delegates to `react_on_rails_pro:pre_seed_renderer_cache` with `MODE=symlink`. That mode pre-stages the same bundle-hash cache layout the renderer uses at runtime, but does so with symlinks instead of copies. Use `MODE=copy` (the default) for Docker/image-build workflows where the cache needs to be copied into an immutable artifact.
 
 If you're not using the default cache location, set `RENDERER_SERVER_BUNDLE_CACHE_PATH` so the files stage into the right place. `RENDERER_BUNDLE_PATH` remains a deprecated compatibility alias.
 
@@ -17569,10 +17679,7 @@ Then you can use the rake task: `react_on_rails_pro:pre_seed_renderer_cache MODE
 You might do something like this:
 
 ```ruby
-Rake::Task["assets:precompile"]
-    .clear_prerequisites
-    .enhance([:environment, "react_on_rails:assets:compile_environment"])
-    .enhance do
+Rake::Task["assets:precompile"].enhance do
   ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
 end
 ```
@@ -18337,20 +18444,18 @@ ReactOnRails.configure do |config|
   ################################################################################
   # DEPRECATED CONFIGURATION
   ################################################################################
-  # 🚫 DEPRECATED: immediate_hydration is no longer used
+  # 🚫 REMOVED in v16.2.0: `config.immediate_hydration` now raises NoMethodError at boot.
+  # Immediate hydration is now automatically enabled for React on Rails Pro users and
+  # cannot be disabled. Remove this line from your initializer.
   #
-  # This configuration option has been removed. Immediate hydration is now
-  # automatically enabled for React on Rails Pro users and cannot be disabled.
+  # The helper parameter (`immediate_hydration:` key in `react_component`, `react_component_hash`,
+  # `redux_store`, and the streaming helpers) was removed later in v16.6.0. Passing it now logs a
+  # one-time warning and is ignored.
   #
-  # If you still have this in your config, it will log a deprecation warning:
-  # config.immediate_hydration = false  # ⚠️ Logs warning, has no effect
+  # The `data-immediate-hydration` HTML attribute is no longer rendered on component
+  # elements as of v16.6.0. Remove any CSS/JS selectors or test assertions that target it.
   #
-  # Action Required: Remove this line from your config/initializers/react_on_rails.rb
-  # See CHANGELOG.md for migration instructions.
-  #
-  # Historical Context:
-  # Previously controlled whether Pro components hydrated immediately upon their
-  # server-rendered HTML reaching the client, vs waiting for full page load.
+  # See CHANGELOG.md for migration details.
 
   ################################################################################
   # I18N OPTIONS
@@ -19286,11 +19391,19 @@ For current configuration options, see [Configuration](README.md).
 
 ### immediate_hydration
 
-**Status:** ⚠️ REMOVED in v16.6.0
+**Configuration option:** ⚠️ REMOVED in v16.2.0 — raises `NoMethodError` at boot
 
-This configuration option has been removed. React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro users are not affected.
+The `config.immediate_hydration` setting was removed in v16.2.0. Assigning it in your initializer now raises `NoMethodError` at boot (no `method_missing` fallback exists). Remove the line.
 
-**Migration:** Remove any `config.immediate_hydration` lines from your configuration and any `immediate_hydration:` keys passed to `react_component` / `stream_react_component` — both are no-ops and can be safely deleted.
+**Helper parameter:** ⚠️ REMOVED in v16.6.0 — logs a one-time warning, then ignored
+
+The `immediate_hydration:` key passed to `react_component`, `react_component_hash`, `redux_store`, `stream_react_component`, or `buffered_stream_react_component` was removed in v16.6.0. Passing it now logs a one-time warning (once per helper per process) and the value is dropped. Delete the key from all helper calls.
+
+**Rendered HTML attribute:** ⚠️ REMOVED in v16.6.0
+
+The `data-immediate-hydration` attribute that was previously emitted on hydrated/streamed component elements is no longer rendered. If you have CSS/JS selectors (e.g. `[data-immediate-hydration]`) or test assertions targeting it, remove them.
+
+**Behavior:** React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro apps are still affected by the removals above (the config raises and the helper parameter is ignored), but their hydration behavior is otherwise unchanged — immediate hydration is disabled for non-Pro and was never a per-component option.
 
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 
@@ -19825,7 +19938,7 @@ A good example of this would be something like a notifications counter in a head
 
 Suppose the Redux store is called `appStore`, and you have 3 React components that each needs to connect to a store: `NavbarApp`, `CommentsApp`, and `BlogsApp`. I named them with `App` to indicate that they are the registered components.
 
-You will need to make a function that can create the store you will be using for all components and register it via the `registerStore` method. Note: this is a **storeCreator**, meaning that it is a function that takes (props, location) and returns a store:
+You will need to make a function that can create the store you will be using for all components and register it via the `registerStoreGenerators` method. Note: this is a **store generator**, meaning that it is a function that takes `(props, railsContext)` and returns a store:
 
 ```js
 function appStore(props, railsContext) {
@@ -19834,7 +19947,7 @@ function appStore(props, railsContext) {
   return myAppStore;
 }
 
-ReactOnRails.registerStore({
+ReactOnRails.registerStoreGenerators({
   appStore,
 });
 ```
@@ -19851,7 +19964,7 @@ return (
 );
 ```
 
-From your Rails view, you can use the provided helper `redux_store(store_name, props)` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
+From your Rails view, you can use the provided helper `redux_store(store_name, props: {})` to create a fresh version of the store (because it may already exist if you came from visiting a previous page). Note: for this example, since we're initializing this from the main layout, we're using a generic name of `@react_props`. In other words, the Rails controller would set `@react_props` to the properties to hydrate the Redux store.
 
 **app/views/layouts/application.html.erb**
 
@@ -19886,7 +19999,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
 `redux_store(store_name, props: {})`
 
 - **store_name:** A name for the store. You'll refer to this name in 2 places in your JavaScript:
-  1. You'll call `ReactOnRails.registerStore({storeName})` in the same place that you register your components.
+  1. You'll call `ReactOnRails.registerStoreGenerators({storeName})` in the same place that you register your components.
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 - **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
@@ -19894,9 +20007,9 @@ For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://git
 
 ## View Helper
 
-`redux_store(store_name, props: {})`
+`redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil)`
 
-This method has the same API as the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
+The view helper accepts the controller extension arguments plus `defer:` and `auto_load_bundle:`. Use `defer: true` to render the store hydration data later through `redux_store_hydration_data`; use `auto_load_bundle:` to auto-load the generated store pack (defaults to `ReactOnRails.configuration.auto_load_bundle`). These two keywords are view-helper-only and are rejected by the controller extension. **HOWEVER**, we recommend the controller extension instead because the Rails executes the template code in the controller action's view file (`erb`, `haml`, `slim`, etc.) before the layout. So long as you call `redux_store` at the beginning of your action's view file, this will work. However, it's an easy mistake to put this call in the wrong place. Calling `redux_store` in the controller action ensures proper load order, regardless of where you call this in the controller action. Note: you won't know of this subtle ordering issue until you server render and you find that your store is not hydrated properly.
 
 `redux_store_hydration_data`
 
@@ -19942,7 +20055,7 @@ end %>
 
 ### `cached_react_component_hash(component_name, options = {}, &block)`
 
-Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true` (required because the hash return value splits server-rendered HTML from the console replay script). Returns a hash with `"html"` and `"consoleReplayScript"` keys.
+Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true` because the render function must return an object of HTML strings. Returns a hash whose `"componentHtml"` key holds the server-rendered HTML; when console replay is enabled, the replay script is embedded in that value. The hash also includes any additional keys your render function returns.
 
 Same caching options as `cached_react_component`.
 
@@ -19951,8 +20064,7 @@ Same caching options as `cached_react_component`.
               cache_key: [@user, @post]) do
   { user: @user.as_json }
 end %>
-<%= result["html"] %>
-<%= content_for :script_tags, result["consoleReplayScript"] %>
+<%= result["componentHtml"] %>
 ```
 
 ### `stream_react_component(component_name, options = {})`
@@ -20140,7 +20252,7 @@ SOURCE: docs/oss/api-reference/generator-details.md
 
 # Generator Details
 
-The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off. The exception is the bundler: **fresh installs now default to Rspack**, so pass `--no-rspack` (or its alias `--webpack`) if you want Webpack instead. Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
+The `react_on_rails:install` generator combined with the example pull requests of generator runs will get you up and running efficiently. There's a fair bit of setup with integrating a bundler with Rails. Most options default to off, with two exceptions: the bundler (**fresh installs now default to Rspack**, so pass `--no-rspack`, or its alias `--webpack`, if you want Webpack instead) and `--agent-files` (on by default — pass `--no-agent-files` to skip writing the AI-agent guidance files). Existing apps that already declare a bundler in `config/shakapacker.yml` are left unchanged.
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
@@ -20150,12 +20262,14 @@ Usage:
 
 Options:
   -T, [--typescript], [--no-typescript]            # Generate TypeScript files and install TypeScript dependencies. Default: false
-      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
-      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack)
       [--tailwind], [--no-tailwind]                # Install Tailwind CSS v4 and style the generated SSR example. Default: false
-      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer. Default: false
-      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro). Default: false
+      [--rspack], [--no-rspack]                    # Use Rspack (default) as the bundler; pass --no-rspack to use Webpack
+      [--webpack], [--no-webpack]                  # Use Webpack as the bundler (alias for --no-rspack; --no-webpack is equivalent to --rspack)
       [--ignore-warnings], [--no-ignore-warnings]  # Skip warnings. Default: false
+      [--agent-files], [--no-agent-files]          # Write AI-agent guidance files (AGENTS.md + editor pointers). Default: true
+      [--pro], [--no-pro]                          # Install React on Rails Pro with Node Renderer
+      [--rsc], [--no-rsc]                          # Install React Server Components support (includes Pro)
+      [--standard-only], [--no-standard-only]      # Install only the open-source package; cannot be combined with --pro or --rsc
 
 Runtime options:
   -f, [--force]                    # Overwrite files that already exist
@@ -20301,7 +20415,7 @@ The default applies only to fresh installs. If `config/shakapacker.yml` already 
 
 - Rspack core packages (`@rspack/core`, `@rspack/cli`)
 - Rspack-specific plugins (`@rspack/plugin-react-refresh`, `rspack-manifest-plugin`)
-- Shakapacker configured with `assets_bundler: 'rspack'` and `webpack_loader: 'swc'`
+- Shakapacker configured with `assets_bundler: 'rspack'` and `javascript_transpiler: 'swc'`
 
 **Switching bundlers after installation:**
 
@@ -22544,9 +22658,12 @@ Some operations require a working Rails environment:
 
 | react_on_rails | Shakapacker | Webpack | Node.js |
 | -------------- | ----------- | ------- | ------- |
+| v17.x          | >= 6.0      | v5      | 20-22   |
 | v16.x          | >= 6.0      | v5      | 20-22   |
 | v14.x          | >= 6.0      | v5      | 18-20   |
 | v13.x          | >= 6.0      | v5      | 16-18   |
+
+The Webpack column lists Webpack compatibility only. React on Rails v17 also supports Rspack as the assets bundler via Shakapacker's `assets_bundler: 'rspack'`.
 
 ### Common Upgrade Issues
 
@@ -22985,15 +23102,16 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 - **Webpacker support completely removed**. Shakapacker >= 6.0 is now required.
 - **Updated runtime requirements**:
-  - Minimum Ruby version: 3.2 (v16 minimum; v17 requires 3.3+)
-  - Minimum Node.js version: 20
+  - Minimum Ruby version: 3.0 (v16 minimum; v17 requires 3.3+)
+  - Minimum Node.js version: 18
+  - CI tests against newer Ruby and Node.js versions than these minimums; CI targets are not support floors
 - **Install generator now validates prerequisites** and requires at least one JavaScript package manager
 
 ### Migration Steps
 
 1. **Update Dependencies**
 
-   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
+   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest stable release and substitute accordingly.
 
    ```ruby
    # Gemfile
@@ -24244,6 +24362,10 @@ React on Rails is a better fit when you want one or more of these:
 
 If your app is already happy with a Vite-only client-rendered setup, this migration is optional.
 
+If you are weighing the bundler change itself — why React on Rails ships on Rspack rather than Vite — see
+[Why Rspack (and not Vite)?](../getting-started/why-rspack.md) for the recorded decision, the published
+measurements so far, and the revisit triggers.
+
 ## Two different starting points
 
 Not all `vite_rails` + React apps are the same shape, and the migration effort differs for each:
@@ -24831,7 +24953,7 @@ Enable Rspack in `config/shakapacker.yml`:
 ```yaml
 default: &default
   assets_bundler: 'rspack' # or 'webpack'
-  webpack_loader: 'swc' # Rspack works best with SWC
+  javascript_transpiler: 'swc' # Rspack works best with SWC
 ```
 
 ## Troubleshooting
@@ -25001,7 +25123,7 @@ This document describes the migration from Babel to SWC for JavaScript/TypeScrip
 
 ## What is SWC?
 
-SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. Shakapacker 9.0+ uses SWC as the default transpiler.
+SWC (Speedy Web Compiler) is a Rust-based JavaScript/TypeScript compiler that is approximately 20x faster than Babel. SWC is available in Shakapacker 9.0+: Rspack projects use SWC by default, while Webpack projects default to Babel and opt in via `javascript_transpiler: swc` as shown below.
 
 ## Prerequisites
 
@@ -25324,7 +25446,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 > [!NOTE]
 > **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) with the node renderer. Current public releases (16.2.0+) are version-aligned: install Pro at the same version as `react_on_rails`. The Pro gem provides the streaming view helpers (`stream_react_component`, `stream_react_component_with_async_props`, `rsc_payload_react_component`, and `rsc_payload_react_component_with_async_props`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -25532,7 +25654,7 @@ These mistakes account for the majority of setup failures:
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with React on Rails 15+
+- [React on Rails Pro](../../pro/react-on-rails-pro.md) installed at the same version as React on Rails (current public releases, 16.2.0+, are version-aligned)
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
@@ -25582,7 +25704,7 @@ After these steps, every component is still a Client Component (because of the `
 
 Before starting, ensure you have:
 
-- **React on Rails Pro 4+** with **React on Rails 15+**
+- **React on Rails Pro** and **React on Rails** installed at the same version — current public releases (16.2.0+) are version-aligned, and the Pro gem depends on the exact matching `react_on_rails` release
 - **React 19.2.x** (`react` and `react-dom` both at 19.2.x with patch `>= 19.2.7` for the React on Rails Pro 17 RSC path)
 - **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
@@ -31850,7 +31972,7 @@ SOURCE: docs/oss/upgrading/release-notes/16.0.0.md
 
 # React on Rails 16.0.0 Release Notes
 
-Also see the [Changelog for 16.0.0](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#1600---2025-01-xx).
+Also see the [Changelog for 16.0.0](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#1600---2025-09-16).
 
 **Note: Version 15.0.0 has been retracted. Please upgrade directly from v14 to v16.**
 
@@ -32052,17 +32174,19 @@ The `config.immediate_hydration` setting in `config/initializers/react_on_rails.
 2. **Pro users:** No action needed - immediate hydration is now enabled automatically
 3. **Non-Pro users:** No action needed - standard hydration behavior continues
 
-**Component-level overrides still work:**
+**Component-level overrides (historical — accurate for v16.2.0 only):**
+
+> **⚠️ No longer supported.** In v16.2.0 you could override immediate hydration per component or per store. This option was **completely removed in v16.6.0** ([PR 2834](https://github.com/shakacode/react_on_rails/pull/2834)). The helpers now log a warning and ignore `immediate_hydration:`. Immediate hydration is automatic (enabled for Pro users, disabled for non-Pro), with no per-component override. Remove any `immediate_hydration:` keys from your `react_component` / `react_component_hash` / `redux_store` calls. The example below is retained only as a record of the v16.2.0 behavior.
 
 ```ruby
-# Override for a specific component
-<%= react_component("MyComponent", props, immediate_hydration: false) %>
+# Override for a specific component (v16.2.0 only — removed in v16.6.0)
+<%= react_component("MyComponent", props: props, immediate_hydration: false) %>
 
-# Override for a specific store
+# Override for a specific store (v16.2.0 only — removed in v16.6.0)
 <%= redux_store("MyStore", props: store_props, immediate_hydration: true) %>
 ```
 
-**Note:** If a non-Pro user explicitly sets `immediate_hydration: true`, a warning will be logged and the value will be overridden to `false`.
+**Note:** In v16.2.0, if a non-Pro user explicitly set `immediate_hydration: true`, a warning was logged and the value was overridden to `false`. As of v16.6.0 the option is ignored entirely.
 
 [PR 1997](https://github.com/shakacode/react_on_rails/pull/1997) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
@@ -32333,7 +32457,7 @@ Removed obsolete minimum version checks (6.5.1) and example generation pinning (
 - **Multiple License Plan Types**: License validation now supports plan types beyond "paid": `startup`, `nonprofit`, `education`, `oss`, and `partner`. [PR 2334](https://github.com/shakacode/react_on_rails/pull/2334).
 - **Node Renderer Master/Worker Exports**: Added public `master` and `worker` exports to `react-on-rails-pro-node-renderer`. [PR 2326](https://github.com/shakacode/react_on_rails/pull/2326).
 
-See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the full list of changes.
+See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the full list of changes.
 
 ================================================================================
 PAGE: https://reactonrails.com/docs/upgrading/release-notes/16.4.0
@@ -32366,7 +32490,7 @@ Then run `bundle install` and your package manager's install command.
 
 ## Highlights
 
-This is a large release with significant improvements to the install generator, development workflow, and Pro stability. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the full list of changes.
+This is a large release with significant improvements to the install generator, development workflow, and Pro stability. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the full list of changes.
 
 ### Generator Improvements
 
@@ -32396,5 +32520,5 @@ This is a large release with significant improvements to the install generator, 
 
 ### Bug Fixes
 
-Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
+Numerous bug fixes for CSS module SSR with rspack, `bin/dev` hook resolution, generator test defaults, precompile hook coordination, and more. See the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 

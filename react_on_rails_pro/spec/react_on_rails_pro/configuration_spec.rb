@@ -112,6 +112,26 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     end
 
     describe ".rolling_deploy_adapter" do
+      it "exposes the singular previous URL through the plural backward-compatible accessor" do
+        config = described_class.new(
+          rolling_deploy_previous_url: "https://old.example.com/rolling"
+        )
+
+        expect(config.rolling_deploy_previous_urls).to eq("https://old.example.com/rolling")
+      end
+
+      it "fails setup clearly when singular and plural previous URLs are both configured" do
+        config = described_class.new(
+          rolling_deploy_adapter: ReactOnRailsPro::RollingDeployAdapters::Http,
+          rolling_deploy_token: "t" * 32,
+          rolling_deploy_previous_url: "https://old.example.com/rolling",
+          rolling_deploy_previous_urls: ["https://new.example.com/rolling"]
+        )
+
+        expect { config.setup_config_values }
+          .to raise_error(ReactOnRailsPro::Error, /both rolling_deploy_previous_url and rolling_deploy_previous_urls/)
+      end
+
       it "throws if upload does not accept bundle and assets keyword arguments" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []
