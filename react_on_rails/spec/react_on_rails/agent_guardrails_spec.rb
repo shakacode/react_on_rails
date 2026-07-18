@@ -7,6 +7,7 @@ require "json"
 require "open3"
 require "rbconfig"
 require "rake"
+require "pathname"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -287,6 +288,96 @@ module ReactOnRails
       )
 
       stdout, stderr, status = run_hook("app/controllers/ordinary_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "does not treat a skip_before_action inside a heredoc body as real code" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          before_action :authenticate_user!
+          DOC = <<~DOCS
+            skip_before_action :authenticate_user!
+          DOCS
+          include RSCPayloadRenderer
+        RUBY
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "does not treat a skip_before_action inside a multiline string literal as real code" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!\nDOC = \"\nskip_before_action :authenticate_user!\n\"\n" \
+        "include RSCPayloadRenderer\n"
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "still warns for a real skip_before_action alongside a heredoc mentioning callbacks" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        <<~RUBY
+          before_action :authenticate_user!
+          DOC = <<~DOCS
+            before_action :authenticate_user!
+          DOCS
+          skip_before_action :authenticate_user!
+          include RSCPayloadRenderer
+        RUBY
+      )
+
+      stdout, _stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(additional_context(stdout)).to include("shows no before_action/authentication")
+    end
+
+    it "accepts an authentication callback whose action list is a plain string" do
+      described_class.install(@app_root)
+      controller_path = File.join(@app_root, "app/controllers/rsc_payload_controller.rb")
+      FileUtils.mkdir_p(File.dirname(controller_path))
+      File.write(
+        controller_path,
+        "before_action :authenticate_user!, only: \"rsc_payload\"\ninclude RSCPayloadRenderer\n"
+      )
+
+      stdout, stderr, status = run_hook("app/controllers/rsc_payload_controller.rb")
+
+      expect(status).to be_success
+      expect(stdout).to be_empty
+      expect(stderr).to be_empty
+    end
+
+    it "does not warn when a routes file only mentions the payload route inside a heredoc" do
+      described_class.install(@app_root)
+      routes_path = File.join(@app_root, "config/routes.rb")
+      FileUtils.mkdir_p(File.dirname(routes_path))
+      File.write(routes_path, "TIP = <<~TXT\n  rsc_payload_route\nTXT\n")
+
+      stdout, stderr, status = run_hook("config/routes.rb")
 
       expect(status).to be_success
       expect(stdout).to be_empty
@@ -652,6 +743,67 @@ module ReactOnRails
         expect(File.exist?(File.join(claude_dir, "skills/rsc-app-safety/SKILL.md"))).to be false
         expect(File.exist?(File.join(claude_dir, "hooks/rsc-app-safety-check.rb"))).to be false
       end
+    end
+
+    it "leaves an existing settings.json intact when the settings write fails partway" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      original = { "hooks" => { "PostToolUse" => [] }, "model" => "opus" }
+      File.write(settings_path, "#{JSON.pretty_generate(original)}\n")
+      allow(File).to receive(:rename).and_raise(Errno::EIO)
+
+      expect { described_class.install(@app_root) }.to raise_error(SystemCallError)
+
+      expect(JSON.parse(File.read(settings_path))).to eq(original)
+      expect(Dir.children(File.dirname(settings_path))).not_to include(a_string_matching(/\.tmp\z/))
+    end
+
+    it "preserves the permissions of an existing settings.json across an update" do
+      settings_path = File.join(@app_root, ".claude/settings.json")
+      FileUtils.mkdir_p(File.dirname(settings_path))
+      File.write(settings_path, "{}\n")
+      File.chmod(0o600, settings_path)
+
+      described_class.install(@app_root)
+
+      expect(File.stat(settings_path).mode & 0o7777).to eq(0o600)
+      expect(rsc_hooks.size).to eq(1)
+    end
+
+    describe ".default_destination_root" do
+      it "prefers an explicit destination" do
+        expect(described_class.default_destination_root("/explicit/root")).to eq("/explicit/root")
+      end
+
+      it "falls back to the working directory outside a Rails app" do
+        allow(Rails).to receive(:root).and_return(nil)
+
+        expect(described_class.default_destination_root(nil)).to eq(Dir.pwd)
+      end
+
+      it "resolves the Rails application root so a subdirectory invocation still targets the app" do
+        allow(Rails).to receive(:root).and_return(Pathname.new("/apps/my_app"))
+
+        expect(described_class.default_destination_root(nil)).to eq("/apps/my_app")
+      end
+    end
+
+    it "installs into the Rails application root when run from a subdirectory" do
+      subdirectory = File.join(@app_root, "app/controllers")
+      FileUtils.mkdir_p(subdirectory)
+      allow(Rails).to receive(:root).and_return(Pathname.new(@app_root))
+      original_rake_application = Rake.application
+      Rake.application = Rake::Application.new
+      load File.expand_path("../../lib/tasks/agent_guardrails.rake", __dir__)
+
+      expect do
+        Dir.chdir(subdirectory) { Rake::Task["react_on_rails:install_rsc_agent_guardrails"].invoke }
+      end.to output(a_string_including("RSC agent guardrails")).to_stdout
+
+      expect(File.file?(File.join(@app_root, ".claude/settings.json"))).to be true
+      expect(File.exist?(File.join(subdirectory, ".claude"))).to be false
+    ensure
+      Rake.application = original_rake_application
     end
 
     it "reports filesystem errors from the install task without a raw backtrace" do

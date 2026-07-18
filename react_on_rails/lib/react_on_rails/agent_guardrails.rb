@@ -2,6 +2,7 @@
 
 require "json"
 require "fileutils"
+require "tempfile"
 
 module ReactOnRails
   # Installs (and idempotently updates) the RSC "agent guardrail" assets into a host app:
@@ -36,6 +37,17 @@ module ReactOnRails
 
     def self.new_installer(destination_root, skip_existing: false)
       Installer.new(destination_root, skip_existing:)
+    end
+
+    # Where guardrails get installed when no explicit destination is given. Prefers the Rails
+    # application root so the task installs into the app's `.claude/` even when rake is invoked
+    # from a subdirectory; falls back to the working directory outside a Rails app.
+    def self.default_destination_root(explicit = nil)
+      explicit = explicit.to_s
+      return explicit unless explicit.empty?
+
+      rails_root = defined?(Rails) && Rails.respond_to?(:root) ? Rails.root : nil
+      rails_root ? rails_root.to_s : Dir.pwd
     end
 
     # Encapsulates a single install run against one app root.
@@ -94,8 +106,28 @@ module ReactOnRails
         add_hook(settings)
         FileUtils.mkdir_p(File.dirname(settings_path))
         existed = File.exist?(settings_path)
-        File.write(settings_path, "#{JSON.pretty_generate(settings)}\n")
+        atomic_write(settings_path, "#{JSON.pretty_generate(settings)}\n")
         existed ? "updated    #{SETTINGS_REL} (registered hook)" : "created    #{SETTINGS_REL} (registered hook)"
+      end
+
+      # settings.json is the user's file and may hold unrelated configuration, so it is replaced by
+      # rename rather than truncate-and-write: an interrupted or failed write can never leave a
+      # half-written or empty settings file behind.
+      def atomic_write(path, content)
+        directory = File.dirname(path)
+        mode = File.exist?(path) ? File.stat(path).mode & 0o7777 : 0o644
+        temp = Tempfile.create([".#{File.basename(path)}", ".tmp"], directory)
+        begin
+          temp.write(content)
+          temp.flush
+          temp.fsync
+          temp.close
+          File.chmod(mode, temp.path)
+          File.rename(temp.path, path)
+        rescue StandardError
+          FileUtils.rm_f(temp.path)
+          raise
+        end
       end
 
       def remove_legacy_hook

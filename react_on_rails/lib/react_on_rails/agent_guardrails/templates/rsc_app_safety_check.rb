@@ -19,6 +19,10 @@ AUTH_NAME = /
 /x
 AUTH_CALLBACK_NAME = "(?:prepend_|append_)?before_action"
 COMMENT_EVENTS = %i[on_comment on_embdoc_beg on_embdoc on_embdoc_end].freeze
+# String, heredoc, and regexp bodies are data, not executable code. Ripper reports all of them as
+# :on_tstring_content, so they must be neutralized alongside comments — otherwise a
+# `skip_before_action` written inside a heredoc reads as a real callback and produces a false warning.
+STRING_BODY_EVENTS = %i[on_tstring_content].freeze
 SCOPE_SYNTAX = /(?:%[iw](?:\[[^\]]*\]|\([^)]*\)|\{[^}]*\})|\[[^\]]*\]|:[A-Za-z_]\w*[!?]?|["'][^"']+["'])/
 ONLY_SCOPE = /\A,\s*only:\s*(#{SCOPE_SYNTAX})\z/o
 EXCEPT_SCOPE = /\A,\s*except:\s*(#{SCOPE_SYNTAX})\z/o
@@ -86,10 +90,43 @@ rescue ArgumentError
   []
 end
 
-def uncommented_ruby_lines(tokens)
-  tokens.each_with_object(+"") do |(_position, event, token, _state), uncommented|
-    uncommented << (COMMENT_EVENTS.include?(event) ? token.gsub(/[^\n]/, " ") : token)
+def blank_text(text)
+  text.gsub(/[^\n]/, " ")
+end
+
+# Blanks only the parts of a string body that begin a source line, because those are the parts that
+# can masquerade as a statement to the line-oriented callback scanner. Content that starts mid-line
+# (`only: "rsc_payload"`) is preserved so callback scope parsing keeps working.
+def blank_line_starting_text(text, column)
+  text.split("\n", -1).each_with_index.map do |part, index|
+    index.zero? && column.positive? ? part : blank_text(part)
+  end.join("\n")
+end
+
+def scannable_ruby_lines(tokens)
+  heredoc_depth = 0
+  tokens.each_with_object(+"") do |(position, event, token, _state), scannable|
+    heredoc_depth += 1 if event == :on_heredoc_beg
+    heredoc_depth -= 1 if event == :on_heredoc_end
+    scannable << if COMMENT_EVENTS.include?(event)
+                   blank_text(token)
+                 elsif STRING_BODY_EVENTS.include?(event)
+                   # Every line of a heredoc body begins a source line; Ripper reports its indentation
+                   # as a separate token, so the body's column is not a reliable signal there.
+                   heredoc_depth.positive? ? blank_text(token) : blank_line_starting_text(token, position[1])
+                 else
+                   token
+                 end
   end.lines
+end
+
+# Executable lines only. Falls back to a crude comment strip when the file does not lex (so an
+# unparseable routes file still gets its advisory rather than silently passing).
+def code_lines(content)
+  tokens = ruby_tokens(content)
+  return scannable_ruby_lines(tokens) if tokens.any?
+
+  content.lines.map { |line| line.sub(/#.*/, "") }
 end
 
 def renderer_evidence?(tokens)
@@ -140,13 +177,13 @@ relative_path = file.delete_prefix("#{root}/")
 detail = case file
          when %r{\A(?:.*/)?config/routes(?:/[^/]+)?\.rb\z}
            content = read_file(file)
-           if content&.lines&.any? { |line| line.sub(/#.*/, "").include?("rsc_payload_route") }
+           if content && code_lines(content).any? { |line| line.include?("rsc_payload_route") }
              "This routes file mounts rsc_payload_route (a public RSC endpoint)."
            end
          when %r{\A(?:.*/)?app/controllers/.+\.rb\z}
            content = read_file(file)
            tokens = ruby_tokens(content) if content
-           lines = uncommented_ruby_lines(tokens) if tokens&.any?
+           lines = scannable_ruby_lines(tokens) if tokens&.any?
            if lines && renderer_evidence?(tokens) && !authentication_evidence?(lines)
              "This controller wires an RSC payload renderer, but the edited file shows no " \
                "before_action/authentication locally. Inherited callbacks are not inspected."

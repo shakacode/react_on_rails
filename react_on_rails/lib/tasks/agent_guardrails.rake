@@ -6,7 +6,7 @@ namespace :react_on_rails do
   desc "Install/update the RSC agent-guardrail skill + advisory hook into this app's .claude/ " \
        "(steers AI coding agents away from React Server Components API footguns; idempotent)"
   task :install_rsc_agent_guardrails do
-    root = ENV["DESTINATION"].to_s.empty? ? Dir.pwd : ENV.fetch("DESTINATION", nil)
+    root = ReactOnRails::AgentGuardrails.default_destination_root(ENV.fetch("DESTINATION", nil))
     actions = ReactOnRails::AgentGuardrails.install(root)
 
     puts "React on Rails: RSC agent guardrails -> #{File.join(root, '.claude')}"
