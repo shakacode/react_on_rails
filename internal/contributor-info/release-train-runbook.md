@@ -737,8 +737,46 @@ require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push   # push main directly or push the exact forward-port PR branch
 # If a PR is required, complete its exact-head gates, then in the merger's shell:
 FORWARD_PORT_PR="${FORWARD_PORT_PR:?set the forward-port PR number or URL}"
+forward_port_pr_json="$(gh pr view "${FORWARD_PORT_PR}" --json id,headRefOid)" || {
+  echo "could not resolve the forward-port PR identity; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+FORWARD_PORT_PR_ID="$(
+  jq -er '.id | select(type == "string" and length > 0)' <<<"${forward_port_pr_json}"
+)" || {
+  echo "forward-port PR node id is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+FORWARD_PORT_HEAD_OID="$(
+  jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+    <<<"${forward_port_pr_json}"
+)" || {
+  echo "forward-port PR head OID is missing or invalid; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-gh pr merge "${FORWARD_PORT_PR}" --rebase   # stop if this would queue or defer the merge
+forward_port_merge_result="$(
+  gh api graphql \
+    -f query='mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
+      mergePullRequest(input: {
+        pullRequestId: $pullRequestId
+        expectedHeadOid: $expectedHeadOid
+        mergeMethod: REBASE
+      }) {
+        pullRequest { merged }
+      }
+    }' \
+    -f pullRequestId="${FORWARD_PORT_PR_ID}" \
+    -f expectedHeadOid="${FORWARD_PORT_HEAD_OID}"
+)" || {
+  echo "synchronous forward-port PR merge failed; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
+jq -e '.data.mergePullRequest.pullRequest.merged == true' \
+  >/dev/null <<<"${forward_port_merge_result}" || {
+  echo "forward-port PR was not merged synchronously; stop closeout" >&2
+  return 1 2>/dev/null || exit 1
+}
 # 2. Delete the ephemeral branch — the tags are the durable record.
 require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
 git push origin --delete release/17.0.0
@@ -827,8 +865,46 @@ audited manual path instead:
    git push   # push main directly or push the exact selective-closeout PR branch
    # If a PR is required, complete its exact-head gates, then:
    SELECTIVE_CLOSEOUT_PR="${SELECTIVE_CLOSEOUT_PR:?set the selective-closeout PR number or URL}"
+   selective_closeout_pr_json="$(gh pr view "${SELECTIVE_CLOSEOUT_PR}" --json id,headRefOid)" || {
+     echo "could not resolve the selective-closeout PR identity; stop closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   SELECTIVE_CLOSEOUT_PR_ID="$(
+     jq -er '.id | select(type == "string" and length > 0)' <<<"${selective_closeout_pr_json}"
+   )" || {
+     echo "selective-closeout PR node id is missing or invalid; stop closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   SELECTIVE_CLOSEOUT_HEAD_OID="$(
+     jq -er '.headRefOid | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+       <<<"${selective_closeout_pr_json}"
+   )" || {
+     echo "selective-closeout PR head OID is missing or invalid; stop closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
    require_live_release_line_lease || { return 1 2>/dev/null || exit 1; }
-   gh pr merge "${SELECTIVE_CLOSEOUT_PR}" --rebase   # stop if this would queue or defer the merge
+   selective_closeout_merge_result="$(
+     gh api graphql \
+       -f query='mutation($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
+         mergePullRequest(input: {
+           pullRequestId: $pullRequestId
+           expectedHeadOid: $expectedHeadOid
+           mergeMethod: REBASE
+         }) {
+           pullRequest { merged }
+         }
+       }' \
+       -f pullRequestId="${SELECTIVE_CLOSEOUT_PR_ID}" \
+       -f expectedHeadOid="${SELECTIVE_CLOSEOUT_HEAD_OID}"
+   )" || {
+     echo "synchronous selective-closeout PR merge failed; stop closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
+   jq -e '.data.mergePullRequest.pullRequest.merged == true' \
+     >/dev/null <<<"${selective_closeout_merge_result}" || {
+     echo "selective-closeout PR was not merged synchronously; stop closeout" >&2
+     return 1 2>/dev/null || exit 1
+   }
    ```
 
    Refetch `origin/main` and the exact release ref with the explicit tracking
