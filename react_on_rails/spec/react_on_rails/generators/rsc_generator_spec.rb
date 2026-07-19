@@ -27,11 +27,23 @@ describe RscGenerator, type: :generator do
 
     it "uses Shakapacker's watch binstub when it is present" do
       simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o755, File.join(destination_root, "bin/shakapacker-watch"))
 
       Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
 
       assert_file "Procfile.dev" do |content|
         expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+    end
+
+    it "uses the standard Shakapacker command when the watch binstub is not executable" do
+      simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o644, File.join(destination_root, "bin/shakapacker-watch"))
+
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
       end
     end
   end
