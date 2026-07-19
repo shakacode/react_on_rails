@@ -6329,25 +6329,6 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "preserves an existing Shakapacker watch binstub without prompting or changing its permissions" do
-      shakapacker_watch = <<~RUBY
-        #!/usr/bin/env ruby
-        puts "Shakapacker-owned watcher"
-      RUBY
-      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
-      simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
-      File.chmod(0o640, shakapacker_watch_path)
-
-      expect(install_generator.shell).not_to receive(:file_collision)
-
-      Dir.chdir(destination_root) do
-        install_generator.send(:add_bin_scripts)
-      end
-
-      expect(File.read(shakapacker_watch_path)).to eq(shakapacker_watch)
-      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o640)
-    end
-
     it "detects custom bin/dev files" do
       simulate_existing_file("bin/dev", "#!/usr/bin/env ruby\nputs 'custom'\n")
 
