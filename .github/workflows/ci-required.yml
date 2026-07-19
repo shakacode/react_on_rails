@@ -61,7 +61,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           repository: shakacode/agent-workflows
-          ref: 8f6ab757486b8d579ff13ece32144da0f6f6d0f6
+          ref: 1958648b70a450aa67c15b833428485d17021045
           path: .agent-workflows-source
           fetch-depth: 1
           persist-credentials: false
@@ -70,8 +70,6 @@ jobs:
         # yamllint disable rule:line-length
         run: |
           ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root .agent-workflows-source
-          AGENT_WORKFLOWS_SOURCE_ROOT=.agent-workflows-source \
-            ruby .agents/skills/pr-batch/bin/stage-dependency-gate-test.rb
           .agent-workflows-source/bin/check-agent-workflow-drift \
             --manifest .agents/agent-workflow-drift.yml \
             --source-root .agent-workflows-source \

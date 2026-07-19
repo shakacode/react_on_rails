@@ -205,4 +205,7 @@ test from React on Rails.
 - `ruby bin/push-downstream-test.rb`
 - `bin/agent-workflow-seam-doctor --root <consumer-repo> --shared <this-repo>`
 - `ruby .agents/bin/agent-workflow-drift-manifest-test.rb --source-root <pinned-agent-workflows>`
+- `<pinned-agent-workflows>/bin/check-agent-workflow-drift --manifest
+<consumer-repo>/.agents/agent-workflow-drift.yml --source-root
+<pinned-agent-workflows> --consumer-root <consumer-repo>`
 - Markdown review for edited docs

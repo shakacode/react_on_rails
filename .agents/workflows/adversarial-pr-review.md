@@ -10,13 +10,6 @@ For a verified Codex GPT-5.6 route profile:
 Sol/high remains the route for routine deterministic QA, not this qualifying
 adversarial verdict.
 
-For a verified Claude route profile (`claude-profile v0`, provisional):
-
-- Independent adversarial QA: Opus 4.8/xhigh
-
-Opus 4.8/high remains the route for routine deterministic QA, not this
-qualifying adversarial verdict.
-
 ## Safety Rules
 
 - Report only by default. Do not create commits, comments, labels, issues, review approvals, thread resolutions, pushes, merges, or changelog edits without explicit user approval.

@@ -26,7 +26,9 @@ RED -> GREEN -> REFACTOR -> repeat
    - For a feature or behavior change, start with the smallest user-visible or public-interface behavior.
    - Prefer tests through public interfaces and real code paths over tests coupled to private implementation details.
 2. RED: write one failing test.
-   - Run the new test with the repo's narrowest relevant test invocation. Start from `.agents/bin/test` when present, then narrow using the repo's test framework convention.
+   - Run the new test with the repo's narrowest relevant test invocation from
+     `AGENTS.md`; use `.agents/bin/test` only when the wrapper accepts the needed
+     selector or when the narrow loop is ready for the broader repository default.
    - Confirm the test fails for the right reason: the missing behavior or reproduced bug.
    - If it fails because of a typo, missing import, bad fixture, or harness problem, fix the test setup before touching production code.
    - If it passes immediately, do not proceed to GREEN: the test describes existing behavior; tighten or replace it until you have watched the intended failure.

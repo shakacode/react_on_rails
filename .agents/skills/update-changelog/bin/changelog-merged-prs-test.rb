@@ -21,9 +21,8 @@ RANGE_SUBJECTS = [
   "Bump version to 17.0.0"
 ].freeze
 
-# Fake gh stub. Maps the bare commit's sha (%<bare_sha>s) to merged PRs on the
-# default and release branches, returns [] for every other commit, and answers
-# repo-view queries.
+# Fake gh stub. Maps the bare commit's sha (%<bare_sha>s) to merged PR 3597 on
+# base main, returns [] for every other commit, and answers repo-view queries.
 FAKE_GH = <<~BASH
   #!/usr/bin/env bash
   set -euo pipefail
@@ -39,11 +38,8 @@ FAKE_GH = <<~BASH
   if [ "${1:-}" = "api" ]; then
     for arg in "$@"; do
       case "$arg" in
-        */commits/%<inline_sha>s/pulls)
-          printf '[{"number":3595,"title":"Original main PR","merged_at":"2026-01-01T00:00:00Z","base":{"ref":"main"}},{"number":4595,"title":"Release backport PR","merged_at":"2026-01-02T00:00:00Z","base":{"ref":"release/17.0.0"}}]'
-          exit 0 ;;
         */commits/%<bare_sha>s/pulls)
-          printf '[{"number":3597,"title":"Resolved via commit API","merged_at":"2026-01-01T00:00:00Z","base":{"ref":"main"}},{"number":4597,"title":"Resolved release-branch PR","merged_at":"2026-01-02T00:00:00Z","base":{"ref":"release/17.0.0"}}]'
+          printf '[{"number":3597,"title":"Resolved via commit API","merged_at":"2026-01-01T00:00:00Z","base":{"ref":"main"}}]'
           exit 0 ;;
         */commits/*/pulls) printf '[]'; exit 0 ;;
       esac
@@ -140,51 +136,6 @@ class ChangelogMergedPrsTest < Minitest::Test
     end
   end
 
-  def test_target_branch_selects_release_branch_api_pr
-    with_fixture do |repo, bin_dir|
-      json = JSON.parse(
-        run_script(
-          repo, bin_dir, "base..target", "--repo", "shakacode/react_on_rails",
-          "--target-branch", "release/17.0.0"
-        )
-      )
-
-      assert_includes json.map { |row| row["pr"] }, 4595
-      assert_includes json.map { |row| row["pr"] }, 4597
-      refute_includes json.map { |row| row["pr"] }, 3595
-      refute_includes json.map { |row| row["pr"] }, 3597
-    end
-  end
-
-  def test_explicit_default_branch_keeps_inline_fast_path
-    with_fixture do |repo, bin_dir|
-      json = JSON.parse(
-        run_script(
-          repo, bin_dir, "base..target", "--repo", "shakacode/react_on_rails",
-          "--target-branch", "main"
-        )
-      )
-
-      assert_includes json.map { |row| row["pr"] }, 3595
-      assert_includes json.map { |row| row["pr"] }, 3596
-      refute_includes json.map { |row| row["pr"] }, 4595
-    end
-  end
-
-  def test_target_branch_emits_unknown_without_selected_target_match
-    with_fixture do |repo, bin_dir|
-      json = JSON.parse(
-        run_script(
-          repo, bin_dir, "base..target", "--repo", "shakacode/react_on_rails",
-          "--target-branch", "release/17.0.0"
-        )
-      )
-      original_merge = json.find { |row| row["subject"].include?("#3596") }
-
-      assert_equal "UNKNOWN", original_merge["pr"]
-    end
-  end
-
   def test_self_check_passes
     out, status = Open3.capture2e("ruby", SCRIPT, "--self-check")
     assert status.success?, out
@@ -221,14 +172,6 @@ class ChangelogMergedPrsTest < Minitest::Test
     assert_includes out, "--repo must be in OWNER/REPO form"
   end
 
-  def test_rejects_invalid_target_branch
-    out, status = Open3.capture2e(
-      "ruby", SCRIPT, "a..b", "--repo", "a/b", "--target-branch", "release branch"
-    )
-    refute status.success?
-    assert_includes out, "--target-branch must be a valid branch name"
-  end
-
   private
 
   # Build a throwaway repo + fake gh on PATH, then yield (repo, bin_dir).
@@ -237,11 +180,7 @@ class ChangelogMergedPrsTest < Minitest::Test
       build_fixture_repo(repo)
       bin_dir = File.join(repo, "bin")
       FileUtils.mkdir_p(bin_dir)
-      write_fake_gh(
-        bin_dir,
-        sha_for(repo, "Refactor render path"),
-        sha_for(repo, "Add RSC manifest verification")
-      )
+      write_fake_gh(bin_dir, sha_for(repo, "Refactor render path"))
       yield repo, bin_dir
     end
   end
@@ -270,9 +209,9 @@ class ChangelogMergedPrsTest < Minitest::Test
     line.split(" ", 2).first
   end
 
-  def write_fake_gh(bin_dir, bare_sha, inline_sha)
+  def write_fake_gh(bin_dir, bare_sha)
     path = File.join(bin_dir, "gh")
-    File.write(path, format(FAKE_GH, bare_sha:, inline_sha:))
+    File.write(path, format(FAKE_GH, bare_sha:))
     FileUtils.chmod(0o755, path)
   end
 

@@ -26,16 +26,6 @@ For a verified Codex GPT-5.6 host, the recommended exact routing profile is:
 - Independent adversarial QA: Sol/xhigh
 - Routine deterministic QA: Sol/high
 
-For a verified Claude host, the provisional recommended exact routing profile
-(`claude-profile v0`) is:
-
-- Multi-lane coordinator: Opus 4.8/xhigh
-- Simple, positively classified worker: Sonnet 5/high
-- Unknown or uncertain worker: Opus 4.8/xhigh
-- High-risk or escalated work: Opus 4.8/xhigh
-- Independent adversarial QA: Opus 4.8/xhigh
-- Routine deterministic QA: Opus 4.8/high
-
 Other runtimes continue to use the portable `fastest-low-cost`, `balanced`, and
 `strongest` classes until dispatch binds an exact supported pair.
 
@@ -52,7 +42,7 @@ Other runtimes continue to use the portable `fastest-low-cost`, `balanced`, and
 | `$pr-batch`          | One or more exact targets are trusted and ready to run or convert into a `/goal` prompt.                    | A single-target lane, launch plan, worker split, or final `/goal` prompt.                                                     |
 | `$replicate-ci`      | Local validation is green but hosted CI is red, or runner/toolchain parity is suspected.                    | A CI parity report with reproduction result, environment delta, and next action.                                              |
 
-The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill. Deliberate exclusion: `qa-stress` ships without picker metadata because destructive stress campaigns must be invoked by explicit request, not surfaced through default picker prompting.
+The `agents/openai.yaml` file under a skill is optional Codex UI metadata for skill picker display text and the default prompt. Add it only for skills that need Codex picker metadata; it is not required for every skill.
 
 ## Issue Audit Prompt Flow
 
@@ -207,7 +197,8 @@ and requires `MODEL_ESCALATION_REQUEST` before stronger-model review or replacem
   coverage is the specific risk. Direct `ready-for-hosted-ci` labels are a
   human/local user-token path, not a substitute for comment-command dispatch
   from automation. If the trigger reports specific Actions run ids or URLs, pass
-  them to `skills/pr-batch/bin/pr-ci-readiness` with `--requested-hosted-run` so
+  them to `"${PR_BATCH_SKILL_DIR}/bin/pr-ci-readiness"` with
+  `--requested-hosted-run` so
   readiness waits for the explicitly requested current-head hosted runs only; in
   repos with no usable required checks, those requested runs gate readiness
   instead of the full advisory check list.
