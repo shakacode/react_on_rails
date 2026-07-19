@@ -492,6 +492,16 @@ module GeneratorHelper
     nil
   end
 
+  # Prefer Shakapacker's optional watcher binstub when the application has it. Older
+  # supported Shakapacker installations can still run watch mode through the required
+  # bin/shakapacker binstub, so React on Rails does not need to vendor a fallback watcher.
+  def shakapacker_watch_command
+    watch_binstub = File.join(destination_root, "bin/shakapacker-watch")
+    executable = File.exist?(watch_binstub) ? "bin/shakapacker-watch" : "bin/shakapacker"
+
+    "#{executable} --watch"
+  end
+
   # Check if Shakapacker 9.0 or higher is available
   # Returns true if Shakapacker >= 9.0, false otherwise
   #

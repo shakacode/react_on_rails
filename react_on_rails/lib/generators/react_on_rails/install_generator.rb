@@ -675,15 +675,10 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
-        preserve_existing_shakapacker_watch = File.exist?(shakapacker_watch_path)
-        # Always exclude these scripts from the bulk copy. `dev` needs app-specific patches,
-        # while Shakapacker owns its watch binstub when it provides one.
-        directory_options = { exclude_pattern: %r{/(?:dev|shakapacker-watch)(?:\.tt)?\z} }
+        # Always exclude `dev` from the bulk copy; it is handled explicitly below
+        # so we can patch DEFAULT_ROUTE and AUTO_OPEN_BROWSER_ONCE after copying.
+        directory_options = { exclude_pattern: %r{/dev(?:\.tt)?\z} }
         directory template_bin_path, "bin", directory_options
-        unless preserve_existing_shakapacker_watch
-          copy_file("#{template_bin_path}/shakapacker-watch", "bin/shakapacker-watch")
-        end
 
         if preserve_existing_bin_dev?
           if use_rsc? && !options.redux? && !options.new_app?
@@ -706,10 +701,7 @@ module ReactOnRails
 
         # Make these and only these files executable. Use destination_root so
         # chmod remains correct even if an earlier generator step changed Dir.pwd.
-        files_to_become_executable = bin_scripts_to_chmod(
-          template_bin_path,
-          preserve_existing_shakapacker_watch:
-        )
+        files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
       end
 
@@ -774,10 +766,8 @@ module ReactOnRails
         !!@preserve_existing_bin_dev
       end
 
-      def bin_scripts_to_chmod(template_bin_path, preserve_existing_shakapacker_watch:)
-        files = Dir.children(template_bin_path).reject do |filename|
-          filename == "dev" || (filename == "shakapacker-watch" && preserve_existing_shakapacker_watch)
-        end
+      def bin_scripts_to_chmod(template_bin_path)
+        files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
         files << "dev" unless preserve_existing_bin_dev?
         files.map { |filename| File.join(destination_root, "bin/#{filename}") }
       end

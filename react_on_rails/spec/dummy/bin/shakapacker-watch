@@ -1,20 +1,71 @@
 #!/usr/bin/env sh
 set -eu
 
+show_help() {
+  cat <<'HELP'
+Usage: bin/shakapacker-watch [OPTIONS]
+
+Signal-safe wrapper around bin/shakapacker for Procfile-based workflows
+(foreman, overmind, bin/dev). Traps INT/TERM signals and forwards TERM
+to the child process, preventing Ruby interrupt backtraces on Ctrl-C.
+
+All options are passed through to bin/shakapacker. Common options:
+
+  --watch, -w          Watch for file changes and rebuild
+  --progress           Show build progress
+  --help, -h           Show this help
+  --version, -v        Show version (from bin/shakapacker)
+
+Examples:
+  bin/shakapacker-watch --watch              # Procfile watcher
+  bin/shakapacker-watch --watch --progress   # Procfile watcher with progress
+
+Procfile example:
+  web: bin/rails s
+  js: bin/shakapacker-watch --watch
+HELP
+  exit 0
+}
+
+case "${1:-}" in
+  -h|--help) show_help ;;
+esac
+
 child_pid=""
+shutdown_requested=""
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 cleanup() {
-  if [ -n "${child_pid}" ] && kill -0 "$child_pid" 2>/dev/null; then
+  shutdown_requested=1
+  if [ -z "${child_pid}" ]; then
+    return
+  fi
+
+  if kill -0 "$child_pid" 2>/dev/null; then
     kill -TERM "$child_pid" 2>/dev/null || true
+    i=0
+    while [ "$i" -lt 50 ] && kill -0 "$child_pid" 2>/dev/null; do
+      sleep 0.1
+      i=$((i + 1))
+    done
+
+    if kill -0 "$child_pid" 2>/dev/null; then
+      kill -KILL "$child_pid" 2>/dev/null || true
+    fi
+
     wait "$child_pid" 2>/dev/null || true
   fi
 
   exit 0
 }
 
-bin/shakapacker "$@" &
-child_pid=$!
 trap cleanup INT TERM
+"$script_dir/shakapacker" "$@" &
+child_pid=$!
+
+if [ -n "$shutdown_requested" ]; then
+  cleanup
+fi
 
 if wait "$child_pid"; then
   status=0

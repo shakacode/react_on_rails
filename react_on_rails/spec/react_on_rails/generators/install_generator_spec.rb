@@ -461,18 +461,15 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
-      assert_file "bin/shakapacker-watch" do |content|
-        expect(content).to include('bin/shakapacker "$@" &')
-        expect(content).to include("trap cleanup INT TERM")
-      end
+    it "uses the standard Shakapacker command when the optional watch binstub is absent" do
+      assert_no_file "bin/shakapacker-watch"
 
       assert_file "Procfile.dev" do |content|
-        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
       end
 
       assert_file "Procfile.dev-static-assets" do |content|
-        expect(content).to include("js: bin/shakapacker-watch --watch")
+        expect(content).to include("js: bin/shakapacker --watch")
       end
     end
 
@@ -509,6 +506,38 @@ describe InstallGenerator, type: :generator do
     it "sets shakapacker test compile to false by default" do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
+      end
+    end
+  end
+
+  context "when the Shakapacker watch binstub is already installed" do
+    shakapacker_watch = <<~RUBY
+      #!/usr/bin/env ruby
+      puts "Shakapacker-owned watcher"
+    RUBY
+
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_preinstalled_shakapacker(source_path: "app/javascript", source_entry_path: "packs")
+        simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
+        File.chmod(0o640, File.join(destination_root, "bin/shakapacker-watch"))
+      end
+    end
+
+    it "preserves Shakapacker's binstub under --force" do
+      assert_file "bin/shakapacker-watch" do |content|
+        expect(content).to eq(shakapacker_watch)
+      end
+      expect(File.stat(File.join(destination_root, "bin/shakapacker-watch")).mode & 0o777).to eq(0o640)
+    end
+
+    it "uses Shakapacker's binstub in generated Procfiles" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+
+      assert_file "Procfile.dev-static-assets" do |content|
+        expect(content).to include("js: bin/shakapacker-watch --watch")
       end
     end
   end
@@ -3580,7 +3609,7 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=true")
         expect(content).to include("rsc-bundle:")
-        expect(content).to include("bin/shakapacker-watch --watch")
+        expect(content).to include("bin/shakapacker --watch")
       end
     end
 
@@ -4760,12 +4789,7 @@ describe InstallGenerator, type: :generator do
 
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
-      allow(install_generator).to receive(:copy_file).and_call_original
       allow(install_generator).to receive(:use_rsc?).and_return(false)
-      shakapacker_watch_template = File.expand_path(
-        "../../../lib/generators/react_on_rails/templates/base/base/bin/shakapacker-watch",
-        __dir__
-      )
 
       expect(install_generator).to receive(:say_status)
         .with(:gsub, "bin/dev", true)
@@ -4776,9 +4800,6 @@ describe InstallGenerator, type: :generator do
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
-
-      expect(install_generator).to have_received(:copy_file)
-        .with(shakapacker_watch_template, "bin/shakapacker-watch")
     end
 
     it "does not install typescript dependencies in pretend mode" do
@@ -6325,39 +6346,6 @@ describe InstallGenerator, type: :generator do
 
       expect(File.read(shakapacker_watch_path)).to eq(shakapacker_watch)
       expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o640)
-    end
-
-    it "preserves an existing Shakapacker watch binstub when run with --force" do
-      shakapacker_watch = <<~RUBY
-        #!/usr/bin/env ruby
-        puts "Customized watcher"
-      RUBY
-      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
-      force_generator = described_class.new([], { force: true }, destination_root:)
-      simulate_existing_file("bin/shakapacker-watch", shakapacker_watch)
-      File.chmod(0o640, shakapacker_watch_path)
-
-      Dir.chdir(destination_root) do
-        force_generator.send(:add_bin_scripts)
-      end
-
-      expect(File.read(shakapacker_watch_path)).to eq(shakapacker_watch)
-      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o640)
-    end
-
-    it "installs the React on Rails Shakapacker watch fallback when the binstub is absent" do
-      template_path = File.expand_path(
-        "../../../lib/generators/react_on_rails/templates/base/base/bin/shakapacker-watch",
-        __dir__
-      )
-      shakapacker_watch_path = File.join(destination_root, "bin/shakapacker-watch")
-
-      Dir.chdir(destination_root) do
-        install_generator.send(:add_bin_scripts)
-      end
-
-      expect(File.read(shakapacker_watch_path)).to eq(File.read(template_path))
-      expect(File.stat(shakapacker_watch_path).mode & 0o777).to eq(0o755)
     end
 
     it "detects custom bin/dev files" do
