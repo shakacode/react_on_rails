@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "react_on_rails/lenient_json"
 
 module ReactOnRails
   # Parses the length-prefixed wire format used between Node renderer and Ruby.
@@ -21,15 +22,6 @@ module ReactOnRails
     # MIRROR VALUES END
     private_constant :CONTROL_MESSAGE_TYPES
 
-    # The six-character JSON escape for U+FFFD, emitted for a lone surrogate.
-    # Kept as an ASCII escape (not a literal multibyte char) so sanitized output
-    # stays valid regardless of the input string's encoding, which may be binary.
-    REPLACEMENT_CHAR_ESCAPE = '\ufffd'
-    FOUR_HEX_DIGITS = /\A[0-9a-fA-F]{4}\z/
-    BACKSLASH_BYTE = 0x5C # "\\"
-    LOWER_U_BYTE = 0x75   # "u"
-    private_constant :REPLACEMENT_CHAR_ESCAPE, :FOUR_HEX_DIGITS, :BACKSLASH_BYTE, :LOWER_U_BYTE
-
     # Parses a complete length-prefixed result string that must contain exactly one chunk.
     # Used by the non-streaming rendering path where ExecJS/node renderer returns a single result.
     # Returns a single Hash: { "html" => String|nil, "consoleReplayScript" => "...", ... }
@@ -48,112 +40,6 @@ module ReactOnRails
       end
       results.first
     end
-
-    # Parses JSON emitted by JavaScript's JSON.stringify, tolerating one Unicode
-    # divergence that would otherwise crash SSR.
-    #
-    # JavaScript strings are UTF-16 and JSON.stringify happily emits unpaired
-    # surrogate escapes (e.g. a lone high surrogate "\ud83d" from corrupted user
-    # data, DB encoding issues, or API responses). Ruby's JSON.parse rejects a
-    # lone HIGH surrogate with "incomplete surrogate pair", so JS output that the
-    # browser would render fine (as U+FFFD) crashes the whole Ruby-side render.
-    #
-    # To keep React on Rails a general-purpose framework that passes content
-    # through instead of crashing, we retry the parse ONCE with unpaired
-    # surrogates replaced by the U+FFFD replacement character. The retry runs
-    # only after a JSON::ParserError, so the happy path pays nothing. If the
-    # sanitized string still fails to parse, the (second) JSON::ParserError
-    # propagates so genuinely malformed JSON is still surfaced to callers.
-    def self.parse_json_lenient(str)
-      JSON.parse(str)
-    rescue JSON::ParserError
-      JSON.parse(sanitize_unpaired_surrogates(str))
-    end
-
-    # Replaces only genuinely LONE \uXXXX surrogate escapes with the U+FFFD
-    # replacement escape, leaving every other byte intact.
-    #
-    # The scan runs at the BYTE level (mirroring #feed / #try_parse_header in this
-    # file). Every meaningful token — "\\", "u", the four hex digits — is
-    # single-byte ASCII, so byte scanning is O(n) regardless of the payload's
-    # encoding (character indexing would be O(n^2) on multibyte text) and, because
-    # byteslice/getbyte never raise on invalid byte sequences, it also cannot turn
-    # a genuinely-corrupt-UTF-8 input into a non-JSON exception on the retry path.
-    #
-    # It gets three things right that a naive global regex does not:
-    #   * Backslash parity — a "\u..." is a real escape only when the backslash
-    #     before "u" is itself unescaped. In "\\uD83D" the backslash is escaped,
-    #     so "uD83D" is literal text and must not be rewritten. Consuming "\\" as
-    #     one unit makes the following "u" an ordinary byte.
-    #   * Pairing — a high surrogate (U+D800..U+DBFF) is kept only when it is
-    #     immediately followed by a low surrogate (U+DC00..U+DFFF); the valid pair
-    #     passes through untouched. A high surrogate followed by anything else, and
-    #     a low surrogate not preceded by a high one, are lone and replaced.
-    #   * No over-consumption — a non-surrogate escape (e.g. "A") is never
-    #     swallowed as part of a pair.
-    #
-    # The replacement is an ASCII \u escape so the output stays valid regardless of
-    # encoding. It runs only on the JSON::ParserError retry path, never the happy
-    # path. Genuinely-invalid UTF-8 bytes pass through unchanged, so the caller's
-    # second JSON.parse surfaces them as an ordinary JSON::ParserError, not a new type.
-    def self.sanitize_unpaired_surrogates(str)
-      bytes = str.b
-      out = String.new(encoding: Encoding::BINARY)
-      index = 0
-      length = bytes.bytesize
-
-      while index < length
-        chunk, advance = next_sanitized_token(bytes, index, length)
-        out << chunk
-        index += advance
-      end
-
-      out.force_encoding(str.encoding)
-    end
-
-    # Returns [bytes_to_emit, bytes_consumed] for the token at +index+.
-    def self.next_sanitized_token(bytes, index, length)
-      code = unicode_escape_codepoint(bytes, index, length)
-      return non_escape_token(bytes, index, length) if code.nil?
-      return surrogate_token(bytes, index, length, code) if code.between?(0xD800, 0xDFFF)
-
-      [bytes.byteslice(index, 6), 6] # ordinary non-surrogate \uXXXX escape
-    end
-
-    # A "\X" escape is consumed as one two-byte unit so an escaped backslash can't
-    # be misread as the start of a \u escape; any other byte is emitted verbatim.
-    def self.non_escape_token(bytes, index, length)
-      return [bytes.byteslice(index, 2), 2] if bytes.getbyte(index) == BACKSLASH_BYTE && index + 1 < length
-
-      [bytes.byteslice(index, 1), 1]
-    end
-
-    # A high surrogate is kept only when immediately followed by a low surrogate;
-    # otherwise it (or a lone low surrogate) becomes the U+FFFD replacement escape.
-    def self.surrogate_token(bytes, index, length, code)
-      if code.between?(0xD800, 0xDBFF)
-        low = unicode_escape_codepoint(bytes, index + 6, length)
-        return [bytes.byteslice(index, 12), 12] if low&.between?(0xDC00, 0xDFFF)
-      end
-
-      [REPLACEMENT_CHAR_ESCAPE, 6]
-    end
-
-    # Returns the codepoint of a genuine six-byte \uXXXX escape starting at
-    # +index+, or nil when +index+ does not begin one. Callers reach this position
-    # only after two-byte "\X" escapes have been consumed as a unit, so a leading
-    # backslash here is always unescaped (odd backslash parity).
-    def self.unicode_escape_codepoint(bytes, index, length)
-      return nil unless index + 6 <= length
-      return nil unless bytes.getbyte(index) == BACKSLASH_BYTE && bytes.getbyte(index + 1) == LOWER_U_BYTE
-
-      hex = bytes.byteslice(index + 2, 4)
-      return nil unless hex.match?(FOUR_HEX_DIGITS)
-
-      hex.to_i(16)
-    end
-
-    private_class_method :next_sanitized_token, :non_escape_token, :surrogate_token, :unicode_escape_codepoint
 
     def initialize
       # Binary encoding ensures correct byte-position arithmetic regardless of payload encoding.
@@ -233,7 +119,9 @@ module ReactOnRails
       raise ParseError, "Malformed length-prefixed header: negative content length" if @content_len.negative?
 
       begin
-        @metadata = self.class.parse_json_lenient(meta_json.force_encoding(Encoding::UTF_8))
+        # LenientJson tolerates lone UTF-16 surrogates that the JS renderer can emit
+        # (e.g. from truncating a string mid-emoji) which stock JSON.parse rejects. See #4710.
+        @metadata = LenientJson.parse(meta_json.force_encoding(Encoding::UTF_8))
       rescue JSON::ParserError
         raise ParseError, "Malformed length-prefixed header: invalid metadata JSON", cause: nil
       end
@@ -276,7 +164,8 @@ module ReactOnRails
     end
 
     def parse_object_payload(raw_content)
-      self.class.parse_json_lenient(raw_content)
+      # See the metadata parse above: LenientJson repairs lone-surrogate escapes (#4710).
+      LenientJson.parse(raw_content)
     rescue JSON::ParserError
       raise ParseError, "Malformed length-prefixed object payload JSON", cause: nil
     end

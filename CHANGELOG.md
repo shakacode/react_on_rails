@@ -37,6 +37,18 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Server rendering no longer crashes on or corrupts lone UTF-16 surrogates**: When the JavaScript
+  renderer emits a string containing a lone surrogate (commonly from truncating text mid-emoji, e.g. an
+  excerpt cut with `slice`/`substring`), `JSON.stringify` serializes it as a `\uXXXX` escape that Ruby's
+  `JSON.parse` mishandles — depending on the case and `json` gem version it raises `incomplete surrogate
+pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now normalizes such escapes to
+  the Unicode replacement character (`�`) and passes the content through to the browser instead of failing.
+  This works the same across `json` gem versions. Clean payloads are unaffected: repair only runs when the
+  text actually contains a surrogate escape, a single cheap substring check. Fixes
+  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
+  [PR 4745](https://github.com/shakacode/react_on_rails/pull/4745) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Streaming caches no longer persist error-containing renders**: When a streamed render
   emits a chunk with `hasErrors: true` (for example a Suspense boundary whose async data fetch hit a
   transient failure on that one request), the resulting chunk set is no longer written to
@@ -59,19 +71,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   RSC app no longer receives a spurious layout warning. Fixes
   [Issue 4619](https://github.com/shakacode/react_on_rails/issues/4619).
   [PR 4724](https://github.com/shakacode/react_on_rails/pull/4724) by
-  [justin808](https://github.com/justin808).
-
-- **Stopped server rendering from crashing on unpaired UTF-16 surrogates**: JavaScript's
-  `JSON.stringify` can emit a lone surrogate escape (for example `\uD83D` with no paired low
-  surrogate) from corrupted user data, database-encoding issues, or upstream API responses.
-  Ruby's `JSON.parse` rejects a lone high surrogate with `JSON::ParserError: incomplete
-surrogate pair`, so such content crashed the entire server render instead of passing through
-  for the browser to display. The render-result parsers now retry once with unpaired surrogates
-  replaced by the Unicode replacement character (U+FFFD) — this only runs after a parse failure,
-  so the happy path is unchanged. Covers the length-prefixed object-payload and metadata paths
-  plus the legacy JSON fallback for older bundles. Fixes
-  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
-  [PR 4726](https://github.com/shakacode/react_on_rails/pull/4726) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
@@ -225,6 +224,15 @@ surrogate pair`, so such content crashed the entire server render instead of pas
   [justin808](https://github.com/justin808).
 
 #### Added
+
+- **[Pro]** **RSC agent guardrails installer**: New
+  `rake react_on_rails:install_rsc_agent_guardrails` task (also run automatically by the RSC
+  generator) installs a Claude Code `rsc-app-safety` skill and an advisory hook into a host app's
+  `.claude/`, steering AI coding agents away from React Server Components API footguns (mounting the
+  RSC payload route without authentication, trusting server-component props, exposing the Node
+  renderer, leaking secrets). Idempotent and safe to re-run after upgrades.
+  [PR 4606](https://github.com/shakacode/react_on_rails/pull/4606) by
+  [justin808](https://github.com/justin808).
 
 - **[Pro] React 18 support for non-RSC streaming SSR**: `stream_react_component` with synchronous
   props is now explicitly supported on React 18 as well as React 19. Permanent packed-artifact

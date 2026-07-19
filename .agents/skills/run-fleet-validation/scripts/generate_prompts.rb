@@ -4,7 +4,9 @@
 require "fileutils"
 require "optparse"
 require "securerandom"
+require "shellwords"
 require "yaml"
+require_relative "fleet_lifecycle"
 
 module FleetValidation
   CORE_GATE = {
@@ -14,10 +16,8 @@ module FleetValidation
     "weight" => 5
   }.freeze
 
-  class ManifestError < StandardError; end
-
   class Generator
-    attr_reader :assignments
+    attr_reader :assignments, :lifecycle_inventory, :required_paths, :snapshot_fingerprint
 
     def initialize(manifest_path:, prompt_count:, machines:, release_selector:, pack_id: nil)
       @manifest_path = manifest_path
@@ -27,6 +27,10 @@ module FleetValidation
       @pack_id = pack_id || default_pack_id
       @manifest = load_manifest
       validate_options!
+      @lifecycle = Lifecycle.new(manifest: @manifest, pack_id: @pack_id, release_selector: @release_selector)
+      @lifecycle_inventory = @lifecycle.inventory
+      @required_paths = @lifecycle.required_paths
+      @snapshot_fingerprint = @lifecycle.snapshot_fingerprint
       @targets = build_targets
       validate_target_ids!
       @assignments = assign_machines(build_lanes)
@@ -57,7 +61,16 @@ module FleetValidation
       MARKDOWN
     end
 
+    def ledger_template
+      @lifecycle.ledger_template
+    end
+
+    def ledger_schema
+      @lifecycle.schema
+    end
+
     def write_pack(output_dir)
+      @lifecycle.validate_existing_ledger(File.join(output_dir, "result-ledger.json"))
       FileUtils.mkdir_p(output_dir)
       clear_generated_prompts(output_dir)
       rendered_prompts = []
@@ -74,6 +87,7 @@ module FleetValidation
       end
 
       File.write(File.join(output_dir, "INDEX.md"), render_index(rendered_prompts))
+      @lifecycle.write_artifacts(output_dir)
     end
 
     private
@@ -97,6 +111,9 @@ module FleetValidation
     def validate_options!
       raise ManifestError, "schema_version must be 1" unless @manifest["schema_version"] == 1
       raise ManifestError, "repos must be an array" unless @manifest["repos"].is_a?(Array)
+      unless @release_selector.is_a?(String) && !@release_selector.strip.empty?
+        raise ManifestError, "release selector must be nonempty"
+      end
 
       validate_repo_entries!
       raise ManifestError, "--prompts must be positive" unless @prompt_count.positive?
@@ -125,8 +142,19 @@ module FleetValidation
 
       @manifest.fetch("repos").each_with_index do |repo, index|
         raise ManifestError, "repos[#{index}] must be a mapping" unless repo.is_a?(Hash)
+        unless %w[hard_gate soft_track].include?(repo["tier"])
+          raise ManifestError, "repos[#{index}] tier must be hard_gate or soft_track"
+        end
 
-        next unless repo["tier"] == "hard_gate"
+        if repo["tier"] == "soft_track"
+          %w[name headline].each do |field|
+            unless repo[field].is_a?(String) && !repo[field].empty?
+              raise ManifestError, "repos[#{index}] soft track is missing #{field}"
+            end
+          end
+          validate_package_entries!(repo.fetch("packages", []), index)
+          next
+        end
 
         validate_hard_gate_repo!(defaults.merge(repo), index)
       end
@@ -152,9 +180,22 @@ module FleetValidation
         raise ManifestError, "repos[#{index}] hard gate smoke entries must be non-empty strings"
       end
 
-      repo.fetch("packages").each_with_index do |package, package_index|
-        unless package.is_a?(Hash) && package["ecosystem"].to_s != "" && package["name"].to_s != ""
-          raise ManifestError, "repos[#{index}].packages[#{package_index}] must name an ecosystem and package"
+      validate_package_entries!(repo.fetch("packages"), index)
+    end
+
+    def validate_package_entries!(packages, index)
+      unless packages.is_a?(Array)
+        raise ManifestError, "repos[#{index}] packages must be an array"
+      end
+
+      packages.each_with_index do |package, package_index|
+        unless package.is_a?(Hash) && package["ecosystem"].to_s != "" &&
+               package["name"].is_a?(String) && !package["name"].strip.empty?
+          raise ManifestError,
+                "repos[#{index}].packages[#{package_index}] must name an ecosystem and nonblank string package"
+        end
+        unless %w[gem npm].include?(package["ecosystem"])
+          raise ManifestError, "repos[#{index}].packages[#{package_index}] ecosystem must be gem or npm"
         end
       end
     end
@@ -172,7 +213,7 @@ module FleetValidation
     end
 
     def validate_target_ids!
-      ids = @targets.map { |target| stable_target_id(target) }
+      ids = @lifecycle_inventory.map { |target| target.fetch("id") }
       raise ManifestError, "target names must have non-empty stable IDs" if ids.any?(&:empty?)
 
       duplicates = ids.tally.select { |_id, count| count > 1 }.keys
@@ -228,7 +269,8 @@ module FleetValidation
 
     def ordered_assignments
       assignments.sort_by do |assignment|
-        [@machines.index(assignment.fetch(:machine)), -assignment.fetch(:weight)]
+        has_core_gate = assignment.fetch(:targets).any? { |target| target["kind"] == "core" }
+        [has_core_gate ? 0 : 1, @machines.index(assignment.fetch(:machine)), -assignment.fetch(:weight)]
       end
     end
 
@@ -249,7 +291,38 @@ module FleetValidation
       <<~MARKDOWN
         # Fleet validation launch index
 
-        Start all #{@prompt_count} prompts simultaneously. This layout runs at most
+        1. Start prompt coordinator 1 in snapshot/read-only mode so the release-snapshot leader can
+           resolve and publish the shared snapshot and generator-matrix evidence. It must not start its
+           assigned app mutation yet.
+        2. Run [PREFLIGHT.md](PREFLIGHT.md) against that exact snapshot and record its results in
+           `result-ledger.json`. Before remote makers start, publish its pack-bound public-safe
+           `APP_WORK_ALLOWED` tracker marker and verify that it is readable.
+        3. Start the remaining prompt coordinators after the snapshot exists and preflight opens the barrier.
+           Do not start the app mutation prompts before `APP_WORK_ALLOWED`; coordinators may prepare
+           read-only evidence while waiting.
+        4. Run [REPORT-ONLY.md](REPORT-ONLY.md) for the complete soft-track inventory.
+        5. Run [CLOSEOUT.md](CLOSEOUT.md) with an independent checker, validate `result-ledger.json`
+           against `result-ledger.schema.json`, and render the tracker matrix from that ledger. The
+           checker must copy the policy commit and initial tracker mode from the unique public snapshot
+           comment, never from `result-ledger.json`, before running:
+
+           ```bash
+           EXPECTED_CANDIDATE=RESOLVED_CANDIDATE_TAG
+           EXPECTED_CANDIDATE_COMMIT=RESOLVED_CANDIDATE_COMMIT
+           EXPECTED_POLICY_COMMIT=FULL_POLICY_COMMIT_SHA
+           EXPECTED_TRACKER_MODE=INITIAL_TRACKER_MODE
+           ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+             --ledger result-ledger.json \
+             --expected-pack-id #{Shellwords.escape(@pack_id)} \
+             --expected-release-selector #{Shellwords.escape(@release_selector)} \
+             --expected-candidate "$EXPECTED_CANDIDATE" \
+             --expected-candidate-commit "$EXPECTED_CANDIDATE_COMMIT" \
+             --expected-policy-commit "$EXPECTED_POLICY_COMMIT" \
+             --expected-tracker-mode "$EXPECTED_TRACKER_MODE" \
+             --render-tracker tracker-closeout.md
+           ```
+
+        This layout runs at most
         #{(@prompt_count.to_f / @machines.length).ceil} prompts on one machine; use the exact allocation
         below. Do not share mutable app checkouts between prompts.
 
@@ -274,6 +347,7 @@ module FleetValidation
         #{candidate_resolution_steps(number)}
         #{tracker_resolution_steps(number)}
         #{snapshot_resolution_steps(number)}
+        #{preflight_resolution_steps}
 
         Assigned targets:
         #{targets.map { |target| render_target(target) }.join("\n")}
@@ -304,6 +378,13 @@ module FleetValidation
            needed to resolve disagreement. Never convert missing evidence into a pass.
 
         Execution contract:
+        - Do not start app mutation work until `preflight.app_work_allowed: true` records the
+          `APP_WORK_ALLOWED` marker in the pack-specific release-wide preflight ledger. The marker
+          is valid only when `preflight.opened_at` records when the exact snapshot barrier opened
+          and release commit CI, published
+          artifacts, and the standard / Pro / Pro+RSC generator matrix are terminal green, or when
+          an explicit public-safe waiver names the failed gate and authority. Record `work_started_at`
+          and the stable worker/coordinator `maker_id` for every mutable target before its first write.
         - Read AGENTS.md and repository-specific instructions before changing any target repo. Treat the
           manifest commands as starting data; because `verify: true` entries are provisional, confirm
           commands against the target before running or proposing a manifest correction.
@@ -313,8 +394,20 @@ module FleetValidation
           artifacts: do not create a bump branch or PR for it.
         - Capture dependency install, intentional lockfile diff, build/assets, target tests, required CI,
           primary route smoke, SSR/hydration, and the target's headline Pro/RSC behavior where applicable.
+          Record the immutable target head for every check and the reconciled current base for every
+          mutable app check; a later target or base commit invalidates that evidence and requires the
+          audited, reviewed, and current revisions, bases, and affected checks to be refreshed.
           When review-app metadata is null/unverified, derive a repo-owned local boot/smoke command from
           target docs; do not invent a public deployment URL or claim hosted review-app smoke.
+        - For every assigned target, produce its complete schema-valid `inventory` row. It must include
+          id, tier, work_mode, maker_id, work_state, work_started_at, result, waiver, blocker_id,
+          package_locks, checks, review_app, baseline, revisions, bases, merge, reachability, and evidence.
+          Validate it against the inventory-item definition in `result-ledger.schema.json` and write the
+          exact fragment to `lane-result-#{number}.json`. Only an explicitly designated single ledger
+          writer may take the pack's lock and atomically merge the row into `result-ledger.json`;
+          otherwise include the exact JSON fragment in the final response for the closeout coordinator
+          to validate and merge. Do not return only a prose summary, and never hand-copy prose into the
+          ledger.
         - A confirmed candidate regression is BLOCKED and needs a linked issue. Unrelated failures remain
           PENDING until an allowed tracker waiver exists. Lane 4b artifact defects cannot be waived.
         - For HiChee or Pro/private material, never paste private logs, URLs, screenshots, credentials, or
@@ -330,6 +423,8 @@ module FleetValidation
 
         Final response:
         - Resolved release identifiers and tracking issue.
+        - One exact JSON fragment containing each assigned target's complete schema-valid `inventory` row,
+          unless those rows were already atomically merged into the shared `result-ledger.json`.
         - One row per target: PASSED / BLOCKED / PENDING / UNKNOWN, PR, current-head CI, smoke evidence,
           blocker/waiver link, and next owner/action.
         - Any manifest fields proven stale, with an exact proposed YAML patch.
@@ -406,17 +501,27 @@ module FleetValidation
           - Derive the independently released `react-on-rails-rsc` version separately from the tagged
             product manifests and the release tracker, then verify that exact RSC artifact is published.
             Never require it to share the React on Rails product version.
+          - Before any lane changes tracker state, resolve the exact release policy/default commit and
+            initial tracker mode from trusted repository/tracker state. Do not derive either from the
+            result ledger.
           - Post one tracker snapshot comment marked `<!-- fleet-validation-snapshot:#{@pack_id} -->` with
-            the exact tag, normalized gem/npm product versions, RSC version, commit SHA, and resolution time.
-            Heartbeat/close the snapshot claim only after the public-safe comment is readable.
+            the exact tag, normalized gem/npm product versions, RSC version, candidate commit SHA,
+            resolution time, `policy_commit: FULL_POLICY_COMMIT_SHA`, and
+            `tracker_mode: INITIAL_TRACKER_MODE`. Replace both placeholders with the exact resolved
+            values. The independent checker must
+            copy both exact values from that unique snapshot comment rather than the ledger.
+            Heartbeat/close the snapshot claim only after the
+            public-safe comment is readable.
         STEPS
       else
         <<~STEPS.chomp
           - Do not select a candidate independently. Wait up to five minutes for the tracker comment marked
             `<!-- fleet-validation-snapshot:#{@pack_id} -->` from coordinator 1, then use its exact tag,
-            product gem/npm versions, independently versioned RSC pin, and commit SHA for the whole lane.
-            Cross-check those artifacts and tag before mutation. If the snapshot is absent, malformed, or
-            inconsistent, report UNKNOWN and make no writes.
+            product gem/npm versions, independently versioned RSC pin, candidate commit, policy commit,
+            and initial tracker mode for the whole lane. Cross-check those artifacts and tag before
+            mutation. The independent checker must
+            copy both exact values from that unique snapshot comment rather than the ledger.
+            If the snapshot is absent, malformed, or inconsistent, report UNKNOWN and make no writes.
         STEPS
       end
     end
@@ -446,6 +551,22 @@ module FleetValidation
             artifacts or the matching tag conflict with the pinned selector, stop writes and report UNKNOWN.
         STEPS
       end
+    end
+
+    def preflight_resolution_steps
+      <<~STEPS.chomp
+        - The designated preflight runner must publish the public-safe `APP_WORK_ALLOWED` marker
+          `<!-- fleet-validation-preflight:#{@pack_id} -->` on the resolved release tracker before any
+          remote maker starts. The comment must record the exact candidate tag and commit, snapshot
+          fingerprint #{@snapshot_fingerprint}, `preflight.opened_at`, every release-wide gate's terminal
+          status and replayable evidence, and `app_work_allowed: true`.
+        - Do not start a remote mutable worker until one unique preflight marker is readable. Cross-check
+          its candidate tag and commit, snapshot fingerprint, opened_at, gate evidence, and barrier state
+          against the pack snapshot and the local ledger when accessible. Missing, duplicate, stale,
+          malformed, or mismatched markers are `UNKNOWN`: make no app write and do not trust launch timing.
+          Record a successful cross-check in `preflight.public_marker` with `status: unique`, the exact
+          pack/candidate/commit/fingerprint/opened-at fields, and replayable public-safe evidence.
+      STEPS
     end
 
     def install_command(package_manager)

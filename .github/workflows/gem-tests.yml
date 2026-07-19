@@ -116,19 +116,23 @@ jobs:
 
           # Full matrices run only on main, merge queue, release targets, or
           # explicit force-full hosted CI. Normal hosted PR CI stays optimized.
-          # Each Ruby version / dependency level is split into two shards:
-          #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
-          #   unit       – everything else under spec/react_on_rails
+          # Each Ruby version / dependency level keeps one unit shard and splits
+          # spec/react_on_rails/generators across three deterministic subshards
+          # while keeping context-hook setup atomic.
           if [[ "$SHOULD_USE_FULL_MATRIX" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions × 2 shards
+            # Full matrix: test both latest and minimum supported versions.
             matrix="$(jq -nc \
               --arg latest_ruby_version "$latest_ruby_version" \
               --arg minimum_ruby_version "$minimum_ruby_version" \
               '{
                 "include": [
-                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-1"},
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-2"},
+                  {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-3"},
                   {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"},
-                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "generators"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "generators-1"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "generators-2"},
+                  {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "generators-3"},
                   {"ruby-version": $minimum_ruby_version, "dependency-level": "minimum", "shard": "unit"}
                 ]
               }')"
@@ -140,7 +144,9 @@ jobs:
                 --arg latest_ruby_version "$latest_ruby_version" \
                 '{
                   "include": [
-                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators"},
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-1"},
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-2"},
+                    {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "generators-3"},
                     {"ruby-version": $latest_ruby_version, "dependency-level": "latest", "shard": "unit"}
                   ]
                 }')"
@@ -218,8 +224,118 @@ jobs:
           SHARD: ${{ matrix.shard }}
         run: |
           cd react_on_rails
-          if [[ "$SHARD" = "generators" ]]; then
-            bundle exec rspec spec/react_on_rails/generators
+          if [[ "$SHARD" == generators-* ]]; then
+            shard_number="${SHARD#generators-}"
+            # Keep this aligned with the generators-1/2/3 rows in both matrix branches above.
+            shard_count=3
+            shard_index="$((shard_number - 1))"
+            manifest_path="${RUNNER_TEMP}/generator-shard-${shard_number}.opts"
+
+            # Rebuild from each job's exact checkout; never share a manifest across jobs or heads.
+            bundle exec ruby -rrspec/core -rdigest -e '
+              shard_index = Integer(ARGV.fetch(0))
+              shard_count = Integer(ARGV.fetch(1))
+              manifest_path = ARGV.fetch(2)
+              abort "invalid generator shard index" unless shard_index.between?(0, shard_count - 1)
+
+              sink = File.open(File::NULL, "w")
+              status = RSpec::Core::Runner.run(
+                ["spec/react_on_rails/generators", "--dry-run", "--format", "progress"],
+                sink,
+                sink
+              )
+              abort "generator manifest dry run failed with status #{status}" unless status.zero?
+
+              id_for = lambda do |item|
+                metadata = item.metadata
+                "#{metadata.fetch(:rerun_file_path)}[#{metadata.fetch(:scoped_id)}]"
+              end
+              examples = RSpec.world.all_examples.map do |example|
+                metadata = example.metadata
+                file = metadata.fetch(:rerun_file_path)
+                scoped_id = metadata.fetch(:scoped_id)
+                { id: id_for.call(example), file:, scoped_id: }
+              end
+              ids = examples.map { |row| row.fetch(:id) }
+              abort "generator manifest is empty" if ids.empty?
+              abort "generator manifest has duplicate scoped IDs" unless ids.uniq.length == ids.length
+
+              atomic_unit_by_id = {}
+              setup_count_by_unit = Hash.new(0)
+
+              visit_group = lambda do |group|
+                hooks = group.hooks
+                owns_context_hook = %i[before after].any? do |position|
+                  # RSpec has no public hook-enumeration API; fail loudly if this private seam changes.
+                  !hooks.send(:all_hooks_for, position, :context).empty?
+                end
+
+                if owns_context_hook
+                  descendants = group.descendant_filtered_examples
+                  existing_units = descendants.filter_map do |example|
+                    atomic_unit_by_id[id_for.call(example)]
+                  end.uniq
+                  abort "nested generator setup spans multiple atomic units" if existing_units.length > 1
+
+                  own_unit_id = id_for.call(group)
+                  unit_id = existing_units.first || own_unit_id
+                  descendants.each do |example|
+                    atomic_unit_by_id[id_for.call(example)] = unit_id
+                  end
+                  setup_count_by_unit[unit_id] += 1
+                end
+
+                group.children.each { |child| visit_group.call(child) }
+              end
+              RSpec.world.example_groups.each { |group| visit_group.call(group) }
+
+              units = examples.group_by do |row|
+                id = row.fetch(:id)
+                atomic_unit_by_id.fetch(id, id)
+              end.to_a
+              weight_by_unit = units.to_h do |unit_id, rows|
+                [unit_id, rows.length + setup_count_by_unit.fetch(unit_id, 0)]
+              end
+              shards = Array.new(shard_count) { [] }
+              shard_loads = Array.new(shard_count, 0)
+              shard_example_counts = Array.new(shard_count, 0)
+
+              units.sort_by do |unit_id, rows|
+                [-weight_by_unit.fetch(unit_id), Digest::SHA256.hexdigest(unit_id), unit_id]
+              end.each do |unit_id, rows|
+                unit_weight = weight_by_unit.fetch(unit_id)
+                target = (0...shard_count).min_by do |index|
+                  [shard_loads[index], shard_example_counts[index], shards[index].length, index]
+                end
+                shards.fetch(target) << [unit_id, rows]
+                shard_loads[target] += unit_weight
+                shard_example_counts[target] += rows.length
+              end
+
+              assigned_ids = shards.flat_map do |shard_units|
+                shard_units.flat_map { |_, rows| rows.map { |row| row.fetch(:id) } }
+              end
+              abort "generator partition lost or duplicated examples" unless assigned_ids.sort == ids.sort
+
+              selected_units = shards.fetch(shard_index)
+              selected = selected_units.flat_map(&:last)
+              abort "generator shard #{shard_index + 1} is empty" if selected.empty?
+
+              arguments = selected.group_by { |row| row.fetch(:file) }.map do |file, rows|
+                scoped_ids = rows.map { |row| row.fetch(:scoped_id) }
+                "#{file}[#{scoped_ids.join(",")}]"
+              end
+              File.write(manifest_path, arguments.join("\n") << "\n")
+              puts "generator shard #{shard_index + 1}/#{shard_count}: " \
+                   "#{selected.length}/#{ids.length} examples in #{selected_units.length} setup-safe units " \
+                   "across #{arguments.length} files"
+            ' "$shard_index" "$shard_count" "$manifest_path"
+
+            specs=()
+            while IFS= read -r spec; do
+              specs+=("$spec")
+            done < "$manifest_path"
+            bundle exec rspec "${specs[@]}"
           else
             bundle exec rspec spec/react_on_rails --exclude-pattern "**/generators/**"
           fi

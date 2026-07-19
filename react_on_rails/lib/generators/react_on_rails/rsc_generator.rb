@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "react_on_rails/agent_guardrails"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
@@ -53,6 +54,7 @@ module ReactOnRails
           warn_about_react_version_for_rsc(force: true)
           setup_rsc
           add_rsc_npm_dependencies
+          install_agent_guardrails
           print_success_message unless options[:invoked_by_install]
         else
           GeneratorMessages.add_error(<<~MSG.strip)
@@ -118,6 +120,21 @@ module ReactOnRails
         say "📝 Adding RSC npm dependencies...", :yellow
         add_rsc_dependencies
         say "✅ RSC npm dependencies added", :green
+      end
+
+      def install_agent_guardrails
+        if options[:pretend]
+          say_status :pretend, ".claude/ (RSC agent guardrails)", :yellow
+          return
+        end
+
+        say "🛡️  Installing RSC agent guardrails (rsc-app-safety skill + advisory hook)...", :yellow
+        ReactOnRails::AgentGuardrails.install(destination_root, skip_existing: options[:skip]).each do |action|
+          say "   #{action}"
+        end
+        say "✅ RSC agent guardrails installed", :green
+      rescue ReactOnRails::AgentGuardrails::Error, SystemCallError => e
+        say "⚠️  RSC agent guardrail installation incomplete: #{e.message}", :yellow
       end
 
       def print_success_message
