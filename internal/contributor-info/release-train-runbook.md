@@ -279,6 +279,33 @@ the old id, invent another target, or bypass a refusal. If the old process
 crashed, wait until the backend permits takeover. Once the fresh holder is
 active, any resumed old process is refused because its agent id differs.
 
+#### Partial-publication recovery
+
+If a compound release stops after any outward write, stop the helper and keep
+the release-line lease live. Preserve the exact local and remote branch tips,
+local and remote tag identity, the complete six-package registry artifact set,
+and the helper command and output. Do not delete or move tags, reset or
+force-push the release branch, rerun the compound release, overwrite published
+artifacts, or ad-lib manual publication.
+
+- **The tag exists and zero immutable packages were published.** Live recovery
+  is **BLOCKED** pending the repository-owned process-group/per-write fencing
+  wrapper or an explicit maintainer-approved fully fenced reconciliation plan.
+- **All six immutable packages were published, but GitHub release creation or
+  update failed.** `sync_github_release` remains idempotent in behavior, but its
+  live GitHub create/edit boundary is unfenced. Preview only with the dry-run
+  form `sync_github_release[X.Y.Z,true]`; live recovery is **BLOCKED** pending
+  the repository-owned process-group/per-write fencing wrapper or an explicit
+  maintainer-approved fully fenced reconciliation plan.
+- **Only a subset of the six immutable packages was published.** Live recovery
+  is **BLOCKED** pending the repository-owned process-group/per-write fencing
+  wrapper or an explicit maintainer-approved fully fenced reconciliation plan.
+
+If the lease, branch, tag, registry, or helper evidence is missing,
+contradictory, or `UNKNOWN`, remain stopped. A maintainer-approved plan must
+identify and fence every remaining outward write; approval alone does not make
+an unfenced command safe.
+
 ### 1. Cut the RC onto `release/X.Y.Z`
 
 Do this when maintainers decide `main` is feature-complete for the target and want to start stabilizing.

@@ -15,11 +15,12 @@ and [Release Verification Runbook](release-verification-runbook.md).
 > release-line lease for its whole lifetime and fences every outward operation,
 > use `bundle exec rake release`, `script/release-finish`, and other compound
 > release helpers only in dry-run or preview mode. All release-mutating examples
-> on this page are therefore previews. For a live cut, retry, reconciliation, or
-> recovery, follow the individually guarded commands in the
+> on this page are therefore previews. For a live cut or reconciliation, follow
+> the individually guarded commands in the
 > [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
-> If an outward operation cannot expose a live lease check immediately before
-> its write, stop rather than run it unfenced.
+> Interrupted or partial-publication recovery is currently blocked; preserve
+> the evidence and follow the dispositions in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 ## Testing the Gem before Release from a Rails App
 
@@ -66,8 +67,9 @@ React on Rails RC. Follow the ordered dependency-promotion gate in the
 4. Review the PR, verify the computed version, and merge
 
 If a stable target lacks this section, the release task aborts before confirmation, tagging, or publication.
-For a prerelease, the task warns and skips the GitHub release; after adding the section, create it with
-`sync_github_release`.
+For a prerelease, the task warns and skips the GitHub release. After adding the section, preview the idempotent update
+with the dry-run form `sync_github_release[X.Y.Z,true]`; live GitHub release creation or editing remains **BLOCKED** as
+documented in [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery).
 
 #### Why changelog comes BEFORE the release
 
@@ -109,7 +111,9 @@ bundle exec rake "release[16.2.0,true,true]"
 
 > **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
 > exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
-> the guarded live-recovery sequence in the Release-Train Runbook. From a prerelease
+> the blocked-state dispositions in
+> [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). There is no
+> safe live retry until the required fencing exists. From a prerelease
 > checkout, an argument-less release fails closed unless the changelog advances the same release line
 > to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
 > changelog section.
@@ -605,8 +609,10 @@ The task automatically converts Ruby gem format to npm semver format:
    Run `$update-changelog 16.5.0` (using the already-released version) to analyze
    commits, write entries, and automatically open a PR. Use
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
-   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. Use
-   the Release-Train Runbook for the guarded live sync:
+   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. The
+   `sync_github_release` command below is preview-only; live GitHub release creation or editing remains
+   **BLOCKED** as documented in
+   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
    ```bash
    git pull --rebase
@@ -624,8 +630,8 @@ The task automatically converts Ruby gem format to npm semver format:
 ### Syncing GitHub Releases Manually
 
 If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
-preview the recovery after updating the changelog. Run the live sync only through the guarded recovery
-flow in the Release-Train Runbook:
+preview the recovery after updating the changelog. The live path is blocked, as documented in
+[Partial-publication recovery](release-train-runbook.md#partial-publication-recovery):
 
 1. Update `CHANGELOG.md` with the published version section
 2. Commit and push `CHANGELOG.md`
@@ -641,7 +647,8 @@ bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
 as the main release task, and creates or updates the GitHub release for the corresponding tag. It is the idempotent
-recovery path when package publication succeeded but the final GitHub step failed.
+recovery behavior when package publication succeeded but the final GitHub step failed. Its live GitHub create/edit
+boundary remains unfenced, so the commands above are preview-only until the required wrapper exists.
 
 ### Pre-Release Checklist
 
@@ -735,8 +742,10 @@ If the release fails partway through (e.g., during NPM publish):
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
 3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
-4. Follow the [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write) for
-   guarded live recovery. If lease state or any remote/artifact identity is `UNKNOWN`, remain stopped.
+4. Follow the blocked-state dispositions in
+   [Partial-publication recovery](release-train-runbook.md#partial-publication-recovery). Current live recovery paths
+   are blocked until the required fencing exists. If lease state or any remote/artifact identity is `UNKNOWN`, remain
+   stopped.
 
 ## Version History
 
