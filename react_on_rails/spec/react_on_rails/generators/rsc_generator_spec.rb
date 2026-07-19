@@ -9,6 +9,45 @@ describe RscGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
+  describe "#add_rsc_to_procfile" do
+    let(:generator) { described_class.new([], {}, destination_root:) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+    end
+
+    it "uses the standard Shakapacker command when the optional watch binstub is absent" do
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+      end
+    end
+
+    it "uses Shakapacker's watch binstub when it is present" do
+      simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o755, File.join(destination_root, "bin/shakapacker-watch"))
+
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+    end
+
+    it "uses the standard Shakapacker command when the watch binstub is not executable" do
+      simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o644, File.join(destination_root, "bin/shakapacker-watch"))
+
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+      end
+    end
+  end
+
   # Unit tests for prerequisite validation
 
   context "when Pro is not installed" do
@@ -207,7 +246,7 @@ describe RscGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("rsc-bundle:")
         expect(content).to include("RSC_BUNDLE_ONLY")
-        expect(content).to include("bin/shakapacker-watch --watch")
+        expect(content).to include("bin/shakapacker --watch")
       end
     end
 

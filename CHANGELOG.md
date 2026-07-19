@@ -37,6 +37,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Stopped replacing Shakapacker-owned watch binstubs during installation**: React on Rails no longer ships
+  its own `bin/shakapacker-watch` template. Generated Procfiles use Shakapacker's optional watch binstub when
+  it is present and fall back to `bin/shakapacker --watch` for older supported Shakapacker installations.
+  Existing Shakapacker-provided or customized watch binstubs remain untouched, including under `--force`. Fixes
+  [Issue 4617](https://github.com/shakacode/react_on_rails/issues/4617).
+  [PR 4715](https://github.com/shakacode/react_on_rails/pull/4715) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **Server rendering no longer crashes on or corrupts lone UTF-16 surrogates**: When the JavaScript
   renderer emits a string containing a lone surrogate (commonly from truncating text mid-emoji, e.g. an
   excerpt cut with `slice`/`substring`), `JSON.stringify` serializes it as a `\uXXXX` escape that Ruby's
