@@ -44,7 +44,11 @@ agent-coord config show --json
 : "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
 : "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
 unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
-agent-coord doctor --json
+(
+  set -o pipefail
+  agent-coord doctor --json |
+    ruby -rjson -e 'report = JSON.parse($stdin.read); report.delete("backend_url"); puts JSON.pretty_generate(report)'
+)
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`.
@@ -52,8 +56,10 @@ The workflow docs assume `agent-coord` is available on `PATH`.
 default. Add that directory to the active shell `PATH` if the shell has not
 reloaded its profile yet. Obtain the deployed HTTP URL and a scoped machine
 token through the private operator channel; never copy those values into this
-repository, a PR, a lane handoff, or shell output. Remove stale legacy GitHub
-backend exports instead of relying on selector precedence to hide them.
+repository, a PR, or a lane handoff. The setup command above removes the private
+endpoint from displayed doctor output; never expose the token in shell output.
+Remove stale legacy GitHub backend exports instead of relying on selector
+precedence to hide them.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
@@ -107,11 +113,11 @@ the configured backend.
 
 ```bash
 STATE_ROOT=$(mktemp -d)
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord heartbeat \
+agent-coord heartbeat --state-root "$STATE_ROOT" \
   --agent-id smoke-test-0 \
   --repo shakacode/react_on_rails \
   --target 9999
-AGENT_COORD_STATE_ROOT="$STATE_ROOT" agent-coord status
+agent-coord status --state-root "$STATE_ROOT"
 rm -rf "$STATE_ROOT"
 ```
 

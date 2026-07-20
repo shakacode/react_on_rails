@@ -46,7 +46,11 @@ should use this PR branch or `main` for the current workflow docs.
    : "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
    : "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
    unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
-   agent-coord doctor --json
+   (
+     set -o pipefail
+     agent-coord doctor --json |
+       ruby -rjson -e 'report = JSON.parse($stdin.read); report.delete("backend_url"); puts JSON.pretty_generate(report)'
+   )
    agent-coord config show --json
    agent-coord status --batch-id <batch-id> --json
    ```
