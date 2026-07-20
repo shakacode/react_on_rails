@@ -37,6 +37,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
+  only while its source element and JSON text remain unchanged. Replacing the context element or
+  morphing its payload in place now makes the next core render or immediate Pro hydration receive the
+  new page's URL, locale, and application-specific values instead of the first page's context. Fixes
+  [Issue 4583](https://github.com/shakacode/react_on_rails/issues/4583).
+  [PR 4765](https://github.com/shakacode/react_on_rails/pull/4765) by
+  [ihabadham](https://github.com/ihabadham).
+
 - **Stopped replacing Shakapacker-owned watch binstubs during installation**: React on Rails no longer ships
   its own `bin/shakapacker-watch` template. Generated Procfiles use Shakapacker's optional watch binstub when
   it is present and fall back to `bin/shakapacker --watch` for older supported Shakapacker installations.
