@@ -27,7 +27,6 @@ export function getRailsContext(): RailsContext | null {
     return cachedRailsContext.value;
   }
 
-  railsContextCache.delete(el);
   try {
     const railsContext = JSON.parse(sourceText) as RailsContext;
     railsContextCache.set(el, { sourceText, value: railsContext });
