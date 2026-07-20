@@ -36,7 +36,8 @@ should use this PR branch or `main` for the current workflow docs.
    ```bash
    gh repo clone shakacode/agent-coordination
    cd agent-coordination
-   ruby -Itest test/agent_coord_test.rb
+   bundle install
+   .agents/bin/validate
    bin/agent-coord --help
    bin/agent-coord bootstrap
    export PATH="$HOME/.local/bin:$PATH"
@@ -52,9 +53,7 @@ should use this PR branch or `main` for the current workflow docs.
 
    The remaining snippets assume that `PATH` entry is present in the active
    shell. In another shell, add the export first or replace each `agent-coord`
-   command below with `"$HOME/.local/bin/agent-coord"`. The CLI bootstrap also
-   installs `agent_coord` as an underscore alias for launchers or prompts that
-   use that spelling.
+   command below with `"$HOME/.local/bin/agent-coord"`.
 
 4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
    degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
