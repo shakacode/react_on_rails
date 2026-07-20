@@ -7,24 +7,31 @@ declare global {
   /* eslint-enable vars-on-top,no-underscore-dangle */
 }
 
-let currentRailsContext: RailsContext | null = null;
+type CachedRailsContext = {
+  sourceText: string;
+  value: RailsContext;
+};
 
-// caches context and railsContext to avoid re-parsing rails-context each time a component is rendered
-// Cached values will be reset when resetRailsContext() is called
+let railsContextCache = new WeakMap<Element, CachedRailsContext>();
+
+// Key by source element and text so replacements and in-place morphs cannot reuse stale context.
 export function getRailsContext(): RailsContext | null {
-  // Return cached values if already set
-  if (currentRailsContext) {
-    return currentRailsContext;
-  }
-
   const el = document.getElementById('js-react-on-rails-context');
-  if (!el?.textContent) {
+  const sourceText = el?.textContent;
+  if (!el || !sourceText) {
     return null;
   }
 
+  const cachedRailsContext = railsContextCache.get(el);
+  if (cachedRailsContext?.sourceText === sourceText) {
+    return cachedRailsContext.value;
+  }
+
+  railsContextCache.delete(el);
   try {
-    currentRailsContext = JSON.parse(el.textContent) as RailsContext;
-    return currentRailsContext;
+    const railsContext = JSON.parse(sourceText) as RailsContext;
+    railsContextCache.set(el, { sourceText, value: railsContext });
+    return railsContext;
   } catch (e) {
     console.error('Error parsing Rails context:', e);
     return null;
@@ -32,5 +39,5 @@ export function getRailsContext(): RailsContext | null {
 }
 
 export function resetRailsContext(): void {
-  currentRailsContext = null;
+  railsContextCache = new WeakMap<Element, CachedRailsContext>();
 }
