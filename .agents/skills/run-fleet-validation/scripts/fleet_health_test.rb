@@ -1516,6 +1516,54 @@ class FleetHealthTest < Minitest::Test
     refute_includes status.fetch("evidence"), "No reusable fleet-smoke caller"
   end
 
+  def test_shared_smoke_ignores_synthetic_non_repository_workflow_paths
+    repo = "sanitized/demo"
+    head = "a" * 40
+    real_workflow = { "id" => 41, "path" => ".github/workflows/ci.yml" }
+    synthetic_workflow = { "id" => 42, "path" => "dynamic/dependabot/dependabot-updates" }
+    content_reads = []
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "wrong head" unless ref == head
+
+      content_reads << path
+      unless path == real_workflow.fetch("path")
+        raise FleetValidation::ManifestError, "synthetic workflow content is not repository-backed"
+      end
+
+      "{}"
+    end
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [real_workflow, synthetic_workflow], default_branch: "main")
+
+    assert_equal [real_workflow.fetch("path")], content_reads
+    assert_equal "unknown", status.fetch("status")
+    assert_equal false, status.fetch("shared_contract")
+    assert_equal "No reusable fleet-smoke caller was found at the default head", status.fetch("evidence")
+  end
+
+  def test_shared_smoke_reads_direct_workflow_paths_with_unusual_filenames
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = { "id" => 41, "path" => ".github/workflows/_fleet smoke.yml" }
+    content_reads = []
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "wrong head" unless ref == head
+
+      content_reads << path
+      "{}"
+    end
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [workflow], default_branch: "main")
+
+    assert_equal [workflow.fetch("path")], content_reads
+    assert_equal "unknown", status.fetch("status")
+    assert_equal false, status.fetch("shared_contract")
+  end
+
   def test_shared_smoke_does_not_pass_when_discovery_is_partially_incomplete
     repo = "sanitized/demo"
     head = "a" * 40

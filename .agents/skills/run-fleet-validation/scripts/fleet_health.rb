@@ -194,6 +194,7 @@ module FleetValidation
     SHARED_SMOKE_REFERENCE = "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@"
     PASSING_CONCLUSIONS = %w[success neutral skipped].freeze
     DEPENDABOT_PATHS = %w[.github/dependabot.yml .github/dependabot.yaml].freeze
+    REPOSITORY_WORKFLOW_PATH = %r{\A\.github/workflows/[^/]+\.ya?ml\z}
     MAX_PAGES = 20
 
     def initialize(client:, max_default_age_days:)
@@ -284,7 +285,10 @@ module FleetValidation
 
     def smoke_status(repo, head, _checks, workflows, default_branch:)
       discovery_errors = []
-      shared_callers = workflows.flat_map do |workflow|
+      repository_workflows = workflows.select do |workflow|
+        workflow["path"].to_s.match?(REPOSITORY_WORKFLOW_PATH)
+      end
+      shared_callers = repository_workflows.flat_map do |workflow|
         content = @client.content(repo, workflow.fetch("path"), ref: head)
         shared_smoke_callers(content).map { |caller| [workflow, caller] }
       rescue StandardError => e
