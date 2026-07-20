@@ -23,7 +23,9 @@ import React, { Suspense } from 'react';
 async function AsyncSectionContent({ delayMs, children }) {
   // Wait for the specified delay
   if (delayMs > 0) {
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    await new Promise((resolve) => {
+      setTimeout(resolve, delayMs);
+    });
   }
   return children;
 }
@@ -41,5 +43,3 @@ export default function CacheSection({ fallback = null, children, delayMs = 0 })
     </Suspense>
   );
 }
-
-export { CacheSection };
