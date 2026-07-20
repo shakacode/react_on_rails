@@ -53,9 +53,10 @@ module AgentWorkflowSeamDoctorTestHelpers
       "review_gate" => "claude-review",
       "approval_exempt" => "focused trusted workflow/build/dependency edits",
       "coordination_backend" =>
-        "private agent-coord state backend (current default from config: shakacode/agent-coordination-state; " \
-        "claims/heartbeats namespaced by full repo name); external adopters use the structured public " \
-        "claim-comment fallback in .agents/workflows/pr-processing.md."
+        "private agent-coord HTTP/D1 backend selected by AGENT_COORD_API_URL and AGENT_COORD_API_TOKEN " \
+        "(claims/heartbeats namespaced by full repo name); the archived legacy GitHub state repository is not " \
+        "a writable backend; external adopters use the structured public claim-comment fallback in " \
+        ".agents/workflows/pr-processing.md."
     }.merge(overrides)
 
     File.write(File.join(root, ".agents/agent-workflow.yml"), YAML.dump(config))

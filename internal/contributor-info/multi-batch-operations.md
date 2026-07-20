@@ -25,7 +25,6 @@ should use this PR branch or `main` for the current workflow docs.
    gh auth status
    gh repo view shakacode/react_on_rails
    gh repo view shakacode/agent-coordination
-   gh repo view shakacode/agent-coordination-state
    ```
 
 2. Check out the public repo branch that contains the active workflow docs,
@@ -43,6 +42,9 @@ should use this PR branch or `main` for the current workflow docs.
    export PATH="$HOME/.local/bin:$PATH"
    hash -r 2>/dev/null || true
    command -v agent-coord || which agent-coord
+   : "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
+   : "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
+   unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
    agent-coord doctor --json
    agent-coord config show --json
    agent-coord status --batch-id <batch-id> --json

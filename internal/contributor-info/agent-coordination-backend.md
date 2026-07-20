@@ -7,11 +7,13 @@ and selects a private `agent-coord` backend through
 
 `shakacode/agent-coordination` is the public CLI/bootstrap source repository.
 Runtime coordination state lives in the backend reported by
-`agent-coord config show --json` and `agent-coord doctor --json`; the current
-default is the private `shakacode/agent-coordination-state` repository on the
-`state` ref. Do not hardcode an old backend repo name in lane handoffs or
-workflow prose. The CLI help, config JSON, state repo README, and schema files
-are authoritative when they differ from this public pointer.
+`agent-coord doctor --json`; live multi-machine coordination uses the HTTP/D1
+backend selected by `AGENT_COORD_API_URL` and `AGENT_COORD_API_TOKEN`. The
+legacy `shakacode/agent-coordination-state` GitHub repository is intentionally
+archived and read-only, so it is historical state rather than a valid live
+backend. Do not hardcode a backend repo, URL, or token in lane handoffs or
+workflow prose. The CLI help, config JSON, HTTP backend health response, and
+schema files are authoritative when they differ from this public pointer.
 
 This repo carries only the React on Rails supplement: setup commands, public
 workflow links, and release-train phase rules. Keep authoritative JSON schema
@@ -28,24 +30,30 @@ and then run the backend setup below.
 ```bash
 gh auth status
 gh repo view shakacode/agent-coordination
-gh repo view shakacode/agent-coordination-state
 gh repo clone shakacode/agent-coordination
 cd agent-coordination
-ruby -Itest test/agent_coord_test.rb
+bundle install
+.agents/bin/validate
 bin/agent-coord --help
 bin/agent-coord bootstrap
 export PATH="$HOME/.local/bin:$PATH"
+hash -r 2>/dev/null || true
 agent-coord --help
-agent_coord --help
 agent-coord version --json
 agent-coord config show --json
+: "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
+: "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
+unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
 agent-coord doctor --json
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`.
-`bin/agent-coord bootstrap` installs both `agent-coord` and the compatibility
-alias `agent_coord` into `$HOME/.local/bin` by default. Add that directory to the
-active shell `PATH` if the shell has not reloaded its profile yet.
+`bin/agent-coord bootstrap` installs `agent-coord` into `$HOME/.local/bin` by
+default. Add that directory to the active shell `PATH` if the shell has not
+reloaded its profile yet. Obtain the deployed HTTP URL and a scoped machine
+token through the private operator channel; never copy those values into this
+repository, a PR, a lane handoff, or shell output. Remove stale legacy GitHub
+backend exports instead of relying on selector precedence to hide them.
 
 Treat the backend as available when `agent-coord doctor --json` and targeted
 lane-scoped status probes exit 0. In React on Rails batch workflows, run agent
