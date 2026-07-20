@@ -101,6 +101,28 @@ class FleetHealthTest < Minitest::Test
     }
   end
 
+  def test_active_public_pro_targets_do_not_require_duplicate_direct_react_on_rails_npm_packages
+    manifest = YAML.safe_load_file(MANIFEST, aliases: false)
+    active_public_pro_targets = %w[
+      shakacode/react-on-rails-demo-flagship
+      shakacode/react-on-rails-demo-hacker-news-rsc
+      shakacode/react-on-rails-demo-marketplace-rsc
+      shakacode/react-on-rails-demo-gumroad-rsc
+      shakacode/react-webpack-rails-tutorial
+      shakacode/react-on-rails-starter-tanstack
+    ]
+
+    active_public_pro_targets.each do |name|
+      packages = manifest.fetch("repos").find { |repo| repo.fetch("name") == name }.fetch("packages")
+      npm_packages = packages.filter_map { |package| package["name"] if package["ecosystem"] == "npm" }
+
+      refute_includes npm_packages, "react-on-rails", name
+      assert_includes npm_packages, "react-on-rails-pro", name
+      assert_includes npm_packages, "react-on-rails-pro-node-renderer", name
+      assert_includes npm_packages, "react-on-rails-rsc", name
+    end
+  end
+
   def test_active_drift_blocks_aggregate_while_soft_and_archived_targets_are_report_only
     evidence = @contract.evaluate(
       observations: @observations,
@@ -1466,6 +1488,89 @@ class FleetHealthTest < Minitest::Test
     refute_includes status.fetch("evidence"), "newer-invalid"
   end
 
+  def test_review_app_skips_a_newer_bot_run_that_cannot_access_review_app_secrets
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    bot_failure = valid_review_run(
+      "actor" => { "login" => "dependabot[bot]", "type" => "Bot" },
+      "conclusion" => "failure",
+      "html_url" => "https://example.invalid/bot-secret-failure",
+      "run_started_at" => "2026-07-18T11:00:00Z",
+      "updated_at" => "2026-07-18T11:05:00Z"
+    )
+    human_success = valid_review_run(
+      "actor" => { "login" => "source-contributor", "type" => "User" },
+      "html_url" => "https://example.invalid/source-pr-success",
+      "run_started_at" => "2026-07-18T10:00:00Z",
+      "updated_at" => "2026-07-18T10:05:00Z"
+    )
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end.new([bot_failure, human_success])
+
+    status = review_app_status(public_github_probe(client:), repo, target, workflow)
+
+    assert_equal "passed", status.fetch("status")
+    assert_includes status.fetch("evidence"), "source-pr-success"
+    refute_includes status.fetch("evidence"), "bot-secret-failure"
+  end
+
+  def test_review_app_with_only_bot_runs_is_unknown
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    bot_failure = valid_review_run(
+      "actor" => { "login" => "dependabot[bot]", "type" => "Bot" },
+      "conclusion" => "failure",
+      "html_url" => "https://example.invalid/bot-secret-failure"
+    )
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end.new([bot_failure])
+
+    status = review_app_status(public_github_probe(client:), repo, target, workflow)
+
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "run actor is a bot"
+  end
+
+  def test_review_app_without_actor_metadata_fails_closed
+    target = @contract.targets.first
+    repo = target.fetch("name")
+    workflow = {
+      "id" => 42,
+      "path" => ".github/workflows/cpflow-deploy-review-app.yml",
+      "name" => "Deploy review app",
+      "state" => "active"
+    }
+    identity_unknown = valid_review_run("actor" => nil)
+    client = Struct.new(:runs) do
+      def get(_path)
+        { "workflow_runs" => runs }
+      end
+    end.new([identity_unknown])
+
+    status = review_app_status(public_github_probe(client:), repo, target, workflow)
+
+    assert_equal "unknown", status.fetch("status")
+    assert_includes status.fetch("evidence"), "run actor identity is unavailable"
+  end
+
   def test_review_app_recency_uses_the_manifest_staleness_limit
     manifest = Marshal.load(Marshal.dump(@manifest))
     manifest.fetch("standing_health")["max_default_age_days"] = 1
@@ -1514,6 +1619,77 @@ class FleetHealthTest < Minitest::Test
     assert_includes status.fetch("evidence"), "FleetValidation::ManifestError"
     assert_includes status.fetch("evidence"), "workflow content forbidden"
     refute_includes status.fetch("evidence"), "No reusable fleet-smoke caller"
+  end
+
+  def test_shared_smoke_skips_stale_missing_workflow_metadata_and_evaluates_a_valid_caller
+    repo = "sanitized/demo"
+    head = "a" * 40
+    stale_workflow = { "id" => 41, "path" => ".github/workflows/deleted.yml" }
+    caller_workflow = { "id" => 42, "path" => ".github/workflows/ci.yml" }
+    caller_content = YAML.dump(
+      "jobs" => {
+        "fleet" => {
+          "name" => "Fleet",
+          "uses" => "shakacode/react_on_rails/.github/workflows/demo-fleet-smoke.yml@main"
+        }
+      }
+    )
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, path, ref:|
+      raise "wrong head" unless ref == head
+      raise FleetValidation::MissingPublicContentError, "missing at exact head" if path == stale_workflow.fetch("path")
+
+      caller_content
+    end
+    client.define_singleton_method(:get) do |path|
+      case path
+      when "/repos/#{repo}/actions/workflows/42/runs?branch=main&per_page=100"
+        {
+          "workflow_runs" => [{
+            "id" => 4201,
+            "head_sha" => head,
+            "status" => "completed",
+            "conclusion" => "success"
+          }]
+        }
+      when "/repos/#{repo}/actions/runs/4201/jobs?per_page=100"
+        {
+          "jobs" => [{
+            "name" => "Fleet / Demo fleet smoke",
+            "status" => "completed",
+            "conclusion" => "success"
+          }]
+        }
+      else
+        raise "unexpected path #{path}"
+      end
+    end
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [stale_workflow, caller_workflow], default_branch: "main")
+
+    assert_equal "passed", status.fetch("status")
+    assert_equal true, status.fetch("shared_contract")
+  end
+
+  def test_shared_smoke_with_only_stale_missing_workflow_metadata_remains_no_caller_unknown
+    repo = "sanitized/demo"
+    head = "a" * 40
+    workflow = { "id" => 41, "path" => ".github/workflows/deleted.yml" }
+    client = Object.new
+    client.define_singleton_method(:content) do |_repo, _path, ref:|
+      raise "wrong head" unless ref == head
+
+      raise FleetValidation::MissingPublicContentError, "missing at exact head"
+    end
+    client.define_singleton_method(:get) { |_path| raise "no caller must not look up runs" }
+
+    status = public_github_probe(client:)
+             .send(:smoke_status, repo, head, [], [workflow], default_branch: "main")
+
+    assert_equal "unknown", status.fetch("status")
+    assert_equal false, status.fetch("shared_contract")
+    assert_equal "No reusable fleet-smoke caller was found at the default head", status.fetch("evidence")
   end
 
   def test_shared_smoke_ignores_synthetic_non_repository_workflow_paths
@@ -2052,6 +2228,7 @@ class FleetHealthTest < Minitest::Test
 
   def valid_review_run(overrides = {})
     {
+      "actor" => { "login" => "source-contributor", "type" => "User" },
       "event" => "pull_request",
       "status" => "completed",
       "conclusion" => "success",
