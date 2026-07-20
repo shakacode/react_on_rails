@@ -69,6 +69,41 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  describe "#run_generator" do
+    let(:generator_options) { {} }
+    let(:generator) { described_class.new([], generator_options) }
+
+    before do
+      allow(generator).to receive(:print_generator_messages)
+      allow(generator).to receive(:warn_about_react_version_for_rsc)
+      allow(generator).to receive(:install_agent_guardrails)
+    end
+
+    context "when invoked by the install generator" do
+      let(:generator_options) { { invoked_by_install: true } }
+
+      it "runs RSC setup without adding dependencies again" do
+        expect(generator).to receive(:setup_rsc).once
+        expect(generator).not_to receive(:add_rsc_npm_dependencies)
+
+        generator.run_generator
+      end
+    end
+
+    context "when invoked standalone" do
+      before do
+        allow(generator).to receive_messages(prerequisites_met?: true, print_success_message: nil)
+      end
+
+      it "runs RSC setup and adds dependencies once" do
+        expect(generator).to receive(:setup_rsc).once
+        expect(generator).to receive(:add_rsc_npm_dependencies).once
+
+        generator.run_generator
+      end
+    end
+  end
+
   context "when standalone Tailwind flag is passed" do
     before do
       prepare_destination
