@@ -33,6 +33,7 @@ gh repo view shakacode/agent-coordination
 gh repo clone shakacode/agent-coordination
 cd agent-coordination
 bundle install
+.agents/bin/test
 .agents/bin/validate
 bin/agent-coord --help
 bin/agent-coord bootstrap
@@ -44,11 +45,7 @@ agent-coord config show --json
 : "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
 : "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
 unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
-(
-  set -o pipefail
-  agent-coord doctor --json |
-    ruby -rjson -e 'report = JSON.parse($stdin.read); report.delete("backend_url"); puts JSON.pretty_generate(report)'
-)
+agent-coord doctor --json
 ```
 
 The workflow docs assume `agent-coord` is available on `PATH`.
@@ -56,8 +53,10 @@ The workflow docs assume `agent-coord` is available on `PATH`.
 default. Add that directory to the active shell `PATH` if the shell has not
 reloaded its profile yet. Obtain the deployed HTTP URL and a scoped machine
 token through the private operator channel; never copy those values into this
-repository, a PR, or a lane handoff. The setup command above removes the private
-endpoint from displayed doctor output; never expose the token in shell output.
+repository, a PR, or a lane handoff. The token is a secret and must never appear
+in shell output. The deployment-specific URL is not an authentication secret;
+`doctor --json` reports it so operators can verify the selected backend. Review
+doctor and status output before sharing it outside the private operator channel.
 Remove stale legacy GitHub backend exports instead of relying on selector
 precedence to hide them.
 
@@ -107,9 +106,8 @@ state as `UNKNOWN` and stay in advisory fallback mode until a coordinator
 validates the backend.
 
 Use a temporary local state directory for smoke checks that should not write to
-GitHub. `AGENT_COORD_STATE_ROOT` sets the directory where `agent-coord` reads
-and writes JSON state; override it here so dry runs stay local instead of using
-the configured backend.
+the configured backend. Pass `--state-root` explicitly so it takes precedence
+over the loaded HTTP backend environment and keeps dry runs local.
 
 ```bash
 STATE_ROOT=$(mktemp -d)
