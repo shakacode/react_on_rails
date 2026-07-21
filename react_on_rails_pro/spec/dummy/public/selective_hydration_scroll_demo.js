@@ -38,14 +38,24 @@
     return;
   }
 
+  // ?mode=fetch switches the scroll reaction from "signal the server to release the section
+  // down the stream" to "fetch the cached section file and reveal it client-side". In fetch
+  // mode the stream is never told anything: its timer re-delivers every fetched section later
+  // as a DUPLICATE, which is safe -- React's $RC reveal helper consumes the duplicate's hidden
+  // div and bails out when it finds the boundary already revealed. The panel logs each
+  // duplicate so the harmlessness is observable.
+  var deliveryMode = /[?&]mode=fetch\b/.test(window.location.search) ? 'fetch' : 'signal';
+
   var startedAt = Date.now();
 
   // Exposed for Playwright/console assertions.
   var state = {
     streamId: streamId,
+    deliveryMode: deliveryMode, // 'signal' (server releases section) | 'fetch' (client pulls file)
     mode: 'streaming', // streaming | progressive | complete | error
     trigger: null, // 'boundary-observer' | 'scroll-threshold'
     totalSections: 1,
+    duplicates: 0, // stream re-deliveries of sections already revealed by a fetch
     sections: [{ index: 0, status: 'arrived', via: 'stream', at: 0 }],
     events: [],
   };
@@ -106,7 +116,10 @@
         var label;
         var color;
         if (section.status === 'arrived') {
-          label = section.via === 'skip' ? 'arrived (scroll)' : 'arrived (timed)';
+          if (section.via === 'skip') label = 'arrived (scroll)';
+          else if (section.via === 'fetch') label = 'arrived (fetch)';
+          else label = 'arrived (timed)';
+          if (section.duplicates) label += ' +' + section.duplicates + ' dup';
           color = '#5ad48a';
         } else if (section.status === 'requested') {
           label = 'requested...';
@@ -150,6 +163,10 @@
       '">' +
       state.mode +
       '</b></div>' +
+      '<div style="color:#9aa0a6">delivery: ' +
+      state.deliveryMode +
+      (state.duplicates ? ' &middot; ' + state.duplicates + ' stream duplicates ignored' : '') +
+      '</div>' +
       '<div style="color:#9aa0a6">trigger: ' +
       (state.trigger || 'arming...') +
       '</div>' +
@@ -197,6 +214,15 @@
     if (state.mode === 'streaming') state.mode = 'progressive';
     log('section ' + index + ' requested (' + reason + ')');
 
+    if (deliveryMode === 'fetch') {
+      fetchAndRevealSection(index);
+    } else {
+      signalSection(index);
+    }
+  }
+
+  // signal mode: ask the server to release this section down the still-open stream.
+  function signalSection(index) {
     fetch('/selective_hydration_skip_delay/' + streamId + '?section=' + index, { method: 'POST' })
       .then(function onResponse(response) {
         if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -205,6 +231,51 @@
         // Non-destructive: the timed cadence still delivers this section eventually.
         state.mode = 'error';
         log('request for section ' + index + ' failed: ' + error.message + ' (timer still applies)');
+      });
+  }
+
+  // fetch mode: pull the cached section file and reveal it ourselves. The fetched chunk is
+  //   <div hidden id="…S:N">…content…</div><script>$RC("…B:N","…S:N")</script>
+  // We NEVER execute the fetched scripts (their cached CSP nonces are stale anyway): we insert
+  // the hidden divs, then call the page's own $RC with the extracted id pairs. The stream keeps
+  // running and will re-deliver this section later; that duplicate is harmless because $RC
+  // consumes the duplicate div and bails when the boundary template is already gone.
+  function fetchAndRevealSection(index) {
+    fetch('/cache/selective_hydration_demo/section' + index + '.html')
+      .then(function onResponse(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.text();
+      })
+      .then(function onHtml(html) {
+        var rcPairs = [];
+        var rcPattern = /\$RC\("([^"]+)","([^"]+)"\)/g;
+        var match = rcPattern.exec(html);
+        while (match) {
+          rcPairs.push([match[1], match[2]]);
+          match = rcPattern.exec(html);
+        }
+        if (!rcPairs.length || typeof window.$RC !== 'function') {
+          throw new Error('no reveal instructions found');
+        }
+        // The stream may have delivered this section while our fetch was in flight; if the
+        // boundary template is gone, the reveal already happened -- discard the fetched copy.
+        if (!document.getElementById(rcPairs[0][0])) {
+          log('stream beat the fetch for section ' + index + '; fetched copy discarded');
+          return;
+        }
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var divs = doc.querySelectorAll('div[hidden][id]');
+        for (var i = 0; i < divs.length; i += 1) {
+          document.body.appendChild(document.adoptNode(divs[i]));
+        }
+        rcPairs.forEach(function reveal(pair) {
+          window.$RC(pair[0], pair[1]);
+        });
+        onSectionArrived(index, 'fetch', Date.now());
+      })
+      .catch(function onError(error) {
+        state.mode = 'error';
+        log('fetch for section ' + index + ' failed: ' + error.message + ' (timer still applies)');
       });
   }
 
@@ -217,10 +288,21 @@
 
   // --- arrival tracking ---------------------------------------------------------------------
 
-  function onSectionArrived(index, viaSkip, at) {
+  function onSectionArrived(index, via, at) {
     var section = sectionState(index);
+
+    // The stream re-delivering a section we already revealed via fetch: its marker script still
+    // fires, then its $RC call consumes the duplicate div and no-ops (boundary already gone).
+    // Record it so the panel proves the duplicate was harmless, and change nothing else.
+    if (section.status === 'arrived') {
+      section.duplicates = (section.duplicates || 0) + 1;
+      state.duplicates += 1;
+      log('duplicate of section ' + index + ' arrived on the stream; ignored by $RC guard');
+      return;
+    }
+
     section.status = 'arrived';
-    section.via = viaSkip ? 'skip' : 'stream';
+    section.via = via;
     section.at = typeof at === 'number' ? at - startedAt : elapsed();
 
     delete visiblePending[index];
@@ -231,7 +313,8 @@
       delete targetsByIndex[index];
     }
 
-    log('section ' + index + ' arrived via ' + (viaSkip ? 'scroll request' : 'timer'));
+    var sourceLabel = { skip: 'scroll request', fetch: 'client fetch', stream: 'timer' }[via] || via;
+    log('section ' + index + ' arrived via ' + sourceLabel);
 
     var allArrived = state.sections.every(function isArrived(entry) {
       return entry && entry.status === 'arrived';
@@ -333,11 +416,19 @@
   // over. Matters at ?delay=0, where sections can land almost immediately.
   var queued = window.__selectiveHydrationQueue || [];
   window.__sectionArrived = function sectionArrived(index, viaSkip) {
-    onSectionArrived(index, viaSkip, Date.now());
+    onSectionArrived(index, viaSkip ? 'skip' : 'stream', Date.now());
   };
   queued.forEach(function drain(entry) {
-    onSectionArrived(entry[0], entry[1], entry[2]);
+    onSectionArrived(entry[0], entry[1] ? 'skip' : 'stream', entry[2]);
   });
 
-  log('armed via ' + state.trigger + ', watching ' + (state.totalSections - 1) + ' pending sections');
+  log(
+    'armed via ' +
+      state.trigger +
+      ' (delivery: ' +
+      deliveryMode +
+      '), watching ' +
+      (state.totalSections - 1) +
+      ' pending sections',
+  );
 })();
