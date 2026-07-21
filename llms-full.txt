@@ -5018,7 +5018,7 @@ hydration of the clicked component, so there is no single "hydration wall."
 - **[Critical resource hints](../../pro/react-server-components/critical-resource-hints.md)**
   (`preload`, `preinit`, `preconnect`) let React itself prioritize the LCP resource, CSS, and fonts
   — a React-native alternative to hand-rolled `preload_pack_asset` tags.
-- **JSON serialization:** see [JSON Serialization Performance](#json-serialization-performance) below.
+- **JSON serialization:** see [JSON serialization performance](#json-serialization-performance) below.
 
 ## Reading the result honestly
 
@@ -5169,7 +5169,7 @@ an early data point; run a fresh paired comparison with ShakaPerf for any curren
   `config.logging_on_server = true`
 - **Node Renderer logs:** lifecycle and error detail via `RENDERER_LOG_LEVEL` (Pro)
 
-## JSON Serialization Performance
+## JSON serialization performance
 
 React on Rails serializes component props to JSON before passing them to the JavaScript renderer.
 The speed of that serialization depends on which version of Ruby's `json` gem you have.
