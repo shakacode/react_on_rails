@@ -135,6 +135,11 @@ Rails.application.routes.draw do
   get "posts_page" => "pages#posts_page"
   get "selective_hydration_demo" => "pages#selective_hydration_demo", as: :selective_hydration_demo
   get "selective_hydration_cached" => "pages#selective_hydration_cached", as: :selective_hydration_cached
+  # Out-of-band signal that releases an in-flight selective_hydration_cached stream from its
+  # artificial delay. The stream_id is used as a filename, so constrain it to hex here and
+  # re-validate in the controller.
+  post "selective_hydration_skip_delay/:stream_id" => "pages#selective_hydration_skip_delay",
+       as: :selective_hydration_skip_delay, constraints: { stream_id: /[a-f0-9]{16}/ }
 
   # API Routes
   namespace :api do

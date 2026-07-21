@@ -21,22 +21,30 @@ require "fileutils"
 namespace :section_cache do # rubocop:disable Metrics/BlockLength
   desc "Generate cached section HTML files for a route with CacheSection components"
   # rubocop:disable Metrics/BlockLength
-  task :generate, %i[route section_count delay_seconds] => :environment do |_t, args|
+  task :generate, %i[route section_count delay_seconds immediate_count] => :environment do |_t, args|
     route = args[:route] || "/selective_hydration_demo"
-    section_count = (args[:section_count] || 4).to_i
+    section_count = (args[:section_count] || 10).to_i
     delay_seconds = (args[:delay_seconds] || 5).to_i
+    # Sections that render into the initial chunk, so the visitor lands on a full viewport of
+    # already-interactive content. Must match IMMEDIATE_SECTION_COUNT in SelectiveHydrationDemo.jsx.
+    immediate_count = (args[:immediate_count] || 3).to_i
     delay_ms = delay_seconds * 1000
+
+    # The first chunk carries the shell plus every immediate section; each delayed section then
+    # gets a chunk of its own, so chunks != sections once immediate_count > 1.
+    chunk_count = section_count - immediate_count + 1
 
     puts "=" * 80
     puts "Section Cache Generator"
     puts "=" * 80
     puts "Route: #{route}"
-    puts "Sections: #{section_count}"
-    puts "Delay between sections: #{delay_seconds}s"
+    puts "Sections: #{section_count} (#{immediate_count} immediate, #{section_count - immediate_count} delayed)"
+    puts "Chunks to capture: #{chunk_count}"
+    puts "Delay between chunks: #{delay_seconds}s"
     puts
 
-    # Generate delay array: [0, 5000, 10000, 15000, ...]
-    delays = Array.new(section_count) { |i| i * delay_ms }
+    # e.g. immediate_count=3, delay=5s -> [0, 0, 0, 5000, 10000, 15000, ...]
+    delays = Array.new(section_count) { |i| i < immediate_count ? 0 : (i - immediate_count + 1) * delay_ms }
     puts "Section delays (ms): #{delays.inspect}"
 
     # Build URL with sectionDelays as JSON query param
@@ -47,12 +55,12 @@ namespace :section_cache do # rubocop:disable Metrics/BlockLength
     puts "Fetching: #{uri}"
     puts
 
-    # Capture streaming response, dividing purely by time windows
-    # Each section's async prop resolves at section_index * delay_seconds
-    # So content arriving in each time window belongs to that section
-    sections = Array.new(section_count) { +"" }
+    # Capture streaming response, dividing purely by time windows.
+    # The Nth delayed section resolves at N * delay_seconds, so content arriving in each time
+    # window belongs to that chunk.
+    sections = Array.new(chunk_count) { +"" }
     section_start_time = Time.now
-    total_timeout = (section_count * delay_seconds) + 30
+    total_timeout = (chunk_count * delay_seconds) + 30
 
     # Use IO.popen with unbuffered curl for streaming
     IO.popen(["curl", "-sN", "--max-time", total_timeout.to_s, uri.to_s], "r") do |io|
@@ -67,9 +75,9 @@ namespace :section_cache do # rubocop:disable Metrics/BlockLength
 
         elapsed = Time.now - section_start_time
 
-        # Determine which section this chunk belongs to based on time
-        # Section N receives content arriving at time >= N * delay_seconds
-        section_index = [(elapsed / delay_seconds).floor, section_count - 1].min
+        # Determine which chunk this belongs to based on time.
+        # Chunk N receives content arriving at time >= N * delay_seconds
+        section_index = [(elapsed / delay_seconds).floor, chunk_count - 1].min
 
         sections[section_index] << chunk
       end

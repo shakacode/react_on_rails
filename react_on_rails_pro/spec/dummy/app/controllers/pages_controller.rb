@@ -21,6 +21,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   enable_async_react_rendering only: [:async_components_demo]
 
+  # The page that issues this POST is a *cached* HTML snapshot, so its embedded csrf-token meta
+  # tag is stale by construction. The endpoint only touches a marker file in tmp/, so there is
+  # nothing to protect.
+  skip_forgery_protection only: :selective_hydration_skip_delay
+
   XSS_PAYLOAD = { "<script>window.alert('xss1');</script>" => '<script>window.alert("xss2");</script>' }.freeze
   PROPS_NAME = "Mr. Server Side Rendering"
   POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY = 0
@@ -32,6 +37,12 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   LAZY_PROP_REDIS_BLOCK_MS = 30_000
   MAX_LAZY_PROP_REDIS_EMPTY_READS = 10
   LAZY_PROP_REDIS_STALL_WARN_READS = 3
+  # selective_hydration_cached / selective_hydration_skip_delay. The stream id becomes a
+  # filename, so the format is enforced at both the route and the action.
+  SELECTIVE_HYDRATION_STREAM_ID_FORMAT = /\A[a-f0-9]{16}\z/
+  SELECTIVE_HYDRATION_SKIP_POLL_INTERVAL = 0.05
+  SELECTIVE_HYDRATION_SKIP_FLAG_MAX_AGE = 300
+  SELECTIVE_HYDRATION_HEARTBEAT_INTERVAL = 2
   private_constant :POSTS_PAGE_DEFAULT_ARTIFICIAL_DELAY, :POSTS_PAGE_DEFAULT_POSTS_COUNT,
                    :POSTS_PAGE_MAX_ARTIFICIAL_DELAY, :POSTS_PAGE_MAX_POSTS_COUNT,
                    :LAZY_PROP_REDIS_BLOCK_MS, :MAX_LAZY_PROP_REDIS_EMPTY_READS,
@@ -301,48 +312,46 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/selective_hydration_demo")
   end
 
-  def selective_hydration_cached # rubocop:disable Metrics/AbcSize
-    # Stream pre-cached section files with delays using ActionController::Live
-    # This simulates serving cached SSR content with progressive streaming
+  # Streams pre-cached section files with an artificial delay between them, simulating a
+  # progressively streamed SSR page. Delivery is *demand-aware*, per section: a POST to
+  # #selective_hydration_skip_delay with a section index releases exactly that section
+  # immediately, down this same still-open connection -- possibly out of order, which React's
+  # per-boundary reveal scripts handle. Unrequested sections keep the timed cadence. See
+  # selective_hydration_scroll_demo.js.
+  def selective_hydration_cached
     delay_seconds = (params[:delay] || 5).to_i
-    cache_dir = Rails.root.join("public", "cache", "selective_hydration_demo")
-
-    # Find all section files
-    section_files = Dir.glob(cache_dir.join("section*.html")).sort_by do |f|
-      f.match(/section(\d+)/)[1].to_i
-    end
+    section_files = selective_hydration_section_files
 
     if section_files.empty?
       response.stream.write "No cached sections found. Run: rake section_cache:generate[/selective_hydration_demo,4,5]"
-      response.stream.close
       return
     end
 
-    # Get current CSP nonce for this request
-    current_nonce = content_security_policy_nonce
+    stream_id = SecureRandom.hex(8)
+    sweep_stale_skip_flags
+    nonce = content_security_policy_nonce
 
-    # Set headers for streaming
-    response.headers["Content-Type"] = "text/html; charset=utf-8"
-    response.headers["Cache-Control"] = "no-cache"
-    response.headers["X-Accel-Buffering"] = "no"
-
-    # Stream sections with delays using Live streaming
-    section_files.each_with_index do |section_path, index|
-      # Wait before sending this section (except first)
-      sleep(delay_seconds) if index.positive?
-
-      # Read section content and replace cached nonce with current nonce
-      content = File.read(section_path)
-      # Replace any nonce="..." with the current request's nonce
-      content = content.gsub(/nonce="[^"]*"/, "nonce=\"#{current_nonce}\"")
-
-      # Stream the content immediately
-      response.stream.write(content)
-
-      Rails.logger.info "[SectionCache] Sent section #{index}: #{File.basename(section_path)}"
-    end
+    write_selective_hydration_shell(section_files, stream_id, nonce)
+    stream_remaining_sections(section_files, stream_id, nonce, delay_seconds)
   ensure
+    FileUtils.rm_f(Dir.glob(selective_hydration_skip_flag_dir.join("#{stream_id}.*"))) if stream_id
     response.stream.close
+  end
+
+  # Out-of-band release valve for an in-flight #selective_hydration_cached stream. The POST
+  # almost always lands on a different Puma worker than the one holding the open stream, so the
+  # signal travels through a per-section marker file rather than process memory.
+  def selective_hydration_skip_delay
+    stream_id = params[:stream_id].to_s
+    return head(:bad_request) unless stream_id.match?(SELECTIVE_HYDRATION_STREAM_ID_FORMAT)
+
+    section = Integer(params[:section], exception: false)
+    return head(:bad_request) unless section&.between?(1, 99)
+
+    FileUtils.mkdir_p(selective_hydration_skip_flag_dir)
+    FileUtils.touch(selective_hydration_skip_flag_dir.join("#{stream_id}.#{section}"))
+    Rails.logger.info "[SectionCache] Section #{section} requested for stream #{stream_id}"
+    head :no_content
   end
 
   def loadable_component
@@ -404,6 +413,145 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   helper_method :read_async_props_from_redis, :read_lazy_props_from_redis
 
   private
+
+  # --- selective_hydration_cached helpers ---------------------------------------------------
+
+  def selective_hydration_section_files
+    cache_dir = Rails.root.join("public", "cache", "selective_hydration_demo")
+    Dir.glob(cache_dir.join("section*.html")).sort_by { |f| f.match(/section(\d+)/)[1].to_i }
+  end
+
+  def selective_hydration_skip_flag_dir
+    Rails.root.join("tmp", "selective_hydration_skip")
+  end
+
+  # A stream that dies without running its ensure block (killed worker, hard reload) leaves its
+  # markers behind. Nothing else reaps them, so each new stream clears the old ones.
+  def sweep_stale_skip_flags
+    cutoff = Time.current - SELECTIVE_HYDRATION_SKIP_FLAG_MAX_AGE
+    Dir.glob(selective_hydration_skip_flag_dir.join("*")).each do |path|
+      FileUtils.rm_f(path) if File.mtime(path) < cutoff
+    rescue Errno::ENOENT
+      # Raced with another stream's sweep or its own cleanup; nothing to do.
+    end
+  end
+
+  # Demand-aware delivery loop for sections 1..N. Two release paths compete:
+  #   - scroll: a marker file "<stream_id>.<index>" releases exactly that section, immediately,
+  #     even out of order (each cached chunk is a self-contained boundary reveal);
+  #   - timer: every `delay_seconds` after the last send, the lowest unsent section flushes,
+  #     preserving the original paced-stream behavior when nobody scrolls.
+  # Polling files (rather than a blocking primitive) is what lets the scroll signal cross Puma
+  # worker processes.
+  def stream_remaining_sections(section_files, stream_id, nonce, delay_seconds)
+    remaining = (1...section_files.size).to_a
+    next_timed_at = monotonic_now + delay_seconds
+    next_heartbeat_at = monotonic_now + SELECTIVE_HYDRATION_HEARTBEAT_INTERVAL
+
+    while remaining.any?
+      to_send, via_skip = pick_sections_to_send(remaining, stream_id, next_timed_at)
+
+      if to_send.empty?
+        next_heartbeat_at = write_stream_heartbeat(next_heartbeat_at)
+        sleep SELECTIVE_HYDRATION_SKIP_POLL_INTERVAL
+        next
+      end
+
+      to_send.each do |index|
+        write_selective_hydration_section(section_files, index, via_skip, nonce)
+        FileUtils.rm_f(selective_hydration_skip_flag_dir.join("#{stream_id}.#{index}"))
+      end
+      remaining -= to_send
+      next_timed_at = monotonic_now + delay_seconds
+    end
+  end
+
+  # Scroll-requested sections win over the timer; the timer releases the lowest unsent section.
+  def pick_sections_to_send(remaining, stream_id, next_timed_at)
+    requested = remaining.select do |index|
+      File.exist?(selective_hydration_skip_flag_dir.join("#{stream_id}.#{index}"))
+    end
+    return [requested, true] if requested.any?
+    return [[remaining.first], false] if monotonic_now >= next_timed_at
+
+    [[], false]
+  end
+
+  # Heartbeat: an abandoned browser tab leaves the delivery loop running (holding a Puma thread
+  # -- and in development, the code-reloading interlock) until the next write hits the dead
+  # socket. An HTML comment is invisible to the parser and makes disconnects surface in seconds
+  # instead of minutes; the write raises and the ensure block cleans up.
+  def write_stream_heartbeat(next_heartbeat_at)
+    return next_heartbeat_at if monotonic_now < next_heartbeat_at
+
+    response.stream.write("<!--hb-->")
+    monotonic_now + SELECTIVE_HYDRATION_HEARTBEAT_INTERVAL
+  end
+
+  def write_selective_hydration_shell(section_files, stream_id, nonce)
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+
+    shell = File.read(section_files[0]).gsub(/nonce="[^"]*"/, %(nonce="#{nonce}"))
+    response.stream.write(inject_selective_hydration_bootstrap(shell, stream_id, nonce))
+  end
+
+  def write_selective_hydration_section(section_files, index, via_skip, nonce)
+    # Marker script goes immediately before the content so the client learns a section has
+    # landed only when it actually lands.
+    response.stream.write(section_arrived_script(index, via_skip, nonce))
+    response.stream.write(File.read(section_files[index]).gsub(/nonce="[^"]*"/, %(nonce="#{nonce}")))
+    Rails.logger.info "[SectionCache] Sent section #{index} (#{via_skip ? 'scroll-requested' : 'timed'})"
+  end
+
+  def monotonic_now
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
+  def section_arrived_script(index, skip_requested, nonce)
+    call = "window.__sectionArrived(#{index}, #{skip_requested ? 'true' : 'false'});"
+    %(<script nonce="#{ERB::Util.html_escape(nonce)}">#{call}</script>)
+  end
+
+  # Injects the demo's client runtime into the *cached* shell rather than into
+  # selective_hydration_demo.html.erb, so the cached snapshot stays a faithful capture of the
+  # real streaming route and the demo can be edited without regenerating the cache.
+  #
+  # The inline half goes in <head> and runs synchronously, so window.__sectionArrived always
+  # exists -- even at ?delay=0, where section 1 can land before an external script has loaded.
+  #
+  # The external half is *appended to the very end of section 0*, NOT before </body>. React
+  # closes the shell (</body></html>) long before it flushes the root boundary's content, so the
+  # section-1..N Suspense placeholders the demo watches only enter the DOM with section 0's
+  # trailing $RC(B:0, S:0) call. Injecting at </body> would arm the observer against a DOM that
+  # does not contain them yet.
+  def inject_selective_hydration_bootstrap(html, stream_id, nonce)
+    escaped_nonce = ERB::Util.html_escape(nonce)
+    inline = <<~HTML
+      <script nonce="#{escaped_nonce}">
+        window.__selectiveHydrationStreamId = "#{stream_id}";
+        window.__selectiveHydrationQueue = [];
+        window.__sectionArrived = function (index, viaSkip) {
+          window.__selectiveHydrationQueue.push([index, viaSkip, Date.now()]);
+        };
+      </script>
+    HTML
+    # mtime-based cache buster: the dev public file server sends cacheable headers, which would
+    # otherwise pin browsers to stale copies of the demo runtime while iterating on it.
+    demo_js = Rails.public_path.join("selective_hydration_scroll_demo.js")
+    version = File.exist?(demo_js) ? File.mtime(demo_js).to_i : 0
+    external = %(<script nonce="#{escaped_nonce}" src="/selective_hydration_scroll_demo.js?v=#{version}"></script>)
+
+    (insert_before_last(html, "</head>", inline) || (inline + html)) + external
+  end
+
+  def insert_before_last(html, tag, snippet)
+    index = html.rindex(tag)
+    return nil unless index
+
+    html.dup.insert(index, snippet)
+  end
 
   def posts_page_posts_count
     value = params[:posts_count]
