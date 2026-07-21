@@ -4806,79 +4806,162 @@ SOURCE: docs/oss/core-concepts/performance-benchmarks.md
 
 # Performance Benchmarks
 
-This page covers the performance characteristics of React on Rails across different rendering strategies, with data from real-world deployments and comparative benchmarks.
+The point of this page is not to admire numbers. It is to help you **make a page measurably
+faster and prove the win** — increasingly with an AI agent doing the conversion while a benchmark
+harness keeps it honest.
 
-## SSR Performance: ExecJS vs Node Renderer
+The React on Rails v17 story (React 19.2, [React Server Components](../../pro/react-server-components/index.md),
+[streaming SSR](../building-features/streaming-server-rendering.md), and the
+[Node renderer](../building-features/node-renderer/basics.md)) is that an existing SSR or
+client-rendered page can be converted to a faster rendering strategy — often by prompting a coding
+agent — and the result can be verified with a trustworthy A/B benchmark instead of a hopeful
+before/after. The rest of this page is the loop, the harness that proves it, the levers you pull,
+and how to read the result without fooling yourself.
 
-The default ExecJS renderer evaluates JavaScript synchronously inside a single-threaded pool. The [Node Renderer](../building-features/node-renderer/basics.md) (React on Rails Pro) runs a dedicated Node.js master process with worker processes (via `cluster.fork()`), providing dramatically better throughput.
+## The improve-and-prove loop
 
-### Key Differences
+A modern performance change on React on Rails looks like this:
 
-| Metric            | ExecJS (mini_racer)           | ExecJS (Node.js runtime)      | Node Renderer (Pro)        |
-| ----------------- | ----------------------------- | ----------------------------- | -------------------------- |
-| Architecture      | V8 isolate in Ruby process    | New process per eval call     | Persistent Node.js workers |
-| Concurrency (MRI) | Single-threaded (pool size 1) | Single-threaded (pool size 1) | Multi-worker               |
-| Async support     | None                          | None                          | Full (Promises, timers)    |
-| Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
-| RSC support       | Not supported                 | Not supported                 | Supported                  |
-| Typical speedup   | Baseline                      | Comparable                    | 3-10x over ExecJS          |
+1. **Point an agent at a page.** "Convert the `home` page to React Server Components," or "move
+   this dashboard's formatting libraries server-side." The [RSC performance skill](../migrating/rsc-performance-validation.md)
+   and guides give the agent the conversion patterns.
+2. **The agent converts the page** on a branch, keeping the same data, routes, and visual output.
+3. **A paired A/B benchmark proves the win** — control (your default branch) versus experiment
+   (the branch) — under production builds and mobile throttling, with a statistical test that
+   survives a noisy laptop.
 
-The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. Popmenu reported a [73% decrease in response times](#popmenu) after switching to Pro. ExecJS is limited to synchronous rendering within a single-threaded pool, so the gap widens for pages with many async data sources or large component trees.
+Step 3 is what makes the loop real rather than vibes. An agent iterating in a tight loop is running
+on the _same machine_ it is benchmarking; conventional "run before, run after, compare the average"
+measurement is dominated by that noise and will happily report a phantom win or hide a real
+regression. The harness below is built to cancel that noise so the agent (and you) can trust the
+number after every single change.
 
-## Bundle Splitting Impact
+## Proving a change with ShakaPerf
 
-React on Rails supports [code splitting](../building-features/code-splitting.md) (Pro feature) to reduce the amount of JavaScript sent to the browser. The impact depends on your application's structure:
+[ShakaPerf](https://github.com/shakacode/shakaperf) is the ShakaCode benchmarking toolkit we use to
+verify React on Rails performance work. It is source-available and public on
+[npm](https://www.npmjs.com/package/shaka-perf) and [GitHub](https://github.com/shakacode/shakaperf).
+The methodology is what matters — any harness that runs two production builds side by side under
+identical throttling with paired sampling and a significance test gives the same signal — but
+ShakaPerf packages the whole thing, so it is the path of least resistance.
 
-### Client Bundle Size
+### Twin dockerized servers take the noise out
 
-Code splitting with dynamic `import()` breaks your application into smaller chunks loaded on demand:
+ShakaPerf stands up **two production-mode servers side by side** in Docker:
 
-- **Without splitting:** A single bundle contains all components, even those not needed on the current page
-- **With splitting:** Only the components required for the current route are loaded initially; others load on navigation
+- **Control** — built from your baseline branch (typically `main`). Your reference point.
+- **Experiment** — built from your current branch. What you are measuring.
 
-For applications with many routes and components, code splitting can substantially reduce initial bundle size. The actual reduction depends on how much code is shared across routes — apps with mostly independent route content typically see larger gains.
+Both containers run the same data and configuration in production mode; the only difference is the
+code on each branch (surfaced to the app as a `PERF_EXPERIMENT` environment variable). Because the
+two servers are real, isolated builds running at the same time, you get a genuine side-by-side
+comparison instead of "run the old code, change branches, rebuild, hope nothing else drifted."
 
-### Server Bundle Size
-
-Server bundles are not typically split because the server can load the full bundle once at startup. However, with React Server Components, server-only dependencies are excluded from the client bundle entirely, which compounds the benefits of code splitting.
-
-## Streaming SSR Benefits
-
-[Streaming SSR](../building-features/streaming-server-rendering.md) (Pro feature) uses React's `renderToPipeableStream` to send HTML progressively as components resolve:
-
-### Time to First Byte (TTFB)
-
-| Rendering Strategy                 | TTFB                      | Full Page Load              |
-| ---------------------------------- | ------------------------- | --------------------------- |
-| Client-side only                   | Fast (empty shell)        | Slow (fetch + render)       |
-| Traditional SSR (`renderToString`) | Slow (waits for all data) | Fast (complete HTML)        |
-| Streaming SSR                      | Fast (shell immediately)  | Progressive (chunks arrive) |
-
-Streaming SSR provides the best of both approaches: the browser receives the initial HTML shell immediately (fast TTFB) while data-dependent sections stream in as they resolve. This is especially valuable for pages with multiple independent data sources.
-
-### Selective Hydration
-
-With streaming SSR and React 18+, components can hydrate independently as their JavaScript loads:
-
-- Navigation can become interactive while main content is still streaming
-- User interactions automatically prioritize hydration of the clicked component
-- No single "hydration wall" where the entire page freezes
-
-**Note:** By default, React on Rails uses `defer` scripts which delay all hydration until the page finishes streaming. To enable selective hydration, configure your initializer:
-
-```ruby
-config.generated_component_packs_loading_strategy = :async
+```bash
+# In your app, after a one-time twin-servers setup:
+pnpm exec shaka-perf servers    # detect stale images → rebuild → start both containers → start servers
+# Control:    http://localhost:3020
+# Experiment: http://localhost:3030
 ```
 
-See [Selective Hydration in Streamed Components](../../pro/react-server-components/selective-hydration-in-streamed-components.md) for complete details.
+### Paired, simultaneous sampling — no quiet machine required
 
-## React Server Components Impact
+The reason ShakaPerf is trustworthy on a developer laptop (or a shared CI box) is that it does not
+try to average noise away. It **aligns the noise and subtracts it**:
 
-React Server Components (Pro feature) provide additional performance benefits on top of streaming SSR:
+- Each iteration measures control and experiment **at the same instant** (`Promise.all`), so both
+  sides experience the same CPU contention, thermal state, and background interference. Whatever
+  noise hits iteration `i` hits both samples equally.
+- Analysis runs on the per-iteration **paired difference** `d[i] = control[i] − experiment[i]`,
+  where the shared noise cancels. Significance is a **Wilcoxon signed-rank test** (with the exact
+  null distribution for small `n`, so an 8-sample run can still reach significance), and the point
+  estimate is the paired **Hodges-Lehmann** estimator. Both are non-parametric and robust to the
+  heavy-tailed outliers Lighthouse produces.
 
-### Client Bundle Reduction
+The practical payoff: you do **not** need a dedicated quiet machine or a silent CI runner. Shared
+noise cancels inside each pair, which is exactly what lets an agent benchmark reliably on the same
+machine it is coding on. (The full statistical justification, including why paired Wilcoxon beats
+Mann-Whitney U and Welch's t-test here, is in ShakaPerf's
+[`used_statistics.md`](https://github.com/shakacode/shakaperf/blob/main/packages/shaka-perf/used_statistics.md).)
 
-Server components and their dependencies are excluded from the client bundle. In practice, this means:
+### What it measures
+
+A single Playwright-based `abTest` definition drives every check. From it, ShakaPerf collects:
+
+- **Core Web Vitals and load metrics:** FCP, LCP, TBT, CLS, Speed Index, TTFB, and INP.
+- **Network/byte metrics:** total downloads and JavaScript bytes (with request counts and
+  before-LCP variants), so a JavaScript-payload reduction shows up directly.
+- **Custom timing marks:** any `performance.mark()` you emit. `hydration-start` and `hydration-end`
+  are measured out of the box, which is how you see hydration cost move on an RSC conversion.
+- **Visual regression:** screenshot diffs of control vs experiment across viewports, so "faster"
+  is gated on "still the same page."
+- **Accessibility (axe-core):** violations, so a conversion does not silently regress a11y.
+
+### Running the comparison
+
+```bash
+# Perf + visual regression across both branches:
+pnpm exec shaka-perf compare --categories perf,visreg \
+  --controlURL http://localhost:3020 \
+  --experimentURL http://localhost:3030 \
+  --full-report-zip
+```
+
+Results land in `compare-results/` as a self-contained `report.html` (plus `report.json` for
+machine parsing and, with `--full-report-zip`, an archived bundle for the PR). Key knobs live in an
+`abtests.config.ts` file — `numberOfMeasurements` (default 20), `regressionThreshold` (default
+50 ms), `pValueThreshold` (default 0.05), and `samplingMode` (default `simultaneous`). See
+ShakaPerf's [twin-servers guide](https://github.com/shakacode/shakaperf/blob/main/packages/shaka-perf/README-twin-servers.md)
+for the one-time Docker setup.
+
+> [!NOTE]
+> ShakaPerf is source-available under the ShakaPerf License (not MIT). It is **free** for reading
+> and studying the source, a 45-day evaluation (agents welcome), education, personal projects,
+> supporting public open-source projects, and production use by small organizations (under 10
+> people **and** under $1M revenue **and** under $1M raised). Larger or funded organizations need a
+> paid subscription. See [shakaperf.com](https://shakaperf.com) for terms and pricing. The
+> methodology on this page applies to any equivalent paired-A/B harness.
+
+### In-repo example
+
+React on Rails uses ShakaPerf as a release gate for the RSC `'use client'` CSS fix — a real, small
+`abTest` you can copy from. See
+[`test/shakaperf/rsc-fouc/`](https://github.com/shakacode/react_on_rails/tree/master/test/shakaperf/rsc-fouc)
+for the config and the `.abtest.ts` definition.
+
+## The performance levers
+
+Once you can prove a change, these are the levers with the largest payoff, roughly in order of
+impact for a typical server-rendered React on Rails page. Each links to its deep dive.
+
+### SSR engine: ExecJS vs the Node Renderer
+
+The default ExecJS renderer evaluates JavaScript synchronously inside a single-threaded pool. The
+[Node Renderer](../building-features/node-renderer/basics.md) (React on Rails Pro) runs a dedicated
+Node.js master process with worker processes (default: one per CPU minus one), providing
+dramatically better throughput.
+
+| Metric            | ExecJS (mini_racer)           | ExecJS (Node.js runtime)        | Node Renderer (Pro)        |
+| ----------------- | ----------------------------- | ------------------------------- | -------------------------- |
+| Architecture      | V8 isolate in Ruby process    | New process per eval call       | Persistent Node.js workers |
+| Concurrency (MRI) | Single-threaded (pool size 1) | Single-threaded (pool size 1)   | Multi-worker               |
+| Async support     | None                          | None                            | Full (Promises, timers)    |
+| Streaming SSR     | Not supported                 | Not supported                   | Supported                  |
+| RSC support       | Not supported                 | Not supported                   | Supported                  |
+| Relative speed    | Baseline                      | Slower (process spawn per eval) | Substantially faster       |
+
+On MRI Ruby, `server_renderer_pool_size` must stay at 1 to avoid deadlocks (see
+[ExecJS Limitations](./execjs-limitations.md)); JRuby can raise it. The Node Renderer's persistent
+workers support full async rendering and multi-worker concurrency, which are the primary sources of
+the difference — the gap widens for pages with many async data sources or large component trees.
+[Popmenu measured a 73% response-time reduction](#popmenu) in production after switching to Pro;
+the exact multiple is workload-dependent, so benchmark your own pages rather than quoting a headline
+number.
+
+### React Server Components: ship less JavaScript
+
+[React Server Components](../../pro/react-server-components/index.md) (Pro) exclude server components
+and their dependencies from the client bundle entirely:
 
 ```jsx
 // These imports stay server-side — zero client cost
@@ -4887,29 +4970,89 @@ import { marked } from 'marked'; // ~35KB
 import numeral from 'numeral'; // ~25KB
 ```
 
-Applications that use heavy formatting, parsing, or data-processing libraries on the server side see the largest gains. Frigade reported a [62% reduction in client-side bundle size](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade) after migrating to RSC.
+Server components produce HTML that needs **no hydration** — only client components (`'use client'`)
+hydrate — which cuts Total Blocking Time and improves Time to Interactive. Applications that lean on
+heavy formatting, parsing, or data-processing libraries on the server see the largest gains.
+[Frigade reported a 62% reduction in client-side bundle size](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)
+after migrating to RSC. This is the conversion the improve-and-prove loop most often targets; see the
+[RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md).
 
-### No Hydration for Server Components
+### Streaming SSR and selective hydration
 
-Server components produce HTML that does not need hydration — they have no client-side JavaScript. Only client components (those with `'use client'`) require hydration. This reduces Total Blocking Time and improves Time to Interactive.
+[Streaming SSR](../building-features/streaming-server-rendering.md) (Pro) uses React's
+`renderToPipeableStream` to send HTML progressively as components resolve:
 
-## Benchmarking RSC Against Warm SSR Caches
+| Rendering Strategy                 | TTFB                      | Full Page Load              |
+| ---------------------------------- | ------------------------- | --------------------------- |
+| Client-side only                   | Fast (empty shell)        | Slow (fetch + render)       |
+| Traditional SSR (`renderToString`) | Slow (waits for all data) | Fast (complete HTML)        |
+| Streaming SSR                      | Fast (shell immediately)  | Progressive (chunks arrive) |
 
-React Server Components reduce client JavaScript, hydration work, and duplicated data-fetching paths. They do not
-automatically beat an already-warm SSR cache on every first-paint metric. If the existing page uses
-[`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching),
+The browser gets the initial HTML shell immediately (fast TTFB) while data-dependent sections stream
+in as they resolve — especially valuable for pages with multiple independent data sources. With
+streaming and React 18+, components can hydrate independently as their JavaScript loads: navigation
+can become interactive while main content is still streaming, and user interactions prioritize
+hydration of the clicked component, so there is no single "hydration wall."
+
+> [!NOTE]
+> Selective hydration requires `:async` script loading. In **React on Rails Pro** apps on
+> Shakapacker ≥ 8.2.0 this is already the default when the setting is unset — no initializer change
+> is needed. Non-Pro apps default to `:defer` (which delays all hydration until streaming finishes),
+> and `:async` is a Pro capability there. On Shakapacker < 8.2.0, script loading falls back to
+> `:sync`. See [Selective Hydration in Streamed Components](../../pro/react-server-components/selective-hydration-in-streamed-components.md)
+> and [Hydration Scheduling](../building-features/hydration-scheduling.md) for control over when
+> individual islands hydrate.
+
+### Caching, code splitting, and the smaller levers
+
+- **[Caching](../building-features/caching.md):** prerender caching and fragment caching
+  (`cached_react_component_hash`) can skip prop assembly, JSON serialization, and JavaScript
+  evaluation on a warm hit. This is often the highest-leverage change for mostly static pages — and,
+  as the next section explains, it sets the fair baseline any RSC conversion must beat.
+- **[Code splitting](../building-features/code-splitting.md)** (Pro) and
+  **[bundle caching](../building-features/bundle-caching.md)** (Pro) reduce initial and rebuilt
+  JavaScript. Gains scale with how independent your routes are.
+- **[React Compiler](../building-features/react-compiler.md)** adds build-time memoization with no
+  source changes.
+- **[Critical resource hints](../../pro/react-server-components/critical-resource-hints.md)**
+  (`preload`, `preinit`, `preconnect`) let React itself prioritize the LCP resource, CSS, and fonts
+  — a React-native alternative to hand-rolled `preload_pack_asset` tags.
+- **JSON serialization:** see [JSON Serialization Performance](#json-serialization-performance) below.
+
+## Reading the result honestly
+
+A faster number is only a real win if it is the same page, measured against the right baseline, and
+you understand _which_ metric moved.
+
+### Decompose the metrics — do not just stare at LCP
+
+The fix depends on which signals moved together:
+
+| Signal                              | Likely cause                                                            | Where to look                                                                                             |
+| ----------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **FCP and TBT both high**           | JS-bundle / hydration bound — the `'use client'` tail ships too much    | Reduce client boundaries ([chunk contamination](../migrating/rsc-troubleshooting.md#chunk-contamination)) |
+| **LCP high while FCP is also high** | LCP is gated on a late FCP; the element is healthy but cannot paint yet | Fix FCP first by reducing client JS; LCP usually follows                                                  |
+| **LCP high while FCP is healthy**   | The LCP element or its asset delivery is slow                           | Inspect the hero/image resource, CDN headers, preload/fetch priority                                      |
+| **INP high in RUM**                 | Long client tasks delay input, often the same JS tail that raises TBT   | Follow the FCP/TBT path, verify with RUM or traces                                                        |
+
+A high FCP dragging LCP behind it is the common RSC-conversion pattern: the largest element is
+healthy, it just cannot paint until a late first render lets it. Fix FCP first.
+
+### Benchmarking RSC against warm SSR caches {#benchmarking-rsc-against-warm-ssr-caches}
+
+React Server Components reduce client JavaScript, hydration work, and duplicated data-fetching
+paths. They do **not** automatically beat an already-warm SSR cache on every first-paint metric. If
+the existing page uses [`cached_react_component` or `cached_react_component_hash`](../building-features/caching.md#level-2-fragment-caching),
 the fair baseline is a warm fragment-cache hit. If it uses
-[`config.prerender_caching = true`](../building-features/caching.md#level-1-prerender-caching) without fragment caching,
-the fair baseline is a warm prerender-cache hit. Do not compare RSC against an uncached SSR request unless that uncached
-state is the production baseline.
+[`config.prerender_caching = true`](../building-features/caching.md#level-1-prerender-caching)
+without fragment caching, the fair baseline is a warm prerender-cache hit. Do not compare RSC
+against an uncached SSR request unless that uncached state is the production baseline.
 
-This distinction matters most for mostly static public pages. On a fragment-cache hit, React on Rails Pro can skip prop
-assembly, JSON serialization, and JavaScript evaluation. Fragment-caching helpers skip the prerender cache for that render
-call because the full fragment is already cached. On a prerender-cache hit, props are still assembled and serialized, but
-the JavaScript render result is reused. Either warm path can be very hard for an RSC conversion to beat on TTFB, FCP, or
-LCP because there may be little server-rendering work left to remove.
-
-### Static landing-page pattern
+This matters most for mostly static public pages. On a fragment-cache hit, React on Rails Pro can
+skip prop assembly, JSON serialization, and JavaScript evaluation. On a prerender-cache hit, props
+are still assembled and serialized, but the JavaScript render result is reused. Either warm path can
+be very hard for an RSC conversion to beat on TTFB, FCP, or LCP because there is little
+server-rendering work left to remove.
 
 A cache-optimized landing page often looks like this:
 
@@ -4939,224 +5082,51 @@ A cache-optimized landing page often looks like this:
 <%= rendered["componentHtml"] %>
 ```
 
-In this shape, `auto_load_bundle: false` keeps asset loading explicit so the page can preserve head ordering and preload
-the critical CSS. That per-call option only disables automatic loading when the app has not enabled
-`config.auto_load_bundle` globally; if the global setting is `true`, preserve the resulting asset behavior in both the SSR
-baseline and the RSC experiment. An RSC experiment must keep the same data, release, device, locale, CMS state, CSS
-delivery, font preloads, and hero/image priority before claiming that RSC changed rendering performance. Otherwise the
-comparison is apples to oranges: a lower JavaScript payload or lower Total Blocking Time can coexist with worse LCP if the
-conversion delays CSS, fonts, or the LCP resource.
+An RSC experiment must keep the same data, release, device, locale, CMS state, CSS delivery, font
+preloads, and hero/image priority before claiming that RSC changed rendering performance. Otherwise
+the comparison is apples to oranges: a lower JavaScript payload can coexist with worse LCP if the
+conversion delays CSS, fonts, or the LCP resource. This is exactly why the ShakaPerf harness gates
+performance on **visual regression** in the same run — a faster page has to still be the same page.
 
-### Cache-state matrix
+Measure each cache state intentionally and label it in the report:
 
-Measure each relevant state intentionally and label it in the report:
+| Variant           | How to prepare it                                                                          | What it answers                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Cold uncached SSR | Clear fragment/prerender caches; measure the first request                                 | Cost of prop assembly, serialization, and JavaScript rendering before caching    |
+| Warm cached SSR   | Prime the exact cache key, then measure repeated hits; log `RORP_CACHE_HIT` when available | Repeat-visitor steady state for the existing cached implementation               |
+| RSC cold          | Clear relevant Rails/browser/renderer caches; measure the first RSC request                | First-hit cost of the RSC render, Flight payload generation, and asset discovery |
+| RSC warm          | Prime the RSC route under the same data and cache policy; measure repeated navigations     | Steady state for RSC rendering, hydration, Flight payload, and cached assets     |
 
-| Variant           | How to prepare it                                                                                   | What it answers                                                                  |
-| ----------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Cold uncached SSR | Clear fragment/prerender caches and measure the first request for the SSR page                      | Cost of prop assembly, serialization, and JavaScript rendering before caching    |
-| Warm cached SSR   | Prime the exact cache key, then measure repeated hits; log `RORP_CACHE_HIT` when available          | Repeat-visitor/server steady state for the existing cached implementation        |
-| RSC cold          | Clear relevant Rails/browser/renderer caches and measure the first RSC request                      | First-hit cost of the RSC render, Flight payload generation, and asset discovery |
-| RSC warm          | Prime the RSC route under the same data and browser-cache policy, then measure repeated navigations | Steady state for RSC rendering, hydration, Flight payload, and cached assets     |
+For RSC pages, also measure what moved into the HTML response. The initial Flight payload is usually
+embedded in the HTML stream rather than fetched as a separate `/rsc_payload/*` resource, so you may
+see fewer JavaScript requests while the navigation response grows. Pair JavaScript byte counts with
+HTML transfer size, Flight payload bytes, FCP/LCP, TBT, and server/renderer timing before drawing
+conclusions.
 
-Use the same production build mode, data snapshot, asset host, CDN/cache policy, browser cache policy, throttling, and
-sample order for control and experiment. Include both desktop and mobile runs, and keep visual regression checks in the
-same gate as performance checks so a faster page is still the same page.
+It is valid for an RSC migration to be a win on TBT and JavaScript bytes, a wash on LCP, and still
+worth doing for maintainability or lower browser work. Say that plainly rather than framing a
+warm-cache first-paint tie as a failure. For the full PR evidence checklist — same-machine
+control/experiment, stable package stack, one variable per run, archived output — use the
+[RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md).
 
-### Reading RSC wins and non-wins
-
-RSC is most likely to win when the page currently pays a large browser cost: heavy client bundles, long hydration tasks,
-large client-only data parsing, repeated interactive subtrees that can become Server Components, or server-only
-formatting/parsing libraries that can leave the client bundle entirely. Judge those migrations by Total Blocking Time,
-long tasks, JavaScript bytes, hydration/interactivity marks, and navigation responsiveness in addition to LCP.
-
-Warm cached SSR may already be close to optimal when the page is static or cacheable, the cache key is stable, prop
-assembly is skipped by `cached_react_component_hash`, critical CSS/fonts are manually preloaded, and the remaining client
-JavaScript is already small. In that case, an RSC conversion can still be valuable for maintainability or lower browser
-work, but the benchmark should say that clearly instead of framing a warm-cache first-paint tie as an RSC failure.
-
-For RSC pages, also measure what moved into the HTML response. The initial Flight payload is usually embedded in the
-HTML stream rather than fetched as a separate `/rsc_payload/*` resource, so `PerformanceResourceTiming` may show fewer
-JavaScript requests while the navigation response grows. Pair JavaScript byte counts with HTML transfer size, Flight
-payload bytes, FCP/LCP, TBT, and server/renderer timing before drawing conclusions.
-
-For PR evidence, use the [RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md). It covers
-same-machine control/experiment setup, visual regression gates, stable package-stack evidence, archived benchmark
-artifacts, and the metrics checklist reviewers need. For public pages that become mostly static RSC shells, pair the
-benchmark with [Mostly Static RSC Shell With a Tiny Sidecar](../migrating/rsc-static-shell-sidecar.md) so JavaScript
-byte reductions do not hide missing behavior.
-
-## Real-World Results
+## Real-world results
 
 > [!NOTE]
-> This section links to a public live demo first, then covers a non-production local directional benchmark, then a production case study. For validated,
-> at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
+> Start with the public live demo, then the production case study. For a fully inspectable,
+> side-by-side comparison of rendering strategies, use the Marketplace demo.
 
 ### Marketplace demo {#public-marketplace-rsc-demo}
 
-The [Marketplace demo](https://rsc.reactonrails.com/) is a public,
-inspectable React on Rails Pro + RSC demo showing the same page families
-rendered with traditional SSR, client rendering, and React Server Components.
-See the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
-section for the canonical link inventory and caveats: performance showcase, raw
-Lighthouse reports, bundle-size breakdowns, the `/why-rsc` walkthrough, and the
-demo source.
+The [Marketplace demo](https://rsc.reactonrails.com/) is a public, inspectable React on Rails Pro +
+RSC demo showing the same page families rendered with traditional SSR, client rendering, and React
+Server Components. See the [Live Demo and Evidence](../../pro/react-server-components/index.md#live-demo-and-evidence)
+section for the canonical link inventory: performance showcase, raw Lighthouse reports, bundle-size
+breakdowns, the `/why-rsc` walkthrough, and the demo source.
 
-### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
+### Production case study: Popmenu {#popmenu}
 
-The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
-is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
-not an official Gumroad integration. The benchmark methodology, earlier-run artifacts, and the April 30, 2026
-production-like local run with median and p95 timings are documented in
-[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/010b3564398dbb9c8f5caafab25daed65b6f425c/docs/performance-findings.md#production-like-compiled-asset-8-cycle-repeat)
-on stacked demo PR
-[shakacode/react-on-rails-demo-gumroad-rsc#12](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/12);
-the per-run JSON files remain gitignored local artifacts
-([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data).
-It measures the same reduced presenter data and outer layout across two routes. The comparison
-changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single
-factor. The routes are:
-
-- Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer or SSR)
-- React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
-
-> [!NOTE]
-> Both routes use the same Shakapacker with Rspack page-asset build, so this is a route-level comparison rather than a
-> bundler comparison. It also does not isolate a renderer-only baseline: the Inertia route has no React on Rails Pro
-> renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined route-level effect;
-> see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
-
-The April 30, 2026 local benchmark used eight cycles, each measuring both routes in alternating cycle order
-(cycle 1: Inertia then RSC; cycle 2: RSC then Inertia; cycle 3: Inertia then RSC; and so on), producing sixteen
-measured runs total — eight per route. Before each measured run, the harness sent one warmup request to the route
-being measured.
-
-Conditions:
-
-- Compiled page assets from the same Shakapacker with Rspack configuration for both routes
-- Compiled RSC demo bundles
-- Rails server without the Shakapacker dev server running
-- Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
-- Chrome 147 with matching ChromeDriver 147
-
-> [!WARNING]
-> The original April 30, 2026 local run did not preserve `RAILS_ENV`, hardware/OS, Ruby/Node/Rails versions, or
-> browser-cache state between measured runs, and those values are not recoverable for that run. The absolute timing
-> values may therefore include `RAILS_ENV=development` overhead (no eager loading, active code reloader, no asset
-> caching), and unknown browser-cache state between measured runs affects repeatability. The single warmup request
-> before each measured run may also be insufficient for the Pro Node renderer worker pool to reach JIT and
-> RSC-payload-compilation steady state, which is more likely to make the RSC route look slower than its steady-state
-> performance than to inflate its advantage. Treat these numbers as directional signals rather than a stable baseline.
-> [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks a deployed/staging repeat that will
-> publish full environment metadata; see [Environment metadata to capture for a new
-> run](#gumroad-rsc-env-metadata-checklist) below for the required fields.
-
-The median results showed this directional signal. The source artifact's navigation-duration metric comes from its
-Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
-
-| Source  | Metric                                          | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
-| ------- | ----------------------------------------------- | -----------: | -------: | ------------------------------: |
-| Browser | Navigation duration                             |        775ms |    607ms |                          -21.7% |
-| Browser | Largest Contentful Paint                        |        794ms |    634ms |                          -20.2% |
-| Browser | `responseEnd`                                   |        645ms |    589ms |                           -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) [†] |        347ms |    339ms |                           -2.3% |
-
-[†] `action_total` scope is unconfirmed; do not use it to infer the server-rendering split — see the paragraph below.
-
-`action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
-artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
-`process_action` duration including rendering or a narrower controller-action field, so do not use it to infer the
-server-rendering split. Because the Pro Node renderer runs in a separate OS process, Rails wall time may also exclude
-RSC rendering cost that the Inertia control keeps in-process, so the two `action_total` values may not measure identical
-scopes of work. The source artifact publishes median and p95 for `responseEnd` but not for `action_total`;
-[Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks publishing per-run distribution data.
-
-The navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%), which is consistent with the RSC
-route delivering fully server-rendered HTML — the browser has minimal client-side hydration work after `responseEnd`,
-while the Inertia control must hydrate the React component tree on the client. Because the navigation-duration value
-comes from the source artifact's Playwright harness rather than `PerformanceNavigationTiming.duration`, the two metrics
-are not from the same timing source and a direct `navigation duration - responseEnd` subtraction is not reported here.
-
-The same April 30, 2026 benchmark also captured per-navigation resource bytes via the `PerformanceResourceTiming` API
-for resources whose URL contains `/packs/` and ends in `.js`, plus the HTML response via
-`PerformanceNavigationTiming`. Medians across n=8 measured runs per route:
-
-| Metric                                                              | Inertia demo | RSC demo |
-| ------------------------------------------------------------------- | -----------: | -------: |
-| Page-specific JS requests (`/packs/*.js`)                           |            6 |        1 |
-| Page-specific JS transfer (wire bytes)                              |      3,587 B |      0 B |
-| Page-specific JS encoded body                                       |      3,287 B |      0 B |
-| Page-specific JS decoded body                                       |     10,947 B |      0 B |
-| HTML response transfer (`PerformanceNavigationTiming.transferSize`) |     14,523 B | 12,673 B |
-
-These transfer-size values are warmed-cache wire bytes, not cold-cache bundle totals. The harness sends one warmup
-request to the measured route before each measured run, which primes Chrome's HTTP disk cache so the Resource Timing
-API reports `transferSize: 0` for assets already cached by the warmup. For the Inertia demo, 5 of the 6 `/packs/` JS
-files (webpack-runtime, webpack-commons, two vendor chunks, and the inertia bundle) are served from disk cache on the
-measured run; the freshly-fetched bytes (~3.3 KB compressed, ~10.9 KB decompressed) come from a route-specific page
-chunk. For the RSC demo, the single page-specific JS file (the React on Rails Pro client bootstrap) is served from
-cache on the measured run, so its measured `transferSize` is `0`.
-
-The RSC route's Flight payload is not delivered as a separate `/rsc_payload/*` request in this benchmark; it is inlined
-in the HTML response, so the HTML transfer column (12,673 B vs 14,523 B for the Inertia control) captures most of the
-route-specific data delivered per navigation. The combined route-specific new bytes per warmed-cache navigation are
-roughly ~18.1 KB for the Inertia control (~3.6 KB JS + ~14.5 KB HTML) and ~12.7 KB for the RSC demo (~0 KB JS + ~12.7 KB
-HTML) — a ~30% warmed-cache wire-byte reduction, materially smaller than the -83% page-specific JS request-count
-reduction implies. Cold-cache bundle totals (what a first-time visitor downloads before any caching kicks in) are not
-captured by this benchmark methodology and remain a follow-up; see
-[Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
-
-- _All timing values are medians from the raw benchmark artifact values (n=8 per route); sample size is too small to
-  establish statistical significance._
-- _The published `responseEnd` p95 (731ms Inertia vs 768ms RSC, see the
-  [`responseEnd` p95 counter-signal](#gumroad-rsc-worst-case-responseend) below) is larger than the other route's
-  median in both directions (Inertia p95 731ms > RSC median 589ms; RSC p95 768ms > Inertia median 645ms), so
-  the per-run `responseEnd` ranges overlap and the median -8.7% RSC-favored delta is consistent with measurement noise
-  rather than a stable RSC win on this metric._
-- _The source artifact does not publish a p95 or per-run distribution for `action_total`, so its -2.3% median delta
-  cannot be distinguished from measurement noise at n=8._
-
-#### `responseEnd` p95 counter-signal {#gumroad-rsc-worst-case-responseend}
-
-| Metric                  | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
-| ----------------------- | -----------: | -------: | ------------------------------: |
-| `responseEnd` p95 (n=8) |        731ms |    768ms |                           +5.1% |
-
-At n=8 the p95 is interpolated near the second-worst observed value rather than the maximum, but with only eight
-samples it remains a coarse tail estimate rather than a stable population p95. It shows a +5.1% RSC regression on tail
-`responseEnd` (high variance is expected at n=8), indicating the Inertia control had a faster tail
-`responseEnd` than the RSC route on this run.
-
-Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
-renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route showed
-faster median navigation duration and LCP on the measured routes. The `responseEnd` p95 counter-signal favored
-the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and distribution artifacts
-are still required before making stronger production-performance claims.
-
-See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
-[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
-
-#### Environment metadata to capture for a new run {#gumroad-rsc-env-metadata-checklist}
-
-For any new local or staging Gumroad benchmark run, record the following so readers can calibrate the results. Missing
-fields should be listed explicitly rather than left implied.
-
-- **Environment:** `RAILS_ENV`, `NODE_ENV`
-- **Hardware/OS:** machine model, CPU, RAM, OS version
-- **Tool versions:** Ruby, Node.js, Rails, React on Rails, React on Rails Pro, Shakapacker, Rspack, Chrome, ChromeDriver
-- **Cache state:** Rails fragment/SQL cache mode, browser cache behavior between measured runs (cold vs warm), Pro Node
-  renderer cache state
-- **Run protocol:** warmup requests per route, measured runs per route, alternation pattern, total wall-clock duration
-- **Renderer setup:** dedicated vs shared Pro Node renderer, `RENDERER_PORT`, worker count, eager-loading status
-- **Renderer-internal timing:** whether `config.tracing = true` was enabled on the Pro initializer, or `Server-Timing`
-  was emitted for the RSC render/payload path
-- **Distribution:** raw per-run values for each metric (not just medians), enough to publish variance and tail values
-
-[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks applying this checklist to a stable
-deployed/staging repeat.
-
-### Production Case Study: Popmenu {#popmenu}
-
-Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
+Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on
+Rails Pro and reported:
 
 - **73% decrease** in average response times
 - **20-25% lower** Heroku hosting costs
@@ -5164,37 +5134,51 @@ Popmenu, a restaurant platform serving tens of millions of SSR requests daily, a
 
 See the [full case study](https://www.shakacode.com/recent-work/popmenu/).
 
-## Measuring Your Own Performance
+### Earlier directional experiment: Gumroad-style RSC demo
 
-### Key Metrics to Track
+An earlier local A/B (April 2026) compared an Inertia-style control route against an RSC route in the
+public [Gumroad-style demo repo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc). It
+produced a directional RSC-favored signal on navigation duration and LCP, but the run predated the
+paired-A/B methodology above — it used a single warmup, `n=8`, unrecorded environment metadata, and
+showed a `responseEnd` p95 counter-signal — so it is not a stable baseline. It is preserved only as
+an early data point; run a fresh paired comparison with ShakaPerf for any current claim.
 
-- **Time to First Byte (TTFB):** How quickly the server begins sending HTML
-- **Largest Contentful Paint (LCP):** When the main content becomes visible
-- **Total Blocking Time (TBT):** Time the main thread is blocked during page load
-- **Client bundle size:** Total JavaScript downloaded by the browser
-- **Server render time:** Time spent in the SSR process (not logged by default — measure wall clock time in Ruby around the render call; on Pro, enable `config.tracing = true` in `config/initializers/react_on_rails_pro.rb` to log render timings)
+## Measuring your own performance
+
+### Key metrics to track
+
+- **Time to First Byte (TTFB):** how quickly the server begins sending HTML
+- **Largest Contentful Paint (LCP):** when the main content becomes visible
+- **Total Blocking Time (TBT):** time the main thread is blocked during load
+- **Client bundle size / JavaScript bytes:** total JavaScript downloaded
+- **Server render time:** not logged by default — measure wall-clock time in Ruby around the render
+  call; on Pro, enable `config.tracing = true` in `config/initializers/react_on_rails_pro.rb` to log
+  render timings
 
 ### Tools
 
-- **Chrome DevTools Performance tab:** Profile page load and hydration timing
-- **Lighthouse:** Automated performance scoring with LCP, TBT, and other Core Web Vitals
-- **`webpack-bundle-analyzer`:** Visualize bundle composition and identify large dependencies
-- **Rails server logs:** Server-side console messages replayed to `Rails.logger` when `config.logging_on_server = true`
-- **Node Renderer logs:** Renderer lifecycle and error details controlled by `RENDERER_LOG_LEVEL` (Pro)
+- **[ShakaPerf](https://github.com/shakacode/shakaperf):** paired twin-server A/B for a trustworthy
+  branch-vs-branch verdict (the harness above)
+- **[Performance tracks and profiling](../building-features/performance-tracks-and-profiling.md):**
+  the React on Rails-specific profiling workflow and metric clusters
+- **[Web Vitals and RUM](../building-features/web-vitals-and-rum.md):** field data from real users
+- **Chrome DevTools Performance tab / Lighthouse:** ad-hoc profiling and Core Web Vitals scoring
+- **`webpack-bundle-analyzer`:** visualize bundle composition and large dependencies
+- **Rails server logs:** server-side console messages replayed to `Rails.logger` when
+  `config.logging_on_server = true`
+- **Node Renderer logs:** lifecycle and error detail via `RENDERER_LOG_LEVEL` (Pro)
 
 ## JSON Serialization Performance
 
-React on Rails serializes component props to JSON before passing them to the JavaScript renderer. The performance of this serialization depends on which version of Ruby's `json` gem you have installed.
+React on Rails serializes component props to JSON before passing them to the JavaScript renderer.
+The speed of that serialization depends on which version of Ruby's `json` gem you have.
 
-### Upgrading the JSON Gem
-
-Ruby's bundled `json` gem (versions 2.5–2.7) is slower than it needs to be. Version 2.8.0 introduced a major performance rewrite that makes it **2x faster** for large payloads. To get this improvement, add to your `Gemfile`:
+Ruby's bundled `json` gem (2.5–2.7, as shipped with Ruby 3.3) is slower than it needs to be. Version
+2.8.0 introduced a performance rewrite that makes it roughly **2x faster** for large payloads:
 
 ```ruby
 gem 'json', '>= 2.8'
 ```
-
-### Benchmark Results
 
 For a ~3 MB props payload on Ruby 3.3:
 
@@ -5203,28 +5187,27 @@ For a ~3 MB props payload on Ruby 3.3:
 | 2.7.2 (bundled)   | 21.5 ms            | Baseline        |
 | 2.19.8 (upgraded) | 10.2 ms            | **2.1x faster** |
 
-The improvement scales with payload size — approximately **3-4 ms saved per MB** of props data.
+The improvement scales with payload size — roughly **3-4 ms saved per MB** of props. It is most
+impactful for large component trees, data-heavy pages (dashboards, tables, lists), and traditional
+SSR where props are serialized before rendering. For typical pages with small props (under 100 KB),
+the difference is negligible (< 1 ms).
 
-### When This Matters
+React on Rails v17 requires Ruby ≥ 3.3, whose bundled `json` predates 2.8; on Ruby 3.4+ the bundled
+gem is already 2.9+, so the explicit upgrade is unnecessary. The upgraded `json` gem supports all
+Ruby versions React on Rails supports.
 
-This optimization is most impactful for:
+## Related documentation
 
-- **Large component trees** with many props
-- **Data-heavy pages** (dashboards, tables, lists)
-- **Traditional SSR** where props are serialized before rendering
-
-For typical pages with small props (under 100 KB), the difference is negligible (< 1 ms).
-
-### Compatibility
-
-JSON gem 2.19.8 (latest) supports Ruby 2.7+, so it works with all Ruby versions supported by React on Rails.
-
-## Related Documentation
-
-- [ExecJS Limitations](./execjs-limitations.md) — constraints of the default rendering engine
+- [RSC Performance Validation Playbook](../migrating/rsc-performance-validation.md) — the full PR evidence workflow
+- [Performance Tracks and Profiling](../building-features/performance-tracks-and-profiling.md) — profiling workflow
+- [Web Vitals and RUM](../building-features/web-vitals-and-rum.md) — field data from real users
+- [Caching](../building-features/caching.md) — prerender and fragment caching (the warm-cache baseline)
+- [Hydration Scheduling](../building-features/hydration-scheduling.md) — control when islands hydrate
 - [Streaming Server Rendering](../building-features/streaming-server-rendering.md) — setup and best practices
-- [Code Splitting](../building-features/code-splitting.md) — route-based bundle splitting
+- [Code Splitting](../building-features/code-splitting.md) and [Bundle Caching](../building-features/bundle-caching.md) — JavaScript reduction (Pro)
+- [React Compiler](../building-features/react-compiler.md) — build-time memoization
 - [Node Renderer Basics](../building-features/node-renderer/basics.md) — Pro Node.js renderer setup
+- [ExecJS Limitations](./execjs-limitations.md) — constraints of the default rendering engine
 - [OSS vs Pro](../getting-started/oss-vs-pro.md) — feature comparison
 - [React Server Components](../../pro/react-server-components/index.md) — RSC overview and guides
 
