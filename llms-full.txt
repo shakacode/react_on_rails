@@ -4907,8 +4907,9 @@ pnpm exec shaka-perf compare --categories perf,visreg \
   --full-report-zip
 ```
 
-Results land in `compare-results/` as a self-contained `report.html` (plus `report.json` for
-machine parsing and, with `--full-report-zip`, an archived bundle for the PR). Key knobs live in an
+Results land in `compare-results/` — `self-contained-performance-report.html` (a single portable
+file to attach to a PR), `full-report.html`, and `report.json` for machine parsing; add
+`--full-report-zip` to bundle everything into one archive. Key knobs live in an
 `abtests.config.ts` file — `numberOfMeasurements` (default 20), `regressionThreshold` (default
 50 ms), `pValueThreshold` (default 0.05), and `samplingMode` (default `simultaneous`). See
 ShakaPerf's [twin-servers guide](https://github.com/shakacode/shakaperf/blob/main/packages/shaka-perf/README-twin-servers.md)
@@ -4926,7 +4927,7 @@ for the one-time Docker setup.
 
 React on Rails uses ShakaPerf as a release gate for the RSC `'use client'` CSS fix — a real, small
 `abTest` you can copy from. See
-[`test/shakaperf/rsc-fouc/`](https://github.com/shakacode/react_on_rails/tree/master/test/shakaperf/rsc-fouc)
+[`test/shakaperf/rsc-fouc/`](https://github.com/shakacode/react_on_rails/tree/main/test/shakaperf/rsc-fouc)
 for the config and the `.abtest.ts` definition.
 
 ## The performance levers
