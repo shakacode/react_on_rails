@@ -25,7 +25,6 @@ should use this PR branch or `main` for the current workflow docs.
    gh auth status
    gh repo view shakacode/react_on_rails
    gh repo view shakacode/agent-coordination
-   gh repo view shakacode/agent-coordination-state
    ```
 
 2. Check out the public repo branch that contains the active workflow docs,
@@ -37,12 +36,17 @@ should use this PR branch or `main` for the current workflow docs.
    ```bash
    gh repo clone shakacode/agent-coordination
    cd agent-coordination
-   ruby -Itest test/agent_coord_test.rb
+   bundle install
+   .agents/bin/test
+   .agents/bin/validate
    bin/agent-coord --help
    bin/agent-coord bootstrap
    export PATH="$HOME/.local/bin:$PATH"
    hash -r 2>/dev/null || true
    command -v agent-coord || which agent-coord
+   : "${AGENT_COORD_API_URL:?load the private HTTP backend URL before continuing}"
+   : "${AGENT_COORD_API_TOKEN:?load this machine's private HTTP backend token before continuing}"
+   unset AGENT_COORD_BACKEND AGENT_COORD_REF AGENT_COORD_STATE_ROOT AGENT_COORD_STATUS_STATE_ROOT
    agent-coord doctor --json
    agent-coord config show --json
    agent-coord status --batch-id <batch-id> --json
@@ -50,9 +54,7 @@ should use this PR branch or `main` for the current workflow docs.
 
    The remaining snippets assume that `PATH` entry is present in the active
    shell. In another shell, add the export first or replace each `agent-coord`
-   command below with `"$HOME/.local/bin/agent-coord"`. The CLI bootstrap also
-   installs `agent_coord` as an underscore alias for launchers or prompts that
-   use that spelling.
+   command below with `"$HOME/.local/bin/agent-coord"`.
 
 4. If `doctor --json` fails, or targeted status exits non-zero (exit 2 means
    degraded/UNKNOWN) or times out, report private state as `UNKNOWN` and use the
