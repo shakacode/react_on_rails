@@ -19,8 +19,8 @@ an adversarially-verified research pass (18 surviving primary-source claims; 7 c
 claims refuted) plus direct verification against shipped `react-dom` builds and the React
 repository. **Recommendation: a layered architecture** —
 
-1. **Foundation:** section chunks as individually addressable static assets behind a build
-   -time manifest; for strict-CSP deployments, switch chunk generation to React's external
+1. **Foundation:** section chunks as individually addressable static assets behind a
+   build-time manifest; for strict-CSP deployments, switch chunk generation to React's external
    Fizz runtime so cached chunks contain **zero inline scripts** and are byte-identical for
    every user.
 2. **Default transport (Scenario A):** Service-Worker stream-stitching — the SW proxies the
@@ -192,7 +192,8 @@ Verified directly against npm tarballs `react-dom@18.3.1`, `react-dom@19.2.7`,
 
 ### Edge platforms, Service Workers, and wire semantics — adversarially verified research
 
-An 18-claim verification pass (3 independent votes per claim; 2/3 refutes kill) against
+A verification pass over 25 extracted claims (3 independent votes per claim; 2/3 refutes
+kill; 18 confirmed, 7 refuted) against
 primary sources, fetched live 2026-07-21:
 
 13. **Cloudflare Durable Objects (C1) are documented and costed for this pattern.**
@@ -336,7 +337,9 @@ primary sources, fetched live 2026-07-21:
 Three workable strategies, in order of preference:
 
 1. **External runtime (Fact 12) — recommended for strict-CSP deployments.** Chunks carry
-   zero inline scripts; CSP is `script-src 'self'` (or a hash of the single runtime file).
+   zero inline scripts; CSP is `script-src 'self'` for the runtime file, optionally
+   hash-pinned via Subresource Integrity (`integrity=…` on the script tag — CSP
+   `script-src` hashes apply to inline scripts, not external files).
    Chunks become byte-identical for all users → maximal CDN cacheability, and Range
    resumption becomes possible. Cost: vendoring the runtime file + a contract test; the
    option is `unstable_`-prefixed.
@@ -377,8 +380,9 @@ time, alongside the chunk files:
 ```
 
 `concatOffset`/`bytes` enable the Range variant and SW byte-accounting;
-`boundaryId`/`contentId` remove filename-convention coupling; per-chunk `sha256` doubles as
-integrity check and CSP-hash input. Chunk 0 links the manifest via
+`boundaryId`/`contentId` remove filename-convention coupling; per-chunk `sha256` is a
+content-integrity check (and, under the hash-enumeration CSP strategy only, the input for
+computing the chunk's inline-script hashes). Chunk 0 links the manifest via
 `<link rel="preload" as="fetch">` (or inlines it) so the SW and page JS discover it without
 convention.
 
@@ -458,10 +462,22 @@ possible.
 - **Lifetime hardening (Fact 14):** `event.waitUntil()` on the stitch promise +
   StreamSaver-style `postMessage` heartbeat (~29 s) while the upstream is paced; the
   heartbeat stops once stitching completes.
-- **Truncation recovery:** if the SW is killed mid-stream anyway, the response truncates —
-  the page detects unresolved boundaries (Fact 4) and falls back to client pull of the
-  missing sections (C4 mechanism). Bytes remain ×1.0 because the killed stream stopped
-  sending. This same pull path serves browsers without SW support.
+- **Truncation recovery — with a byte cursor, because truncation can land mid-section:**
+  if the SW is killed mid-stream anyway, the response truncates, and the cut can fall
+  _inside_ a section file (sections are larger than one network chunk). The SW therefore
+  persists a per-page byte cursor (total forwarded bytes, mapped through the manifest's
+  `concatOffset`s to "last complete section + intra-section offset") as it forwards. The
+  page detects unresolved boundaries (Fact 4) and recovers: complete sections are fetched
+  whole; a partially-forwarded section is completed with a suffix request
+  (`Range: bytes=<intra-section-offset>-` against that section file, or the equivalent
+  offset into the concatenated asset). Bytes then remain exactly ×1.0. Where Range is
+  unavailable or the cursor was lost, recovery refetches the partial section from zero —
+  the guarantee degrades to "×1.0 for all sections except at most one repeated prefix",
+  and that degradation is measured, not hidden (P2). The same pull path serves browsers
+  without SW support. The skip path has the same mid-section geometry (an abort usually
+  lands inside a section) but no fragility: the SW is alive, its cursor is exact, and the
+  suffix fetch is precise. Only unexpected SW death risks a lost cursor — hence the
+  persistence requirement.
 - **First visit:** no controller → plain streamed page, no acceleration (requirement 5
   makes this acceptable by design). Optionally offer C4 as an opt-in first-visit
   accelerator where product prefers speed over the strict byte guarantee.
@@ -473,12 +489,29 @@ possible.
 Replace timing-window capture with a deterministic build: `prerender` (aborted at the
 shell) → store `prelude` (= chunk 0, cacheable) + `postponed` JSON. The tail is a
 `resume`/`resumeToPipeableStream` response generated on demand — and because the tail is
-now _a request_, the skip/priority signal is **stateless**: the client (or SW) simply
-issues `GET /resume/:page?first=<boundaryId>` and aborts the paced default. Transports
-from Layer 1 (or C1's edge join) carry the bytes. This is the same shape Next.js PPR
-ships, applied to a Rails + custom Node renderer stack, and it is the honest Scenario B
-answer: re-prioritization = which tail request you issue, not a reordering inside one
-stream.
+now _a request_, the skip/priority signal is **stateless**: the client (or SW) issues the
+tail request (e.g. `GET /resume/:page?priority=<boundaryId>`) and aborts the paced
+default. Transports from Layer 1 (or C1's edge join) carry the bytes.
+
+**Be precise about what the priority parameter can do.** React's `resume` API accepts no
+boundary selector or ordering option — within one resume stream, React completes
+boundaries in the order their data resolves. The `priority` parameter is therefore an
+**application contract, not a React one**, honored by one of two app-level mechanisms:
+
+- **Data-resolution ordering (preferred):** the endpoint resolves the target section's
+  data dependencies first (our `CacheSection` demo literally controls this — its async
+  delay is the data dependency), so React completes that boundary first. P6 explicitly
+  tests whether data-resolution order controls emission order in a resume stream.
+- **Per-section resume units:** produce independently resumable artifacts per section
+  (nested prerenders), so priority = which request is issued first. Coarser but
+  unambiguous; higher build complexity.
+
+These APIs are **recently stabilized** (new in the 19.2 line): treat them as a
+version-pinned contract — P6 is the standalone compatibility gate before any renderer
+integration, re-run on every React upgrade. This is the same shape Next.js PPR ships,
+applied to a Rails + custom Node renderer stack, and it is the honest Scenario B answer:
+re-prioritization = which tail request you issue plus data-resolution order inside it,
+not a protocol-level reordering inside one stream.
 
 ### Positioning of the other candidates
 
@@ -529,9 +562,11 @@ Where each layer can break, what breaks with it, and what it costs to build:
   is a few hundred lines against standard APIs. The single genuine fragility is the
   spec-acknowledged SW-lifetime gap (Fact 14) — mitigated by the production-proven
   heartbeat, and **designed so every failure degrades to today's behavior**: SW killed
-  mid-stream → truncated response → pull recovery completes the page (still ×1.0 bytes);
-  no SW support / first visit / hard reload → plain streamed page. There is no failure
-  mode in which the page breaks or bytes duplicate; the worst case is "no acceleration."
+  mid-stream → truncated response → cursor-based pull recovery completes the page (×1.0
+  bytes with the persisted cursor; at most one section's prefix repeats if the cursor is
+  lost and Range is unavailable); no SW support / first visit / hard reload → plain
+  streamed page. There is no failure mode in which the page breaks; the worst case is
+  "no acceleration."
 - **Layer 2 (resume): moderate integration complexity, negative net fragility.** New
   renderer endpoints + postponed-state storage, but it **deletes** invented machinery
   (timing-window capture, interruptible sleeps, marker files) in favor of stable React
@@ -548,15 +583,15 @@ Where each layer can break, what breaks with it, and what it costs to build:
 
 ### Failure modes of the recommendation
 
-| Failure                                                  | Impact                            | Mitigation                                                                  |
-| -------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| SW killed mid-stitch (Firefox 30 s budget; others **?**) | Truncated navigation response     | Heartbeat; truncation-recovery pull (still ×1.0); P2 verifies both          |
-| No SW (first visit, unsupported browser, hard reload)    | No acceleration                   | Plain stream (requirement 5); optional C4 opt-in                            |
-| CDN keeps egress/origin drain after abort (**?**)        | Wasted egress/origin work, not UX | P4 measures per-CDN; Scenario B tails are short-lived resume requests       |
-| External runtime is `unstable_` / not shipped stable     | Vendoring burden; upgrade risk    | Pin + contract test per React upgrade (P5); hash-CSP fallback strategy      |
-| `resume` composition outside Next.js unproven            | Layer 2 blocked                   | P6 is a standalone spike before any renderer integration                    |
-| Reveal batching adds ≤~300 ms after bytes arrive         | Perceived latency                 | Accept (design intent of React 19.2); measure in P3; do not fight internals |
-| bfcache behavior unknown (claims refuted both ways)      | Possible hidden back-nav tax      | P7 measures `notRestoredReasons` per candidate; no assumptions              |
+| Failure                                                  | Impact                                              | Mitigation                                                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| SW killed mid-stitch (Firefox 30 s budget; others **?**) | Truncated navigation response, possibly mid-section | Heartbeat; cursor-based recovery with Range suffix (×1.0; ≤1 prefix repeat if cursor lost); P2 verifies both |
+| No SW (first visit, unsupported browser, hard reload)    | No acceleration                                     | Plain stream (requirement 5); optional C4 opt-in                                                             |
+| CDN keeps egress/origin drain after abort (**?**)        | Wasted egress/origin work, not UX                   | P4 measures per-CDN; Scenario B tails are short-lived resume requests                                        |
+| External runtime is `unstable_` / not shipped stable     | Vendoring burden; upgrade risk                      | Pin + contract test per React upgrade (P5); hash-CSP fallback strategy                                       |
+| `resume` composition outside Next.js unproven            | Layer 2 blocked                                     | P6 is a standalone spike before any renderer integration                                                     |
+| Reveal batching adds ≤~300 ms after bytes arrive         | Perceived latency                                   | Accept (design intent of React 19.2); measure in P3; do not fight internals                                  |
+| bfcache behavior unknown (claims refuted both ways)      | Possible hidden back-nav tax                        | P7 measures `notRestoredReasons` per candidate; no assumptions                                               |
 
 ## Prototype plan
 
@@ -564,11 +599,18 @@ Every step has an experiment with pass/fail criteria, mirroring the empirical st
 original brief. Steps are ordered so each de-risks the next; P1–P4 exercise Layer 1, P5–P6
 the foundation upgrade and Layer 2.
 
-- **P0 — Manifest + addressable sections.** Extend `section_cache.rake` to emit
-  `manifest.json` (schema above: boundary/content ids parsed from captured chunks, byte
-  sizes, concat offsets, sha256). _Pass:_ `section_cache:verify` cross-checks every
-  manifest entry against file bytes and every `template[id*="B:"]` in chunk 0 has a
-  manifest row.
+- **P0 — Manifest + boundary-aligned, addressable sections.** Extend `section_cache.rake`
+  to emit `manifest.json` (schema above: boundary/content ids parsed from captured
+  chunks, byte sizes, concat offsets, sha256) — **and make section files boundary-aligned
+  rather than trusting time windows**: today's capture assigns raw 4096-byte
+  `read_nonblock` fragments to time buckets, so a large section or a fragment straddling
+  a delay cutoff can split a hidden div or reveal instruction across files. Re-split the
+  captured byte stream on Fizz unit boundaries (each tail file starts at
+  `<div hidden id="…S:` and ends after its reveal instruction) before writing. _Pass:_
+  `section_cache:verify` cross-checks every manifest entry against file bytes; every
+  `template[id*="B:"]` in chunk 0 has a manifest row; every tail file independently
+  parses to exactly one hidden content div + its instruction (no dangling open tags);
+  concatenating all files byte-equals the original captured stream.
 - **P1 — SW passthrough parity.** Register a SW that pipes the navigation through an
   identity `TransformStream` (no abort logic yet). Compare against no-SW streaming.
   _Pass:_ byte-identical delivered document (hash of received bytes), all sections hydrate,
@@ -576,12 +618,19 @@ the foundation upgrade and Layer 2.
   over 20 runs).
 - **P2 — Lifetime + truncation recovery.** (a) With 60 s pacing in Firefox, confirm the
   stitch dies without mitigation, then that `waitUntil` + 29 s heartbeat keeps it alive to
-  completion. (b) Kill the SW deliberately mid-stream (unregister/devtools); verify the
-  page detects unresolved boundaries and the pull fallback completes them. _Pass:_ page
-  reaches full interactivity in both arms; server/SW byte accounting shows **every section
-  crossed the wire exactly once** in arm (b).
+  completion. (b) Kill the SW deliberately mid-stream (unregister/devtools) in **two
+  arms**: between sections, and **mid-section** (kill while a section's bytes are
+  partially forwarded); verify the page detects unresolved boundaries and recovers via
+  the persisted byte cursor — whole fetches for missing sections, a
+  `Range: bytes=<offset>-` suffix fetch for the partial one. _Pass:_ page reaches full
+  interactivity in all arms; server/SW byte accounting shows **every section crossed the
+  wire exactly once, including the partially-forwarded one**; a third arm with the cursor
+  deliberately dropped documents the degraded case (exactly one prefix repeat, page still
+  completes).
 - **P3 — Scroll-priority skip.** Wire the capturing scroll listener → `postMessage` → SW
-  abort + manifest-driven fetch of missing sections (target first). Instrument: intent
+  abort + manifest-driven fetch of missing sections (target first). The abort will
+  usually land **mid-section**: the SW uses its byte cursor to complete the in-flight
+  section with a Range suffix fetch, then fetches the rest whole. Instrument: intent
   timestamp, upstream-abort timestamp, per-section fetch start/finish, reveal time
   (MutationObserver on boundary), interactive time (click responds). _Pass:_
   scroll-intent → target-section interactive < 500 ms on localhost with 25 s pacing
@@ -599,8 +648,9 @@ the foundation upgrade and Layer 2.
   (`unstable_externalRuntimeSrc`, `externalRuntimeConfig`) through
   `streamServerRenderedReactComponent.ts` and the renderer config; vendor the runtime file
   pinned to the installed React; regenerate chunks. Serve under
-  `Content-Security-Policy-Report-Only: script-src 'self' 'sha256-<runtime>'` first, then
-  enforced. _Pass:_ chunks contain zero inline `<script>`; streamed, SW-stitched, and
+  `Content-Security-Policy-Report-Only: script-src 'self'` first (optionally with SRI
+  `integrity=…` pinning the runtime script tag), then enforced. _Pass:_ chunks contain
+  zero inline `<script>`; streamed, SW-stitched, and
   client-appended deliveries all reveal + hydrate with zero CSP reports; contract test
   asserts instruction attributes (`data-rci`/`data-bid`/`data-sid`) against the installed
   react-dom and fails loudly on upgrade drift.
@@ -608,10 +658,14 @@ the foundation upgrade and Layer 2.
   script against the dummy page component: `prerenderToNodeStream` aborted at the shell →
   persist prelude + `postponed` JSON → serve prelude → later `resumeToPipeableStream` →
   deliver tail (i) piped by the SW into the original stream and (ii) client-appended.
-  _Pass:_ boundaries resolve and hydrate from a resume stream generated in a **separate
-  process invocation** than the prelude (proves the on-demand composition outside
-  Next.js); bytes ×1.0; document any semantic surprises (this is the research pass's
-  open question #3).
+  Additionally test the **priority mechanism**: resolve the sections' data dependencies
+  in non-document order and observe whether boundary emission order in the resume stream
+  follows data-resolution order. _Pass:_ boundaries resolve and hydrate from a resume
+  stream generated in a **separate process invocation** than the prelude (proves the
+  on-demand composition outside Next.js); bytes ×1.0; emission order demonstrably follows
+  data-resolution order (or the per-section-resume-unit fallback is documented as
+  required); document any semantic surprises (this is the research pass's open
+  question #3).
 - **P7 — bfcache + readiness observation.** For plain stream, C2, C3, C4: instrument
   `PerformanceNavigationTiming.notRestoredReasons` and back/forward navigation across
   Chrome/Firefox/Safari, plus `readyState`/`load` timing. _Pass:_ a filled-in table; no
