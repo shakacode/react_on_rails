@@ -27,7 +27,8 @@ repository. **Recommendation: a layered architecture** —
    navigation, and on scroll intent aborts the upstream fetch (protocol-clean per-stream
    cancel) and pipes only the missing section files into the same stream the parser is
    already consuming. Verified SW-lifetime risk is mitigated by a production-proven
-   heartbeat plus a truncation-recovery path that still never duplicates a byte.
+   heartbeat plus byte-cursor truncation recovery (exactly-once delivery with the cursor;
+   at most one section-prefix repeat in the degraded cursor-lost case).
 3. **Scenario B (origin still rendering):** move chunk production to React's now-stable
    `prerender`/`resume` APIs, making "the rest of the page" a first-class, parameterizable
    resume request — which makes the skip/priority signal **stateless**.
