@@ -493,6 +493,59 @@ stream.
 - **C6:** opt-in page mode for JS-required apps; its mechanics (per-section addressability,
   append-reveal) are exactly what Layer 1's skip path uses anyway.
 
+### How much is core React vs invented?
+
+Inventory of every mechanism the recommendation relies on, by provenance. The design rule
+throughout was: **let React and the web platform do the semantically hard parts; everything
+we invent must be inert data or replaceable glue.**
+
+| Mechanism                                                      | Provenance                                                                                                                                  | Invented surface                                                                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Chunked Suspense wire format (templates, hidden divs, reveals) | **React Fizz** emits it; we never construct or modify it                                                                                    | None — we only split the byte stream on boundaries                                                                        |
+| Boundary reveal + hydration retry                              | **React's own runtime** (parser-executed inline scripts, or React's external runtime)                                                       | None in the recommended path (no manual `$RC`)                                                                            |
+| Shell-now / tail-later rendering (Scenario B)                  | **React stable APIs** — `prerender` → `postponed` → `resume` (the PPR foundation)                                                           | Rails/renderer endpoint plumbing only                                                                                     |
+| Inline-script-free chunks (strict CSP)                         | **React option** `unstable_externalRuntimeSrc` + React's own runtime file (vendored)                                                        | A build step that copies/pins React's file                                                                                |
+| Navigation proxying, stream stitching, per-stream abort        | **Web platform** (Service Worker, `TransformStream`, `AbortController`; RFC 9113/9114 cancel) — pattern shipped by Google's workbox-streams | ~300–400 lines of SW glue: byte accounting, "which boundaries passed", fetch-missing, write-through                       |
+| Section manifest                                               | Invented                                                                                                                                    | Inert build-time JSON; cross-checked by a verify task; no runtime semantics                                               |
+| Scroll-intent detection, heartbeat, truncation recovery        | Invented (heartbeat is the StreamSaver-proven workaround for spec gap w3c#882)                                                              | ~100–200 lines page JS + SW messages                                                                                      |
+| Chunk capture (today)                                          | Invented (timing-window rake capture)                                                                                                       | **Shrinks over time**: P6 replaces it with `prerender` output, making chunk 0 a React artifact rather than a parsed guess |
+
+Net: the two things that make the feature _work_ — out-of-order boundary completion with
+selective hydration, and shell/tail splitting — are 100% core React. What we invent is
+transport glue (SW) and build metadata (manifest), both of which React never sees: from
+React's perspective, SW-stitched bytes are indistinguishable from origin-paced bytes. The
+rejected candidates were rejected largely on this axis: C3/C4's manual `$RC` invocation is
+the only variant that _calls into_ React internals, and Facts 7–10 show exactly that
+surface churning (sync→batched rewrite in 19.2).
+
+### Fragility and complexity budget
+
+Where each layer can break, what breaks with it, and what it costs to build:
+
+- **Layer 0 (manifest + assets): low complexity, near-zero fragility.** A rake-task
+  extension (~100 lines) emitting JSON that a verify task cross-checks against the chunk
+  files. Failure mode: build-time error, never a runtime one.
+- **Layer 1 (SW): moderate complexity, one known spec gap, graceful blast radius.** The SW
+  is a few hundred lines against standard APIs. The single genuine fragility is the
+  spec-acknowledged SW-lifetime gap (Fact 14) — mitigated by the production-proven
+  heartbeat, and **designed so every failure degrades to today's behavior**: SW killed
+  mid-stream → truncated response → pull recovery completes the page (still ×1.0 bytes);
+  no SW support / first visit / hard reload → plain streamed page. There is no failure
+  mode in which the page breaks or bytes duplicate; the worst case is "no acceleration."
+- **Layer 2 (resume): moderate integration complexity, negative net fragility.** New
+  renderer endpoints + postponed-state storage, but it **deletes** invented machinery
+  (timing-window capture, interruptible sleeps, marker files) in favor of stable React
+  APIs. P6 gates this layer behind a standalone spike before any renderer code changes.
+- **Upgrade drift is made loud, not silent.** The two places React can move under us — the
+  wire format we split on, and the vendored external runtime — get contract tests that run
+  against the installed `react-dom` (P0/P5) and fail CI on drift, turning "fragile
+  internals dependence" into a per-upgrade checklist item. The 18.3.1→19.2.8 comparison in
+  Facts 7–10 is evidence the load-bearing wire contract has already survived a major
+  version plus a runtime rewrite.
+- **Rollout is reversible at every step.** Each layer is opt-in per page; removing the SW
+  registration or the manifest reverts to exactly the current `selective_hydration_cached`
+  behavior.
+
 ### Failure modes of the recommendation
 
 | Failure                                                  | Impact                            | Mitigation                                                                  |
