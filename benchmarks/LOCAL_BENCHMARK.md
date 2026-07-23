@@ -117,6 +117,13 @@ ruby benchmarks/run-local-benchmark.rb core --no-setup --no-upload
 Options: `--testbed NAME` (default `m1-bench`), `--branch NAME`, `--[no-]upload`,
 `--fail-on-alert`, `--[no-]setup`, `--duration`, `--rate`, `--connections`. See `--help`.
 
+Local runs keep bench.rb's single-sample default (one 30s k6 run per route);
+`BENCHMARK_SAMPLES=3` opts into CI's repeated-sample mode (medians per route,
+12s per sample unless `--duration` overrides). Note: k6 now opens a fresh
+connection per request (`noConnectionReuse`, #4580) — absolute RPS/latency
+stepped once when that landed, so a t-test alert straddling that commit on a
+local trend series is expected; the series re-baselines within a few runs.
+
 ## Quiet A/B comparisons
 
 For release-candidate comparisons, do not trust a single `main` vs RC pass. Use the A/B
@@ -172,8 +179,9 @@ ruby benchmarks/run-local-benchmark-comparison.rb core \
 
 The script reuses the CI building blocks (no duplicated benchmark logic): per-suite config
 from `generate_matrix.rb`, the dummy app's `bin/prod*` for the build + server, `bench.rb` for
-the measurement, and `lib/bencher_runner.rb` for the upload (same tuned thresholds, with the
-testbed overridden via `BENCHER_TESTBED`). It reports under the **checked-out git ref** (branch
+the measurement, and `lib/bencher_runner.rb` for the upload (in its default statistical mode:
+tuned t-test thresholds against this testbed's own history — unlike CI, which runs a relative
+base-vs-head comparison per run — with the testbed overridden via `BENCHER_TESTBED`). It reports under the **checked-out git ref** (branch
 name, or tag/SHA when detached) unless `--branch` overrides it: a nightly `main` run feeds the
 dedicated main trend, while an RC tag or feature branch forms its own series instead of
 polluting that baseline.

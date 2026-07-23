@@ -1,15 +1,40 @@
 name: Benchmark Suite (reusable)
 
-# Runs one manually requested hosted benchmark suite/shard end to end and tracks it with
-# Bencher. Automatic push/PR benchmark selection and fresh-runner confirmation jobs are
-# intentionally disabled because GitHub-hosted runners are too noisy for trusted trends.
-# The whole matrix row from benchmarks/generate_matrix.rb is passed as a JSON string and
-# unpacked into job-level env once.
+# Runs one benchmark suite/shard end to end and tracks it with Bencher using RELATIVE
+# continuous benchmarking (#3492,
+# https://bencher.dev/docs/how-to/track-benchmarks/#relative-continuous-benchmarking):
+# the job builds and benchmarks the comparison BASE ref first, then the HEAD ref, on
+# the SAME runner (the benchmark-suite-phase composite action, invoked twice), and
+# track_benchmarks.rb submits the pair to Bencher — base results as a throwaway per-run
+# baseline branch, head results compared against it with percentage thresholds. The
+# side-by-side run replaces the old statistical baseline built from main's history
+# across runners, whose cross-runner variance was noise-dominated on shared
+# GitHub-hosted runners (#4071).
+#
+# Both phases run the HEAD ref's benchmarks/ tree (stashed outside the workspace by
+# the "Stash head benchmark harness" step): the harness is the measuring instrument,
+# so measuring both refs with one instrument keeps harness changes from reading as
+# performance deltas. Each phase still builds and serves its own ref's app code.
+# Additionally, each route is sampled BENCHMARK_SAMPLES times per phase; medians ship
+# to Bencher and a boundary crossing must reproduce across samples (disjoint
+# base/head sample ranges) or the report downgrades it to "unconfirmed".
+#
+# Hosted suites are manual-only (workflow_dispatch via benchmark.yml): the trusted
+# Bencher trend runs on dedicated local hardware, and this workflow serves explicit
+# hosted diagnostics. The whole matrix row from benchmarks/generate_matrix.rb is
+# passed as a JSON string and unpacked into job-level env once.
 on:
   workflow_call:
     inputs:
       matrix_row:
         description: 'JSON-encoded benchmark matrix row (one entry of generate_matrix.rb include[])'
+        required: true
+        type: string
+      base_sha:
+        description: >-
+          Commit SHA of the comparison base benchmarked alongside the head ref (merge
+          parent for PRs, the previous main commit for pushes, the merge-base with main
+          for dispatches). Resolved once by benchmark.yml's detect-changes job.
         required: true
         type: string
     secrets:
@@ -30,6 +55,13 @@ env:
   ROUTES: ${{ github.event.inputs.routes }}
   RATE: ${{ github.event.inputs.rate || 'max' }}
   DURATION: ${{ github.event.inputs.duration }}
+  # Repeated k6 samples per route (bench.rb): medians ship to Bencher and the
+  # per-sample values let the relative comparison require a flagged change to
+  # reproduce across samples (#4580). Per-sample duration defaults to 12s when
+  # sampling (3x12s vs the old single 30s); an explicit DURATION input overrides
+  # per sample. Only the k6 suites read this; the vegeta node-renderer suite
+  # keeps its single fixed-rate run.
+  BENCHMARK_SAMPLES: '3'
   REQUEST_TIMEOUT: ${{ github.event.inputs.request_timeout }}
   CONNECTIONS: ${{ github.event.inputs.connections }}
   MAX_CONNECTIONS: ${{ github.event.inputs.connections }}
@@ -40,8 +72,7 @@ env:
 jobs:
   run-suite:
     runs-on: ubuntu-24.04
-    # Token permissions are set by each caller in benchmark.yml: initial mode can
-    # update PR comments, while confirm mode only reads the candidate and writes checks.
+    # Token permissions are set by the caller in benchmark.yml.
     env:
       SECRET_KEY_BASE: 'dummy-secret-key-for-ci-testing-not-used-in-production'
       REACT_ON_RAILS_PRO_LICENSE: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}
@@ -199,216 +230,78 @@ jobs:
           echo "SERVER_CMD: $SERVER_CMD"
           echo "BENCH_CMD: $BENCH_CMD"
 
-      - name: Install Node modules with pnpm
-        run: pnpm install --frozen-lockfile
+      - name: Validate comparison base input
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          if [ -z "$BASE_SHA" ]; then
+            echo "::error::base_sha input is empty; relative continuous benchmarking cannot run without a comparison base."
+            exit 1
+          fi
+          echo "Comparison base: $BASE_SHA"
 
-      - name: Build workspace packages
-        run: pnpm run build
+      # The bench harness (benchmarks/) is the measuring instrument. BOTH phases must
+      # run the HEAD ref's copy: each phase checks out its own ref, so running the
+      # checked-out benchmarks/ would measure the two refs with two different
+      # instruments, and any harness change (k6 connection behavior, sampling,
+      # durations) would masquerade as a base-vs-head performance delta. Stash the
+      # head copy outside the workspace (phases git-clean it) while the head ref is
+      # still checked out; the phase action runs scripts from this stash. App-side
+      # inputs (bin/prod*, gems, packs, renderer config) still come from each
+      # phase's own checkout — only the instrument is pinned.
+      - name: Stash head benchmark harness
+        run: |
+          rm -rf "$RUNNER_TEMP/bench-harness"
+          cp -R benchmarks "$RUNNER_TEMP/bench-harness"
+          echo "Stashed head benchmarks/ -> $RUNNER_TEMP/bench-harness"
 
-      - name: Install Ruby Gems for the benchmarked app
-        uses: ./.github/actions/setup-bundle
+      # Relative continuous benchmarking, phase 1 of 2: build + benchmark the comparison
+      # BASE ref on this runner. Its results are stashed under runner.temp because the
+      # head phase git-cleans the workspace.
+      - name: Benchmark base ref
+        uses: ./.github/actions/benchmark-suite-phase
         with:
-          working-directory: ${{ env.APP_DIRECTORY }}
+          ref: ${{ inputs.base_sha }}
+          phase: base
+          results-dir: ${{ runner.temp }}/bench_results_base
+          app-directory: ${{ env.APP_DIRECTORY }}
+          server-kind: ${{ env.SERVER_KIND }}
+          pro-env: ${{ env.PRO_ENV }}
+          generate-packs: ${{ env.GENERATE_PACKS }}
+          benchmark-script: ${{ env.BENCHMARK_SCRIPT }}
+          harness-dir: ${{ runner.temp }}/bench-harness
+          benchmark-timeout-minutes: ${{ fromJSON(inputs.matrix_row).benchmark_timeout_minutes }}
+          suite-name: ${{ env.SUITE_NAME }}
+          summary-file: ${{ env.SUMMARY_FILE }}
+          summary-title: ${{ env.SUMMARY_TITLE }}
           ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
-          install-libyaml: 'false'
 
-      - name: Generate file-system based entrypoints for Pro
-        if: env.GENERATE_PACKS == 'true'
-        working-directory: ${{ env.APP_DIRECTORY }}
-        run: bundle exec rake react_on_rails:generate_packs
+      # The base phase leaves the workspace checked out at the base ref. Restore the
+      # head checkout BEFORE the next `uses: ./...` step: GitHub resolves local actions
+      # from the workspace when the step starts, so without this the head phase would
+      # execute the BASE ref's (possibly older or missing) copy of benchmark-suite-phase.
+      - name: Restore head checkout
+        run: git checkout --force "$GITHUB_SHA"
 
-      - name: Prepare production assets
-        working-directory: ${{ env.APP_DIRECTORY }}
-        run: |
-          set -e
-          echo "🔨 Building $SUITE_NAME production assets..."
-
-          if ! bin/prod-assets; then
-            echo "❌ ERROR: Failed to build production assets"
-            exit 1
-          fi
-
-          echo "✅ Production assets built successfully"
-
-      - name: Prepare and seed benchmark database
-        # The Pro Rails suite serves DB-backed routes (e.g. /posts_page). Without
-        # a migrated + seeded database those routes 500 on every request (the
-        # `posts` table does not exist), so the benchmark must create and seed it
-        # before the server starts. On a fresh CI runner `db:prepare` creates the
-        # database, loads the schema, and — because the database is newly created —
-        # runs db/seeds.rb (deterministic and faker-free so it works under
-        # RAILS_ENV=production). Note: `db:prepare` only seeds on first creation, so
-        # the row-count check below fails the job loudly if seeding was skipped (an
-        # empty table would otherwise serve a 200 "No posts found" payload that the
-        # benchmark scores as healthy).
-        if: env.SERVER_KIND == 'rails' && env.PRO_ENV == 'true'
-        working-directory: ${{ env.APP_DIRECTORY }}
-        env:
-          RAILS_ENV: production
-        run: |
-          set -euo pipefail
-          echo "🌱 Preparing and seeding $SUITE_NAME benchmark database..."
-          bundle exec rails db:prepare
-          # Guard every table `/posts_page` reads (posts, plus the users and
-          # comments it joins), not just posts: a partial seed would otherwise
-          # let the route 500 (or render an empty page) while the job stayed
-          # green.
-          bundle exec rails runner - <<'RUBY'
-          counts = {
-            posts: Post.count,
-            users: User.count,
-            comments: Comment.count
-          }
-
-          empty_tables = counts.select { |_, count| count.zero? }.keys
-          if empty_tables.any?
-            abort(
-              "Benchmark DB seeding incomplete after db:prepare " \
-              "(empty: #{empty_tables.join(', ')}); seeds did not run"
-            )
-          end
-
-          puts "✅ Database seeded (#{counts.map { |table, count| "#{count} #{table}" }.join(', ')})"
-          RUBY
-
-      - name: Start Pro node renderer
-        if: env.SERVER_KIND == 'node-renderer'
-        working-directory: ${{ env.APP_DIRECTORY }}
-        env:
-          RAILS_ENV: production
-          NODE_ENV: production
-          RENDERER_LOG_LEVEL: error
-          RENDERER_PORT: 3800
-        run: |
-          set -e
-          echo "🔧 Pre-seeding node renderer bundle cache..."
-          bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
-
-          echo "🚀 Starting $SUITE_NAME node renderer..."
-          renderer_log="${RUNNER_TEMP:-$PWD}/node-renderer.log"
-          echo "TARGET_LOG=$renderer_log" >> "$GITHUB_ENV"
-          node renderer/node-renderer.js > "$renderer_log" 2>&1 &
-          renderer_pid=$!
-          # Persist the PID so "Execute benchmark suite" can confirm the renderer
-          # survived the run; a backgrounded child under `set -e` does not
-          # propagate its failure to the step.
-          echo "TARGET_PID=$renderer_pid" >> "$GITHUB_ENV"
-          echo "Node renderer started in background (PID $renderer_pid)"
-
-          echo "⏳ Waiting for node renderer to be ready..."
-          for i in {1..30}; do
-            # Fail fast if the renderer bound the port and then crashed, instead
-            # of looping until the timeout (or racing a dead/restarting target).
-            if ! kill -0 "$renderer_pid" 2>/dev/null; then
-              echo "::error::Node renderer (PID $renderer_pid) exited during startup"
-              cat "$renderer_log" || true
-              exit 1
-            fi
-            if ruby -e "require 'socket'; TCPSocket.new('localhost', 3800).close"; then
-              echo "✅ Node renderer is ready and listening (PID $renderer_pid)"
-              exit 0
-            fi
-            echo "  Attempt $i/30: Node renderer not ready yet..."
-            sleep 1
-          done
-
-          echo "::error::Node renderer failed to start within 30 seconds"
-          cat "$renderer_log" || true
-          exit 1
-
-      - name: Start Rails production server
-        if: env.SERVER_KIND == 'rails'
-        working-directory: ${{ env.APP_DIRECTORY }}
-        run: |
-          set -e
-          echo "🚀 Starting $SUITE_NAME production server..."
-          $SERVER_CMD &
-          server_pid=$!
-          # Persist the PID so "Execute benchmark suite" can confirm the server
-          # survived the run; a backgrounded child under `set -e` does not
-          # propagate its failure to the step.
-          echo "TARGET_PID=$server_pid" >> "$GITHUB_ENV"
-          echo "Server started in background (PID $server_pid)"
-
-          echo "⏳ Waiting for server to be ready..."
-          for i in {1..30}; do
-            # Fail fast if the server bound the port and then crashed, instead of
-            # looping until the timeout (or racing a dead/restarting target).
-            if ! kill -0 "$server_pid" 2>/dev/null; then
-              echo "::error::Server (PID $server_pid) exited during startup"
-              exit 1
-            fi
-            if curl -fsS http://localhost:3001 > /dev/null; then
-              echo "✅ Server is ready and responding (PID $server_pid)"
-              exit 0
-            fi
-            echo "  Attempt $i/30: Server not ready yet..."
-            sleep 1
-          done
-
-          echo "::error::Server failed to start within 30 seconds"
-          exit 1
-
-      - name: Execute benchmark suite
-        timeout-minutes: ${{ fromJSON(inputs.matrix_row).benchmark_timeout_minutes }}
-        run: |
-          set -e
-          echo "🏃 Running $SUITE_NAME benchmark suite..."
-
-          if [ "$PRO_ENV" = "true" ]; then
-            if ! PRO=true $BENCH_CMD "$BENCHMARK_SCRIPT"; then
-              echo "❌ ERROR: Benchmark execution failed"
-              exit 1
-            fi
-          elif ! $BENCH_CMD "$BENCHMARK_SCRIPT"; then
-            echo "❌ ERROR: Benchmark execution failed"
-            exit 1
-          fi
-
-          # The benchmark target was backgrounded in a prior step, so `set -e`
-          # never saw it crash. Confirm it survived the whole run: a mid-run
-          # death means the metrics were measured against a dead/restarting
-          # target and must not ship to Bencher, so fail the job.
-          if [ -z "$TARGET_PID" ]; then
-            echo "::error::TARGET_PID is unset; cannot verify the benchmark target stayed alive"
-            exit 1
-          fi
-          if ! kill -0 "$TARGET_PID" 2>/dev/null; then
-            echo "::error::Benchmark target (PID $TARGET_PID) died during the benchmark run; metrics are unreliable"
-            exit 1
-          fi
-          if [ -n "${TARGET_LOG:-}" ] && [ -f "$TARGET_LOG" ]; then
-            if grep -q "died UNEXPECTEDLY" "$TARGET_LOG"; then
-              echo "::error::Benchmark target logged an unexpected worker restart; metrics are unreliable"
-              grep -n "died UNEXPECTEDLY" "$TARGET_LOG" || true
-              exit 1
-            fi
-          fi
-
-          echo "✅ Benchmark suite completed successfully"
-
-      - name: Validate benchmark results
-        run: |
-          set -e
-          echo "🔍 Validating $SUITE_NAME benchmark results..."
-
-          if [ ! -f "$SUMMARY_FILE" ]; then
-            echo "❌ ERROR: benchmark summary file not found"
-            exit 1
-          fi
-          echo "📊 $SUMMARY_TITLE:"
-          column -t -s $'\t' "$SUMMARY_FILE"
-          echo ""
-
-          if [ ! -f "bench_results/benchmark.json" ]; then
-            echo "❌ ERROR: benchmark JSON file not found"
-            exit 1
-          fi
-
-          echo "✅ Benchmark results validated"
-          echo ""
-          echo "Generated files:"
-          ls -lh bench_results/
+      # Phase 2 of 2: build + benchmark the HEAD ref on the same runner. Results stay in
+      # bench_results/ for the tracking step.
+      - name: Benchmark head ref
+        uses: ./.github/actions/benchmark-suite-phase
+        with:
+          ref: ${{ github.sha }}
+          phase: head
+          results-dir: bench_results
+          app-directory: ${{ env.APP_DIRECTORY }}
+          server-kind: ${{ env.SERVER_KIND }}
+          pro-env: ${{ env.PRO_ENV }}
+          generate-packs: ${{ env.GENERATE_PACKS }}
+          benchmark-script: ${{ env.BENCHMARK_SCRIPT }}
+          harness-dir: ${{ runner.temp }}/bench-harness
+          benchmark-timeout-minutes: ${{ fromJSON(inputs.matrix_row).benchmark_timeout_minutes }}
+          suite-name: ${{ env.SUITE_NAME }}
+          summary-file: ${{ env.SUMMARY_FILE }}
+          summary-title: ${{ env.SUMMARY_TITLE }}
+          ruby-version: ${{ steps.tool-versions.outputs.minimum-ruby-version }}
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v7
@@ -419,13 +312,27 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+      - name: Upload base benchmark results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: base-${{ env.RESULTS_ARTIFACT_NAME }}
+          path: ${{ runner.temp }}/bench_results_base/
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Track benchmarks with Bencher
         env:
           BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_KEY == '' && secrets.BENCHER_API_TOKEN || '' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          # The base phase's results — this runner's own comparison baseline.
+          BENCHMARK_BASELINE_JSON: ${{ runner.temp }}/bench_results_base/benchmark.json
+          BENCHER_BASELINE_REPORT_JSON: ${{ runner.temp }}/bench_results_base/bencher_report.json
+          # The base phase's per-sample values, paired with the head sidecar for
+          # sample confirmation (unreproduced boundary crossings are downgraded).
+          BENCHMARK_BASELINE_DISPLAY_JSON: ${{ runner.temp }}/bench_results_base/benchmark_display.json
         run: ruby benchmarks/track_benchmarks.rb
 
       - name: Benchmark workflow summary

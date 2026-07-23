@@ -16,20 +16,30 @@ require_relative "lib/benchmark_config"
 require_relative "lib/benchmark_helpers"
 require_relative "lib/bmf_helpers"
 
+# The monorepo checkout under test. These reads target the APP side (the phase's
+# checked-out package/config/bundles), NOT the benchmark harness: CI stashes the
+# head ref's benchmarks/ outside the workspace and runs both phases with it (one
+# measuring instrument), so script-relative "../" would escape the stash instead
+# of reaching the workspace. GITHUB_WORKSPACE points at the checkout in CI; local
+# in-tree runs fall back to this script's parent directory as before.
+def workspace_root
+  ENV.fetch("GITHUB_WORKSPACE") { File.expand_path("..", __dir__) }
+end
+
 # Read configuration from source files
 def read_protocol_version
-  package_json_path = File.expand_path(
-    "../packages/react-on-rails-pro-node-renderer/package.json",
-    __dir__
+  package_json_path = File.join(
+    workspace_root,
+    "packages/react-on-rails-pro-node-renderer/package.json"
   )
   package_json = JSON.parse(File.read(package_json_path))
   package_json["protocolVersion"] || raise("protocolVersion not found in #{package_json_path}")
 end
 
 def read_password_from_config
-  config_path = File.expand_path(
-    "../react_on_rails_pro/spec/dummy/renderer/node-renderer.js",
-    __dir__
+  config_path = File.join(
+    workspace_root,
+    "react_on_rails_pro/spec/dummy/renderer/node-renderer.js"
   )
   config_content = File.read(config_path)
   match = config_content.match(/password:\s*['"]([^'"]+)['"]/)
@@ -75,9 +85,9 @@ end
 
 # Find all production bundles in the node-renderer bundles directory
 def find_all_production_bundles
-  bundles_dir = File.expand_path(
-    "../react_on_rails_pro/spec/dummy/.node-renderer-bundles",
-    __dir__
+  bundles_dir = File.join(
+    workspace_root,
+    "react_on_rails_pro/spec/dummy/.node-renderer-bundles"
   )
 
   unless Dir.exist?(bundles_dir)

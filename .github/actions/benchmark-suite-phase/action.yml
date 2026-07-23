@@ -1,0 +1,412 @@
+name: Benchmark suite phase
+description: >
+  Builds and benchmarks ONE ref of one benchmark suite/shard, entirely on the current
+  runner. Invoked twice per benchmark job for relative continuous benchmarking (#3492,
+  https://bencher.dev/docs/how-to/track-benchmarks/#relative-continuous-benchmarking):
+  first with the comparison base ref (results stashed outside the workspace), then with
+  the head ref. Measuring both refs on the SAME runner is the whole point — it removes
+  the cross-runner variance that made the old statistical baseline noise-dominated on
+  shared GitHub-hosted runners (#4071).
+
+  Assumes the job already ran the ref-independent setup: Bencher CLI, k6/vegeta,
+  Ruby + foreman, pnpm, Node, the "Configure benchmark commands" step (SERVER_CMD /
+  BENCH_CMD / WEB_CONCURRENCY), and the "Stash head benchmark harness" step.
+  Everything ref-dependent happens here, per phase: checkout + clean, JS
+  install/build, gems, packs, assets, DB seed, server, benchmark.
+
+  The bench script runs from harness-dir (the HEAD ref's stashed benchmarks/), NOT
+  from the phase's checkout: the harness is the measuring instrument, and both
+  phases must be measured with the same one or a harness change would masquerade
+  as a base-vs-head performance delta. App-side inputs still come from the phase's
+  checkout.
+
+  Invariant for callers: invoke this action only while the HEAD ref is checked out
+  (restore it between invocations). GitHub resolves `uses: ./...` from the workspace at
+  step start, so invoking it while the BASE ref is checked out would silently run the
+  base ref's (possibly older or missing) copy of this file. Nested local actions
+  (setup-bundle/setup-ruby) are resolved while the phase's ref is checked out — that ref
+  builds itself with its own setup definitions, which is exactly what a fair comparison
+  wants.
+
+inputs:
+  ref:
+    description: Commit SHA (or ref) to build and benchmark.
+    required: true
+  phase:
+    description: Phase label, "base" or "head" (log/step labelling only).
+    required: true
+  results-dir:
+    description: >
+      Where bench_results/ is moved after the run. Pass a path OUTSIDE the workspace for
+      the base phase (the head phase git-cleans the workspace). "bench_results" leaves
+      the results in place.
+    required: false
+    default: bench_results
+  app-directory:
+    description: The benchmarked dummy app directory (matrix row app_directory).
+    required: true
+  server-kind:
+    description: rails or node-renderer (matrix row server_kind).
+    required: true
+  pro-env:
+    description: Whether the suite runs with PRO=true (matrix row pro_env).
+    required: true
+  generate-packs:
+    description: Whether to generate file-system based entrypoints (matrix row generate_packs).
+    required: true
+  benchmark-script:
+    description: >-
+      The bench script to execute (matrix row benchmark_script), as a benchmarks/-
+      prefixed repo path; resolved inside harness-dir, never the phase's checkout.
+    required: true
+  harness-dir:
+    description: >-
+      Directory holding the HEAD ref's stashed benchmarks/ tree (outside the
+      workspace). Both phases execute the bench script from here so one instrument
+      measures both refs.
+    required: true
+  benchmark-timeout-minutes:
+    description: Timeout for the benchmark execution (matrix row benchmark_timeout_minutes).
+    required: true
+  suite-name:
+    description: Human-readable suite name (matrix row suite_name).
+    required: true
+  summary-file:
+    description: The summary table file the bench script writes (matrix row summary_file).
+    required: true
+  summary-title:
+    description: Title for the printed summary (matrix row summary_title).
+    required: true
+  ruby-version:
+    description: Ruby version for the benchmarked app's bundle.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check out ${{ inputs.phase }} ref
+      shell: bash
+      env:
+        REF: ${{ inputs.ref }}
+        PHASE: ${{ inputs.phase }}
+      run: |
+        set -euo pipefail
+        if ! git cat-file -e "${REF}^{commit}" 2>/dev/null; then
+          echo "Fetching $REF..."
+          git fetch --no-tags --depth=1 origin "$REF"
+        fi
+        git checkout --force "$REF"
+        # Drop every gitignored build output left by the previous phase (webpack
+        # bundles, generated packs, sqlite DBs, bench_results, bundler path config) so
+        # this phase builds and measures only its own ref. node_modules survives the
+        # clean: `pnpm install --frozen-lockfile` below syncs it to this ref's lockfile
+        # far faster than a cold install, with identical results.
+        git clean -ffdx -e node_modules
+        echo "Benchmarking ($PHASE): $(git log -1 --oneline --no-decorate)"
+
+    - name: Install Node modules with pnpm (${{ inputs.phase }})
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Build workspace packages (${{ inputs.phase }})
+      shell: bash
+      run: pnpm run build
+
+    - name: Install Ruby Gems for the benchmarked app (${{ inputs.phase }})
+      uses: ./.github/actions/setup-bundle
+      with:
+        working-directory: ${{ inputs.app-directory }}
+        ruby-version: ${{ inputs.ruby-version }}
+        install-libyaml: 'false'
+
+    - name: Generate file-system based entrypoints for Pro (${{ inputs.phase }})
+      if: inputs.generate-packs == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      run: bundle exec rake react_on_rails:generate_packs
+
+    - name: Prepare production assets (${{ inputs.phase }})
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -e
+        echo "🔨 Building $SUITE_NAME_INPUT production assets..."
+
+        if ! bin/prod-assets; then
+          echo "❌ ERROR: Failed to build production assets"
+          exit 1
+        fi
+
+        echo "✅ Production assets built successfully"
+
+    - name: Prepare and seed benchmark database (${{ inputs.phase }})
+      # The Pro Rails suite serves DB-backed routes (e.g. /posts_page). Without
+      # a migrated + seeded database those routes 500 on every request (the
+      # `posts` table does not exist), so the benchmark must create and seed it
+      # before the server starts. The phase checkout git-cleans any previous
+      # phase's database, so `db:prepare` always creates this phase's database
+      # fresh, loads the schema, and — because the database is newly created —
+      # runs db/seeds.rb (deterministic and faker-free so it works under
+      # RAILS_ENV=production). The row-count check below fails the job loudly if
+      # seeding was skipped (an empty table would otherwise serve a 200 "No posts
+      # found" payload that the benchmark scores as healthy).
+      if: inputs.server-kind == 'rails' && inputs.pro-env == 'true'
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        RAILS_ENV: production
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -euo pipefail
+        echo "🌱 Preparing and seeding $SUITE_NAME_INPUT benchmark database..."
+        bundle exec rails db:prepare
+        # Guard every table `/posts_page` reads (posts, plus the users and
+        # comments it joins), not just posts: a partial seed would otherwise
+        # let the route 500 (or render an empty page) while the job stayed
+        # green.
+        bundle exec rails runner - <<'RUBY'
+        counts = {
+          posts: Post.count,
+          users: User.count,
+          comments: Comment.count
+        }
+
+        empty_tables = counts.select { |_, count| count.zero? }.keys
+        if empty_tables.any?
+          abort(
+            "Benchmark DB seeding incomplete after db:prepare " \
+            "(empty: #{empty_tables.join(', ')}); seeds did not run"
+          )
+        end
+
+        puts "✅ Database seeded (#{counts.map { |table, count| "#{count} #{table}" }.join(', ')})"
+        RUBY
+
+    - name: Start Pro node renderer (${{ inputs.phase }})
+      if: inputs.server-kind == 'node-renderer'
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        RAILS_ENV: production
+        NODE_ENV: production
+        RENDERER_LOG_LEVEL: error
+        RENDERER_PORT: 3800
+        PHASE: ${{ inputs.phase }}
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -e
+        echo "🔧 Pre-seeding node renderer bundle cache..."
+        bundle exec rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
+
+        echo "🚀 Starting $SUITE_NAME_INPUT node renderer ($PHASE)..."
+        renderer_log="${RUNNER_TEMP:-$PWD}/node-renderer-${PHASE}.log"
+        echo "TARGET_LOG=$renderer_log" >> "$GITHUB_ENV"
+        # setsid: own process group, so the stop step can terminate the whole tree.
+        setsid node renderer/node-renderer.js > "$renderer_log" 2>&1 &
+        renderer_pid=$!
+        # Persist the PID so "Execute benchmark suite" can confirm the renderer
+        # survived the run; a backgrounded child under `set -e` does not
+        # propagate its failure to the step.
+        echo "TARGET_PID=$renderer_pid" >> "$GITHUB_ENV"
+        echo "Node renderer started in background (PID $renderer_pid)"
+
+        echo "⏳ Waiting for node renderer to be ready..."
+        for i in {1..30}; do
+          # Fail fast if the renderer bound the port and then crashed, instead
+          # of looping until the timeout (or racing a dead/restarting target).
+          if ! kill -0 "$renderer_pid" 2>/dev/null; then
+            echo "::error::Node renderer (PID $renderer_pid) exited during startup"
+            cat "$renderer_log" || true
+            exit 1
+          fi
+          if ruby -e "require 'socket'; TCPSocket.new('localhost', 3800).close" 2>/dev/null; then
+            echo "✅ Node renderer is ready and listening (PID $renderer_pid)"
+            exit 0
+          fi
+          echo "  Attempt $i/30: Node renderer not ready yet..."
+          sleep 1
+        done
+
+        echo "::error::Node renderer failed to start within 30 seconds"
+        cat "$renderer_log" || true
+        exit 1
+
+    - name: Start Rails production server (${{ inputs.phase }})
+      if: inputs.server-kind == 'rails'
+      shell: bash
+      working-directory: ${{ inputs.app-directory }}
+      env:
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -e
+        echo "🚀 Starting $SUITE_NAME_INPUT production server..."
+        # setsid: own process group. bin/prod runs `rails server` as a child (core) or
+        # foreman managing rails + node-renderer (pro), so the stop step must be able
+        # to TERM the whole group — killing the wrapper alone would orphan the server
+        # into the next phase and leave port 3001 occupied.
+        setsid $SERVER_CMD &
+        server_pid=$!
+        # Persist the PID so "Execute benchmark suite" can confirm the server
+        # survived the run; a backgrounded child under `set -e` does not
+        # propagate its failure to the step.
+        echo "TARGET_PID=$server_pid" >> "$GITHUB_ENV"
+        echo "Server started in background (PID $server_pid)"
+
+        echo "⏳ Waiting for server to be ready..."
+        for i in {1..30}; do
+          # Fail fast if the server bound the port and then crashed, instead of
+          # looping until the timeout (or racing a dead/restarting target).
+          if ! kill -0 "$server_pid" 2>/dev/null; then
+            echo "::error::Server (PID $server_pid) exited during startup"
+            exit 1
+          fi
+          if curl -fsS http://localhost:3001 > /dev/null; then
+            echo "✅ Server is ready and responding (PID $server_pid)"
+            exit 0
+          fi
+          echo "  Attempt $i/30: Server not ready yet..."
+          sleep 1
+        done
+
+        echo "::error::Server failed to start within 30 seconds"
+        exit 1
+
+    - name: Execute benchmark suite (${{ inputs.phase }})
+      shell: bash
+      env:
+        BENCHMARK_SCRIPT_INPUT: ${{ inputs.benchmark-script }}
+        BENCHMARK_TIMEOUT_MINUTES: ${{ inputs.benchmark-timeout-minutes }}
+        HARNESS_DIR: ${{ inputs.harness-dir }}
+        PRO_ENV_INPUT: ${{ inputs.pro-env }}
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -e
+        echo "🏃 Running $SUITE_NAME_INPUT benchmark suite..."
+
+        # Run the HEAD ref's copy of the bench script (see harness-dir input): the
+        # phase's checked-out benchmarks/ tree is never executed, so both phases
+        # are measured with one instrument.
+        if [ "${BENCHMARK_SCRIPT_INPUT#benchmarks/}" = "$BENCHMARK_SCRIPT_INPUT" ]; then
+          echo "::error::benchmark-script '$BENCHMARK_SCRIPT_INPUT' is not under benchmarks/; cannot resolve it in the stashed harness"
+          exit 1
+        fi
+        harness_script="$HARNESS_DIR/${BENCHMARK_SCRIPT_INPUT#benchmarks/}"
+        if [ ! -f "$harness_script" ]; then
+          echo "::error::Stashed harness script $harness_script not found; did the 'Stash head benchmark harness' step run?"
+          exit 1
+        fi
+
+        # `timeout` replaces the step-level timeout-minutes the pre-composite workflow
+        # used (composite action steps don't support timeout-minutes).
+        if [ "$PRO_ENV_INPUT" = "true" ]; then
+          if ! PRO=true timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$harness_script"; then
+            echo "❌ ERROR: Benchmark execution failed"
+            exit 1
+          fi
+        elif ! timeout "${BENCHMARK_TIMEOUT_MINUTES}m" $BENCH_CMD "$harness_script"; then
+          echo "❌ ERROR: Benchmark execution failed"
+          exit 1
+        fi
+
+        # The benchmark target was backgrounded in a prior step, so `set -e`
+        # never saw it crash. Confirm it survived the whole run: a mid-run
+        # death means the metrics were measured against a dead/restarting
+        # target and must not ship to Bencher, so fail the job.
+        if [ -z "$TARGET_PID" ]; then
+          echo "::error::TARGET_PID is unset; cannot verify the benchmark target stayed alive"
+          exit 1
+        fi
+        if ! kill -0 "$TARGET_PID" 2>/dev/null; then
+          echo "::error::Benchmark target (PID $TARGET_PID) died during the benchmark run; metrics are unreliable"
+          exit 1
+        fi
+        if [ -n "${TARGET_LOG:-}" ] && [ -f "$TARGET_LOG" ]; then
+          if grep -q "died UNEXPECTEDLY" "$TARGET_LOG"; then
+            echo "::error::Benchmark target logged an unexpected worker restart; metrics are unreliable"
+            grep -n "died UNEXPECTEDLY" "$TARGET_LOG" || true
+            exit 1
+          fi
+        fi
+
+        echo "✅ Benchmark suite completed successfully"
+
+    - name: Stop benchmark target (${{ inputs.phase }})
+      shell: bash
+      env:
+        SERVER_KIND_INPUT: ${{ inputs.server-kind }}
+      run: |
+        set -uo pipefail
+        if [ -z "${TARGET_PID:-}" ]; then
+          echo "No benchmark target PID recorded; nothing to stop"
+          exit 0
+        fi
+
+        echo "🛑 Stopping benchmark target (PID $TARGET_PID and its process group)..."
+        # The target was started with setsid, so -PID addresses its whole process
+        # group (rails/foreman children included). Fall back to the bare PID if the
+        # group is already gone.
+        kill -TERM -- "-$TARGET_PID" 2>/dev/null || kill -TERM "$TARGET_PID" 2>/dev/null || true
+        for _ in {1..15}; do
+          kill -0 "$TARGET_PID" 2>/dev/null || break
+          sleep 1
+        done
+        if kill -0 "$TARGET_PID" 2>/dev/null; then
+          echo "Target did not exit after TERM; escalating to KILL"
+          kill -KILL -- "-$TARGET_PID" 2>/dev/null || kill -KILL "$TARGET_PID" 2>/dev/null || true
+        fi
+
+        # The next phase's server must be able to bind immediately; a lingering
+        # listener would make its startup probe pass against THIS phase's server and
+        # benchmark the wrong ref.
+        if [ "$SERVER_KIND_INPUT" = "node-renderer" ]; then port=3800; else port=3001; fi
+        for _ in {1..30}; do
+          if ! ruby -e "require 'socket'; TCPSocket.new('localhost', $port).close" 2>/dev/null; then
+            echo "✅ Benchmark target stopped; port $port is free"
+            # Clear the hand-off vars so the next phase can never validate against
+            # this phase's dead PID/log.
+            { echo "TARGET_PID="; echo "TARGET_LOG="; } >> "$GITHUB_ENV"
+            exit 0
+          fi
+          sleep 1
+        done
+        echo "::error::Port $port is still in use after stopping the benchmark target"
+        exit 1
+
+    - name: Validate and stash benchmark results (${{ inputs.phase }})
+      shell: bash
+      env:
+        PHASE: ${{ inputs.phase }}
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        SUMMARY_FILE_INPUT: ${{ inputs.summary-file }}
+        SUMMARY_TITLE_INPUT: ${{ inputs.summary-title }}
+        SUITE_NAME_INPUT: ${{ inputs.suite-name }}
+      run: |
+        set -euo pipefail
+        echo "🔍 Validating $SUITE_NAME_INPUT ($PHASE) benchmark results..."
+
+        if [ ! -f "$SUMMARY_FILE_INPUT" ]; then
+          echo "❌ ERROR: benchmark summary file not found"
+          exit 1
+        fi
+        echo "📊 $SUMMARY_TITLE_INPUT ($PHASE):"
+        column -t -s $'\t' "$SUMMARY_FILE_INPUT"
+        echo ""
+
+        if [ ! -f "bench_results/benchmark.json" ]; then
+          echo "❌ ERROR: benchmark JSON file not found"
+          exit 1
+        fi
+
+        echo "✅ Benchmark results validated"
+        echo ""
+        echo "Generated files:"
+        ls -lh bench_results/
+
+        if [ "$RESULTS_DIR" != "bench_results" ]; then
+          rm -rf "$RESULTS_DIR"
+          mkdir -p "$(dirname "$RESULTS_DIR")"
+          mv bench_results "$RESULTS_DIR"
+          echo "Stashed bench_results/ -> $RESULTS_DIR"
+        fi
