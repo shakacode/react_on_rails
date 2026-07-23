@@ -91,7 +91,7 @@ describe ReactOnRailsPro::Request do
       response = mock_response(status: 200)
       requested_path = nil
       requested_form = nil
-      allow(mock_connection).to receive(:post) do |path, form:|
+      allow(mock_connection).to receive(:post) do |path, form:, **_opts|
         requested_path = path
         requested_form = form
         response
@@ -130,7 +130,7 @@ describe ReactOnRailsPro::Request do
       response = mock_response(status: 200)
       requested_path = nil
       requested_form = nil
-      allow(mock_connection).to receive(:post) do |path, form:|
+      allow(mock_connection).to receive(:post) do |path, form:, **_opts|
         requested_path = path
         requested_form = form
         response
@@ -313,7 +313,7 @@ describe ReactOnRailsPro::Request do
       requests = []
       call_count = 0
       allow(mock_connection).to receive(:post) do |path, **options|
-        requests << [path, options[:form]]
+        requests << [path, options[:form], options[:raw]]
         call_count += 1
         case call_count
         when 1 then mock_response(status: ReactOnRailsPro::STATUS_SEND_BUNDLE, chunks: ["Bundle not found"])
@@ -337,14 +337,20 @@ describe ReactOnRailsPro::Request do
         "/bundles/#{server_artifact.id}/render/digest"
       ]
       expect(requests.map(&:first)).to eq(expected_paths)
-      expect(requests.fetch(1).last).to include(
+      upload_form = requests.fetch(1)[1]
+      expect(upload_form).to include(
         "bundle_#{server_artifact.id}",
         "bundle_#{rsc_artifact.id}"
       )
-      expect(requests.fetch(1).last.fetch("assetsToCopy0")[:body]).to eq("old manifest bytes")
-      expect(requests.fetch(2).last["renderingRequest"]).to eq(js_code)
-      expect(requests.fetch(2).last["dependencyBundleTimestamps"])
-        .to eq([rsc_artifact.id, server_artifact.id])
+      expect(upload_form.fetch("assetsToCopy0")[:body]).to eq("old manifest bytes")
+      retry_render = requests.fetch(2)[2]
+      expect(retry_render.fetch(:body)).to eq(js_code)
+      expect(retry_render.fetch(:headers)).to include(
+        [
+          "x-react-on-rails-pro-dependency-bundle-timestamps",
+          JSON.generate([rsc_artifact.id, server_artifact.id])
+        ]
+      )
       expect(ReactOnRailsPro::Utils).not_to have_received(:renderer_artifacts)
     end
 
@@ -488,7 +494,7 @@ describe ReactOnRailsPro::Request do
     end
   end
 
-  describe ".render_code" do
+  describe ".render_code request body encoding" do
     let(:form) do
       {
         "renderingRequest" => "ReactOnRails.dummy",
