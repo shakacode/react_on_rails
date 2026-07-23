@@ -483,8 +483,9 @@ RSpec.describe BencherReport do
     end
 
     it "leaves boundary-only significance untouched for pairs without an alert" do
-      # p90 has no alert (boundary-less in production) — confirmation only consults
-      # sample data for flags that fire; a non-flagged measure stays nil/unchanged.
+      # rps at 95.0 sits inside its 90–110 interval, so no flag fires — confirmation
+      # only downgrades measures whose boundary crossing fired; a non-flagged measure
+      # stays nil/unchanged even when its sample ranges overlap.
       report = described_class.parse(report_json(results: [[rps_regression_result(value: 95.0)]]))
       confirmed(report, head: [95.0, 96.0], base: [100.0, 99.0])
 
