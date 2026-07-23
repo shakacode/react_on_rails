@@ -41,6 +41,8 @@ PASSWORD = read_password_from_config
 BASE_URL = env_or_default("BASE_URL", "localhost:3800")
 PROTOCOL_VERSION = read_protocol_version
 LOAD_GENERATOR_SHARDS = env_or_default("LOAD_GENERATOR_SHARDS", 1).to_i
+RAW_RENDER_CONTENT_TYPE = "application/vnd.react-on-rails.render-request+javascript"
+RAW_RENDER_PROTOCOL_HEADER = "X-React-On-Rails-Pro-Protocol-Version"
 
 # Test cases: JavaScript expressions to evaluate
 # Format: { name: "test_name", request: "javascript_code", rsc: true/false }
@@ -105,8 +107,10 @@ def rsc_bundle?(bundle_timestamp)
   # Use curl with h2c since Net::HTTP doesn't support HTTP/2
   result, status = Open3.capture2(
     "curl", "-s", "--http2-prior-knowledge", "-X", "POST",
-    "-H", "Content-Type: application/x-www-form-urlencoded",
-    "-d", body,
+    "-H", "Content-Type: #{RAW_RENDER_CONTENT_TYPE}",
+    "-H", "#{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}",
+    "-H", "Authorization: Bearer #{PASSWORD}",
+    "--data-binary", body,
     url
   )
   return nil unless status.success?
@@ -145,11 +149,6 @@ def categorize_bundles(bundles)
   [rsc_bundle, non_rsc_bundle]
 end
 
-# URL-encode special characters for form body
-def url_encode(str)
-  URI.encode_www_form_component(str)
-end
-
 # Build render URL for a bundle and render name
 def render_url(bundle_timestamp, render_name)
   "http://#{BASE_URL}/bundles/#{bundle_timestamp}/render/#{render_name}"
@@ -157,11 +156,7 @@ end
 
 # Build request body for a rendering request
 def render_body(rendering_request)
-  [
-    "protocolVersion=#{url_encode(PROTOCOL_VERSION)}",
-    "password=#{url_encode(PASSWORD)}",
-    "renderingRequest=#{url_encode(rendering_request)}"
-  ].join("&")
+  rendering_request
 end
 
 def validate_node_renderer_benchmark_config!
@@ -380,7 +375,9 @@ def run_vegeta_benchmark(test_case, bundle_timestamp, shard_count: LOAD_GENERATO
   # Write targets file (Vegeta format with @body reference)
   File.write(targets_file, <<~TARGETS)
     POST #{target_url}
-    Content-Type: application/x-www-form-urlencoded
+    Content-Type: #{RAW_RENDER_CONTENT_TYPE}
+    #{RAW_RENDER_PROTOCOL_HEADER}: #{PROTOCOL_VERSION}
+    Authorization: Bearer #{PASSWORD}
     @#{body_file}
   TARGETS
 

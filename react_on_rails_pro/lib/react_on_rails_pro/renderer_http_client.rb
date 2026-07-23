@@ -487,25 +487,10 @@ module ReactOnRailsPro
       end
 
       def build_form_body(form)
-        return build_multipart_body(form) if form.any? { |_name, value| file_part?(value) }
-
-        [
-          [["content-type", "application/x-www-form-urlencoded"]],
-          URI.encode_www_form(flatten_url_encoded_form(form))
-        ]
+        build_multipart_body(form)
       end
 
       private
-
-      def flatten_url_encoded_form(form)
-        form.each_with_object([]) do |(name, value), pairs|
-          if value.is_a?(Array)
-            value.each { |item| pairs << ["#{name}[]", item] }
-          else
-            pairs << [name, value]
-          end
-        end
-      end
 
       def append_multipart_value(body, boundary, name, value)
         if value.is_a?(Array)
@@ -572,9 +557,9 @@ module ReactOnRailsPro
       @closed_mutex = Mutex.new
     end
 
-    def post(path, form: nil, json: nil, stream: false)
+    def post(path, form: nil, json: nil, raw: nil, stream: false)
       ensure_open!
-      headers, body = request_body(form:, json:)
+      headers, body = request_body(form:, json:, raw:)
       build_response(stream:) do |yielder, status_assigner, headers_assigner|
         execute_request(:post, path, [headers, body],
                         stream:,
@@ -630,11 +615,16 @@ module ReactOnRailsPro
 
     private
 
-    def request_body(form:, json:)
+    def request_body(form:, json:, raw:)
+      body_options = [form, json, raw].compact
+      raise ArgumentError, "Specify only one request body encoding" if body_options.length > 1
+
       if form
         self.class.build_form_body(form)
       elsif json
         [[["content-type", "application/json"]], JSON.generate(json)]
+      elsif raw
+        [raw.fetch(:headers), raw.fetch(:body)]
       else
         [[], nil]
       end
