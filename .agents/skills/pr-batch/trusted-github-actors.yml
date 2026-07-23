@@ -1,11 +1,13 @@
 # Packaged fallback allowlist for the pr-batch security preflight. Keep this
-# fail-closed: human maintainers and trusted automation are repo- or
+# fail-closed for humans and actionable automation: those actors are repo- or
 # user-specific and belong in a repo-local or user-global trust config, not in
-# this public fallback.
+# this public fallback. GitHub Actions is metadata-only so its CI/status evidence
+# may be accepted, but its comment text never becomes actionable input.
 trusted_users: []
 
 trusted_bots: []
 
-trusted_metadata_bots: []
+trusted_metadata_bots:
+  - github-actions
 
 trusted_teams: []

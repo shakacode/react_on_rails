@@ -113,6 +113,35 @@ describe ProGenerator, type: :generator do
       allow(generator).to receive(:print_generator_messages)
     end
 
+    context "when invoked by the install generator" do
+      let(:generator) { described_class.new([], { invoked_by_install: true }) }
+
+      it "runs Pro setup without adding dependencies again" do
+        expect(generator).to receive(:setup_pro).once
+        expect(generator).not_to receive(:add_pro_npm_dependencies)
+
+        generator.run_generator
+      end
+    end
+
+    context "when invoked standalone" do
+      before do
+        allow(generator).to receive_messages(
+          prerequisites_met?: true,
+          swap_base_gem_for_pro_in_gemfile: true,
+          update_imports_to_pro_package: nil,
+          print_success_message: nil
+        )
+      end
+
+      it "runs Pro setup and adds dependencies once" do
+        expect(generator).to receive(:setup_pro).once
+        expect(generator).to receive(:add_pro_npm_dependencies).once
+
+        generator.run_generator
+      end
+    end
+
     it "stops before setup when the Gemfile swap fails" do
       allow(generator).to receive_messages(prerequisites_met?: true, swap_base_gem_for_pro_in_gemfile: false)
       allow(generator).to receive(:setup_pro)

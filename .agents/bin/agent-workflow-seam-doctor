@@ -4,66 +4,139 @@
 # Validate that portable agent workflows can resolve their repo-specific seam.
 
 require "json"
+require "fileutils"
+require "open3"
 require "optparse"
+require "shellwords"
 require "yaml"
 
 module AgentWorkflowSeamDoctor
   SECTION = "Agent Workflow Configuration"
   SECTION_HEADING = /^##\s+#{Regexp.escape(SECTION)}\s*$/
-  REQUIRED_KEYS = [
-    "Base branch",
-    "Pre-push local validation",
-    "CI change detector",
-    "Hosted-CI trigger",
-    "CI parity environment",
-    "Secret redaction patterns",
-    "Benchmark labels",
-    "Follow-up issue prefix",
-    "Changelog",
-    "Lint / format",
-    "Merge ledger",
-    "Docs checks",
-    "Tests",
-    "Build / type checks",
-    "Review gate",
-    "Approval-exempt change categories",
-    "Coordination backend"
+  POINTER_SECTION = <<~MARKDOWN.chomp
+    ## Agent Workflow Configuration
+
+    Portable shared skills resolve this repo's commands and policy through:
+    - **Commands** — run `.agents/bin/<name>` (`setup`, `validate`, `test`, ...); see `.agents/bin/README.md`. A missing script means that capability is n/a here.
+    - **Policy / config** — `.agents/agent-workflow.yml`.
+  MARKDOWN
+  COMMANDS_DIR = ".agents/bin"
+  COMMAND_README = ".agents/bin/README.md"
+  POLICY_CONFIG = ".agents/agent-workflow.yml"
+  TRUST_CONFIG = ".agents/trusted-github-actors.yml"
+  STANDARD_SCRIPTS = %w[setup validate test lint build docs ci-detect].freeze
+  CORE_SCRIPTS = %w[validate test].freeze
+  ENV_OPTIONS_WITH_ARGUMENT = %w[-u --unset -C --chdir -S --split-string --argv0].freeze
+  ENV_OPTIONS_WITHOUT_ARGUMENT = %w[-i --ignore-environment -0 --null -v --debug --help --version].freeze
+  NPM_RUN_COMMANDS = %w[run run-script rum urn].freeze
+  NPM_SCRIPT_COMMANDS = (NPM_RUN_COMMANDS + %w[test t tst start stop restart]).freeze
+  NPM_POST_SCRIPT_OPTIONS_WITH_ARGUMENT = %w[
+    -C -L -c -m -w --enjoy-by --reg --workspace --script-shell
   ].freeze
-  REQUIRED_CONFIG_KEYS = %w[
+  NPM_POST_SCRIPT_OPTIONS_WITHOUT_ARGUMENT = %w[
+    --workspaces --include-workspace-root --if-present --ignore-scripts --foreground-scripts
+    -? -B -D -E -H -O -P -S -a -d -dd -ddd -f -g -h -l -n -p -q -s -v -y
+    --desc --help --iwr --local --no --porcelain --quiet --readonly --silent --verbose --ws
+  ].freeze
+  NPM_BOOLEAN_SHORT_OPTIONS_WITH_OPTIONAL_ARGUMENT = %w[
+    -a -f -g -l -n -p -S -B -D -E -O -P -? -H -h -v -y
+  ].freeze
+  NPM_OPTIONAL_VALUE_KINDS = %i[
+    optional_boolean optional_nullable_boolean optional_color optional_string
+  ].freeze
+  SHELL_OPTIONS_WITH_ARGUMENT = %w[-o -O --init-file --rcfile].freeze
+  COMPLETE_ARGUMENT_FORWARDING_WORDS = ["$@", "${@}", '"$@"', '"${@}"'].freeze
+  KSH_FAMILY_SHELLS = %w[ksh mksh oksh loksh ksh93].freeze
+  SHELL_COMMANDS = %w[ash bash rbash dash ksh mksh oksh loksh ksh93 posh sh yash zsh].freeze
+  SHELLS_WITH_ATTACHED_O_OPTION_VALUES = [*KSH_FAMILY_SHELLS, "zsh"].freeze
+  VERSIONED_BASH_SHELL = /\A(?:r?bash)(?:-?\d+(?:\.\d+)*)\z/
+  UNSUPPORTED_C_SHELL_COMMANDS = %w[csh tcsh].freeze
+  BUSYBOX_SHELL_APPLETS = %w[ash sh].freeze
+  # Generated from the union of npm 11.6.0 effective config keys and @npmcli/config definition types.
+  # Boolean-capable keys may consume an explicit following non-option value and support --no-*;
+  # all other keys require a value unless supplied inline with `=`. The sole effective key outside
+  # the definitions is npm-version.
+  NPM_CONFIG_BOOLEAN_KEYS = %w[
+    all allow-same-version audit bin-links browser color commit-hooks description dev diff-ignore-all-space
+    diff-name-only diff-no-prefix diff-text dry-run engine-strict expect-results force foreground-scripts
+    format-package-lock fund git-tag-version global global-style if-present ignore-scripts include-staged
+    include-workspace-root init-private install-links json legacy-bundling legacy-peer-deps link long offline
+    omit-lockfile-registry-resolved optional package-lock package-lock-only parseable prefer-dedupe
+    prefer-offline prefer-online production progress provenance read-only rebuild-bundle save save-bundle
+    save-dev save-exact save-optional save-peer save-prod shrinkwrap sign-git-commit sign-git-tag
+    strict-peer-deps strict-ssl timing unicode update-notifier usage version versions workspaces
+    workspaces-update yes
+  ].freeze
+  NPM_NULLABLE_BOOLEAN_KEYS = %w[expect-results optional production workspaces yes].freeze
+  NPM_LONG_BOOLEAN_ALIAS_KINDS = {
+    "desc" => :optional_boolean,
+    "help" => :optional_boolean,
+    "iwr" => :optional_boolean,
+    "local" => :optional_boolean,
+    "no" => :optional_boolean,
+    "porcelain" => :optional_boolean,
+    "readonly" => :optional_boolean,
+    "ws" => :optional_nullable_boolean
+  }.freeze
+  NPM_CONFIG_VALUE_KEYS = %w[
+    _auth access also audit-level auth-type before ca cache cache-max cache-min cafile call cert cidr cpu depth
+    diff diff-dst-prefix diff-src-prefix diff-unified editor expect-result-count fetch-retries
+    fetch-retry-factor fetch-retry-maxtimeout fetch-retry-mintimeout fetch-timeout git globalconfig heading
+    https-proxy include init-author-email init-author-name init-author-url init-license init-module init-type
+    init-version init.author.email init.author.name init.author.url init.license init.module init.version
+    install-strategy key libc local-address location lockfile-version loglevel logs-dir logs-max maxsockets
+    message node-gyp node-options noproxy npm-version omit only os otp pack-destination package prefix preid
+    provenance-file proxy registry replace-registry-host save-prefix sbom-format sbom-type scope script-shell
+    searchexclude searchlimit searchopts searchstaleness shell tag tag-version-prefix umask user-agent
+    userconfig viewer which workspace
+  ].freeze
+  NPM_LONG_OPTION_KINDS = {}.tap do |options|
+    NPM_CONFIG_BOOLEAN_KEYS.each { |key| options[key] = :optional_boolean }
+    NPM_NULLABLE_BOOLEAN_KEYS.each { |key| options[key] = :optional_nullable_boolean }
+    options["browser"] = :optional_string
+    options["color"] = :optional_color
+    NPM_LONG_BOOLEAN_ALIAS_KINDS.each { |key, kind| options[key] = kind }
+    NPM_CONFIG_VALUE_KEYS.each { |key| options[key] = :required }
+    NPM_POST_SCRIPT_OPTIONS_WITHOUT_ARGUMENT.grep(/\A--/).each do |option|
+      key = option.delete_prefix("--")
+      options[key] = :none unless options.key?(key)
+    end
+    NPM_POST_SCRIPT_OPTIONS_WITH_ARGUMENT.grep(/\A--/).each do |option|
+      options[option.delete_prefix("--")] = :required
+    end
+  end.freeze
+  TRUST_KEYS = %w[trusted_users trusted_bots trusted_metadata_bots trusted_teams].freeze
+  ROOT_RESOLUTION = 'CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd'
+  INIT_MARKER = "Generated by shakacode/agent-workflows agent-workflow-seam-doctor --init."
+  INIT_SCRIPT_MARKER = "# #{INIT_MARKER}".freeze
+  INIT_README_MARKER = "<!-- #{INIT_MARKER} -->".freeze
+  INIT_PLACEHOLDER_MARKER = "# Agent workflow seam init: command not configured."
+  REQUIRED_POLICY_KEYS = %w[
     base_branch
-    hosted_ci_trigger
-    ci_parity_environment
-    secret_redaction_patterns
-    trusted_github_actor_boundary
-    benchmark_labels
     follow_up_prefix
-    changelog
-    merge_ledger
     review_gate
     approval_exempt
     coordination_backend
+    changelog
+    benchmark_labels
+    merge_ledger
+    ci_parity_environment
+    hosted_ci_trigger
+    ci_change_detector
   ].freeze
-  REQUIRED_COMMAND_SCRIPTS = %w[
-    setup
-    validate
-    test
-    lint
-    build
-    docs
-    ci-detect
+  UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY = "untrusted_contributor_intake"
+  UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEYS = %w[
+    trusted_github_host
+    trusted_github_scheme
+    trusted_github_repo
   ].freeze
-  CONFIG_RELATIVE_PATH = ".agents/agent-workflow.yml"
-  COMMAND_README_RELATIVE_PATH = ".agents/bin/README.md"
-  FOLLOW_UP_PREFIX = "Follow-up:"
-  CONFIG_KEY_PATTERN = /^-\s+\*\*(.+?)\*\*:\s*(.*)$/
-
   SEAM_PLACEHOLDER = %r{
     <[^>\n]*
     (?:
       follow-up\ prefix |
       hosted[-\ ]CI |
       benchmark\ labels? |
-      (?:secret\ )?redaction\ (?:patterns?|commands?) |
+      (?:secret\ )?redaction\ patterns? |
       changelog\ path |
       main\ branch |
       base\ branch |
@@ -85,23 +158,1372 @@ module AgentWorkflowSeamDoctor
     [^>\n]*>
   }ix
   CI_PARITY_KEYWORDS = /(?:CI\ parity\ (?:environment|command)|parity\ environment|runner\ image|reproduction\ guide)/
-  CI_PARITY_FILLED_VALUE = /\s*(?![^>,:\n]*\boptional\b)[^>,:\n]*:\s*[^>\s]/
-  # CI_PARITY_SEAM_PLACEHOLDER matches unfilled values only. The negative
-  # lookahead lets filled seam values like <runner image: ghcr.io/...> pass.
-  # The [^>,:\n]* span intentionally excludes commas so
-  # <runner image, optional: value> still counts as unresolved.
-  CI_PARITY_SEAM_PLACEHOLDER = /<(?=[^>\n]*(?:#{CI_PARITY_KEYWORDS.source})\b(?!#{CI_PARITY_FILLED_VALUE.source}))[^>\n]*>/i
-  # CI_PARITY_EXECUTABLE_PLACEHOLDER matches any runnable CI parity angle token:
-  # filled or unfilled, it still needs repo substitution before copy/paste use.
-  CI_PARITY_EXECUTABLE_PLACEHOLDER = /<[^>\n]*(?:#{CI_PARITY_KEYWORDS.source})\b[^>\n]*>/i
+  CI_PARITY_SEAM_PLACEHOLDER = /<(?=[^>\n]*#{CI_PARITY_KEYWORDS.source}\b(?!\s*(?:[[:alnum:]_-]+\s*)*:\s*[^>\s]))[^>\n]*>/i
+  CI_PARITY_EXECUTABLE_PLACEHOLDER = /<[^>\n]*#{CI_PARITY_KEYWORDS.source}\b[^>\n]*>/i
   EXECUTABLE_FENCE_LANGS = ["", "bash", "sh", "shell", "zsh", "ruby", "python", "js", "javascript"].freeze
   COMMAND_LIKE = %r{
-    (?:\bact\s+(?:--?|\S+\s+--?|\S*<)) |
+    (?:\bact\s+(?:--?|\S+\s+--?)) |
     (?:\b(?:bash|bundle|codex|gh|git|node|npm|pnpm|rake|ruby|script|sh|yarn)\b) |
     (?:\b(?:bin|script|\.agents)/)
   }x
 
+  COMMAND_PURPOSES = {
+    "setup" => "Install dependencies",
+    "validate" => "Pre-push gate",
+    "test" => "Run tests",
+    "lint" => "Lint / format",
+    "build" => "Build / type-check",
+    "docs" => "Docs checks",
+    "ci-detect" => "CI change detector"
+  }.freeze
+
+  class InitError < StandardError; end
+  class AnsiCDecodeError < StandardError; end
+
   module_function
+
+  def init(root, base_branch:, validate_command:, test_command:, shared_roots: [])
+    raise InitError, "missing directory: #{root}" unless File.directory?(root)
+
+    validate_init_command_pair!(validate_command, test_command)
+    validate_init_base_branch!(base_branch)
+    validate_init_command_inputs!(validate_command, test_command)
+    validate_command = validate_command&.strip
+    test_command = test_command&.strip
+    explicit_commands = !validate_command.nil?
+
+    existing_policy = load_init_mapping(File.join(root, POLICY_CONFIG), "policy config")
+    existing_trust = load_init_mapping(File.join(root, TRUST_CONFIG), "trust config")
+    validate_trust_mapping!(existing_trust)
+    validate_explicit_wrapper_conflicts!(root) if explicit_commands
+    policy_update = prepare_init_policy(root, base_branch, existing_policy)
+    trust_update = prepare_init_trust(root, existing_trust)
+
+    detected_commands = detect_init_commands(root) unless explicit_commands
+    commands = {
+      "validate" => validate_command || detected_commands&.[]("validate"),
+      "test" => test_command || detected_commands&.[]("test")
+    }
+    run_lines = commands.to_h { |name, command| [name, init_script_run_line(name, command)] }
+
+    FileUtils.mkdir_p(File.join(root, COMMANDS_DIR))
+    scripts_changed = commands.map do |name, _command|
+      write_init_script(root, name, run_lines.fetch(name), replace_managed: explicit_commands)
+    end.any?
+    write_init_readme(root, commands, explicit_commands:, scripts_changed:)
+    write_init_mapping(policy_update)
+    write_init_mapping(trust_update)
+    write_init_agents(root)
+
+    check(root, shared_roots:)
+  end
+
+  def validate_init_command_pair!(validate_command, test_command)
+    return if validate_command.nil? == test_command.nil?
+
+    raise InitError, "--validate-command and --test-command must be provided together"
+  end
+
+  def validate_init_base_branch!(base_branch)
+    candidate = base_branch.is_a?(String) && !base_branch.strip.empty? && !base_branch.match?(/[\0\r\n]/)
+    if candidate && !base_branch.include?("@{")
+      _out, status = Open3.capture2e("git", "check-ref-format", "--branch", base_branch)
+      return if status.success?
+    end
+
+    raise InitError, "base branch must be a valid Git branch name"
+  end
+
+  def validate_init_command_inputs!(*commands)
+    invalid = commands.compact.any? do |command|
+      command.strip.empty? || command.match?(/[\0\r\n]/)
+    end
+    return unless invalid
+
+    raise InitError, "commands must be non-empty single-line shell commands without NUL bytes"
+  end
+
+  def detect_init_commands(root)
+    root_commands = CORE_SCRIPTS.to_h do |name|
+      path = File.join(root, "bin", name)
+      command = File.file?(path) && File.executable?(path) ? %(bin/#{name} "$@") : nil
+      [name, command]
+    end
+    return root_commands if root_commands.values.none?(&:nil?)
+
+    detect_javascript_commands(root)
+  end
+
+  def detect_javascript_commands(root)
+    package_path = File.join(root, "package.json")
+    return nil unless File.file?(package_path)
+
+    lockfiles = {
+      "package-lock.json" => "npm run",
+      "pnpm-lock.yaml" => "pnpm run",
+      "yarn.lock" => "yarn run"
+    }.select { |name, _runner| File.file?(File.join(root, name)) }
+    return nil unless lockfiles.length == 1
+
+    package = JSON.parse(File.binread(package_path).force_encoding("UTF-8").scrub)
+    return nil unless package.is_a?(Hash)
+
+    scripts = package["scripts"]
+    return nil unless scripts.is_a?(Hash) &&
+                      CORE_SCRIPTS.all? { |name| scripts[name].is_a?(String) && !scripts[name].strip.empty? }
+
+    runner = lockfiles.values.fetch(0)
+    CORE_SCRIPTS.to_h { |name| [name, "#{runner} #{name}"] }
+  rescue JSON::ParserError
+    nil
+  end
+
+  def load_init_mapping(path, label)
+    return {} unless File.file?(path)
+
+    value = YAML.safe_load(File.read(path, encoding: "UTF-8"), aliases: false) || {}
+    raise InitError, "invalid #{label}: #{path}" unless value.is_a?(Hash)
+
+    value
+  rescue Psych::Exception => e
+    raise InitError, "invalid #{label}: #{path}: #{e.message.lines.first.to_s.strip}"
+  end
+
+  def validate_trust_mapping!(trust)
+    trusted_bots = Array(trust.fetch("trusted_bots", [])).map { |login| normalized_trust_bot_login(login) }
+    metadata_bots = Array(trust.fetch("trusted_metadata_bots", [])).map { |login| normalized_trust_bot_login(login) }
+    overlap = (trusted_bots & metadata_bots).sort
+    return if overlap.empty?
+
+    raise InitError,
+          "invalid trust config: #{TRUST_CONFIG} bot(s) listed in both trusted_bots and " \
+          "trusted_metadata_bots: #{overlap.join(', ')}"
+  end
+
+  def normalized_trust_bot_login(login)
+    login.to_s.delete_prefix("@").downcase.delete_suffix("[bot]")
+  end
+
+  def validate_explicit_wrapper_conflicts!(root)
+    conflicts = CORE_SCRIPTS.filter_map do |name|
+      path = File.join(root, COMMANDS_DIR, name)
+      File.join(COMMANDS_DIR, name) if File.file?(path) && !init_managed_file?(path)
+    end
+    return if conflicts.empty?
+
+    raise InitError,
+          "explicit commands cannot replace repo-owned wrappers: #{conflicts.join(', ')}; " \
+          "edit those wrappers directly or rerun --init without explicit commands"
+  end
+
+  def init_script_run_line(name, command)
+    return init_command_line(command) if command
+
+    <<~FAIL.chomp
+      #{INIT_PLACEHOLDER_MARKER}
+      echo "Configure .agents/bin/#{name}, then rerun agent-workflow-seam-doctor." >&2
+      exit 1
+    FAIL
+  end
+
+  def write_init_script(root, name, run_line, replace_managed:)
+    path = File.join(root, COMMANDS_DIR, name)
+    if File.file?(path) && !replace_managed
+      issues = script_issues(root, name)
+      return false if issues.empty?
+
+      mode_issue = core_script_not_executable_issue(name)
+      if init_managed_file?(path) && issues == [mode_issue]
+        File.chmod(0o755, path)
+        return true
+      end
+    end
+    return false if File.file?(path) && !init_managed_file?(path)
+
+    content = <<~BASH
+      #!/usr/bin/env bash
+      #{INIT_SCRIPT_MARKER}
+      set -euo pipefail
+      cd "$(#{ROOT_RESOLUTION})"
+      #{run_line}
+    BASH
+    content_changed = write_if_changed(path, content)
+    mode_changed = !File.executable?(path)
+    File.chmod(0o755, path) if mode_changed
+    content_changed || mode_changed
+  end
+
+  def init_command_line(command)
+    command = command.to_s
+    if assignment_only_command?(command)
+      raise InitError, "assignment-only commands cannot safely forward wrapper arguments; add an executable command"
+    end
+
+    comment_index = shell_comment_index(command)
+    executable_command = comment_index ? command[...comment_index] : command
+    if active_outer_command_substitution?(executable_command)
+      raise InitError, "cannot safely initialize command with active outer command substitution; " \
+                       "remove it or single-quote literal command-substitution text"
+    end
+
+    if comment_index && command[comment_index..].match?(/\$(?:@|\{@\})/) &&
+       !outer_argument_forwarding?(command[...comment_index])
+      raise InitError, "argument-forwarding text inside a shell comment is ambiguous; remove the comment or " \
+                       "forward arguments in the outer command"
+    end
+    if (error = shell_c_forwarding_error(command))
+      raise InitError, error
+    end
+    return command if compound_shell_command?(command)
+
+    if (split_string_boundary = env_split_string_operand_boundary(command))
+      unless complete_argument_forwarding_after?(command, split_string_boundary)
+        raise InitError, "opaque env split-string commands require explicit outer argument forwarding; " \
+                         'add "$@" after the env command and a safe $0 placeholder inside shell -c payloads'
+      end
+
+      return command
+    end
+
+    argument_suffix = outer_argument_forwarding?(command) ? "" : ' "$@"'
+    has_exec = command.match?(/\Aexec\s+/)
+    has_environment = command.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/)
+    npm_command = init_npm_command_info(command)
+
+    if npm_command
+      prefix = has_exec || has_environment ? "" : "exec "
+      command = insert_npm_argument_separator(command, npm_command) unless npm_argument_separator?(npm_command)
+
+      return "#{prefix}#{command}#{argument_suffix}"
+    end
+
+    return "#{command}#{argument_suffix}" if has_exec
+    # Shell assignment words must precede the command; `exec VAR=value command` would try to execute the assignment.
+    return "#{command}#{argument_suffix}" if has_environment
+
+    "exec #{command}#{argument_suffix}"
+  end
+
+  def assignment_only_command?(command)
+    words = Shellwords.shellsplit(command)
+    !words.empty? && words.all? { |word| word.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/) }
+  rescue ArgumentError
+    false
+  end
+
+  def shell_comment_index(command)
+    quote = nil
+    escaped = false
+    token_start = true
+
+    command.each_char.with_index do |character, index|
+      if escaped
+        escaped = false
+        token_start = false
+        next
+      end
+      if quote
+        if quote == '"' && character == "\\"
+          escaped = true
+        elsif character == quote
+          quote = nil
+        end
+        token_start = false
+        next
+      end
+
+      case character
+      when "\\"
+        escaped = true
+      when "'", '"'
+        quote = character
+        token_start = false
+      when "#"
+        return index if token_start
+
+        token_start = false
+      else
+        token_start = character.match?(/\s/)
+      end
+    end
+    nil
+  end
+
+  def shell_c_forwarding_error(command)
+    tokens = shell_word_spans(command)
+    unless strip_command_prefixes!(tokens)
+      return "cannot safely parse env command prefix; use supported env options with their required values"
+    end
+
+    tokens.each_index do |index|
+      suffix = tokens.drop(index)
+      next unless supported_shell_command_suffix?(suffix)
+
+      error = shell_c_forwarding_error_for_tokens(suffix)
+      return error if error
+    end
+    nil
+  rescue ArgumentError
+    "cannot safely parse command: unmatched quotes or shell tokenization mismatch; fix the command quoting"
+  end
+
+  def supported_shell_command_suffix?(tokens)
+    shell = File.basename(tokens.fetch(0, {}).fetch(:value, ""))
+    return true if supported_shell_command?(shell) || UNSUPPORTED_C_SHELL_COMMANDS.include?(shell)
+    return false unless shell == "busybox"
+
+    BUSYBOX_SHELL_APPLETS.include?(tokens.fetch(1, {}).fetch(:value, ""))
+  end
+
+  def shell_c_forwarding_error_for_tokens(tokens)
+    shell = File.basename(tokens.fetch(0).fetch(:value))
+    if UNSUPPORTED_C_SHELL_COMMANDS.include?(shell)
+      return nil unless shell_command_string_index(tokens)
+
+      return "#{shell} -c cannot safely accept generated wrapper arguments; " \
+             "use a supported POSIX-family shell with an explicit $0 placeholder"
+    end
+
+    if shell == "busybox"
+      applet = tokens.fetch(1, {}).fetch(:value, "")
+      return nil unless BUSYBOX_SHELL_APPLETS.include?(applet)
+
+      tokens.shift
+      shell = "busybox #{applet}"
+    else
+      return nil unless supported_shell_command?(shell)
+    end
+
+    command_string_index = shell_command_string_index(tokens)
+    return nil unless command_string_index
+
+    command_token = tokens[command_string_index]
+    unless command_token
+      return "#{shell} -c requires a command string before forwarded wrapper arguments"
+    end
+
+    raw_command = command_token&.fetch(:raw)
+    if positional_state_reference?(raw_command.to_s)
+      return "#{shell} -c has active outer argument expansion inside its command string; " \
+             "use a single-quoted command string plus an explicit $0 placeholder"
+    end
+
+    begin
+      ansi_c_decoded_shell_word(raw_command.to_s)
+    rescue AnsiCDecodeError => e
+      return "#{shell} -c cannot safely decode ANSI-C command string: #{e.message}"
+    end
+
+    command_boundary = unquoted_shell_boundary?(raw_command.to_s)
+    if command_boundary
+      return "#{shell} -c command string has an attached unquoted shell metacharacter; " \
+             "quote or separate the metacharacter so the command string is one unambiguous word"
+    end
+
+    placeholder = tokens[command_string_index + 1]
+    if placeholder.nil? || !shell_c_placeholder_word?(placeholder.fetch(:raw)) ||
+       outer_argument_forwarding?(placeholder.fetch(:raw))
+      "#{shell} -c forwarding requires an explicit $0 placeholder after the command string; " \
+        "add _ before forwarded wrapper arguments"
+    end
+  end
+
+  def supported_shell_command?(shell)
+    SHELL_COMMANDS.include?(shell) || shell.match?(VERSIONED_BASH_SHELL)
+  end
+
+  def unquoted_shell_boundary?(raw)
+    quote = nil
+    escaped = false
+
+    raw.each_char do |character|
+      if escaped
+        escaped = false
+      elsif quote
+        if quote == '"' && character == "\\"
+          escaped = true
+        elsif character == quote
+          quote = nil
+        end
+      elsif character == "\\"
+        escaped = true
+      elsif ["'", '"'].include?(character)
+        quote = character
+      elsif character.match?(/[|&;()<>]/)
+        return true
+      end
+    end
+
+    false
+  end
+
+  def shell_c_placeholder_word?(raw)
+    return false if raw.empty? || raw.match?(/\A[#|&;()<>]/)
+    return false if raw.match?(/\A(?:[0-9]+|\{[A-Za-z_][A-Za-z0-9_]*\})[<>]/)
+
+    quote = nil
+    escaped = false
+    raw.each_char do |character|
+      if escaped
+        escaped = false
+      elsif quote == "'"
+        quote = nil if character == quote
+      elsif character == "\\"
+        escaped = true
+      elsif quote == '"'
+        return false if ["$", "`"].include?(character)
+
+        quote = nil if character == quote
+      elsif ["'", '"'].include?(character)
+        quote = character
+      elsif ["$", "`", "*", "?", "[", "]", "{", "}", "(", ")", "|", "&", ";", "<", ">"].include?(character)
+        return false
+      end
+    end
+
+    true
+  end
+
+  def ansi_c_decoded_shell_word(raw)
+    rewritten = +""
+    found = false
+    quote = nil
+    index = 0
+
+    while index < raw.length
+      character = raw[index]
+      if quote
+        rewritten << character
+        if quote == '"' && character == "\\"
+          index += 1
+          rewritten << raw[index].to_s
+        elsif character == quote
+          quote = nil
+        end
+      elsif character == "\\"
+        rewritten << character
+        index += 1
+        rewritten << raw[index].to_s
+      elsif ["'", '"'].include?(character)
+        quote = character
+        rewritten << character
+      elsif character == "$" && raw[index + 1] == "'"
+        decoded, finish = decode_ansi_c_segment(raw, index + 2)
+        rewritten << Shellwords.escape(decoded)
+        found = true
+        index = finish
+      else
+        rewritten << character
+      end
+      index += 1
+    end
+    return nil unless found
+
+    words = Shellwords.shellsplit(rewritten)
+    raise ArgumentError, "ANSI-C shell tokenization mismatch" unless words.one?
+
+    words.fetch(0)
+  end
+
+  def decode_ansi_c_segment(raw, index)
+    decoded = +""
+    truncated = false
+    while index < raw.length
+      character = raw[index]
+      return [decoded, index] if character == "'"
+
+      unless character == "\\"
+        decoded << character unless truncated
+        index += 1
+        next
+      end
+
+      index += 1
+      escape = raw[index]
+      raise AnsiCDecodeError, "trailing backslash escape" unless escape
+
+      if escape.match?(/[0-7]/)
+        digits = raw[index, 3].to_s[/\A[0-7]{1,3}/]
+        value = digits.to_i(8)
+        truncated = true if (value & 0xff).zero?
+        decoded << ansi_c_byte_for_syntax(value) unless truncated
+        index += digits.length
+      elsif escape == "x"
+        digits = raw[index + 1, 2].to_s[/\A[0-9A-Fa-f]{1,2}/]
+        raise AnsiCDecodeError, "hex escape requires at least one digit" unless digits
+
+        value = digits.to_i(16)
+        truncated = true if (value & 0xff).zero?
+        decoded << ansi_c_byte_for_syntax(value) unless truncated
+        index += digits.length + 1
+      elsif %w[u U].include?(escape)
+        limit = escape == "u" ? 4 : 8
+        digits = raw[index + 1, limit].to_s[/\A[0-9A-Fa-f]{1,#{limit}}/]
+        raise AnsiCDecodeError, "Unicode escape requires at least one digit" unless digits
+
+        value = digits.to_i(16)
+        if value > 0x10ffff || value.between?(0xd800, 0xdfff)
+          raise AnsiCDecodeError, "Unicode escape is not a scalar value"
+        end
+
+        truncated = true if value.zero?
+        decoded << value.chr(Encoding::UTF_8) unless truncated
+        index += digits.length + 1
+      elsif (value = {
+        "a" => "\a", "b" => "\b", "e" => "\e", "E" => "\e", "f" => "\f", "n" => "\n",
+        "r" => "\r", "t" => "\t", "v" => "\v", '"' => '"', "?" => "?"
+      }[escape])
+        decoded << value unless truncated
+        index += 1
+      elsif ["\\", "'"].include?(escape)
+        decoded << escape unless truncated
+        index += 1
+      else
+        raise AnsiCDecodeError, "unsupported escape \\#{escape}"
+      end
+    end
+    raise AnsiCDecodeError, "unterminated ANSI-C quote"
+  end
+
+  def ansi_c_byte_for_syntax(value)
+    byte = value & 0xff
+    return "" if byte.zero?
+    return byte.chr if byte < 0x80
+
+    # High bytes cannot introduce ASCII shell syntax. A valid UTF-8 sentinel keeps analysis safe
+    # while the original ANSI-C command remains byte-for-byte unchanged in the generated wrapper.
+    "\ufffd"
+  end
+
+  def shell_command_string_index(tokens)
+    shell = File.basename(tokens.fetch(0, {}).fetch(:value, ""))
+    index = 1
+    command_string_pending = false
+    while (token = tokens[index])
+      option = token.fetch(:value)
+      if option == "--"
+        index += 1
+        return index if command_string_pending && tokens[index]
+
+        break
+      end
+      unless option.start_with?("-", "+") && !%w[- +].include?(option)
+        return index if command_string_pending
+
+        break
+      end
+
+      command_string_pending ||= shell_command_string_option?(option, shell:)
+
+      index += 1
+      next unless shell_option_requires_argument?(option, shell:)
+
+      break unless tokens[index]
+
+      index += 1
+    end
+    command_string_pending ? index : nil
+  end
+
+  def shell_option_requires_argument?(option, shell:)
+    if KSH_FAMILY_SHELLS.include?(shell) && (metadata = ksh_family_short_option_metadata(option))
+      return metadata.fetch(:argument) == :next
+    end
+    if shell == "zsh" && (metadata = zsh_short_option_metadata(option))
+      return metadata.fetch(:argument) == :next
+    end
+
+    return true if SHELL_OPTIONS_WITH_ARGUMENT.include?(option)
+    return false if option.start_with?("--")
+    if SHELLS_WITH_ATTACHED_O_OPTION_VALUES.include?(shell) && option.match?(/\A[-+][A-Za-z]*[oO].+/)
+      return false
+    end
+
+    option.match?(/\A[-+][A-Za-z]*[oO][A-Za-z]*\z/)
+  end
+
+  def shell_command_string_option?(option, shell:)
+    return false unless option.start_with?("-")
+
+    flags = option.delete_prefix("-")
+    if KSH_FAMILY_SHELLS.include?(shell)
+      metadata = ksh_family_short_option_metadata(option)
+      return metadata ? metadata.fetch(:command_string) : false
+    end
+    if shell == "zsh"
+      metadata = zsh_short_option_metadata(option)
+      return metadata ? metadata.fetch(:command_string) : false
+    end
+    return false unless flags.match?(/\A[A-Za-z]+\z/)
+
+    if SHELLS_WITH_ATTACHED_O_OPTION_VALUES.include?(shell)
+      option_index = flags.index(/[oO]/)
+      flags = flags[...option_index] if option_index && option_index < flags.length - 1
+    end
+    flags.include?("c")
+  end
+
+  def ksh_family_short_option_metadata(option)
+    return nil unless option.match?(/\A[-+][^-].*/)
+
+    command_string = false
+    flags = option[1..]
+    index = 0
+    while index < flags.length
+      flag = flags[index]
+      command_string = true if option.start_with?("-") && flag == "c"
+
+      if %w[o O R].include?(flag)
+        argument = index == flags.length - 1 ? :next : :attached
+        return { argument:, command_string: }
+      end
+
+      if flag == "T"
+        index += 1
+        return { argument: :next, command_string: } unless flags[index]
+        unless flags[index].match?(/\A[0-9]\z/)
+          return { argument: :attached, command_string: }
+        end
+
+        index += 1 while flags[index]&.match?(/\A[0-9]\z/)
+        next
+      end
+
+      index += 1
+    end
+    { argument: :none, command_string: }
+  end
+
+  def zsh_short_option_metadata(option)
+    return nil unless option.match?(/\A[-+][^-].*/)
+
+    flags = option[1..]
+    option_index = flags.index(/[oO]/)
+    if option_index
+      prefix = flags[...option_index]
+      return nil unless prefix.match?(/\A[A-Za-z]*\z/)
+
+      argument = option_index == flags.length - 1 ? :next : :attached
+      command_string = option.start_with?("-") && prefix.include?("c")
+      return { argument:, command_string: }
+    end
+    return nil unless flags.match?(/\A[A-Za-z]+\z/)
+
+    { argument: :none, command_string: option.start_with?("-") && flags.include?("c") }
+  end
+
+  def compound_shell_command?(command)
+    quote = nil
+    escaped = false
+    token_start = true
+
+    command.each_char do |character|
+      if escaped
+        escaped = false
+        token_start = false
+        next
+      end
+
+      if quote
+        if quote == '"' && character == "\\"
+          escaped = true
+        elsif character == quote
+          quote = nil
+        end
+        token_start = false
+        next
+      end
+
+      case character
+      when "\\"
+        escaped = true
+      when "'", '"'
+        quote = character
+        token_start = false
+      when "|", "&", ";", "<", ">", "(", ")"
+        return true
+      when "#"
+        return true if token_start
+
+        token_start = false
+      else
+        token_start = character.match?(/\s/)
+      end
+    end
+
+    false
+  end
+
+  def active_outer_command_substitution?(command)
+    characters = command.chars
+    quote = nil
+    escaped = false
+
+    characters.each_with_index do |character, index|
+      if escaped
+        escaped = false
+        next
+      end
+      if quote == "'"
+        quote = nil if character == quote
+        next
+      end
+      if quote == '"'
+        if character == "\\"
+          escaped = true
+        elsif character == quote
+          quote = nil
+        elsif character == "`" || (character == "$" && characters[index + 1] == "(")
+          return true
+        end
+        next
+      end
+
+      if character == "\\"
+        escaped = true
+      elsif character == "'"
+        quote = character
+      elsif character == '"'
+        quote = character
+      elsif character == "`" || (character == "$" && characters[index + 1] == "(")
+        return true
+      end
+    end
+
+    false
+  end
+
+  def outer_argument_forwarding?(command)
+    shell_word_spans(command).any? do |token|
+      COMPLETE_ARGUMENT_FORWARDING_WORDS.include?(token.fetch(:raw))
+    end
+  rescue ArgumentError
+    false
+  end
+
+  def complete_argument_forwarding_after?(command, boundary)
+    shell_word_spans(command).any? do |token|
+      token.fetch(:start) >= boundary && COMPLETE_ARGUMENT_FORWARDING_WORDS.include?(token.fetch(:raw))
+    end
+  end
+
+  def positional_state_reference?(command)
+    active_dollar_expansion?(command) do |characters, index|
+      positional_argument_expansion_at?(characters, index) ||
+        bash_outer_argument_state_expansion_at?(characters, index)
+    end
+  end
+
+  def bash_outer_argument_state_expansion_at?(characters, index)
+    return true if characters[index + 1, 2] == ["{", "!"]
+
+    %w[BASH_ARGV BASH_ARGC BASH_ARGV0].any? do |name|
+      named_parameter_expansion_at?(characters, index, name)
+    end
+  end
+
+  def named_parameter_expansion_at?(characters, index, name)
+    offset = index + 1
+    if characters[offset] == "{"
+      offset += 1
+      offset += 1 if characters[offset] == "#"
+    end
+    return false unless characters[offset, name.length].join == name
+
+    !characters[offset + name.length]&.match?(/\A[A-Za-z0-9_]\z/)
+  end
+
+  def active_dollar_expansion?(command)
+    characters = command.chars
+    quote = nil
+    escaped = false
+
+    characters.each_with_index do |character, index|
+      if escaped
+        escaped = false
+        next
+      end
+
+      if quote == "'"
+        quote = nil if character == quote
+        next
+      end
+
+      if character == "\\"
+        escaped = true
+      elsif quote == '"'
+        quote = nil if character == quote
+      elsif ["'", '"'].include?(character)
+        quote = character
+      end
+
+      next unless character == "$"
+
+      return true if yield(characters, index)
+    end
+
+    false
+  end
+
+  def positional_argument_expansion_at?(characters, index)
+    marker = characters[index + 1]
+    return true if marker&.match?(/\A[@*#0-9]\z/)
+    return false unless marker == "{"
+
+    parameter = characters[index + 2]
+    return true if parameter&.match?(/\A[@*0-9]\z/)
+    if parameter == "!"
+      return characters[index + 3]&.match?(/\A[@*#0-9]\z/)
+    end
+    return false unless parameter == "#"
+
+    # `${#name}` is the length of a named variable; other `${#...}` forms address
+    # the positional-count parameter or the length of a positional parameter.
+    !characters[index + 3]&.match?(/\A[A-Za-z_]\z/)
+  end
+
+  def env_split_string_operand_boundary(command)
+    tokens = shell_word_spans(command)
+    discard_exec_prefix!(tokens)
+    tokens.shift while tokens.first&.fetch(:value)&.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/)
+    discard_exec_prefix!(tokens)
+    loop do
+      return nil unless env_utility_command?(tokens.shift&.fetch(:value))
+
+      while tokens.first&.fetch(:value)&.start_with?("-")
+        option_token = tokens.shift
+        option = option_token.fetch(:value)
+        break if option == "--"
+
+        if %w[-S --split-string].include?(option)
+          argument = tokens.shift
+          return argument.fetch(:finish) if argument && !argument.fetch(:value).empty?
+
+          next
+        end
+        return option_token.fetch(:finish) if option.match?(/\A-S.+/)
+
+        if option.match?(/\A--(?:unset|chdir|split-string|argv0)=/)
+          return option_token.fetch(:finish) if option.match?(/\A--split-string=.+/)
+
+          next
+        end
+
+        if ENV_OPTIONS_WITH_ARGUMENT.include?(option)
+          tokens.shift
+        elsif ENV_OPTIONS_WITHOUT_ARGUMENT.include?(option) ||
+              option.match?(/\A(?:-u|-C).+/)
+          next
+        elsif (metadata = clustered_env_short_option_metadata(option))
+          if metadata.fetch(:argument) == :next
+            argument = tokens.shift
+            boundary = split_string_argument_boundary(metadata, argument)
+            return boundary if boundary
+          elsif metadata.fetch(:split_string)
+            return option_token.fetch(:finish)
+          end
+        else
+          return nil
+        end
+      end
+
+      tokens.shift while tokens.first&.fetch(:value)&.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/)
+      return nil unless env_utility_command?(tokens.first&.fetch(:value))
+    end
+  rescue ArgumentError
+    nil
+  end
+
+  def split_string_argument_boundary(metadata, argument)
+    return unless metadata.fetch(:split_string) && argument && !argument.fetch(:value).empty?
+
+    argument.fetch(:finish)
+  end
+
+  def init_npm_command_info(command)
+    tokens = shell_word_spans(command)
+    return false unless strip_command_prefixes!(tokens)
+
+    return false unless tokens.shift&.fetch(:value) == "npm"
+
+    words = tokens.map { |token| token.fetch(:value) }
+    command_index = npm_lifecycle_command_index(words, tokens:)
+    return nil unless command_index
+
+    npm_command = words.fetch(command_index)
+    operand_index = if NPM_RUN_COMMANDS.include?(npm_command)
+                      npm_run_script_operand_index(words, command_index, tokens:)
+                    else
+                      command_index
+                    end
+    return nil unless operand_index
+
+    {
+      words:,
+      command_index:,
+      npm_command:,
+      command_token: tokens.fetch(command_index),
+      operand_index:,
+      operand_token: tokens.fetch(operand_index),
+      argument_tokens: tokens.drop(operand_index + 1),
+      tokens:
+    }
+  rescue ArgumentError
+    nil
+  end
+
+  def npm_run_script_operand_index(words, command_index, tokens:)
+    index = command_index + 1
+    while (word = words[index])
+      return index unless word.start_with?("-") && word != "-"
+
+      metadata = npm_option_metadata(word)
+      return nil unless metadata
+
+      reject_npm_attached_positional_state!(word, tokens.fetch(index)) if metadata == :attached
+
+      index += 1
+      if metadata == :required
+        return nil unless words[index]
+
+        reject_npm_required_forwarding_value!(word, tokens.fetch(index))
+        index += 1
+      elsif NPM_OPTIONAL_VALUE_KINDS.include?(metadata) &&
+            npm_optional_option_value?(metadata, words[index])
+        index += 1
+      end
+    end
+    nil
+  end
+
+  def npm_lifecycle_command_index(words, tokens:)
+    index = 0
+    while (word = words[index])
+      return index if NPM_SCRIPT_COMMANDS.include?(word)
+      return nil unless word.start_with?("-") && word != "-"
+
+      metadata = npm_option_metadata(word)
+      return nil unless metadata
+
+      reject_npm_attached_positional_state!(word, tokens.fetch(index)) if metadata == :attached
+
+      index += 1
+      if metadata == :required
+        return nil unless words[index]
+
+        reject_npm_required_forwarding_value!(word, tokens.fetch(index))
+        index += 1
+      elsif NPM_OPTIONAL_VALUE_KINDS.include?(metadata) &&
+            npm_optional_option_value?(metadata, words[index])
+        index += 1
+      end
+    end
+    nil
+  end
+
+  def strip_command_prefixes!(tokens)
+    discard_exec_prefix!(tokens)
+    tokens.shift while tokens.first&.fetch(:value)&.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/)
+    discard_exec_prefix!(tokens)
+    while env_utility_command?(tokens.first&.fetch(:value, nil))
+      tokens.shift
+      return false unless discard_env_options!(tokens, value_key: :value)
+
+      tokens.shift while tokens.first&.fetch(:value)&.match?(/\A[A-Za-z_][A-Za-z0-9_]*=/)
+    end
+    true
+  end
+
+  def env_utility_command?(command)
+    command == "env" || (command&.start_with?("/") && File.basename(command) == "env")
+  end
+
+  def discard_exec_prefix!(tokens)
+    return unless tokens.first&.fetch(:value) == "exec"
+
+    tokens.shift
+    while (option = tokens.first&.fetch(:value))&.start_with?("-")
+      tokens.shift
+      break if option == "--"
+
+      if option == "-a"
+        exec_name = tokens.shift
+        raise_exec_prefix_error unless exec_name
+      elsif !option.match?(/\A-[cl]+\z/)
+        raise_exec_prefix_error
+      end
+    end
+    raise_exec_prefix_error if tokens.empty?
+  end
+
+  def raise_exec_prefix_error
+    raise InitError, "cannot safely parse exec command prefix; use exec [-cl] [-a name] [--] " \
+                     "followed by a command"
+  end
+
+  def npm_argument_separator?(npm_command)
+    separator_index = npm_command.fetch(:operand_index) + 1
+    npm_command.fetch(:words).fetch(separator_index, nil) == "--"
+  end
+
+  def npm_argument_partition(npm_command)
+    words = npm_command.fetch(:words)
+    tokens = npm_command.fetch(:tokens)
+    index = npm_command.fetch(:operand_index) + 1
+    separator_index = words.each_index.drop(index).find { |candidate| words.fetch(candidate) == "--" }
+    segment_end = separator_index || words.length
+    npm_tokens = []
+    script_tokens = []
+    while index < segment_end
+      option = words.fetch(index)
+
+      metadata = npm_option_metadata(option)
+      unless metadata
+        script_tokens << tokens.fetch(index)
+        index += 1
+        next
+      end
+
+      if metadata == :none
+        npm_tokens << tokens.fetch(index)
+        index += 1
+      elsif metadata == :attached
+        reject_npm_attached_positional_state!(option, tokens.fetch(index))
+        npm_tokens << tokens.fetch(index)
+        index += 1
+      elsif NPM_OPTIONAL_VALUE_KINDS.include?(metadata)
+        npm_tokens << tokens.fetch(index)
+        index += 1
+        if index < segment_end && npm_optional_option_value?(metadata, words[index])
+          npm_tokens << tokens.fetch(index)
+          index += 1
+        end
+      elsif metadata == :required
+        value_index = index + 1
+        if value_index >= segment_end
+          raise InitError, npm_option_guidance(option, "requires a value")
+        end
+
+        reject_npm_required_forwarding_value!(option, tokens.fetch(value_index))
+        npm_tokens.concat(tokens.slice(index, 2))
+        index += 2
+      else
+        raise "unexpected npm option metadata: #{metadata.inspect}"
+      end
+    end
+
+    script_tokens.concat(tokens.drop(separator_index + 1)) if separator_index
+    [npm_tokens, script_tokens]
+  end
+
+  def npm_option_metadata(option)
+    return :optional_boolean if NPM_BOOLEAN_SHORT_OPTIONS_WITH_OPTIONAL_ARGUMENT.include?(option)
+    return :none if !option.start_with?("--") && NPM_POST_SCRIPT_OPTIONS_WITHOUT_ARGUMENT.include?(option)
+    return :required if !option.start_with?("--") && NPM_POST_SCRIPT_OPTIONS_WITH_ARGUMENT.include?(option)
+
+    attached_option = NPM_POST_SCRIPT_OPTIONS_WITH_ARGUMENT.any? do |name|
+      separator = name.start_with?("--") ? "=" : ""
+      option.start_with?("#{name}#{separator}") && option != name
+    end
+    return :attached if attached_option
+    return nil unless option.start_with?("--")
+
+    name, inline_value = option.split("=", 2)
+    key = name.delete_prefix("--")
+    negated = key.start_with?("no-")
+    key = key.delete_prefix("no-") if negated
+    candidates = NPM_LONG_OPTION_KINDS.select do |candidate, kind|
+      candidate.start_with?(key) && (!negated || kind == :none || NPM_OPTIONAL_VALUE_KINDS.include?(kind))
+    end
+    kind = candidates.fetch(key, nil)
+    kind ||= candidates.values.first if candidates.one?
+    return nil unless kind
+    return :attached unless inline_value.nil?
+
+    kind
+  end
+
+  def npm_optional_option_value?(metadata, word)
+    return false unless word && !word.empty? && (word == "-" || !word.start_with?("-"))
+
+    values = case metadata
+             when :optional_boolean then %w[true false]
+             when :optional_nullable_boolean then %w[true false null]
+             when :optional_color then %w[true false always]
+             when :optional_string then nil
+             else return false
+             end
+    values.nil? || values.include?(word)
+  end
+
+  def npm_option_guidance(option, reason)
+    subject = option ? "npm option #{option.inspect} #{reason}" : reason
+    "cannot safely normalize command: #{subject}; place npm options before the script name " \
+      "or put -- immediately after the script operand"
+  end
+
+  def reject_npm_required_forwarding_value!(option, token)
+    return unless COMPLETE_ARGUMENT_FORWARDING_WORDS.include?(token.fetch(:raw))
+
+    raise InitError, npm_option_guidance(option, "requires a literal value, not complete argument forwarding")
+  end
+
+  def reject_npm_attached_positional_state!(option, token)
+    return unless positional_state_reference?(token.fetch(:raw))
+
+    option_name = if option.start_with?("--")
+                    option.split("=", 2).first
+                  else
+                    NPM_POST_SCRIPT_OPTIONS_WITH_ARGUMENT
+                      .reject { |candidate| candidate.start_with?("--") }
+                      .select { |candidate| option.start_with?(candidate) && option != candidate }
+                      .max_by(&:length)
+                  end
+    raise InitError, npm_option_guidance(option_name, "requires a literal value, not positional-state forwarding")
+  end
+
+  def insert_npm_argument_separator(command, npm_command)
+    npm_tokens, script_tokens = npm_argument_partition(npm_command)
+    operand = npm_command.fetch(:operand_token)
+    arguments = [*npm_tokens, "--", *script_tokens].map do |token|
+      token.is_a?(String) ? token : token.fetch(:raw)
+    end
+    "#{command[...operand.fetch(:finish)]} #{arguments.join(' ')}"
+  end
+
+  def shell_word_spans(command)
+    values = Shellwords.shellsplit(command)
+    spans = []
+    token_start = nil
+    quote = nil
+    escaped = false
+
+    command.each_char.with_index do |character, index|
+      if escaped
+        escaped = false
+        next
+      end
+
+      if quote
+        if quote == '"' && character == "\\"
+          escaped = true
+        elsif character == quote
+          quote = nil
+        end
+        next
+      end
+
+      if character.match?(/\s/)
+        if token_start
+          spans << { start: token_start, finish: index }
+          token_start = nil
+        end
+      else
+        token_start ||= index
+        case character
+        when "\\"
+          escaped = true
+        when "'", '"'
+          quote = character
+        end
+      end
+    end
+    spans << { start: token_start, finish: command.length } if token_start
+    raise ArgumentError, "shell tokenization mismatch" unless values.length == spans.length
+
+    values.zip(spans).map do |value, span|
+      span.merge(value:, raw: command[span.fetch(:start)...span.fetch(:finish)])
+    end
+  end
+
+  def discard_env_options!(words, value_key: nil)
+    value = ->(word) { value_key ? word.fetch(value_key) : word }
+    split_string = false
+    while words.first && value.call(words.first).start_with?("-")
+      option = words.shift
+      option = value.call(option)
+      break if option == "--"
+
+      if ENV_OPTIONS_WITH_ARGUMENT.include?(option)
+        argument = words.shift
+        return false unless argument
+
+        split_string ||= %w[-S --split-string].include?(option) && !value.call(argument).empty?
+      elsif ENV_OPTIONS_WITHOUT_ARGUMENT.include?(option)
+        next
+      elsif option.match?(/\A--(?:unset|chdir|split-string|argv0)=/)
+        split_string ||= option.match?(/\A--split-string=.+/)
+      elsif (metadata = clustered_env_short_option_metadata(option))
+        if metadata.fetch(:argument) == :next
+          argument = words.shift
+          return false unless argument
+
+          split_string ||= metadata.fetch(:split_string) && !value.call(argument).empty?
+        else
+          split_string ||= metadata.fetch(:split_string)
+        end
+      else
+        return false
+      end
+    end
+    remaining = words.drop_while { |word| value.call(word).match?(/\A[A-Za-z_][A-Za-z0-9_]*=/) }
+    split_string || !remaining.empty?
+  end
+
+  def clustered_env_short_option_metadata(option)
+    return nil unless option.start_with?("-") && !option.start_with?("--")
+
+    flags = option.delete_prefix("-")
+    return nil if flags.empty?
+
+    flags.each_char.with_index do |flag, index|
+      next if %w[i 0 v].include?(flag)
+      return nil unless %w[u C S].include?(flag)
+
+      return {
+        argument: index == flags.length - 1 ? :next : :attached,
+        split_string: flag == "S"
+      }
+    end
+    { argument: :none, split_string: false }
+  end
+
+  def write_init_readme(root, commands, explicit_commands:, scripts_changed:)
+    path = File.join(root, COMMAND_README)
+    configured_core = CORE_SCRIPTS.all? do |name|
+      script_path = File.join(root, COMMANDS_DIR, name)
+      File.file?(script_path) && script_issues(root, name).empty?
+    end
+    return if File.file?(path) && !init_managed_file?(path)
+
+    if File.file?(path) && !explicit_commands && !scripts_changed && configured_core
+      # Preserve explicitly recorded core commands while refreshing optional-wrapper state.
+      content = File.binread(path).force_encoding("UTF-8").scrub
+      optional_scripts = STANDARD_SCRIPTS - CORE_SCRIPTS
+      updated = optional_scripts.reduce(content) do |readme, name|
+        purpose = COMMAND_PURPOSES.fetch(name)
+        replacement = init_readme_row(root, name, commands, explicit_commands:)
+        readme.sub(/^\| `#{Regexp.escape(name)}` \| #{Regexp.escape(purpose)} \|.*\|$/, replacement)
+      end
+      write_if_changed(path, updated)
+      return
+    end
+
+    rows = STANDARD_SCRIPTS.map { |name| init_readme_row(root, name, commands, explicit_commands:) }
+    content = <<~MARKDOWN
+      # Agent Workflow Scripts
+
+      #{INIT_README_MARKER}
+
+      Standard entry points that portable agent-workflow skills call. A script that
+      is absent means that capability is n/a in this repository.
+
+      | Script | Purpose | This repo runs |
+      | --- | --- | --- |
+      #{rows.join("\n")}
+
+      Non-command policy lives in [`../agent-workflow.yml`](../agent-workflow.yml).
+    MARKDOWN
+    write_if_changed(path, content)
+  end
+
+  def init_readme_row(root, name, commands, explicit_commands:)
+    script_path = File.join(root, COMMANDS_DIR, name)
+    summary = if explicit_commands && commands[name]
+                markdown_table_code_span(commands.fetch(name))
+              elsif File.file?(script_path) && script_issues(root, name).empty?
+                "configured wrapper"
+              elsif CORE_SCRIPTS.include?(name)
+                "unconfigured (fail-closed)"
+              elsif File.file?(script_path)
+                "present (doctor reports issues)"
+              else
+                "n/a"
+              end
+    "| `#{name}` | #{COMMAND_PURPOSES.fetch(name)} | #{summary} |"
+  end
+
+  def markdown_table_code_span(command)
+    escaped = command.gsub("|", "\\|")
+    fence = "`" * ((escaped.scan(/`+/).map(&:length).max || 0) + 1)
+    padding = escaped.start_with?("`") || escaped.end_with?("`") ? " " : ""
+    "#{fence}#{padding}#{escaped}#{padding}#{fence}"
+  end
+
+  def prepare_init_policy(root, base_branch, existing)
+    defaults = REQUIRED_POLICY_KEYS.to_h { |key| [key, key == "base_branch" ? base_branch : "n/a"] }
+    defaults["follow_up_prefix"] = "Follow-up:"
+    prepare_init_mapping(File.join(root, POLICY_CONFIG), existing, defaults, "policy config")
+  end
+
+  def prepare_init_trust(root, existing)
+    defaults = TRUST_KEYS.to_h { |key| [key, []] }
+    defaults["trusted_metadata_bots"] = ["github-actions"]
+    prepare_init_mapping(File.join(root, TRUST_CONFIG), existing, defaults, "trust config")
+  end
+
+  def prepare_init_mapping(path, existing, defaults, label)
+    merged = defaults.merge(existing)
+    return if File.file?(path) && merged == existing
+    return [path, merged.to_yaml] unless File.file?(path)
+
+    missing = defaults.reject { |key, _value| existing.key?(key) }
+    current = File.read(path, encoding: "UTF-8")
+    separator = current.empty? || current.end_with?("\n") ? "" : "\n"
+    content = "#{current}#{separator}#{missing.to_yaml.delete_prefix("---\n")}"
+    parsed = YAML.safe_load(content, aliases: false) || {}
+    unless parsed == merged
+      raise InitError, "cannot safely add missing #{label} keys without rewriting #{path}"
+    end
+
+    [path, content]
+  rescue Psych::Exception => e
+    raise InitError, "cannot safely add missing #{label} keys without rewriting #{path}: #{e.message.lines.first.to_s.strip}"
+  end
+
+  def write_init_mapping(update)
+    write_if_changed(*update) if update
+  end
+
+  def write_init_agents(root)
+    path = File.join(root, "AGENTS.md")
+    current = File.file?(path) ? File.binread(path).force_encoding("UTF-8").scrub : "# AGENTS.md\n"
+    write_if_changed(path, reconcile_pointer_section(current))
+  end
+
+  def reconcile_pointer_section(text)
+    return text if pointer_section_issues(text).empty?
+
+    lines = text.lines
+    start = unfenced_heading_index(lines, SECTION_HEADING)
+    if start
+      finish = unfenced_heading_index(lines, /^##\s+/, start + 1) || lines.length
+      after = lines[finish..].join
+      separator = after.empty? ? "" : "\n"
+      return "#{lines[0...start].join}#{POINTER_SECTION}\n#{separator}#{after}"
+    end
+
+    separator = if text.empty? || text.end_with?("\n\n")
+                  ""
+                elsif text.end_with?("\n")
+                  "\n"
+                else
+                  "\n\n"
+                end
+    "#{text}#{separator}#{POINTER_SECTION}\n"
+  end
+
+  def init_managed_file?(path)
+    File.binread(path).force_encoding("UTF-8").scrub.include?(INIT_MARKER)
+  end
+
+  def write_if_changed(path, content)
+    return false if File.file?(path) && File.binread(path).force_encoding("UTF-8").scrub == content
+
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, content)
+    true
+  end
 
   def check(root, shared_roots: [])
     issues = []
@@ -112,18 +1534,10 @@ module AgentWorkflowSeamDoctor
     # Read as UTF-8 regardless of locale; a non-UTF-8 default external encoding
     # (e.g. LANG=C) otherwise crashes the parser on non-ASCII bytes in AGENTS.md.
     agents_text = File.binread(agents_path).force_encoding("UTF-8").scrub
-    section = extract_section(agents_text)
-    if section.nil?
-      issues << "missing AGENTS.md section: #{SECTION}"
-    elsif File.file?(File.join(root, CONFIG_RELATIVE_PATH))
-      issues.concat(portable_contract_issues(section))
-      issues.concat(command_script_issues(root))
-      issues.concat(yaml_config_issues(root))
-    else
-      config = parse_config(agents_text, section)
-      issues.concat(missing_key_issues(config))
-      issues.concat(unresolved_extra_key_issues(config))
-    end
+    issues.concat(pointer_section_issues(agents_text))
+    issues.concat(binstub_issues(root))
+    issues.concat(policy_issues(root))
+    issues.concat(trust_issues(root))
 
     issues.concat(shared_root_issues(shared_roots))
 
@@ -134,158 +1548,197 @@ module AgentWorkflowSeamDoctor
     issues
   end
 
-  def portable_contract_issues(section)
+  def pointer_section_issues(text)
+    section = extract_section(text)
+    if section.nil?
+      return ["missing AGENTS.md section: #{SECTION}"]
+    end
+
+    actual = "## #{SECTION}\n#{section}".rstrip
+    return [] if actual == POINTER_SECTION
+
+    ["AGENTS.md section does not match binstub pointer: #{SECTION}"]
+  end
+
+  def trust_issues(root)
+    path = File.join(root, TRUST_CONFIG)
+    return [] unless File.file?(path)
+
+    trust = load_init_mapping(path, "trust config")
+    validate_trust_mapping!(trust)
+    []
+  rescue InitError => e
+    [e.message.sub("#{root}/", "")]
+  end
+
+  def binstub_issues(root)
     issues = []
-    unless section.include?(COMMAND_README_RELATIVE_PATH)
-      issues << "AGENTS.md section must point to #{COMMAND_README_RELATIVE_PATH}"
+    commands_dir = File.join(root, COMMANDS_DIR)
+    unless File.directory?(commands_dir)
+      return ["missing commands directory: #{COMMANDS_DIR}"]
     end
 
-    unless section.include?(".agents/bin/<name>")
-      issues << "AGENTS.md section must include .agents/bin/<name> as the generic invocation form"
+    readme = File.join(root, COMMAND_README)
+    issues << "missing commands README: #{COMMAND_README}" unless File.file?(readme)
+
+    CORE_SCRIPTS.each do |script|
+      path = File.join(root, COMMANDS_DIR, script)
+      unless File.file?(path)
+        issues << "missing core script: #{COMMANDS_DIR}/#{script}"
+      end
     end
 
-    unless section.include?(CONFIG_RELATIVE_PATH)
-      issues << "AGENTS.md section must point to #{CONFIG_RELATIVE_PATH}"
+    script_names = STANDARD_SCRIPTS.select { |script| File.file?(File.join(root, COMMANDS_DIR, script)) }
+    script_names.each do |script|
+      issues.concat(script_issues(root, script))
     end
 
     issues
   end
 
-  def command_script_issues(root)
-    REQUIRED_COMMAND_SCRIPTS.flat_map do |script_name|
-      path = File.join(root, ".agents/bin", script_name)
-      if !File.file?(path)
-        ["missing agent workflow command script: .agents/bin/#{script_name}"]
-      elsif !File.executable?(path)
-        ["agent workflow command script is not executable: .agents/bin/#{script_name}"]
-      else
-        []
-      end
+  def script_issues(root, script)
+    relative = "#{COMMANDS_DIR}/#{script}"
+    path = File.join(root, relative)
+    issues = []
+
+    unless File.executable?(path)
+      issues << if CORE_SCRIPTS.include?(script)
+                  core_script_not_executable_issue(script)
+                else
+                  "script is not executable: #{relative}"
+                end
+    end
+
+    content = File.binread(path).force_encoding("UTF-8").scrub
+    if content.include?(INIT_PLACEHOLDER_MARKER)
+      issues << "unconfigured init wrapper: #{relative}; rerun --init with both " \
+                "--validate-command CMD and --test-command CMD"
+    end
+    issues << "script is not a bash wrapper: #{relative}" unless content.start_with?("#!/usr/bin/env bash\n")
+    issues << "script does not enable strict bash mode: #{relative}" unless content.include?("set -euo pipefail")
+    issues << "script does not cd to repo root: #{relative}" unless script_cd_to_root?(content)
+    issues.concat(missing_sibling_script_issues(root, relative, content))
+
+    _out, status = Open3.capture2e("bash", "-n", path)
+    issues << "script has bash syntax error: #{relative}" unless status.success?
+
+    issues
+  end
+
+  def core_script_not_executable_issue(script)
+    "core script is not executable: #{COMMANDS_DIR}/#{script}"
+  end
+
+  def missing_sibling_script_issues(root, relative, content)
+    content.scan(%r{\$(?:root|\{root\})/\.agents/bin/([A-Za-z0-9_.-]+)}).flatten.uniq.filter_map do |script|
+      next if File.file?(File.join(root, COMMANDS_DIR, script))
+
+      "script references missing sibling script: #{relative} -> #{COMMANDS_DIR}/#{script}"
     end
   end
 
-  def yaml_config_issues(root)
-    path = File.join(root, CONFIG_RELATIVE_PATH)
-    config = load_yaml_config(path)
-    return config if config.is_a?(Array)
+  def script_cd_to_root?(content)
+    return false unless content.include?(ROOT_RESOLUTION)
 
-    issues = REQUIRED_CONFIG_KEYS.filter_map do |key|
-      value = config[key]
-      if value.nil?
-        "missing agent workflow config key: #{key}"
-      elsif unresolved_yaml_value?(value)
-        "unresolved agent workflow config value for key: #{key}"
+    content.include?('cd "$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"') ||
+      content.include?('cd "$root"') ||
+      content.include?('cd "${root}"')
+  end
+
+  def policy_issues(root)
+    path = File.join(root, POLICY_CONFIG)
+    return ["missing policy config: #{POLICY_CONFIG}"] unless File.file?(path)
+
+    config = load_policy_config(path)
+    return ["invalid policy config: #{POLICY_CONFIG}"] unless config.is_a?(Hash)
+
+    issues = []
+    REQUIRED_POLICY_KEYS.each do |key|
+      if !config.key?(key)
+        issues << "missing policy key: #{key}"
+      elsif unresolved_policy_value?(config[key])
+        issues << "unresolved policy value for key: #{key}"
       end
     end
 
-    follow_up_prefix = config["follow_up_prefix"]
-    if !follow_up_prefix.nil? && !unresolved_yaml_value?(follow_up_prefix) && follow_up_prefix != FOLLOW_UP_PREFIX
-      issues << "invalid agent workflow config value for key: follow_up_prefix (expected #{FOLLOW_UP_PREFIX.inspect})"
-    end
-
-    # Optional keys written with an empty/null YAML value are "unresolved" rather
-    # than "missing" because the key is present but intentionally left unfilled.
     config.each do |key, value|
-      next if REQUIRED_CONFIG_KEYS.include?(key)
-      next unless unresolved_yaml_value?(value)
+      next if REQUIRED_POLICY_KEYS.include?(key)
+      next unless unresolved_policy_value?(value)
 
-      issues << "unresolved agent workflow config value for key: #{key}"
+      issues << "unresolved policy value for key: #{key}"
     end
 
+    issues.concat(untrusted_contributor_intake_policy_issues(config))
+
     issues
+  rescue Psych::Exception
+    ["invalid policy config: #{POLICY_CONFIG}"]
   end
 
-  def load_yaml_config(path)
-    parsed = YAML.safe_load(File.binread(path).force_encoding("UTF-8").scrub,
-                            permitted_classes: [], permitted_symbols: [], aliases: false)
-    return ["#{CONFIG_RELATIVE_PATH} must be a mapping"] unless parsed.is_a?(Hash)
+  def untrusted_contributor_intake_policy_issues(config)
+    return [] unless config.key?(UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY)
 
-    parsed
-  rescue Psych::Exception => e
-    ["invalid #{CONFIG_RELATIVE_PATH}: #{e.message}"]
-  rescue Errno::SystemCallError => e
-    ["unable to read #{CONFIG_RELATIVE_PATH}: #{e.message}"]
+    intake_policy = config[UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY]
+    unless intake_policy.is_a?(Hash)
+      return ["invalid policy value for key: #{UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY}"]
+    end
+
+    issues = UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEYS.filter_map do |key|
+      qualified_key = "#{UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY}.#{key}"
+      if !intake_policy.key?(key)
+        "missing policy key: #{qualified_key}"
+      elsif !intake_policy[key].is_a?(String) || intake_policy[key].strip.empty? ||
+            unresolved_policy_value?(intake_policy[key]) || intake_policy[key].strip == "n/a"
+        "invalid policy value for key: #{qualified_key}"
+      end
+    end
+    scheme_key = "#{UNTRUSTED_CONTRIBUTOR_INTAKE_POLICY_KEY}.trusted_github_scheme"
+    scheme = intake_policy["trusted_github_scheme"]
+    issues << "invalid policy value for key: #{scheme_key}" if scheme && scheme != "https"
+    issues.uniq
   end
 
-  def unresolved_yaml_value?(value)
+  def load_policy_config(path)
+    YAML.safe_load(File.read(path, encoding: "UTF-8"), aliases: false) || {}
+  end
+
+  def unresolved_policy_value?(value)
     case value
     when String
       unresolved_template_value?(value)
     when Array
-      value.any? { |item| unresolved_yaml_value?(item) }
+      value.empty? || value.any? { |entry| unresolved_policy_value?(entry) }
     when Hash
-      value.any? { |_key, item| unresolved_yaml_value?(item) }
-    when NilClass
-      true
+      value.empty? || value.any? { |key, entry| unresolved_policy_value?(key.to_s) || unresolved_policy_value?(entry) }
     else
-      false
+      value.nil?
     end
-  end
-
-  def parse_config(text, section = nil)
-    section ||= extract_section(text)
-    return nil if section.nil?
-
-    config = {}
-    current_key = nil
-
-    section.each_line do |line|
-      if (match = line.match(CONFIG_KEY_PATTERN))
-        current_key = match[1].strip
-        config[current_key] = match[2].strip
-        next
-      end
-
-      if config_continuation?(line, current_key)
-        config[current_key] = [config[current_key], line.strip].reject(&:empty?).join(" ")
-      elsif config_key_finished?(line)
-        current_key = nil
-      end
-    end
-
-    config
-  end
-
-  def config_continuation?(line, current_key)
-    current_key && line.match?(/^\s{2,}\S/) && !line.match?(CONFIG_KEY_PATTERN)
-  end
-
-  def config_key_finished?(line)
-    line.strip.empty? || !line.match?(/^\s{2,}\S/)
   end
 
   def extract_section(text)
     lines = text.lines
-    start_index = lines.index { |line| line.match?(SECTION_HEADING) }
+    start_index = unfenced_heading_index(lines, SECTION_HEADING)
     return nil if start_index.nil?
 
-    body = []
-    lines[(start_index + 1)..].each do |line|
-      break if line.match?(/^##\s+/)
-
-      body << line
-    end
-    body.join
+    finish_index = unfenced_heading_index(lines, /^##\s+/, start_index + 1) || lines.length
+    lines[(start_index + 1)...finish_index].join
   end
 
-  def missing_key_issues(config)
-    REQUIRED_KEYS.filter_map do |key|
-      value = config[key]
-      if value.nil?
-        "missing #{SECTION} key: #{key}"
-      elsif unresolved_template_value?(value)
-        "unresolved #{SECTION} value for key: #{key}"
+  def unfenced_heading_index(lines, pattern, start_at = 0)
+    in_fence = false
+    fence_delimiter = nil
+
+    lines.each_with_index do |line, index|
+      fence_state = update_fence_state(line, in_fence, fence_delimiter)
+      if fence_state
+        in_fence, _executable_fence, fence_delimiter = fence_state
+        next
       end
-    end
-  end
+      next if index < start_at || in_fence
 
-  def unresolved_extra_key_issues(config)
-    config.filter_map do |key, value|
-      next if REQUIRED_KEYS.include?(key)
-      next unless unresolved_template_value?(value)
-
-      "unresolved #{SECTION} value for key: #{key}"
+      return index if line.match?(pattern)
     end
+    nil
   end
 
   def unresolved_template_value?(value)
@@ -393,8 +1846,6 @@ module AgentWorkflowSeamDoctor
       placeholders.concat(snippet.scan(CI_PARITY_EXECUTABLE_PLACEHOLDER))
     end
 
-    # The two placeholder regexes intentionally overlap for compound runnable
-    # tokens such as <hosted CI runner image>; keep this dedupe.
     placeholders.uniq
   end
 
@@ -438,10 +1889,33 @@ module AgentWorkflowSeamDoctor
 end
 
 if $PROGRAM_NAME == __FILE__
-  options = { root: Dir.pwd, json: false, shared_roots: [] }
+  options = {
+    root: Dir.pwd,
+    init: false,
+    base_branch: "main",
+    validate_command: nil,
+    test_command: nil,
+    init_only_options: [],
+    json: false,
+    shared_roots: []
+  }
   parser = OptionParser.new do |opts|
-    opts.banner = "Usage: agent-workflow-seam-doctor [--root DIR] [--shared DIR] [--json]"
+    opts.banner = "Usage: agent-workflow-seam-doctor [--init] [--root DIR] [--base-branch BRANCH] " \
+                  "[--validate-command CMD --test-command CMD] [--shared DIR] [--json]"
+    opts.on("--init", "Initialize a consumer repository seam before validation") { options[:init] = true }
     opts.on("--root DIR", "Repository root to inspect") { |value| options[:root] = value }
+    opts.on("--base-branch BRANCH", "Base branch for a newly initialized policy (default: main)") do |value|
+      options[:base_branch] = value
+      options[:init_only_options] << "--base-branch"
+    end
+    opts.on("--validate-command CMD", "Explicit command for .agents/bin/validate") do |value|
+      options[:validate_command] = value
+      options[:init_only_options] << "--validate-command"
+    end
+    opts.on("--test-command CMD", "Explicit command for .agents/bin/test") do |value|
+      options[:test_command] = value
+      options[:init_only_options] << "--test-command"
+    end
     opts.on("--shared DIR", "Installed shared skill/workflow root to scan; repeatable") do |value|
       options[:shared_roots] << value
     end
@@ -454,7 +1928,23 @@ if $PROGRAM_NAME == __FILE__
   parser.parse!
 
   root = File.expand_path(options.fetch(:root))
-  issues = AgentWorkflowSeamDoctor.check(root, shared_roots: options.fetch(:shared_roots))
+  issues = if !options.fetch(:init) && options.fetch(:init_only_options).any?
+             options.fetch(:init_only_options).uniq.map { |option| "#{option} requires --init" }
+           elsif options.fetch(:init)
+             begin
+               AgentWorkflowSeamDoctor.init(
+                 root,
+                 base_branch: options.fetch(:base_branch),
+                 validate_command: options[:validate_command],
+                 test_command: options[:test_command],
+                 shared_roots: options.fetch(:shared_roots)
+               )
+             rescue AgentWorkflowSeamDoctor::InitError, SystemCallError => e
+               [e.message]
+             end
+           else
+             AgentWorkflowSeamDoctor.check(root, shared_roots: options.fetch(:shared_roots))
+           end
   print(options[:json] ? AgentWorkflowSeamDoctor.format_json(issues) : AgentWorkflowSeamDoctor.format_text(issues))
   exit(issues.empty? ? 0 : 1)
 end

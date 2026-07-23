@@ -26,6 +26,34 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **RailsContext now stays current across Turbo and Turbolinks navigation**: Parsed context is cached
+  only while its source element and JSON text remain unchanged. Replacing the context element or
+  morphing its payload in place now makes the next core render or immediate Pro hydration receive the
+  new page's URL, locale, and application-specific values instead of the first page's context. Fixes
+  [Issue 4583](https://github.com/shakacode/react_on_rails/issues/4583).
+  [PR 4765](https://github.com/shakacode/react_on_rails/pull/4765) by
+  [ihabadham](https://github.com/ihabadham).
+
+- **Stopped replacing Shakapacker-owned watch binstubs during installation**: React on Rails no longer ships
+  its own `bin/shakapacker-watch` template. Generated Procfiles use Shakapacker's optional watch binstub when
+  it is present and fall back to `bin/shakapacker --watch` for older supported Shakapacker installations.
+  Existing Shakapacker-provided or customized watch binstubs remain untouched, including under `--force`. Fixes
+  [Issue 4617](https://github.com/shakacode/react_on_rails/issues/4617).
+  [PR 4715](https://github.com/shakacode/react_on_rails/pull/4715) by
+  [ihabadham](https://github.com/ihabadham).
+
+- **Server rendering no longer crashes on or corrupts lone UTF-16 surrogates**: When the JavaScript
+  renderer emits a string containing a lone surrogate (commonly from truncating text mid-emoji, e.g. an
+  excerpt cut with `slice`/`substring`), `JSON.stringify` serializes it as a `\uXXXX` escape that Ruby's
+  `JSON.parse` mishandles — depending on the case and `json` gem version it raises `incomplete surrogate
+pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now normalizes such escapes to
+  the Unicode replacement character (`�`) and passes the content through to the browser instead of failing.
+  This works the same across `json` gem versions. Clean payloads are unaffected: repair only runs when the
+  text actually contains a surrogate escape, a single cheap substring check. Fixes
+  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
+  [PR 4745](https://github.com/shakacode/react_on_rails/pull/4745) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 - **[Pro]** **Streaming caches no longer persist error-containing renders**: When a streamed render
   emits a chunk with `hasErrors: true` (for example a Suspense boundary whose async data fetch hit a
   transient failure on that one request), the resulting chunk set is no longer written to
@@ -48,19 +76,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   RSC app no longer receives a spurious layout warning. Fixes
   [Issue 4619](https://github.com/shakacode/react_on_rails/issues/4619).
   [PR 4724](https://github.com/shakacode/react_on_rails/pull/4724) by
-  [justin808](https://github.com/justin808).
-
-- **Stopped server rendering from crashing on unpaired UTF-16 surrogates**: JavaScript's
-  `JSON.stringify` can emit a lone surrogate escape (for example `\uD83D` with no paired low
-  surrogate) from corrupted user data, database-encoding issues, or upstream API responses.
-  Ruby's `JSON.parse` rejects a lone high surrogate with `JSON::ParserError: incomplete
-surrogate pair`, so such content crashed the entire server render instead of passing through
-  for the browser to display. The render-result parsers now retry once with unpaired surrogates
-  replaced by the Unicode replacement character (U+FFFD) — this only runs after a parse failure,
-  so the happy path is unchanged. Covers the length-prefixed object-payload and metadata paths
-  plus the legacy JSON fallback for older bundles. Fixes
-  [Issue 4710](https://github.com/shakacode/react_on_rails/issues/4710).
-  [PR 4726](https://github.com/shakacode/react_on_rails/pull/4726) by
   [justin808](https://github.com/justin808).
 
 - **[Pro]** **Stopped logging routine async-props stream-close races at error level**: When a client
@@ -174,6 +189,15 @@ surrogate pair`, so such content crashed the entire server render instead of pas
 
 #### Added
 
+- **[Pro]** **RSC agent guardrails installer**: New
+  `rake react_on_rails:install_rsc_agent_guardrails` task (also run automatically by the RSC
+  generator) installs a Claude Code `rsc-app-safety` skill and an advisory hook into a host app's
+  `.claude/`, steering AI coding agents away from React Server Components API footguns (mounting the
+  RSC payload route without authentication, trusting server-component props, exposing the Node
+  renderer, leaking secrets). Idempotent and safe to re-run after upgrades.
+  [PR 4606](https://github.com/shakacode/react_on_rails/pull/4606) by
+  [justin808](https://github.com/justin808).
+
 - **Existing-app Pro choice**: Interactive `react_on_rails:install` runs now ask whether to enable
   React on Rails Pro when no Pro, RSC, or standard-only choice is supplied. The bounded prompt defaults
   to yes and explains trust-based evaluation and production licensing, while noninteractive runs retain
@@ -206,6 +230,19 @@ surrogate pair`, so such content crashed the entire server render instead of pas
   `REACT_ON_RAILS_PRO_LICENSE`, blank configuration preserves the environment fallback, and renderer
   diagnostics mask token values. [PR 4552](https://github.com/shakacode/react_on_rails/pull/4552) by
   [ihabadham](https://github.com/ihabadham).
+
+#### Changed
+
+- **[Pro] Render requests now send raw JavaScript bodies to the Node renderer**: Non-bundle render
+  requests use a raw `application/vnd.react-on-rails.render-request+javascript` body with metadata in
+  `X-React-On-Rails-Pro-*` headers instead of `application/x-www-form-urlencoded`, removing
+  URL-encoding overhead on large rendering payloads. The renderer still accepts the legacy form
+  encoding, so a not-yet-upgraded gem keeps working against an upgraded renderer during rolling
+  deploys; deploy the Node renderer before or together with the gem upgrade, since an older renderer
+  rejects the new content type. Fixes
+  [Issue 3584](https://github.com/shakacode/react_on_rails/issues/3584).
+  [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
+  [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
 ### [17.0.0] - 2026-07-16
 

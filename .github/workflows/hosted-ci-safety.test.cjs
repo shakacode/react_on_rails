@@ -67,6 +67,7 @@ function runGemMatrix(script, { full, generators }) {
 
 const labelDispatchWorkflow = read('.github/workflows/hosted-ci-label-dispatch.yml');
 const requiredWorkflow = read('.github/workflows/ci-required.yml');
+const agentWorkflowDriftManifest = read('.agents/agent-workflow-drift.yml');
 const hostedSelectorsAction = read('.github/actions/hosted-ci-selectors/action.yml');
 const ciCommandsWorkflow = read('.github/workflows/ci-commands.yml');
 const claudeWorkflow = read('.github/workflows/claude.yml');
@@ -114,6 +115,27 @@ assertMatches(
 );
 assertMatches('ci-required check-run read permission', requiredWorkflow, /checks: read/);
 assertMatches('ci-required actions-run read permission', requiredWorkflow, /actions: read/);
+const agentWorkflowRevision = agentWorkflowDriftManifest.match(
+  /^source_revision:\s*["']?([0-9a-f]{40})["']?$/m,
+);
+assert.ok(agentWorkflowRevision, 'agent workflow drift manifest must pin a full source revision');
+assertMatches(
+  'ci-required pinned agent workflow checkout',
+  requiredWorkflow,
+  new RegExp(
+    String.raw`- name: Check out pinned agent workflows[\s\S]*uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5[\s\S]*repository: shakacode/agent-workflows[\s\S]*ref: ${agentWorkflowRevision[1]}[\s\S]*path: \.agent-workflows-source[\s\S]*fetch-depth: 1[\s\S]*persist-credentials: false`,
+  ),
+);
+assertMatches(
+  'ci-required agent workflow manifest completeness check',
+  requiredWorkflow,
+  /ruby \.agents\/bin\/agent-workflow-drift-manifest-test\.rb --source-root \.agent-workflows-source/,
+);
+assertMatches(
+  'ci-required pinned agent workflow drift check',
+  requiredWorkflow,
+  /\.agent-workflows-source\/bin\/check-agent-workflow-drift[\s\S]*--manifest \.agents\/agent-workflow-drift\.yml[\s\S]*--source-root \.agent-workflows-source[\s\S]*--consumer-root \./,
+);
 assertMatches('ci-required mirrored-block lint', requiredWorkflow, /ruby bin\/lint-mirrored-blocks/);
 assertMatches(
   'ci-required mirrored-block lint tests',
@@ -226,17 +248,17 @@ assertMatches(
 
 const gemMatrixScript = extractRunScript(gemTestsWorkflow, 'Set gem tests matrix');
 const latestUnit = { 'ruby-version': '3.4', 'dependency-level': 'latest', shard: 'unit' };
-const latestGenerators = {
+const latestGenerators = ['generators-1', 'generators-2', 'generators-3'].map((shard) => ({
   'ruby-version': '3.4',
   'dependency-level': 'latest',
-  shard: 'generators',
-};
+  shard,
+}));
 const minimumUnit = { 'ruby-version': '3.2', 'dependency-level': 'minimum', shard: 'unit' };
-const minimumGenerators = {
+const minimumGenerators = ['generators-1', 'generators-2', 'generators-3'].map((shard) => ({
   'ruby-version': '3.2',
   'dependency-level': 'minimum',
-  shard: 'generators',
-};
+  shard,
+}));
 
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: false, generators: false }).include,
@@ -245,13 +267,51 @@ assert.deepEqual(
 );
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: false, generators: true }).include,
-  [latestGenerators, latestUnit],
-  'optimized generator PR matrix should keep the latest generator and unit shards',
+  [...latestGenerators, latestUnit],
+  'optimized generator PR matrix should keep three latest generator subshards and the latest unit shard',
 );
 assert.deepEqual(
   runGemMatrix(gemMatrixScript, { full: true, generators: false }).include,
-  [latestGenerators, latestUnit, minimumGenerators, minimumUnit],
-  'main, merge-group, release-target, and force-full matrices should retain both dependency levels and shards',
+  [...latestGenerators, latestUnit, ...minimumGenerators, minimumUnit],
+  'main, merge-group, release-target, and force-full matrices should retain both unit rows and three generator subshards per dependency level',
+);
+
+const gemRspecScript = extractRunScript(gemTestsWorkflow, 'Run rspec tests');
+assertMatches(
+  'generator subshards use stable RSpec scoped IDs',
+  gemRspecScript,
+  /metadata\.fetch\(:rerun_file_path\)[\s\S]*metadata\.fetch\(:scoped_id\)/,
+);
+assertMatches(
+  'generator subshards keep context-hook setup atomic',
+  gemRspecScript,
+  /all_hooks_for, position, :context[\s\S]*atomic_unit_by_id/,
+);
+assertMatches(
+  'generator subshards use a deterministic head-local tie break',
+  gemRspecScript,
+  /Digest::SHA256\.hexdigest\(unit_id\)/,
+);
+assertMatches(
+  'generator subshards balance examples and shared setup units',
+  gemRspecScript,
+  /weight_by_unit = units\.to_h[\s\S]*rows\.length \+ setup_count_by_unit\.fetch\(unit_id, 0\)/,
+);
+assertMatches(
+  'generator subshards reject duplicate scoped IDs',
+  gemRspecScript,
+  /ids\.uniq\.length == ids\.length/,
+);
+assertMatches(
+  'unit shard retains generator exclusion',
+  gemRspecScript,
+  /bundle exec rspec spec\/react_on_rails --exclude-pattern "\*\*\/generators\/\*\*"/,
+);
+assertDoesNotMatch('generator subshards avoid brittle line-number selection', gemRspecScript, /line_number/);
+assertDoesNotMatch(
+  'generator subshards do not split shared setup by leaf-example hash',
+  gemRspecScript,
+  /Digest::SHA256\.hexdigest\(id\)\.to_i\(16\) % shard_count/,
 );
 
 assertMatches('ShakaPerf renderer h2c probe', shakaperfReleaseGateWorkflow, /require\('node:http2'\)/);

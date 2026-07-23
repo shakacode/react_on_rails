@@ -30,9 +30,12 @@ on:
         default: 'max'
         type: string
       duration:
-        description: 'Duration (e.g., "30s", "1m", "90s")'
+        description: >-
+          k6 duration PER SAMPLE (e.g., "12s", "30s", "1m") — each route runs
+          BENCHMARK_SAMPLES (3) k6 samples and reports the medians. Empty = auto
+          (12s per sample). Also the vegeta node-renderer suite's single-run duration.
         required: false
-        default: '30s'
+        default: ''
         type: string
       request_timeout:
         description: 'Request timeout (e.g., "60s", "1m", "90s")'
@@ -101,11 +104,16 @@ jobs:
     outputs:
       run_benchmark_suites: ${{ steps.benchmark-matrices.outputs.run_benchmark_suites }}
       benchmark_matrix: ${{ steps.benchmark-matrices.outputs.benchmark_matrix }}
+      base_sha: ${{ steps.benchmark-base.outputs.base_sha }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 50
+          # Full history: the base-resolution step below computes `git merge-base` with
+          # origin/main, and a shallow boundary between a long-lived branch and its fork
+          # point can make merge-base fail — or worse, silently resolve to a wrong base
+          # inside the shallow window. This job is cheap and manual-dispatch-only.
+          fetch-depth: 0
           persist-credentials: false
       - name: Read runtime versions
         id: tool-versions
@@ -134,6 +142,25 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         shell: bash
+      # Relative continuous benchmarking (#3492): each suite job builds and benchmarks
+      # BOTH this base and the dispatched head ref on the same runner, so the base must
+      # be one concrete SHA resolved once here. Fail-loud by design: silently comparing
+      # against an unintended base would be worse than aborting a manual dispatch.
+      - name: Resolve benchmark comparison base
+        id: benchmark-base
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            # Dispatch on main itself: compare against the previous main commit.
+            base=$(git rev-parse --verify "HEAD^")
+          else
+            # Dispatch on a branch: compare against its merge-base with main.
+            base=$(git merge-base HEAD origin/main)
+          fi
+          echo "Comparison base: $base"
+          echo "base_sha=$base" >> "$GITHUB_OUTPUT"
+        shell: bash
 
   # Manual hosted run of every selected suite/shard. Automatic push/PR benchmarks
   # are intentionally disabled; use the dedicated local M1 runner for the trusted
@@ -155,6 +182,7 @@ jobs:
     uses: ./.github/workflows/benchmark-suite.yml
     with:
       matrix_row: ${{ toJSON(matrix) }}
+      base_sha: ${{ needs.prepare-benchmark-matrix.outputs.base_sha }}
     secrets:
       REACT_ON_RAILS_PRO_LICENSE_V2: ${{ secrets.REACT_ON_RAILS_PRO_LICENSE_V2 }}  # yamllint disable-line rule:line-length
       BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}

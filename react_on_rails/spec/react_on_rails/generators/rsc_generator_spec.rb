@@ -9,6 +9,45 @@ describe RscGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
+  describe "#add_rsc_to_procfile" do
+    let(:generator) { described_class.new([], {}, destination_root:) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+    end
+
+    it "uses the standard Shakapacker command when the optional watch binstub is absent" do
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+      end
+    end
+
+    it "uses Shakapacker's watch binstub when it is present" do
+      simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o755, File.join(destination_root, "bin/shakapacker-watch"))
+
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+    end
+
+    it "uses the standard Shakapacker command when the watch binstub is not executable" do
+      simulate_existing_file("bin/shakapacker-watch", "#!/usr/bin/env sh\n")
+      File.chmod(0o644, File.join(destination_root, "bin/shakapacker-watch"))
+
+      Dir.chdir(destination_root) { generator.send(:add_rsc_to_procfile) }
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
+      end
+    end
+  end
+
   # Unit tests for prerequisite validation
 
   context "when Pro is not installed" do
@@ -27,6 +66,41 @@ describe RscGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("React on Rails Pro is not installed")
       expect(error_text).to include("rails g react_on_rails:pro")
+    end
+  end
+
+  describe "#run_generator" do
+    let(:generator_options) { {} }
+    let(:generator) { described_class.new([], generator_options) }
+
+    before do
+      allow(generator).to receive(:print_generator_messages)
+      allow(generator).to receive(:warn_about_react_version_for_rsc)
+      allow(generator).to receive(:install_agent_guardrails)
+    end
+
+    context "when invoked by the install generator" do
+      let(:generator_options) { { invoked_by_install: true } }
+
+      it "runs RSC setup without adding dependencies again" do
+        expect(generator).to receive(:setup_rsc).once
+        expect(generator).not_to receive(:add_rsc_npm_dependencies)
+
+        generator.run_generator
+      end
+    end
+
+    context "when invoked standalone" do
+      before do
+        allow(generator).to receive_messages(prerequisites_met?: true, print_success_message: nil)
+      end
+
+      it "runs RSC setup and adds dependencies once" do
+        expect(generator).to receive(:setup_rsc).once
+        expect(generator).to receive(:add_rsc_npm_dependencies).once
+
+        generator.run_generator
+      end
     end
   end
 
@@ -60,6 +134,53 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  describe "#install_agent_guardrails" do
+    subject(:install_agent_guardrails) { generator.send(:install_agent_guardrails) }
+
+    let(:generator) { described_class.new }
+
+    before do
+      allow(generator).to receive(:options).and_return(generator_options)
+      allow(ReactOnRails::AgentGuardrails).to receive(:install).and_return([])
+    end
+
+    context "when the generator is in pretend mode" do
+      let(:generator_options) { { pretend: true, skip: false } }
+
+      it "does not write guardrail files" do
+        install_agent_guardrails
+
+        expect(ReactOnRails::AgentGuardrails).not_to have_received(:install)
+      end
+    end
+
+    context "when the generator is in skip mode" do
+      let(:generator_options) { { pretend: false, skip: true } }
+
+      it "creates missing guardrails while preserving existing files" do
+        install_agent_guardrails
+
+        expect(ReactOnRails::AgentGuardrails).to have_received(:install)
+          .with(generator.destination_root, skip_existing: true)
+      end
+    end
+
+    context "when guardrail files cannot be written" do
+      let(:generator_options) { { pretend: false, skip: false } }
+
+      before do
+        allow(generator).to receive(:say)
+        allow(ReactOnRails::AgentGuardrails).to receive(:install).and_raise(Errno::EACCES, ".claude/settings.json")
+      end
+
+      it "warns and allows RSC generation to continue" do
+        expect { install_agent_guardrails }.not_to raise_error
+        expect(generator).to have_received(:say)
+          .with(a_string_including("RSC agent guardrail installation incomplete", ".claude/settings.json"), :yellow)
+      end
+    end
+  end
+
   # Integration test for standalone happy path
 
   context "when Pro is installed" do
@@ -88,6 +209,15 @@ describe RscGenerator, type: :generator do
         expect(content).to include("enable_rsc_support = true")
         expect(content).to include('rsc_bundle_js_file = "rsc-bundle.js"')
         expect(content).to include('rsc_payload_generation_url_path = "rsc_payload/"')
+      end
+    end
+
+    it "installs the RSC agent guardrails into .claude" do
+      assert_file ".claude/skills/rsc-app-safety/SKILL.md"
+      assert_file ".claude/hooks/rsc-app-safety-check.rb"
+      assert_file ".claude/settings.json" do |content|
+        expect(content).to include('"command": "ruby"')
+        expect(content).to include("rsc-app-safety-check.rb")
       end
     end
 
@@ -151,7 +281,7 @@ describe RscGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("rsc-bundle:")
         expect(content).to include("RSC_BUNDLE_ONLY")
-        expect(content).to include("bin/shakapacker-watch --watch")
+        expect(content).to include("bin/shakapacker --watch")
       end
     end
 

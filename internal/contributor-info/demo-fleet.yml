@@ -8,7 +8,8 @@
 # Field semantics:
 #   tier           — hard_gate | soft_track. hard_gate failures block a final
 #                    release. soft_track repos are remembered for follow-up but
-#                    do not block.
+#                    do not block; blockers referenced only by soft tracks are
+#                    non-gating PARTIAL follow-up state.
 #   packages       — which of our packages the demo consumes. Each entry must
 #                    declare an ecosystem (`gem` | `npm`) and a package name.
 #                    The orchestrator only proposes bumps for listed packages,
@@ -29,6 +30,12 @@
 #                    `cpflow_app_name` must be non-null before `verify: true` can
 #                    be cleared; a null name inside the block is an unverified
 #                    placeholder. The orchestrator skips smoke when no app is set.
+#   standing_health.review_app_workflow
+#                  — exact public workflow path used for standing review-app
+#                    evidence when `standing_health.review_app: required`.
+#   standing_health.stable_release / rsc_version
+#                  — authoritative stable versions used by scheduled public
+#                    health checks when no manual workflow override is supplied.
 #   smoke          — list of paths the orchestrator hits against the
 #                    review-app URL after deploy. Each must return 2xx.
 #   headline       — short name of the per-repo appendix in the RC plan.
@@ -41,6 +48,41 @@
 # treats the commands as authoritative.
 
 schema_version: 1
+
+standing_health:
+  # Standing health is intentionally public-only and independent from the
+  # candidate lifecycle below. Only repos with `standing_health.public: true`
+  # are queried. Archived targets are retained here as report-only catalog
+  # evidence and never become release mutation lanes.
+  schema_version: 1
+  stable_release: v17.0.0
+  rsc_version: 19.2.1
+  max_minor_lag: 1
+  max_default_age_days: 45
+  dependabot_policy: v1
+  archived_targets:
+    - name: shakacode/react-on-rails-rsc-demo
+      headline: Retired manual RSC generator demo
+      packages: []
+
+lifecycle:
+  # Release-path coverage is independent from repository tier. Every required
+  # path needs a generated lane/evidence source or an explicit public waiver.
+  required_paths:
+    - id: standard-generator
+      evidence_source: core_generator
+    - id: pro-ssr
+      evidence_source: core_generator
+    - id: pro-rsc
+      evidence_source: core_generator
+    - id: rspack
+      evidence_source: fleet
+    - id: webpack-rsc-production
+      evidence_source: release_must_have
+    - id: ssr-rsc-html
+      evidence_source: fleet
+    - id: client-navigation-interaction
+      evidence_source: fleet
 
 # Bounded parallelism for a single release/freshness run. Caps wall time at the
 # slowest repo rather than the sum of all repos. Override per-run with the
@@ -103,9 +145,12 @@ repos:
   - name: shakacode/react-on-rails-demo-flagship
     tier: hard_gate
     headline: Flagship Pro + RSC happy path
+    standing_health:
+      public: true
+      disposition: active
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -128,9 +173,13 @@ repos:
   - name: shakacode/react-on-rails-demo-hacker-news-rsc
     tier: hard_gate
     headline: RSC streaming with comment trees
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -146,9 +195,13 @@ repos:
   - name: shakacode/react-on-rails-demo-marketplace-rsc
     tier: hard_gate
     headline: RSC product grid + filter
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -163,9 +216,13 @@ repos:
   - name: shakacode/react-on-rails-demo-gumroad-rsc
     tier: hard_gate
     headline: RSC dashboards + performance
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -179,9 +236,13 @@ repos:
   - name: shakacode/react-webpack-rails-tutorial
     tier: hard_gate
     headline: Pro + RSC tutorial reference app
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -198,9 +259,13 @@ repos:
   - name: shakacode/react-on-rails-starter-tanstack
     tier: hard_gate
     headline: TanStack Pro + RSC starter example
+    standing_health:
+      public: true
+      disposition: active
+      review_app: required
+      review_app_workflow: .github/workflows/cpflow-deploy-review-app.yml
     packages:
       - { ecosystem: gem, name: react_on_rails }
-      - { ecosystem: npm, name: react-on-rails }
       - { ecosystem: gem, name: react_on_rails_pro }
       - { ecosystem: npm, name: react-on-rails-pro }
       - { ecosystem: npm, name: react-on-rails-pro-node-renderer }
@@ -217,6 +282,10 @@ repos:
   - name: shakacode/react_on_rails-demo-octochangelog-on-rails-pro
     tier: soft_track
     headline: RSC + server-rendered markdown
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -234,6 +303,10 @@ repos:
   - name: shakacode/react-on-rails-demo-ssr-hmr
     tier: soft_track
     headline: SSR + HMR coexistence
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -247,6 +320,10 @@ repos:
   - name: shakacode/react-on-rails-demo-v16-bundle-splitting
     tier: soft_track
     headline: On-demand bundle loading
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -261,6 +338,10 @@ repos:
   - name: shakacode/react-on-rails-example-open-flights
     tier: soft_track
     headline: Larger migrated app (search + map)
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }
@@ -274,6 +355,10 @@ repos:
   - name: shakacode/react-on-rails-example-migration
     tier: soft_track
     headline: react-rails → React on Rails migration
+    standing_health:
+      public: true
+      disposition: report_only
+      review_app: not_required
     packages:
       - { ecosystem: gem, name: react_on_rails }
       - { ecosystem: npm, name: react-on-rails }

@@ -1,0 +1,212 @@
+---
+version: 1
+source_revision: 1958648b70a450aa67c15b833428485d17021045
+files:
+- source: ".rubocop.yml"
+  consumer: ".agents/.rubocop.yml"
+  mode: overlay
+  reason: React on Rails pins its supported Ruby target and RuboCop compatibility
+    settings for the repository validation toolchain.
+  consumer_mode: '100644'
+  source_sha256: cdbafa760fac90538cea9605bed1fbb359d469fbb6c4b1ae7b370965fe575d07
+  consumer_sha256: 622598aa9c8a1c5e1e577f95b39c9a3cd6a52dd558f94bdfe9add44106e5d290
+- source: bin/agent-workflow-seam-doctor
+  consumer: ".agents/bin/agent-workflow-seam-doctor"
+  mode: identical
+- source: bin/agent-workflow-seam-doctor-test.rb
+  consumer: ".agents/bin/agent-workflow-seam-doctor-test.rb"
+  mode: identical
+- source: bin/validate
+  consumer: ".agents/bin/validate"
+  mode: overlay
+  reason: React on Rails delegates workflow validation to its repository-owned bin/ci-local
+    wrapper.
+  consumer_mode: '100755'
+  source_sha256: 6e818b9d6559679256fad5f3995cd1351468b69586f91284d0892f2f8a986527
+  consumer_sha256: 90083e67864ac63778329fda3d744da2dd458ba7bdb235af3f66cb0788a81559
+- source: docs/adoption.md
+  consumer: ".agents/docs/adoption.md"
+  mode: overlay
+  reason: React on Rails documents installed shared skills, repo-pinned helper copies,
+    and source-pack links for its consumer layout.
+  consumer_mode: '100644'
+  source_sha256: 509b333b461cded9f7f05498567aa454240af62f63697d66e4ebf41e6499555f
+  consumer_sha256: 3f184494b2ba156bf2ada9e2412af2371eea5465f4f948b6d3a05d72e3840583
+- source: docs/coordination-backend.md
+  consumer: ".agents/docs/coordination-backend.md"
+  mode: identical
+- source: docs/installation-and-upgrades.md
+  consumer: ".agents/docs/installation-and-upgrades.md"
+  mode: identical
+- source: docs/issue-evaluation.md
+  consumer: ".agents/docs/issue-evaluation.md"
+  mode: overlay
+  reason: React on Rails resolves shared issue-evaluation skills from installed skill
+    locations.
+  consumer_mode: '100644'
+  source_sha256: bc585fa7979627fbba275688ceee7000f08c1659486e40533fffd49b40920299
+  consumer_sha256: '005207708aead92fef805ba3652b0ce393aeeaeb3c72db60d8eb24d6e820a4bd'
+- source: docs/pr-batch-skills.md
+  consumer: ".agents/docs/pr-batch-skills.md"
+  mode: overlay
+  reason: React on Rails resolves shared skills from installed locations and replaces
+    source-pack-only relative links.
+  consumer_mode: '100644'
+  source_sha256: 561c388a6718f7854fa145435410a515296ec119d2f9ea864c32d758d13ded72
+  consumer_sha256: c86b4aa56bd2616ff7d77f8b04c9e25e095a372de42186a0acc0a47db623f603
+- source: docs/release-branching.md
+  consumer: ".agents/docs/release-branching.md"
+  mode: identical
+- source: docs/seam-design.md
+  consumer: ".agents/docs/seam-design.md"
+  mode: overlay
+  reason: React on Rails preserves its no-duplicate skill-picker architecture and
+    replaces source-pack-only glossary links.
+  consumer_mode: '100644'
+  source_sha256: 39b1afb441b0b77f26c31daa043c51d0665c22190efa6454fff2882aa6ab4f05
+  consumer_sha256: 5fc91bb70b28784d04c24a54c65877271abf258e0f3e91d2f1413f4665223343
+- source: docs/security-posture.md
+  consumer: ".agents/docs/security-posture.md"
+  mode: overlay
+  reason: React on Rails replaces the source-pack-only trust and preflight documentation
+    link.
+  consumer_mode: '100644'
+  source_sha256: cfae5b2de0211c5039b43358d566868099fc7c8266108dbfed59607d8245b9a4
+  consumer_sha256: 25d5a5b2162623e4679a16f2f935bf1df581f38282b3ccf8be5a98dfe2241be3
+- source: skills/address-review/bin/fetch-pr-review-data
+  consumer: ".agents/skills/address-review/bin/fetch-pr-review-data"
+  mode: identical
+- source: skills/address-review/bin/fetch-pr-review-data-test.rb
+  consumer: ".agents/skills/address-review/bin/fetch-pr-review-data-test.rb"
+  mode: identical
+- source: skills/plan-pr-batch/bin/pr-file-touch-map
+  consumer: ".agents/skills/plan-pr-batch/bin/pr-file-touch-map"
+  mode: identical
+- source: skills/plan-pr-batch/bin/pr-file-touch-map-test.rb
+  consumer: ".agents/skills/plan-pr-batch/bin/pr-file-touch-map-test.rb"
+  mode: identical
+- source: skills/plan-pr-batch/scripts/check_goal_prompt_size.rb
+  consumer: ".agents/skills/plan-pr-batch/scripts/check_goal_prompt_size.rb"
+  mode: identical
+- source: skills/post-merge-audit/bin/closeout-evidence-replay
+  consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay"
+  mode: identical
+- source: skills/post-merge-audit/bin/closeout-evidence-replay-test.rb
+  consumer: ".agents/skills/post-merge-audit/bin/closeout-evidence-replay-test.rb"
+  mode: identical
+- source: skills/post-merge-audit/bin/post-merge-audit-scope
+  consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope"
+  mode: identical
+- source: skills/post-merge-audit/bin/post-merge-audit-scope-test.bash
+  consumer: ".agents/skills/post-merge-audit/bin/post-merge-audit-scope-test.bash"
+  mode: identical
+- source: skills/post-merge-audit/bin/pr-check-completion-timing
+  consumer: ".agents/skills/post-merge-audit/bin/pr-check-completion-timing"
+  mode: identical
+- source: skills/post-merge-audit/bin/pr-check-completion-timing-test.rb
+  consumer: ".agents/skills/post-merge-audit/bin/pr-check-completion-timing-test.rb"
+  mode: identical
+- source: skills/pr-batch/bin/agent-coord-bounded
+  consumer: ".agents/skills/pr-batch/bin/agent-coord-bounded"
+  mode: identical
+- source: skills/pr-batch/bin/agent-coord-bounded-test.rb
+  consumer: ".agents/skills/pr-batch/bin/agent-coord-bounded-test.rb"
+  mode: identical
+- source: skills/pr-batch/bin/dispatcher-capability-preflight
+  consumer: ".agents/skills/pr-batch/bin/dispatcher-capability-preflight"
+  mode: identical
+- source: skills/pr-batch/bin/dispatcher-capability-preflight-test.rb
+  consumer: ".agents/skills/pr-batch/bin/dispatcher-capability-preflight-test.rb"
+  mode: identical
+# Count disposition: the pull request 182 pin alone would classify these two files
+# as identical. Retaining the merged pull request 198 cancellation guardrail
+# honestly reclassifies them as overlays, yielding 26 identical and 16 overlays.
+- source: skills/pr-batch/bin/pr-ci-readiness
+  consumer: ".agents/skills/pr-batch/bin/pr-ci-readiness"
+  mode: overlay
+  reason: React on Rails preserves the merged agent-workflows pull request 198 required-check
+    cancellation guardrail while pinning the pull request 182 drift-detector merge commit.
+  consumer_mode: '100755'
+  source_sha256: 9dc09642440690625e80046622878c708b620fe25d6fbf475bc5b41dc52d8f06
+  consumer_sha256: f95f871697a08dad2c2dff202c07be097f7bf6c09a8dc48860c69b14fb8b7b1d
+- source: skills/pr-batch/bin/pr-ci-readiness-test.rb
+  consumer: ".agents/skills/pr-batch/bin/pr-ci-readiness-test.rb"
+  mode: overlay
+  reason: React on Rails keeps the merged agent-workflows pull request 198 distinct-cancel
+    regression coverage with its required-check readiness guardrail.
+  consumer_mode: '100755'
+  source_sha256: 69880f45910c25be259696c26e7362044e21b6cd715b1602bc119b4bea3c458a
+  consumer_sha256: c4d8ef00f739e307054d2298629a971efa916ed148b432c4ddf6a071505219d8
+- source: skills/pr-batch/bin/pr-security-preflight
+  consumer: ".agents/skills/pr-batch/bin/pr-security-preflight"
+  mode: identical
+- source: skills/pr-batch/bin/pr-security-preflight-test.rb
+  consumer: ".agents/skills/pr-batch/bin/pr-security-preflight-test.rb"
+  mode: identical
+- source: skills/pr-batch/lib/git_probe_env.rb
+  consumer: ".agents/skills/pr-batch/lib/git_probe_env.rb"
+  mode: identical
+- source: skills/pr-batch/trusted-github-actors.yml
+  consumer: ".agents/skills/pr-batch/trusted-github-actors.yml"
+  mode: identical
+- source: skills/update-changelog/bin/changelog-merged-prs
+  consumer: ".agents/skills/update-changelog/bin/changelog-merged-prs"
+  mode: identical
+- source: skills/update-changelog/bin/changelog-merged-prs-test.rb
+  consumer: ".agents/skills/update-changelog/bin/changelog-merged-prs-test.rb"
+  mode: identical
+- source: workflows/address-review.md
+  consumer: ".agents/workflows/address-review.md"
+  mode: overlay
+  reason: React on Rails resolves helpers through shared-skill-dir and invokes the
+    installed address-review skill.
+  consumer_mode: '100644'
+  source_sha256: 9337d46ed3d446c831e5b00f7c7310a40b0f0d981b6d8213a9ea7735b2e1aa31
+  consumer_sha256: c5060895bbf37e68305b9e4f936c7398c0c32380c4fb00b45ca378c543981ecb
+- source: workflows/adversarial-pr-review.md
+  consumer: ".agents/workflows/adversarial-pr-review.md"
+  mode: overlay
+  reason: React on Rails adds local helper resolution and repository-specific review-liveness
+    and approved-reviewer policy.
+  consumer_mode: '100644'
+  source_sha256: 5acf6a323b42b4fc48233874d066d82dbb5a0e52732cb60490ba2284ac8c929d
+  consumer_sha256: c79c743aa0771b976a01227b318ae842d586d848fc79e934207733d28832cdd6
+- source: workflows/continuous-evaluation-loop.md
+  consumer: ".agents/workflows/continuous-evaluation-loop.md"
+  mode: overlay
+  reason: React on Rails adds local helper resolution and installed shared-skill references.
+  consumer_mode: '100644'
+  source_sha256: 91fab43cedfb1bb241218a27b12949797bdb4570aa5f7044ec2d52434ecefab9
+  consumer_sha256: 8be582b5ceef546309b6ac797f89b0efe0e18a822b4c38f62a4687fe4ce96e2a
+- source: workflows/evaluate-issue.md
+  consumer: ".agents/workflows/evaluate-issue.md"
+  mode: overlay
+  reason: React on Rails resolves issue-evaluation workflows through installed shared
+    skills.
+  consumer_mode: '100644'
+  source_sha256: c9122e79ffe81325b0f08532900a3fcfa8a194e07a1b01e8b749af2d0e9d417d
+  consumer_sha256: 573bbbe4d77b4ba1db13a1ca0d5cbea0fbac9245a59e7cee391cd8d12f3f22e1
+- source: workflows/post-merge-audit.md
+  consumer: ".agents/workflows/post-merge-audit.md"
+  mode: overlay
+  reason: React on Rails adds local helper resolution and release-branch changelog
+    routing.
+  consumer_mode: '100644'
+  source_sha256: b290eded973c722015dbf4240a34a32734e59e69464dcf344bee113de17571f3
+  consumer_sha256: 7bd2418fc5b8bbe2b3385b86e82b09fd2f2cb0c39a3a493ac04f5a1e6d3ad195
+- source: workflows/pr-processing.md
+  consumer: ".agents/workflows/pr-processing.md"
+  mode: overlay
+  reason: React on Rails adds release-train, hosted-CI, coordination, review-coverage,
+    changelog-routing, and installed-helper policy.
+  consumer_mode: '100644'
+  source_sha256: 7d0fbef62293d3a59e2c7a63abc6863be39ceb6883c6bc11b6a1c9747d9ad6c7
+  consumer_sha256: 8d18e7414e23587a977c752cf48eb7459ca4b95d40199d7deacde013cd6d33d0
+- source: workflows/tdd.md
+  consumer: ".agents/workflows/tdd.md"
+  mode: overlay
+  reason: React on Rails routes narrow tests through the affected monorepo package
+    and repository tooling.
+  consumer_mode: '100644'
+  source_sha256: 6ded7dac5e37d3a4c747bc6da76a68537ece5a3935de2fa0b0fb7165a388dca1
+  consumer_sha256: 21083f536873afd1d657012fbc0da0f65bc312623c48efa332bfe0289ed98f56

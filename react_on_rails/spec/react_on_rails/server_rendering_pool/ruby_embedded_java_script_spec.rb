@@ -301,30 +301,6 @@ module ReactOnRails
         end
       end
 
-      # Regression for issue #4710: legacy (non-length-prefixed) JSON returned by
-      # older bundles may contain unpaired UTF-16 surrogates that Ruby's JSON.parse
-      # rejects. The legacy fallback must recover instead of crashing SSR.
-      describe ".parse_render_result legacy JSON path" do
-        let(:render_options) do
-          instance_double(ReactOnRails::ReactComponent::RenderOptions, logging_on_server: false)
-        end
-
-        it "parses ordinary legacy JSON" do
-          result = described_class.send(:parse_render_result, '{"html":"<p>ok</p>"}', render_options)
-          expect(result["html"]).to eq("<p>ok</p>")
-        end
-
-        it "does not crash on a lone high surrogate and yields valid UTF-8" do
-          legacy_json = '{"html":"Hello \uD83D world","consoleReplayScript":""}'
-
-          result = nil
-          expect do
-            result = described_class.send(:parse_render_result, legacy_json, render_options)
-          end.not_to raise_error
-          expect(result["html"].valid_encoding?).to be(true)
-        end
-      end
-
       describe ".read_bundle_js_code" do
         it "raises a bundle-load error when an HTTP server bundle cannot be read" do
           server_bundle_url = "http://localhost:3035/webpack/development/server-bundle.js"

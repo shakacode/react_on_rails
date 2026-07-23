@@ -70,6 +70,7 @@ exclude = [
   # BADGE AND CI SERVICES
   # ============================================================================
   '^https://badge\.fury\.io',  # Returns 403 for automated requests
+  '^https://img\.shields\.io/gem/dt/react_on_rails$',  # Repeatedly times out during full CI link sweeps
   '^https://coveralls\.io',    # Returns 503 for automated requests
 
   # ============================================================================

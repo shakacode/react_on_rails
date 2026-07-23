@@ -73,30 +73,53 @@ The tracking issue is the single source of truth for:
 ### Fast parallel launch
 
 Use the repo-local `$run-fleet-validation` skill to avoid hand-copying the fleet or pinning a
-candidate into six separate prompts. Its generator reads the hard gates from `demo-fleet.yml`,
-adds the monorepo generator/install gate, and emits six self-contained coordinator prompts
-balanced three-per-machine by default:
+candidate into six separate prompts. Its generator reads the complete `demo-fleet.yml` inventory,
+adds the monorepo generator/install gate and required release-path axes, and emits a lifecycle pack:
+release/capability preflight, six hard-gate coordinator prompts balanced three-per-machine by
+default, report-only soft-track coverage, a durable result ledger/schema, and independent closeout.
 
 From the repository root, run:
 
 ```bash
-ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/generate_prompts.rb \
   --machines local,m1 \
   --prompts 6 \
   --output-dir tmp/fleet-validation-prompts
 ```
 
 The default prompt contract resolves the **latest RC or beta** when each lane starts. Use
-`--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Launch every prompt listed in
-`tmp/fleet-validation-prompts/INDEX.md` simultaneously. Each prompt coordinates bounded subagents:
-one read-only live-evidence pass plus one isolated execution worker per assigned target. With the
-default partition, no coordinator receives more than two execution targets. Run each prompt as a
-separate top-level task; do not place all six under one shared four-slot agent tree.
+`--release vX.Y.Z.rc.N` only for a deliberately pinned rerun. Follow
+`tmp/fleet-validation-prompts/INDEX.md`: start prompt 1 for the exact snapshot and read-only generator
+matrix, run `PREFLIGHT.md`, start the remaining prompt coordinators, run
+`REPORT-ONLY.md`, then reserve a maker-independent checker for `CLOSEOUT.md`. Each prompt
+coordinates bounded subagents: one read-only live-evidence pass plus one isolated execution worker
+per assigned target. With the default partition, no coordinator receives more than two execution
+targets. Run each prompt as a separate top-level task; do not place all six under one shared
+four-slot agent tree.
+
+If the release-wide preflight finds an owned terminal blocker, do not manufacture passing app
+results to finish the ledger. Keep `APP_WORK_ALLOWED` false, retain the blocker ID and public-safe
+evidence, leave every app target untouched, keep the public marker pristine and unpublished, audit
+the blocked disposition with no maker IDs, and close aggregate merge/reachability and promotion
+exactly as `blocked`, not `hold`. When report-only
+tracks do run, their closeout evidence includes retained package versions/sources and terminal
+checks bound to the exact inspected head; those observed locks need not match the candidate
+snapshot, and `pending` or `unknown` is not a completed report. Candidate snapshot matching applies
+only to candidate-managed hard-gate packages, including the separately resolved RSC package, not
+independently versioned Shakapacker or Control Plane Flow dependencies.
+Untouched app rows may retain read-only package-lock probes, while validation-only generator
+evidence must use the pack's exact candidate commit.
 
 Prompt 1 is the release-snapshot leader. It resolves the latest product RC/beta and the separately
 versioned `react-on-rails-rsc` pin once, then posts the pack's unique snapshot marker. The other
 five prompts may start simultaneously but must wait for that exact marker before mutation. This
 prevents a newly published candidate from splitting a staggered launch across versions.
+
+The release-wide barrier also requires exact-commit CI, registry/tarball coherence, and the
+published standard/Pro/Pro+RSC generator matrix to be terminal green, or an explicit public-safe
+waiver allowed by this plan. Machine/session capability attestation and target capability/baseline
+probes run before expensive app work. Review-app state is classified as configured/runnable,
+configured/broken, not configured, or `UNKNOWN`; absence is recorded instead of inventing a deploy.
 
 Each lane must acquire or resume an authoritative coordination claim before creating a mutable app
 checkout. It must reuse live candidate ownership first and use the pack's generated fallback claim
@@ -105,10 +128,81 @@ not pack ID, so independently generated packs cannot race. Each lane then reuses
 idempotent marker comment per stable target identity to the tracking issue. Lanes must not
 concurrently rewrite the issue body. Generate a fresh pack and snapshot identity for every
 replacement candidate, even when the manifest is unchanged. Within one exact-candidate run, reuse
-that pack ID and rerun only the prompt files that own affected targets.
+the existing prompt files for affected targets. Regenerate a same-ID pack only when its original
+selector was pinned to the exact resolved candidate; after a dynamic `latest RC or beta` selector
+resolves, regeneration fails closed because it cannot prove that the selector has not advanced.
 
-The generated prompts accelerate the fleet hard gates; they do not replace the independent
-behavioral lanes in `release-verification-runbook.md` or the maintainer's final go/no-go decision.
+The candidate-scoped lifecycle is distinct from standing fleet-health automation: standing health
+detects currency/staleness between releases, while this pack proves one exact candidate and closes
+its release tracker. It is also distinct from hosted-CI dispatch and generator-routing
+optimizations: those shorten individual gates but do not supply inventory, blocker ownership,
+independent audit, merge/reachability, or closeout. The generated pack does not replace the
+independent behavioral lanes in `release-verification-runbook.md` or the maintainer's final
+promotion decision.
+
+The standing-health implementation uses the same canonical manifest but a separate public-only
+schema and evidence pack:
+
+```bash
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/check_fleet_health.rb \
+  --live \
+  --pack-id "fleet-health-stable-$(date -u +%Y%m%dT%H%M%SZ)" \
+  --policy-commit "$(git rev-parse HEAD)" \
+  --output-dir tmp/fleet-health-stable
+```
+
+The scheduled/default stable versions come from `standing_health.stable_release` and
+`standing_health.rsc_version` in the manifest. Pass explicit version flags only for a manual
+historical or forward-looking probe.
+Only explicitly public standing-health entries are queried. Active public targets gate the
+standing-health result; soft-track and archived targets are report-only. The evidence records
+exact-default-head currency, CI, reusable-smoke adoption, review-app capability, staleness, and
+Dependabot v1 conformance. It does not grant candidate promotion or mutate any demo.
+
+The checker validates one public-safe `result-ledger.json` and renders the append-only tracker
+matrix from that exact file:
+
+```bash
+bundle exec ruby .agents/skills/run-fleet-validation/scripts/validate_ledger.rb \
+  --ledger tmp/fleet-validation-prompts/result-ledger.json \
+  --expected-pack-id PACK_ID \
+  --expected-release-selector "GENERATED_RELEASE_SELECTOR" \
+  --expected-candidate vX.Y.Z.rc.N \
+  --expected-candidate-commit CANDIDATE_COMMIT_SHA \
+  --expected-policy-commit POLICY_COMMIT_SHA \
+  --expected-tracker-mode TRACKER_MODE \
+  --render-tracker tmp/fleet-validation-prompts/tracker-closeout.md
+```
+
+Every nonterminal blocker needs a durable issue or public-safe tracker-only reason before closeout.
+The independently supplied expected pack ID, generated release selector, candidate tag, source
+commit, policy commit, and tracker mode, plus the ledger's unique public preflight-marker record,
+must match the exact candidate snapshot before any distributed app work can validate. The rendered
+tracker path must remain distinct from the durable ledger path.
+Resolved package entries use the canonical `registry` source so local workspace/path overrides
+cannot stand in for published artifacts. Blocked outcomes must reference active owned blockers, and
+tracker promotion must be `blocked` exactly when a release blocker remains; `hold` is only a
+non-gating partial disposition.
+Waived and deferred blockers additionally retain a durable owner and need a structured disposition
+naming the gate, authority, evidence URL, and public-safe reason. A failed required path may close
+the run as `BLOCKED` only with its lane, failure evidence, and a `blocker_id` that resolves to a durable owner. Missing ownership,
+required-path coverage, current-head evidence, independent audit, merge authority, default
+reachability, tree parity, or any `UNKNOWN` keeps the ledger non-passing.
+An owned blocker referenced exclusively by soft-track inventory is non-gating follow-up and renders
+the run `PARTIAL`; it becomes release-gating when preflight, a hard gate, or a required path shares
+that blocker.
+
+Every mutable target records the stable canonical nonblank maker identity that performed its work,
+and the independent checker must differ from every maker after canonical comparison. The independent
+audit's maker list must exactly cover those target identities and retain replayable public-safe
+audit evidence. Each hard-gate check is bound to the target's exact audited, reviewed, and current
+revision. Product gem/npm versions must normalize to the selected candidate; the independently
+versioned RSC package retains its separately resolved version. Merge authority, freeze state,
+merge commit, reachability, and tree parity are recorded per mutable target, with a derived
+aggregate that can represent partial fleet merges without dropping landed-lane proof.
+The validation-only monorepo gate
+retains the exact OSS, Pro, node-renderer, RSC, and generator CLI versions exercised by its matrix,
+but it has no synthetic branch merge, per-target reachability, or tree-parity evidence.
 
 1. Cut the RC packages.
 2. Create or update the release-gate tracking issue from
