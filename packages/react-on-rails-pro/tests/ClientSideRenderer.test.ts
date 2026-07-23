@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { resetRailsContext } from 'react-on-rails/context';
+import { getRailsContext, resetRailsContext } from 'react-on-rails/context';
 import { supportsReact19RootErrorCallbacks } from 'react-on-rails/reactApis';
 import type { RailsContext, RendererFunction } from 'react-on-rails/types';
 import { resetRootErrorHandlers, setRootErrorHandlers } from 'react-on-rails/@internal/rootErrorHandlers';
@@ -131,6 +131,25 @@ describe('ClientSideRenderer', () => {
     addRailsContext();
     await renderOrHydrateComponent(componentSpec);
     expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses replacement RailsContext for immediate hydration before page-loaded callbacks', async () => {
+    const receivedPathnames: Array<string | undefined> = [];
+    const TestRenderer: RendererFunction = (_props, railsContext, _domNodeId) => {
+      receivedPathnames.push(railsContext?.pathname);
+    };
+    ComponentRegistry.register({ TestComponent: TestRenderer });
+    addRailsContext({ pathname: '/posts/1' });
+    await renderOrHydrateComponent(setupTestComponentDom('page-one'));
+
+    unmountAll();
+    getRailsContext();
+    const contextElement = document.getElementById('js-react-on-rails-context');
+    if (!contextElement) throw new Error('Expected RailsContext element');
+    contextElement.textContent = JSON.stringify({ serverSide: false, rorPro: true, pathname: '/posts/2' });
+    await renderOrHydrateComponent(setupTestComponentDom('page-two'));
+
+    expect(receivedPathnames).toEqual(['/posts/1', '/posts/2']);
   });
 
   it('does not cache a store renderer created before railsContext exists', async () => {
