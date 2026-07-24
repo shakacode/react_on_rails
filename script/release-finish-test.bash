@@ -177,7 +177,8 @@ setup_release_repo() {
 # Run release-finish with stdin closed (no TTY), capturing combined output.
 # Returns the exit status in RF_STATUS and output in RF_OUT.
 run_rf() {
-  RF_OUT="$(ruby "$RELEASE_FINISH" "$@" </dev/null 2>&1)"
+  local executable="${RELEASE_FINISH_UNDER_TEST:-$RELEASE_FINISH}"
+  RF_OUT="$(ruby "$executable" "$@" </dev/null 2>&1)"
   RF_STATUS=$?
 }
 
@@ -493,6 +494,19 @@ test_close_out_refuses_delete_when_forward_port_prs_remain() {
   fi
 }
 
+test_close_out_propagates_verifier_errors() {
+  setup_release_repo
+  git checkout -q main
+
+  run_rf close-out 9.9.9 --dry-run
+
+  assert_status 1 "$RF_STATUS" "close-out verifier-error status"
+  assert_contains "$RF_OUT" "source ref" "close-out verifier-error source"
+  assert_contains "$RF_OUT" "verification failed with status 3" "close-out verifier-error propagation"
+  assert_not_contains "$RF_OUT" "blocked until the separate forward-port PRs" \
+    "close-out verifier errors are not ordinary pending work"
+}
+
 # --- close-out: P1 stale-main guard ----------------------------------------
 
 # #2: local main behind origin/main must abort before forward-porting, so the
@@ -545,6 +559,63 @@ test_close_out_dry_run_fetches_before_main_sync_check() {
   assert_contains "$RF_OUT" "+ git fetch -- origin" "close-out dry-run stale-origin fetch"
   assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out dry-run stale-origin message"
   assert_not_contains "$RF_OUT" "Release forward-port plan" "close-out stale-origin should stop before preview"
+}
+
+prepare_post_check_remote_revert_wrapper() {
+  local wrapper_dir="$PWD/../race-bin"
+  mkdir -p "$wrapper_dir"
+  cp "$RELEASE_FINISH" "$wrapper_dir/release-finish"
+  cp "$SCRIPT_DIR/release-forward-port" "$wrapper_dir/release-forward-port-real"
+
+  cat > "$wrapper_dir/release-forward-port" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+wrapper_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$wrapper_dir/release-forward-port-real" "$@"
+rc=$?
+
+has_changelog=false
+has_check=false
+for arg in "$@"; do
+  [ "$arg" = "--changelog" ] && has_changelog=true
+  [ "$arg" = "--check" ] && has_check=true
+done
+
+marker="$wrapper_dir/remote-revert-fired"
+if [ "$rc" -eq 0 ] && [ "$has_changelog" = true ] && [ "$has_check" = true ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  writer="$wrapper_dir/origin-race-writer"
+  git clone -q "$(git remote get-url origin)" "$writer"
+  git -C "$writer" checkout -q main
+  git -C "$writer" config user.email test@example.com
+  git -C "$writer" config user.name "Release Finish Race Test"
+  forward_port_sha="$(git -C "$writer" log --format=%H --grep='Fix SSR regression' -n 1)"
+  git -C "$writer" revert --no-edit "$forward_port_sha" >/dev/null
+  git -C "$writer" push -q origin main
+fi
+
+exit "$rc"
+WRAPPER
+  chmod +x "$wrapper_dir/release-forward-port"
+  RACE_RELEASE_FINISH="$wrapper_dir/release-finish"
+}
+
+test_close_out_aborts_if_remote_main_advances_after_checks() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  prepare_post_check_remote_revert_wrapper
+
+  RELEASE_FINISH_UNDER_TEST="$RACE_RELEASE_FINISH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out post-check race status"
+  assert_contains "$RF_OUT" "All source and changelog forward-port work is complete on main" \
+    "close-out post-check race precondition"
+  assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out post-check race guard"
+  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out post-check race no delete"
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "post-check remote advancement deleted the release branch"
+  fi
 }
 
 # --- close-out: guard — not on main ----------------------------------------
@@ -626,8 +697,10 @@ run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
 run_test test_close_out_refuses_delete_when_changelog_pr_remains
 run_test test_close_out_refuses_delete_when_forward_port_prs_remain
+run_test test_close_out_propagates_verifier_errors
 run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_dry_run_fetches_before_main_sync_check
+run_test test_close_out_aborts_if_remote_main_advances_after_checks
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
 run_test test_rejects_rc_version_argument

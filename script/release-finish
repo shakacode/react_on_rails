@@ -30,6 +30,7 @@ require "open3"
 class ReleaseFinish
   STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
   SUBCOMMANDS = %w[promote close-out].freeze
+  FORWARD_PORT_INCOMPLETE_STATUS = 1
   # Resolve the sibling forward-port helper relative to this script so close-out
   # works regardless of the current directory (the runbook runs from repo root,
   # but the throwaway-repo tests run from a temp checkout).
@@ -310,12 +311,12 @@ class ReleaseFinish
     puts "Code plan (every remaining PICK/MANUAL item needs its own source-change PR):"
     code_args = ["--source", source, "--target", "main", "--check"]
     @options.fetch(:ack_manual).each { |sha| code_args.push("--ack-manual", sha) }
-    code_complete = system(FORWARD_PORT_SCRIPT, *code_args)
+    code_complete = run_forward_port_check(*code_args)
 
     puts
     puts "Changelog plan (remaining reconciliation needs its own squash PR):"
     changelog_complete =
-      system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main", "--changelog", "--check")
+      run_forward_port_check("--source", source, "--target", "main", "--changelog", "--check")
 
     if code_complete && changelog_complete
       puts "\nAll source and changelog forward-port work is complete on main."
@@ -324,6 +325,17 @@ class ReleaseFinish
 
     puts "\nNext: follow the runbook's one-source-PR-at-a-time loop, then merge the release/changelog squash PR."
     false
+  end
+
+  def run_forward_port_check(*)
+    launched = system(FORWARD_PORT_SCRIPT, *)
+    status = Process.last_status
+    raise GitError, "could not launch #{FORWARD_PORT_SCRIPT}" if launched.nil? || status.nil?
+
+    return true if status.success?
+    return false if status.exitstatus == FORWARD_PORT_INCOMPLETE_STATUS
+
+    raise GitError, "#{FORWARD_PORT_SCRIPT} verification failed with status #{status.exitstatus}"
   end
 
   def delete_release_branch!(release_branch, remote)
@@ -336,7 +348,7 @@ class ReleaseFinish
     end
 
     # SAFETY: never delete the source branch unless the verified local main is
-    # already reachable from the remote main.
+    # still exactly the remote main checked by the completion gate.
     ensure_forward_port_durable_on_remote!(remote)
 
     confirm_outward!(
@@ -390,22 +402,11 @@ class ReleaseFinish
   end
 
   # SAFETY GATE for the branch delete: re-fetch and require the checked local
-  # main tip to be reachable from remote main. The plan checks above establish
-  # semantic completeness; this reachability check prevents an operator from
-  # validating unpushed local work and then deleting the source branch.
+  # main tip to still equal remote main. Any advancement, including a revert or
+  # changelog rewrite after the semantic checks, requires a fresh close-out run.
   def ensure_forward_port_durable_on_remote!(remote)
     fetch_remote!(remote)
-    remote_main = "#{remote}/main"
-    local_main = git("rev-parse", "main").strip
-    return if commit_reachable_from?(local_main, remote_main)
-
-    raise AbortError, <<~ERROR.strip
-      the forward-ported commits on local main are not yet on #{remote_main}.
-      Push main before deleting the source branch — its unique commits would
-      otherwise be lost (tags do not preserve the forward-port onto main):
-        git push   # or merge the forward-port PR into main
-      Then re-run: script/release-finish close-out #{@options.fetch(:version)}
-    ERROR
+    ensure_local_main_matches_remote!(remote)
   end
 
   def ensure_clean_worktree!

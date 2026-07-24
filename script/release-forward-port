@@ -7,6 +7,7 @@ require "digest"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
+  CHECK_ERROR_STATUS = 3
   VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
   CHANGELOG_FILE = "CHANGELOG.md"
   # Project convention is `X.Y.Z.rc.N`, but a release branch can still contain a
@@ -24,8 +25,15 @@ class ReleaseForwardPort
   }ix
   PR_NUMBER_LIST_PATTERN = /#\d+(?:\s*,\s*#\d+)*(?:\s*,?\s+and\s+#\d+)?/i
   EXPLICIT_BACKPORT_PATTERN =
-    /\bbackports?\s+(?:merged\s+)?(?:source\s+PR\s+)?(?<prs>#{PR_NUMBER_LIST_PATTERN})/io
-  FROM_BACKPORT_PATTERN = /\bbackports?\b.*?\bfrom\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})/io
+    /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+(?:to|onto)\b/io
+  FROM_BACKPORT_PATTERN =
+    /\A\s*backports?\s+(?:the|this|these)\b.*?\bfrom\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})/io
+  MERGED_REPLACEMENT_PATTERN = /
+    \A\s*-\s+replaces?\b.*?\bwith\b.*?\balready\s+reviewed\s+and\s+merged\s+in\s+
+    (?<prs>#{PR_NUMBER_LIST_PATTERN})
+  /iox
+  COMPOSITE_BACKPORT_PATTERN =
+    /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+and\s+includes\s+the\s+reviewed\b/io
   PRERELEASE_RANKS = {
     "dev" => 0,
     "test" => 1,
@@ -44,7 +52,14 @@ class ReleaseForwardPort
   NARRATED_FORWARD_PORT_PATTERN =
     /^\s*-\s+cherry-picked\b.*\bwith\s+`?(?:git\s+)?cherry-pick\s+-x`?\s*$/i
   NARRATED_SOURCE_PR_FORWARD_PORT_PATTERN =
-    /\bforward-ports?\b.*\b(?:release|source)\s+PR\s+#\d+/i
+    /\A-\s+forward-ports?\b.*\b(?:release|source)\s+PR\s+#\d+/i
+  NARRATED_SOURCE_SHA_PROVENANCE_PATTERN = /
+    \A(?:the|this)\s+(?:forward-port\s+)?commit\s+(?:retains|records)\s+
+    `?(?:git\s+)?cherry-pick\s+-x`?\s+provenance\s+from\s+
+    source(?:\s+squash)?\s+commit\s+`?(?<sha>[0-9a-f]{12,40})`?\.?\z
+  /ix
+  NARRATED_REVIEW_FIX_FORWARD_PORT_PATTERN =
+    /\Aforward-port\s+the\s+review\s+fix\s+from\s+release\s+PR\s+#(?<pr>\d+)\b/i
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
@@ -100,7 +115,7 @@ class ReleaseForwardPort
     2
   rescue GitError => e
     warn "ERROR: #{e.message}"
-    1
+    @options[:check] ? CHECK_ERROR_STATUS : 1
   end
 
   private
@@ -369,7 +384,7 @@ class ReleaseForwardPort
   end
 
   def targeted_patch_equivalent_skip_reason(sha, subject, target)
-    identity_candidates = target_history_source_identity_candidates(subject, target)
+    identity_candidates = target_history_source_identity_candidates(sha, subject, target)
     return "already forward-ported to #{target} via source-bound forward-port narration with no later target revert" if
       identity_candidates.any? do |target_sha|
         narrated_forward_port_commit_live?(target_sha, target, source_sha: sha, source_subject: subject)
@@ -389,8 +404,8 @@ class ReleaseForwardPort
     "patch already exists on #{target} according to target history with no later standard revert"
   end
 
-  def target_history_source_identity_candidates(subject, target)
-    ([subject] + subject.scan(/#\d+/)).uniq.flat_map do |source_identity|
+  def target_history_source_identity_candidates(sha, subject, target)
+    ([sha, sha[0, 12], subject] + subject.scan(/#\d+/)).uniq.flat_map do |source_identity|
       target_history_commits_mentioning(source_identity, target)
     end.uniq
   end
@@ -420,16 +435,29 @@ class ReleaseForwardPort
   def narrated_forward_port_commit_live?(sha, target, source_sha:, source_subject:)
     body = git("log", "-1", "--format=%B", sha)
     target_subject = subject_for_commit(sha)
+    exact_source_provenance = exact_source_sha_provenance?(body, target_subject, source_sha)
+    narrated = source_pr_narration_present?(body, target_subject, source_sha, source_subject)
+    (exact_source_provenance || narrated) && target_commit_live_on_target?(sha, target)
+  end
+
+  def exact_source_sha_provenance?(body, target_subject, source_sha)
+    return false unless target_subject&.match?(/\AForward-port\b/i)
+
+    body.split(/\n\s*\n/).any? do |paragraph|
+      match = paragraph.gsub(/\s+/, " ").strip.match(NARRATED_SOURCE_SHA_PROVENANCE_PATTERN)
+      match && source_sha.start_with?(match[:sha])
+    end
+  end
+
+  def source_pr_narration_present?(body, target_subject, source_sha, source_subject)
     narration_segments = forward_port_narration_segments(body).select do |segment|
       segment.match?(NARRATED_FORWARD_PORT_PATTERN) ||
         (target_subject&.match?(/\AForward-port\b/i) &&
-          (segment.match?(/`git cherry-pick -x`/i) ||
-            segment.match?(NARRATED_SOURCE_PR_FORWARD_PORT_PATTERN)))
+          segment.match?(NARRATED_SOURCE_PR_FORWARD_PORT_PATTERN))
     end
-    narrated = narration_segments.any? do |segment|
+    narration_segments.any? do |segment|
       narrated_line_names_source?(segment, source_sha, source_subject)
     end
-    narrated && target_commit_live_on_target?(sha, target)
   end
 
   def forward_port_narration_segments(body)
@@ -696,22 +724,55 @@ class ReleaseForwardPort
     subject = subject_for_commit(sha).to_s
     release_pr_numbers = subject.scan(/#(\d+)/).flatten
     body = git("log", "-1", "--format=%B", sha)
+    composite_pr_numbers = composite_backport_pr_numbers(body)
+    if composite_pr_numbers.any?
+      return target_pr_numbers_live?(composite_pr_numbers, target) &&
+             review_fix_forward_ported_from_release_pr?(release_pr_numbers, target)
+    end
+
     narrated_pr_numbers = narrated_upstream_pr_numbers(body)
 
     upstream_pr_numbers = (narrated_pr_numbers - release_pr_numbers).uniq
-    upstream_pr_numbers.any? && upstream_pr_numbers.all? do |pr_number|
+    upstream_pr_numbers.any? && target_pr_numbers_live?(upstream_pr_numbers, target)
+  end
+
+  def composite_backport_pr_numbers(body)
+    forward_port_narration_segments(body).flat_map do |segment|
+      match = segment.match(COMPOSITE_BACKPORT_PATTERN)
+      match ? match[:prs].scan(/#(\d+)/).flatten : []
+    end.uniq
+  end
+
+  def target_pr_numbers_live?(pr_numbers, target)
+    pr_numbers.all? do |pr_number|
       target_pr_commit_shas(pr_number, target).any? { |target_sha| target_commit_live_on_target?(target_sha, target) }
     end
   end
 
-  def narrated_upstream_pr_numbers(body)
-    body.each_line.flat_map do |line|
-      numbers = line.scan(/\b(?:main|source)\s+PR\s+#(\d+)/i).flatten
+  def review_fix_forward_ported_from_release_pr?(release_pr_numbers, target)
+    release_pr_numbers.any? do |pr_number|
+      target_history_commits_mentioning("release PR ##{pr_number}", target).any? do |target_sha|
+        next false unless subject_for_commit(target_sha)&.match?(/\bforward-port\b/i)
 
-      explicit_backport = line.match(EXPLICIT_BACKPORT_PATTERN)
-      from_backport = line.match(FROM_BACKPORT_PATTERN)
+        body = git("log", "-1", "--format=%B", target_sha)
+        narrated = body.split(/\n\s*\n/).any? do |paragraph|
+          match = paragraph.gsub(/\s+/, " ").strip.match(NARRATED_REVIEW_FIX_FORWARD_PORT_PATTERN)
+          match && match[:pr] == pr_number
+        end
+        narrated && target_commit_live_on_target?(target_sha, target)
+      end
+    end
+  end
+
+  def narrated_upstream_pr_numbers(body)
+    forward_port_narration_segments(body).flat_map do |segment|
+      explicit_backport = segment.match(EXPLICIT_BACKPORT_PATTERN)
+      from_backport = segment.match(FROM_BACKPORT_PATTERN)
+      merged_replacement = segment.match(MERGED_REPLACEMENT_PATTERN)
+      numbers = []
       numbers.concat(explicit_backport[:prs].scan(/#(\d+)/).flatten) if explicit_backport
       numbers.concat(from_backport[:prs].scan(/#(\d+)/).flatten) if from_backport
+      numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
       numbers
     end.uniq
   end
@@ -1301,6 +1362,10 @@ class ReleaseForwardPort
     target_changelog = changelog_at(target, label: "target")
 
     release_version = release_version_from_ref(source)
+    authoritative_sha =
+      authoritative_final_changelog_commit(source, target, target_changelog, release_version)
+    return finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha) if authoritative_sha
+
     reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:, release_version:)
     result = reconciler.reconcile
 
@@ -1331,6 +1396,61 @@ class ReleaseForwardPort
 
   def release_version_from_ref(ref)
     ref.match(%r{(?:\A|/)release/(?<version>\d+\.\d+\.\d+)\z})&.[](:version)
+  end
+
+  def authoritative_final_changelog_commit(source, target, target_changelog, release_version)
+    return unless release_version
+
+    source_time = git("show", "-s", "--format=%ct", source).to_i
+    subject_pattern =
+      /\ARecord the final React on Rails #{Regexp.escape(release_version)} changelog \(#\d+\)\z/
+    candidates =
+      git_lines(
+        "log",
+        target,
+        "--fixed-strings",
+        "--grep",
+        "final React on Rails #{release_version} changelog",
+        "--format=%H"
+      )
+
+    candidates.find do |sha|
+      next false unless subject_for_commit(sha)&.match?(subject_pattern)
+      next false unless changed_paths_for_commit(sha) == [CHANGELOG_FILE]
+      next false unless target_commit_live_on_target?(sha, target)
+      next false if git("show", "-s", "--format=%ct", sha).to_i < source_time
+
+      recorded_changelog = changelog_at(sha, label: "authoritative final changelog")
+      changelog_section(recorded_changelog, release_version) ==
+        changelog_section(target_changelog, release_version)
+    end
+  end
+
+  def changelog_section(changelog, version)
+    lines = changelog.lines
+    start_index = lines.index { |line| line.match?(/^### \[#{Regexp.escape(version)}\](?:\s|$)/) }
+    return unless start_index
+
+    end_index =
+      ((start_index + 1)...lines.length).find { |index| lines[index].match?(/^### \[/) } || lines.length
+    lines[start_index...end_index].join
+  end
+
+  def finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha)
+    puts "Release forward-port CHANGELOG.md reconciliation plan"
+    puts "  source: #{source}"
+    puts "  target: #{target}"
+    puts
+    puts "Authoritative final #{release_version} changelog is unchanged on #{target}."
+    puts "  commit: #{authoritative_sha[0, 12]}"
+    puts "  superseded prerelease entries intentionally omitted by the dedicated final changelog PR"
+
+    if @options[:check]
+      puts "\nCHECK PASSED: the release changelog is already reconciled on the target."
+    else
+      puts "\nNothing to reconcile; the dedicated final changelog PR is authoritative."
+    end
+    0
   end
 
   def apply_changelog_reconciliation(target, result)

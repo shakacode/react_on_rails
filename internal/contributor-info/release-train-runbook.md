@@ -326,15 +326,21 @@ script/release-forward-port \
 git diff --check
 git add CHANGELOG.md
 git commit -m "Reconcile X.Y.Z release changelog on main"
-# Validate, push, and open the dedicated release/changelog PR to main.
+# Validate, push, and open the dedicated release/changelog PR to main. Squash it with:
+# Record the final React on Rails X.Y.Z changelog (#<pr-number>)
 ```
 
 - Treat the dry-run plan as a queue, not one combined forward-port branch. Land one missing source
   change per PR, wait for it to merge, fetch the new `origin/main`, and then plan the next PR. Prefer
   a history-preserving rebase merge for source-change PRs. If the repository merge queue enforces a
   squash, the one-change-per-PR boundary is mandatory and the PR title/body must identify the release
-  source commit and source PR.
-- Squash the dedicated changelog/release reconciliation PR. Do not mix source changes into it.
+  source commit and source PR. Use this exact positive provenance sentence in the PR body so the
+  squash commit remains machine-checkable even when Markdown wraps it:
+  `The commit retains \`cherry-pick -x\` provenance from source squash commit \`<40-character-sha>\`.`
+- Squash the dedicated changelog/release reconciliation PR with
+  `Record the final React on Rails X.Y.Z changelog (#<pr-number>)`. Do not mix source changes into it.
+  That changelog-only commit is the authoritative final release record while its `X.Y.Z` section remains
+  byte-for-byte unchanged on `main`; this permits reviewed consolidation of superseded RC-only entries.
 - Do not create empty marker or provenance-only commits for `SKIP` entries. A commit marked already
   present, patch-equivalent, changelog-only, version-only, generated-only, or empty is evidence that
   no source PR is needed. The helper's empty-commit guard specifically prevents no-op forward-port
@@ -351,9 +357,10 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   backport body explicitly names its upstream PR, the helper can use a zero-context path-scoped match so
   harmless neighboring context drift does not hide an otherwise identical patch.
 - Adapted backports can record stronger provenance instead of byte-equivalent patches. The helper recognizes
-  a narrated main commit SHA cherry-picked with `-x`, an explicit upstream PR in a release backport body, or
-  a target `Forward-port ...` commit that names the release PR and records `git cherry-pick -x`. It skips only
-  while the identified target commit remains live; a later standard revert makes the source eligible again.
+  the exact source-SHA sentence above, positive action lines such as `Backports #123 to the release train`,
+  and reviewed replacement/forward-port forms covered by the release tooling specs. Incidental, contrastive,
+  or negated prose such as `not a backport from main PR #123` is never authoritative. The helper skips only
+  while every identified target commit remains live; a later standard revert makes the source eligible again.
 - Generated-only `llms-full.txt` / `llms-full-pro.txt` commits are skipped because release artifacts can be
   stale relative to current target documentation. Regenerate both files from the resolved target sources.
 - An interim prerelease package pin is skipped only when a later stable source commit names the same stable
@@ -469,7 +476,9 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 `git fetch`, asserts you are on a clean and current `main`, and runs the real
 `script/release-forward-port --check` code and changelog plans. It does not apply release commits to
 `main`; step 3's separate PRs must already be merged. Only after both checks pass does it ask for
-confirmation before deleting the release branch on the remote. Pass `--ack-manual <sha>` for each
+confirmation before deleting the release branch on the remote. A final fetch must still find local
+`main` exactly equal to `origin/main`; any intervening commit requires rerunning both checks. Pass
+`--ack-manual <sha>` for each
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. Preview everything first with `--dry-run`:
 
