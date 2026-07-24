@@ -312,7 +312,7 @@ script/release-forward-port \
 # Validate, push, open the PR to main, and merge it before repeating from a freshly fetched origin/main.
 
 # After every source-change PR has merged, use a separate release/changelog branch and PR.
-git fetch origin main
+git fetch --prune origin main
 git switch -c release/reconcile-17.0.0-changelog origin/main
 script/release-forward-port \
   --source origin/release/17.0.0 \
@@ -371,8 +371,12 @@ git commit -m "Reconcile 17.0.0 release changelog on main"
   backport body explicitly names its upstream PR, the helper can use a zero-context path-scoped match so
   harmless neighboring context drift does not hide an otherwise identical patch.
 - Adapted backports can record stronger provenance instead of byte-equivalent patches. The helper recognizes
-  the exact source-SHA sentence above, positive action lines such as `Backports #123 to the release train`,
-  and reviewed replacement/forward-port forms covered by the release tooling specs. Incidental, contrastive,
+  the exact source-SHA sentence above, an explicit whole-commit statement such as
+  `This is equivalent to main PR #123 with release-specific behavior preserved.`, and reviewed
+  replacement/forward-port forms covered by the release tooling specs. The source commit's non-changelog
+  paths must also be covered by the identified target commits. A generic action line such as
+  `Backports #123 to the release train` proves only the source relationship, not whole-commit equivalence,
+  so the helper reports `MANUAL` for inspection instead of silently skipping it. Incidental, contrastive,
   or negated prose such as `not a backport from main PR #123` is never authoritative. The helper skips only
   while every identified target commit remains live; a later standard revert makes the source eligible again.
 - Generated-only `llms-full.txt` / `llms-full-pro.txt` commits are skipped because release artifacts can be

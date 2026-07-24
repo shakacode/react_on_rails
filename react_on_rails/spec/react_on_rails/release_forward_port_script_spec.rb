@@ -961,6 +961,68 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not let generic backport narration hide release-only changes" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      commit_all(repo, "Fix release regression on main (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nrelease-adapted fix\n")
+      write_file(repo, "release-only.txt", "release-only follow-up\n")
+      git(repo, "add", "app.txt", "release-only.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Backports #123 to the release train."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1), stderr
+      expect(stdout).to include("MANUAL #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR already present on main")
+    end
+  end
+
+  it "does not trust an equivalence sentence when the source commit changes an uncovered path" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      commit_all(repo, "Fix release regression on main (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nrelease-adapted fix\n")
+      write_file(repo, "release-only.txt", "release-only follow-up\n")
+      git(repo, "add", "app.txt", "release-only.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Backports #123 to the release train.",
+        "-m",
+        "This is equivalent to main PR #123 with release-specific behavior preserved."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1), stderr
+      expect(stdout).to include("MANUAL #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR already present on main")
+    end
+  end
+
   it "recognizes a backport action that replaces code with an already-merged implementation" do
     with_release_repo do |repo|
       write_file(repo, "app.txt", "base\nmain scanner fix\n")

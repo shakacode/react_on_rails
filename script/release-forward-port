@@ -32,6 +32,9 @@ class ReleaseForwardPort
     \A\s*-\s+replaces?\b.*?\bwith\b.*?\balready\s+reviewed\s+and\s+merged\s+in\s+
     (?<prs>#{PR_NUMBER_LIST_PATTERN})
   /iox
+  EXPLICIT_EQUIVALENT_MAIN_PR_PATTERN = /
+    \A\s*this\s+is\s+equivalent\s+to\s+main\s+PR\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\b
+  /iox
   COMPOSITE_BACKPORT_PATTERN =
     /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+and\s+includes\s+the\s+reviewed\b/io
   PROVENANCE_NEGATION_PATTERN = /
@@ -397,7 +400,19 @@ class ReleaseForwardPort
     # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
-    patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
+    patch_or_narrated_manual_reason(sha, subject, target, patch_equivalent_commits)
+  end
+
+  def patch_or_narrated_manual_reason(sha, subject, target, patch_equivalent_commits)
+    patch_reason = patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
+    return patch_reason if patch_reason
+
+    return unless source_narrated_pr_reference_on_target?(sha, target)
+
+    manual_skip_reason(
+      "source commit names a live upstream PR on #{target}, but does not prove whole-commit equivalence; " \
+      "inspect its release-specific hunks before acknowledging it"
+    )
   end
 
   def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
@@ -774,12 +789,31 @@ class ReleaseForwardPort
     body = git("log", "-1", "--format=%B", sha)
     composite_pr_numbers = composite_backport_pr_numbers(body)
     narrated_pr_numbers = narrated_upstream_pr_numbers(body)
-    upstream_pr_numbers = (composite_pr_numbers + narrated_pr_numbers - release_pr_numbers).uniq
     if composite_pr_numbers.any?
+      upstream_pr_numbers = (composite_pr_numbers + narrated_pr_numbers - release_pr_numbers).uniq
+      review_fix_shas = review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
       return upstream_pr_numbers.any? &&
              target_pr_numbers_live?(upstream_pr_numbers, target) &&
-             review_fix_forward_ported_from_release_pr?(release_pr_numbers, target)
+             review_fix_shas.any? &&
+             source_paths_covered_by_target_commits?(
+               sha,
+               target_pr_commit_shas_for(upstream_pr_numbers, target) + review_fix_shas
+             )
     end
+
+    equivalent_pr_numbers = narrated_equivalent_upstream_pr_numbers(body) - release_pr_numbers
+    equivalent_pr_numbers.any? &&
+      target_pr_numbers_live?(equivalent_pr_numbers, target) &&
+      source_paths_covered_by_target_commits?(sha, target_pr_commit_shas_for(equivalent_pr_numbers, target))
+  end
+
+  def source_narrated_pr_reference_on_target?(sha, target)
+    release_pr_number = source_pr_number_from_subject(subject_for_commit(sha).to_s)
+    release_pr_numbers = release_pr_number ? [release_pr_number] : []
+    body = git("log", "-1", "--format=%B", sha)
+    return false if composite_backport_pr_numbers(body).any?
+
+    upstream_pr_numbers = narrated_upstream_pr_numbers(body) - release_pr_numbers
 
     upstream_pr_numbers.any? && target_pr_numbers_live?(upstream_pr_numbers, target)
   end
@@ -799,16 +833,31 @@ class ReleaseForwardPort
     end
   end
 
-  def review_fix_forward_ported_from_release_pr?(release_pr_numbers, target)
-    release_pr_numbers.any? do |pr_number|
-      target_history_commits_mentioning("release PR ##{pr_number}", target).any? do |target_sha|
+  def target_pr_commit_shas_for(pr_numbers, target)
+    pr_numbers.flat_map do |pr_number|
+      target_pr_commit_shas(pr_number, target).select do |target_sha|
+        target_commit_live_on_target?(target_sha, target)
+      end
+    end.uniq
+  end
+
+  def source_paths_covered_by_target_commits?(source_sha, target_shas)
+    source_paths = changed_paths_for_commit(source_sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    target_paths = target_shas.flat_map { |target_sha| changed_paths_for_commit(target_sha) }.uniq
+
+    source_paths.any? && (source_paths - target_paths).empty?
+  end
+
+  def review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
+    release_pr_numbers.flat_map do |pr_number|
+      target_history_commits_mentioning("release PR ##{pr_number}", target).select do |target_sha|
         next false unless subject_for_commit(target_sha)&.match?(/\bforward-port\b/i)
 
         body = git("log", "-1", "--format=%B", target_sha)
         narrated = body.split(/\n\s*\n/).any? { |paragraph| narrated_review_fix_matches?(paragraph, pr_number) }
         narrated && target_commit_live_on_target?(target_sha, target)
       end
-    end
+    end.uniq
   end
 
   def narrated_review_fix_matches?(paragraph, pr_number)
@@ -829,6 +878,19 @@ class ReleaseForwardPort
       numbers = []
       numbers.concat(explicit_backport[:prs].scan(/#(\d+)/).flatten) if explicit_backport
       numbers.concat(from_backport[:prs].scan(/#(\d+)/).flatten) if from_backport
+      numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
+      numbers
+    end.uniq
+  end
+
+  def narrated_equivalent_upstream_pr_numbers(body)
+    forward_port_narration_segments(body).flat_map do |segment|
+      next [] unless authoritative_provenance_segment?(segment)
+
+      explicit_equivalence = segment.match(EXPLICIT_EQUIVALENT_MAIN_PR_PATTERN)
+      merged_replacement = segment.match(MERGED_REPLACEMENT_PATTERN)
+      numbers = []
+      numbers.concat(explicit_equivalence[:prs].scan(/#(\d+)/).flatten) if explicit_equivalence
       numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
       numbers
     end.uniq
@@ -1140,7 +1202,7 @@ class ReleaseForwardPort
   end
 
   def generated_llm_artifact_changed?(sha)
-    (changed_paths_for_commit(sha) & GENERATED_LLM_FILES).any?
+    changed_paths_for_commit(sha).intersect?(GENERATED_LLM_FILES)
   end
 
   def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil, zero_context: false)
