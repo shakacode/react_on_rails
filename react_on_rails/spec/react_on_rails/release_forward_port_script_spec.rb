@@ -1051,6 +1051,44 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not mistake an upstream title reference for the composite backport's release PR" do
+    with_release_repo do |repo|
+      shared_base_sha = git(repo, "rev-parse", "HEAD").strip
+      write_file(repo, "base-fix.txt", "main implementation\n")
+      commit_all(repo, "Fix prerelease retry ambiguity (#789)")
+      write_file(repo, "unrelated-review.txt", "unrelated review change\n")
+      git(repo, "add", "unrelated-review.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port an unrelated review guard (#999)",
+        "-m",
+        "Forward-port the review fix from release PR #123."
+      )
+
+      git(repo, "checkout", "-b", "release/1.0.1", shared_base_sha)
+      write_file(repo, "base-fix.txt", "release-adapted implementation\n")
+      write_file(repo, "release-review.txt", "required release review guard\n")
+      git(repo, "add", "base-fix.txt", "release-review.txt")
+      release_sha = commit_all(
+        repo,
+        "Backport upstream #123 with reviewed guard (#456)\n\n" \
+        "Backports #789 and includes the reviewed release-only guard."
+      )
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+      expect(stdout).to include("PICK #{release_sha[0, 12]} Backport upstream #123 with reviewed guard (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR already present on main")
+    end
+  end
+
   it "does not trust negated or contrastive backport prose as provenance" do
     with_release_repo do |repo|
       write_file(repo, "app.txt", "base\nunrelated main change\n")
@@ -1463,6 +1501,36 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression (#11)")
+      expect(stdout).not_to include("source-bound forward-port narration")
+    end
+  end
+
+  it "uses only the terminal squash trailer as the source PR identity" do
+    with_release_repo do |repo|
+      shared_base_sha = git(repo, "rev-parse", "HEAD").strip
+      write_file(repo, "other.txt", "unrelated main behavior\n")
+      git(repo, "add", "other.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port unrelated upstream work (#999)",
+        "-m",
+        "- cherry-picked release PR #123 with `git cherry-pick -x`"
+      )
+
+      git(repo, "checkout", "-b", "release/1.0.1", shared_base_sha)
+      write_file(repo, "needed.txt", "required release behavior\n")
+      fix_sha = commit_all(repo, "Backport upstream #123 for release (#456)")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Backport upstream #123 for release (#456)")
       expect(stdout).not_to include("source-bound forward-port narration")
     end
   end

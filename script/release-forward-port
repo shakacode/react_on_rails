@@ -70,6 +70,7 @@ class ReleaseForwardPort
   /ix
   NARRATED_REVIEW_FIX_FORWARD_PORT_PATTERN =
     /\Aforward-port\s+the\s+review\s+fix\s+from\s+release\s+PR\s+#(?<pr>\d+)\b/i
+  SOURCE_PR_TRAILER_PATTERN = /\(#(?<pr>\d+)\)\z/
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
@@ -510,9 +511,13 @@ class ReleaseForwardPort
   def narrated_line_names_source?(line, source_sha, source_subject)
     return true if line.include?(source_sha) || line.include?(source_sha[0, 12])
 
-    source_subject.scan(/#(\d+)/).flatten.any? do |pr_number|
-      line.match?(/(?<!\d)##{Regexp.escape(pr_number)}(?!\d)/)
-    end
+    source_pr_number = source_pr_number_from_subject(source_subject)
+    source_pr_number && line.match?(/(?<!\d)##{Regexp.escape(source_pr_number)}(?!\d)/)
+  end
+
+  def source_pr_number_from_subject(subject)
+    match = subject.to_s.match(SOURCE_PR_TRAILER_PATTERN)
+    match && match[:pr]
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)
@@ -762,7 +767,8 @@ class ReleaseForwardPort
 
   def source_narrated_pr_origin_on_target?(sha, target)
     subject = subject_for_commit(sha).to_s
-    release_pr_numbers = subject.scan(/#(\d+)/).flatten
+    release_pr_number = source_pr_number_from_subject(subject)
+    release_pr_numbers = release_pr_number ? [release_pr_number] : []
     body = git("log", "-1", "--format=%B", sha)
     composite_pr_numbers = composite_backport_pr_numbers(body)
     narrated_pr_numbers = narrated_upstream_pr_numbers(body)
