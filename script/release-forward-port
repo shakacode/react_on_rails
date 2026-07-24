@@ -1425,6 +1425,8 @@ class ReleaseForwardPort
 
     release_version = release_version_from_ref(source)
     reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:, release_version:)
+    return 1 if missing_source_release_section_check?(source, release_version, reconciler)
+
     authoritative_sha =
       authoritative_final_changelog_commit(
         source,
@@ -1439,19 +1441,17 @@ class ReleaseForwardPort
         return finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha)
       end
 
-      print_changelog_reconciliation_plan(source, target, residue)
-      return check_changelog_plan(residue) if @options[:check]
-
-      if @options[:dry_run]
-        puts "\nDRY RUN: CHANGELOG.md was not modified and no branch was checked out."
-        return 0
-      end
-
-      return apply_changelog_reconciliation(target, residue)
+      return finish_changelog_reconciliation(source, target, residue)
     end
 
     result = reconciler.reconcile
+    finish_changelog_reconciliation(source, target, result)
+  rescue ChangelogReconciler::ReconcileError => e
+    # Map the reconciler's own error onto the shared GitError exit path.
+    raise GitError, e.message
+  end
 
+  def finish_changelog_reconciliation(source, target, result)
     print_changelog_reconciliation_plan(source, target, result)
 
     return check_changelog_plan(result) if @options[:check]
@@ -1462,9 +1462,14 @@ class ReleaseForwardPort
     end
 
     apply_changelog_reconciliation(target, result)
-  rescue ChangelogReconciler::ReconcileError => e
-    # Map the reconciler's own error onto the shared GitError exit path.
-    raise GitError, e.message
+  end
+
+  def missing_source_release_section_check?(source, release_version, reconciler)
+    return false unless @options[:check] && release_version
+    return false if reconciler.source_release_section_present?
+
+    warn "CHECK FAILED: #{source} has no matching stable or prerelease #{release_version} changelog section."
+    true
   end
 
   def check_changelog_plan(result)
@@ -1993,8 +1998,12 @@ class ChangelogReconciler
     return false unless @release_version
 
     source = parse_sections(@source_changelog)
-    source_release_base_version(source) == @release_version &&
+    source_release_section_present?(source) &&
       section_entries(find_unreleased(source)).empty?
+  end
+
+  def source_release_section_present?(source = parse_sections(@source_changelog))
+    source_release_base_version(source) == @release_version
   end
 
   # Even after a final changelog PR, a later mixed cherry-pick can reintroduce an

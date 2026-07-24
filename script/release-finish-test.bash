@@ -480,6 +480,37 @@ test_close_out_refuses_delete_when_changelog_pr_remains() {
   fi
 }
 
+test_close_out_refuses_mismatched_source_changelog_completion() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+
+  git checkout -q release/1.0.0
+  printf '# Change Log\n\n### [Unreleased]\n\n### [0.9.0]\n\n#### Fixed\n\n- Older release\n' > CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Replace source with mismatched changelog section"
+  git push -q origin release/1.0.0
+
+  git checkout -q main
+  printf '# Change Log\n\n### [Unreleased]\n\n### [1.0.0.rc.1]\n\n#### Fixed\n\n- RC residue\n' > CHANGELOG.md
+  git add CHANGELOG.md
+  git commit -qm "Retain target RC residue"
+  git push -q origin main
+  git fetch -q origin
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out mismatched-source status"
+  assert_contains "$RF_OUT" "no matching stable or prerelease 1.0.0 changelog section" \
+    "close-out mismatched-source explanation"
+  assert_contains "$RF_OUT" "release close-out is not complete on origin/main" \
+    "close-out mismatched-source completion gate"
+  assert_not_contains "$RF_OUT" "Delete the ephemeral branch" \
+    "close-out mismatched-source stops before delete"
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "mismatched source changelog allowed release branch deletion"
+  fi
+}
+
 # --- close-out: refuse direct local application when forward-port PRs remain -
 
 # Close-out is now a completion gate, not an all-at-once mutator. When source or
@@ -813,6 +844,75 @@ test_close_out_restores_release_branch_if_main_races_during_delete() {
   fi
 }
 
+prepare_post_delete_source_recreation_wrapper() {
+  local origin_dir="$PWD/../origin.git"
+  local writer_dir="$PWD/../source-recreation-writer"
+  local wrapper_dir="$PWD/../source-recreation-bin"
+
+  git clone -q "$origin_dir" "$writer_dir"
+  git -C "$writer_dir" checkout -q release/1.0.0
+  git -C "$writer_dir" config user.email test@example.com
+  git -C "$writer_dir" config user.name "Release Finish Source Recreation Test"
+  printf 'source recreated after deletion\n' > "$writer_dir/recreated-source.txt"
+  git -C "$writer_dir" add recreated-source.txt
+  git -C "$writer_dir" commit -qm "Recreate release branch after deletion"
+  RECREATED_SOURCE_SHA="$(git -C "$writer_dir" rev-parse HEAD)"
+  git -C "$writer_dir" push -q origin HEAD:refs/heads/source-recreation-candidate
+  mkdir -p "$wrapper_dir"
+  REAL_GIT_BIN="$(command -v git)"
+  export REAL_GIT_BIN
+
+  cat > "$wrapper_dir/git" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+marker="$(dirname "$0")/source-recreation-fired"
+is_release_delete=false
+if [ "${1:-}" = "push" ]; then
+  for arg in "$@"; do
+    [ "$arg" = ":refs/heads/release/1.0.0" ] && is_release_delete=true
+  done
+fi
+
+if [ "$is_release_delete" = true ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  "$REAL_GIT_BIN" "$@"
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    "$REAL_GIT_BIN" push -q origin \
+      refs/remotes/origin/source-recreation-candidate:refs/heads/release/1.0.0
+  fi
+  exit "$rc"
+fi
+
+exec "$REAL_GIT_BIN" "$@"
+WRAPPER
+  chmod +x "$wrapper_dir/git"
+  SOURCE_RECREATION_GIT_BIN="$wrapper_dir"
+}
+
+test_close_out_aborts_if_source_reappears_after_delete() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  local checked_source_sha recovery_ref
+  checked_source_sha="$(git rev-parse origin/release/1.0.0)"
+  recovery_ref="refs/heads/release-finish-recovery/1.0.0-${checked_source_sha:0:12}"
+  prepare_post_delete_source_recreation_wrapper
+
+  PATH="$SOURCE_RECREATION_GIT_BIN:$PATH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out source-recreation status"
+  assert_contains "$RF_OUT" "origin/release/1.0.0 reappeared during post-delete verification" \
+    "close-out source-recreation detection"
+  assert_contains "$RF_OUT" "temporary recovery branch" "close-out source-recreation recovery guidance"
+  assert_equal "$RECREATED_SOURCE_SHA" \
+    "$(git ls-remote "$PWD/../origin.git" refs/heads/release/1.0.0 | cut -f1)" \
+    "close-out source-recreation preserves new source"
+  assert_equal "$checked_source_sha" \
+    "$(git ls-remote "$PWD/../origin.git" "$recovery_ref" | cut -f1)" \
+    "close-out source-recreation retains checked recovery"
+}
+
 test_close_out_aborts_with_an_empty_cherry_pick_in_progress() {
   setup_release_repo
   git checkout -q main
@@ -929,6 +1029,7 @@ run_test test_close_out_dry_run_prints_plan_and_runs_nothing
 run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
 run_test test_close_out_refuses_delete_when_changelog_pr_remains
+run_test test_close_out_refuses_mismatched_source_changelog_completion
 run_test test_close_out_refuses_delete_when_forward_port_prs_remain
 run_test test_close_out_propagates_verifier_errors
 run_test test_close_out_aborts_when_local_main_behind_origin
@@ -937,6 +1038,7 @@ run_test test_close_out_aborts_if_remote_main_advances_after_checks
 run_test test_close_out_aborts_if_source_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
 run_test test_close_out_restores_release_branch_if_main_races_during_delete
+run_test test_close_out_aborts_if_source_reappears_after_delete
 run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree

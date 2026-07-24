@@ -428,6 +428,16 @@ class ReleaseFinish
   def verify_main_after_delete!(remote, release_branch, checked_main_sha:, checked_source_sha:, recovery_ref:)
     fetch_remote!(remote)
     current_main_sha = git("rev-parse", "#{remote}/main").strip
+    recreated_source_sha = remote_branch_sha(remote, release_branch)
+    if recreated_source_sha
+      raise AbortError, <<~ERROR.strip
+        #{remote}/#{release_branch} reappeared during post-delete verification
+          checked: #{checked_source_sha}
+          current: #{recreated_source_sha}
+        The temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} remains at the checked tip.
+        Re-run the code and changelog checks against the recreated source branch before removing recovery.
+      ERROR
+    end
 
     if current_main_sha == checked_main_sha
       run_or_print(*leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:))
@@ -447,6 +457,15 @@ class ReleaseFinish
       Restored #{release_branch} at #{checked_source_sha}.
       Re-run close-out against the new main tip; no release-branch commit was discarded.
     ERROR
+  end
+
+  def remote_branch_sha(remote, branch)
+    stdout, stderr, status =
+      capture_git("ls-remote", "--exit-code", "--heads", "--", remote, branch)
+    return stdout.split.first if status.success?
+    return if status.exitstatus == 2
+
+    raise GitError, git_error(["ls-remote", "--exit-code", "--heads", "--", remote, branch], stdout, stderr, status)
   end
 
   def leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:)

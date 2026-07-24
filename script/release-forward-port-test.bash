@@ -789,6 +789,16 @@ EOF
   assert_contains "$after" "### [1.0.1.rc.1]" "target RC section preserved"
   assert_contains "$after" "Only RC copy" "target RC entry preserved"
   [ "$before" = "$after" ] || fail "mismatched source section must not modify CHANGELOG.md"
+
+  local check_out check_rc
+  set +e
+  check_out="$(run_changelog release/1.0.1 --check 2>&1)"
+  check_rc=$?
+  set -e
+  [ "$check_rc" -eq 1 ] || fail "mismatched source check should report incomplete, got $check_rc"
+  assert_contains "$check_out" "CHECK FAILED" "mismatched source check fails closed"
+  assert_contains "$check_out" "no matching stable or prerelease 1.0.1 changelog section" \
+    "mismatched source check explains missing section"
 }
 
 # Multi-line entries (continuation/detail lines and nested bullets) are carried

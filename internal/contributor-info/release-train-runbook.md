@@ -349,8 +349,9 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   matching RC section and no release entry reintroduced under `[Unreleased]`; the helper removes that residue
   in a new changelog reconciliation rather than letting the authority check hide it. This permits reviewed
   consolidation of superseded RC-only entries without allowing a later release-branch or target correction
-  to be hidden. For a legacy dedicated changelog PR that predates the sentence, inspect the current source
-  changelog commit and pass
+  to be hidden. The close-out check also fails if `release/X.Y.Z` no longer contains a matching stable or
+  prerelease `X.Y.Z` section, because a non-destructive no-op is not proof of release completion. For a legacy
+  dedicated changelog PR that predates the sentence, inspect the current source changelog commit and pass
   `--ack-final-changelog-source <sha>` to the changelog check and `release-finish close-out`.
 - Do not create empty marker or provenance-only commits for `SKIP` entries. A commit marked already
   present, patch-equivalent, changelog-only, version-only, generated-only, or empty is evidence that
@@ -497,7 +498,8 @@ requires rerunning both checks. Git omits an unchanged `main` refspec from a pus
 cannot close the last network race. Instead, the deletion atomically moves the checked source tip to a
 temporary `release-finish-recovery/*` branch while deleting the release branch with a real source lease.
 It then re-fetches `main`: if `main` raced, it atomically restores the release branch before aborting;
-otherwise it removes the temporary recovery branch. Pass
+if another actor recreated the release branch, it aborts and retains recovery for inspection; otherwise
+it removes the temporary recovery branch. Pass
 `--ack-manual <sha>` for each
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
@@ -547,8 +549,12 @@ git push --atomic \
   ":${release_ref}"
 
 # Re-fetch immediately. Restore the release branch if main changed during deletion;
-# otherwise remove the temporary recovery branch with its own lease.
+# abort with recovery intact if the release branch reappeared; otherwise remove recovery with its own lease.
 git fetch origin
+if git ls-remote --exit-code --heads -- origin release/17.0.0 >/dev/null 2>&1; then
+  echo "release branch reappeared; retain recovery and rerun all completion checks" >&2
+  exit 1
+fi
 if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
   git push --atomic \
     --force-with-lease="${release_ref}:" \
