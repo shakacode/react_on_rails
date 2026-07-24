@@ -114,11 +114,11 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 In practice this means a `staging` deploy hits the same artifact store as production — it must have the same credentials and write access. This is intentional: a `staging` → `staging` rolling deploy needs the previous staging hash seeded, and a `staging` → `production` promotion benefits from staging having warmed the store. If you need to keep `staging` out of the artifact store entirely, set `config.rolling_deploy_adapter = nil` in a `staging`-specific initializer rather than relying on env-based skipping at the gem level.
 
 > [!NOTE]
-> This section is about the **upload** (publish) side. Promotion has a second, independent gap on the **seed** side: an image built on staging seeds staging's previous bundle, not production's — and with the built-in HTTP adapter (`upload` is a no-op) there is no shared store to paper over it. See [Promotion deploys need a boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed) and [Multi-source seeding](#multi-source-seeding) below.
+> This section is about the **upload** (publish) side. Promotion has a second, independent gap on the **seed** side: build-time seeding captures only then-advertised bundles. See [Promotion deploys need a boot seed](./rolling-deploy-adapters.md#promotion-deploys-need-a-release-time-boot-seed) and [Multi-source seeding](#multi-source-seeding) below.
 
 ## Multi-source seeding
 
-The built-in HTTP adapter's `rolling_deploy_previous_urls` accepts **more than one** endpoint. When you **promote** an image between environments (build on staging, promote to production), pass both the build environment and the promotion target so the built image carries bundles from **both** — the promoted image is then born ready to serve production's draining bundle:
+The built-in HTTP adapter's `rolling_deploy_previous_urls` accepts **more than one** endpoint. When you **promote** an image between environments (build on staging, promote to production), pass both the build environment and the promotion target so the built image carries bundles then advertised by **both**. This improves fallback warmth, but only the release-time boot seed resolves the target's current draining bundle:
 
 ```ruby
 # config/initializers/react_on_rails_pro.rb

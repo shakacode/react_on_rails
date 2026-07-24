@@ -35,16 +35,23 @@ environment's config and a _snapshot_ of its then-live bundle. Frozen into the
 image layer.
 
 **Release-time seed** (a.k.a. **boot seed**):
-Pre-seed run by the _target_ environment's renderer container at container boot
-via `rake react_on_rails_pro:pre_seed_renderer_cache`, resolving that
-environment's _actually-live_ bundle at that moment. Readiness-gated.
+Pre-seed run by a Ruby-capable release, init, or startup step via
+`rake react_on_rails_pro:pre_seed_renderer_cache`, resolving the target
+environment's _actually-live_ bundle. A combined Ruby+Node image can run it
+before Node; a Node-only renderer needs a Ruby-capable step with the promoted
+app artifact/config. That step and the renderer must mount the same writable
+shared volume at `RENDERER_SERVER_BUNDLE_CACHE_PATH`, or copy/sync the completed
+cache into the renderer before it starts. Renderer start/readiness waits for
+completion. Without a Ruby-capable step that makes the completed cache available
+to the renderer, use multi-source fallback plus 410 recovery or a combined
+shape.
 _Avoid_: "runtime seed" (ambiguous with the per-request 410 path).
 
 **Multi-source seed**:
 A build-time seed whose **pre-seed source** is a _list_ of endpoints (the
 built-in HTTP adapter's `rolling_deploy_previous_urls` accepts more than one).
-Staging seeds from both staging and production so the promoted image is born
-prod-ready.
+Staging can carry bundles then advertised by both staging and production, which
+improves fallback warmth but cannot determine a later production drain.
 
 **Promotion model**:
 Production is deployed by promoting the _exact staging image_, not by building a
@@ -82,8 +89,8 @@ called **renderer-before-Rails**.
   production's **draining bundle** is only known at the later promotion.
 - Set staging's **pre-seed source** to both **staging and production**, so the
   image carries each environment's then-live bundle. This keeps staging's own
-  rolling deploys warm and makes the promoted image prod-ready for a single
-  pending promotion, but still goes stale across _two pending promotions_.
+  rolling deploys warm and improves fallback warmth, but still goes stale across
+  _two pending promotions_.
 - The residual staleness window (two images built before either is promoted) is
   closed by a **release-time seed** at promotion, which resolves production's
   actually-live **draining bundle**.
@@ -92,18 +99,18 @@ called **renderer-before-Rails**.
 
 Correctness is layered; each layer bounds the failure the prior one leaves open.
 
-1. **Multi-source build-time seed** — the image is born prod-ready; failure floor
-   if the boot seed can't reach the live endpoint. (Correct for a single pending
-   promotion.)
+1. **Multi-source build-time seed** — carries then-advertised bundles as a
+   failure floor if the boot seed cannot reach the live endpoint.
 2. **Boot seed (release-time)** — the correctness path: pulls the _actually-live_
-   **draining bundle** at container start, closing the two-pending-promotions
-   window. Subsumes layer 1's correctness; layer 1 remains only as a fallback.
+   **draining bundle** before renderer readiness, closing the
+   two-pending-promotions window. Layer 1 remains only as a fallback.
 3. **Deploy ordering (R2)** — renderer live+warm before Rails; readiness gates on
    the boot seed _completing_ (not succeeding — a failed seed degrades to the 410
    fallback rather than wedging the deploy).
 
 **Interdependency:** the **boot seed** returns the correct **draining bundle**
-_only because_ the renderer boots before Rails (R2). Before new Rails is live,
+only when its release-time step completes before renderer readiness and Rails
+cutover (R2). Before new Rails is live,
 the environment's live endpoint is still served by the draining old pods, so it
 advertises the draining hash. If Rails cut over first, the live endpoint would
 advertise the _new_ hash and the boot seed would miss the very bundle it needs.
@@ -116,12 +123,11 @@ Layer 2 depends on Layer 3.
 > **Domain expert:** "Because the **build-time seed** ran in the staging
 > pipeline — the image holds staging's previous bundle, not prod's **draining
 > bundle**. The seed was correct for the wrong environment."
-> **Dev:** "So if staging's **pre-seed source** includes staging and production,
-> the promoted image is already prod-ready?"
-> **Domain expert:** "For a single pending promotion, generally yes, while
-> staging still carries its own draining bundle. Two pending promotions still go
-> stale — that's why promotion also runs a **release-time seed** against prod's
-> live bundle."
+> **Dev:** "So does staging's **pre-seed source** including staging and
+> production guarantee the promoted image has prod's draining bundle?"
+> **Domain expert:** "No. It carries then-advertised bundles and improves the
+> fallback, but two pending promotions can still go stale. The **release-time
+> seed** against prod's live bundle establishes correctness."
 > **Dev:** "And that's enough?"
 > **Domain expert:** "That's **R1**. You still need **R2** — the new renderer
 > fleet live and warm before Rails cuts over — or you get the 410 storm anyway."
