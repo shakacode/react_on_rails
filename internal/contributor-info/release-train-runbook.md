@@ -345,9 +345,12 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   `Record the final React on Rails X.Y.Z changelog (#<pr-number>)`. Do not mix source changes into it.
   Include the exact source-CHANGELOG sentence shown above in the PR body. That changelog-only commit is
   authoritative only while the named source commit remains the newest release-branch `CHANGELOG.md` change
-  and its `X.Y.Z` section remains byte-for-byte unchanged on `main`; this permits reviewed consolidation of
-  superseded RC-only entries without allowing a later release-branch correction to be hidden. For a legacy
-  dedicated changelog PR that predates the sentence, inspect the current source changelog commit and pass
+  and its `X.Y.Z` section remains byte-for-byte unchanged on `main`. The current target must also have no
+  matching RC section and no release entry reintroduced under `[Unreleased]`; the helper removes that residue
+  in a new changelog reconciliation rather than letting the authority check hide it. This permits reviewed
+  consolidation of superseded RC-only entries without allowing a later release-branch or target correction
+  to be hidden. For a legacy dedicated changelog PR that predates the sentence, inspect the current source
+  changelog commit and pass
   `--ack-final-changelog-source <sha>` to the changelog check and `release-finish close-out`.
 - Do not create empty marker or provenance-only commits for `SKIP` entries. A commit marked already
   present, patch-equivalent, changelog-only, version-only, generated-only, or empty is evidence that
@@ -490,8 +493,11 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 `main`; step 3's separate PRs must already be merged. Only after both checks pass does it ask for
 confirmation before deleting the release branch on the remote. A final fetch must still find local
 `main` exactly equal to `origin/main` and both checked remote tips unchanged; any intervening commit
-requires rerunning both checks. The deletion uses one atomic push with matching leases for `main` and
-the release branch, so neither ref can change in the final fetch-to-delete window. Pass
+requires rerunning both checks. Git omits an unchanged `main` refspec from a push, so a no-op main lease
+cannot close the last network race. Instead, the deletion atomically moves the checked source tip to a
+temporary `release-finish-recovery/*` branch while deleting the release branch with a real source lease.
+It then re-fetches `main`: if `main` raced, it atomically restores the release branch before aborting;
+otherwise it removes the temporary recovery branch. Pass
 `--ack-manual <sha>` for each
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
@@ -526,17 +532,34 @@ script/release-forward-port --source origin/release/17.0.0 --target main --check
 script/release-forward-port --source origin/release/17.0.0 --target main --changelog --check \
   --ack-final-changelog-source <current-source-changelog-sha>
 
-# 2. Prefer release-finish for deletion. Its atomic leased push verifies that neither checked ref changed.
-# If reproducing it manually, fetch and compare both refs to the SHAs captured before the checks:
+# 2. Prefer release-finish for deletion. If reproducing it manually, fetch and compare both refs,
+# then preserve the source tip on a temporary remote branch throughout the destructive window:
 git fetch origin
 test "$(git rev-parse origin/main)" = "${checked_main_sha}"
 test "$(git rev-parse origin/release/17.0.0)" = "${checked_source_sha}"
+release_ref="refs/heads/release/17.0.0"
+recovery_ref="refs/heads/release-finish-recovery/17.0.0-${checked_source_sha:0:12}"
 git push --atomic \
-  --force-with-lease="refs/heads/main:${checked_main_sha}" \
-  --force-with-lease="refs/heads/release/17.0.0:${checked_source_sha}" \
+  --force-with-lease="${release_ref}:${checked_source_sha}" \
+  --force-with-lease="${recovery_ref}:" \
   origin \
-  "${checked_main_sha}:refs/heads/main" \
-  ":refs/heads/release/17.0.0"
+  "${checked_source_sha}:${recovery_ref}" \
+  ":${release_ref}"
+
+# Re-fetch immediately. Restore the release branch if main changed during deletion;
+# otherwise remove the temporary recovery branch with its own lease.
+git fetch origin
+if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
+  git push --atomic \
+    --force-with-lease="${release_ref}:" \
+    --force-with-lease="${recovery_ref}:${checked_source_sha}" \
+    origin \
+    "${checked_source_sha}:${release_ref}" \
+    ":${recovery_ref}"
+  echo "main changed; release branch restored — rerun close-out" >&2
+  exit 1
+fi
+git push --force-with-lease="${recovery_ref}:${checked_source_sha}" origin ":${recovery_ref}"
 ```
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips

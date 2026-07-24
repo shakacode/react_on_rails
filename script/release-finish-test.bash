@@ -443,14 +443,20 @@ test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed() {
   # confirm_outward! with NO TTY (no "no TTY" abort, no prompt) and actually ran
   # the outward delete.
   assert_not_contains "$RF_OUT" "no TTY for confirmation" "close-out --yes should not stop on TTY"
-  assert_contains "$RF_OUT" "+ git push --atomic --force-with-lease=refs/heads/main:" \
-    "close-out --yes uses a checked main lease"
-  assert_contains "$RF_OUT" "--force-with-lease=refs/heads/release/1.0.0:" \
+  assert_contains "$RF_OUT" "+ git push --atomic --force-with-lease=refs/heads/release/1.0.0:" \
     "close-out --yes uses a checked source lease"
+  assert_contains "$RF_OUT" "--force-with-lease=refs/heads/release-finish-recovery/1.0.0-" \
+    "close-out --yes protects the source on a temporary recovery branch"
   assert_contains "$RF_OUT" ":refs/heads/release/1.0.0" "close-out --yes deleted branch"
+  assert_contains "$RF_OUT" ":refs/heads/release-finish-recovery/1.0.0-" \
+    "close-out --yes removed the temporary recovery branch"
   # The branch is actually gone from the (local bare) origin.
   if git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
     fail "close-out --yes did not delete the release branch on origin"
+  fi
+  if git ls-remote --heads "$PWD/../origin.git" "release-finish-recovery/*" |
+      grep -q release-finish-recovery; then
+    fail "close-out --yes left the temporary recovery branch on origin"
   fi
 }
 
@@ -740,6 +746,73 @@ RUBY
   fi
 }
 
+prepare_during_delete_main_race_wrapper() {
+  local origin_dir="$PWD/../origin.git"
+  local writer_dir="$PWD/../delete-race-writer"
+  local wrapper_dir="$PWD/../delete-race-bin"
+
+  git clone -q "$origin_dir" "$writer_dir"
+  git -C "$writer_dir" checkout -q main
+  git -C "$writer_dir" config user.email test@example.com
+  git -C "$writer_dir" config user.name "Release Finish Delete Race Test"
+  printf 'main advanced during branch deletion\n' > "$writer_dir/delete-race.txt"
+  git -C "$writer_dir" add delete-race.txt
+  git -C "$writer_dir" commit -qm "Advance main during branch deletion"
+  DELETE_RACE_MAIN_SHA="$(git -C "$writer_dir" rev-parse HEAD)"
+  git -C "$writer_dir" push -q origin HEAD:refs/heads/delete-race-candidate
+  mkdir -p "$wrapper_dir"
+  REAL_GIT_BIN="$(command -v git)"
+  export REAL_GIT_BIN
+
+  cat > "$wrapper_dir/git" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+marker="$(dirname "$0")/delete-race-fired"
+should_race=false
+if [ "${1:-}" = "push" ]; then
+  for arg in "$@"; do
+    [ "$arg" = ":refs/heads/release/1.0.0" ] && should_race=true
+  done
+fi
+
+if [ "$should_race" = true ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  "$REAL_GIT_BIN" push -q origin \
+    refs/remotes/origin/delete-race-candidate:refs/heads/main
+fi
+
+exec "$REAL_GIT_BIN" "$@"
+WRAPPER
+  chmod +x "$wrapper_dir/git"
+  DELETE_RACE_GIT_BIN="$wrapper_dir"
+}
+
+test_close_out_restores_release_branch_if_main_races_during_delete() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  local checked_source_sha
+  checked_source_sha="$(git rev-parse origin/release/1.0.0)"
+  prepare_during_delete_main_race_wrapper
+
+  PATH="$DELETE_RACE_GIT_BIN:$PATH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out during-delete main-race status"
+  assert_contains "$RF_OUT" "origin/main changed during the release-branch deletion" \
+    "close-out during-delete main-race detection"
+  assert_contains "$RF_OUT" "Restored release/1.0.0 at $checked_source_sha" \
+    "close-out during-delete source restoration"
+  assert_equal "$DELETE_RACE_MAIN_SHA" "$(git ls-remote "$PWD/../origin.git" refs/heads/main | cut -f1)" \
+    "close-out during-delete raced main tip"
+  assert_equal "$checked_source_sha" \
+    "$(git ls-remote "$PWD/../origin.git" refs/heads/release/1.0.0 | cut -f1)" \
+    "close-out during-delete restored source tip"
+  if git ls-remote --heads "$PWD/../origin.git" "release-finish-recovery/*" |
+      grep -q release-finish-recovery; then
+    fail "close-out during-delete restoration left the temporary recovery branch on origin"
+  fi
+}
+
 test_close_out_aborts_with_an_empty_cherry_pick_in_progress() {
   setup_release_repo
   git checkout -q main
@@ -863,6 +936,7 @@ run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_if_remote_main_advances_after_checks
 run_test test_close_out_aborts_if_source_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
+run_test test_close_out_restores_release_branch_if_main_races_during_delete
 run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree

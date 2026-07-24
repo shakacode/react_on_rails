@@ -345,6 +345,105 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "rejects authoritative final changelog state when a later RC section is reintroduced" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
+        "#### Fixed\n\n- Final release fix. (PR #101)\n"
+      )
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
+        "#### Fixed\n\n- Consolidated final release fix. (PR #101)\n"
+      )
+      git(repo, "add", "CHANGELOG.md")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Record the final React on Rails 1.0.1 changelog (#999)",
+        "-m",
+        "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+      )
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1.rc.1] - 2026-07-23\n\n" \
+        "#### Fixed\n\n- Reintroduced RC residue. (PR #101)\n\n" \
+        "### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Consolidated final release fix. (PR #101)\n"
+      )
+      commit_all(repo, "Reintroduce RC changelog residue")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+    end
+  end
+
+  it "removes stale release entries reintroduced after an authoritative final changelog" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
+        "#### Changed\n\n- Intermediate prerelease behavior. (PR #100)\n" \
+        "- Final shipped behavior. (PR #101)\n"
+      )
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
+        "#### Changed\n\n- Final shipped behavior, consolidated after review. (PR #101)\n"
+      )
+      git(repo, "add", "CHANGELOG.md")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Record the final React on Rails 1.0.1 changelog (#999)",
+        "-m",
+        "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+      )
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n#### Changed\n\n" \
+        "- Intermediate prerelease behavior. (PR #100)\n\n" \
+        "### [1.0.1] - 2026-07-24\n\n#### Changed\n\n" \
+        "- Final shipped behavior, consolidated after review. (PR #101)\n"
+      )
+      commit_all(repo, "Reintroduce stale release entry")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog")
+      expect(status).to be_success, stderr
+      expect(File.read(File.join(repo, "CHANGELOG.md"))).not_to include("Intermediate prerelease behavior")
+      expect(File.read(File.join(repo, "CHANGELOG.md"))).to include("consolidated after review")
+    end
+  end
+
   it "requires source-SHA provenance for a dedicated final changelog PR" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")

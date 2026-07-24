@@ -1424,11 +1424,32 @@ class ReleaseForwardPort
     target_changelog = changelog_at(target, label: "target")
 
     release_version = release_version_from_ref(source)
-    authoritative_sha =
-      authoritative_final_changelog_commit(source, target, target_changelog, release_version)
-    return finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha) if authoritative_sha
-
     reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:, release_version:)
+    authoritative_sha =
+      authoritative_final_changelog_commit(
+        source,
+        target,
+        target_changelog,
+        release_version,
+        source_ready: reconciler.authoritative_source_ready?
+      )
+    if authoritative_sha
+      residue = reconciler.reconcile_authoritative_residue
+      unless residue.changed?
+        return finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha)
+      end
+
+      print_changelog_reconciliation_plan(source, target, residue)
+      return check_changelog_plan(residue) if @options[:check]
+
+      if @options[:dry_run]
+        puts "\nDRY RUN: CHANGELOG.md was not modified and no branch was checked out."
+        return 0
+      end
+
+      return apply_changelog_reconciliation(target, residue)
+    end
+
     result = reconciler.reconcile
 
     print_changelog_reconciliation_plan(source, target, result)
@@ -1460,8 +1481,8 @@ class ReleaseForwardPort
     ref.match(%r{(?:\A|/)release/(?<version>\d+\.\d+\.\d+)\z})&.[](:version)
   end
 
-  def authoritative_final_changelog_commit(source, target, target_changelog, release_version)
-    return unless release_version
+  def authoritative_final_changelog_commit(source, target, target_changelog, release_version, source_ready:)
+    return unless release_version && source_ready
 
     source_changelog_sha = latest_changelog_commit(source)
     validate_acknowledged_changelog_source!(source_changelog_sha)
@@ -1476,15 +1497,27 @@ class ReleaseForwardPort
         "final React on Rails #{release_version} changelog",
         "--format=%H"
       )
+    context = {
+      target:,
+      target_changelog:,
+      release_version:,
+      source_changelog_sha:,
+      subject_pattern:
+    }
 
-    candidates.find do |sha|
-      next false unless subject_for_commit(sha)&.match?(subject_pattern)
-      next false unless changed_paths_for_commit(sha) == [CHANGELOG_FILE]
-      next false unless target_commit_live_on_target?(sha, target)
-      next false unless authoritative_changelog_source_bound?(sha, source_changelog_sha)
+    candidates.find { |sha| authoritative_changelog_candidate?(sha, context) }
+  end
 
-      authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
-    end
+  def authoritative_changelog_candidate?(sha, context)
+    subject_for_commit(sha)&.match?(context.fetch(:subject_pattern)) &&
+      changed_paths_for_commit(sha) == [CHANGELOG_FILE] &&
+      target_commit_live_on_target?(sha, context.fetch(:target)) &&
+      authoritative_changelog_source_bound?(sha, context.fetch(:source_changelog_sha)) &&
+      authoritative_changelog_section_unchanged?(
+        sha,
+        context.fetch(:target_changelog),
+        context.fetch(:release_version)
+      )
   end
 
   def latest_changelog_commit(source)
@@ -1952,7 +1985,59 @@ class ChangelogReconciler
     )
   end
 
+  # A dedicated final changelog PR may intentionally consolidate or omit
+  # prerelease wording, so its stable section is authoritative. It is only safe
+  # to use that fast path when the named release section exists on the source and
+  # the source has no later [Unreleased] entries.
+  def authoritative_source_ready?
+    return false unless @release_version
+
+    source = parse_sections(@source_changelog)
+    source_release_base_version(source) == @release_version &&
+      section_entries(find_unreleased(source)).empty?
+  end
+
+  # Even after a final changelog PR, a later mixed cherry-pick can reintroduce an
+  # RC section or duplicate one of the release entries under target [Unreleased].
+  # Remove only that residue; never re-add source wording that the authoritative
+  # final PR intentionally consolidated or omitted.
+  def reconcile_authoritative_residue
+    target = parse_sections(@target_changelog)
+    source = parse_sections(@source_changelog)
+    base_version = source_release_base_version(source)
+    removed_sections = stray_rc_sections(target, base_version)
+    target_entries, removed_entries = authoritative_residue_entries(target, source, base_version)
+    retained_entries = target_entries - removed_entries
+
+    reconciled = if removed_entries.any? || removed_sections.any?
+                   rebuild_changelog(target, retained_entries, removed_sections)
+                 else
+                   @target_changelog
+                 end
+
+    Result.new(
+      reconciled_changelog: reconciled,
+      added_entries: [],
+      skipped_entries: [],
+      removed_entries:,
+      removed_sections: removed_sections.map { |section| section[:version] },
+      original_changelog: @target_changelog
+    )
+  end
+
   private
+
+  def authoritative_residue_entries(target, source, base_version)
+    target_entries = section_entries(find_unreleased(target))
+    source_entries = stamped_source_entries(source, base_version)
+    source_pr_numbers = source_entries.filter_map(&:pr_number).to_set
+    source_texts = source_entries.to_set { |entry| normalize_text(entry.text) }
+    removed_entries = target_entries.select do |entry|
+      (entry.pr_number && source_pr_numbers.include?(entry.pr_number)) ||
+        source_texts.include?(normalize_text(entry.text))
+    end
+    [target_entries, removed_entries]
+  end
 
   def reconcile_entries(target, source, removed_sections, base_version)
     target_entries = section_entries(find_unreleased(target))
@@ -2016,10 +2101,18 @@ class ChangelogReconciler
   # active base version.
   def collect_source_entries(source, base_version)
     sections = [find_unreleased(source)].compact
-    sections += stable_sections(source, base_version)
-    sections += prerelease_sections(source, base_version)
+    sections += stamped_source_sections(source, base_version)
     blocks = sections.flat_map { |section| section_blocks(section[:body]) }
     entries_from_blocks(consolidate_blocks(blocks))
+  end
+
+  def stamped_source_entries(source, base_version)
+    blocks = stamped_source_sections(source, base_version).flat_map { |section| section_blocks(section[:body]) }
+    entries_from_blocks(consolidate_blocks(blocks))
+  end
+
+  def stamped_source_sections(source, base_version)
+    stable_sections(source, base_version) + prerelease_sections(source, base_version)
   end
 
   # Split the collapsed source entries into those to add to main's [Unreleased]
@@ -2120,7 +2213,13 @@ class ChangelogReconciler
   # For arbitrary source refs, retain the prerelease-section inference fallback.
   # Never infer from the target: an unrelated target RC section must stay intact.
   def source_release_base_version(source)
-    @release_version || highest_prerelease_base(source)
+    if @release_version
+      return @release_version if stamped_source_sections(source, @release_version).any?
+
+      return nil
+    end
+
+    highest_prerelease_base(source)
   end
 
   def highest_prerelease_base(parsed)

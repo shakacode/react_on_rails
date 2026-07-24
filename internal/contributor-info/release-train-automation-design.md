@@ -219,8 +219,9 @@ rake promotion guards with confirmations:
   `bundle exec rake release[X.Y.Z]`
   (all promotion guards already enforced in `release.rake`).
 - **Close out (step 5):** forward-port remaining commits to `main` (uses PR 3),
-  then atomically delete `release/X.Y.Z` with matching leases on the checked source and `main` tips
-  (tags are the durable record).
+  then atomically move the checked source tip to a temporary recovery branch while deleting
+  `release/X.Y.Z` with a source lease. Re-fetch `main`; if it raced, atomically restore the release
+  branch before aborting, otherwise delete the recovery branch (tags remain the durable release record).
 
 Surface to pin at PR-4 design: one script with `promote` / `close-out`
 subcommands vs a single linear flow with a confirmation between phases. This PR is

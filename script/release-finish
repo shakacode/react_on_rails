@@ -369,18 +369,23 @@ class ReleaseFinish
 
   def delete_release_branch!(release_branch, remote, checked_main_sha:, checked_source_sha:)
     section "Delete the ephemeral branch #{release_branch} on #{remote} (tags are the durable record)"
+    recovery_ref = release_recovery_ref(release_branch, checked_source_sha)
 
     if @options[:dry_run]
-      puts "DRY RUN: would verify the checked source and main tips, then atomically delete with matching leases:"
+      puts "DRY RUN: would verify the checked source and main tips, then atomically move the release tip"
+      puts "to temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} while deleting"
+      puts "with a source lease:"
       run_or_print(
-        *leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
+        *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
       )
+      puts "DRY RUN: would re-fetch #{remote}/main, restore #{release_branch} if main raced,"
+      puts "then remove the recovery branch."
       return
     end
 
     confirm_outward!(
       "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
-      "git push --atomic #{remote} <checked-main>:main :#{release_branch} (with matching leases)"
+      "git push --atomic #{remote} <checked-source>:#{recovery_ref} :#{release_branch} (with matching leases)"
     )
 
     ensure_forward_port_durable_on_remote!(
@@ -390,23 +395,90 @@ class ReleaseFinish
       checked_source_sha:
     )
     run_or_print(
-      *leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
+      *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
+    )
+    verify_main_after_delete!(
+      remote,
+      release_branch,
+      checked_main_sha:,
+      checked_source_sha:,
+      recovery_ref:
     )
   end
 
-  def leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
-    main_ref = "refs/heads/main"
+  def release_recovery_ref(release_branch, checked_source_sha)
+    version = release_branch.delete_prefix("release/")
+    "refs/heads/release-finish-recovery/#{version}-#{checked_source_sha[0, 12]}"
+  end
+
+  def leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
     source_ref = "refs/heads/#{release_branch}"
     [
       "git",
       "push",
       "--atomic",
-      "--force-with-lease=#{main_ref}:#{checked_main_sha}",
       "--force-with-lease=#{source_ref}:#{checked_source_sha}",
+      "--force-with-lease=#{recovery_ref}:",
       remote,
-      "#{checked_main_sha}:#{main_ref}",
+      "#{checked_source_sha}:#{recovery_ref}",
       ":#{source_ref}"
     ]
+  end
+
+  def verify_main_after_delete!(remote, release_branch, checked_main_sha:, checked_source_sha:, recovery_ref:)
+    fetch_remote!(remote)
+    current_main_sha = git("rev-parse", "#{remote}/main").strip
+
+    if current_main_sha == checked_main_sha
+      run_or_print(*leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:))
+      return
+    end
+
+    restore_release_branch!(
+      remote,
+      release_branch,
+      checked_source_sha:,
+      recovery_ref:
+    )
+    raise AbortError, <<~ERROR.strip
+      #{remote}/main changed during the release-branch deletion
+        checked: #{checked_main_sha}
+        current: #{current_main_sha}
+      Restored #{release_branch} at #{checked_source_sha}.
+      Re-run close-out against the new main tip; no release-branch commit was discarded.
+    ERROR
+  end
+
+  def leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:)
+    [
+      "git",
+      "push",
+      "--force-with-lease=#{recovery_ref}:#{checked_source_sha}",
+      remote,
+      ":#{recovery_ref}"
+    ]
+  end
+
+  def restore_release_branch!(remote, release_branch, checked_source_sha:, recovery_ref:)
+    source_ref = "refs/heads/#{release_branch}"
+    command = [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=#{source_ref}:",
+      "--force-with-lease=#{recovery_ref}:#{checked_source_sha}",
+      remote,
+      "#{checked_source_sha}:#{source_ref}",
+      ":#{recovery_ref}"
+    ]
+    run_or_print(*command)
+  rescue GitError => e
+    raise AbortError, <<~ERROR.strip
+      #{remote}/main changed during the release-branch deletion, and automatic restoration failed.
+      The checked release tip remains protected by #{recovery_ref} at #{checked_source_sha}.
+      Inspect #{remote}/#{release_branch} and restore it from that recovery branch before retrying.
+      Recovery command failure: #{e.message}
+    ERROR
   end
 
   # ---------------------------------------------------------------------------
@@ -453,8 +525,9 @@ class ReleaseFinish
   end
 
   # SAFETY GATE for the branch delete: re-fetch and require both checked tips to
-  # remain unchanged. The following atomic push repeats those expectations as
-  # leases, closing the final fetch-to-delete race for both refs.
+  # remain unchanged. The following atomic push leases the source and preserves
+  # its exact tip on a temporary remote recovery branch. A post-delete fetch then
+  # detects a main race and restores the source before aborting.
   def ensure_forward_port_durable_on_remote!(remote, release_branch, checked_main_sha:, checked_source_sha:)
     fetch_remote!(remote)
     ensure_local_main_matches_remote!(remote)

@@ -750,6 +750,47 @@ EOF
   [ "$before" = "$after" ] || fail "no-op run must not modify CHANGELOG.md"
 }
 
+# A release/X.Y.Z ref with no matching stable or prerelease source section must
+# not infer X.Y.Z from the branch name and delete the target's only RC notes.
+test_mismatched_source_section_does_not_drop_target_rc() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [1.0.1.rc.1] - 2026-07-20
+
+#### Fixed
+
+- **Only RC copy**: must remain. $(pr_link 101) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [1.0.0] - 2026-06-01
+
+#### Fixed
+
+- **Older stable**: unrelated. $(pr_link 100) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md "release/1.0.1"
+
+  local before out after
+  before="$(cat CHANGELOG.md)"
+  out="$(run_changelog release/1.0.1)"
+  after="$(cat CHANGELOG.md)"
+  assert_not_contains "$out" "RC-header sections to DROP" "mismatched source does not authorize RC removal"
+  assert_contains "$after" "### [1.0.1.rc.1]" "target RC section preserved"
+  assert_contains "$after" "Only RC copy" "target RC entry preserved"
+  [ "$before" = "$after" ] || fail "mismatched source section must not modify CHANGELOG.md"
+}
+
 # Multi-line entries (continuation/detail lines and nested bullets) are carried
 # over intact, not truncated to the first line.
 test_multiline_entry_preserved() {
@@ -1228,6 +1269,7 @@ run_test test_multiple_entries_same_new_pr_all_carry_over
 run_test test_entries_regroup_under_headings_in_order
 run_test test_second_run_is_noop
 run_test test_no_release_entries_is_clean_noop
+run_test test_mismatched_source_section_does_not_drop_target_rc
 run_test test_multiline_entry_preserved
 run_test test_hash_shorthand_pr_reference_dedupes
 run_test test_empty_main_unreleased_receives_entries
