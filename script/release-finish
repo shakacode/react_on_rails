@@ -3,6 +3,7 @@
 
 require "optparse"
 require "open3"
+require "tempfile"
 
 # Orchestrates the release-train runbook's steps 4 (promote) and 5 (close out),
 # wrapping the existing rake promotion guards (`stable_release_branch_allowed?`,
@@ -16,8 +17,9 @@ require "open3"
 # in the release line and must not run unattended back-to-back:
 #
 #   promote    Step 4: promote the accepted RC at the release-branch tip to the
-#              final tag, in place (no re-cut from main). Verifies the tip equals
-#              the accepted RC tag, collapses the rc->stable CHANGELOG, then runs
+#              final tag, in place (no re-cut from main). Verifies any commits
+#              after the RC are metadata-only, confirms the stable CHANGELOG,
+#              then runs
 #              `bundle exec rake release[X.Y.Z]` (the rake guards enforce the
 #              dangerous tag/version safety; this script does not re-implement it).
 #   close-out  Step 5: forward-port remaining release-branch commits to main via
@@ -136,8 +138,9 @@ class ReleaseFinish
 
       Orchestrates the release-train runbook steps 4 (promote) and 5 (close out).
 
-        promote    Verify the release/X.Y.Z tip equals the accepted RC tag, collapse the
-                   rc->stable CHANGELOG, then run `bundle exec rake release[X.Y.Z]`.
+        promote    Verify release/X.Y.Z descends from the accepted RC with only
+                   metadata-only commits after it, confirm the stable CHANGELOG,
+                   then run `bundle exec rake release[X.Y.Z]`.
         close-out  Forward-port remaining commits to main via #{FORWARD_PORT_SCRIPT},
                    then delete release/X.Y.Z on the remote.
 
@@ -158,11 +161,13 @@ class ReleaseFinish
     ensure_on_release_branch!(release_branch)
     ensure_clean_worktree!
 
-    fetch_remote!(@options.fetch(:remote))
+    remote = @options.fetch(:remote)
+    fetch_remote!(remote)
+    ensure_local_release_matches_remote!(release_branch, remote)
     rc_tag = resolve_rc_tag!(version)
-    ensure_tip_matches_rc_tag!(rc_tag)
+    ensure_tip_preserves_rc_runtime!(rc_tag)
 
-    collapse_changelog_to_stable
+    confirm_stable_changelog_committed
     run_release_task!(version, release_branch, rc_tag)
 
     finish_dry_run_notice
@@ -197,47 +202,75 @@ class ReleaseFinish
     match && match[1].to_i
   end
 
-  def ensure_tip_matches_rc_tag!(rc_tag)
-    # Two checks, because `git diff --stat` compares TREES: an empty or
-    # metadata-only commit layered on top of the accepted RC has the same tree
-    # and would pass the diff alone. First require HEAD to be the exact tagged
-    # commit (identity), then keep the tree check as defense in depth.
+  def ensure_tip_preserves_rc_runtime!(rc_tag)
     head_sha = git("rev-parse", "--verify", "HEAD").strip
     tag_sha = peeled_tag_sha(rc_tag)
-    unless head_sha == tag_sha
+    return if head_sha == tag_sha
+
+    unless commit_reachable_from?(tag_sha, head_sha)
       raise AbortError, <<~ERROR.strip
-        release tip is not the accepted RC commit #{rc_tag}.
+        release tip does not descend from accepted RC tag #{rc_tag}.
           HEAD:   #{head_sha}
           #{rc_tag}: #{tag_sha}
-        Even an empty or metadata-only commit on top of the RC breaks the
-        "promote in place, no re-cut" invariant. Reset the branch to the RC tip
-        (git reset --hard #{rc_tag}) or cut and validate a new RC before promoting.
+        Reset the branch to #{rc_tag}, or cut and validate a new RC before promoting.
       ERROR
     end
 
-    diff = git("diff", "--stat", rc_tag).strip
-    return if diff.empty?
+    commits = git_lines("rev-list", "--reverse", "#{tag_sha}..#{head_sha}")
+    runtime_commits = commits.reject { |sha| non_runtime_only_commit?(sha) }
+    if runtime_commits.empty?
+      puts "Verified #{commits.length} metadata-only commit#{commits.length == 1 ? '' : 's'} after #{rc_tag}; " \
+           "accepted RC runtime content is unchanged."
+      return
+    end
+
+    summaries = runtime_commits.map { |sha| git("show", "-s", "--format=%h %s", sha).strip }
 
     raise AbortError, <<~ERROR.strip
-      release tip has drifted from the accepted RC tag #{rc_tag}.
-      `git diff --stat #{rc_tag}` is not empty:
+      release tip is not the accepted RC commit #{rc_tag} or a metadata-only finalization descendant.
+      Runtime-bearing or unclassified commits after #{rc_tag}:
 
-      #{diff}
+      #{summaries.join("\n")}
 
-      The final must be the accepted RC promoted in place (no re-cut). Reset the
-      branch to the RC tip or cut a new RC and re-validate before promoting.
+      Only commits positively classified as non-runtime by script/ci-changes-detector
+      may follow the accepted RC. Cut and validate a new RC before promoting this tip.
     ERROR
   end
 
-  def collapse_changelog_to_stable
-    section "Collapse rc CHANGELOG sections into the final ### [#{@options.fetch(:version)}] section"
+  def non_runtime_only_commit?(sha)
+    changed_paths = git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", "#{sha}^", sha)
+    return false if changed_paths.empty?
+
+    repo_root = git("rev-parse", "--show-toplevel").strip
+    detector = File.join(repo_root, "script", "ci-changes-detector")
+    return false unless File.executable?(detector)
+
+    Tempfile.create("release-finish-ci-output") do |output_file|
+      stdout, stderr, status = Open3.capture3(
+        { "GITHUB_OUTPUT" => output_file.path }, detector, "#{sha}^", sha, chdir: repo_root
+      )
+      return false unless status.success?
+
+      flag = File.readlines(output_file.path).reverse.find { |line| line.start_with?("non_runtime_only=") }
+      return flag.split("=", 2).last.strip == "true" if flag
+
+      warn "Unable to classify #{sha} as non-runtime-only:\n#{stderr.strip}\n#{stdout.strip}"
+      false
+    end
+  rescue StandardError => e
+    warn "Unable to classify #{sha} as non-runtime-only: #{e.class}: #{e.message}"
+    false
+  end
+
+  def confirm_stable_changelog_committed
+    section "Confirm rc CHANGELOG sections are committed as ### [#{@options.fetch(:version)}]"
     if @options[:dry_run]
-      puts "DRY RUN: would collapse the rc CHANGELOG sections into ### [#{@options.fetch(:version)}]:"
+      puts "DRY RUN: would require the committed rc-to-stable CHANGELOG collapse:"
       puts indent('$react-on-rails-update-changelog release   # or: bundle exec rake "update_changelog[release]"')
       return
     end
 
-    puts "Run the changelog collapse now, before the release task tags the final:"
+    puts "The changelog collapse must be committed after the accepted RC and before promotion:"
     puts indent("$react-on-rails-update-changelog release")
     puts indent("(equivalently: bundle exec rake \"update_changelog[release]\")")
     puts
@@ -249,7 +282,7 @@ class ReleaseFinish
   def run_release_task!(version, release_branch, rc_tag)
     section "Promote: bundle exec rake release[#{version}]"
     puts "This tags v#{version} and publishes. The rake guards (stable_release_branch_allowed?,"
-    puts "ensure_release_branch_promotes_tagged_rc!) validate the #{release_branch} tip against #{rc_tag}."
+    puts "ensure_release_branch_promotes_tagged_rc!) verify #{release_branch} preserves #{rc_tag} runtime content."
 
     confirm_outward!(
       "Run `bundle exec rake \"release[#{version}]\"` now (tags v#{version} and publishes)?",
@@ -373,6 +406,25 @@ class ReleaseFinish
         remote: #{upstream}
       Sync before forward-porting so the cherry-picks land on current main:
         git checkout main && git pull --rebase
+    ERROR
+  end
+
+  # Promotion mutates and pushes the checked-out release branch. Require its
+  # local tip to equal the freshly fetched remote tip so a changelog PR merged
+  # after checkout cannot be omitted, and so the later version-bump push cannot
+  # fail after release work has already started.
+  def ensure_local_release_matches_remote!(release_branch, remote)
+    local = git("rev-parse", release_branch).strip
+    remote_release = "#{remote}/#{release_branch}"
+    upstream = git("rev-parse", remote_release).strip
+    return if local == upstream
+
+    raise AbortError, <<~ERROR.strip
+      local #{release_branch} is not in sync with #{remote_release}
+        local:  #{local}
+        remote: #{upstream}
+      Fast-forward the local release branch before promotion:
+        git pull --ff-only #{remote} #{release_branch}
     ERROR
   end
 

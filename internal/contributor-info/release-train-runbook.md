@@ -344,10 +344,11 @@ git push   # or open a PR if main is protected / the fix needs review on main
 When the hard gates pass for a specific RC, promote **that** RC. Do not re-cut from `main`.
 
 **Scripted path (recommended).** `script/release-finish promote X.Y.Z` orchestrates this whole step:
-it runs `git fetch`, asserts you are on `release/X.Y.Z` with a clean tree, verifies the tip equals the
-accepted RC tag (`git diff --stat vX.Y.Z.rc.N` is empty), prompts you to collapse the rc CHANGELOG, then
-asks for explicit confirmation before running `bundle exec rake release[X.Y.Z]`. It wraps — does not
-replace — the rake promotion guards (`stable_release_branch_allowed?`,
+it runs `git fetch`, asserts local `release/X.Y.Z` exactly matches the fetched remote branch and has a clean tree,
+then verifies the accepted RC is an ancestor of the tip and requires every intervening commit to be positively classified as
+non-runtime by `script/ci-changes-detector`. It then confirms the rc CHANGELOG was collapsed and
+committed before asking for explicit confirmation to run `bundle exec rake release[X.Y.Z]`. It wraps —
+does not replace — the rake promotion guards (`stable_release_branch_allowed?`,
 `ensure_release_branch_promotes_tagged_rc!`). Preview the exact commands first with `--dry-run`:
 
 ```bash
@@ -361,20 +362,33 @@ to pin a specific one. The manual equivalent the script runs is below.
 ```bash
 git fetch origin
 git checkout release/17.0.0
-# The branch tip MUST be the last good RC commit (e.g. the v17.0.0.rc.3 commit).
-git rev-parse HEAD            # confirm it equals the tag of the good RC
-git diff --stat v17.0.0.rc.3  # expect: empty (no drift since the good RC)
+git pull --ff-only origin release/17.0.0
+# The accepted RC must be an ancestor of the release tip.
+git merge-base --is-ancestor v17.0.0.rc.3 HEAD
+git log --oneline v17.0.0.rc.3..HEAD
+# Expect only the committed stable CHANGELOG/docs/comment-only finalization work.
+# script/release-finish and the rake guard classify each intervening commit
+# through script/ci-changes-detector and fail closed on runtime or unknown changes.
 ```
 
-Collapse the RC CHANGELOG sections into the final section, then release. Do not manually bump the
+After the RC is accepted, open and merge a dedicated metadata-only PR that collapses the RC CHANGELOG
+sections into the final section. This commit is intentionally newer than—and was never shipped in—the
+accepted RC. It is safe because it does not change the tested runtime tree. Do not manually bump the
 React on Rails gem/npm product-version files; the release task owns that coordinated change. The
-CHANGELOG edit plus the task-generated version metadata is the only difference between the good RC
-and the final:
+committed CHANGELOG edit plus the task-generated version metadata are the only differences between the
+good RC and the final:
 
 ```bash
 # $react-on-rails-update-changelog release   (collapses rc sections into ### [17.0.0])
-bundle exec rake "release[17.0.0]"   # version.rb rc.3 -> 17.0.0, tags v17.0.0, publishes
+git commit -m "Update changelog for 17.0.0"
+script/release-finish promote 17.0.0 --dry-run
+script/release-finish promote 17.0.0  # confirms, then runs bundle exec rake "release[17.0.0]"
 ```
+
+Do not add release tooling or other process-code changes to the release branch after the accepted RC.
+Those commits are not classified as metadata-only and require another RC. Fix reusable tooling on
+`main`; for an already-cut release line, use the rake promotion path whose guard already supports the
+committed changelog-only descendant.
 
 > **Run the stable promotion from `release/X.Y.Z` itself.** `rakelib/release.rake` allows a stable
 > (non-prerelease) `release[X.Y.Z]` from `main` **or** from the matching `release/X.Y.Z` branch (the

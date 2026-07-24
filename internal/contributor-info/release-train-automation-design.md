@@ -213,9 +213,10 @@ uses `*-test.bash` harnesses, e.g. `ci-changes-detector-test.bash`).
 `script/release-finish` orchestrates the runbook's steps 4–5, wrapping the existing
 rake promotion guards with confirmations:
 
-- **Promote (step 4):** `git checkout release/X.Y.Z`; verify the tip equals the
-  accepted RC (`git diff --stat` against `vX.Y.Z.rc.N` is empty); collapse rc →
-  stable changelog (`$react-on-rails-update-changelog release`);
+- **Promote (step 4):** `git checkout release/X.Y.Z`; fetch and require the local release tip to exactly match the
+  remote release tip; verify the accepted RC is an ancestor and every later commit is positively classified as non-runtime;
+  confirm the rc → stable changelog was collapsed and committed after the RC
+  (`$react-on-rails-update-changelog release`);
   `bundle exec rake release[X.Y.Z]`
   (all promotion guards already enforced in `release.rake`).
 - **Close out (step 5):** forward-port remaining commits to `main` (uses PR 3),
