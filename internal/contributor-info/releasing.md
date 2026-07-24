@@ -10,6 +10,17 @@ RC to final, and close out the release branch, see
 behavioral release verification lanes, see [RC Testing Plan](rc-testing-plan.md)
 and [Release Verification Runbook](release-verification-runbook.md).
 
+> **Execution boundary:** This page is a mechanical reference, not a live-release
+> procedure. Until a repository-owned wrapper binds a compound helper to the
+> release-line lease for its whole lifetime and fences every outward operation,
+> use `bundle exec rake release`, `script/release-finish`, and other compound
+> release helpers only in dry-run or preview mode. All release-mutating examples
+> on this page are therefore previews. For a live cut, retry, reconciliation, or
+> recovery, follow the individually guarded commands in the
+> [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
+> If an outward operation cannot expose a live lease check immediately before
+> its write, stop rather than run it unfenced.
+
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md)
@@ -70,33 +81,35 @@ For a prerelease, the task warns and skips the GitHub release; after adding the 
 - A premature version header (if release fails) is harmless -- you'll release eventually
 - A prerelease or historical release missing its changelog requires manual GitHub release synchronization
 
-### 2. Run the Release Task
+### 2. Preview the Release Task
 
-The simplest way to release is with no arguments -- the task reads the version from CHANGELOG.md:
+The task reads the version from CHANGELOG.md when the version argument is empty. Preview that path,
+or an explicit target, with `dry_run=true`:
 
 ```bash
-# Recommended: reads version from CHANGELOG.md (requires step 1)
-bundle exec rake release
+# Reads version from CHANGELOG.md (requires step 1)
+bundle exec rake "release[,true]"
 
 # For a specific version (overrides CHANGELOG.md detection)
-bundle exec rake "release[16.2.0]"
+bundle exec rake "release[16.2.0,true]"
 
 # For a pre-release version (note: use period, not dash)
-bundle exec rake "release[16.2.0.beta.1]"  # Creates npm package 16.2.0-beta.1
+bundle exec rake "release[16.2.0.beta.1,true]"  # Previews npm package 16.2.0-beta.1
 
 # For a release candidate
-bundle exec rake "release[16.5.0.rc.0]"
+bundle exec rake "release[16.5.0.rc.0,true]"
 
 # Dry run to test without publishing
 bundle exec rake "release[16.2.0,true]"
 
 # Override version policy checks (monotonic + changelog/bump consistency)
-RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0]"
-bundle exec rake "release[16.2.0,false,true]"
+RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0,true]"
+bundle exec rake "release[16.2.0,true,true]"
 ```
 
 > **Retry safety:** Never drop the version argument when resuming an interrupted release. Retry the
-> exact prerelease version, for example `bundle exec rake "release[17.0.0.rc.10]"`. From a prerelease
+> exact prerelease version; preview it with `bundle exec rake "release[17.0.0.rc.10,true]"`, then use
+> the guarded live-recovery sequence in the Release-Train Runbook. From a prerelease
 > checkout, an argument-less release fails closed unless the changelog advances the same release line
 > to a newer prerelease. Stable promotion must use an explicit stable version and a matching non-empty
 > changelog section.
@@ -197,7 +210,7 @@ Examples:
 
 ```bash
 # Only after the task reports complete healthy exact-HEAD evidence, retry the explicit target version:
-RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10]"
+RELEASE_CI_EVALUATE_HEAD=true bundle exec rake "release[17.0.0.rc.10,true]"
 ```
 
 Do not use `RELEASE_CI_STATUS_OVERRIDE=true` to substitute for pending, missing, failed, or
@@ -214,7 +227,7 @@ and a GitHub account that has write, maintain, or admin permission:
 RELEASE_ACCELERATED_RC=true \
 RELEASE_TRACKER=4821 \
 RELEASE_ACCELERATED_RC_REASON="Start published-artifact fleet testing while the named gates finish" \
-bundle exec rake "release[17.0.0.rc.10]"
+bundle exec rake "release[17.0.0.rc.10,true]"
 ```
 
 Accelerated publication and same-candidate durable retries must run from the exact matching
@@ -374,16 +387,9 @@ Reconciliation performs bounded repository-wide exact-version-and-SHA validation
 tracker and canonical authorization before reporting existing terminal state or appending a new terminal
 transition, then repeats that validation after the append helper re-fetches the selected tracker.
 
-Reconcile the record after the deferred gates and all downstream RC testing finish:
-
-```bash
-RELEASE_TRACKER=4821 \
-RELEASE_ACCELERATED_RC_RECONCILIATION_REASON="All deferred gates and published-artifact checks passed" \
-RELEASE_DEMO_FLEET_EVIDENCE_URL=https://github.com/example/demo-evidence \
-RELEASE_BEHAVIORAL_EVIDENCE_URL=https://github.com/example/behavioral-evidence \
-RELEASE_ARTIFACT_EVIDENCE_URL=https://github.com/example/artifact-evidence \
-bundle exec rake "release:reconcile_accelerated_rc[17.0.0.rc.10]"
-```
+Reconcile the record after the deferred gates and all downstream RC testing finish. The live
+reconciliation command is intentionally omitted here; run it only from the guarded release coordinator
+flow in the [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write).
 
 Reconciliation refreshes exact-candidate CI and the recorded ShakaPerf run. A known failure writes
 `candidate-rejected` with do-not-promote guidance; fix the cause and cut the next immutable RC.
@@ -477,15 +483,13 @@ CI override flags cannot weaken final promotion.
 **Examples:**
 
 ```bash
-bundle exec rake release                                  # Auto-detect version; stable targets require changelog
-bundle exec rake "release[patch]"                         # Bump patch version (16.1.1 → 16.1.2)
-bundle exec rake "release[minor]"                         # Bump minor version (16.1.1 → 16.2.0)
-bundle exec rake "release[major]"                         # Bump major version (16.1.1 → 17.0.0)
-bundle exec rake "release[16.2.0]"                        # Set explicit version
-bundle exec rake "release[16.2.0.beta.1]"                 # Set pre-release version (→ 16.2.0-beta.1 for NPM)
-bundle exec rake "release[patch,true]"                    # Dry run
-VERBOSE=1 bundle exec rake "release[patch]"               # Release with verbose logging
-NPM_OTP=123456 RUBYGEMS_OTP=789012 bundle exec rake "release[patch]"  # Skip OTP prompts
+bundle exec rake "release[,true]"                         # Preview auto-detected version
+bundle exec rake "release[patch,true]"                    # Preview patch bump (16.1.1 → 16.1.2)
+bundle exec rake "release[minor,true]"                    # Preview minor bump (16.1.1 → 16.2.0)
+bundle exec rake "release[major,true]"                    # Preview major bump (16.1.1 → 17.0.0)
+bundle exec rake "release[16.2.0,true]"                   # Preview explicit version
+bundle exec rake "release[16.2.0.beta.1,true]"            # Preview prerelease (→ 16.2.0-beta.1 for NPM)
+VERBOSE=1 bundle exec rake "release[patch,true]"          # Preview with verbose logging
 ```
 
 ### 3. What the Release Task Does
@@ -601,27 +605,27 @@ The task automatically converts Ruby gem format to npm semver format:
    Run `$update-changelog 16.5.0` (using the already-released version) to analyze
    commits, write entries, and automatically open a PR. Use
    `$react-on-rails-update-changelog` instead when the catch-up PR must target
-   `release/X.Y.Z`. After the PR merges, pull the updated changelog and sync the
-   GitHub release:
+   `release/X.Y.Z`. After the PR merges, preview the GitHub release update. Use
+   the Release-Train Runbook for the guarded live sync:
 
    ```bash
    git pull --rebase
-   bundle exec rake "sync_github_release[16.5.0]"
+   bundle exec rake "sync_github_release[16.5.0,true]"
    ```
 
    **Option B - Manual (headers only, you must write entries):**
 
    ```bash
    bundle exec rake "update_changelog[16.5.0]"
-   # Write entries manually, then:
-   git commit -a -m 'Update CHANGELOG.md'
-   git push
-   bundle exec rake "sync_github_release[16.5.0]"
+   # Write entries manually, then preview the GitHub release update:
+   bundle exec rake "sync_github_release[16.5.0,true]"
    ```
 
 ### Syncing GitHub Releases Manually
 
-If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release), you can create it manually after updating the changelog:
+If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release),
+preview the recovery after updating the changelog. Run the live sync only through the guarded recovery
+flow in the Release-Train Runbook:
 
 1. Update `CHANGELOG.md` with the published version section
 2. Commit and push `CHANGELOG.md`
@@ -629,13 +633,10 @@ If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section
 
 ```bash
 # Stable
-bundle exec rake "sync_github_release[16.5.0]"
+bundle exec rake "sync_github_release[16.5.0,true]"
 
 # Prerelease
-bundle exec rake "sync_github_release[16.5.0.rc.1]"
-
-# Dry run
-bundle exec rake "sync_github_release[16.5.0,true]"
+bundle exec rake "sync_github_release[16.5.0.rc.1,true]"
 ```
 
 `sync_github_release` reads release notes from the matching `CHANGELOG.md` section, applies the same size preparation
@@ -728,33 +729,19 @@ The release script now checks NPM authentication at the start and will automatic
 
 If the release fails partway through (e.g., during NPM publish):
 
-1. Check what was published:
+1. Stop the compound helper and keep the release-line lease. Do not delete or move tags, rewrite the
+   release branch, rerun publication, or manually publish missing packages.
+2. Check what was published with read-only registry queries:
    - NPM: `npm view react-on-rails@X.Y.Z`
    - RubyGems: `gem list react_on_rails -r -a`
-
-2. If the git tag was created but packages weren't published:
-   - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
-   - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
-   - Start over with `bundle exec rake "release[X.Y.Z]"`
-
-3. If GitHub release creation fails after successful publishing:
-   - Fix GitHub auth (`gh auth login`) or permissions
-   - Ensure `CHANGELOG.md` has matching header `### [X.Y.Z]`
-   - Do not rerun registry publication; the failure message prints the GitHub-only recovery command
-   - Rerun only: `bundle exec rake "sync_github_release[X.Y.Z]"`
-
-4. If some packages were published but not others:
-   - You can manually publish the missing packages:
-     ```bash
-     cd packages/react-on-rails && pnpm version X.Y.Z && pnpm publish
-     cd ../react-on-rails-pro && pnpm version X.Y.Z && pnpm publish
-     gem release
-     ```
-     `pnpm publish -r` will publish all packages where current version isn't published yet.
+3. Record the exact branch tip, local and remote tag identity, published artifact set, and helper output.
+4. Follow the [Release-Train Runbook](release-train-runbook.md#serialize-every-release-line-write) for
+   guarded live recovery. If lease state or any remote/artifact identity is `UNKNOWN`, remain stopped.
 
 ## Version History
 
-Running `bundle exec rake "release[X.Y.Z]"` will create a commit that looks like this:
+A dry-run preview with `bundle exec rake "release[X.Y.Z,true]"` shows the generated commit, which looks
+like this:
 
 ```
 commit abc123...

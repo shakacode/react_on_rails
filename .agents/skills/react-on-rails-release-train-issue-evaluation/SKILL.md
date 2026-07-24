@@ -11,11 +11,95 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
 
 `release/*` receives only stabilizing fixes. Features, cleanup, docs, process work, non-blocking hardening, and ordinary follow-ups target `main`.
 
+## Backport Shape
+
+When one or more merged `main` PRs qualify for `release/X.Y.Z`, default to one
+source PR per release backport PR:
+
+- Before branching, search open release-targeted PRs, targeted private
+  coordination for the source, and remote branches with verified ownership and
+  source binding. Reuse or skip a valid source-atomic lane, or an explicitly
+  maintainer-approved aggregate whose sources meet the inseparability exception
+  below. Stop rather than duplicate work when a candidate branch's ownership or
+  source binding is `UNKNOWN`. If an unapproved aggregate violates this shape,
+  recommend separate replacements; close it only with explicit write
+  authorization and retain its branch unless deletion is also authorized.
+- Process them serially under the canonical `release-line:X.Y.Z` coordination
+  lease defined in the release-train runbook, held by one dedicated release
+  coordinator across discovery, validation, and merge. Every writer targeting
+  that release branch, including a release-first stabilizing fix or metadata PR,
+  must participate in the same lease; source-scoped claims do not provide this
+  serialization. Chain later batch lanes with `depends_on`, and do not launch
+  them until the preceding merge is terminal. A writer that cannot participate
+  in the canonical lease must stop; the repository's merge-group CI does not
+  rerun source-liveness, provenance, attribution, manual QA, or review gates and
+  is not an alternative. Refresh the dedicated heartbeat at the runbook cadence
+  during long gates, and immediately before merge require the canonical claim to
+  be active, unexpired, and owned by the expected coordinator with a live
+  matching heartbeat. Stop if the guard is unavailable or its state is
+  `UNKNOWN`. Merge one release-targeted change,
+  fetch the new release tip, then update a reused PR onto that tip or branch the
+  next. Rerun validation, QA, and review on the updated head before merging.
+- Before updating or branching, confirm each selected source patch is still live
+  on explicitly fetched `origin/main`. A source reverted or superseded on `main`
+  requires renewed maintainer approval before backporting. Repeat this check and
+  the release-tip check immediately before merge; update and rerun validation,
+  QA, and review if either relevant ref changed.
+- Before every RC cut or re-spin, final promotion, and release closeout, fetch
+  `origin/main` and revalidate every retained main-origin backport. A source
+  patch that is no longer live is a blocker until a maintainer explicitly
+  reapproves retaining it in the release. During closeout, do not let the
+  forward-port helper automatically reapply reverted or superseded origins;
+  stop for explicit manual dispositions and use the runbook's selective manual
+  closeout path plus its complete omitted-pick manifest when the disposition is
+  to omit or replace one or more picks.
+- Give each source PR its own `git cherry-pick -x` provenance, conflict record,
+  validation, QA evidence, review cycle, and rollback boundary. Every commit
+  created by a `main`-to-release backport and landed on the release branch must
+  have exactly one direct
+  `(cherry picked from commit <source-sha>)` footer; record inherited provenance
+  from a source commit in the PR instead of copying another footer. A backport
+  with exactly one source commit must be squash-merged with a final subject
+  ending in `(#<backport-pr-number>)` and that footer in the commit body; rebase
+  merge is unsupported because an unattributed source subject can make the
+  changelog sweep report `UNKNOWN`. For a multi-commit rebase-merged source PR
+  or approved aggregate, stop for a
+  maintainer-approved merge plan until the repository can preserve both one
+  normalized release commit per source commit and changelog-sweep PR
+  attribution; never create a multi-footer commit.
+- Do not bundle independent source PRs because they share a target, component,
+  milestone, or `CHANGELOG.md`. Shared changelog edits require serialization;
+  retain each source PR's applicable changelog entry, then reconcile the entries
+  and stamp or regenerate the RC changelog after every backport retained in the
+  final release set lands.
+- Combine only behaviorally inseparable changes that cannot be reviewed,
+  tested, or reverted safely alone. Require an explicit maintainer-approved
+  rationale naming every source PR before implementation.
+
 ## Workflow
 
-1. Refresh repo context: `git fetch --prune origin main`, then `.agents/bin/agent-workflow-seam-doctor`. Fetch the release branch if ancestry matters.
+1. Refresh repo context: fetch and prune `origin/main` and the target release
+   branch, then run `.agents/bin/agent-workflow-seam-doctor`. Use the refreshed
+   release ref for ancestry, prior-backport, and supersession checks.
 2. Resolve candidates from live GitHub. For strict 48-hour windows, search by date then timestamp-filter locally because GitHub search is date-granular.
-3. Exclude started lanes. An issue is started when it has an assignee, linked/open implementation PR, private claim/heartbeat/branch, or implementation comment. Run `agent-coord doctor --json`, then targeted `agent-coord status --repo shakacode/react_on_rails --target <issue> --json`. Dead or expired claims count as started-but-stalled, not non-started.
+3. Exclude started lanes. For an ordinary issue candidate, an assignee,
+   linked/open implementation PR, private claim/heartbeat/branch, or
+   implementation comment means the lane is started. A merged `main` source PR
+   is completed input, not a started release-backport lane: its linked issue,
+   assignee, merged implementation PR, and generic source coordination state do
+   not exclude it. Its backport lane is started by a valid source-atomic
+   release-targeted implementation PR or branch; an explicitly
+   maintainer-approved aggregate whose sources are behaviorally inseparable; a
+   backport implementation comment for either valid shape; or private
+   coordination state that explicitly identifies that valid release/backport
+   lane. An unapproved, shape-violating aggregate does not exclude its source
+   candidates; keep them eligible so the **Backport Shape** replacement can be
+   recommended.
+   Run `agent-coord doctor --json`, then run
+   `agent-coord status --repo shakacode/react_on_rails --target <issue-or-pr> --json`
+   for each candidate. Dead or expired ordinary-issue claims and explicitly
+   identified backport claims count as started-but-stalled, not non-started;
+   generic source claims do not prove that a backport started.
 4. Read release context: active `Release gate:` tracker, `release` + `TRACKING` labels, the `Agent Release Mode` block, `agent-coord` phase when available, source PR base branches, and whether source commits are already on `origin/release/X.Y.Z`.
 5. Evaluate each candidate with `$evaluate-issue`: evidence source, impact, complexity, process gap disposition, and priority.
 6. Choose the target:
@@ -23,6 +107,8 @@ Use this with `$evaluate-issue`. That skill answers "is this worth doing?"; this
    - `release/X.Y.Z contingent`: only needed if maintainers decide to cherry-pick a related main-only fix into the train. Name the dependency.
    - `main`: docs, changelog for main-only PRs, CI/tooling hygiene, tests, process automation, non-blocking runtime hardening, features, and performance/cleanup without release-gate proof.
    - `park/close`: P3, speculative, duplicate, no-PR evidence, or not worth doing.
+7. For one or more `release/X.Y.Z` selections, apply the **Backport Shape**
+   rules above. For multiple selections, also record the serial order.
 
 Recommend labels/milestones/comments, but do not mutate GitHub unless the user explicitly authorizes writes.
 
