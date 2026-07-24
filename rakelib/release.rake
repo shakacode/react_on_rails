@@ -5881,10 +5881,24 @@ def gh_included_response_parts(output)
   # to reject the inverse or arbitrarily mixed framing.
   return [nil, nil, nil] unless compatible_gh_included_response_newlines?(status_newline, newline)
 
-  headers, body, *trailing_sections = remainder.split("#{newline}#{newline}", -1)
-  return [nil, nil, nil] unless trailing_sections.empty? && headers && body
+  headers, body = gh_included_response_headers_and_body(remainder, newline:)
+  return [nil, nil, nil] unless headers && body
 
-  [[status_line, headers].join(newline), body, newline]
+  header_block = headers.empty? ? status_line : [status_line, headers].join(newline)
+  [header_block, body, newline]
+end
+
+def gh_included_response_headers_and_body(remainder, newline:)
+  separator = "#{newline}#{newline}"
+  if remainder.start_with?(newline)
+    body = remainder.delete_prefix(newline)
+    return if body.include?(separator)
+
+    return ["", body]
+  end
+
+  headers, body, *trailing_sections = remainder.split(separator, -1)
+  [headers, body] if trailing_sections.empty? && headers && body
 end
 
 def gh_included_response_status_line_parts(output)

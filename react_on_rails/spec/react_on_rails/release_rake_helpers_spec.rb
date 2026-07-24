@@ -17315,6 +17315,16 @@ RSpec.describe "release.rake helper methods" do
       )
     end
 
+    it "parses an included response without HTTP headers" do
+      response = "HTTP/2.0 404 Not Found\r\n\r\n" \
+                 '{"message":"Branch not protected"}'
+
+      expect(gh_included_json_response(response)).to eq(
+        status: 404,
+        body: { "message" => "Branch not protected" }
+      )
+    end
+
     it "rejects mixed newline framing and HTTP control bytes" do
       mixed_newlines = "HTTP/2.0 404 Not Found\r\nContent-Type: application/json\n\n" \
                        '{"message":"Branch not protected"}'
