@@ -171,6 +171,21 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [Issue 4609](https://github.com/shakacode/react_on_rails/issues/4609).
   [PR 4625](https://github.com/shakacode/react_on_rails/pull/4625) by
   [justin808](https://github.com/justin808).
+- **[Pro]** **Renderer keep-alive connections recover from idle-close instead of failing a render**: on
+  standard Puma (no `Fiber.scheduler`), non-streaming renderer requests reuse one persistent async-http
+  client per Puma request thread, which keeps a renderer connection warm across requests. A warm client
+  now transparently reconnects and retries a request a single time if it reuses a keep-alive connection
+  the renderer, a load balancer, or a proxy has since idle-closed, so a stale socket no longer surfaces as
+  a render failure. The retry only covers failures that occur before the renderer returns a response; a
+  connection drop while reading the response body is not retried, so an already-executed render is never
+  silently re-run. Reachability failures (connection refused, host unreachable, timeouts), HTTP/2 stream
+  resets, first-contact failures, and non-replayable upload bodies are not retried by this reconnect path;
+  they continue to flow to the existing renderer request retry loop unchanged. Documentation
+  for `renderer_http_pool_size` was corrected to clarify it is a per-client limit — total warm renderer
+  connections scale with the number of live Puma request threads, not with that value alone. Fixes
+  [Issue 4571](https://github.com/shakacode/react_on_rails/issues/4571).
+  [PR 4575](https://github.com/shakacode/react_on_rails/pull/4575) by
+  [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 - **[Pro]** **Streamed RSC roots hydrate without transport-node mismatches**: Pro client hydration now
   removes the embedded RSC payload initializer from the hydration root, relocates leading streamed

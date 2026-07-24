@@ -65,9 +65,12 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_URL = "http://localhost:3800"
     DEFAULT_RENDERER_METHOD = "ExecJS"
     DEFAULT_RENDERER_FALLBACK_EXEC_JS = true
-    # Maximum concurrent HTTP/2 streams per persistent client. When Fiber.scheduler is available,
-    # clients are reused across requests within the same scheduler, making this limit effective.
-    # Without a scheduler, clients are per-request and this limits streams on that single request.
+    # Maximum concurrent HTTP/2 streams/connections per renderer HTTP client. This is a PER-CLIENT
+    # limit, not a global cap. When a Fiber.scheduler is available (e.g. Falcon), one client is
+    # reused per scheduler. Under plain Puma (no scheduler), non-streaming requests reuse one
+    # persistent client PER Puma request thread and streaming requests use a request-scoped client;
+    # in both cases this bounds concurrency within a single client, so total warm renderer capacity
+    # scales with the number of live Puma request threads, not with this value alone.
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     # TCP connect timeout. Request and response processing are still bounded by ssr_timeout.
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
@@ -168,11 +171,16 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
-    # Sets the maximum concurrent HTTP/2 streams per persistent client.
+    # Sets the maximum concurrent HTTP/2 streams/connections per renderer HTTP client.
     #
-    # When Fiber.scheduler is available (e.g., inside Sync {} blocks), HTTP clients are
-    # reused across requests within the same scheduler context, making this limit effective
-    # for connection pooling. Without a scheduler, clients are created per-request.
+    # This is a per-client limit, not a global ceiling on renderer connections.
+    # - With a Fiber.scheduler (e.g. Falcon), one client is reused per scheduler and this limit
+    #   bounds connection concurrency for renders sharing that client.
+    # - Under plain Puma (no scheduler), non-streaming requests reuse one persistent client per
+    #   Puma request thread (keeping a renderer connection warm across requests on that thread),
+    #   and streaming requests use a request-scoped client. In both cases the limit applies within
+    #   a single client, so total warm renderer capacity scales with the number of live Puma
+    #   request threads (workers * threads), not with this value alone.
     #
     # @param value [Integer, nil] A positive integer or nil (uses default)
     # @raise [ReactOnRailsPro::Error] if value is not a positive integer or nil

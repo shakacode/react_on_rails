@@ -56,6 +56,23 @@ module ReactOnRailsPro
       Protocol::HTTP2::StreamError
     ].freeze
 
+    # Dropped-connection errors that a *warm* persistent no-scheduler client
+    # (see PersistentThreadClient) retries ONCE, after rebuilding its async-http client, on a
+    # replay-safe request body. Because that client is built with retries: 0, reusing an HTTP
+    # keep-alive connection that the renderer, a load balancer, or a proxy has since idle-closed
+    # fails hard instead of transparently reconnecting; this set makes that recovery transparent.
+    # Reachability/startup errors (ECONNREFUSED, EHOSTUNREACH, ENETUNREACH, ETIMEDOUT, SocketError)
+    # are intentionally excluded so a genuinely-down renderer still fails fast. HTTP/2 stream resets
+    # (Protocol::HTTP2::StreamError) are also excluded: an RST_STREAM is a request-level abort by the
+    # renderer (possibly mid-response), not a dropped idle connection, so it stays with the outer
+    # request retry loop rather than being transparently replayed here.
+    STALE_KEEPALIVE_RETRY_ERRORS = [
+      IOError, # includes EOFError
+      Errno::ECONNRESET,
+      Errno::EPIPE,
+      Protocol::HTTP::RefusedError
+    ].freeze
+
     # Per-scheduler storage for persistent HTTP clients. When an outer Fiber.scheduler
     # exists BEFORE we enter `Sync {}`, clients are stored on the scheduler object using
     # this instance variable key. This enables connection reuse across requests within
@@ -179,13 +196,16 @@ module ReactOnRailsPro
       ResponseEnvelope = Struct.new(:status, :body, :headers)
 
       def initialize(endpoint:, protocol:, pool_limit:)
+        @endpoint = endpoint
+        @protocol = protocol
+        @pool_limit = pool_limit
         @queue = Queue.new
         @ready = Queue.new
         @pending_results = {}.compare_by_identity
         @pending_results_mutex = Mutex.new
         @closed = false
         @closed_mutex = Mutex.new
-        @thread = Thread.new { run_loop(endpoint:, protocol:, pool_limit:) }
+        @thread = Thread.new { run_loop }
 
         status, payload = @ready.pop
         raise payload if status == :error
@@ -238,13 +258,12 @@ module ReactOnRailsPro
         unregister_pending_result(result) if result
       end
 
-      def run_loop(endpoint:, protocol:, pool_limit:)
+      def run_loop
         client = nil
-        client_closed = false
-        ready = false
+        client_closed = ready = warm = false
 
         Async do
-          client = Async::HTTP::Client.new(endpoint, protocol:, retries: 0, limit: pool_limit)
+          client = build_async_client
           @ready << [:ok, nil]
           ready = true
 
@@ -257,7 +276,7 @@ module ReactOnRailsPro
               break
             end
 
-            handle_request(client, message)
+            client, warm = handle_request(client, message, warm)
           end
         ensure
           client&.close unless client_closed
@@ -267,16 +286,69 @@ module ReactOnRailsPro
         notify_pending_results(worker_thread_exited_error) if ready
       end
 
-      def handle_request(client, message)
-        result = nil
-        _type, method, path, headers, body, result = message
-        raw_response = method == :post ? client.post(path, headers:, body:) : client.get(path, headers:)
+      def build_async_client
+        Async::HTTP::Client.new(@endpoint, protocol: @protocol, retries: 0, limit: @pool_limit)
+      end
 
+      # Returns [client, warm]. `warm` becomes true only after a request has fully succeeded on
+      # this reactor. A warm client that then hits a dropped-keepalive connection error while
+      # *sending* a replay-safe request (nil or a String body, never a consumable upload body) is
+      # transparently reconnected and retried ONCE, so a socket idle-closed by the renderer/LB/proxy
+      # does not surface as a render failure.
+      #
+      # The retry only covers acquiring the response (`send_request`), NOT reading its body: once the
+      # renderer has returned a response, the render has already executed, so a connection drop while
+      # buffering must surface as a normal error rather than silently re-running the render. Likewise,
+      # first-contact failures (client not yet warm), read timeouts, and non-replayable bodies are
+      # never retried, so a genuinely-down or slow renderer still fails fast.
+      def handle_request(client, message, warm)
+        _type, method, path, headers, body, result = message
+        reconnected = false
+        begin
+          raw_response = method == :post ? client.post(path, headers:, body:) : client.get(path, headers:)
+        rescue *STALE_KEEPALIVE_RETRY_ERRORS => e
+          if retry_stale_connection?(warm, reconnected, e, body)
+            reconnected = true
+            # A build failure here is surfaced by the terminal rescue below, so it never kills the worker.
+            client = reconnect_async_client(client)
+            retry
+          end
+          result << [:error, e] if result
+          # If we reconnected and still failed, drop `warm` so a sustained renderer outage stops
+          # paying a doomed reconnect+retry on every subsequent request on this thread.
+          return [client, reconnected ? false : warm]
+        end
+
+        # Response acquired: a drop while buffering is not retried (see method comment). Non-stale
+        # send errors and buffering failures both fall through to the terminal rescue below. `warm`
+        # is preserved: these paths either already obtained a response (connection was healthy) or
+        # failed before any reconnect. The failed-reconnect case that resets `warm` is handled above;
+        # a reconnect *build* failure (Async::HTTP::Client.new is lazy, so this is effectively
+        # unreachable) also lands here, self-limited by `reconnected` to a single attempt.
         result << [:ok, buffer_response(raw_response)]
+        [client, true]
       rescue StandardError => e
         raise unless result
 
         result << [:error, e]
+        [client, warm]
+      end
+
+      # Retry once only for a warm client (>=1 prior success) whose body is safe to re-send: nil or a
+      # String. A read timeout (IO::TimeoutError, a subclass of IOError) is excluded so a slow render
+      # flows to the outer timeout/`renderer_request_retry_limit` handling instead of being replayed
+      # here. A consumable upload body (MultipartBody) is excluded because it cannot be re-sent after
+      # a partial write.
+      def retry_stale_connection?(warm, reconnected, error, body)
+        warm && !reconnected && !error.is_a?(IO::TimeoutError) && (body.nil? || body.is_a?(String))
+      end
+
+      def reconnect_async_client(old_client)
+        old_client&.close
+        build_async_client
+      rescue StandardError
+        # Best-effort: closing a poisoned keep-alive client can fail; the fresh client is what matters.
+        build_async_client
       end
 
       def wait_for_close_result(result)
