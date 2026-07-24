@@ -16313,7 +16313,7 @@ Rails and the Node Renderer run as independent workloads with their own scaling.
 
 **Disadvantages:**
 
-- **Version drift risk** — During rolling deploys, Rails and the Node Renderer may briefly run different versions. While protocol changes are rare, this is a risk to monitor.
+- **Version drift risk** — During rolling deploys, Rails and the Node Renderer roll independently and briefly run different bundle versions, so the renderer can receive SSR requests for a bundle it hasn't cached. Mitigate this with a [rolling-deploy adapter](../../../pro/rolling-deploy-adapters.md) (Pro): it pre-seeds the new renderer with the draining bundle and makes the renderer-before-Rails ordering explicit. This risk (and that mitigation) is **specific to this separate-workloads option** — Options 1–2 share one lifecycle and cannot drift.
 - **Race conditions** — Pods restart independently, which can cause transient connection errors.
 - **Network dependency** — Renderer must be reachable via internal service DNS.
 - **Overkill for most setups** — If you're running 2–4 replicas, independent scaling adds complexity without real benefit.
