@@ -337,6 +337,8 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   source commit and source PR. Use this exact positive provenance sentence in the PR body so the
   squash commit remains machine-checkable even when Markdown wraps it:
   `The commit retains \`cherry-pick -x\` provenance from source squash commit \`<40-character-sha>\`.`
+  That exact sentence is authoritative regardless of the squash title; free-form or negated prose
+  is not a substitute.
 - Squash the dedicated changelog/release reconciliation PR with
   `Record the final React on Rails X.Y.Z changelog (#<pr-number>)`. Do not mix source changes into it.
   That changelog-only commit is the authoritative final release record while its `X.Y.Z` section remains
@@ -347,6 +349,8 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   markers from reaching `main`.
 - Normal mode refuses to apply more than one actionable commit unless `--all` is explicit. `--all`
   exists for exceptional local recovery and is not the main-branch release close-out workflow.
+- `--check` and `release-finish close-out` refuse to run while a cherry-pick is in progress, including
+  an empty cherry-pick whose porcelain status appears clean. Finish, skip, or abort it first.
 - The helper skips commits already present on `main` using `(cherry picked from commit <sha>)`
   evidence when available, unless the footer-bearing target commit has a later standard `git revert` commit
   on the target branch. For already-applied patches without the footer, it uses `git cherry` as the

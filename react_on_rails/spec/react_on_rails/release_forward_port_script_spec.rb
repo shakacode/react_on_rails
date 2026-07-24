@@ -464,6 +464,37 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "preserves a scoped package name when a stable forward-port supersedes its prerelease pin" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "package.txt", "@scope/widget=2.0.0-rc.1\n")
+      prerelease_sha = commit_all(repo, "Update @scope/widget package pin to 2.0.0-rc.1 (#10)")
+      write_file(repo, "package.txt", "@scope/widget=2.0.0\n")
+      commit_all(repo, "Adopt stable @scope/widget 2.0.0 (#11)")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "package.txt", "@scope/widget=2.0.0\n")
+      git(repo, "add", "package.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port stable @scope/widget (#12)",
+        "-m",
+        "- cherry-picked the merged #11 squash commit with `git cherry-pick -x`"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{prerelease_sha[0, 12]} Update @scope/widget package pin")
+      expect(stdout).to include("prerelease package pin is superseded by later stable source commit")
+      expect(stdout).not_to include("PICK #{prerelease_sha[0, 12]}")
+    end
+  end
+
   it "does not treat a different dependency at the same stable version as superseding a prerelease pin" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -555,6 +586,31 @@ RSpec.describe "script/release-forward-port" do
       expect(status).not_to be_success
       expect(stdout).to include("No commits found in main..main.")
       expect(stdout).not_to include("Nothing to cherry-pick")
+      expect(stderr).to include("a cherry-pick is already in progress")
+    end
+  end
+
+  it "rejects check mode while a real empty cherry-pick is in progress" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "duplicate-source")
+      write_file(repo, "app.txt", "base\nduplicate change\n")
+      duplicate_sha = commit_all(repo, "Apply duplicate change from source")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "app.txt", "base\nduplicate change\n")
+      commit_all(repo, "Apply duplicate change independently")
+
+      _stdout, _stderr, cherry_pick_status =
+        Open3.capture3(git_env, "git", "cherry-pick", duplicate_sha, chdir: repo)
+      expect(cherry_pick_status.exitstatus).to eq(1)
+      git_dir = git(repo, "rev-parse", "--git-dir").strip
+      expect(File).to exist(File.join(repo, git_dir, "CHERRY_PICK_HEAD"))
+      expect(git(repo, "status", "--porcelain")).to eq("")
+
+      stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(3)
+      expect(stdout).not_to include("CHECK PASSED")
       expect(stderr).to include("a cherry-pick is already in progress")
     end
   end
@@ -675,7 +731,7 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Backport release regression (#456)",
         "-m",
-        "Backport the fix from #123 after the release-only prerequisite in #789.",
+        "Backport the fix from #123 to the release train after the release-only prerequisite in #789.",
         "-m",
         "This is equivalent to main PR #123 with release-specific behavior preserved."
       )
@@ -793,32 +849,30 @@ RSpec.describe "script/release-forward-port" do
       negative_segments = [
         "Backport the fix not from #123.",
         "Backport this behavior, not from #123 but from #456.",
-        "- replaces the regex with code not already reviewed and merged in #456"
+        "- replaces the regex with code not already reviewed and merged in #456",
+        "Backport the fix that doesn't come from #123 to the release train.",
+        "Backport this behavior that isn’t from #123 to the release train.",
+        "- replaces the regex with code that wasn't already reviewed and merged in #456"
       ]
-      release_fix_shas = negative_segments.each_with_index.map do |segment, index|
-        write_file(repo, "release-fix-#{index}.txt", "unique release fix #{index}\n")
-        git(repo, "add", "release-fix-#{index}.txt")
-        git(
-          repo,
-          "commit",
-          "--no-gpg-sign",
-          "-m",
-          "Fix separate release regression #{index} (#90#{index})",
-          "-m",
-          segment
-        )
-        git(repo, "rev-parse", "HEAD").strip
-      end
+      write_file(repo, "release-fix.txt", "unique release fix\n")
+      git(repo, "add", "release-fix.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Fix separate release regression (#900)",
+        "-m",
+        negative_segments.join("\n\n")
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
 
       stdout, stderr, status =
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      release_fix_shas.each_with_index do |release_fix_sha, index|
-        expected_pick = "PICK #{release_fix_sha[0, 12]} Fix separate release regression #{index} (#90#{index})"
-        expect(stdout).to include(expected_pick)
-      end
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix separate release regression (#900)")
       expect(stdout).not_to include("source commit identifies a live upstream PR")
     end
   end
@@ -1089,7 +1143,7 @@ RSpec.describe "script/release-forward-port" do
         "commit",
         "--no-gpg-sign",
         "-m",
-        "Forward-port release regression (#999)",
+        "Integrate release regression (#999)",
         "-m",
         "The commit retains `cherry-pick -x` provenance from source squash commit\n`#{fix_sha}`."
       )
@@ -1127,7 +1181,7 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Forward-port license metadata to main (#4668)",
         "-m",
-        "- forward-ports the reviewed licensing change from release\n" \
+        "- forward-ports the complete reviewed licensing change from release\n" \
         "PR #4660\n" \
         "- preserves newer mainline token handling"
       )
@@ -1138,6 +1192,36 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("source-bound forward-port narration")
       expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Publish accurate license metadata (#4660)")
+    end
+  end
+
+  it "does not trust negated target forward-port narration" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "license.txt", "release-only license behavior\n")
+      fix_sha = commit_all(repo, "Publish accurate license metadata (#4660)")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "other.txt", "unrelated main behavior\n")
+      git(repo, "add", "other.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port unrelated license work (#4668)",
+        "-m",
+        "- forward-ports no code from release PR #4660\n" \
+        "- forward-ports nothing from release PR #4660\n" \
+        "- forward-ports the reviewed change that wasn't from release PR #4660"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Publish accurate license metadata (#4660)")
+      expect(stdout).not_to include("source-bound forward-port narration")
     end
   end
 
@@ -1634,7 +1718,8 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Backport release regression fix",
         "-m",
-        "Cherry-picked main squash commit\n`#{main_fix_sha}` with `-x`."
+        "- Cherry-picked main squash commit\n`#{main_fix_sha}` with `-x`.\n" \
+        "- Preserves the release-specific conflict resolution."
       )
       release_fix_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
@@ -1646,6 +1731,36 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("already forward-ported to main via cherry-pick -x evidence")
       expect(stdout).to include("Nothing to cherry-pick")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nmain fix\n")
+    end
+  end
+
+  it "does not trust negated narrated cherry-pick origins" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\nmain fix\n")
+      main_fix_sha = commit_all(repo, "Fix release regression on main")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nunique release fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Fix separate release regression",
+        "-m",
+        "We never cherry-picked main squash commit `#{main_fix_sha}` with `-x`.\n\n" \
+        "This wasn't cherry-picked main commit `#{main_fix_sha}` with `-x`."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix separate release regression")
+      expect(stdout).not_to include("already forward-ported to main via cherry-pick -x evidence")
     end
   end
 
@@ -2603,7 +2718,7 @@ RSpec.describe "script/release-forward-port" do
       helper.send(:ensure_clean_worktree!)
     end.to raise_error(
       ReleaseForwardPort::GitError,
-      "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
+      "a cherry-pick is already in progress; run git cherry-pick --continue, --skip, or --abort first"
     )
   end
 end

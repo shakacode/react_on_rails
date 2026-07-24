@@ -677,6 +677,44 @@ RUBY
   fi
 }
 
+test_close_out_aborts_with_an_empty_cherry_pick_in_progress() {
+  setup_release_repo
+  git checkout -q main
+
+  git checkout -q -b duplicate-source
+  printf 'duplicate change\n' >> app.txt
+  git add app.txt
+  git commit -qm "Apply duplicate change from source"
+  local duplicate_sha
+  duplicate_sha="$(git rev-parse HEAD)"
+
+  git checkout -q main
+  printf 'duplicate change\n' >> app.txt
+  git add app.txt
+  git commit -qm "Apply duplicate change independently"
+
+  git cherry-pick "$duplicate_sha" >/dev/null 2>&1
+  local cherry_pick_status=$?
+  if [ "$cherry_pick_status" -eq 0 ]; then
+    fail "fixture invalid: duplicate cherry-pick unexpectedly succeeded"
+    return
+  fi
+  if [ ! -f "$(git rev-parse --git-path CHERRY_PICK_HEAD)" ]; then
+    fail "fixture invalid: duplicate cherry-pick did not leave CHERRY_PICK_HEAD"
+    return
+  fi
+  assert_equal "" "$(git status --porcelain)" "empty cherry-pick porcelain precondition"
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out empty cherry-pick status"
+  assert_contains "$RF_OUT" "a cherry-pick is already in progress" "close-out empty cherry-pick guard"
+  assert_not_contains "$RF_OUT" "+ git fetch -- origin" "close-out empty cherry-pick stops before fetch"
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "empty cherry-pick state allowed deletion of the release branch"
+  fi
+}
+
 # --- close-out: guard — not on main ----------------------------------------
 
 test_close_out_aborts_when_not_on_main() {
@@ -761,6 +799,7 @@ run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_if_remote_main_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
+run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
 run_test test_rejects_rc_version_argument

@@ -31,6 +31,8 @@ class ReleaseFinish
   STABLE_VERSION = /\A\d+\.\d+\.\d+\z/
   SUBCOMMANDS = %w[promote close-out].freeze
   FORWARD_PORT_INCOMPLETE_STATUS = 1
+  CHERRY_PICK_IN_PROGRESS_MESSAGE =
+    "a cherry-pick is already in progress; run git cherry-pick --continue, --skip, or --abort first"
   # Resolve the sibling forward-port helper relative to this script so close-out
   # works regardless of the current directory (the runbook runs from repo root,
   # but the throwaway-repo tests run from a temp checkout).
@@ -412,9 +414,16 @@ class ReleaseFinish
   end
 
   def ensure_clean_worktree!
+    raise AbortError, CHERRY_PICK_IN_PROGRESS_MESSAGE if cherry_pick_in_progress?
+
     return if git("status", "--porcelain").strip.empty?
 
     raise AbortError, "working tree is not clean; commit, stash, or discard local changes before continuing"
+  end
+
+  def cherry_pick_in_progress?
+    git_dir = git("rev-parse", "--git-dir").strip
+    File.exist?(File.expand_path("CHERRY_PICK_HEAD", git_dir))
   end
 
   def ensure_tag_exists!(tag)
