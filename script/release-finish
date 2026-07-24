@@ -394,9 +394,18 @@ class ReleaseFinish
       checked_main_sha:,
       checked_source_sha:
     )
-    run_or_print(
-      *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
-    )
+    begin
+      run_or_print(
+        *leased_branch_delete_command(release_branch, remote, checked_source_sha:, recovery_ref:)
+      )
+    rescue GitError => e
+      raise AbortError, <<~ERROR.strip
+        The leased delete transaction could not be confirmed; its remote outcome is UNKNOWN.
+        Inspect #{remote}/#{release_branch} and #{recovery_ref.delete_prefix('refs/heads/')} before retrying.
+        A retained recovery branch at a conflicting tip intentionally rejects reuse until it is accounted for.
+        Git command failure: #{e.message}
+      ERROR
+    end
     verify_main_after_delete!(
       remote,
       release_branch,
@@ -426,9 +435,19 @@ class ReleaseFinish
   end
 
   def verify_main_after_delete!(remote, release_branch, checked_main_sha:, checked_source_sha:, recovery_ref:)
-    fetch_remote!(remote)
-    current_main_sha = git("rev-parse", "#{remote}/main").strip
-    recreated_source_sha = remote_branch_sha(remote, release_branch)
+    begin
+      fetch_remote!(remote)
+      current_main_sha = git("rev-parse", "#{remote}/main").strip
+      recreated_source_sha = remote_branch_sha(remote, release_branch)
+    rescue GitError => e
+      raise AbortError, <<~ERROR.strip
+        Post-delete verification did not complete.
+        The temporary recovery branch #{recovery_ref.delete_prefix('refs/heads/')} was created for the checked source tip.
+        Inspect #{remote}/main, #{remote}/#{release_branch}, and the recovery branch before retrying.
+        Git command failure: #{e.message}
+      ERROR
+    end
+
     if recreated_source_sha
       raise AbortError, <<~ERROR.strip
         #{remote}/#{release_branch} reappeared during post-delete verification

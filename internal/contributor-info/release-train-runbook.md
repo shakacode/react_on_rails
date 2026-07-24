@@ -325,7 +325,7 @@ script/release-forward-port \
   --changelog
 git diff --check
 git add CHANGELOG.md
-git commit -m "Reconcile X.Y.Z release changelog on main"
+git commit -m "Reconcile 17.0.0 release changelog on main"
 # Validate, push, and open the dedicated release/changelog PR to main. Squash it with:
 # Record the final React on Rails X.Y.Z changelog (#<pr-number>)
 # Include this exact sentence in the PR body, using the newest release-branch commit that changed CHANGELOG.md:

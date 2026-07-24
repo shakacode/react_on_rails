@@ -1253,6 +1253,29 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "ignores regenerated LLM artifacts when matching an independently applied code patch" do
+    with_release_repo do |repo|
+      base_sha = git(repo, "rev-parse", "HEAD").strip
+
+      write_file(repo, "app.txt", "base\nshared fix\n")
+      write_file(repo, "llms-full.txt", "generated from current main docs\n")
+      commit_all(repo, "Apply the equivalent fix independently")
+
+      git(repo, "checkout", "-b", "release/1.0.1", base_sha)
+      write_file(repo, "app.txt", "base\nshared fix\n")
+      write_file(repo, "llms-full.txt", "stale release-branch generation\n")
+      release_fix_sha = commit_all(repo, "Fix release regression and regenerate docs")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{release_fix_sha[0, 12]} Fix release regression and regenerate docs")
+      expect(stdout).to include("patch already exists on main")
+    end
+  end
+
   it "skips no-footer cherry-picks after later target context changes" do
     with_release_repo do |repo|
       _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)

@@ -404,7 +404,9 @@ class ReleaseForwardPort
     targeted_reason = targeted_patch_equivalent_skip_reason(sha, subject, target)
     return targeted_reason if targeted_reason
 
-    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
+    return unless patch_equivalent_commits[sha] ||
+                  target_has_renamed_source_paths?(target, sha) ||
+                  generated_llm_artifact_changed?(sha)
     return unless patch_equivalent_commit_present_on_target?(sha, target)
 
     patch_equivalent_skip_reason_message(target)
@@ -977,7 +979,7 @@ class ReleaseForwardPort
   end
 
   def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil, zero_context: false)
-    source_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE]
+    source_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
     source_patch_id = patch_id_for_commit(sha, paths: source_paths, zero_context:)
 
     (candidates || patch_equivalent_target_candidates(sha, target)).any? do |target_sha|
@@ -1135,6 +1137,10 @@ class ReleaseForwardPort
   def changed_paths_for_commit(sha)
     @changed_paths_cache ||= {}
     @changed_paths_cache[sha] ||= git_lines("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha)
+  end
+
+  def generated_llm_artifact_changed?(sha)
+    (changed_paths_for_commit(sha) & GENERATED_LLM_FILES).any?
   end
 
   def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil, zero_context: false)

@@ -11,6 +11,11 @@
 
 set -uo pipefail
 
+# Test repositories must not inherit signing hooks or other machine-specific
+# Git behavior from the operator's global/system configuration.
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_FINISH="$SCRIPT_DIR/release-finish"
 
@@ -408,16 +413,37 @@ test_close_out_dry_run_does_not_delete_branch() {
 # so origin/main carries the cherry-pick. This is the precondition the durable
 # branch-delete gate requires. Leaves the checkout on a synced local main.
 push_forward_port_to_origin_main() {
-  git checkout -q main
-  git cherry-pick -x "$(git rev-parse release/1.0.0)" >/dev/null 2>&1
-  "$SCRIPT_DIR/release-forward-port" \
-    --source release/1.0.0 \
-    --target main \
-    --changelog >/dev/null
-  git add CHANGELOG.md
-  git commit -qm "Reconcile 1.0.0 release changelog on main"
-  git push -q origin main
-  git fetch -q origin
+  if ! git checkout -q main; then
+    fail "precondition: could not check out main"
+    return 1
+  fi
+  if ! git cherry-pick -x "$(git rev-parse release/1.0.0)" >/dev/null 2>&1; then
+    fail "precondition: forward-port cherry-pick failed"
+    return 1
+  fi
+  if ! "$SCRIPT_DIR/release-forward-port" \
+      --source release/1.0.0 \
+      --target main \
+      --changelog >/dev/null; then
+    fail "precondition: changelog reconciliation failed"
+    return 1
+  fi
+  if ! git add CHANGELOG.md; then
+    fail "precondition: could not stage changelog reconciliation"
+    return 1
+  fi
+  if ! git commit -qm "Reconcile 1.0.0 release changelog on main"; then
+    fail "precondition: changelog reconciliation produced nothing to commit"
+    return 1
+  fi
+  if ! git push -q origin main; then
+    fail "precondition: could not push forward-port fixture"
+    return 1
+  fi
+  if ! git fetch -q origin; then
+    fail "precondition: could not refresh forward-port fixture"
+    return 1
+  fi
 }
 
 # --- close-out: real apply (--yes, no TTY) deletes the branch ---------------
@@ -460,6 +486,30 @@ test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed() {
   fi
 }
 
+test_close_out_explains_a_conflicting_recovery_ref_rejection() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  local checked_source_sha conflicting_recovery_sha recovery_ref
+  checked_source_sha="$(git rev-parse origin/release/1.0.0)"
+  conflicting_recovery_sha="$(git rev-parse main)"
+  recovery_ref="refs/heads/release-finish-recovery/1.0.0-${checked_source_sha:0:12}"
+  git push -q origin "$conflicting_recovery_sha:$recovery_ref"
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out preexisting-recovery status"
+  assert_contains "$RF_OUT" "leased delete transaction could not be confirmed" \
+    "close-out preexisting-recovery rejection"
+  assert_contains "$RF_OUT" "remote outcome is UNKNOWN" "close-out preexisting-recovery uncertainty"
+  assert_contains "$RF_OUT" "${recovery_ref#refs/heads/}" "close-out preexisting-recovery guidance"
+  assert_equal "$checked_source_sha" \
+    "$(git ls-remote "$PWD/../origin.git" refs/heads/release/1.0.0 | cut -f1)" \
+    "close-out preexisting-recovery preserves source"
+  assert_equal "$conflicting_recovery_sha" \
+    "$(git ls-remote "$PWD/../origin.git" "$recovery_ref" | cut -f1)" \
+    "close-out preexisting-recovery preserves recovery"
+}
+
 test_close_out_refuses_delete_when_changelog_pr_remains() {
   setup_release_repo
   git checkout -q main
@@ -474,7 +524,7 @@ test_close_out_refuses_delete_when_changelog_pr_remains() {
     "close-out changelog-incomplete code check"
   assert_contains "$RF_OUT" "CHECK FAILED: release changelog reconciliation still needs its own squash PR" \
     "close-out changelog-incomplete changelog check"
-  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out changelog-incomplete must not delete"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out changelog-incomplete must not delete"
   if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
     fail "completion gate deleted the release branch before the changelog PR"
   fi
@@ -527,7 +577,7 @@ test_close_out_refuses_delete_when_forward_port_prs_remain() {
   assert_contains "$RF_OUT" "release close-out is not complete on origin/main" "close-out incomplete message"
   assert_contains "$RF_OUT" "each remaining source change in its own PR" "close-out incomplete next step"
   assert_not_contains "$RF_OUT" "Forward-port complete" "close-out must not apply picks directly"
-  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out incomplete must not delete"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out incomplete must not delete"
   assert_equal "$main_before" "$(git rev-parse main)" "close-out incomplete main tip"
   # Critical: the branch still exists on origin (its unique commits are safe).
   if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
@@ -728,6 +778,7 @@ test_close_out_aborts_if_remote_main_advances_during_confirmation() {
   origin="$(git remote get-url origin)"
   cat > "$runner" <<'RUBY'
 require "pty"
+require "timeout"
 
 script, origin, writer = ARGV
 output = +""
@@ -736,24 +787,33 @@ status = nil
 
 PTY.spawn("ruby", script, "close-out", "1.0.0") do |read, write, pid|
   begin
-    loop do
-      chunk = read.readpartial(1024)
-      output << chunk
-      next if advanced || !output.include?("Delete release/1.0.0 on origin now?")
+    Timeout.timeout(120) do
+      loop do
+        chunk = read.readpartial(1024)
+        output << chunk
+        next if advanced || !output.include?("Delete release/1.0.0 on origin now?")
 
-      abort "clone failed" unless system("git", "clone", "-q", origin, writer)
-      system("git", "-C", writer, "checkout", "-q", "main") || abort("checkout failed")
-      system("git", "-C", writer, "config", "user.email", "test@example.com") || abort("config failed")
-      system("git", "-C", writer, "config", "user.name", "Release Finish Prompt Race Test") || abort("config failed")
-      File.write(File.join(writer, "prompt-race.txt"), "remote advanced while confirmation was open\n")
-      system("git", "-C", writer, "add", "prompt-race.txt") || abort("add failed")
-      system("git", "-C", writer, "commit", "-qm", "Advance remote main during confirmation") ||
-        abort("commit failed")
-      system("git", "-C", writer, "push", "-q", "origin", "main") || abort("push failed")
+        abort "clone failed" unless system("git", "clone", "-q", origin, writer)
+        system("git", "-C", writer, "checkout", "-q", "main") || abort("checkout failed")
+        system("git", "-C", writer, "config", "user.email", "test@example.com") || abort("config failed")
+        system("git", "-C", writer, "config", "user.name", "Release Finish Prompt Race Test") || abort("config failed")
+        File.write(File.join(writer, "prompt-race.txt"), "remote advanced while confirmation was open\n")
+        system("git", "-C", writer, "add", "prompt-race.txt") || abort("add failed")
+        system("git", "-C", writer, "commit", "-qm", "Advance remote main during confirmation") ||
+          abort("commit failed")
+        system("git", "-C", writer, "push", "-q", "origin", "main") || abort("push failed")
 
-      advanced = true
-      write.write("y\n")
+        advanced = true
+        write.write("y\n")
+      end
     end
+  rescue Timeout::Error
+    begin
+      Process.kill("TERM", pid)
+    rescue Errno::ESRCH
+      # The child exited at the timeout boundary.
+    end
+    warn "timed out waiting for the delete confirmation prompt"
   rescue EOFError, Errno::EIO
     # PTYs report EIO at normal child exit on some platforms.
   ensure
@@ -762,7 +822,7 @@ PTY.spawn("ruby", script, "close-out", "1.0.0") do |read, write, pid|
 end
 
 print output
-exit(status.exitstatus)
+exit(status&.exitstatus || 1)
 RUBY
 
   RF_OUT="$(ruby "$runner" "$RELEASE_FINISH" "$origin" "$writer" 2>&1)"
@@ -842,6 +902,55 @@ test_close_out_restores_release_branch_if_main_races_during_delete() {
       grep -q release-finish-recovery; then
     fail "close-out during-delete restoration left the temporary recovery branch on origin"
   fi
+}
+
+prepare_post_delete_verification_failure_wrapper() {
+  local wrapper_dir="$PWD/../verification-failure-bin"
+
+  mkdir -p "$wrapper_dir"
+  REAL_GIT_BIN="$(command -v git)"
+  export REAL_GIT_BIN
+
+  cat > "$wrapper_dir/git" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+marker="$(dirname "$0")/verification-failure-fired"
+if [ "$*" = "ls-remote --exit-code --heads -- origin release/1.0.0" ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  echo "simulated post-delete ls-remote failure" >&2
+  exit 128
+fi
+
+exec "$REAL_GIT_BIN" "$@"
+WRAPPER
+  chmod +x "$wrapper_dir/git"
+  VERIFICATION_FAILURE_GIT_BIN="$wrapper_dir"
+}
+
+test_close_out_retains_recovery_when_post_delete_verification_io_fails() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  local checked_source_sha recovery_ref
+  checked_source_sha="$(git rev-parse origin/release/1.0.0)"
+  recovery_ref="refs/heads/release-finish-recovery/1.0.0-${checked_source_sha:0:12}"
+  prepare_post_delete_verification_failure_wrapper
+
+  PATH="$VERIFICATION_FAILURE_GIT_BIN:$PATH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out post-delete verification-I/O status"
+  assert_contains "$RF_OUT" "Post-delete verification did not complete" \
+    "close-out post-delete verification-I/O explanation"
+  assert_contains "$RF_OUT" "${recovery_ref#refs/heads/}" \
+    "close-out post-delete verification-I/O recovery guidance"
+  assert_contains "$RF_OUT" "simulated post-delete ls-remote failure" \
+    "close-out post-delete verification-I/O cause"
+  if git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "post-delete verification-I/O failure unexpectedly restored the release branch"
+  fi
+  assert_equal "$checked_source_sha" \
+    "$(git ls-remote "$PWD/../origin.git" "$recovery_ref" | cut -f1)" \
+    "close-out post-delete verification-I/O retains checked recovery"
 }
 
 prepare_post_delete_source_recreation_wrapper() {
@@ -1095,6 +1204,7 @@ run_test test_promote_without_tty_and_without_yes_aborts_before_release
 run_test test_close_out_dry_run_prints_plan_and_runs_nothing
 run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
+run_test test_close_out_explains_a_conflicting_recovery_ref_rejection
 run_test test_close_out_refuses_delete_when_changelog_pr_remains
 run_test test_close_out_refuses_mismatched_source_changelog_completion
 run_test test_close_out_refuses_delete_when_forward_port_prs_remain
@@ -1105,6 +1215,7 @@ run_test test_close_out_aborts_if_remote_main_advances_after_checks
 run_test test_close_out_aborts_if_source_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
 run_test test_close_out_restores_release_branch_if_main_races_during_delete
+run_test test_close_out_retains_recovery_when_post_delete_verification_io_fails
 run_test test_close_out_aborts_if_source_reappears_after_delete
 run_test test_close_out_preserves_recovery_if_source_reappears_during_cleanup
 run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
