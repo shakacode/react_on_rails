@@ -109,14 +109,14 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
 
 - **Ruby 3.3+ is required.** Upgrade Ruby before moving to React on Rails v17. React on Rails v16 remains the supported line for applications that must stay on Ruby 3.2 or older.
 - **React on Rails Pro already required Ruby 3.3+.** v17 aligns the open-source gem, Pro gem, create-app validator, and CI minimum matrix on the same Ruby floor.
-- **Three deprecated configuration options were removed.** They were deprecated in v16 and are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
+- **Four configuration options were removed.** Three were deprecated in v16, while `config.server_render_method` was inert. All four are gone in v17. Setting any of them in `config/initializers/react_on_rails.rb` now raises `NoMethodError` at boot. Run `bin/rake react_on_rails:doctor` to detect any that remain in your initializer.
   - `config.generated_assets_dirs` — delete the line. Public asset paths are determined automatically from `public_output_path` in `config/shakapacker.yml`.
   - `config.skip_display_none` — delete the line. It had no runtime effect.
   - `config.defer_generated_component_packs` — replaced by `config.generated_component_packs_loading_strategy`:
     - `config.defer_generated_component_packs = true` → `config.generated_component_packs_loading_strategy = :defer`
     - `config.defer_generated_component_packs = false` → **delete the line.** The old option was truthy-gated — only `= true` did anything (it set `:defer`); `= false` was a no-op that fell through to the default strategy. Deleting the line preserves that behavior. Set `config.generated_component_packs_loading_strategy = :sync` explicitly only if you specifically relied on synchronous (blocking) pack loading.
     - The default strategy (when you don't set one) is `:async` for Pro or `:defer` for non-Pro on Shakapacker 8.2.0+, and `:sync` on older Shakapacker.
-- **The inert `config.server_render_method` option was removed.** The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Delete any `config.server_render_method = ...` line from `config/initializers/react_on_rails.rb`; leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
+  - `config.server_render_method` — delete the line. The open-source gem always renders with ExecJS, so this option never selected a server render method — its validator only raised at boot for any non-blank, non-`"ExecJS"` value. Leaving it in place now raises `NoMethodError` at boot (`bin/rake react_on_rails:doctor` also flags the stale line). For a standalone Node rendering process, use React on Rails Pro's Node renderer, configured via `ReactOnRailsPro.configure`.
 
 ### Migration Steps
 
