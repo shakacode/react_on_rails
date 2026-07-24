@@ -20,9 +20,9 @@ require "open3"
 #              the accepted RC tag, collapses the rc->stable CHANGELOG, then runs
 #              `bundle exec rake release[X.Y.Z]` (the rake guards enforce the
 #              dangerous tag/version safety; this script does not re-implement it).
-#   close-out  Step 5: forward-port remaining release-branch commits to main via
-#              `script/release-forward-port` (dry-run, then apply on confirmation),
-#              then delete the ephemeral release branch on origin.
+#   close-out  Step 5: verify the one-change forward-port PRs and the separate
+#              changelog/release PR are complete on main, then delete the
+#              ephemeral release branch on origin.
 #
 # The dangerous outward operations (`rake release`, `git push --delete`) are each
 # gated behind an explicit confirmation and are printed-only under --dry-run.
@@ -46,6 +46,7 @@ class ReleaseFinish
       assume_yes: false,
       version: nil,
       rc_tag: nil,
+      ack_manual: [],
       remote: "origin"
     }
     @parser = build_parser
@@ -92,6 +93,10 @@ class ReleaseFinish
     raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
 
     validate_version!
+    if subcommand == "promote" && @options[:ack_manual].any?
+      raise UsageError, "--ack-manual applies only to close-out forward-port verification"
+    end
+
     subcommand
   end
 
@@ -116,6 +121,9 @@ class ReleaseFinish
       parser.on("--remote NAME", "Remote for fetch and branch deletion (default: origin)") do |remote|
         @options[:remote] = remote
       end
+      parser.on("--ack-manual SHA", "Acknowledge one inspected MANUAL forward-port item (repeatable)") do |sha|
+        @options[:ack_manual] << sha
+      end
       parser.on("--dry-run", "Preview the plan; still fetches remote refs needed for current-state checks") do
         @options[:dry_run] = true
       end
@@ -132,14 +140,14 @@ class ReleaseFinish
   def usage_banner
     <<~BANNER
       Usage: script/release-finish promote   X.Y.Z [--rc-tag vX.Y.Z.rc.N] [--dry-run] [--yes]
-             script/release-finish close-out X.Y.Z [--remote origin] [--dry-run] [--yes]
+             script/release-finish close-out X.Y.Z [--remote origin] [--ack-manual SHA] [--dry-run] [--yes]
 
       Orchestrates the release-train runbook steps 4 (promote) and 5 (close out).
 
         promote    Verify the release/X.Y.Z tip equals the accepted RC tag, collapse the
                    rc->stable CHANGELOG, then run `bundle exec rake release[X.Y.Z]`.
-        close-out  Forward-port remaining commits to main via #{FORWARD_PORT_SCRIPT},
-                   then delete release/X.Y.Z on the remote.
+        close-out  Verify separate source and changelog forward-port PRs are complete
+                   on main, then delete release/X.Y.Z on the remote.
 
       The rake promotion guards enforce the dangerous tag/version safety; this script
       adds dry-run, confirmations, and on/at-release/clean-tree guards around them.
@@ -275,39 +283,47 @@ class ReleaseFinish
     fetch_remote!(remote)
     ensure_local_main_matches_remote!(remote)
 
-    forward_port_to_main!(source)
+    complete = forward_port_complete?(source)
+    unless complete
+      if @options[:dry_run]
+        puts "\nDRY RUN: close-out is blocked until the separate forward-port PRs above merge."
+        finish_dry_run_notice
+        return 0
+      end
+
+      raise AbortError, <<~ERROR.strip
+        release close-out is not complete on #{remote}/main.
+        Land each remaining source change in its own PR, then land the separate
+        changelog/release reconciliation as a squash PR. Re-run close-out only
+        after both checks pass; the release branch was not deleted.
+      ERROR
+    end
+
     delete_release_branch!(release_branch, remote)
 
     finish_dry_run_notice
     0
   end
 
-  def forward_port_to_main!(source)
-    section "Forward-port remaining #{source} commits to main"
-    # Always show the REAL plan: release-forward-port --dry-run is read-only (no
-    # checkout, no cherry-pick), so running it even under our own --dry-run gives
-    # the operator the actual forward-port preview rather than a bare command.
-    puts "Dry-run plan first (delegates to #{FORWARD_PORT_SCRIPT}; it skips rc bumps and already-ported fixes):"
-    unless system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main", "--dry-run")
-      raise GitError, "#{FORWARD_PORT_SCRIPT} --dry-run failed; cannot preview the forward-port plan"
+  def forward_port_complete?(source)
+    section "Verify separate forward-port PRs from #{source}"
+    puts "Code plan (every remaining PICK/MANUAL item needs its own source-change PR):"
+    code_args = ["--source", source, "--target", "main", "--check"]
+    @options.fetch(:ack_manual).each { |sha| code_args.push("--ack-manual", sha) }
+    code_complete = system(FORWARD_PORT_SCRIPT, *code_args)
+
+    puts
+    puts "Changelog plan (remaining reconciliation needs its own squash PR):"
+    changelog_complete =
+      system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main", "--changelog", "--check")
+
+    if code_complete && changelog_complete
+      puts "\nAll source and changelog forward-port work is complete on main."
+      return true
     end
 
-    if @options[:dry_run]
-      puts
-      puts "DRY RUN: the plan above is read-only; the apply step (forward-port without --dry-run) was skipped."
-      return
-    end
-
-    unless confirm?("Apply the forward-port plan above onto main?")
-      raise AbortError, "review the plan and re-run close-out when ready to forward-port"
-    end
-
-    forwarded = system(FORWARD_PORT_SCRIPT, "--source", source, "--target", "main")
-    return if forwarded
-
-    raise AbortError,
-          "#{FORWARD_PORT_SCRIPT} did not complete (conflict or MANUAL item). Resolve per the runbook, " \
-          "then re-run close-out; the helper is idempotent and the branch deletion below was not run."
+    puts "\nNext: follow the runbook's one-source-PR-at-a-time loop, then merge the release/changelog squash PR."
+    false
   end
 
   def delete_release_branch!(release_branch, remote)
@@ -319,11 +335,8 @@ class ReleaseFinish
       return
     end
 
-    # SAFETY: never delete the source branch while its forward-ported commits
-    # exist only on LOCAL main. close-out applies the cherry-picks locally but
-    # deliberately does not push main (main may be protected), so the operator
-    # must push first. Re-fetch and verify local main is now on origin/main
-    # before allowing the delete.
+    # SAFETY: never delete the source branch unless the verified local main is
+    # already reachable from the remote main.
     ensure_forward_port_durable_on_remote!(remote)
 
     confirm_outward!(
@@ -376,16 +389,10 @@ class ReleaseFinish
     ERROR
   end
 
-  # SAFETY GATE for the branch delete: the forward-port applies cherry-picks to
-  # LOCAL main but close-out never pushes main itself (main may be protected), so
-  # the operator must push (or merge the forward-port PR) first. Re-fetch and
-  # require local main — which carries those cherry-picks — to be reachable from
-  # the remote main. If the operator has not pushed, local main holds commits
-  # absent from #{remote}/main and this aborts, making it impossible to delete
-  # the source branch while its unique forward-ported commits exist only locally.
-  # (Cherry-picks get new SHAs, so this checks the pushed local-main tip, not the
-  # original release-branch commit identities, which are never ancestors of main
-  # under the trunk-based -x model.)
+  # SAFETY GATE for the branch delete: re-fetch and require the checked local
+  # main tip to be reachable from remote main. The plan checks above establish
+  # semantic completeness; this reachability check prevents an operator from
+  # validating unpushed local work and then deleting the source branch.
   def ensure_forward_port_durable_on_remote!(remote)
     fetch_remote!(remote)
     remote_main = "#{remote}/main"

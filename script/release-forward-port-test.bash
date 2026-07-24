@@ -8,6 +8,11 @@
 
 set -uo pipefail
 
+# Test repositories must not inherit signing hooks or other machine-specific
+# Git behavior from the operator's global/system configuration.
+export GIT_CONFIG_GLOBAL=/dev/null
+export GIT_CONFIG_NOSYSTEM=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FORWARD_PORT="$SCRIPT_DIR/release-forward-port"
 
@@ -62,7 +67,11 @@ run_test() {
   echo "-> $test_fn"
 
   local tmpdir before_failed had_errexit=false subshell_failures
-  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/release-forward-port-test.XXXXXX")"
+  if ! tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/release-forward-port-test.XXXXXX")" ||
+     [ -z "$tmpdir" ] || [ ! -d "$tmpdir" ]; then
+    fail "could not create an isolated temporary repository"
+    return
+  fi
   subshell_failures="$tmpdir/failures.log"
   : > "$subshell_failures"
   before_failed="$TESTS_FAILED"
@@ -108,6 +117,7 @@ init_repo() {
   git init -q -b main
   git config user.email test@example.com
   git config user.name "Forward Port Test"
+  git config commit.gpgsign false
 }
 
 commit_all() {
@@ -361,6 +371,207 @@ EOF
   assert_contains "$changelog" "PR 4490" "consolidated original PR kept"
   assert_not_contains "$changelog" "Narrow prerelease wording" "narrow target wording replaced"
   assert_contains "$changelog" "#### Breaking Changes" "final heading kept"
+}
+
+# If the canonical stable entry is already retained in target history, stale
+# same-PR wording under [Unreleased] still needs to be removed. That removal is
+# a semantic change even though there is no canonical entry left to add.
+test_stale_unreleased_copy_is_removed_when_canonical_entry_is_in_history() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Changed
+
+- **Stale prerelease wording**: obsolete copy. $(pr_link 123) by [a](https://github.com/a).
+
+### [17.0.0] - 2026-07-16
+
+#### Breaking Changes
+
+- **Canonical final wording**: released guidance. $(pr_link 123) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Breaking Changes
+
+- **Canonical final wording**: released guidance. $(pr_link 123) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  local out changelog
+  out="$(run_changelog release/17.0.0)"
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$out" "1 stale entry to drop" "stale removal counted"
+  assert_not_contains "$changelog" "Stale prerelease wording" "stale copy removed"
+  assert_contains "$changelog" "Canonical final wording" "canonical history retained"
+}
+
+# A final-stable source is authoritative over matching target RC sections.
+# Target-only RC notes can describe prerelease pins or experiments deliberately
+# removed before final, so drop them with the obsolete RC header.
+test_target_only_rc_entries_are_discarded_with_section() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0.rc.1] - 2026-07-01
+
+#### Fixed
+
+- **Target-only RC note**: prerelease-only behavior. $(pr_link 999) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Fixed
+
+- **Canonical final fix**: release entry. $(pr_link 123) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+
+  run_changelog release/17.0.0 >/dev/null
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_not_contains "$changelog" "Target-only RC note" "target RC note discarded"
+  assert_contains "$changelog" "Canonical final fix" "source stable entry re-homed"
+  assert_not_contains "$changelog" "### [17.0.0.rc.1]" "target RC header removed"
+}
+
+# Stable changelogs can contain several distinct entries with the same own PR.
+# If main already has every exact entry, sibling wording must not make the
+# reconciler replace and reorder the whole PR group on every run.
+test_exact_same_pr_group_is_idempotent() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Added
+
+- **First feature**: first final entry. $(pr_link 3320) by [a](https://github.com/a).
+- **Second feature**: second final entry. $(pr_link 3320) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **First feature**: first final entry. $(pr_link 3320) by [a](https://github.com/a).
+- **Second feature**: second final entry. $(pr_link 3320) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+  local before
+  before="$(cat CHANGELOG.md)"
+
+  local out
+  out="$(run_changelog release/17.0.0)"
+  assert_contains "$out" "0 entries to add" "exact same-PR group is a no-op"
+  assert_contains "$out" "2 entries already present" "both exact entries counted"
+  [ "$(cat CHANGELOG.md)" = "$before" ] || fail "exact same-PR group changed CHANGELOG.md"
+}
+
+# A partial target copy of a same-PR group must not suppress a canonical sibling
+# from the stable source.
+test_partial_same_pr_group_restores_missing_sibling() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Added
+
+- **First feature**: first final entry. $(pr_link 3320) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Added
+
+- **First feature**: first final entry. $(pr_link 3320) by [a](https://github.com/a).
+- **Second feature**: second final entry. $(pr_link 3320) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+  run_changelog release/17.0.0 >/dev/null
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "First feature" "existing same-PR sibling retained"
+  assert_contains "$changelog" "Second feature" "missing same-PR sibling restored"
+  [ "$(grep -c "First feature" CHANGELOG.md)" -eq 1 ] || fail "expected one first feature entry"
+  [ "$(grep -c "Second feature" CHANGELOG.md)" -eq 1 ] || fail "expected one second feature entry"
+}
+
+# Stable headings are part of the canonical entry identity. Identical prose
+# under the wrong heading must move to the stable source heading.
+test_stable_heading_replaces_matching_text_under_wrong_heading() {
+  init_repo
+
+  cat > main.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+#### Changed
+
+- **Canonical fix**: final wording. $(pr_link 123) by [a](https://github.com/a).
+EOF
+
+  cat > release.md <<EOF
+# Change Log
+
+### [Unreleased]
+
+### [17.0.0] - 2026-07-16
+
+#### Fixed
+
+- **Canonical fix**: final wording. $(pr_link 123) by [a](https://github.com/a).
+EOF
+
+  seed_main_and_release main.md release.md
+  run_changelog release/17.0.0 >/dev/null
+
+  local changelog
+  changelog="$(cat CHANGELOG.md)"
+  assert_contains "$changelog" "#### Fixed" "stable heading restored"
+  assert_not_contains "$changelog" "#### Changed" "stale heading removed"
 }
 
 # Multiple distinct entries that share one PR number are all carried over (the
@@ -1008,6 +1219,11 @@ run_test test_collapses_rc_sections_and_branch_unreleased_into_main_unreleased
 run_test test_dry_run_previews_without_writing
 run_test test_dedupes_by_pr_number_even_with_different_prose
 run_test test_final_stable_wording_replaces_target_unreleased_copy
+run_test test_stale_unreleased_copy_is_removed_when_canonical_entry_is_in_history
+run_test test_target_only_rc_entries_are_discarded_with_section
+run_test test_exact_same_pr_group_is_idempotent
+run_test test_partial_same_pr_group_restores_missing_sibling
+run_test test_stable_heading_replaces_matching_text_under_wrong_heading
 run_test test_multiple_entries_same_new_pr_all_carry_over
 run_test test_entries_regroup_under_headings_in_order
 run_test test_second_run_is_noop

@@ -4,10 +4,10 @@
 # `bash script/release-finish-test.bash`.
 #
 # Every case runs against a throwaway `mktemp -d` git repo and exercises only the
-# dry-run output and the guard/abort paths. NOTHING here runs a real release,
-# branch deletion, or push: promote stops at the rake-release confirmation under
-# dry-run, and close-out only invokes the forward-port DRY-RUN plan plus printed
-# branch-deletion. The harness never adds a network remote.
+# dry-run output and the guard/abort paths. NOTHING here runs a real network
+# release or push: promote stops at the rake-release confirmation under dry-run.
+# Close-out tests use only a throwaway local bare remote when exercising the
+# final branch-deletion gate.
 
 set -uo pipefail
 
@@ -155,7 +155,7 @@ setup_release_repo() {
   mkdir -p react_on_rails/lib/react_on_rails
   printf 'module ReactOnRails\n  VERSION = "1.0.0"\nend\n' > react_on_rails/lib/react_on_rails/version.rb
   printf 'core\n' > app.txt
-  printf '## [Unreleased]\n\n## [1.0.0.rc.0]\n- Fix something\n' > CHANGELOG.md
+  printf '# Change Log\n\n### [Unreleased]\n\n### [1.0.0.rc.0]\n\n#### Fixed\n\n- Fix something\n' > CHANGELOG.md
   git add .
   git commit -qm "beta work"
   git push -q origin main
@@ -384,7 +384,8 @@ test_close_out_dry_run_prints_plan_and_runs_nothing() {
   # The real forward-port DRY-RUN plan is shown (it resolves origin/release/1.0.0).
   assert_contains "$RF_OUT" "Release forward-port plan" "close-out dry-run"
   assert_contains "$RF_OUT" "PICK" "close-out dry-run picks the fix"
-  assert_contains "$RF_OUT" 'DRY RUN: would run: git push origin --delete release/1.0.0' "close-out dry-run"
+  assert_contains "$RF_OUT" "close-out is blocked until the separate forward-port PRs above merge" "close-out dry-run"
+  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out dry-run"
   assert_contains "$RF_OUT" "no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed" "close-out dry-run"
 }
 
@@ -408,6 +409,12 @@ test_close_out_dry_run_does_not_delete_branch() {
 push_forward_port_to_origin_main() {
   git checkout -q main
   git cherry-pick -x "$(git rev-parse release/1.0.0)" >/dev/null 2>&1
+  "$SCRIPT_DIR/release-forward-port" \
+    --source release/1.0.0 \
+    --target main \
+    --changelog >/dev/null
+  git add CHANGELOG.md
+  git commit -qm "Reconcile 1.0.0 release changelog on main"
   git push -q origin main
   git fetch -q origin
 }
@@ -442,28 +449,47 @@ test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed() {
   fi
 }
 
-# --- close-out: P1 durability gate — refuse delete if main not pushed -------
-
-# #1: a single close-out run forward-ports the fix onto LOCAL main but never
-# pushes main itself. The fix now exists only locally, so the durable-delete gate
-# MUST abort before deleting the source branch (otherwise the commit is lost).
-# Local main starts in sync with origin/main, so the stale-main guard passes and
-# control reaches the durability gate the in-run cherry-pick triggers.
-test_close_out_refuses_delete_when_forward_port_only_local() {
+test_close_out_refuses_delete_when_changelog_pr_remains() {
   setup_release_repo
-  git checkout -q main   # local main == origin/main (synced by setup's fetch)
+  git checkout -q main
+  git cherry-pick -x "$(git rev-parse release/1.0.0)" >/dev/null 2>&1
+  git push -q origin main
+  git fetch -q origin
 
   run_rf close-out 1.0.0 --yes
 
-  assert_status 1 "$RF_STATUS" "close-out local-only status"
-  # The forward-port DID apply locally...
-  assert_contains "$RF_OUT" "Forward-port complete" "close-out local-only applied the pick"
-  # ...but the gate refused the delete because main was not pushed.
-  assert_contains "$RF_OUT" "not yet on origin/main" "close-out local-only message"
-  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out local-only must not delete"
+  assert_status 1 "$RF_STATUS" "close-out changelog-incomplete status"
+  assert_contains "$RF_OUT" "CHECK PASSED: the release source has no remaining code forward-port work" \
+    "close-out changelog-incomplete code check"
+  assert_contains "$RF_OUT" "CHECK FAILED: release changelog reconciliation still needs its own squash PR" \
+    "close-out changelog-incomplete changelog check"
+  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out changelog-incomplete must not delete"
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "completion gate deleted the release branch before the changelog PR"
+  fi
+}
+
+# --- close-out: refuse direct local application when forward-port PRs remain -
+
+# Close-out is now a completion gate, not an all-at-once mutator. When source or
+# changelog work remains it must leave local main unchanged and refuse deletion.
+test_close_out_refuses_delete_when_forward_port_prs_remain() {
+  setup_release_repo
+  git checkout -q main   # local main == origin/main (synced by setup's fetch)
+  local main_before
+  main_before="$(git rev-parse main)"
+
+  run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out incomplete status"
+  assert_contains "$RF_OUT" "release close-out is not complete on origin/main" "close-out incomplete message"
+  assert_contains "$RF_OUT" "each remaining source change in its own PR" "close-out incomplete next step"
+  assert_not_contains "$RF_OUT" "Forward-port complete" "close-out must not apply picks directly"
+  assert_not_contains "$RF_OUT" "git push origin --delete" "close-out incomplete must not delete"
+  assert_equal "$main_before" "$(git rev-parse main)" "close-out incomplete main tip"
   # Critical: the branch still exists on origin (its unique commits are safe).
   if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
-    fail "durability gate deleted the release branch while commits were only local"
+    fail "completion gate deleted the release branch while PR work remained"
   fi
 }
 
@@ -598,7 +624,8 @@ run_test test_promote_without_tty_and_without_yes_aborts_before_release
 run_test test_close_out_dry_run_prints_plan_and_runs_nothing
 run_test test_close_out_dry_run_does_not_delete_branch
 run_test test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed
-run_test test_close_out_refuses_delete_when_forward_port_only_local
+run_test test_close_out_refuses_delete_when_changelog_pr_remains
+run_test test_close_out_refuses_delete_when_forward_port_prs_remain
 run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_when_not_on_main

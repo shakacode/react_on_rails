@@ -385,7 +385,7 @@ flagship demo needs the same change.
 Run specific test files:
 
 ```bash
-bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
+(cd react_on_rails && bundle exec rspec spec/react_on_rails/path/to/spec.rb)
 cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 ```
 
@@ -730,7 +730,7 @@ Releases use a release-train branching model. Full mechanics (cut, stabilize, fo
 
 - **`main` never freezes.** It stays in the `beta` phase and keeps absorbing batch work the whole time.
 - **RCs stabilize on an ephemeral `release/X.Y.Z` branch** (one branch per final target, deleted after the final ships; tags are the durable record). Only stabilizing fixes target `release/*`; new features keep targeting `main`.
-- **Forward-port every `release/*` fix to `main` with `git cherry-pick -x <sha>`.** Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`.
+- **Forward-port every missing `release/*` fix to `main` in its own PR with `git cherry-pick -x <sha>`.** Merge each source-change PR before planning the next one from fresh `origin/main`; skip commits the helper proves are already present or empty. Keep the changelog/release reconciliation in a separate squash PR. Never `git merge release/X.Y.Z` into `main` — that leaks the RC version-bump commits onto `main`.
 - **Final = promote the last good RC by dropping `-rc`**, not a re-cut from `main`. The final's runtime code tree must equal the last good RC's tree — only version/changelog **metadata** differs (under unified versioning the release task bumps `version.rb`, the Pro version file, every workspace `package.json`, and lockfiles in addition to `CHANGELOG.md`), never runtime source; post-cut `main` commits roll into the next version. See the [release-train runbook](internal/contributor-info/release-train-runbook.md) for the per-artifact diff check. The release task supports the in-place promotion directly: a stable `release[X.Y.Z]` runs from `main` **or** the matching `release/X.Y.Z` branch, and the CI gate validates the tip of whichever branch you release from (`origin/release/X.Y.Z` for a release-branch cut/promotion, else `origin/main`).
 
 The **merge gate is a function of the target branch's release phase**. Resolve the phase, then apply its row plus the mode rules above:

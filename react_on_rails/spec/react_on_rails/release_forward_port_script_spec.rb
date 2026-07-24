@@ -143,10 +143,149 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "applies only the selected source commit for a one-change forward-port PR" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "first.txt", "first release fix\n")
+      first_sha = commit_all(repo, "Fix first release regression (#101)")
+      write_file(repo, "second.txt", "second release fix\n")
+      second_sha = commit_all(repo, "Fix second release regression (#102)")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--only", first_sha)
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{first_sha[0, 12]} Fix first release regression (#101)")
+      expect(stdout).not_to include(second_sha[0, 12])
+      expect(File.read(File.join(repo, "first.txt"))).to eq("first release fix\n")
+      expect(File).not_to exist(File.join(repo, "second.txt"))
+    end
+  end
+
+  it "refuses to batch multiple source commits unless --all is explicit" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "first.txt", "first release fix\n")
+      first_sha = commit_all(repo, "Fix first release regression (#101)")
+      write_file(repo, "second.txt", "second release fix\n")
+      second_sha = commit_all(repo, "Fix second release regression (#102)")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+
+      expect(status.exitstatus).to eq(2)
+      expect(stdout).to include("PICK #{first_sha[0, 12]}")
+      expect(stdout).to include("PICK #{second_sha[0, 12]}")
+      expect(stderr).to include("normal mode found 2 actionable commits")
+      expect(stderr).to include("--only SHA")
+      expect(File).not_to exist(File.join(repo, "first.txt"))
+      expect(File).not_to exist(File.join(repo, "second.txt"))
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--all")
+
+      expect(status).to be_success, stderr
+      expect(File.read(File.join(repo, "first.txt"))).to eq("first release fix\n")
+      expect(File.read(File.join(repo, "second.txt"))).to eq("second release fix\n")
+    end
+  end
+
+  it "rejects code selection flags in changelog mode" do
+    with_release_repo do |repo|
+      _stdout, stderr, status =
+        run_script(repo, "--source", "main", "--target", "main", "--changelog", "--only", "HEAD")
+
+      expect(status.exitstatus).to eq(2)
+      expect(stderr).to include("--only/--all select code commits and cannot be combined with --changelog")
+    end
+  end
+
+  it "checks whether the complete code forward-port plan is satisfied without changing the target" do
+    with_release_repo do |repo|
+      _rc_bump_sha, fix_sha = add_rc_bump_and_fix(repo)
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression")
+      expect(stderr).to include("CHECK FAILED")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\n")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--only", fix_sha)
+      expect(status).to be_success, stderr
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("CHECK PASSED")
+    end
+  end
+
+  it "accepts inspected manual items while checking the complete code plan" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "react_on_rails/lib/react_on_rails/version.rb", version_file("1.0.1"))
+      stable_bump_sha = commit_all(repo, "Bump version to 1.0.1")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(
+          repo,
+          "--source",
+          "release/1.0.1",
+          "--target",
+          "main",
+          "--check",
+          "--ack-manual",
+          stable_bump_sha
+        )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("ACK-MANUAL #{stable_bump_sha[0, 12]} Bump version to 1.0.1")
+      expect(stdout).to include("CHECK PASSED")
+    end
+  end
+
+  it "checks whether release changelog reconciliation is complete" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Release fix.\n"
+      )
+      commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog")
+      expect(status).to be_success, stderr
+      commit_all(repo, "Reconcile release changelog")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("CHECK PASSED")
+    end
+  end
+
   it "dry-runs release and target branches with unrelated root histories" do
     with_release_repo do |repo|
       git(repo, "checkout", "--orphan", "release/1.0.1")
-      commit_all(repo, "Seed rewritten release history")
+      write_file(repo, "release-seed-only.txt", "rewritten release root\n")
+      release_root_sha = commit_all(repo, "Seed rewritten release history")
       write_file(repo, "app.txt", "base\nrelease fix\n")
       fix_sha = commit_all(repo, "Fix release regression after history rewrite")
       git(repo, "checkout", "main")
@@ -155,8 +294,26 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status).to be_success, stderr
       expect(stderr).to eq("")
+      expect(stdout).to include("MANUAL #{release_root_sha[0, 12]} Seed rewritten release history")
+      expect(stdout).to include("root commit from unrelated history")
+      expect(stdout).not_to include("PICK #{release_root_sha[0, 12]} Seed rewritten release history")
       expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression after history rewrite")
       expect(stdout).to include("DRY RUN")
+
+      stdout, stderr, status = run_script(
+        repo,
+        "--source",
+        "release/1.0.1",
+        "--target",
+        "main",
+        "--ack-manual",
+        release_root_sha
+      )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Cherry-picking #{fix_sha[0, 12]} Fix release regression after history rewrite")
+      expect(File.read(File.join(repo, "app.txt"))).to eq("base\nrelease fix\n")
+      expect(File).not_to exist(File.join(repo, "release-seed-only.txt"))
     end
   end
 
@@ -231,6 +388,37 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not treat a different dependency at the same stable version as superseding a prerelease pin" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "package.txt", "widget=2.0.0-rc.1\ngadget=1.0.0\n")
+      prerelease_sha = commit_all(repo, "Update Widget package pin to 2.0.0-rc.1 (#10)")
+      write_file(repo, "package.txt", "widget=2.0.0-rc.1\ngadget=2.0.0\n")
+      stable_sha = commit_all(repo, "Adopt stable Gadget 2.0.0 (#11)")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "package.txt", "widget=1.0.0\ngadget=2.0.0\n")
+      git(repo, "add", "package.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port stable Gadget (#12)",
+        "-m",
+        "- cherry-picked the merged #11 squash commit with `git cherry-pick -x`\n\n" \
+        "(cherry picked from commit #{stable_sha})"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{prerelease_sha[0, 12]} Update Widget package pin to 2.0.0-rc.1 (#10)")
+      expect(stdout).not_to include("prerelease package pin is superseded")
+    end
+  end
+
   it "skips reverts of skipped rc version bump commits" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -243,7 +431,8 @@ RSpec.describe "script/release-forward-port" do
       git(repo, "checkout", "main")
       commit_count = git(repo, "rev-list", "--count", "main").strip
 
-      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main")
 
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{rc_bump_sha[0, 12]} Bump version to 1.0.1.rc.1")
@@ -410,7 +599,9 @@ RSpec.describe "script/release-forward-port" do
         "-m",
         "Backport release regression (#456)",
         "-m",
-        "Backports #123 to the release train with release-specific behavior preserved."
+        "Backport the fix from #123 after the release-only prerequisite in #789.",
+        "-m",
+        "This is equivalent to main PR #123 with release-specific behavior preserved."
       )
       release_fix_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
@@ -422,6 +613,67 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("source commit identifies a live upstream PR already present on main")
       expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
+    end
+  end
+
+  it "does not treat incidental merged-in references as forward-port provenance" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "base\noriginal main feature\n")
+      commit_all(repo, "Original feature (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
+      write_file(repo, "app.txt", "base\nseparate release fix\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Fix separate release regression (#456)",
+        "-m",
+        "Follow-up to behavior merged in #123; this adds a separate release fix."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix separate release regression (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR")
+    end
+  end
+
+  it "does not skip composite backports until every narrated upstream PR is live on target" do
+    with_release_repo do |repo|
+      write_file(repo, "first.txt", "first main fix\n")
+      commit_all(repo, "Fix first release regression on main (#123)")
+      write_file(repo, "second.txt", "second main fix\n")
+      commit_all(repo, "Fix second release regression on main (#124)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~2")
+      write_file(repo, "first.txt", "first release-adapted fix\n")
+      write_file(repo, "third.txt", "third release-only fix\n")
+      git(repo, "add", "first.txt", "third.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regressions (#456)",
+        "-m",
+        "Backports #123, #124, and #125 to the release train."
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Backport release regressions (#456)")
+      expect(stdout).not_to include("source commit identifies a live upstream PR")
     end
   end
 
@@ -469,6 +721,23 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("SKIP #{artifact_sha[0, 12]} Regenerate release-branch llms artifacts")
       expect(stdout).to include("generated LLM artifact-only commit")
+    end
+  end
+
+  it "defers commits containing only changelog and generated LLM artifacts" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [1.0.1.rc.1]\n- RC notes\n")
+      write_file(repo, "llms-full.txt", "generated release docs\n")
+      artifact_sha = commit_all(repo, "Stamp release docs and changelog")
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("SKIP #{artifact_sha[0, 12]} Stamp release docs and changelog")
+      expect(stdout).to include("changelog/generated artifact-only commit")
     end
   end
 
@@ -593,9 +862,68 @@ RSpec.describe "script/release-forward-port" do
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("narrated cherry-pick -x evidence")
+      expect(stdout).to include("source-bound forward-port narration")
       expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Fix release regression (#123)")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
+    end
+  end
+
+  it "trusts a Forward-port commit whose action line names the release PR" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "license.txt", "release license behavior\n")
+      fix_sha = commit_all(repo, "Publish accurate license metadata (#4660)")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "license.txt", "conflict-adapted main license behavior\n")
+      git(repo, "add", "license.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port license metadata to main (#4668)",
+        "-m",
+        "- forward-ports the reviewed licensing change from release\n" \
+        "PR #4660\n" \
+        "- preserves newer mainline token handling"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("source-bound forward-port narration")
+      expect(stdout).not_to include("PICK #{fix_sha[0, 12]} Publish accurate license metadata (#4660)")
+    end
+  end
+
+  it "does not trust a narrated forward-port unless the narration names this source PR" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "app.txt", "base\nrelease fix\n")
+      fix_sha = commit_all(repo, "Fix release regression (#11)")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "other.txt", "different forward-port\n")
+      git(repo, "add", "other.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port a different regression (#999)",
+        "-m",
+        "This commit discusses release PR #11, but did not apply it.\n\n" \
+        "- cherry-picked release PR #12 with `git cherry-pick -x`"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{fix_sha[0, 12]} Fix release regression (#11)")
+      expect(stdout).not_to include("source-bound forward-port narration")
     end
   end
 
@@ -630,6 +958,38 @@ RSpec.describe "script/release-forward-port" do
       expect(status).to be_success, stderr
       expect(stdout).to include("patch already exists on main according to target history")
       expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
+    end
+  end
+
+  it "does not trust zero-context provenance when the target patch differs" do
+    with_release_repo do |repo|
+      write_file(repo, "app.txt", "top\nanchor\nbottom\n")
+      shared_base_sha = commit_all(repo, "Prepare shared source context")
+
+      write_file(repo, "app.txt", "top\nanchor\ndifferent main fix\nbottom\n")
+      commit_all(repo, "Fix a different regression on main (#123)")
+
+      git(repo, "checkout", "-b", "release/1.0.1", shared_base_sha)
+      write_file(repo, "app.txt", "top\nanchor\nrelease fix\nbottom\n")
+      git(repo, "add", "app.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Backport release regression (#456)",
+        "-m",
+        "Source PR: #123"
+      )
+      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "main")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(stdout).not_to include("patch already exists on main according to target history")
     end
   end
 
@@ -816,7 +1176,8 @@ RSpec.describe "script/release-forward-port" do
       merge_sha = git(repo, "rev-parse", "HEAD").strip
       git(repo, "checkout", "main")
 
-      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--all")
 
       expect(status).not_to be_success
       expect(stdout).to include("PICK #{base_fix_sha[0, 12]} Fix release regression")
@@ -866,7 +1227,8 @@ RSpec.describe "script/release-forward-port" do
       write_file(repo, "conflict.txt", "main branch\n")
       commit_all(repo, "Change conflict on main")
 
-      stdout, stderr, status = run_script(repo, "--source", "release/1.0.1", "--target", "main")
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--all")
 
       expect(status).not_to be_success
       expect(stdout).to include("Cherry-picking")
@@ -1175,7 +1537,7 @@ RSpec.describe "script/release-forward-port" do
       git(repo, "checkout", "main")
 
       first_stdout, first_stderr, first_status =
-        run_script(repo, "--source", "release/1.0.1", "--target", "main")
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--all")
 
       expect(first_status).not_to be_success
       expect(first_stdout).to include("MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
@@ -1186,7 +1548,16 @@ RSpec.describe "script/release-forward-port" do
       expect(File).not_to exist(File.join(repo, "later.txt"))
 
       second_stdout, second_stderr, second_status =
-        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--ack-manual", release_revert_sha)
+        run_script(
+          repo,
+          "--source",
+          "release/1.0.1",
+          "--target",
+          "main",
+          "--all",
+          "--ack-manual",
+          release_revert_sha
+        )
 
       expect(second_status).to be_success, second_stderr
       expect(second_stdout).to include("ACK-MANUAL #{release_revert_sha[0, 12]} Revert \"Fix release regression\"")
