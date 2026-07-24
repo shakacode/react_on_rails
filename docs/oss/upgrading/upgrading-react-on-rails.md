@@ -136,11 +136,13 @@ In CI, run precompile preparation explicitly once before webpack compilation or 
    npm install   # or: yarn install / pnpm install
    ```
 
-4. Remove every removed configuration option from `config/initializers/react_on_rails.rb` **before booting**. Any of the options listed in the Breaking Changes above (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`, `config.server_render_method`) now raises `NoMethodError` at boot. Run the doctor task, which flags each remaining option with the exact fix:
+4. Before booting, run the doctor task to find removed configuration options:
 
    ```bash
    bin/rake react_on_rails:doctor
    ```
+
+   Remove or replace every option it reports in `config/initializers/react_on_rails.rb`. Any remaining option listed in the Breaking Changes above (`config.generated_assets_dirs`, `config.skip_display_none`, `config.defer_generated_component_packs`, `config.server_render_method`) raises `NoMethodError` at boot.
 
 5. Run RuboCop, your app's test suite, and asset build after the Ruby and package updates. The Ruby
    baseline bump can activate cops that were previously inactive:

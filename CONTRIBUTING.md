@@ -497,8 +497,8 @@ That fallback comes from `CI_PNPM_FALLBACK_VERSION` in [`react_on_rails/lib/gene
 **Verification:**
 
 ```sh
-bundle exec rspec react_on_rails/spec/react_on_rails/generators/install_generator_spec.rb \
-  -e "keeps the fallback pin tied to a version-specific pnpm release note"
+(cd react_on_rails && bundle exec rspec spec/react_on_rails/generators/install_generator_spec.rb \
+  -e "keeps the fallback pin tied to a version-specific pnpm release note")
 ```
 
 Users who want exact reproducibility in their generated CI can commit a `packageManager: pnpm@<version>` field to their own `package.json`; the generator then omits the fallback `version:` entirely.
