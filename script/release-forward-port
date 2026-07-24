@@ -7,6 +7,7 @@ require "digest"
 
 # rubocop:disable Metrics/ClassLength
 class ReleaseForwardPort
+  CHECK_ERROR_STATUS = 3
   VERSION_FILE = "react_on_rails/lib/react_on_rails/version.rb"
   CHANGELOG_FILE = "CHANGELOG.md"
   # Project convention is `X.Y.Z.rc.N`, but a release branch can still contain a
@@ -18,6 +19,29 @@ class ReleaseForwardPort
     \Abump\s+version\s+to\s+v?
     (?<version>\d+\.\d+\.\d+(?:(?:[.-])(?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?)?)\b
   /ix
+  PRERELEASE_PACKAGE_PIN_SUBJECT = %r{
+    (?<![A-Za-z0-9@._\/-])(?<package>[A-Za-z0-9@._\/-]+)\s+package\s+pin\s+to\s+v?
+    (?<stable_version>\d+\.\d+\.\d+)[.-](?:alpha|beta|rc|pre|dev|test)(?:[.-]?\d+)?\b
+  }ix
+  PR_NUMBER_LIST_PATTERN = /#\d+(?:\s*,\s*#\d+)*(?:\s*,?\s+and\s+#\d+)?/i
+  EXPLICIT_BACKPORT_PATTERN =
+    /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+(?:to|onto)\b/io
+  FROM_BACKPORT_PATTERN =
+    /\A\s*backports?\s+(?:the|this|these)\b.*?\bfrom\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+(?:to|onto)\b/io
+  MERGED_REPLACEMENT_PATTERN = /
+    \A\s*-\s+replaces?\b.*?\bwith\b.*?\balready\s+reviewed\s+and\s+merged\s+in\s+
+    (?<prs>#{PR_NUMBER_LIST_PATTERN})
+  /iox
+  COMPOSITE_BACKPORT_PATTERN =
+    /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+and\s+includes\s+the\s+reviewed\b/io
+  PROVENANCE_NEGATION_PATTERN = /
+    \b(?:
+      not|never|no|none|nothing|neither|nor|nowhere|cannot|without|unlike|
+      except(?:\s+for)?|rather\s+than|instead\s+of|other\s+than|
+      (?:ain|aren|can|couldn|didn|doesn|don|hadn|hasn|haven|isn|mightn|mustn|
+      needn|shan|shouldn|wasn|weren|won|wouldn)['’]?t
+    )\b
+  /ix
   PRERELEASE_RANKS = {
     "dev" => 0,
     "test" => 1,
@@ -28,8 +52,25 @@ class ReleaseForwardPort
   }.freeze
   EMPTY_PATCH_ID = "__empty_patch__"
   HUNKLESS_PATCH_ID_PREFIX = "__hunkless_patch__:"
+  GENERATED_LLM_FILES = %w[llms-full.txt llms-full-pro.txt].freeze
   CHERRY_PICK_FOOTER_FORMAT = "(cherry picked from commit %s)"
-  CHERRY_PICK_FOOTER_PATTERN = /\(cherry picked from commit (?<sha>[0-9a-f]{40})\)/
+  CHERRY_PICK_FOOTER_PATTERN = /^\(cherry picked from commit (?<sha>[0-9a-f]{40})\)$/
+  NARRATED_CHERRY_PICK_PATTERN =
+    /\A(?:-\s+)?cherry-picked\s+(?:main\s+)?(?:squash\s+)?commit\s+
+      `?(?<sha>[0-9a-f]{40})`?\s+with\s+`?-x`?\.?\z/ix
+  NARRATED_FORWARD_PORT_PATTERN =
+    /^\s*-\s+cherry-picked\b.*\bwith\s+`?(?:git\s+)?cherry-pick\s+-x`?\s*$/i
+  NARRATED_SOURCE_PR_FORWARD_PORT_PATTERN =
+    /\A-\s+forward-ports?\s+the\s+(?:complete\s+)?reviewed\b.*\bfrom\s+
+      (?:release|source)\s+PR\s+#\d+[.;]?\z/ix
+  NARRATED_SOURCE_SHA_PROVENANCE_PATTERN = /
+    \A(?:the|this)\s+(?:forward-port\s+)?commit\s+(?:retains|records)\s+
+    `?(?:git\s+)?cherry-pick\s+-x`?\s+provenance\s+from\s+
+    source(?:\s+squash)?\s+commit\s+`?(?<sha>[0-9a-f]{12,40})`?\.?\z
+  /ix
+  NARRATED_REVIEW_FIX_FORWARD_PORT_PATTERN =
+    /\Aforward-port\s+the\s+review\s+fix\s+from\s+release\s+PR\s+#(?<pr>\d+)\b/i
+  SOURCE_PR_TRAILER_PATTERN = /\(#(?<pr>\d+)\)\z/
   ASCII_WHITESPACE_BYTES = [9, 10, 11, 12, 13, 32].freeze
 
   PlanEntry = Struct.new(:sha, :subject, :action, :reason, :manual, keyword_init: true) do
@@ -52,9 +93,13 @@ class ReleaseForwardPort
     @explicit_options = { source: false, target: false }
     @options = {
       dry_run: false,
+      check: false,
       ack_manual: [],
+      only: nil,
+      all: false,
       target: "main",
-      changelog: false
+      changelog: false,
+      ack_final_changelog_source: nil
     }
     @parser = build_parser
   end
@@ -67,8 +112,12 @@ class ReleaseForwardPort
 
     verify_ref!(source, label: "source")
     verify_ref!(target, label: "target")
+    validate_mode_options!
+    normalize_selected_sha!
     normalize_acknowledged_manual_shas!
-    ensure_local_target_branch!(target) unless @options[:dry_run]
+    normalize_acknowledged_changelog_source_sha!
+    ensure_local_target_branch!(target) unless read_only_mode?
+    ensure_no_cherry_pick_in_progress! if @options[:check]
 
     return run_changelog_reconciliation(source, target) if @options[:changelog]
 
@@ -80,7 +129,7 @@ class ReleaseForwardPort
     2
   rescue GitError => e
     warn "ERROR: #{e.message}"
-    1
+    @options[:check] ? CHECK_ERROR_STATUS : 1
   end
 
   private
@@ -96,9 +145,12 @@ class ReleaseForwardPort
     # guard, so normal mode and dry-run report the same plan before refusing to
     # checkout or cherry-pick.
     plan = build_plan(commits, target, target_version, equiv_commits)
+    plan = selected_plan(plan, source, target)
     validate_acknowledged_manual_shas!(plan)
 
     print_plan(source, target, target_version, plan)
+
+    return check_code_plan(plan) if @options[:check]
 
     if @options[:dry_run]
       puts "\nDRY RUN: no branches were checked out and no commits were cherry-picked."
@@ -107,6 +159,7 @@ class ReleaseForwardPort
 
     return finish_no_action_plan(plan, target) unless actionable_plan?(plan)
 
+    enforce_single_forward_port!(plan)
     ensure_clean_worktree!
     checkout_target!(target)
     apply_plan(plan)
@@ -121,6 +174,16 @@ class ReleaseForwardPort
     end
 
     puts "\nNothing to cherry-pick."
+    0
+  end
+
+  def check_code_plan(plan)
+    if actionable_plan?(plan)
+      warn "CHECK FAILED: release source still has code or manual items that need their own forward-port PRs."
+      return 1
+    end
+
+    puts "\nCHECK PASSED: the release source has no remaining code forward-port work."
     0
   end
 
@@ -152,11 +215,10 @@ class ReleaseForwardPort
         @options[:target] = target
         @explicit_options[:target] = true
       end
-      parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
-        @options[:dry_run] = true
-      end
+      add_execution_options(parser)
       add_changelog_option(parser)
       add_ack_manual_option(parser)
+      add_ack_final_changelog_source_option(parser)
       parser.on("-h", "--help", "Show this help") do
         puts parser
         exit 0
@@ -164,21 +226,42 @@ class ReleaseForwardPort
     end
   end
 
+  def add_execution_options(parser)
+    parser.on("--dry-run", "Print the plan without checking out or cherry-picking") do
+      @options[:dry_run] = true
+    end
+    parser.on("--check", "Exit nonzero unless the complete source plan is already satisfied") do
+      @options[:check] = true
+    end
+    parser.on("--only SHA", "Restrict the plan to one source commit for a one-change forward-port PR") do |sha|
+      @options[:only] = sha
+    end
+    parser.on("--all", "Apply every actionable commit (explicit batch override)") do
+      @options[:all] = true
+    end
+  end
+
   def usage_banner
     <<~BANNER
       Usage: script/release-forward-port --source release/X.Y.Z [--target main] [--dry-run]
+             script/release-forward-port --source release/X.Y.Z --check [--target main]
+             script/release-forward-port --source release/X.Y.Z --only SHA [--target main] [--dry-run]
              script/release-forward-port release/X.Y.Z [main] [--dry-run]
              script/release-forward-port --source release/X.Y.Z --changelog [--target main] [--dry-run]
 
       Default mode forward-ports commits that are on a release branch but not on the target
       branch. The helper cherry-picks with -x, skips commits already forward-ported with -x
-      evidence or patches present in the target tree, and excludes RC version bump commits.
+      evidence or patches present in the target tree, and excludes RC version bump and
+      changelog-only commits. Normal mode refuses to apply more than one actionable commit
+      unless --all is explicit; use --only SHA for one-change-at-a-time forward-port PRs.
+      --check evaluates the complete plan without changing the worktree and exits nonzero
+      while any code or manual item remains.
 
       --changelog mode runs a separate CHANGELOG.md reconciliation pass instead of the
       cherry-pick loop: it collapses every release-branch entry (each rc.N section plus
       [Unreleased]) into the target's [Unreleased] section, de-duplicates by PR number against
       the target's existing entries, and drops any RC-header section a prior cherry-pick left
-      on the target. The default cherry-pick behavior is unchanged for callers that omit the flag.
+      on the target. It is mutually exclusive with the --only and --all code-selection flags.
     BANNER
   end
 
@@ -203,6 +286,63 @@ class ReleaseForwardPort
     end
   end
 
+  def add_ack_final_changelog_source_option(parser)
+    parser.on(
+      "--ack-final-changelog-source SHA",
+      "Acknowledge the current source CHANGELOG.md commit for a legacy authoritative changelog PR"
+    ) do |sha|
+      @options[:ack_final_changelog_source] = sha
+    end
+  end
+
+  def validate_mode_options!
+    validate_read_only_options!
+    validate_code_selection_options!
+  end
+
+  def validate_read_only_options!
+    raise UsageError, "--check and --dry-run cannot be used together" if @options[:check] && @options[:dry_run]
+    return unless @options[:check] && code_selection_requested?
+
+    raise UsageError, "--check evaluates the complete plan and cannot be scoped with --only/--all"
+  end
+
+  def validate_code_selection_options!
+    raise UsageError, "--only and --all cannot be used together" if @options[:only] && @options[:all]
+    if @options[:ack_final_changelog_source] && !@options[:changelog]
+      raise UsageError, "--ack-final-changelog-source requires --changelog"
+    end
+    return unless @options[:changelog] && code_selection_requested?
+
+    raise UsageError, "--only/--all select code commits and cannot be combined with --changelog"
+  end
+
+  def code_selection_requested?
+    @options[:only] || @options[:all]
+  end
+
+  def normalize_selected_sha!
+    return unless @options[:only]
+
+    @selected_sha = git("rev-parse", "--verify", "#{@options[:only]}^{commit}").strip
+  rescue GitError => e
+    raise UsageError, "--only #{@options[:only].inspect} is not a commit: #{e.message}"
+  end
+
+  def selected_plan(plan, source, target)
+    return plan unless @selected_sha
+
+    entry = plan.find { |candidate| candidate.sha == @selected_sha }
+    return [entry] if entry
+
+    raise UsageError,
+          "--only #{@options[:only].inspect} is not in the current #{target}..#{source} plan; rerun --dry-run"
+  end
+
+  def read_only_mode?
+    @options[:dry_run] || @options[:check]
+  end
+
   def source_only_commits(source, target)
     git_lines("rev-list", "--reverse", "#{target}..#{source}")
   end
@@ -217,6 +357,8 @@ class ReleaseForwardPort
   end
 
   def build_plan(commits, target, target_version, patch_equivalent_commits)
+    @source_plan_commits = commits
+    @source_plan_positions = commits.each_with_index.to_h
     commits.map do |sha|
       subject = git("log", "-1", "--format=%s", sha).strip
       skip_decision = skip_reason(sha, subject, target, target_version, patch_equivalent_commits)
@@ -252,14 +394,141 @@ class ReleaseForwardPort
     # re-apply it even if git cherry reports a patch match.
     return if source_cherry_pick_origin_reverted_on_target?(sha, target)
 
-    patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
+    patch_or_narrated_manual_reason(sha, subject, target, patch_equivalent_commits)
   end
 
-  def patch_equivalent_skip_reason(sha, target, patch_equivalent_commits)
-    return unless patch_equivalent_commits[sha] || target_has_renamed_source_paths?(target, sha)
+  def patch_or_narrated_manual_reason(sha, subject, target, patch_equivalent_commits)
+    patch_reason = patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
+    return patch_reason if patch_reason
+
+    return unless source_narrated_pr_reference_on_target?(sha, target)
+
+    manual_skip_reason(
+      "source commit names a live upstream PR on #{target}, but does not prove whole-commit equivalence; " \
+      "inspect its release-specific hunks before acknowledging it"
+    )
+  end
+
+  def patch_equivalent_skip_reason(sha, subject, target, patch_equivalent_commits)
+    targeted_reason = targeted_patch_equivalent_skip_reason(sha, subject, target)
+    return targeted_reason if targeted_reason
+
+    return unless patch_equivalent_commits[sha] ||
+                  target_has_renamed_source_paths?(target, sha) ||
+                  generated_llm_artifact_changed?(sha)
     return unless patch_equivalent_commit_present_on_target?(sha, target)
 
+    patch_equivalent_skip_reason_message(target)
+  end
+
+  def targeted_patch_equivalent_skip_reason(sha, subject, target)
+    identity_candidates = target_history_source_identity_candidates(sha, subject, target)
+    return "already forward-ported to #{target} via source-bound forward-port narration with no later target revert" if
+      identity_candidates.any? do |target_sha|
+        narrated_forward_port_commit_live?(target_sha, target, source_sha: sha, source_subject: subject)
+      end
+
+    provenance_candidates = target_history_source_provenance_candidates(sha, target)
+    return patch_equivalent_skip_reason_message(target) if
+      identity_candidates.any? &&
+      patch_equivalent_commit_present_on_target?(sha, target, candidates: identity_candidates)
+
+    patch_equivalent_skip_reason_message(target) if
+      provenance_candidates.any? &&
+      patch_equivalent_commit_present_on_target?(sha, target, candidates: provenance_candidates, zero_context: true)
+  end
+
+  def patch_equivalent_skip_reason_message(target)
     "patch already exists on #{target} according to target history with no later standard revert"
+  end
+
+  def target_history_source_identity_candidates(sha, subject, target)
+    ([sha, sha[0, 12], subject] + subject.scan(/#\d+/)).uniq.flat_map do |source_identity|
+      target_history_commits_mentioning(source_identity, target)
+    end.uniq
+  end
+
+  def target_history_commits_mentioning(source_identity, target)
+    @target_identity_mention_cache ||= {}
+    cache_key = [source_identity, target]
+    return @target_identity_mention_cache.fetch(cache_key) if @target_identity_mention_cache.key?(cache_key)
+
+    @target_identity_mention_cache[cache_key] =
+      git_lines("log", target, "--fixed-strings", "--grep", source_identity, "--format=%H")
+  end
+
+  def target_history_source_provenance_candidates(sha, target)
+    body = git("log", "-1", "--format=%B", sha)
+    source_identities = body.each_line.filter_map do |line|
+      next unless line.match?(/\b(?:backports?|source\s+PR|main\s+PR|merged\s+in)\b/i)
+
+      line.scan(/#\d+/)
+    end.flatten.uniq
+
+    source_identities.flat_map do |source_identity|
+      target_history_commits_mentioning(source_identity, target)
+    end.uniq
+  end
+
+  def narrated_forward_port_commit_live?(sha, target, source_sha:, source_subject:)
+    body = git("log", "-1", "--format=%B", sha)
+    target_subject = subject_for_commit(sha)
+    exact_source_provenance = exact_source_sha_provenance?(body, source_sha)
+    narrated = source_pr_narration_present?(body, target_subject, source_sha, source_subject)
+    (exact_source_provenance || narrated) && target_commit_live_on_target?(sha, target)
+  end
+
+  def exact_source_sha_provenance?(body, source_sha)
+    body.split(/\n\s*\n/).any? do |paragraph|
+      match = paragraph.gsub(/\s+/, " ").strip.match(NARRATED_SOURCE_SHA_PROVENANCE_PATTERN)
+      match && source_sha.start_with?(match[:sha])
+    end
+  end
+
+  def source_pr_narration_present?(body, target_subject, source_sha, source_subject)
+    narration_segments = forward_port_narration_segments(body).select do |segment|
+      next false unless authoritative_provenance_segment?(segment)
+
+      segment.match?(NARRATED_FORWARD_PORT_PATTERN) ||
+        (target_subject&.match?(/\AForward-port\b/i) &&
+          segment.match?(NARRATED_SOURCE_PR_FORWARD_PORT_PATTERN))
+    end
+    narration_segments.any? do |segment|
+      narrated_line_names_source?(segment, source_sha, source_subject)
+    end
+  end
+
+  def forward_port_narration_segments(body)
+    segments = []
+    current_bullet = nil
+
+    body.each_line do |line|
+      stripped = line.strip
+      if line.match?(/^\s*-\s+/)
+        segments << current_bullet if current_bullet
+        current_bullet = stripped
+      elsif current_bullet && !stripped.empty?
+        current_bullet = "#{current_bullet} #{stripped}"
+      else
+        segments << current_bullet if current_bullet
+        current_bullet = nil
+        segments << stripped unless stripped.empty?
+      end
+    end
+    segments << current_bullet if current_bullet
+    segments
+  end
+
+  def narrated_line_names_source?(line, source_sha, source_subject)
+    return true if line.include?(source_sha) || line.include?(source_sha[0, 12])
+
+    source_pr_number = source_pr_number_from_subject(source_subject)
+    source_pr_number && line.match?(/(?<!\d)##{Regexp.escape(source_pr_number)}(?!\d)/)
+  end
+
+  def source_pr_number_from_subject(subject)
+    match = subject.to_s.match(SOURCE_PR_TRAILER_PATTERN)
+    match && match[:pr]
   end
 
   def active_source_revert_skip_reason(subject, target, target_version)
@@ -272,6 +541,16 @@ class ReleaseForwardPort
   end
 
   def special_skip_reason(sha, subject, target, target_version)
+    root_reason = unrelated_root_commit_skip_reason(sha, target)
+    return root_reason if root_reason
+
+    changed_paths = changed_paths_for_commit(sha)
+    artifact_reason = generated_artifact_skip_reason(changed_paths)
+    return artifact_reason if artifact_reason
+
+    superseded_pin_reason = superseded_prerelease_package_pin_reason(sha, subject, target)
+    return superseded_pin_reason if superseded_pin_reason
+
     return "rc version bump commit; release train forward-ports must keep prerelease bumps off #{target}" if
       rc_version_bump?(subject)
 
@@ -285,12 +564,87 @@ class ReleaseForwardPort
       reverse_pick_revert_skip_reason(sha, target)
   end
 
+  def unrelated_root_commit_skip_reason(sha, target)
+    return unless root_commit?(sha)
+
+    manual_skip_reason(
+      "root commit from unrelated history; inspect the source seed manually instead of applying a full-repository " \
+      "snapshot onto #{target}"
+    )
+  end
+
+  def generated_artifact_skip_reason(changed_paths)
+    return "changelog-only commit; use --changelog reconciliation to re-home release entries under [Unreleased]" if
+      changed_paths == [CHANGELOG_FILE]
+
+    if changed_paths.any? && (changed_paths - GENERATED_LLM_FILES).empty?
+      return "generated LLM artifact-only commit; regenerate from current target documentation instead of replaying " \
+             "stale release output"
+    end
+
+    return unless changed_paths.include?(CHANGELOG_FILE) &&
+                  (changed_paths - [CHANGELOG_FILE] - GENERATED_LLM_FILES).empty?
+
+    "changelog/generated artifact-only commit; use --changelog reconciliation and regenerate LLM files " \
+      "from current target documentation"
+  end
+
   def rc_version_bump?(subject)
     subject.match?(RC_VERSION_BUMP_SUBJECT)
   end
 
+  def superseded_prerelease_package_pin_reason(sha, subject, target)
+    match = subject.match(PRERELEASE_PACKAGE_PIN_SUBJECT)
+    return unless match
+
+    stable_sha = later_stable_package_pin_commit(sha, match[:package], match[:stable_version], target)
+    return unless stable_sha
+
+    unless cumulative_prerelease_package_state_present_on_target?(sha, stable_sha, target)
+      return manual_skip_reason(
+        "later stable source commit #{stable_sha[0, 12]} is present on #{target}, but the cumulative state of the " \
+        "prerelease commit's paths differs; inspect those paths before acknowledging this supersession"
+      )
+    end
+
+    "prerelease package pin is superseded by later stable source commit #{stable_sha[0, 12]} already present on " \
+      "#{target}"
+  end
+
+  def later_stable_package_pin_commit(sha, package, stable_version, target)
+    position = @source_plan_positions&.fetch(sha, nil)
+    return unless position
+
+    superseded_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    @source_plan_commits.drop(position + 1).find do |later_sha|
+      later_subject = subject_for_commit(later_sha).to_s
+      next unless later_subject.match?(/\bstable\b/i) && later_subject.include?(stable_version)
+      next unless later_subject.match?(%r{(?<![A-Za-z0-9@._/-])#{Regexp.escape(package)}(?![A-Za-z0-9@._/-])}i)
+
+      later_paths = changed_paths_for_commit(later_sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+      (superseded_paths - later_paths).empty? && source_commit_provenance_present_on_target?(later_sha, target)
+    end
+  end
+
+  def cumulative_prerelease_package_state_present_on_target?(sha, stable_sha, target)
+    paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    return false if paths.empty?
+
+    !diff_changes_paths?(stable_sha, target, paths)
+  end
+
+  def source_commit_provenance_present_on_target?(sha, target)
+    subject = subject_for_commit(sha).to_s
+    already_forward_ported_with_x?(sha, target) ||
+      !targeted_patch_equivalent_skip_reason(sha, subject, target).nil?
+  end
+
   def merge_commit?(sha)
     git("rev-list", "--parents", "-n", "1", sha).split.length > 2
+  end
+
+  def root_commit?(sha)
+    git("rev-list", "--parents", "-n", "1", sha).split.length == 1
   end
 
   def manual_skip_reason?(reason)
@@ -421,6 +775,87 @@ class ReleaseForwardPort
     origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
   end
 
+  def source_narrated_pr_reference_on_target?(sha, target)
+    subject = subject_for_commit(sha).to_s
+    release_pr_number = source_pr_number_from_subject(subject)
+    release_pr_numbers = release_pr_number ? [release_pr_number] : []
+    body = git("log", "-1", "--format=%B", sha)
+    composite_pr_numbers = composite_backport_pr_numbers(body)
+    narrated_pr_numbers = narrated_upstream_pr_numbers(body)
+    if composite_pr_numbers.any?
+      upstream_pr_numbers = (composite_pr_numbers + narrated_pr_numbers - release_pr_numbers).uniq
+      review_fix_shas = review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
+      return upstream_pr_numbers.any? &&
+             target_pr_numbers_live?(upstream_pr_numbers, target) &&
+             review_fix_shas.any?
+    end
+
+    upstream_pr_numbers = narrated_pr_numbers - release_pr_numbers
+
+    upstream_pr_numbers.any? && target_pr_numbers_live?(upstream_pr_numbers, target)
+  end
+
+  def composite_backport_pr_numbers(body)
+    forward_port_narration_segments(body).flat_map do |segment|
+      next [] unless authoritative_provenance_segment?(segment)
+
+      match = segment.match(COMPOSITE_BACKPORT_PATTERN)
+      match ? match[:prs].scan(/#(\d+)/).flatten : []
+    end.uniq
+  end
+
+  def target_pr_numbers_live?(pr_numbers, target)
+    pr_numbers.all? do |pr_number|
+      target_pr_commit_shas(pr_number, target).any? { |target_sha| target_commit_live_on_target?(target_sha, target) }
+    end
+  end
+
+  def review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
+    release_pr_numbers.flat_map do |pr_number|
+      target_history_commits_mentioning("release PR ##{pr_number}", target).select do |target_sha|
+        next false unless subject_for_commit(target_sha)&.match?(/\bforward-port\b/i)
+
+        body = git("log", "-1", "--format=%B", target_sha)
+        narrated = body.split(/\n\s*\n/).any? { |paragraph| narrated_review_fix_matches?(paragraph, pr_number) }
+        narrated && target_commit_live_on_target?(target_sha, target)
+      end
+    end.uniq
+  end
+
+  def narrated_review_fix_matches?(paragraph, pr_number)
+    segment = paragraph.gsub(/\s+/, " ").strip
+    return false unless authoritative_provenance_segment?(segment)
+
+    match = segment.match(NARRATED_REVIEW_FIX_FORWARD_PORT_PATTERN)
+    match && match[:pr] == pr_number
+  end
+
+  def narrated_upstream_pr_numbers(body)
+    forward_port_narration_segments(body).flat_map do |segment|
+      next [] unless authoritative_provenance_segment?(segment)
+
+      explicit_backport = segment.match(EXPLICIT_BACKPORT_PATTERN)
+      from_backport = segment.match(FROM_BACKPORT_PATTERN)
+      merged_replacement = segment.match(MERGED_REPLACEMENT_PATTERN)
+      numbers = []
+      numbers.concat(explicit_backport[:prs].scan(/#(\d+)/).flatten) if explicit_backport
+      numbers.concat(from_backport[:prs].scan(/#(\d+)/).flatten) if from_backport
+      numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
+      numbers
+    end.uniq
+  end
+
+  def authoritative_provenance_segment?(segment)
+    !segment.match?(PROVENANCE_NEGATION_PATTERN)
+  end
+
+  def target_pr_commit_shas(pr_number, target)
+    suffix = "(##{pr_number})"
+    target_history_commits_mentioning(suffix, target).select do |sha|
+      subject_for_commit(sha)&.end_with?(suffix)
+    end
+  end
+
   def source_standard_revert_on_target?(sha, target)
     active_revert_shas =
       standard_revert_shas_on_target(sha, target)
@@ -509,8 +944,17 @@ class ReleaseForwardPort
 
   def cherry_pick_origin(sha)
     body = git("log", "-1", "--format=%B", sha)
-    match = body.match(CHERRY_PICK_FOOTER_PATTERN)
+    match = body.match(CHERRY_PICK_FOOTER_PATTERN) || narrated_cherry_pick_match(body)
     match && match[:sha]
+  end
+
+  def narrated_cherry_pick_match(body)
+    paragraph_segments = body.split(/\n\s*\n/).map { |paragraph| paragraph.gsub(/\s+/, " ").strip }
+    (paragraph_segments + forward_port_narration_segments(body)).uniq.filter_map do |segment|
+      next unless authoritative_provenance_segment?(segment)
+
+      segment.match(NARRATED_CHERRY_PICK_PATTERN)
+    end.first
   end
 
   def commit_on_target?(sha, target)
@@ -545,11 +989,12 @@ class ReleaseForwardPort
     end.uniq
   end
 
-  def patch_equivalent_commit_present_on_target?(sha, target)
-    source_patch_id = patch_id_for_commit(sha)
+  def patch_equivalent_commit_present_on_target?(sha, target, candidates: nil, zero_context: false)
+    source_paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    source_patch_id = patch_id_for_commit(sha, paths: source_paths, zero_context:)
 
-    patch_equivalent_target_candidates(sha, target).any? do |target_sha|
-      patch_id_for_target_candidate(target_sha, sha) == source_patch_id &&
+    (candidates || patch_equivalent_target_candidates(sha, target)).any? do |target_sha|
+      patch_id_for_target_candidate(target_sha, sha, source_paths:, zero_context:) == source_patch_id &&
         target_commit_live_on_target?(target_sha, target)
     end
   end
@@ -627,12 +1072,15 @@ class ReleaseForwardPort
     (source_paths_for_target_diff(target, sha) - changed_paths_for_commit(sha)).any?
   end
 
-  def patch_id_for_target_candidate(target_sha, source_sha)
+  def patch_id_for_target_candidate(target_sha, source_sha, source_paths: changed_paths_for_commit(source_sha),
+                                    zero_context: false)
     parents = git("rev-list", "--parents", "-n", "1", target_sha).split.drop(1)
-    return patch_id_for_commit(target_sha) if parents.empty?
+    return patch_id_for_commit(target_sha, paths: source_paths, zero_context:) if parents.empty?
 
-    target_to_source_paths = target_to_source_path_map(target_sha, source_sha)
-    patch_id_for_commit(target_sha, target_to_source_paths:)
+    target_to_source_paths = target_to_source_path_map(target_sha, source_sha).select do |_target_path, source_path|
+      source_paths.include?(source_path)
+    end
+    patch_id_for_commit(target_sha, target_to_source_paths:, paths: target_to_source_paths.keys, zero_context:)
   end
 
   def source_paths_for_target_diff(first_parent, sha)
@@ -657,12 +1105,37 @@ class ReleaseForwardPort
     return @renamed_target_path_pairs_cache.fetch(cache_key) if @renamed_target_path_pairs_cache.key?(cache_key)
 
     source_paths = paths.to_h { |path| [path, true] }
-    rename_base_refs = [git("merge-base", first_parent, sha).strip, sha].uniq
+    rename_base_refs = [optional_merge_base(first_parent, sha), sha].compact.uniq
 
     @renamed_target_path_pairs_cache[cache_key] =
       rename_base_refs.flat_map do |from_ref|
         renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
       end.uniq
+  end
+
+  def optional_merge_base(left_ref, right_ref)
+    args = ["merge-base", left_ref, right_ref]
+    stdout, stderr, status = capture_git(*args)
+    return stdout.strip if status.success?
+
+    if status.exitstatus == 1 && stdout.empty? && stderr.empty?
+      raise UsageError, shallow_history_message(left_ref, right_ref) if shallow_repository?
+
+      return
+    end
+
+    raise GitError, git_error(args, stdout, stderr, status)
+  end
+
+  def shallow_repository?
+    git("rev-parse", "--is-shallow-repository").strip == "true"
+  end
+
+  def shallow_history_message(left_ref, right_ref)
+    <<~MESSAGE.chomp
+      cannot find a merge base between #{left_ref} and #{right_ref} because repository history is shallow;
+      run `git fetch --unshallow` (or deepen the relevant refs), then rerun the forward-port
+    MESSAGE
   end
 
   def renamed_target_path_pairs_from_ref(from_ref, first_parent, source_paths)
@@ -674,22 +1147,28 @@ class ReleaseForwardPort
 
   def changed_paths_for_commit(sha)
     @changed_paths_cache ||= {}
-    @changed_paths_cache[sha] ||= git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+    @changed_paths_cache[sha] ||= git_lines("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha)
   end
 
-  def patch_id_for_commit(sha, target_to_source_paths: {})
+  def generated_llm_artifact_changed?(sha)
+    changed_paths_for_commit(sha).intersect?(GENERATED_LLM_FILES)
+  end
+
+  def patch_id_for_commit(sha, target_to_source_paths: {}, paths: nil, zero_context: false)
     # git show --format= emits diff-only output. git patch-id still hashes the
     # hunk content and emits a commit field we discard; the first token is the
     # content hash used for comparisons.
-    patch =
-      git(
-        "show",
-        "--no-ext-diff",
-        "--format=",
-        "--full-index",
-        rename_detection_option(target_to_source_paths),
-        sha
-      ).b
+    args = [
+      "show",
+      "--no-ext-diff",
+      "--format=",
+      "--full-index",
+      rename_detection_option(target_to_source_paths),
+      sha
+    ]
+    args << "--unified=0" if zero_context
+    args.push("--", *paths) if paths
+    patch = git(*args).b
     patch = normalize_patch_paths(patch, target_to_source_paths)
     patch_id_for_patch(patch, sha)
   end
@@ -942,7 +1421,7 @@ class ReleaseForwardPort
   def ensure_no_cherry_pick_in_progress!
     return unless cherry_pick_in_progress?
 
-    raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue or --abort first"
+    raise GitError, "a cherry-pick is already in progress; run git cherry-pick --continue, --skip, or --abort first"
   end
 
   def ensure_local_target_branch!(target)
@@ -967,10 +1446,38 @@ class ReleaseForwardPort
     source_changelog = changelog_at(source, label: "source")
     target_changelog = changelog_at(target, label: "target")
 
-    reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:)
-    result = reconciler.reconcile
+    release_version = release_version_from_ref(source)
+    reconciler = ChangelogReconciler.new(source_changelog:, target_changelog:, release_version:)
+    return 1 if missing_source_release_section_check?(source, release_version, reconciler)
 
+    authoritative_sha =
+      authoritative_final_changelog_commit(
+        source,
+        target,
+        target_changelog,
+        release_version,
+        source_ready: reconciler.authoritative_source_ready?
+      )
+    if authoritative_sha
+      residue = reconciler.reconcile_authoritative_residue
+      unless residue.changed?
+        return finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha)
+      end
+
+      return finish_changelog_reconciliation(source, target, residue)
+    end
+
+    result = reconciler.reconcile
+    finish_changelog_reconciliation(source, target, result)
+  rescue ChangelogReconciler::ReconcileError => e
+    # Map the reconciler's own error onto the shared GitError exit path.
+    raise GitError, e.message
+  end
+
+  def finish_changelog_reconciliation(source, target, result)
     print_changelog_reconciliation_plan(source, target, result)
+
+    return check_changelog_plan(result) if @options[:check]
 
     if @options[:dry_run]
       puts "\nDRY RUN: CHANGELOG.md was not modified and no branch was checked out."
@@ -978,9 +1485,124 @@ class ReleaseForwardPort
     end
 
     apply_changelog_reconciliation(target, result)
-  rescue ChangelogReconciler::ReconcileError => e
-    # Map the reconciler's own error onto the shared GitError exit path.
-    raise GitError, e.message
+  end
+
+  def missing_source_release_section_check?(source, release_version, reconciler)
+    return false unless @options[:check] && release_version
+    return false if reconciler.source_release_section_present?
+
+    warn "CHECK FAILED: #{source} has no matching stable or prerelease #{release_version} changelog section."
+    true
+  end
+
+  def check_changelog_plan(result)
+    if result.changed?
+      warn "CHECK FAILED: release changelog reconciliation still needs its own squash PR."
+      return 1
+    end
+
+    puts "\nCHECK PASSED: the release changelog is already reconciled on the target."
+    0
+  end
+
+  def release_version_from_ref(ref)
+    ref.match(%r{(?:\A|/)release/(?<version>\d+\.\d+\.\d+)\z})&.[](:version)
+  end
+
+  def authoritative_final_changelog_commit(source, target, target_changelog, release_version, source_ready:)
+    return unless release_version && source_ready
+
+    source_changelog_sha = latest_changelog_commit(source)
+    validate_acknowledged_changelog_source!(source_changelog_sha)
+    subject_pattern =
+      /\ARecord the final React on Rails #{Regexp.escape(release_version)} changelog \(#\d+\)\z/
+    candidates =
+      git_lines(
+        "log",
+        target,
+        "--fixed-strings",
+        "--grep",
+        "final React on Rails #{release_version} changelog",
+        "--format=%H"
+      )
+    context = {
+      target:,
+      target_changelog:,
+      release_version:,
+      source_changelog_sha:,
+      subject_pattern:
+    }
+
+    candidates.find { |sha| authoritative_changelog_candidate?(sha, context) }
+  end
+
+  def authoritative_changelog_candidate?(sha, context)
+    subject_for_commit(sha)&.match?(context.fetch(:subject_pattern)) &&
+      changed_paths_for_commit(sha) == [CHANGELOG_FILE] &&
+      target_commit_live_on_target?(sha, context.fetch(:target)) &&
+      authoritative_changelog_source_bound?(sha, context.fetch(:source_changelog_sha)) &&
+      authoritative_changelog_section_unchanged?(
+        sha,
+        context.fetch(:target_changelog),
+        context.fetch(:release_version)
+      )
+  end
+
+  def latest_changelog_commit(source)
+    sha = git("log", "-1", "--format=%H", source, "--", CHANGELOG_FILE).strip
+    raise GitError, "#{source} has no #{CHANGELOG_FILE} history to bind the final changelog authority" if sha.empty?
+
+    sha
+  end
+
+  def authoritative_changelog_source_bound?(authoritative_sha, source_changelog_sha)
+    return true if @acknowledged_changelog_source_sha == source_changelog_sha
+
+    exact_sentence =
+      "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+    git("show", "-s", "--format=%B", authoritative_sha).lines.any? { |line| line.strip == exact_sentence }
+  end
+
+  def validate_acknowledged_changelog_source!(source_changelog_sha)
+    return unless @acknowledged_changelog_source_sha
+    return if @acknowledged_changelog_source_sha == source_changelog_sha
+
+    raise UsageError,
+          "--ack-final-changelog-source resolves to #{@acknowledged_changelog_source_sha}, but the current source " \
+          "CHANGELOG.md commit is #{source_changelog_sha}; inspect the newer changelog before acknowledging it"
+  end
+
+  def authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
+    recorded_changelog = changelog_at(sha, label: "authoritative final changelog")
+    recorded_section = changelog_section(recorded_changelog, release_version)
+    recorded_section && recorded_section == changelog_section(target_changelog, release_version)
+  end
+
+  def changelog_section(changelog, version)
+    lines = changelog.lines
+    start_index = lines.index { |line| line.match?(/^### \[#{Regexp.escape(version)}\](?:\s|$)/) }
+    return unless start_index
+
+    end_index =
+      ((start_index + 1)...lines.length).find { |index| lines[index].match?(/^### \[/) } || lines.length
+    lines[start_index...end_index].join
+  end
+
+  def finish_authoritative_changelog_plan(source, target, release_version, authoritative_sha)
+    puts "Release forward-port CHANGELOG.md reconciliation plan"
+    puts "  source: #{source}"
+    puts "  target: #{target}"
+    puts
+    puts "Authoritative final #{release_version} changelog is unchanged on #{target}."
+    puts "  commit: #{authoritative_sha[0, 12]}"
+    puts "  superseded prerelease entries intentionally omitted by the dedicated final changelog PR"
+
+    if @options[:check]
+      puts "\nCHECK PASSED: the release changelog is already reconciled on the target."
+    else
+      puts "\nNothing to reconcile; the dedicated final changelog PR is authoritative."
+    end
+    0
   end
 
   def apply_changelog_reconciliation(target, result)
@@ -994,8 +1616,9 @@ class ReleaseForwardPort
     # Write UTF-8 explicitly so the ⚠️-carrying changelog round-trips byte-for-byte
     # under a C/POSIX-locale runner where the default external encoding is US-ASCII.
     File.write(changelog_path, result.reconciled_changelog, encoding: Encoding::UTF_8)
-    puts "\nReconciled #{result.added_entries.length} entr#{result.added_entries.length == 1 ? 'y' : 'ies'} " \
-         "into #{CHANGELOG_FILE} [Unreleased] on #{target}."
+    puts "\nReconciled #{CHANGELOG_FILE} [Unreleased] on #{target}: " \
+         "#{changelog_count(result.added_entries.length, 'entry', 'entries')} added, " \
+         "#{changelog_count(result.removed_entries.length, 'stale entry', 'stale entries')} removed."
     puts "Review and commit #{CHANGELOG_FILE} (this mode does not commit)."
     0
   end
@@ -1007,6 +1630,7 @@ class ReleaseForwardPort
     puts
 
     print_changelog_added_entries(result)
+    print_changelog_removed_entries(result)
     print_changelog_removed_sections(result)
     print_changelog_already_present(result)
 
@@ -1032,6 +1656,14 @@ class ReleaseForwardPort
     result.removed_sections.each { |version| puts "  - ### [#{version}]" }
   end
 
+  def print_changelog_removed_entries(result)
+    return if result.removed_entries.empty?
+
+    puts
+    puts "Stale target [Unreleased] entries to DROP in favor of final release wording:"
+    result.removed_entries.each { |entry| puts indent_changelog_entry("-", entry) }
+  end
+
   def print_changelog_already_present(result)
     return if result.skipped_entries.empty?
 
@@ -1053,6 +1685,8 @@ class ReleaseForwardPort
       "#{changelog_count(result.added_entries.length, 'entry', 'entries')} to add",
       "#{changelog_count(result.skipped_entries.length, 'entry', 'entries')} already present"
     ]
+    parts << "#{changelog_count(result.removed_entries.length, 'stale entry', 'stale entries')} to drop" if
+      result.removed_entries.any?
     parts << "#{changelog_count(result.removed_sections.length, 'RC section', 'RC sections')} to drop" if
       result.removed_sections.any?
     "Summary: #{parts.join(', ')}."
@@ -1107,8 +1741,24 @@ class ReleaseForwardPort
     0
   end
 
+  def enforce_single_forward_port!(plan)
+    return if @options[:all]
+
+    actionable_entries = plan.select { |entry| actionable_entry?(entry) }
+    return if actionable_entries.length <= 1
+
+    shas = actionable_entries.map(&:short_sha).join(", ")
+    raise UsageError,
+          "normal mode found #{actionable_entries.length} actionable commits (#{shas}); " \
+          "create a fresh branch and rerun with --only SHA for one forward-port PR at a time"
+  end
+
   def actionable_plan?(plan)
-    plan.any? { |entry| entry.action == :pick || (entry.manual? && !acknowledged_manual_entry?(entry)) }
+    plan.any? { |entry| actionable_entry?(entry) }
+  end
+
+  def actionable_entry?(entry)
+    entry.action == :pick || (entry.manual? && !acknowledged_manual_entry?(entry))
   end
 
   def acknowledged_manual_entries?(plan)
@@ -1176,6 +1826,15 @@ class ReleaseForwardPort
     rescue GitError => e
       raise UsageError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
     end.uniq
+  end
+
+  def normalize_acknowledged_changelog_source_sha!
+    sha = @options[:ack_final_changelog_source]
+    return unless sha
+
+    @acknowledged_changelog_source_sha = git("rev-parse", "--verify", "#{sha}^{commit}").strip
+  rescue GitError => e
+    raise UsageError, "--ack-final-changelog-source #{sha.inspect} is not a commit: #{e.message}"
   end
 
   def validate_acknowledged_manual_shas!(plan)
@@ -1262,13 +1921,14 @@ end
 
 # Re-homes release-branch CHANGELOG.md entries into the target's [Unreleased]
 # section. On a release branch a fix's entry lives under an RC header
-# (### [17.0.0.rc.1]); on main it belongs under ### [Unreleased]. A plain
+# (### [17.0.0.rc.1]) or, after final stamping, the matching stable header
+# (### [17.0.0]); on main it belongs under ### [Unreleased]. A plain
 # cherry-pick -x of the fix commit drags the RC-header context and either
 # conflicts or lands the entry in the wrong section. This reconciler is the
 # changelog restructure half of the forward-port: it collapses every entry from
-# the release branch's rc.N sections plus its own [Unreleased] into the target's
-# [Unreleased], de-duplicated by PR number against the target's existing entries,
-# and drops any RC-header section a prior pick left on the target.
+# the release branch's matching stable/rc.N sections plus its own [Unreleased]
+# into the target's [Unreleased], de-duplicated by PR number against the target's
+# existing entries, and drops any RC-header section a prior pick left on the target.
 #
 # The parsing approach intentionally mirrors react_on_rails/rakelib/update_changelog.rake
 # (parse_changelog_sections / changelog_section_blocks / consolidate_changelog_blocks)
@@ -1306,21 +1966,23 @@ class ChangelogReconciler
     :reconciled_changelog,
     :added_entries,
     :skipped_entries,
+    :removed_entries,
     :removed_sections,
     :original_changelog,
     keyword_init: true
   ) do
-    # Semantic change only: adding at least one entry or dropping at least one
+    # Semantic change only: adding/removing an entry or dropping at least one
     # stray RC section. Skipped (already-present) entries do not count, so the
     # reconciler never reformats the target's existing [Unreleased] for nothing.
     def changed?
-      added_entries.any? || removed_sections.any?
+      added_entries.any? || removed_entries.any? || removed_sections.any?
     end
   end
 
-  def initialize(source_changelog:, target_changelog:)
+  def initialize(source_changelog:, target_changelog:, release_version: nil)
     @source_changelog = source_changelog
     @target_changelog = target_changelog
+    @release_version = release_version
   end
 
   def reconcile
@@ -1330,19 +1992,12 @@ class ChangelogReconciler
     base_version = source_release_base_version(source)
     removed_sections = stray_rc_sections(target, base_version)
 
-    target_entries = section_entries(find_unreleased(target))
-    seen_pr_numbers = target_entries.filter_map(&:pr_number).to_set
-    target_entry_texts = target_entries.to_set { |entry| normalize_text(entry.text) }
-
-    added, skipped = partition_source_entries(
-      collect_source_entries(source, base_version),
-      seen_pr_numbers,
-      target_entry_texts
-    )
+    target_entries, added, skipped, removed_entries =
+      reconcile_entries(target, source, removed_sections, base_version)
 
     # Only re-render when there is a real change; otherwise return the target
     # changelog byte-for-byte so a no-op run never reflows existing entries.
-    reconciled = if added.any? || removed_sections.any?
+    reconciled = if added.any? || removed_entries.any? || removed_sections.any?
                    rebuild_changelog(target, target_entries + added, removed_sections)
                  else
                    @target_changelog
@@ -1352,6 +2007,51 @@ class ChangelogReconciler
       reconciled_changelog: reconciled,
       added_entries: added,
       skipped_entries: skipped,
+      removed_entries:,
+      removed_sections: removed_sections.map { |section| section[:version] },
+      original_changelog: @target_changelog
+    )
+  end
+
+  # A dedicated final changelog PR may intentionally consolidate or omit
+  # prerelease wording, so its stable section is authoritative. It is only safe
+  # to use that fast path when the named release section exists on the source and
+  # the source has no later [Unreleased] entries.
+  def authoritative_source_ready?
+    return false unless @release_version
+
+    source = parse_sections(@source_changelog)
+    source_release_section_present?(source) &&
+      section_entries(find_unreleased(source)).empty?
+  end
+
+  def source_release_section_present?(source = parse_sections(@source_changelog))
+    source_release_base_version(source) == @release_version
+  end
+
+  # Even after a final changelog PR, a later mixed cherry-pick can reintroduce an
+  # RC section or duplicate one of the release entries under target [Unreleased].
+  # Remove only that residue; never re-add source wording that the authoritative
+  # final PR intentionally consolidated or omitted.
+  def reconcile_authoritative_residue
+    target = parse_sections(@target_changelog)
+    source = parse_sections(@source_changelog)
+    base_version = source_release_base_version(source)
+    removed_sections = stray_rc_sections(target, base_version)
+    target_entries, removed_entries = authoritative_residue_entries(target, source, base_version)
+    retained_entries = target_entries - removed_entries
+
+    reconciled = if removed_entries.any? || removed_sections.any?
+                   rebuild_changelog(target, retained_entries, removed_sections)
+                 else
+                   @target_changelog
+                 end
+
+    Result.new(
+      reconciled_changelog: reconciled,
+      added_entries: [],
+      skipped_entries: [],
+      removed_entries:,
       removed_sections: removed_sections.map { |section| section[:version] },
       original_changelog: @target_changelog
     )
@@ -1359,14 +2059,101 @@ class ChangelogReconciler
 
   private
 
+  def authoritative_residue_entries(target, source, base_version)
+    target_entries = section_entries(find_unreleased(target))
+    source_entries = stamped_source_entries(source, base_version)
+    source_pr_numbers = source_entries.filter_map(&:pr_number).to_set
+    source_texts = source_entries.to_set { |entry| normalize_text(entry.text) }
+    removed_entries = target_entries.select do |entry|
+      (entry.pr_number && source_pr_numbers.include?(entry.pr_number)) ||
+        source_texts.include?(normalize_text(entry.text))
+    end
+    [target_entries, removed_entries]
+  end
+
+  def reconcile_entries(target, source, removed_sections, base_version)
+    target_entries = section_entries(find_unreleased(target))
+    source_entries = collect_source_entries(source, base_version)
+    replacement_prs = authoritative_replacement_pr_numbers(source, base_version, target_entries)
+
+    # De-duplicate against every section that will remain on main, not only the
+    # current [Unreleased]. A maintained release branch retains its stable
+    # section, whose entries may already live in main's history. Exclude RC
+    # sections being removed so their entries can still be re-homed before the
+    # section headers disappear.
+    retained_target_entries =
+      retained_target_entries(
+        target,
+        removed_sections,
+        replacement_prs,
+        base_version,
+        exclude_release_section: authoritative_source_ready?
+      )
+    seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
+    target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
+
+    added, skipped = partition_source_entries(source_entries, seen_pr_numbers, target_entry_texts)
+    removed_entries = target_entries.select { |entry| replacement_prs.include?(entry.pr_number) }
+    retained_unreleased_entries = target_entries - removed_entries
+    [retained_unreleased_entries, added, skipped, removed_entries]
+  end
+
+  def retained_target_entries(target, removed_sections, replacement_prs, base_version, exclude_release_section:)
+    retained_sections = target[:sections].reject do |section|
+      removed_sections.include?(section) ||
+        (exclude_release_section && section[:version] == base_version)
+    end
+    retained_sections.flat_map do |section|
+      entries = section_entries(section)
+      next entries unless section[:version] == UNRELEASED
+
+      entries.reject { |entry| replacement_prs.include?(entry.pr_number) }
+    end
+  end
+
+  # Final stamping can consolidate an earlier entry with a follow-up PR while
+  # main still has narrower prerelease wording for that same own PR. The final
+  # stable entry is authoritative, so remove the narrower [Unreleased] copy and
+  # let the normal partition pass add the final wording and heading.
+  def authoritative_replacement_pr_numbers(source, base_version, target_entries)
+    stable_entries = stable_sections(source, base_version).flat_map { |section| section_entries(section) }
+    stable_entries_by_pr = stable_entries.select(&:pr_number).group_by(&:pr_number)
+    target_entries_by_pr = target_entries.select(&:pr_number).group_by(&:pr_number)
+
+    target_entries_by_pr.each_with_object(Set.new) do |(pr_number, entries), replacements|
+      stable_group = stable_entries_by_pr[pr_number]
+      replacements << pr_number if authoritative_entry_group?(stable_group, entries)
+    end
+  end
+
+  def authoritative_entry_group?(stable_group, target_group)
+    stable_group && entry_group_fingerprint(stable_group) != entry_group_fingerprint(target_group)
+  end
+
+  def entry_group_fingerprint(entries)
+    entries.map do |entry|
+      [normalize_heading_key(entry.heading), normalize_text(entry.text)]
+    end.sort
+  end
+
   # Collapse every release-branch source section that belongs in main's
   # [Unreleased]: the branch's own [Unreleased] first (so it wins "first seen"
-  # ordering), then each rc.N / prerelease section for the active base version.
+  # ordering), then the final stable section and each prerelease section for the
+  # active base version.
   def collect_source_entries(source, base_version)
     sections = [find_unreleased(source)].compact
-    sections += prerelease_sections(source, base_version)
+    sections += stamped_source_sections(source, base_version)
     blocks = sections.flat_map { |section| section_blocks(section[:body]) }
     entries_from_blocks(consolidate_blocks(blocks))
+  end
+
+  def stamped_source_entries(source, base_version)
+    blocks = stamped_source_sections(source, base_version).flat_map { |section| section_blocks(section[:body]) }
+    entries_from_blocks(consolidate_blocks(blocks))
+  end
+
+  def stamped_source_sections(source, base_version)
+    stable_sections(source, base_version) + prerelease_sections(source, base_version)
   end
 
   # Split the collapsed source entries into those to add to main's [Unreleased]
@@ -1462,13 +2249,17 @@ class ChangelogReconciler
     text.to_s.gsub(/\s+/, " ").strip
   end
 
-  # The active release line is defined by the SOURCE branch's prerelease sections.
-  # We must NOT fall back to the target's RC base: if the source has no prerelease
-  # sections, there is nothing to re-home and no basis to claim a target RC section
-  # belongs to this line, so the run is a clean no-op (handled by the empty-base
-  # guards in prerelease_sections / stray_rc_sections). Forward-porting from a
-  # non-prerelease ref such as release/16.6.0 must not reach into main's RC base.
+  # Prefer the version named by release/X.Y.Z. Final stamping removes RC headers,
+  # so the source ref is the durable way to identify the stable section to re-home.
+  # For arbitrary source refs, retain the prerelease-section inference fallback.
+  # Never infer from the target: an unrelated target RC section must stay intact.
   def source_release_base_version(source)
+    if @release_version
+      return @release_version if stamped_source_sections(source, @release_version).any?
+
+      return nil
+    end
+
     highest_prerelease_base(source)
   end
 
@@ -1494,6 +2285,12 @@ class ChangelogReconciler
   # reconciliation must drop so entries live only under [Unreleased] on main.
   def stray_rc_sections(target, base_version)
     prerelease_sections(target, base_version)
+  end
+
+  def stable_sections(parsed, base_version)
+    return [] unless base_version
+
+    parsed[:sections].select { |section| section[:version] == base_version }
   end
 
   # Prerelease (rc.N / beta.N / ...) sections in `parsed` whose base equals
