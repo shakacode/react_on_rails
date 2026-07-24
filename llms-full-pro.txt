@@ -2046,7 +2046,7 @@ the browser and server bundle entrypoints so the browser can hydrate the streame
 
 ```js
 // app/javascript/packs/react-on-rails-components.js
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import ProductPage from '../components/ProductPage';
 
 ReactOnRails.register({ ProductPage });
