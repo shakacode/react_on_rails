@@ -36,7 +36,7 @@ image layer.
 
 **Release-time seed** (a.k.a. **boot seed**):
 Pre-seed run by a Ruby-capable release, init, or startup step via
-`rake react_on_rails_pro:pre_seed_renderer_cache`, resolving the target
+`bundle exec rake react_on_rails_pro:pre_seed_renderer_cache`, resolving the target
 environment's _actually-live_ bundle. A combined Ruby+Node image can run it
 before Node; a Node-only renderer needs a Ruby-capable step with the promoted
 app artifact/config. That step and the renderer must mount the same writable

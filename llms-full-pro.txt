@@ -4008,7 +4008,7 @@ end
 For CI and testing, set `PREVIOUS_BUNDLE_HASHES` as a comma-separated list to skip `previous_bundle_hashes` discovery:
 
 ```bash
-PREVIOUS_BUNDLE_HASHES=abc123,def456 rake react_on_rails_pro:pre_seed_renderer_cache
+PREVIOUS_BUNDLE_HASHES=abc123,def456 bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
 This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. The adapter is still required to fetch the actual bundle files; setting the env var without configuring `config.rolling_deploy_adapter` produces a warning and skips seeding.

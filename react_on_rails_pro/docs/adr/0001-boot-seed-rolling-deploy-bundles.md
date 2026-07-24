@@ -2,16 +2,17 @@
 
 **Status:** accepted
 
-When the production image is produced by **promoting the staging image**
-(`upstream: hichee-staging` in Control Plane), a build-time pre-seed cannot know
-production's live **draining bundle**: it runs in the staging pipeline against a
-staging snapshot, and promotion happens later and is sometimes skipped. We
+When the production image is produced by **promoting a staging image** (for
+example, through a Control Plane `upstream:` configuration), a build-time
+pre-seed cannot know production's live **draining bundle**: it runs in the
+staging pipeline against a staging snapshot, and promotion happens later and is
+sometimes skipped. We
 therefore run the **Rails/Rake seed task**
-(`rake react_on_rails_pro:pre_seed_renderer_cache`) in a Ruby-capable release,
-init, or startup step as the correctness path, and keep the build-time seed as a
-fallback floor. A combined Ruby+Node image can run it before Node. A Node-only
-renderer needs that step to use the promoted app artifact/config. The step and
-renderer must mount the same writable shared volume at
+(`bundle exec rake react_on_rails_pro:pre_seed_renderer_cache`) in a
+Ruby-capable release, init, or startup step as the correctness path, and keep
+the build-time seed as a fallback floor. A combined Ruby+Node image can run it
+before Node. A Node-only renderer needs that step to use the promoted app
+artifact/config. The step and renderer must mount the same writable shared volume at
 `RENDERER_SERVER_BUNDLE_CACHE_PATH`, or copy/sync the completed cache into the
 renderer before it starts; gate renderer start/readiness on completion. Without
 a Ruby-capable step that makes the completed cache available to the renderer,
