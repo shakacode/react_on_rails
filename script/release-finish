@@ -440,7 +440,12 @@ class ReleaseFinish
     end
 
     if current_main_sha == checked_main_sha
-      run_or_print(*leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:))
+      delete_recovery_if_source_absent!(
+        remote,
+        release_branch,
+        checked_source_sha:,
+        recovery_ref:
+      )
       return
     end
 
@@ -468,12 +473,33 @@ class ReleaseFinish
     raise GitError, git_error(["ls-remote", "--exit-code", "--heads", "--", remote, branch], stdout, stderr, status)
   end
 
-  def leased_recovery_delete_command(remote, checked_source_sha:, recovery_ref:)
+  def delete_recovery_if_source_absent!(remote, release_branch, checked_source_sha:, recovery_ref:)
+    run_or_print(
+      *leased_recovery_delete_command(
+        remote,
+        release_branch,
+        checked_source_sha:,
+        recovery_ref:
+      )
+    )
+  rescue GitError => e
+    raise AbortError, <<~ERROR.strip
+      Recovery cleanup was not confirmed while proving #{remote}/#{release_branch} remained absent.
+      Inspect #{remote}/#{release_branch} and #{recovery_ref.delete_prefix('refs/heads/')} before retrying.
+      Git command failure: #{e.message}
+    ERROR
+  end
+
+  def leased_recovery_delete_command(remote, release_branch, checked_source_sha:, recovery_ref:)
+    source_ref = "refs/heads/#{release_branch}"
     [
       "git",
       "push",
+      "--atomic",
+      "--force-with-lease=#{source_ref}:",
       "--force-with-lease=#{recovery_ref}:#{checked_source_sha}",
       remote,
+      ":#{source_ref}",
       ":#{recovery_ref}"
     ]
   end

@@ -499,7 +499,8 @@ cannot close the last network race. Instead, the deletion atomically moves the c
 temporary `release-finish-recovery/*` branch while deleting the release branch with a real source lease.
 It then re-fetches `main`: if `main` raced, it atomically restores the release branch before aborting;
 if another actor recreated the release branch, it aborts and retains recovery for inspection; otherwise
-it removes the temporary recovery branch. Pass
+it atomically proves the source remains absent while removing the temporary recovery branch. A concurrent
+source recreation rejects that cleanup transaction and leaves recovery available for inspection. Pass
 `--ack-manual <sha>` for each
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
 PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
@@ -549,7 +550,8 @@ git push --atomic \
   ":${release_ref}"
 
 # Re-fetch immediately. Restore the release branch if main changed during deletion;
-# abort with recovery intact if the release branch reappeared; otherwise remove recovery with its own lease.
+# abort with recovery intact if the release branch reappeared; otherwise atomically prove it remains
+# absent while removing recovery with its own lease.
 git fetch origin
 if git ls-remote --exit-code --heads -- origin release/17.0.0 >/dev/null 2>&1; then
   echo "release branch reappeared; retain recovery and rerun all completion checks" >&2
@@ -565,7 +567,12 @@ if test "$(git rev-parse origin/main)" != "${checked_main_sha}"; then
   echo "main changed; release branch restored — rerun close-out" >&2
   exit 1
 fi
-git push --force-with-lease="${recovery_ref}:${checked_source_sha}" origin ":${recovery_ref}"
+git push --atomic \
+  --force-with-lease="${release_ref}:" \
+  --force-with-lease="${recovery_ref}:${checked_source_sha}" \
+  origin \
+  ":${release_ref}" \
+  ":${recovery_ref}"
 ```
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips

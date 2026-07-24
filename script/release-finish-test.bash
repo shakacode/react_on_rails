@@ -913,6 +913,73 @@ test_close_out_aborts_if_source_reappears_after_delete() {
     "close-out source-recreation retains checked recovery"
 }
 
+prepare_cleanup_source_recreation_wrapper() {
+  local origin_dir="$PWD/../origin.git"
+  local writer_dir="$PWD/../cleanup-source-recreation-writer"
+  local wrapper_dir="$PWD/../cleanup-source-recreation-bin"
+
+  git clone -q "$origin_dir" "$writer_dir"
+  git -C "$writer_dir" checkout -q release/1.0.0
+  git -C "$writer_dir" config user.email test@example.com
+  git -C "$writer_dir" config user.name "Release Finish Cleanup Race Test"
+  printf 'source recreated during recovery cleanup\n' > "$writer_dir/cleanup-recreated-source.txt"
+  git -C "$writer_dir" add cleanup-recreated-source.txt
+  git -C "$writer_dir" commit -qm "Recreate release branch during recovery cleanup"
+  CLEANUP_RECREATED_SOURCE_SHA="$(git -C "$writer_dir" rev-parse HEAD)"
+  git -C "$writer_dir" push -q origin HEAD:refs/heads/cleanup-source-recreation-candidate
+  mkdir -p "$wrapper_dir"
+  REAL_GIT_BIN="$(command -v git)"
+  export REAL_GIT_BIN
+
+  cat > "$wrapper_dir/git" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+marker="$(dirname "$0")/cleanup-source-recreation-fired"
+has_source_absence_lease=false
+deletes_recovery=false
+if [ "${1:-}" = "push" ]; then
+  for arg in "$@"; do
+    [ "$arg" = "--force-with-lease=refs/heads/release/1.0.0:" ] && has_source_absence_lease=true
+    case "$arg" in
+      :refs/heads/release-finish-recovery/1.0.0-*) deletes_recovery=true ;;
+    esac
+  done
+fi
+
+if [ "$has_source_absence_lease" = true ] && [ "$deletes_recovery" = true ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  "$REAL_GIT_BIN" push -q origin \
+    refs/remotes/origin/cleanup-source-recreation-candidate:refs/heads/release/1.0.0
+fi
+
+exec "$REAL_GIT_BIN" "$@"
+WRAPPER
+  chmod +x "$wrapper_dir/git"
+  CLEANUP_SOURCE_RECREATION_GIT_BIN="$wrapper_dir"
+}
+
+test_close_out_preserves_recovery_if_source_reappears_during_cleanup() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  local checked_source_sha recovery_ref
+  checked_source_sha="$(git rev-parse origin/release/1.0.0)"
+  recovery_ref="refs/heads/release-finish-recovery/1.0.0-${checked_source_sha:0:12}"
+  prepare_cleanup_source_recreation_wrapper
+
+  PATH="$CLEANUP_SOURCE_RECREATION_GIT_BIN:$PATH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out cleanup-source-recreation status"
+  assert_contains "$RF_OUT" "Recovery cleanup was not confirmed" \
+    "close-out cleanup-source-recreation detection"
+  assert_equal "$CLEANUP_RECREATED_SOURCE_SHA" \
+    "$(git ls-remote "$PWD/../origin.git" refs/heads/release/1.0.0 | cut -f1)" \
+    "close-out cleanup-source-recreation preserves new source"
+  assert_equal "$checked_source_sha" \
+    "$(git ls-remote "$PWD/../origin.git" "$recovery_ref" | cut -f1)" \
+    "close-out cleanup-source-recreation retains checked recovery"
+}
+
 test_close_out_aborts_with_an_empty_cherry_pick_in_progress() {
   setup_release_repo
   git checkout -q main
@@ -1039,6 +1106,7 @@ run_test test_close_out_aborts_if_source_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
 run_test test_close_out_restores_release_branch_if_main_races_during_delete
 run_test test_close_out_aborts_if_source_reappears_after_delete
+run_test test_close_out_preserves_recovery_if_source_reappears_during_cleanup
 run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
