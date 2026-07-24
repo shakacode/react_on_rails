@@ -618,6 +618,65 @@ test_close_out_aborts_if_remote_main_advances_after_checks() {
   fi
 }
 
+test_close_out_aborts_if_remote_main_advances_during_confirmation() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+
+  local runner="$PWD/../prompt-race-runner.rb"
+  local writer="$PWD/../prompt-race-writer"
+  local origin
+  origin="$(git remote get-url origin)"
+  cat > "$runner" <<'RUBY'
+require "pty"
+
+script, origin, writer = ARGV
+output = +""
+advanced = false
+status = nil
+
+PTY.spawn("ruby", script, "close-out", "1.0.0") do |read, write, pid|
+  begin
+    loop do
+      chunk = read.readpartial(1024)
+      output << chunk
+      next if advanced || !output.include?("Delete release/1.0.0 on origin now?")
+
+      abort "clone failed" unless system("git", "clone", "-q", origin, writer)
+      system("git", "-C", writer, "checkout", "-q", "main") || abort("checkout failed")
+      system("git", "-C", writer, "config", "user.email", "test@example.com") || abort("config failed")
+      system("git", "-C", writer, "config", "user.name", "Release Finish Prompt Race Test") || abort("config failed")
+      File.write(File.join(writer, "prompt-race.txt"), "remote advanced while confirmation was open\n")
+      system("git", "-C", writer, "add", "prompt-race.txt") || abort("add failed")
+      system("git", "-C", writer, "commit", "-qm", "Advance remote main during confirmation") ||
+        abort("commit failed")
+      system("git", "-C", writer, "push", "-q", "origin", "main") || abort("push failed")
+
+      advanced = true
+      write.write("y\n")
+    end
+  rescue EOFError, Errno::EIO
+    # PTYs report EIO at normal child exit on some platforms.
+  ensure
+    _waited_pid, status = Process.wait2(pid)
+  end
+end
+
+print output
+exit(status.exitstatus)
+RUBY
+
+  RF_OUT="$(ruby "$runner" "$RELEASE_FINISH" "$origin" "$writer" 2>&1)"
+  RF_STATUS=$?
+
+  assert_status 1 "$RF_STATUS" "close-out confirmation-window race status"
+  assert_contains "$RF_OUT" "Delete release/1.0.0 on origin now?" "close-out confirmation-window prompt"
+  assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out confirmation-window race guard"
+  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out confirmation-window no delete"
+  if ! git ls-remote --heads "$origin" release/1.0.0 | grep -q release/1.0.0; then
+    fail "confirmation-window remote advancement deleted the release branch"
+  fi
+}
+
 # --- close-out: guard — not on main ----------------------------------------
 
 test_close_out_aborts_when_not_on_main() {
@@ -701,6 +760,7 @@ run_test test_close_out_propagates_verifier_errors
 run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_if_remote_main_advances_after_checks
+run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
 run_test test_close_out_aborts_when_not_on_main
 run_test test_close_out_aborts_on_dirty_worktree
 run_test test_rejects_rc_version_argument

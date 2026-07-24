@@ -335,6 +335,28 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not accept an authoritative changelog commit without the final version section" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Release fix.\n"
+      )
+      commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "CHANGELOG.md", "# Change Log\n\n### [Unreleased]\n\n- Main-only note.\n")
+      commit_all(repo, "Record the final React on Rails 1.0.1 changelog (#999)")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+    end
+  end
+
   it "dry-runs release and target branches with unrelated root histories" do
     with_release_repo do |repo|
       git(repo, "checkout", "--orphan", "release/1.0.1")
@@ -712,6 +734,8 @@ RSpec.describe "script/release-forward-port" do
     with_release_repo do |repo|
       write_file(repo, "base-fix.txt", "main implementation\n")
       upstream_sha = commit_all(repo, "Fix prerelease retry ambiguity (#123)")
+      write_file(repo, "second-fix.txt", "second main implementation\n")
+      second_upstream_sha = commit_all(repo, "Fix follow-up retry ambiguity (#124)")
       write_file(repo, "review-fix.txt", "main review guard\n")
       git(repo, "add", "review-fix.txt")
       git(
@@ -727,12 +751,14 @@ RSpec.describe "script/release-forward-port" do
 
       git(repo, "checkout", "-b", "release/1.0.1", "#{upstream_sha}^")
       write_file(repo, "base-fix.txt", "release-adapted implementation\n")
+      write_file(repo, "second-fix.txt", "second release-adapted implementation\n")
       write_file(repo, "review-fix.txt", "release review guard\n")
-      git(repo, "add", "base-fix.txt", "review-fix.txt")
+      git(repo, "add", "base-fix.txt", "second-fix.txt", "review-fix.txt")
       release_sha = commit_all(
         repo,
         "Backport fail-closed prerelease retry (#456)\n\n" \
-        "Backports #123 and includes the reviewed post-pull downgrade guard."
+        "Backports #123 and includes the reviewed post-pull downgrade guard.\n\n" \
+        "Backports #124 to the release train."
       )
       git(repo, "checkout", "main")
 
@@ -743,12 +769,16 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("source commit identifies a live upstream PR already present on main")
       expect(stdout).not_to include("PICK #{release_sha[0, 12]} Backport fail-closed prerelease retry (#456)")
 
-      git(repo, "revert", "--no-edit", review_fix_sha)
-      stdout, stderr, status =
-        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
+      [upstream_sha, second_upstream_sha, review_fix_sha].each do |required_sha|
+        git(repo, "revert", "--no-edit", required_sha)
+        revert_sha = git(repo, "rev-parse", "HEAD").strip
+        stdout, stderr, status =
+          run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
-      expect(status).to be_success, stderr
-      expect(stdout).to include("PICK #{release_sha[0, 12]} Backport fail-closed prerelease retry (#456)")
+        expect(status).to be_success, stderr
+        expect(stdout).to include("PICK #{release_sha[0, 12]} Backport fail-closed prerelease retry (#456)")
+        git(repo, "revert", "--no-edit", revert_sha)
+      end
     end
   end
 
@@ -756,27 +786,39 @@ RSpec.describe "script/release-forward-port" do
     with_release_repo do |repo|
       write_file(repo, "app.txt", "base\nunrelated main change\n")
       commit_all(repo, "Unrelated main feature (#123)")
+      write_file(repo, "other.txt", "other unrelated main change\n")
+      commit_all(repo, "Other unrelated main feature (#456)")
 
-      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~1")
-      write_file(repo, "app.txt", "base\nunique release fix\n")
-      git(repo, "add", "app.txt")
-      git(
-        repo,
-        "commit",
-        "--no-gpg-sign",
-        "-m",
-        "Fix separate release regression (#456)",
-        "-m",
-        "This is not a backport from main PR #123.\nUnlike main PR #123, this fixes release-only behavior."
-      )
-      release_fix_sha = git(repo, "rev-parse", "HEAD").strip
+      git(repo, "checkout", "-b", "release/1.0.1", "HEAD~2")
+      negative_segments = [
+        "Backport the fix not from #123.",
+        "Backport this behavior, not from #123 but from #456.",
+        "- replaces the regex with code not already reviewed and merged in #456"
+      ]
+      release_fix_shas = negative_segments.each_with_index.map do |segment, index|
+        write_file(repo, "release-fix-#{index}.txt", "unique release fix #{index}\n")
+        git(repo, "add", "release-fix-#{index}.txt")
+        git(
+          repo,
+          "commit",
+          "--no-gpg-sign",
+          "-m",
+          "Fix separate release regression #{index} (#90#{index})",
+          "-m",
+          segment
+        )
+        git(repo, "rev-parse", "HEAD").strip
+      end
       git(repo, "checkout", "main")
 
       stdout, stderr, status =
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("PICK #{release_fix_sha[0, 12]} Fix separate release regression (#456)")
+      release_fix_shas.each_with_index do |release_fix_sha, index|
+        expected_pick = "PICK #{release_fix_sha[0, 12]} Fix separate release regression #{index} (#90#{index})"
+        expect(stdout).to include(expected_pick)
+      end
       expect(stdout).not_to include("source commit identifies a live upstream PR")
     end
   end

@@ -34,6 +34,9 @@ class ReleaseForwardPort
   /iox
   COMPOSITE_BACKPORT_PATTERN =
     /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+and\s+includes\s+the\s+reviewed\b/io
+  PROVENANCE_NEGATION_PATTERN = /
+    \b(?:not|never|no|without|unlike|except(?:\s+for)?|rather\s+than|instead\s+of)\b
+  /ix
   PRERELEASE_RANKS = {
     "dev" => 0,
     "test" => 1,
@@ -725,19 +728,21 @@ class ReleaseForwardPort
     release_pr_numbers = subject.scan(/#(\d+)/).flatten
     body = git("log", "-1", "--format=%B", sha)
     composite_pr_numbers = composite_backport_pr_numbers(body)
+    narrated_pr_numbers = narrated_upstream_pr_numbers(body)
+    upstream_pr_numbers = (composite_pr_numbers + narrated_pr_numbers - release_pr_numbers).uniq
     if composite_pr_numbers.any?
-      return target_pr_numbers_live?(composite_pr_numbers, target) &&
+      return upstream_pr_numbers.any? &&
+             target_pr_numbers_live?(upstream_pr_numbers, target) &&
              review_fix_forward_ported_from_release_pr?(release_pr_numbers, target)
     end
 
-    narrated_pr_numbers = narrated_upstream_pr_numbers(body)
-
-    upstream_pr_numbers = (narrated_pr_numbers - release_pr_numbers).uniq
     upstream_pr_numbers.any? && target_pr_numbers_live?(upstream_pr_numbers, target)
   end
 
   def composite_backport_pr_numbers(body)
     forward_port_narration_segments(body).flat_map do |segment|
+      next [] unless authoritative_provenance_segment?(segment)
+
       match = segment.match(COMPOSITE_BACKPORT_PATTERN)
       match ? match[:prs].scan(/#(\d+)/).flatten : []
     end.uniq
@@ -766,6 +771,8 @@ class ReleaseForwardPort
 
   def narrated_upstream_pr_numbers(body)
     forward_port_narration_segments(body).flat_map do |segment|
+      next [] unless authoritative_provenance_segment?(segment)
+
       explicit_backport = segment.match(EXPLICIT_BACKPORT_PATTERN)
       from_backport = segment.match(FROM_BACKPORT_PATTERN)
       merged_replacement = segment.match(MERGED_REPLACEMENT_PATTERN)
@@ -775,6 +782,10 @@ class ReleaseForwardPort
       numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
       numbers
     end.uniq
+  end
+
+  def authoritative_provenance_segment?(segment)
+    !segment.match?(PROVENANCE_NEGATION_PATTERN)
   end
 
   def target_pr_commit_shas(pr_number, target)
@@ -1420,10 +1431,14 @@ class ReleaseForwardPort
       next false unless target_commit_live_on_target?(sha, target)
       next false if git("show", "-s", "--format=%ct", sha).to_i < source_time
 
-      recorded_changelog = changelog_at(sha, label: "authoritative final changelog")
-      changelog_section(recorded_changelog, release_version) ==
-        changelog_section(target_changelog, release_version)
+      authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
     end
+  end
+
+  def authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
+    recorded_changelog = changelog_at(sha, label: "authoritative final changelog")
+    recorded_section = changelog_section(recorded_changelog, release_version)
+    recorded_section && recorded_section == changelog_section(target_changelog, release_version)
   end
 
   def changelog_section(changelog, version)

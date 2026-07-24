@@ -347,14 +347,16 @@ class ReleaseFinish
       return
     end
 
-    # SAFETY: never delete the source branch unless the verified local main is
-    # still exactly the remote main checked by the completion gate.
-    ensure_forward_port_durable_on_remote!(remote)
-
     confirm_outward!(
       "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
       "git push #{remote} --delete #{release_branch}"
     )
+
+    # SAFETY: confirm first so an operator cannot leave this exact-main check
+    # stale while the prompt is open. Never delete the source branch unless the
+    # verified local main still exactly equals freshly fetched remote main.
+    ensure_forward_port_durable_on_remote!(remote)
+
     run_or_print("git", "push", remote, "--delete", release_branch)
   end
 
