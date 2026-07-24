@@ -43,11 +43,11 @@ _Timings are illustrative, not benchmarks — the point is **when** the first pa
 
 ### Compatibility by React Version
 
-| React version | `stream_react_component` behavior                                                                                                                                                  | Async props and RSC                                                                                              |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below does not degrade unchanged. | Not available                                                                                                    |
-| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                      | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
-| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                        | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
+| React version | `stream_react_component` behavior                                                                                                                                               | Async props and RSC                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| React 16/17   | Synchronous SSR fallback for trees that do not suspend. If a child actually suspends, `renderToString` cannot complete SSR; the React 18 example below will not work unchanged. | Not available                                                                                                    |
+| React 18      | Progressive streaming for ordinary, non-RSC components with synchronous props. Suspense boundaries can reveal independently through `renderToPipeableStream`.                   | Not available; do not install `react-on-rails-rsc` or enable RSC support                                         |
+| React 19      | Progressive streaming for ordinary components, including the same non-RSC path as React 18.                                                                                     | Async props and RSC require React/React DOM 19.2.x with patch 19.2.7+ and compatible `react-on-rails-rsc` 19.2.x |
 
 React on Rails detects whether the installed React DOM server provides `renderToPipeableStream`. This keeps
 `stream_react_component` on the synchronous path for React 16 and 17 while selecting progressive streaming
@@ -63,8 +63,9 @@ For a Suspense boundary to reveal progressively, something below it must suspend
 straightforward React 18 case is a lazily loaded component:
 
 :::note Node Renderer module support
-Lazy or loadable components require `supportModules: true` in the Node Renderer launcher. That option injects selected
-Node.js globals into the renderer VM and changes its runtime capabilities, so review the
+This example assumes the server bundle can resolve its dynamic import. If your bundler's lazy or loadable component
+runtime needs Node.js globals, enable `supportModules: true` in the Node Renderer launcher. Because that option changes
+the renderer VM's runtime capabilities, review the
 [supportModules configuration and security notes](../oss/building-features/node-renderer/js-configuration.md#node-renderer-javascript-configuration)
 before enabling it.
 :::
