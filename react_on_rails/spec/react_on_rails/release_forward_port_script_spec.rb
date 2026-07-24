@@ -508,6 +508,43 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
+  it "does not dedupe against an unbound active final section" do
+    with_release_repo do |repo|
+      final_changelog =
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
+        "#### Fixed\n\n- Final release fix. (PR #101)\n"
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "CHANGELOG.md", final_changelog)
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(repo, "CHANGELOG.md", final_changelog)
+      commit_all(repo, "Record the final React on Rails 1.0.1 changelog (#999)")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+
+      stdout, stderr, status =
+        run_script(
+          repo,
+          "--source",
+          "release/1.0.1",
+          "--target",
+          "main",
+          "--changelog",
+          "--check",
+          "--ack-final-changelog-source",
+          source_changelog_sha
+        )
+
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+    end
+  end
+
   it "does not accept an authoritative changelog commit without the final version section" do
     with_release_repo do |repo|
       git(repo, "checkout", "-b", "release/1.0.1")
@@ -929,7 +966,7 @@ RSpec.describe "script/release-forward-port" do
     end
   end
 
-  it "skips adapted release backports whose narrated upstream PR is live on target" do
+  it "requires manual inspection for adapted release backports whose narrated upstream PR is live on target" do
     with_release_repo do |repo|
       write_file(repo, "app.txt", "base\nnewer main fix\n")
       commit_all(repo, "Fix release regression on main (#123)")
@@ -955,7 +992,8 @@ RSpec.describe "script/release-forward-port" do
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("source commit identifies a live upstream PR already present on main")
+      expect(stdout).to include("MANUAL #{release_fix_sha[0, 12]} Backport release regression (#456)")
+      expect(stdout).to include("does not prove whole-commit equivalence")
       expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport release regression (#456)")
       expect(File.read(File.join(repo, "app.txt"))).to eq("base\nnewer main fix\n")
     end
@@ -1049,7 +1087,8 @@ RSpec.describe "script/release-forward-port" do
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("source commit identifies a live upstream PR already present on main")
+      expect(stdout).to include("MANUAL #{release_fix_sha[0, 12]} Backport safe scanner fix (#4671)")
+      expect(stdout).to include("does not prove whole-commit equivalence")
       expect(stdout).not_to include("PICK #{release_fix_sha[0, 12]} Backport safe scanner fix (#4671)")
 
       git(repo, "revert", "--no-edit", target_sha)
@@ -1097,7 +1136,8 @@ RSpec.describe "script/release-forward-port" do
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--dry-run")
 
       expect(status).to be_success, stderr
-      expect(stdout).to include("source commit identifies a live upstream PR already present on main")
+      expect(stdout).to include("MANUAL #{release_sha[0, 12]} Backport fail-closed prerelease retry (#456)")
+      expect(stdout).to include("does not prove whole-commit equivalence")
       expect(stdout).not_to include("PICK #{release_sha[0, 12]} Backport fail-closed prerelease retry (#456)")
 
       [upstream_sha, second_upstream_sha, review_fix_sha].each do |required_sha|

@@ -370,15 +370,15 @@ git commit -m "Reconcile 17.0.0 release changelog on main"
   helper still requires a path-scoped patch-ID match before skipping the source commit. When a release
   backport body explicitly names its upstream PR, the helper can use a zero-context path-scoped match so
   harmless neighboring context drift does not hide an otherwise identical patch.
-- Adapted backports can record stronger provenance instead of byte-equivalent patches. The helper recognizes
-  the exact source-SHA sentence above, an explicit whole-commit statement such as
+- Adapted backports can record their upstream PR relationship, but source-commit narration is not content
+  proof. Statements such as `Backports #123 to the release train`,
   `This is equivalent to main PR #123 with release-specific behavior preserved.`, and reviewed
-  replacement/forward-port forms covered by the release tooling specs. The source commit's non-changelog
-  paths must also be covered by the identified target commits. A generic action line such as
-  `Backports #123 to the release train` proves only the source relationship, not whole-commit equivalence,
-  so the helper reports `MANUAL` for inspection instead of silently skipping it. Incidental, contrastive,
-  or negated prose such as `not a backport from main PR #123` is never authoritative. The helper skips only
-  while every identified target commit remains live; a later standard revert makes the source eligible again.
+  replacement/composite forms therefore report `MANUAL` for operator inspection when every required target
+  commit remains live. They never produce an automatic skip from PR numbers or shared path names alone.
+  Automatic skips still require patch equivalence, `cherry-pick -x`, or exact source-bound provenance recorded
+  by the target forward-port commit. Incidental, contrastive, or negated prose such as
+  `not a backport from main PR #123` is never authoritative. A later standard revert makes the source eligible
+  again instead of leaving it as an acknowledged relationship.
 - Generated-only `llms-full.txt` / `llms-full-pro.txt` commits are skipped because release artifacts can be
   stale relative to current target documentation. Regenerate both files from the resolved target sources.
 - An interim prerelease package pin is skipped only when a later stable source commit names the same stable

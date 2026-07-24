@@ -32,9 +32,6 @@ class ReleaseForwardPort
     \A\s*-\s+replaces?\b.*?\bwith\b.*?\balready\s+reviewed\s+and\s+merged\s+in\s+
     (?<prs>#{PR_NUMBER_LIST_PATTERN})
   /iox
-  EXPLICIT_EQUIVALENT_MAIN_PR_PATTERN = /
-    \A\s*this\s+is\s+equivalent\s+to\s+main\s+PR\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\b
-  /iox
   COMPOSITE_BACKPORT_PATTERN =
     /\A\s*backports?\s+(?<prs>#{PR_NUMBER_LIST_PATTERN})\s+and\s+includes\s+the\s+reviewed\b/io
   PROVENANCE_NEGATION_PATTERN = /
@@ -390,9 +387,6 @@ class ReleaseForwardPort
     return active_source_revert_skip_reason(subject, target, target_version) if
       source_standard_revert_on_target?(sha, target)
 
-    return "source commit identifies a live upstream PR already present on #{target}" if
-      source_narrated_pr_origin_on_target?(sha, target)
-
     return "already forward-ported to #{target} via cherry-pick -x evidence with no later target revert" if
       already_forward_ported_with_x?(sha, target)
 
@@ -641,8 +635,7 @@ class ReleaseForwardPort
 
   def source_commit_provenance_present_on_target?(sha, target)
     subject = subject_for_commit(sha).to_s
-    source_narrated_pr_origin_on_target?(sha, target) ||
-      already_forward_ported_with_x?(sha, target) ||
+    already_forward_ported_with_x?(sha, target) ||
       !targeted_patch_equivalent_skip_reason(sha, subject, target).nil?
   end
 
@@ -782,7 +775,7 @@ class ReleaseForwardPort
     origin_sha && commit_on_target?(origin_sha, target) && !target_commit_live_on_target?(origin_sha, target)
   end
 
-  def source_narrated_pr_origin_on_target?(sha, target)
+  def source_narrated_pr_reference_on_target?(sha, target)
     subject = subject_for_commit(sha).to_s
     release_pr_number = source_pr_number_from_subject(subject)
     release_pr_numbers = release_pr_number ? [release_pr_number] : []
@@ -794,26 +787,10 @@ class ReleaseForwardPort
       review_fix_shas = review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
       return upstream_pr_numbers.any? &&
              target_pr_numbers_live?(upstream_pr_numbers, target) &&
-             review_fix_shas.any? &&
-             source_paths_covered_by_target_commits?(
-               sha,
-               target_pr_commit_shas_for(upstream_pr_numbers, target) + review_fix_shas
-             )
+             review_fix_shas.any?
     end
 
-    equivalent_pr_numbers = narrated_equivalent_upstream_pr_numbers(body) - release_pr_numbers
-    equivalent_pr_numbers.any? &&
-      target_pr_numbers_live?(equivalent_pr_numbers, target) &&
-      source_paths_covered_by_target_commits?(sha, target_pr_commit_shas_for(equivalent_pr_numbers, target))
-  end
-
-  def source_narrated_pr_reference_on_target?(sha, target)
-    release_pr_number = source_pr_number_from_subject(subject_for_commit(sha).to_s)
-    release_pr_numbers = release_pr_number ? [release_pr_number] : []
-    body = git("log", "-1", "--format=%B", sha)
-    return false if composite_backport_pr_numbers(body).any?
-
-    upstream_pr_numbers = narrated_upstream_pr_numbers(body) - release_pr_numbers
+    upstream_pr_numbers = narrated_pr_numbers - release_pr_numbers
 
     upstream_pr_numbers.any? && target_pr_numbers_live?(upstream_pr_numbers, target)
   end
@@ -831,21 +808,6 @@ class ReleaseForwardPort
     pr_numbers.all? do |pr_number|
       target_pr_commit_shas(pr_number, target).any? { |target_sha| target_commit_live_on_target?(target_sha, target) }
     end
-  end
-
-  def target_pr_commit_shas_for(pr_numbers, target)
-    pr_numbers.flat_map do |pr_number|
-      target_pr_commit_shas(pr_number, target).select do |target_sha|
-        target_commit_live_on_target?(target_sha, target)
-      end
-    end.uniq
-  end
-
-  def source_paths_covered_by_target_commits?(source_sha, target_shas)
-    source_paths = changed_paths_for_commit(source_sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
-    target_paths = target_shas.flat_map { |target_sha| changed_paths_for_commit(target_sha) }.uniq
-
-    source_paths.any? && (source_paths - target_paths).empty?
   end
 
   def review_fix_forward_port_shas_from_release_pr(release_pr_numbers, target)
@@ -878,19 +840,6 @@ class ReleaseForwardPort
       numbers = []
       numbers.concat(explicit_backport[:prs].scan(/#(\d+)/).flatten) if explicit_backport
       numbers.concat(from_backport[:prs].scan(/#(\d+)/).flatten) if from_backport
-      numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
-      numbers
-    end.uniq
-  end
-
-  def narrated_equivalent_upstream_pr_numbers(body)
-    forward_port_narration_segments(body).flat_map do |segment|
-      next [] unless authoritative_provenance_segment?(segment)
-
-      explicit_equivalence = segment.match(EXPLICIT_EQUIVALENT_MAIN_PR_PATTERN)
-      merged_replacement = segment.match(MERGED_REPLACEMENT_PATTERN)
-      numbers = []
-      numbers.concat(explicit_equivalence[:prs].scan(/#(\d+)/).flatten) if explicit_equivalence
       numbers.concat(merged_replacement[:prs].scan(/#(\d+)/).flatten) if merged_replacement
       numbers
     end.uniq
@@ -2132,7 +2081,14 @@ class ChangelogReconciler
     # section, whose entries may already live in main's history. Exclude RC
     # sections being removed so their entries can still be re-homed before the
     # section headers disappear.
-    retained_target_entries = retained_target_entries(target, removed_sections, replacement_prs)
+    retained_target_entries =
+      retained_target_entries(
+        target,
+        removed_sections,
+        replacement_prs,
+        base_version,
+        exclude_release_section: authoritative_source_ready?
+      )
     seen_pr_numbers = retained_target_entries.filter_map(&:pr_number).to_set
     target_entry_texts = retained_target_entries.to_set { |entry| normalize_text(entry.text) }
 
@@ -2142,15 +2098,17 @@ class ChangelogReconciler
     [retained_unreleased_entries, added, skipped, removed_entries]
   end
 
-  def retained_target_entries(target, removed_sections, replacement_prs)
-    target[:sections]
-      .reject { |section| removed_sections.include?(section) }
-      .flat_map do |section|
-        entries = section_entries(section)
-        next entries unless section[:version] == UNRELEASED
+  def retained_target_entries(target, removed_sections, replacement_prs, base_version, exclude_release_section:)
+    retained_sections = target[:sections].reject do |section|
+      removed_sections.include?(section) ||
+        (exclude_release_section && section[:version] == base_version)
+    end
+    retained_sections.flat_map do |section|
+      entries = section_entries(section)
+      next entries unless section[:version] == UNRELEASED
 
-        entries.reject { |entry| replacement_prs.include?(entry.pr_number) }
-      end
+      entries.reject { |entry| replacement_prs.include?(entry.pr_number) }
+    end
   end
 
   # Final stamping can consolidate an earlier entry with a follow-up PR while
