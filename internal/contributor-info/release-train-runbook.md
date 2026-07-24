@@ -328,6 +328,8 @@ git add CHANGELOG.md
 git commit -m "Reconcile X.Y.Z release changelog on main"
 # Validate, push, and open the dedicated release/changelog PR to main. Squash it with:
 # Record the final React on Rails X.Y.Z changelog (#<pr-number>)
+# Include this exact sentence in the PR body, using the newest release-branch commit that changed CHANGELOG.md:
+# The final changelog records source CHANGELOG.md commit `<40-character-sha>`.
 ```
 
 - Treat the dry-run plan as a queue, not one combined forward-port branch. Land one missing source
@@ -341,8 +343,12 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   is not a substitute.
 - Squash the dedicated changelog/release reconciliation PR with
   `Record the final React on Rails X.Y.Z changelog (#<pr-number>)`. Do not mix source changes into it.
-  That changelog-only commit is the authoritative final release record while its `X.Y.Z` section remains
-  byte-for-byte unchanged on `main`; this permits reviewed consolidation of superseded RC-only entries.
+  Include the exact source-CHANGELOG sentence shown above in the PR body. That changelog-only commit is
+  authoritative only while the named source commit remains the newest release-branch `CHANGELOG.md` change
+  and its `X.Y.Z` section remains byte-for-byte unchanged on `main`; this permits reviewed consolidation of
+  superseded RC-only entries without allowing a later release-branch correction to be hidden. For a legacy
+  dedicated changelog PR that predates the sentence, inspect the current source changelog commit and pass
+  `--ack-final-changelog-source <sha>` to the changelog check and `release-finish close-out`.
 - Do not create empty marker or provenance-only commits for `SKIP` entries. A commit marked already
   present, patch-equivalent, changelog-only, version-only, generated-only, or empty is evidence that
   no source PR is needed. The helper's empty-commit guard specifically prevents no-op forward-port
@@ -369,7 +375,9 @@ git commit -m "Reconcile X.Y.Z release changelog on main"
   stale relative to current target documentation. Regenerate both files from the resolved target sources.
 - An interim prerelease package pin is skipped only when a later stable source commit names the same stable
   version, covers every non-changelog/non-generated path of the interim pin, and is independently proven live
-  on the target. This prevents replaying an obsolete RC dependency over an already-forward-ported stable pin.
+  on the target. The cumulative contents and modes of the interim pin's paths at that stable source commit
+  must also match the target. If they differ, the helper marks the interim commit `MANUAL` so an unrelated
+  setting cannot be silently omitted while the stable pin is skipped.
 - `-x` appends `(cherry picked from commit <sha>)` so the forward-port is auditable and future
   helper runs can see the relationship.
 - Pure `CHANGELOG.md` stamp commits are skipped in code mode. After the code picks finish, run the
@@ -481,17 +489,22 @@ evidence and maintainer sign-off; it must not become a global skip of CI, ShakaP
 `script/release-forward-port --check` code and changelog plans. It does not apply release commits to
 `main`; step 3's separate PRs must already be merged. Only after both checks pass does it ask for
 confirmation before deleting the release branch on the remote. A final fetch must still find local
-`main` exactly equal to `origin/main`; any intervening commit requires rerunning both checks. Pass
+`main` exactly equal to `origin/main` and both checked remote tips unchanged; any intervening commit
+requires rerunning both checks. The deletion uses one atomic push with matching leases for `main` and
+the release branch, so neither ref can change in the final fetch-to-delete window. Pass
 `--ack-manual <sha>` for each
 stable version-bump, merge, or rollback item that was inspected and intentionally required no source
-PR. Preview everything first with `--dry-run`:
+PR. For a legacy authoritative changelog PR without embedded source-SHA provenance, also pass
+`--ack-final-changelog-source <current-source-changelog-sha>`. Preview everything first with `--dry-run`:
 
 ```bash
 git fetch origin
 git checkout main
 git pull --rebase
 script/release-finish close-out 17.0.0 --dry-run   # prints commands + the real forward-port plan
-script/release-finish close-out 17.0.0 --ack-manual <inspected-sha>
+script/release-finish close-out 17.0.0 \
+  --ack-manual <inspected-sha> \
+  --ack-final-changelog-source <current-source-changelog-sha>
 # If either check is incomplete, land the PRs from step 3 and rerun. No source commit is applied here.
 ```
 
@@ -503,15 +516,27 @@ The manual equivalent the script wraps is below.
 git fetch origin
 git checkout main
 git pull --rebase
+checked_main_sha="$(git rev-parse origin/main)"
+checked_source_sha="$(git rev-parse origin/release/17.0.0)"
 
 # The read-only completion checks must pass after every source PR and the separate
 # changelog/release squash PR have merged. Acknowledge only inspected MANUAL items.
 script/release-forward-port --source origin/release/17.0.0 --target main --check \
   --ack-manual <inspected-sha>
-script/release-forward-port --source origin/release/17.0.0 --target main --changelog --check
+script/release-forward-port --source origin/release/17.0.0 --target main --changelog --check \
+  --ack-final-changelog-source <current-source-changelog-sha>
 
-# 2. Delete the ephemeral branch only after both checks pass — tags are the durable record.
-git push origin --delete release/17.0.0
+# 2. Prefer release-finish for deletion. Its atomic leased push verifies that neither checked ref changed.
+# If reproducing it manually, fetch and compare both refs to the SHAs captured before the checks:
+git fetch origin
+test "$(git rev-parse origin/main)" = "${checked_main_sha}"
+test "$(git rev-parse origin/release/17.0.0)" = "${checked_source_sha}"
+git push --atomic \
+  --force-with-lease="refs/heads/main:${checked_main_sha}" \
+  --force-with-lease="refs/heads/release/17.0.0:${checked_source_sha}" \
+  origin \
+  "${checked_main_sha}:refs/heads/main" \
+  ":refs/heads/release/17.0.0"
 ```
 
 > **Caveat — do not blindly cherry-pick version-bump commits.** The helper always skips

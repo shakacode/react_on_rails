@@ -50,6 +50,7 @@ class ReleaseFinish
       version: nil,
       rc_tag: nil,
       ack_manual: [],
+      ack_final_changelog_source: nil,
       remote: "origin"
     }
     @parser = build_parser
@@ -96,11 +97,16 @@ class ReleaseFinish
     raise UsageError, "too many arguments: #{argv.join(' ')}" unless argv.empty?
 
     validate_version!
-    if subcommand == "promote" && @options[:ack_manual].any?
-      raise UsageError, "--ack-manual applies only to close-out forward-port verification"
-    end
+    validate_subcommand_options!(subcommand)
 
     subcommand
+  end
+
+  def validate_subcommand_options!(subcommand)
+    return unless subcommand == "promote"
+    return if @options[:ack_manual].empty? && !@options[:ack_final_changelog_source]
+
+    raise UsageError, "forward-port acknowledgements apply only to close-out verification"
   end
 
   def validate_version!
@@ -124,9 +130,7 @@ class ReleaseFinish
       parser.on("--remote NAME", "Remote for fetch and branch deletion (default: origin)") do |remote|
         @options[:remote] = remote
       end
-      parser.on("--ack-manual SHA", "Acknowledge one inspected MANUAL forward-port item (repeatable)") do |sha|
-        @options[:ack_manual] << sha
-      end
+      add_forward_port_ack_options(parser)
       parser.on("--dry-run", "Preview the plan; still fetches remote refs needed for current-state checks") do
         @options[:dry_run] = true
       end
@@ -140,10 +144,23 @@ class ReleaseFinish
     end
   end
 
+  def add_forward_port_ack_options(parser)
+    parser.on("--ack-manual SHA", "Acknowledge one inspected MANUAL forward-port item (repeatable)") do |sha|
+      @options[:ack_manual] << sha
+    end
+    parser.on(
+      "--ack-final-changelog-source SHA",
+      "Acknowledge the current source CHANGELOG.md commit for a legacy authoritative changelog PR"
+    ) do |sha|
+      @options[:ack_final_changelog_source] = sha
+    end
+  end
+
   def usage_banner
     <<~BANNER
       Usage: script/release-finish promote   X.Y.Z [--rc-tag vX.Y.Z.rc.N] [--dry-run] [--yes]
-             script/release-finish close-out X.Y.Z [--remote origin] [--ack-manual SHA] [--dry-run] [--yes]
+             script/release-finish close-out X.Y.Z [--remote origin] [--ack-manual SHA]
+                                                  [--ack-final-changelog-source SHA] [--dry-run] [--yes]
 
       Orchestrates the release-train runbook steps 4 (promote) and 5 (close out).
 
@@ -285,6 +302,8 @@ class ReleaseFinish
 
     fetch_remote!(remote)
     ensure_local_main_matches_remote!(remote)
+    checked_main_sha = git("rev-parse", "#{remote}/main").strip
+    checked_source_sha = git("rev-parse", source).strip
 
     complete = forward_port_complete?(source)
     unless complete
@@ -302,7 +321,12 @@ class ReleaseFinish
       ERROR
     end
 
-    delete_release_branch!(release_branch, remote)
+    delete_release_branch!(
+      release_branch,
+      remote,
+      checked_main_sha:,
+      checked_source_sha:
+    )
 
     finish_dry_run_notice
     0
@@ -317,8 +341,11 @@ class ReleaseFinish
 
     puts
     puts "Changelog plan (remaining reconciliation needs its own squash PR):"
-    changelog_complete =
-      run_forward_port_check("--source", source, "--target", "main", "--changelog", "--check")
+    changelog_args = ["--source", source, "--target", "main", "--changelog", "--check"]
+    if (sha = @options[:ack_final_changelog_source])
+      changelog_args.push("--ack-final-changelog-source", sha)
+    end
+    changelog_complete = run_forward_port_check(*changelog_args)
 
     if code_complete && changelog_complete
       puts "\nAll source and changelog forward-port work is complete on main."
@@ -340,26 +367,46 @@ class ReleaseFinish
     raise GitError, "#{FORWARD_PORT_SCRIPT} verification failed with status #{status.exitstatus}"
   end
 
-  def delete_release_branch!(release_branch, remote)
+  def delete_release_branch!(release_branch, remote, checked_main_sha:, checked_source_sha:)
     section "Delete the ephemeral branch #{release_branch} on #{remote} (tags are the durable record)"
 
     if @options[:dry_run]
-      puts "DRY RUN: would verify the forward-ported commits are on #{remote}/main, then run:"
-      run_or_print("git", "push", remote, "--delete", release_branch)
+      puts "DRY RUN: would verify the checked source and main tips, then atomically delete with matching leases:"
+      run_or_print(
+        *leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
+      )
       return
     end
 
     confirm_outward!(
       "Delete #{release_branch} on #{remote} now? Tags persist; this only removes the branch.",
-      "git push #{remote} --delete #{release_branch}"
+      "git push --atomic #{remote} <checked-main>:main :#{release_branch} (with matching leases)"
     )
 
-    # SAFETY: confirm first so an operator cannot leave this exact-main check
-    # stale while the prompt is open. Never delete the source branch unless the
-    # verified local main still exactly equals freshly fetched remote main.
-    ensure_forward_port_durable_on_remote!(remote)
+    ensure_forward_port_durable_on_remote!(
+      remote,
+      release_branch,
+      checked_main_sha:,
+      checked_source_sha:
+    )
+    run_or_print(
+      *leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
+    )
+  end
 
-    run_or_print("git", "push", remote, "--delete", release_branch)
+  def leased_branch_delete_command(release_branch, remote, checked_main_sha:, checked_source_sha:)
+    main_ref = "refs/heads/main"
+    source_ref = "refs/heads/#{release_branch}"
+    [
+      "git",
+      "push",
+      "--atomic",
+      "--force-with-lease=#{main_ref}:#{checked_main_sha}",
+      "--force-with-lease=#{source_ref}:#{checked_source_sha}",
+      remote,
+      "#{checked_main_sha}:#{main_ref}",
+      ":#{source_ref}"
+    ]
   end
 
   # ---------------------------------------------------------------------------
@@ -405,12 +452,26 @@ class ReleaseFinish
     ERROR
   end
 
-  # SAFETY GATE for the branch delete: re-fetch and require the checked local
-  # main tip to still equal remote main. Any advancement, including a revert or
-  # changelog rewrite after the semantic checks, requires a fresh close-out run.
-  def ensure_forward_port_durable_on_remote!(remote)
+  # SAFETY GATE for the branch delete: re-fetch and require both checked tips to
+  # remain unchanged. The following atomic push repeats those expectations as
+  # leases, closing the final fetch-to-delete race for both refs.
+  def ensure_forward_port_durable_on_remote!(remote, release_branch, checked_main_sha:, checked_source_sha:)
     fetch_remote!(remote)
     ensure_local_main_matches_remote!(remote)
+    ensure_remote_ref_unchanged!("#{remote}/main", checked_main_sha)
+    ensure_remote_ref_unchanged!("#{remote}/#{release_branch}", checked_source_sha)
+  end
+
+  def ensure_remote_ref_unchanged!(ref, checked_sha)
+    current_sha = git("rev-parse", ref).strip
+    return if current_sha == checked_sha
+
+    raise AbortError, <<~ERROR.strip
+      #{ref} changed after the forward-port checks
+        checked: #{checked_sha}
+        current: #{current_sha}
+      Re-run close-out against the new tips; the release branch was not deleted.
+    ERROR
   end
 
   def ensure_clean_worktree!

@@ -386,7 +386,7 @@ test_close_out_dry_run_prints_plan_and_runs_nothing() {
   assert_contains "$RF_OUT" "Release forward-port plan" "close-out dry-run"
   assert_contains "$RF_OUT" "PICK" "close-out dry-run picks the fix"
   assert_contains "$RF_OUT" "close-out is blocked until the separate forward-port PRs above merge" "close-out dry-run"
-  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out dry-run"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out dry-run"
   assert_contains "$RF_OUT" "no tags, pushes, releases, changelog changes, cherry-picks, or branch deletions were performed" "close-out dry-run"
 }
 
@@ -443,7 +443,11 @@ test_close_out_yes_non_dry_run_deletes_branch_when_forward_port_pushed() {
   # confirm_outward! with NO TTY (no "no TTY" abort, no prompt) and actually ran
   # the outward delete.
   assert_not_contains "$RF_OUT" "no TTY for confirmation" "close-out --yes should not stop on TTY"
-  assert_contains "$RF_OUT" "+ git push origin --delete release/1.0.0" "close-out --yes deleted branch"
+  assert_contains "$RF_OUT" "+ git push --atomic --force-with-lease=refs/heads/main:" \
+    "close-out --yes uses a checked main lease"
+  assert_contains "$RF_OUT" "--force-with-lease=refs/heads/release/1.0.0:" \
+    "close-out --yes uses a checked source lease"
+  assert_contains "$RF_OUT" ":refs/heads/release/1.0.0" "close-out --yes deleted branch"
   # The branch is actually gone from the (local bare) origin.
   if git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
     fail "close-out --yes did not delete the release branch on origin"
@@ -501,8 +505,8 @@ test_close_out_propagates_verifier_errors() {
   run_rf close-out 9.9.9 --dry-run
 
   assert_status 1 "$RF_STATUS" "close-out verifier-error status"
-  assert_contains "$RF_OUT" "source ref" "close-out verifier-error source"
-  assert_contains "$RF_OUT" "verification failed with status 3" "close-out verifier-error propagation"
+  assert_contains "$RF_OUT" "origin/release/9.9.9" "close-out verifier-error source"
+  assert_contains "$RF_OUT" "git rev-parse origin/release/9.9.9 failed" "close-out verifier-error propagation"
   assert_not_contains "$RF_OUT" "blocked until the separate forward-port PRs" \
     "close-out verifier errors are not ordinary pending work"
 }
@@ -601,6 +605,47 @@ WRAPPER
   RACE_RELEASE_FINISH="$wrapper_dir/release-finish"
 }
 
+prepare_post_check_source_advance_wrapper() {
+  local wrapper_dir="$PWD/../source-race-bin"
+  mkdir -p "$wrapper_dir"
+  cp "$RELEASE_FINISH" "$wrapper_dir/release-finish"
+  cp "$SCRIPT_DIR/release-forward-port" "$wrapper_dir/release-forward-port-real"
+
+  cat > "$wrapper_dir/release-forward-port" <<'WRAPPER'
+#!/usr/bin/env bash
+set -uo pipefail
+
+wrapper_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$wrapper_dir/release-forward-port-real" "$@"
+rc=$?
+
+has_changelog=false
+has_check=false
+for arg in "$@"; do
+  [ "$arg" = "--changelog" ] && has_changelog=true
+  [ "$arg" = "--check" ] && has_check=true
+done
+
+marker="$wrapper_dir/source-advance-fired"
+if [ "$rc" -eq 0 ] && [ "$has_changelog" = true ] && [ "$has_check" = true ] && [ ! -e "$marker" ]; then
+  : > "$marker"
+  writer="$wrapper_dir/source-race-writer"
+  git clone -q "$(git remote get-url origin)" "$writer"
+  git -C "$writer" checkout -q release/1.0.0
+  git -C "$writer" config user.email test@example.com
+  git -C "$writer" config user.name "Release Finish Source Race Test"
+  printf 'late release correction\n' > "$writer/late-release.txt"
+  git -C "$writer" add late-release.txt
+  git -C "$writer" commit -qm "Advance release branch after checks"
+  git -C "$writer" push -q origin release/1.0.0
+fi
+
+exit "$rc"
+WRAPPER
+  chmod +x "$wrapper_dir/release-forward-port"
+  RACE_RELEASE_FINISH="$wrapper_dir/release-finish"
+}
+
 test_close_out_aborts_if_remote_main_advances_after_checks() {
   setup_release_repo
   push_forward_port_to_origin_main
@@ -612,9 +657,27 @@ test_close_out_aborts_if_remote_main_advances_after_checks() {
   assert_contains "$RF_OUT" "All source and changelog forward-port work is complete on main" \
     "close-out post-check race precondition"
   assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out post-check race guard"
-  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out post-check race no delete"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out post-check race no delete"
   if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
     fail "post-check remote advancement deleted the release branch"
+  fi
+}
+
+test_close_out_aborts_if_source_advances_after_checks() {
+  setup_release_repo
+  push_forward_port_to_origin_main
+  prepare_post_check_source_advance_wrapper
+
+  RELEASE_FINISH_UNDER_TEST="$RACE_RELEASE_FINISH" run_rf close-out 1.0.0 --yes
+
+  assert_status 1 "$RF_STATUS" "close-out source-race status"
+  assert_contains "$RF_OUT" "All source and changelog forward-port work is complete on main" \
+    "close-out source-race precondition"
+  assert_contains "$RF_OUT" "origin/release/1.0.0 changed after the forward-port checks" \
+    "close-out source-race guard"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out source-race no delete"
+  if ! git ls-remote --heads "$PWD/../origin.git" release/1.0.0 | grep -q release/1.0.0; then
+    fail "source advancement after checks deleted the release branch"
   fi
 }
 
@@ -671,7 +734,7 @@ RUBY
   assert_status 1 "$RF_STATUS" "close-out confirmation-window race status"
   assert_contains "$RF_OUT" "Delete release/1.0.0 on origin now?" "close-out confirmation-window prompt"
   assert_contains "$RF_OUT" "local main is not in sync with origin/main" "close-out confirmation-window race guard"
-  assert_not_contains "$RF_OUT" "git push origin --delete release/1.0.0" "close-out confirmation-window no delete"
+  assert_not_contains "$RF_OUT" "git push --atomic" "close-out confirmation-window no delete"
   if ! git ls-remote --heads "$origin" release/1.0.0 | grep -q release/1.0.0; then
     fail "confirmation-window remote advancement deleted the release branch"
   fi
@@ -798,6 +861,7 @@ run_test test_close_out_propagates_verifier_errors
 run_test test_close_out_aborts_when_local_main_behind_origin
 run_test test_close_out_dry_run_fetches_before_main_sync_check
 run_test test_close_out_aborts_if_remote_main_advances_after_checks
+run_test test_close_out_aborts_if_source_advances_after_checks
 run_test test_close_out_aborts_if_remote_main_advances_during_confirmation
 run_test test_close_out_aborts_with_an_empty_cherry_pick_in_progress
 run_test test_close_out_aborts_when_not_on_main

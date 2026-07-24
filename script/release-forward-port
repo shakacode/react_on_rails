@@ -97,7 +97,8 @@ class ReleaseForwardPort
       only: nil,
       all: false,
       target: "main",
-      changelog: false
+      changelog: false,
+      ack_final_changelog_source: nil
     }
     @parser = build_parser
   end
@@ -113,7 +114,9 @@ class ReleaseForwardPort
     validate_mode_options!
     normalize_selected_sha!
     normalize_acknowledged_manual_shas!
+    normalize_acknowledged_changelog_source_sha!
     ensure_local_target_branch!(target) unless read_only_mode?
+    ensure_no_cherry_pick_in_progress! if @options[:check]
 
     return run_changelog_reconciliation(source, target) if @options[:changelog]
 
@@ -146,10 +149,7 @@ class ReleaseForwardPort
 
     print_plan(source, target, target_version, plan)
 
-    if @options[:check]
-      ensure_no_cherry_pick_in_progress!
-      return check_code_plan(plan)
-    end
+    return check_code_plan(plan) if @options[:check]
 
     if @options[:dry_run]
       puts "\nDRY RUN: no branches were checked out and no commits were cherry-picked."
@@ -217,6 +217,7 @@ class ReleaseForwardPort
       add_execution_options(parser)
       add_changelog_option(parser)
       add_ack_manual_option(parser)
+      add_ack_final_changelog_source_option(parser)
       parser.on("-h", "--help", "Show this help") do
         puts parser
         exit 0
@@ -284,6 +285,15 @@ class ReleaseForwardPort
     end
   end
 
+  def add_ack_final_changelog_source_option(parser)
+    parser.on(
+      "--ack-final-changelog-source SHA",
+      "Acknowledge the current source CHANGELOG.md commit for a legacy authoritative changelog PR"
+    ) do |sha|
+      @options[:ack_final_changelog_source] = sha
+    end
+  end
+
   def validate_mode_options!
     validate_read_only_options!
     validate_code_selection_options!
@@ -298,6 +308,9 @@ class ReleaseForwardPort
 
   def validate_code_selection_options!
     raise UsageError, "--only and --all cannot be used together" if @options[:only] && @options[:all]
+    if @options[:ack_final_changelog_source] && !@options[:changelog]
+      raise UsageError, "--ack-final-changelog-source requires --changelog"
+    end
     return unless @options[:changelog] && code_selection_requested?
 
     raise UsageError, "--only/--all select code commits and cannot be combined with --changelog"
@@ -571,6 +584,13 @@ class ReleaseForwardPort
     stable_sha = later_stable_package_pin_commit(sha, match[:package], match[:stable_version], target)
     return unless stable_sha
 
+    unless cumulative_prerelease_package_state_present_on_target?(sha, stable_sha, target)
+      return manual_skip_reason(
+        "later stable source commit #{stable_sha[0, 12]} is present on #{target}, but the cumulative state of the " \
+        "prerelease commit's paths differs; inspect those paths before acknowledging this supersession"
+      )
+    end
+
     "prerelease package pin is superseded by later stable source commit #{stable_sha[0, 12]} already present on " \
       "#{target}"
   end
@@ -588,6 +608,13 @@ class ReleaseForwardPort
       later_paths = changed_paths_for_commit(later_sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
       (superseded_paths - later_paths).empty? && source_commit_provenance_present_on_target?(later_sha, target)
     end
+  end
+
+  def cumulative_prerelease_package_state_present_on_target?(sha, stable_sha, target)
+    paths = changed_paths_for_commit(sha) - [CHANGELOG_FILE] - GENERATED_LLM_FILES
+    return false if paths.empty?
+
+    !diff_changes_paths?(stable_sha, target, paths)
   end
 
   def source_commit_provenance_present_on_target?(sha, target)
@@ -1436,7 +1463,8 @@ class ReleaseForwardPort
   def authoritative_final_changelog_commit(source, target, target_changelog, release_version)
     return unless release_version
 
-    source_time = git("show", "-s", "--format=%ct", source).to_i
+    source_changelog_sha = latest_changelog_commit(source)
+    validate_acknowledged_changelog_source!(source_changelog_sha)
     subject_pattern =
       /\ARecord the final React on Rails #{Regexp.escape(release_version)} changelog \(#\d+\)\z/
     candidates =
@@ -1453,10 +1481,34 @@ class ReleaseForwardPort
       next false unless subject_for_commit(sha)&.match?(subject_pattern)
       next false unless changed_paths_for_commit(sha) == [CHANGELOG_FILE]
       next false unless target_commit_live_on_target?(sha, target)
-      next false if git("show", "-s", "--format=%ct", sha).to_i < source_time
+      next false unless authoritative_changelog_source_bound?(sha, source_changelog_sha)
 
       authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
     end
+  end
+
+  def latest_changelog_commit(source)
+    sha = git("log", "-1", "--format=%H", source, "--", CHANGELOG_FILE).strip
+    raise GitError, "#{source} has no #{CHANGELOG_FILE} history to bind the final changelog authority" if sha.empty?
+
+    sha
+  end
+
+  def authoritative_changelog_source_bound?(authoritative_sha, source_changelog_sha)
+    return true if @acknowledged_changelog_source_sha == source_changelog_sha
+
+    exact_sentence =
+      "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+    git("show", "-s", "--format=%B", authoritative_sha).lines.any? { |line| line.strip == exact_sentence }
+  end
+
+  def validate_acknowledged_changelog_source!(source_changelog_sha)
+    return unless @acknowledged_changelog_source_sha
+    return if @acknowledged_changelog_source_sha == source_changelog_sha
+
+    raise UsageError,
+          "--ack-final-changelog-source resolves to #{@acknowledged_changelog_source_sha}, but the current source " \
+          "CHANGELOG.md commit is #{source_changelog_sha}; inspect the newer changelog before acknowledging it"
   end
 
   def authoritative_changelog_section_unchanged?(sha, target_changelog, release_version)
@@ -1713,6 +1765,15 @@ class ReleaseForwardPort
     rescue GitError => e
       raise UsageError, "--ack-manual #{sha.inspect} is not a commit: #{e.message}"
     end.uniq
+  end
+
+  def normalize_acknowledged_changelog_source_sha!
+    sha = @options[:ack_final_changelog_source]
+    return unless sha
+
+    @acknowledged_changelog_source_sha = git("rev-parse", "--verify", "#{sha}^{commit}").strip
+  rescue GitError => e
+    raise UsageError, "--ack-final-changelog-source #{sha.inspect} is not a commit: #{e.message}"
   end
 
   def validate_acknowledged_manual_shas!(plan)

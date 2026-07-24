@@ -302,7 +302,7 @@ RSpec.describe "script/release-forward-port" do
         "#### Changed\n\n- Intermediate prerelease behavior. (PR #100)\n" \
         "- Final shipped behavior. (PR #101)\n"
       )
-      commit_all(repo, "Stamp final changelog")
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
       git(repo, "checkout", "main")
 
       write_file(
@@ -311,7 +311,17 @@ RSpec.describe "script/release-forward-port" do
         "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n" \
         "#### Changed\n\n- Final shipped behavior, consolidated after review. (PR #101)\n"
       )
-      authoritative_sha = commit_all(repo, "Record the final React on Rails 1.0.1 changelog (#999)")
+      git(repo, "add", "CHANGELOG.md")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Record the final React on Rails 1.0.1 changelog (#999)",
+        "-m",
+        "The final changelog records source CHANGELOG.md commit `#{source_changelog_sha}`."
+      )
+      authoritative_sha = git(repo, "rev-parse", "HEAD").strip
 
       stdout, stderr, status =
         run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
@@ -332,6 +342,70 @@ RSpec.describe "script/release-forward-port" do
 
       expect(status.exitstatus).to eq(1)
       expect(stderr).to include("CHECK FAILED")
+    end
+  end
+
+  it "requires source-SHA provenance for a dedicated final changelog PR" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Release fix.\n"
+      )
+      source_changelog_sha = commit_all(repo, "Stamp final changelog")
+      git(repo, "checkout", "main")
+
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Consolidated fix.\n"
+      )
+      commit_all(repo, "Record the final React on Rails 1.0.1 changelog (#999)")
+
+      _stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--changelog", "--check")
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+
+      stdout, stderr, status =
+        run_script(
+          repo,
+          "--source",
+          "release/1.0.1",
+          "--target",
+          "main",
+          "--changelog",
+          "--check",
+          "--ack-final-changelog-source",
+          source_changelog_sha
+        )
+      expect(status).to be_success, stderr
+      expect(stdout).to include("Authoritative final 1.0.1 changelog is unchanged")
+
+      git(repo, "checkout", "release/1.0.1")
+      write_file(
+        repo,
+        "CHANGELOG.md",
+        "# Change Log\n\n### [Unreleased]\n\n### [1.0.1] - 2026-07-24\n\n#### Fixed\n\n- Corrected release fix.\n"
+      )
+      commit_all(repo, "Correct final changelog")
+      git(repo, "checkout", "main")
+
+      _stdout, stderr, status =
+        run_script(
+          repo,
+          "--source",
+          "release/1.0.1",
+          "--target",
+          "main",
+          "--changelog",
+          "--check",
+          "--ack-final-changelog-source",
+          source_changelog_sha
+        )
+      expect(status.exitstatus).to eq(2)
+      expect(stderr).to include("current source CHANGELOG.md commit")
     end
   end
 
@@ -461,6 +535,39 @@ RSpec.describe "script/release-forward-port" do
       expect(stdout).to include("SKIP #{prerelease_sha[0, 12]} Update Widget package pin to 2.0.0-rc.1 (#10)")
       expect(stdout).to include("prerelease package pin is superseded by later stable source commit")
       expect(stdout).not_to include("PICK #{prerelease_sha[0, 12]}")
+    end
+  end
+
+  it "requires manual inspection when a stable forward-port lacks cumulative prerelease state" do
+    with_release_repo do |repo|
+      git(repo, "checkout", "-b", "release/1.0.1")
+      write_file(repo, "package.txt", "widget=2.0.0-rc.1\nmode=new\n")
+      prerelease_sha = commit_all(repo, "Update Widget package pin to 2.0.0-rc.1 (#10)")
+      write_file(repo, "package.txt", "widget=2.0.0\nmode=new\n")
+      stable_sha = commit_all(repo, "Adopt stable Widget 2.0.0 (#11)")
+
+      git(repo, "checkout", "main")
+      write_file(repo, "package.txt", "widget=2.0.0\nmode=old\n")
+      git(repo, "add", "package.txt")
+      git(
+        repo,
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Forward-port stable Widget (#12)",
+        "-m",
+        "- cherry-picked the merged #11 squash commit with `git cherry-pick -x`\n\n" \
+        "(cherry picked from commit #{stable_sha})"
+      )
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "release/1.0.1", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(1)
+      expect(stderr).to include("CHECK FAILED")
+      expect(stdout).to include("MANUAL #{prerelease_sha[0, 12]}")
+      expect(stdout).to include("cumulative state of the prerelease commit's paths differs")
+      expect(stdout).not_to include("SKIP #{prerelease_sha[0, 12]}")
     end
   end
 
@@ -608,6 +715,13 @@ RSpec.describe "script/release-forward-port" do
       expect(git(repo, "status", "--porcelain")).to eq("")
 
       stdout, stderr, status = run_script(repo, "--source", "main", "--target", "main", "--check")
+
+      expect(status.exitstatus).to eq(3)
+      expect(stdout).not_to include("CHECK PASSED")
+      expect(stderr).to include("a cherry-pick is already in progress")
+
+      stdout, stderr, status =
+        run_script(repo, "--source", "main", "--target", "main", "--changelog", "--check")
 
       expect(status.exitstatus).to eq(3)
       expect(stdout).not_to include("CHECK PASSED")
