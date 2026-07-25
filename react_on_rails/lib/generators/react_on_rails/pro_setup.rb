@@ -33,6 +33,32 @@ module ReactOnRails
       AUTO_INSTALL_TIMEOUT = 120
       TERMINATION_GRACE_PERIOD = 5
 
+      # Loader helpers emitted by
+      # templates/base/base/config/webpack/serverWebpackConfig.js.tt.
+      #
+      # Keep both blocks byte-identical to that template: a fresh `--pro` install renders
+      # the template while a standalone Pro upgrade patches an existing base config, and
+      # the two must produce the same source text so drift is detectable (issue #4786).
+      GET_LOADER_PATH_JS = <<~JS
+        // Normalizes an entry of a webpack/rspack `rule.use` array to its loader path.
+        // Entries may be a bare string, a `{ loader, options }` object, or null.
+        function getLoaderPath(item) {
+          if (typeof item === 'string') return item;
+          if (item && typeof item.loader === 'string') return item.loader;
+          return '';
+        }
+      JS
+
+      EXTRACT_LOADER_JS = <<~JS
+        function extractLoader(rule, loaderName) {
+          if (!Array.isArray(rule.use)) return null;
+          return rule.use.find((item) => getLoaderPath(item).includes(loaderName));
+        }
+      JS
+
+      BUNDLER_REQUIRE_PATTERN =
+        %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)}
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -488,25 +514,19 @@ module ReactOnRails
         # Skip if extractLoader already exists
         return if content.include?("function extractLoader")
 
-        extract_loader_code = <<~JS.chomp
-
-
-          function extractLoader(rule, loaderName) {
-            if (!Array.isArray(rule.use)) return null;
-            return rule.use.find((item) => {
-              if (!item) return false;
-              const testValue = typeof item === 'string' ? item : (typeof item.loader === 'string' ? item.loader : '');
-              return testValue.includes(loaderName);
-            });
-          }
-        JS
-
-        # Insert after bundler require line
-        gsub_file(
-          webpack_config,
-          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
-          "\\1#{extract_loader_code}"
-        )
+        if content.include?(GET_LOADER_PATH_JS)
+          # Config rendered by the current base template: append extractLoader directly after
+          # the shared getLoaderPath helper so the result matches the template's Pro output.
+          gsub_file(webpack_config, GET_LOADER_PATH_JS, "#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}")
+        else
+          # Base config generated before getLoaderPath existed (or one whose helper was edited):
+          # emit both helpers after the bundler require so extractLoader's dependency is present.
+          gsub_file(
+            webpack_config,
+            BUNDLER_REQUIRE_PATTERN,
+            "\\1\n\n#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}".chomp
+          )
+        end
       end
 
       def add_babel_ssr_caller_to_server_config(webpack_config, content)

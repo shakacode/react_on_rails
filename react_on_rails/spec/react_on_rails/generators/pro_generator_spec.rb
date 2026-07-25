@@ -1671,6 +1671,25 @@ describe ProGenerator, type: :generator do
         end
       end
 
+      it "emits the same extractLoader source text as a fresh Pro install renders" do
+        # A fresh `rails g react_on_rails:install --pro` renders the template while this
+        # standalone upgrade patches an existing base config. Both must produce identical
+        # source text so the two paths cannot drift unnoticed (issue #4786).
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+        end
+      end
+
+      it "reuses the getLoaderPath helper already present in the base config" do
+        assert_file "config/webpack/serverWebpackConfig.js" do |content|
+          expect(content).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+          expect(content.scan("function getLoaderPath(item) {").size).to eq(1)
+          expect(content).to match(
+            /function getLoaderPath\(item\) \{.*?\n\}\n\nfunction extractLoader\(rule, loaderName\) \{/m
+          )
+        end
+      end
+
       it "enables libraryTarget commonjs2" do
         assert_file "config/webpack/serverWebpackConfig.js" do |content|
           expect(content).to include("libraryTarget: 'commonjs2',")
@@ -1710,6 +1729,39 @@ describe ProGenerator, type: :generator do
           expect(content).to include("{ default: serverWebpackConfig }")
           expect(content).not_to match(/^const serverWebpackConfig = require/)
         end
+      end
+    end
+  end
+
+  # Upgrade path for apps installed before the shared getLoaderPath helper existed:
+  # the emitted extractLoader calls it, so ProSetup must supply it too.
+  context "when prerequisites are met on a base install predating the getLoaderPath helper" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_legacy_base_webpack_files
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "adds getLoaderPath alongside extractLoader so the emitted helper call resolves" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+        expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+        expect(content.scan("function getLoaderPath(item) {").size).to eq(1)
+        expect(content).to match(
+          /function getLoaderPath\(item\) \{.*?\n\}\n\nfunction extractLoader\(rule, loaderName\) \{/m
+        )
       end
     end
   end
