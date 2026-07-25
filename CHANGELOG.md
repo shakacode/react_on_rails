@@ -244,6 +244,15 @@ pair`, returns invalid UTF-8, or silently mis-decodes the value. The parser now 
   [PR 4579](https://github.com/shakacode/react_on_rails/pull/4579) by
   [alexeyr-ci2](https://github.com/alexeyr-ci2).
 
+- **Generated `serverWebpackConfig.js` shares a single loader-path helper**: New installs emit one
+  `getLoaderPath(item)` function instead of repeating the same loader-path expression in four places, and a
+  standalone Pro upgrade now writes the same `extractLoader` source text that a fresh `--pro` install renders
+  instead of an equivalent variant. Behavior is unchanged, but regenerating
+  `config/webpack/serverWebpackConfig.js` produces a smaller, deduplicated file. Fixes
+  [Issue 4786](https://github.com/shakacode/react_on_rails/issues/4786).
+  [PR 4788](https://github.com/shakacode/react_on_rails/pull/4788) by
+  [justin808](https://github.com/justin808).
+
 ### [17.0.0] - 2026-07-16
 
 #### Breaking Changes
