@@ -175,10 +175,17 @@ module GeneratorTransformAnchors
   BASE_MODULE_EXPORTS = /^module\.exports = configureServer;\s*$/
   CONFIGURE_SERVER_SIGNATURE = /^const configureServer = \(\) => \{/
 
-  # Not a gsub pattern: the scope the babel-caller insertion lands in. `extractLoader(rule, …)`
-  # only works if the css-module block sits inside a rule-bound, array-guarded loop.
+  # Not gsub patterns: the scope the babel-caller insertion lands in. `extractLoader(rule, …)`
+  # only works if the css-module block sits inside a rule-bound, array-guarded loop. These are
+  # used for real block-range matching, never for comparing byte offsets — see
+  # GeneratorJsStructure for why offsets are not sufficient.
   RULES_FOREACH = /rules\.forEach\(\(rule\) => \{/
   RULE_USE_ARRAY_GUARD = /if \(Array\.isArray\(rule\.use\)\) \{/
+
+  # What ProSetup#add_babel_ssr_caller_to_server_config inserts, and the marker its own
+  # read-back check looks for.
+  BABEL_CALLER_INSERTION = "const babelLoader = extractLoader(rule, 'babel-loader');"
+  BABEL_CALLER_MARKER = "babelLoader.options.caller = { ssr: true }"
 
   # The export shape update_server_config_exports writes, which RscSetup's
   # ServerClientOrBoth import rewrite then assumes.
@@ -258,6 +265,125 @@ module GeneratorTransformAnchors
   end
 end
 
+# Minimal brace matcher for the generated JS, used to prove real block *nesting*.
+#
+# An earlier version of this spec compared byte offsets (`rules.forEach` appears before
+# `Array.isArray(rule.use)` appears before the css-module block). That is only a proxy, and a
+# weak one: a template refactor that CLOSES the forEach or the array guard before the
+# css-module block leaves all three tokens in the same relative order, so the offset check
+# still passes while the Pro transform inserts `extractLoader(rule, …)` at a point where
+# `rule` is out of scope. That matters most for the simulation fixtures, which are allowed to
+# drift from current output — a fixture could keep satisfying token order while no longer
+# representing a structure the transform can operate on, which is the exact drift class #4787
+# exists to close. So nesting is verified structurally instead.
+module GeneratorJsStructure
+  module_function
+
+  # Range covering the block opened by the first `{` at or after `pattern`, or nil.
+  def block_range(content, pattern)
+    start = content.index(pattern)
+    return nil unless start
+
+    open_index = content.index("{", start)
+    return nil unless open_index
+
+    close_index = matching_brace(content, open_index)
+    return nil unless close_index
+
+    (open_index..close_index)
+  end
+
+  QUOTES = ["'", '"', "`"].freeze
+
+  # Index of the `}` matching the `{` at open_index, skipping braces that appear inside
+  # comments and string literals (the generated config has both, including a template
+  # literal containing `${serverBundleOutputPath}`).
+  def matching_brace(content, open_index)
+    depth = 0
+    index = open_index
+
+    while index < content.length
+      skipped = skip_non_code(content, index)
+      if skipped
+        index = skipped
+        next
+      end
+
+      case content[index]
+      when "{"
+        depth += 1
+      when "}"
+        depth -= 1
+        return index if depth.zero?
+      end
+      index += 1
+    end
+
+    nil
+  end
+
+  # Index just past the comment or string literal starting at `index`, or nil when `index`
+  # is ordinary code. Always advances, so callers cannot spin.
+  def skip_non_code(content, index)
+    return content.index("\n", index) || content.length if line_comment?(content, index)
+    return (content.index("*/", index + 2) || content.length) + 2 if block_comment?(content, index)
+    return end_of_string(content, index) if QUOTES.include?(content[index])
+
+    nil
+  end
+
+  def line_comment?(content, index)
+    content[index] == "/" && content[index + 1] == "/"
+  end
+
+  def block_comment?(content, index)
+    content[index] == "/" && content[index + 1] == "*"
+  end
+
+  # Index just past the closing quote. Backtick strings are treated as opaque through to the
+  # closing backtick, which is correct here because no template literal in these files nests
+  # another backtick.
+  def end_of_string(content, start)
+    quote = content[start]
+    index = start + 1
+
+    while index < content.length
+      return index + 1 if content[index] == quote
+
+      index += content[index] == "\\" ? 2 : 1
+    end
+
+    content.length
+  end
+end
+
+# Drives the real standalone Pro transforms over arbitrary config content, so the spec tests
+# what ProSetup actually does to a file rather than asserting on a proxy for it.
+module GeneratorProTransform
+  module_function
+
+  RELATIVE_CONFIG = "config/webpack/serverWebpackConfig.js"
+
+  # Applies ProSetup's two rule-scope-sensitive transforms and returns the patched file.
+  def apply(content)
+    Dir.mktmpdir("ror-pro-transform") do |destination|
+      path = File.join(destination, RELATIVE_CONFIG)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+
+      generator = ReactOnRails::Generators::ProGenerator.new([], {}, { destination_root: destination })
+      generator.instance_variable_set(:@shell, Thor::Shell::Basic.new)
+
+      GeneratorGoldenOutput.silence_output do
+        generator.__send__(:add_extract_loader_to_server_config, RELATIVE_CONFIG, content)
+        generator.__send__(:add_babel_ssr_caller_to_server_config, RELATIVE_CONFIG, File.read(path))
+      end
+
+      File.read(path)
+    end
+  end
+end
+
 # Regenerate before the examples run so a regeneration run also asserts the round trip:
 # a green run proves the command reproduces exactly what is checked in.
 if GeneratorGoldenOutput.regenerating?
@@ -279,6 +405,24 @@ RSpec.describe "generator golden output", type: :generator do
         expect(actual).to eq(expected),
                           -> { GeneratorGoldenOutput.mismatch_message(variant, actual, expected) }
       end
+    end
+
+    it "has exactly one golden file per variant and no orphans on disk" do
+      # regenerate! overwrites the current matrix but deliberately does not delete anything, so
+      # a variant that was removed or renamed in VARIANTS would leave a stale directory behind
+      # that reads as authoritative while no example covers it. Failing loudly here is better
+      # than silently deleting a file someone added on purpose. This also catches a changed
+      # bundler destination mapping, since the expected paths are derived from it.
+      on_disk = Dir.glob("#{GeneratorGoldenOutput::GOLDEN_ROOT}/**/*.js")
+                   .map { |path| path.sub("#{GeneratorGoldenOutput::GOLDEN_ROOT}/", "") }
+                   .sort
+      expected = GeneratorGoldenOutput::VARIANTS
+                 .map { |variant| File.join(variant[:name], GeneratorGoldenOutput.relative_path(variant)) }
+                 .sort
+
+      expect(on_disk).to eq(expected),
+                         "golden files on disk do not match VARIANTS. Orphans are stale variants that were " \
+                         "removed or renamed; delete them by hand after confirming they are unused."
     end
 
     it "emits identical output for webpack and rspack when RSC is off" do
@@ -351,21 +495,34 @@ RSpec.describe "generator golden output", type: :generator do
       end
     end
 
-    it "keeps the css-module anchor inside a rule-bound, array-guarded rule.use loop" do
-      # add_babel_ssr_caller_to_server_config inserts `extractLoader(rule, 'babel-loader')`
-      # immediately after the css-module block. That inserted code only works if the block sits
-      # inside `rules.forEach((rule) => { if (Array.isArray(rule.use)) { … } })`, which is the
-      # real contract behind the "rule.use filter loops" anchor.
-      { "golden webpack_base" => GeneratorGoldenOutput.golden("webpack_base"),
-        "base_server_webpack_content" => base_server_webpack_content }.each do |label, content|
-        rules_loop = content.index(GeneratorTransformAnchors::RULES_FOREACH)
-        array_guard = content.index(GeneratorTransformAnchors::RULE_USE_ARRAY_GUARD)
-        css_modules = content.index(GeneratorTransformAnchors::CSS_LOADER_MODULES_BLOCK)
+    # Runs the REAL standalone Pro transform over each target and checks where its output
+    # landed. Token ordering is not enough: closing the forEach or the array guard early
+    # keeps the tokens in order while putting `rule` out of scope at the insertion point.
+    # See GeneratorJsStructure for the full rationale.
+    {
+      "golden webpack_base" => -> { GeneratorGoldenOutput.golden("webpack_base") },
+      "base_server_webpack_content" => -> { base_server_webpack_content }
+    }.each do |label, source|
+      it "inserts the Pro babel caller inside the rule scope when transforming #{label}" do
+        patched = GeneratorProTransform.apply(instance_exec(&source))
 
-        expect([rules_loop, array_guard, css_modules]).to all(be_a(Integer)),
-                                                          "#{label} is missing part of the rule.use loop structure"
-        expect(rules_loop).to be < array_guard, "#{label}: Array.isArray(rule.use) guard is outside rules.forEach"
-        expect(array_guard).to be < css_modules, "#{label}: css-module block is outside the rule.use guard"
+        expect(patched).to include(GeneratorTransformAnchors::BABEL_CALLER_MARKER),
+                           "the Pro babel transform did not apply to #{label} at all"
+
+        insertion = patched.index(GeneratorTransformAnchors::BABEL_CALLER_INSERTION)
+        expect(insertion).to be_a(Integer), "#{label}: could not locate the inserted extractLoader call"
+
+        rules_loop = GeneratorJsStructure.block_range(patched, GeneratorTransformAnchors::RULES_FOREACH)
+        array_guard = GeneratorJsStructure.block_range(patched, GeneratorTransformAnchors::RULE_USE_ARRAY_GUARD)
+
+        expect(rules_loop).to be_a(Range), "#{label}: could not find a balanced rules.forEach block"
+        expect(array_guard).to be_a(Range), "#{label}: could not find a balanced Array.isArray(rule.use) block"
+        expect(rules_loop).to cover(insertion),
+                              "#{label}: the inserted extractLoader(rule, …) call is OUTSIDE rules.forEach, " \
+                              "so `rule` is not in scope and the generated config is broken"
+        expect(array_guard).to cover(insertion),
+                               "#{label}: the inserted extractLoader(rule, …) call is OUTSIDE the " \
+                               "Array.isArray(rule.use) guard, so rule.use may not be an array"
       end
     end
 
