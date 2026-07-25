@@ -306,6 +306,8 @@ def base_server_webpack_content
     const configureServer = () => {
       const serverWebpackConfig = commonWebpackConfig();
 
+      const serverBundleOutputPath = require('path').resolve(__dirname, '../../ssr-generated');
+
       serverWebpackConfig.output = {
         filename: 'server-bundle.js',
         globalObject: 'this',
@@ -372,6 +374,8 @@ def legacy_base_server_webpack_content_pre_get_loader_path
 
     const configureServer = () => {
       const serverWebpackConfig = commonWebpackConfig();
+
+      const serverBundleOutputPath = require('path').resolve(__dirname, '../../ssr-generated');
 
       serverWebpackConfig.output = {
         filename: 'server-bundle.js',
