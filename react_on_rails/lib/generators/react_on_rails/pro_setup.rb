@@ -59,6 +59,12 @@ module ReactOnRails
       BUNDLER_REQUIRE_PATTERN =
         %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)}
 
+      # Matches any declaration of the getLoaderPath symbol, however it is written. The
+      # emitted extractLoader calls getLoaderPath, so we must never add a second
+      # declaration: `function` next to an existing `const` is a SyntaxError, not a
+      # silent shadow, and the generated config would fail to parse in Node.
+      GET_LOADER_PATH_DECLARATION = /(?:function\s+getLoaderPath\s*\(|(?:const|let|var)\s+getLoaderPath\s*=)/
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -518,9 +524,15 @@ module ReactOnRails
           # Config rendered by the current base template: append extractLoader directly after
           # the shared getLoaderPath helper so the result matches the template's Pro output.
           gsub_file(webpack_config, GET_LOADER_PATH_JS, "#{GET_LOADER_PATH_JS}\n#{EXTRACT_LOADER_JS}")
+        elsif content.match?(GET_LOADER_PATH_DECLARATION)
+          # The app already declares getLoaderPath but has customized it (reformatted, recommented,
+          # or rewritten as an arrow function). Reuse whatever is there and emit extractLoader only.
+          # Emitting our own copy would redeclare the identifier, which is a SyntaxError next to an
+          # existing const/let and silent shadowing next to another function declaration.
+          gsub_file(webpack_config, BUNDLER_REQUIRE_PATTERN, "\\1\n\n#{EXTRACT_LOADER_JS}".chomp)
         else
-          # Base config generated before getLoaderPath existed (or one whose helper was edited):
-          # emit both helpers after the bundler require so extractLoader's dependency is present.
+          # Base config generated before getLoaderPath existed: emit both helpers after the
+          # bundler require so extractLoader's dependency is present.
           gsub_file(
             webpack_config,
             BUNDLER_REQUIRE_PATTERN,

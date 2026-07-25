@@ -1733,6 +1733,40 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  # Upgrade path for apps that already declare getLoaderPath but have customized it. Redeclaring
+  # the identifier would be a SyntaxError next to the app's const, so the transform must reuse it.
+  context "when prerequisites are met on a base install with a customized getLoaderPath helper" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_customized_base_webpack_files
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "reuses the customized helper instead of emitting a second getLoaderPath declaration" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        # Counted via the declaration matcher, so a redeclaration is caught whether it is
+        # emitted as `function getLoaderPath(` or as `const getLoaderPath =`.
+        declarations = content.scan(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_DECLARATION)
+        expect(declarations.size).to eq(1)
+        expect(content).to include("const getLoaderPath = (item) =>")
+        expect(content).not_to include(ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS)
+        expect(content).to include(ReactOnRails::Generators::ProSetup::EXTRACT_LOADER_JS)
+      end
+    end
+  end
+
   # Upgrade path for apps installed before the shared getLoaderPath helper existed:
   # the emitted extractLoader calls it, so ProSetup must supply it too.
   context "when prerequisites are met on a base install predating the getLoaderPath helper" do

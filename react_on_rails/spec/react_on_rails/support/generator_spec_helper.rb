@@ -210,6 +210,14 @@ def simulate_legacy_base_webpack_files
                          server_client_or_both_content(destructured_import: false))
 end
 
+# Simulates a base install whose getLoaderPath helper the app owner has rewritten.
+# Used to verify the Pro upgrade reuses an existing declaration instead of redeclaring it.
+def simulate_customized_base_webpack_files
+  simulate_existing_file("config/webpack/serverWebpackConfig.js", customized_base_server_webpack_content)
+  simulate_existing_file("config/webpack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+end
+
 # Simulates Pro-transformed webpack configs (after Pro generator, before RSC).
 # Contains extractLoader, object exports, destructured imports — all RSC patterns target these.
 # Used by RSC generator tests to verify standalone upgrade transforms.
@@ -333,6 +341,20 @@ def base_server_webpack_content
 
     module.exports = configureServer;
   JS
+end
+
+# A base install whose getLoaderPath helper has been customized by the app owner.
+# Declared as a const arrow function rather than the template's function declaration, so a
+# second emitted `function getLoaderPath` would be a SyntaxError (identifier already declared),
+# not silent shadowing. The Pro upgrade must reuse this declaration.
+def customized_base_server_webpack_content
+  base_server_webpack_content.sub(
+    ReactOnRails::Generators::ProSetup::GET_LOADER_PATH_JS,
+    <<~JS
+      // Project-specific loader path normalization.
+      const getLoaderPath = (item) => (typeof item === 'string' ? item : (item && item.loader) || '');
+    JS
+  )
 end
 
 # A base install generated before the shared getLoaderPath helper was extracted.
